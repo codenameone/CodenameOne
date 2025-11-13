@@ -23,6 +23,7 @@
  */
 package com.codename1.ui.html;
 
+import com.codename1.io.Log;
 import com.codename1.ui.Component;
 import com.codename1.ui.List;
 import com.codename1.ui.TextArea;
@@ -50,7 +51,7 @@ public class DefaultHTMLCallback implements HTMLCallback {
      * {{@inheritDoc}}
      */
     public boolean parsingError(int errorId, String tag, String attribute, String value, String description) {
-        System.out.println(description);
+        Log.p(description);
         return true; // Signals the parser to continue parsing despite of the error (if it is a recoverable error)
     }
 

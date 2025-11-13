@@ -1944,10 +1944,10 @@ public final class GeneralPath implements Shape {
                                         out.lineTo(prevX, y2);
                                         out.lineTo(buf[0], buf[1]);
                                     } else {
-                                        System.out.println("buf=" + Arrays.toString(buf));
-                                        System.out.println("Curve: " + curve);
-                                        System.out.println("Rect: " + rect2D);
-                                        System.out.println("type: " + type);
+                                        Log.p("buf=" + Arrays.toString(buf));
+                                        Log.p("Curve: " + curve);
+                                        Log.p("Rect: " + rect2D);
+                                        Log.p("type: " + type);
                                         throw new RuntimeException("Unexpected shape segmentation on curve-");
                                     }
 

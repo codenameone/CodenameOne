@@ -1211,7 +1211,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public InputStream openInputStream(Object connection) {
-        return ((TestConnection) connection).openInputStream();
+        if (connection instanceof TestConnection) {
+            return ((TestConnection) connection).openInputStream();
+        }
+        return null;
     }
 
     @Override

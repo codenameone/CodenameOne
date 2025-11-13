@@ -1,6 +1,7 @@
 package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
+import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Command;
 import com.codename1.ui.layouts.BorderLayout;
@@ -24,56 +25,69 @@ class SideMenuBarTest extends UITestBase {
 
     @FormTest
     void addingCommandsIncrementsCount() {
-        implementation.setBuiltinSoundsEnabled(false);
-        Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
+        TestLogger.install();
+        try {
+            implementation.setBuiltinSoundsEnabled(false);
+            Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
 
-        Form form = Display.getInstance().getCurrent();
-        form.setLayout(new BorderLayout());
-        SideMenuBar sideMenu = new SideMenuBar();
-        form.setMenuBar(sideMenu);
-        form.show();
-        form.getAnimationManager().flush();
-        flushSerialCalls();
+            Form form = Display.getInstance().getCurrent();
+            form.setLayout(new BorderLayout());
+            SideMenuBar sideMenu = new SideMenuBar();
+            form.setMenuBar(sideMenu);
+            form.show();
+            form.getAnimationManager().flush();
+            flushSerialCalls();
 
-        int initialCount = form.getCommandCount();
-        Command cmd = new Command("Item");
-        form.addCommand(cmd);
-        form.revalidate();
-        form.getAnimationManager().flush();
-        flushSerialCalls();
+            int initialCount = form.getCommandCount();
+            Command cmd = new Command("Item");
+            form.addCommand(cmd);
+            form.revalidate();
+            form.getAnimationManager().flush();
+            flushSerialCalls();
 
-        assertEquals(initialCount + 1, form.getCommandCount(), "Command count should increase after adding a command");
-        assertTrue(formContainsCommand(form, cmd), "Form should report the newly added command");
+            assertEquals(initialCount + 1, form.getCommandCount(), "Command count should increase after adding a command");
+            assertTrue(formContainsCommand(form, cmd), "Form should report the newly added command");
 
-        form.removeCommand(cmd);
-        form.revalidate();
+            form.removeCommand(cmd);
+            form.revalidate();
 
-        form.getAnimationManager().flush();
+            form.getAnimationManager().flush();
 
-        flushSerialCalls();
-        assertEquals(initialCount, form.getCommandCount(), "Removing the command should restore original count");
-        assertFalse(formContainsCommand(form, cmd), "Form should no longer contain removed command");
+            flushSerialCalls();
+            assertEquals(initialCount, form.getCommandCount(), "Removing the command should restore original count");
+            assertFalse(formContainsCommand(form, cmd), "Form should no longer contain removed command");
+            assertEquals(1, TestLogger.getPrinted().size());
+            assertTrue(TestLogger.getPrinted().get(0).contains("WARNING: Display.setCommandBehavior() is deprecated"));
+        } finally {
+            TestLogger.remove();
+        }
     }
 
     @FormTest
     void closeCurrentMenuRunsCallbackWhenNoMenuShowing() {
-        implementation.setBuiltinSoundsEnabled(false);
-        Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
+        TestLogger.install();
+        try {
+            implementation.setBuiltinSoundsEnabled(false);
+            Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
 
-        Form form = Display.getInstance().getCurrent();
-        form.setLayout(new BorderLayout());
-        SideMenuBar sideMenu = new SideMenuBar();
-        form.setMenuBar(sideMenu);
-        form.show();
-        form.getAnimationManager().flush();
+            Form form = Display.getInstance().getCurrent();
+            form.setLayout(new BorderLayout());
+            SideMenuBar sideMenu = new SideMenuBar();
+            form.setMenuBar(sideMenu);
+            form.show();
+            form.getAnimationManager().flush();
 
+            final boolean[] invoked = {false};
+            SideMenuBar.closeCurrentMenu(() -> invoked[0] = true);
+            form.getAnimationManager().flush();
 
-        final boolean[] invoked = {false};
-        SideMenuBar.closeCurrentMenu(() -> invoked[0] = true);
-        form.getAnimationManager().flush();
-
-        assertTrue(invoked[0], "Callback should run even when no menu is showing");
-        assertFalse(SideMenuBar.isShowing(), "Menu should remain hidden");
+            assertTrue(invoked[0], "Callback should run even when no menu is showing");
+            assertFalse(SideMenuBar.isShowing(), "Menu should remain hidden");
+            assertEquals(1, TestLogger.getPrinted().size());
+            assertTrue(TestLogger.getPrinted().get(0).contains("WARNING: Display.setCommandBehavior() is deprecated"));
+        } finally {
+            TestLogger.remove();
+        }
     }
 
     private boolean formContainsCommand(Form form, Command command) {

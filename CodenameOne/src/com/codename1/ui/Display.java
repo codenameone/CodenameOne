@@ -35,6 +35,7 @@ import com.codename1.impl.ImplementationFactory;
 import com.codename1.impl.VirtualKeyboardInterface;
 import com.codename1.io.Log;
 import com.codename1.io.Preferences;
+import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
@@ -845,17 +846,12 @@ public final class Display extends CN1Constants {
                                 }
                                 backgroundTasks.remove(0);
                             }
-                            //preent a runtime exception to crash the
-                            //backgroundThread
                             try {
                                 executeBackgroundTaskRunnable(nextTask);
                             } catch (Throwable e) {
                                 Log.e(e);
                             }
-                            try {
-                                Thread.sleep(10);
-                            } catch (InterruptedException ex) {
-                            }
+                            Util.sleep(10);
                         }
                     }
                 }, "Task Thread");

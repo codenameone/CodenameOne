@@ -1,6 +1,7 @@
 package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
+import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.layouts.BorderLayout;
@@ -34,39 +35,46 @@ class ToolbarTest extends UITestBase {
 
     @FormTest
     void sideMenuCommandRegistration() {
-        implementation.setBuiltinSoundsEnabled(false);
-        Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
-        Toolbar.setOnTopSideMenu(true);
+        TestLogger.install();
+        try {
+            implementation.setBuiltinSoundsEnabled(false);
+            Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
+            Toolbar.setOnTopSideMenu(true);
 
-        Form form = Display.getInstance().getCurrent();
-        Toolbar toolbar = new Toolbar();
-        form.setToolbar(toolbar);
-        form.show();
-        form.getAnimationManager().flush();
-        flushSerialCalls();
+            Form form = Display.getInstance().getCurrent();
+            Toolbar toolbar = new Toolbar();
+            form.setToolbar(toolbar);
+            form.show();
+            form.getAnimationManager().flush();
+            flushSerialCalls();
 
-        final int[] invocation = {0};
-        Command command = toolbar.addCommandToSideMenu("Execute", null, evt -> invocation[0]++);
+            final int[] invocation = {0};
+            Command command = toolbar.addCommandToSideMenu("Execute", null, evt -> invocation[0]++);
 
-        form.revalidate();
-        form.getAnimationManager().flush();
-        flushSerialCalls();
+            form.revalidate();
+            form.getAnimationManager().flush();
+            flushSerialCalls();
 
-        command.actionPerformed(new ActionEvent(command));
-        assertEquals(1, invocation[0], "Command action should invoke registered listener");
+            command.actionPerformed(new ActionEvent(command));
+            assertEquals(1, invocation[0], "Command action should invoke registered listener");
 
-        toolbar.openSideMenu();
-        form.getAnimationManager().flush();
-        flushSerialCalls();
-        awaitAnimations(form);
-        assertTrue(toolbar.isSideMenuShowing(), "Side menu should be showing after openSideMenu");
+            toolbar.openSideMenu();
+            form.getAnimationManager().flush();
+            flushSerialCalls();
+            awaitAnimations(form);
+            assertTrue(toolbar.isSideMenuShowing(), "Side menu should be showing after openSideMenu");
 
-        toolbar.closeSideMenu();
-        form.getAnimationManager().flush();
-        flushSerialCalls();
-        awaitAnimations(form);
+            toolbar.closeSideMenu();
+            form.getAnimationManager().flush();
+            flushSerialCalls();
+            awaitAnimations(form);
 
-        toolbar.removeCommand(command);
+            toolbar.removeCommand(command);
+            assertEquals(1, TestLogger.getPrinted().size());
+            assertTrue(TestLogger.getPrinted().get(0).contains("WARNING: Display.setCommandBehavior() is deprecated"));
+        } finally {
+            TestLogger.remove();
+        }
     }
 
     private void awaitAnimations(Form form) {

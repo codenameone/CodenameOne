@@ -1523,7 +1523,6 @@ public class Label extends Component implements IconHolder, TextHolder {
                             break;
                         }
                     }
-                    System.out.println("Text is [" + getText().substring(startPos, endPos) + "]");
                     return span.subspan(startPos, endPos);
                 }
 

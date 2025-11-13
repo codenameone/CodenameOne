@@ -1,10 +1,9 @@
 package com.codename1.junit;
 
-import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.ImplementationFactory;
+import com.codename1.io.Util;
 import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.Display;
-import com.codename1.ui.Graphics;
 import com.codename1.ui.plaf.UIManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,15 +14,6 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.Hashtable;
 import java.util.List;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyChar;
-import static org.mockito.ArgumentMatchers.anyFloat;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Provides a minimal initialized {@link Display} environment for unit tests that instantiate UI components.
@@ -46,6 +36,7 @@ public abstract class UITestBase {
         } else {
             implementation = TestCodenameOneImplementation.getInstance();
         }
+        Util.setImplementation(implementation);
     }
 
     @AfterEach

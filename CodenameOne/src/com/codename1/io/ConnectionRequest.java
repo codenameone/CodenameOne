@@ -1316,7 +1316,7 @@ public class ConnectionRequest implements IOProgressListener {
             }
 
             if (Util.getImplementation().getURLPath(url).indexOf(path) != 0) { //if (!hc.getHost().endsWith(domain)) {
-                System.out.println("Warning: Cookie tried to set to another path");
+                Log.p("Warning: Cookie tried to set to another path");
                 c.setPath(path);
             } else {
                 // Don't set the path explicitly

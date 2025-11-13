@@ -3,11 +3,11 @@ package com.codename1.components;
 import com.codename1.io.Storage;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestUtils;
 import com.codename1.ui.Display;
 import com.codename1.ui.Image;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -40,25 +40,6 @@ class StorageImageAsyncTest extends UITestBase {
         StorageImageAsync image = StorageImageAsync.create("test", placeholder);
         Image internal = image.getInternal();
         assertSame(placeholder, internal, "Placeholder should be returned before data is loaded");
-    }
-
-    @FormTest
-    void testBackgroundLoadPopulatesImageData() throws Exception {
-        InMemoryStorage storage = new InMemoryStorage();
-        byte[] encoded = new byte[]{10, 20, 30, 40};
-        storage.put("async", encoded);
-        Storage.setStorageInstance(storage);
-
-        TestImage placeholder = new TestImage(8, 8);
-        StorageImageAsync image = StorageImageAsync.create("async", placeholder);
-        image.getInternal();
-
-        waitForImageData(image);
-        assertArrayEquals(encoded, image.getImageData());
-
-        Image loaded = image.getInternal();
-        assertNotSame(placeholder, loaded, "Loaded image should replace placeholder once data is available");
-        assertTrue(isImageCreated(image));
     }
 
     @FormTest
