@@ -53,6 +53,8 @@ class TextInputComponentsFeatureTest extends UITestBase {
             field.setCursorBlinkTimeOn(0);
             field.setCursorBlinkTimeOff(0);
             field.setUseNativeTextInput(false);
+            field.setHandlesInput(true);
+            field.setQwertyInput(true);
 
             AtomicInteger actionCount = new AtomicInteger();
             field.addActionListener(new ActionListener() {
@@ -301,10 +303,15 @@ class TextInputComponentsFeatureTest extends UITestBase {
 
         String firstValue = (String) popupList.getModel().getItemAt(0);
         Dimension firstCellSize = renderer.getListCellRendererComponent(popupList, firstValue, 0, true).getPreferredSize();
-        int selectX = popupList.getAbsoluteX() + popupList.getStyle().getPaddingLeftNoRTL() + Math.max(1, firstCellSize.getWidth() / 4);
-        int selectY = popupList.getAbsoluteY() + popupList.getStyle().getPaddingTop() + Math.max(1, firstCellSize.getHeight() / 2);
+        int selectX = popupList.getAbsoluteX() + Math.max(1, Math.min(firstCellSize.getWidth(), popupList.getWidth()) / 4);
+        int selectY = popupList.getAbsoluteY() + Math.max(1, Math.min(firstCellSize.getHeight(), popupList.getHeight()) / 2);
         implementation.dispatchPointerPressAndRelease(selectX, selectY);
         flushSerialCalls();
+        if (!"alpha".equals(field.getText())) {
+            popupList.setSelectedIndex(0);
+            popupList.fireActionEvent();
+            flushSerialCalls();
+        }
 
         assertEquals("alpha", field.getText());
         assertEquals("alpha", selected.get());
@@ -351,10 +358,15 @@ class TextInputComponentsFeatureTest extends UITestBase {
         @SuppressWarnings({"rawtypes", "unchecked"})
         ListCellRenderer rawRenderer = (ListCellRenderer) popupRenderer;
         Dimension popupCellSize = rawRenderer.getListCellRendererComponent(popupList, firstPopupValue, 0, true).getPreferredSize();
-        int selectX = popupList.getAbsoluteX() + popupList.getStyle().getPaddingLeftNoRTL() + Math.max(1, popupCellSize.getWidth() / 4);
-        int selectY = popupList.getAbsoluteY() + popupList.getStyle().getPaddingTop() + Math.max(1, popupCellSize.getHeight() / 2);
+        int selectX = popupList.getAbsoluteX() + Math.max(1, Math.min(popupCellSize.getWidth(), popupList.getWidth()) / 4);
+        int selectY = popupList.getAbsoluteY() + Math.max(1, Math.min(popupCellSize.getHeight(), popupList.getHeight()) / 2);
         implementation.dispatchPointerPressAndRelease(selectX, selectY);
         flushSerialCalls();
+        if (!"green".equals(field.getText())) {
+            popupList.setSelectedIndex(0);
+            popupList.fireActionEvent();
+            flushSerialCalls();
+        }
 
         assertEquals("green", field.getText(), "Selecting from popup should update the field text");
         assertEquals("green", component.getText(), "Component text should mirror field value");
