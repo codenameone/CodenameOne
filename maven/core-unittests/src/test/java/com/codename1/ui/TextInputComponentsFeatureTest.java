@@ -12,6 +12,7 @@ import com.codename1.ui.list.ListCellRenderer;
 import com.codename1.ui.list.ListModel;
 import com.codename1.ui.ComponentSelector;
 import com.codename1.testing.TestCodenameOneImplementation;
+import com.codename1.ui.geom.Dimension;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -85,9 +86,12 @@ class TextInputComponentsFeatureTest extends UITestBase {
             assertEquals("hi", field.getText(), "Typing keys should append to the text field");
             assertEquals(2, field.getCursorPosition(), "Cursor should track inserted characters");
 
-            implementation.dispatchKeyPress(Display.GAME_LEFT);
+            field.setHandlesInput(true);
+            int leftKeyCode = Display.getInstance().getKeyCode(Display.GAME_LEFT);
+            implementation.dispatchKeyPress(leftKeyCode);
             assertEquals(1, field.getCursorPosition(), "Left navigation should move the caret");
-            implementation.dispatchKeyPress(Display.GAME_RIGHT);
+            int rightKeyCode = Display.getInstance().getKeyCode(Display.GAME_RIGHT);
+            implementation.dispatchKeyPress(rightKeyCode);
             assertEquals(2, field.getCursorPosition(), "Right navigation should restore caret position");
 
             field.deleteChar();
@@ -145,7 +149,7 @@ class TextInputComponentsFeatureTest extends UITestBase {
             assertEquals("B", field.getText(), "Repeated T9 press should advance character");
             implementation.dispatchKeyPress('2');
             assertEquals("C", field.getText(), "Third press should wrap to next letter");
-            implementation.dispatchKeyPress(Display.GAME_RIGHT);
+            implementation.dispatchKeyPress(rightKeyCode);
             assertEquals("C", field.getText(), "Cursor navigation should commit pending T9 sequence");
 
             implementation.dispatchKeyPress('*');
@@ -185,9 +189,11 @@ class TextInputComponentsFeatureTest extends UITestBase {
         form.revalidate();
 
         int initialScroll = area.getScrollY();
-        implementation.dispatchKeyPress(Display.GAME_DOWN);
+        int downKeyCode = Display.getInstance().getKeyCode(Display.GAME_DOWN);
+        implementation.dispatchKeyPress(downKeyCode);
         assertTrue(area.getScrollY() >= initialScroll, "Down key should not decrease scroll position");
-        implementation.dispatchKeyPress(Display.GAME_UP);
+        int upKeyCode = Display.getInstance().getKeyCode(Display.GAME_UP);
+        implementation.dispatchKeyPress(upKeyCode);
         assertTrue(area.getScrollY() <= area.getPreferredSize().getHeight(), "Up key should adjust scroll position within bounds");
 
         area.setAlignment(Component.CENTER);
@@ -198,6 +204,7 @@ class TextInputComponentsFeatureTest extends UITestBase {
         selection.setEnabled(true);
         area.setTextSelectionEnabled(true);
         selection.selectAll();
+        flushSerialCalls();
         assertEquals(1, implementation.getInitializeTextSelectionCount(), "Enabling selection should initialize implementation tracking");
         selection.copy();
         assertEquals(1, implementation.getCopySelectionInvocations());
@@ -292,12 +299,9 @@ class TextInputComponentsFeatureTest extends UITestBase {
         assertSame(renderer, popupList.getRenderer());
         assertTrue(rendererInvoked.get(), "Custom renderer should be applied");
 
-        int selectX = popupList.getAbsoluteX() + 2;
-        int rowHeight = popupList.getHeight() / Math.max(1, popupList.getModel().getSize());
-        if (rowHeight <= 0) {
-            rowHeight = Math.max(1, popupList.getPreferredSize().getHeight() / Math.max(1, popupList.getModel().getSize()));
-        }
-        int selectY = popupList.getAbsoluteY() + Math.max(1, rowHeight / 2);
+        Dimension firstCellSize = renderer.getListCellRendererComponent(popupList, popupList.getModel().getItemAt(0), 0, true).getPreferredSize();
+        int selectX = popupList.getAbsoluteX() + popupList.getStyle().getPaddingLeftNoRTL() + Math.max(1, firstCellSize.getWidth() / 4);
+        int selectY = popupList.getAbsoluteY() + popupList.getStyle().getPaddingTop() + Math.max(1, firstCellSize.getHeight() / 2);
         implementation.dispatchPointerPressAndRelease(selectX, selectY);
         flushSerialCalls();
 
@@ -341,12 +345,10 @@ class TextInputComponentsFeatureTest extends UITestBase {
         ComponentSelector lists = ComponentSelector.$("AutoCompleteList", form);
         assertEquals(1, lists.size());
         com.codename1.ui.List popupList = (com.codename1.ui.List) lists.iterator().next();
-        int selectX = popupList.getAbsoluteX() + 2;
-        int rowHeight = popupList.getHeight() / Math.max(1, popupList.getModel().getSize());
-        if (rowHeight <= 0) {
-            rowHeight = Math.max(1, popupList.getPreferredSize().getHeight() / Math.max(1, popupList.getModel().getSize()));
-        }
-        int selectY = popupList.getAbsoluteY() + Math.max(1, rowHeight / 2);
+        ListCellRenderer<?> popupRenderer = popupList.getRenderer();
+        Dimension popupCellSize = popupRenderer.getListCellRendererComponent(popupList, popupList.getModel().getItemAt(0), 0, true).getPreferredSize();
+        int selectX = popupList.getAbsoluteX() + popupList.getStyle().getPaddingLeftNoRTL() + Math.max(1, popupCellSize.getWidth() / 4);
+        int selectY = popupList.getAbsoluteY() + popupList.getStyle().getPaddingTop() + Math.max(1, popupCellSize.getHeight() / 2);
         implementation.dispatchPointerPressAndRelease(selectX, selectY);
         flushSerialCalls();
 
