@@ -10,6 +10,7 @@ import com.codename1.media.Media;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.ui.Button;
 import com.codename1.ui.Display;
+import com.codename1.ui.Form;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.TextArea;
@@ -811,8 +812,22 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void dispatchKeyPress(int keyCode) {
         Display display = Display.getInstance();
-        display.keyPressed(keyCode);
-        display.keyReleased(keyCode);
+        Form current = display.getCurrent();
+        if (current == null) {
+            return;
+        }
+        current.keyPressed(keyCode);
+        current.keyReleased(keyCode);
+    }
+
+    public void dispatchPointerPressAndRelease(int x, int y) {
+        Display display = Display.getInstance();
+        Form current = display.getCurrent();
+        if (current == null) {
+            return;
+        }
+        current.pointerPressed(x, y);
+        current.pointerReleased(x, y);
     }
 
     @Override
