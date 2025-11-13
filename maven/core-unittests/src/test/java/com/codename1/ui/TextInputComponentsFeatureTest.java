@@ -299,7 +299,8 @@ class TextInputComponentsFeatureTest extends UITestBase {
         assertSame(renderer, popupList.getRenderer());
         assertTrue(rendererInvoked.get(), "Custom renderer should be applied");
 
-        Dimension firstCellSize = renderer.getListCellRendererComponent(popupList, popupList.getModel().getItemAt(0), 0, true).getPreferredSize();
+        String firstValue = (String) popupList.getModel().getItemAt(0);
+        Dimension firstCellSize = renderer.getListCellRendererComponent(popupList, firstValue, 0, true).getPreferredSize();
         int selectX = popupList.getAbsoluteX() + popupList.getStyle().getPaddingLeftNoRTL() + Math.max(1, firstCellSize.getWidth() / 4);
         int selectY = popupList.getAbsoluteY() + popupList.getStyle().getPaddingTop() + Math.max(1, firstCellSize.getHeight() / 2);
         implementation.dispatchPointerPressAndRelease(selectX, selectY);
@@ -346,7 +347,10 @@ class TextInputComponentsFeatureTest extends UITestBase {
         assertEquals(1, lists.size());
         com.codename1.ui.List popupList = (com.codename1.ui.List) lists.iterator().next();
         ListCellRenderer<?> popupRenderer = popupList.getRenderer();
-        Dimension popupCellSize = popupRenderer.getListCellRendererComponent(popupList, popupList.getModel().getItemAt(0), 0, true).getPreferredSize();
+        Object firstPopupValue = popupList.getModel().getItemAt(0);
+        @SuppressWarnings({"rawtypes", "unchecked"})
+        ListCellRenderer rawRenderer = (ListCellRenderer) popupRenderer;
+        Dimension popupCellSize = rawRenderer.getListCellRendererComponent(popupList, firstPopupValue, 0, true).getPreferredSize();
         int selectX = popupList.getAbsoluteX() + popupList.getStyle().getPaddingLeftNoRTL() + Math.max(1, popupCellSize.getWidth() / 4);
         int selectY = popupList.getAbsoluteY() + popupList.getStyle().getPaddingTop() + Math.max(1, popupCellSize.getHeight() / 2);
         implementation.dispatchPointerPressAndRelease(selectX, selectY);
