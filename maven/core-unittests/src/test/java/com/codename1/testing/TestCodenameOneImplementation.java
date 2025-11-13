@@ -794,10 +794,56 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public void editString(com.codename1.ui.Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
         if (cmp instanceof TextField) {
-            ((TextField) cmp).setText(text);
-        } else if (cmp instanceof TextArea) {
-            ((TextArea) cmp).setText(text);
+            TextField field = (TextField) cmp;
+            if (shouldInsertCharacter(field.isEditable(), initiatingKeycode)) {
+                field.insertChars(String.valueOf((char) initiatingKeycode));
+                return;
+            }
+            field.setText(text);
+            return;
         }
+        if (cmp instanceof TextArea) {
+            TextArea area = (TextArea) cmp;
+            if (shouldInsertCharacter(area.isEditable(), initiatingKeycode)) {
+                insertCharacter(area, (char) initiatingKeycode, maxSize);
+                return;
+            }
+            area.setText(text);
+            return;
+        }
+    }
+
+    private boolean shouldInsertCharacter(boolean editable, int initiatingKeycode) {
+        if (!editable) {
+            return false;
+        }
+        if (initiatingKeycode <= 0) {
+            return false;
+        }
+        char c = (char) initiatingKeycode;
+        return !Character.isISOControl(c) || c == '\n' || c == '\r' || c == '\t';
+    }
+
+    private void insertCharacter(TextArea area, char character, int maxSize) {
+        String current = area.getText();
+        if (current == null) {
+            current = "";
+        }
+        if (maxSize > 0 && current.length() >= maxSize) {
+            return;
+        }
+        int cursor = area.getCursorPosition();
+        if (cursor < 0 || cursor > current.length()) {
+            cursor = current.length();
+        }
+        StringBuilder sb = new StringBuilder(current.length() + 1);
+        sb.append(current, 0, cursor);
+        sb.append(character);
+        if (cursor < current.length()) {
+            sb.append(current.substring(cursor));
+        }
+        area.setText(sb.toString());
+        area.setCursorPosition(cursor + 1);
     }
 
     @Override
