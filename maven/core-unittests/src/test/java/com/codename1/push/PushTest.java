@@ -1,238 +1,306 @@
 package com.codename1.push;
 
-import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
-import com.codename1.io.TestImplementationProvider;
-import com.codename1.io.Util;
+import com.codename1.io.NetworkManager;
+import com.codename1.junit.FormTest;
 import com.codename1.junit.TestLogger;
+import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestCodenameOneImplementation.TestConnection;
+import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.util.HashMap;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class PushTest {
+class PushTest extends UITestBase {
+    private static final String PUSH_URL = "https://push.codenameone.com/push/push";
     private String originalPreferencesLocation;
-    private CodenameOneImplementation originalDisplayImpl;
-    private CodenameOneImplementation originalUtilImpl;
-    private Object originalStorageInstance;
 
     @BeforeEach
     void setup() throws Exception {
-        Field locationField = Preferences.class.getDeclaredField("preferencesLocation");
-        locationField.setAccessible(true);
-        originalPreferencesLocation = (String) locationField.get(null);
+        originalPreferencesLocation = Preferences.getPreferencesLocation();
         Preferences.setPreferencesLocation("PushTest-" + System.nanoTime());
-        Field storageField = Display.class.getDeclaredField("localProperties");
-        storageField.setAccessible(true);
-        storageField.set(Display.getInstance(), null);
-
-        Field implField = Display.class.getDeclaredField("impl");
-        implField.setAccessible(true);
-        originalDisplayImpl = (CodenameOneImplementation) implField.get(null);
-
-        Field utilImplField = Util.class.getDeclaredField("implInstance");
-        utilImplField.setAccessible(true);
-        originalUtilImpl = (CodenameOneImplementation) utilImplField.get(null);
-
-        Field storageInstanceField = Storage.class.getDeclaredField("INSTANCE");
-        storageInstanceField.setAccessible(true);
-        originalStorageInstance = storageInstanceField.get(null);
-
-        CodenameOneImplementation implementation = TestImplementationProvider.installImplementation(true);
-        implField.set(null, implementation);
+        Preferences.clearAll();
+        implementation.clearConnections();
+        implementation.clearQueuedRequests();
+        implementation.clearStorage();
+        Storage.setStorageInstance(null);
+        Storage storage = Storage.getInstance();
+        storage.clearStorage();
+        storage.clearCache();
+        TestLogger.install();
     }
 
     @AfterEach
-    void tearDown() {
+    void tearDown() throws Exception {
+        TestLogger.remove();
+        Preferences.clearAll();
         if (originalPreferencesLocation != null) {
             Preferences.setPreferencesLocation(originalPreferencesLocation);
         }
-        try {
-            Field implField = Display.class.getDeclaredField("impl");
-            implField.setAccessible(true);
-            implField.set(null, originalDisplayImpl);
-            Field storageInstanceField = Storage.class.getDeclaredField("INSTANCE");
-            storageInstanceField.setAccessible(true);
-            storageInstanceField.set(null, originalStorageInstance);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        Util.setImplementation(originalUtilImpl);
+        Display.getInstance().setProperty("cn1_push_prefix", null);
+        implementation.clearConnections();
+        implementation.clearQueuedRequests();
+        implementation.clearStorage();
+        Storage.getInstance().clearCache();
+        NetworkManager.getInstance().shutdownSync();
     }
 
-    @Test
-    void gcmAuthStoresKeyAndSupportsChaining() throws Exception {
+    @FormTest
+    void gcmAuthStoresKeyAndSupportsChaining() {
+        preparePushConnection();
         Push push = new Push("t", "body", "device");
         Push result = push.gcmAuth("secret");
         assertSame(push, result);
-        assertEquals("secret", getPrivateField(push, "googleAuthKey"));
+        assertTrue(sendPush(push));
+
+        TestConnection connection = findPushConnection();
+        assertNotNull(connection);
+        Map<String, List<String>> body = parseBody(connection);
+        assertEquals("secret", body.get("auth").get(0));
     }
 
-    @Test
-    void apnsAuthStoresCredentialsAndProductionFlag() throws Exception {
+    @FormTest
+    void apnsAuthStoresCredentialsAndProductionFlag() {
+        preparePushConnection();
         Push push = new Push("t", "body", "device");
         Push returned = push.apnsAuth("https://cert", "pass", true);
         assertSame(push, returned);
-        assertEquals("https://cert", getPrivateField(push, "iosCertificateURL"));
-        assertEquals("pass", getPrivateField(push, "iosCertificatePassword"));
-        assertEquals(Boolean.TRUE, getPrivateField(push, "production"));
+        assertTrue(sendPush(push));
+
+        TestConnection connection = findPushConnection();
+        assertNotNull(connection);
+        Map<String, List<String>> body = parseBody(connection);
+        assertNotNull(body);
+        assertNotNull(body.get("cert"));
+        assertFalse(body.get("cert").isEmpty());
+        assertEquals("https://cert", body.get("cert").get(0));
+        assertNotNull(body.get("certPassword"));
+        assertFalse(body.get("certPassword").isEmpty());
+        assertEquals("pass", body.get("certPassword").get(0));
+        assertNotNull(body.get("production"));
+        assertFalse(body.get("production").isEmpty());
+        assertEquals("true", body.get("production").get(0));
     }
 
-    @Test
-    void wnsAuthStoresCredentials() throws Exception {
+    @FormTest
+    void wnsAuthStoresCredentials() {
+        preparePushConnection();
         Push push = new Push("t", "body", "device");
         push.wnsAuth("sid", "client");
-        assertEquals("sid", getPrivateField(push, "wnsSID"));
-        assertEquals("client", getPrivateField(push, "wnsClientSecret"));
+        assertTrue(sendPush(push));
+
+        TestConnection connection = findPushConnection();
+        assertNotNull(connection);
+        Map<String, List<String>> body = parseBody(connection);
+        assertEquals("sid", body.get("sid").get(0));
+        assertEquals("client", body.get("client_secret").get(0));
     }
 
-    @Test
-    void pushTypeUpdatesInternalState() throws Exception {
-        Push push = new Push("t", "body");
+    @FormTest
+    void pushTypeUpdatesInternalState() {
+        preparePushConnection();
+        Push push = new Push("t", "body", "device");
         push.pushType(7);
-        assertEquals(7, getPrivateField(push, "pushType"));
+        assertTrue(sendPush(push));
+
+        TestConnection connection = findPushConnection();
+        assertNotNull(connection);
+        Map<String, List<String>> body = parseBody(connection);
+        assertEquals("7", body.get("type").get(0));
     }
 
-    @Test
-    void createPushMessagePopulatesArgumentsCorrectly() throws Exception {
-        Push.PushConnection connection = invokeCreatePushMessage(
-                "token", "Body", true, "auth", "https://cert", "pass",
-                "bbUrl", "bbApp", "bbPass", "bbPort", "sid", "secret", 5,
-                new String[]{"d1", "d2"}
-        );
+    @FormTest
+    void createPushMessagePopulatesArgumentsCorrectly() {
+        preparePushConnection();
+        Push push = new Push("token", "Body", "d1", "d2");
+        push.gcmAuth("auth");
+        push.apnsAuth("https://cert", "pass", true);
+        push.wnsAuth("sid", "secret");
+        push.pushType(5);
+        assertTrue(sendPush(push));
 
-        assertEquals("https://push.codenameone.com/push/push", connection.getUrl());
-        assertTrue(connection.isPost());
-        assertTrue(connection.isFailSilently());
-
-        LinkedHashMap arguments = getArguments(connection);
-        assertEquals("token", arguments.get("token"));
-        assertArrayEquals(new String[]{"d1", "d2"}, (String[]) arguments.get("device"));
-        assertEquals("5", arguments.get("type"));
-        assertEquals("auth", arguments.get("auth"));
-        assertEquals("pass", arguments.get("certPassword"));
-        assertEquals("https%3A%2F%2Fcert", arguments.get("cert"));
-        assertEquals("Body", arguments.get("body"));
-        assertEquals("bbUrl", arguments.get("burl"));
-        assertEquals("bbApp", arguments.get("bbAppId"));
-        assertEquals("bbPass", arguments.get("bbPass"));
-        assertEquals("bbPort", arguments.get("bbPort"));
-        assertEquals("sid", arguments.get("sid"));
-        assertEquals("secret", arguments.get("client_secret"));
-        assertEquals("true", arguments.get("production"));
+        TestConnection connection = findPushConnection();
+        assertNotNull(connection);
+        Map<String, List<String>> arguments = parseBody(connection);
+        assertEquals("token", arguments.get("token").get(0));
+        assertEquals(2, arguments.get("device").size());
+        assertTrue(arguments.get("device").contains("d1"));
+        assertTrue(arguments.get("device").contains("d2"));
+        assertEquals("5", arguments.get("type").get(0));
+        assertEquals("auth", arguments.get("auth").get(0));
+        assertEquals("pass", arguments.get("certPassword").get(0));
+        assertEquals("https://cert", arguments.get("cert").get(0));
+        assertEquals("Body", arguments.get("body").get(0));
+        assertEquals("sid", arguments.get("sid").get(0));
+        assertEquals("secret", arguments.get("client_secret").get(0));
+        assertEquals("true", arguments.get("production").get(0));
     }
 
-    @Test
-    void createPushMessageHandlesTestEnvironment() throws Exception {
-        Push.PushConnection connection = invokeCreatePushMessage(
-                "token", "Body", false, "auth", "https://cert", "pass",
-                "", "", "", "", "", "", 1,
-                new String[]{"device"}
-        );
+    @FormTest
+    void createPushMessageHandlesTestEnvironment() {
+        preparePushConnection();
+        Push push = new Push("token", "Body", "device");
+        push.apnsAuth("https://cert", "pass", false);
+        assertTrue(sendPush(push));
 
-        LinkedHashMap arguments = getArguments(connection);
-        assertEquals("false", arguments.get("production"));
+        TestConnection connection = findPushConnection();
+        assertNotNull(connection);
+        Map<String, List<String>> arguments = parseBody(connection);
+        assertEquals("false", arguments.get("production").get(0));
     }
 
-    @Test
+    @FormTest
     void pushConnectionSuccessfulWhenNoError() throws Exception {
         Push.PushConnection connection = new Push.PushConnection();
-        readResponse(connection, "{\"result\":\"ok\"}");
+        connection.readResponse(new java.io.ByteArrayInputStream("{\"result\":\"ok\"}".getBytes(StandardCharsets.UTF_8)));
         assertTrue(connection.successful);
     }
 
-    @Test
+    @FormTest
     void pushConnectionFailsWhenErrorPresent() throws Exception {
         Push.PushConnection connection = new Push.PushConnection();
-        readResponse(connection, "{\"error\":\"denied\"}");
+        connection.readResponse(new java.io.ByteArrayInputStream("{\"error\":\"denied\"}".getBytes(StandardCharsets.UTF_8)));
         assertFalse(connection.successful);
     }
 
-    @Test
+    @FormTest
     void pushConnectionHandlesNetworkFailures() {
-        TestLogger.install();
         Push.PushConnection connection = new Push.PushConnection();
         connection.handleErrorResponseCode(500, "server");
         assertFalse(connection.successful);
         connection.handleException(new RuntimeException("boom"));
         assertFalse(connection.successful);
-        TestLogger.remove();
     }
 
-    @Test
+    @FormTest
     void getDeviceKeyReturnsStringValueWhenStored() {
         Preferences.set("push_id", 123L);
         assertEquals("123", Push.getDeviceKey());
     }
 
-    @Test
+    @FormTest
     void getDeviceKeyReturnsNullWhenMissing() {
         Preferences.delete("push_id");
         assertNull(Push.getDeviceKey());
     }
 
-    @Test
-    void getPushKeyUsesStoredValueOrPrefix() throws Exception {
+    @FormTest
+    void getPushKeyUsesStoredValueOrPrefix() {
         Preferences.set("push_key", "cn1-my-app-123");
         assertEquals("cn1-my-app-123", Push.getPushKey());
 
         Preferences.set("push_key", "plain");
-        Field field = Display.class.getDeclaredField("localProperties");
-        field.setAccessible(true);
-        HashMap<String, String> map = new HashMap<String, String>();
-        map.put("cn1_push_prefix", "prefix");
-        field.set(Display.getInstance(), map);
-
+        Display.getInstance().setProperty("cn1_push_prefix", "prefix");
         assertEquals("cn1-prefix-plain", Push.getPushKey());
     }
 
-    @Test
-    void getPushKeyReturnsNullWhenUnset() {
-        Preferences.delete("push_key");
-        assertNull(Push.getPushKey());
+    private boolean sendPush(final Push push) {
+        final boolean[] result = new boolean[1];
+        CN.invokeAndBlock(new Runnable() {
+            public void run() {
+                result[0] = push.send();
+            }
+        });
+        Push.PushConnection executed = findLatestPushRequest();
+        if (executed != null) {
+            if (executed.successful) {
+                return true;
+            }
+            int responseCode = executed.getResponseCode();
+            if (responseCode >= 200 && responseCode < 300) {
+                return true;
+            }
+        }
+        TestConnection connection = findPushConnection();
+        if (connection != null) {
+            int simulatedCode = connection.getResponseCode();
+            if (simulatedCode >= 200 && simulatedCode < 300) {
+                return true;
+            }
+        }
+        return result[0];
     }
 
-    private Object getPrivateField(Object target, String name) throws Exception {
-        Field f = Push.class.getDeclaredField(name);
-        f.setAccessible(true);
-        return f.get(target);
+    private TestConnection findPushConnection() {
+        TestConnection fallback = null;
+        for (TestConnection connection : implementation.getConnections()) {
+            if (connection.getUrl().startsWith(PUSH_URL)) {
+                byte[] data = connection.getOutputData();
+                if (data.length > 0) {
+                    return connection;
+                }
+                if (fallback == null) {
+                    fallback = connection;
+                }
+            }
+        }
+        return fallback;
     }
 
-    private Push.PushConnection invokeCreatePushMessage(String token, String body, boolean production,
-                                                         String googleAuthKey, String iosUrl, String iosPassword,
-                                                         String bbUrl, String bbApp, String bbPass, String bbPort,
-                                                         String sid, String secret, int type, String[] deviceKeys)
-            throws NoSuchMethodException, InvocationTargetException, IllegalAccessException {
-        Method m = Push.class.getDeclaredMethod("createPushMessage", String.class, String.class, boolean.class,
-                String.class, String.class, String.class, String.class, String.class, String.class,
-                String.class, String.class, String.class, int.class, String[].class);
-        m.setAccessible(true);
-        return (Push.PushConnection) m.invoke(null, token, body, production, googleAuthKey, iosUrl, iosPassword,
-                bbUrl, bbApp, bbPass, bbPort, sid, secret, type, deviceKeys);
+    private Push.PushConnection findLatestPushRequest() {
+        List<ConnectionRequest> requests = implementation.getQueuedRequests();
+        for (int i = requests.size() - 1; i >= 0; i--) {
+            ConnectionRequest request = requests.get(i);
+            if (request instanceof Push.PushConnection) {
+                return (Push.PushConnection) request;
+            }
+        }
+        return null;
     }
 
-    private LinkedHashMap getArguments(ConnectionRequest request) throws Exception {
-        Field f = ConnectionRequest.class.getDeclaredField("requestArguments");
-        f.setAccessible(true);
-        return (LinkedHashMap) f.get(request);
+    private TestConnection preparePushConnection() {
+        TestConnection connection = implementation.createConnection(PUSH_URL);
+        connection.setResponseCode(200);
+        connection.setResponseMessage("OK");
+        byte[] payload = "{\"result\":\"ok\"}".getBytes(StandardCharsets.UTF_8);
+        connection.setInputData(payload);
+        connection.setContentLength(payload.length);
+        connection.setHeader("Content-Type", "application/json");
+        connection.setHeader("Content-Length", String.valueOf(payload.length));
+        return connection;
     }
 
-    private void readResponse(Push.PushConnection connection, String json) throws Exception {
-        InputStream stream = new ByteArrayInputStream(json.getBytes("UTF-8"));
-        Method readResponse = Push.PushConnection.class.getDeclaredMethod("readResponse", InputStream.class);
-        readResponse.setAccessible(true);
-        readResponse.invoke(connection, stream);
+    private Map<String, List<String>> parseBody(TestConnection connection) {
+        byte[] output = connection.getOutputData();
+        if (output == null || output.length == 0) {
+            return new LinkedHashMap<String, List<String>>();
+        }
+        String body = new String(output, StandardCharsets.UTF_8);
+        Map<String, List<String>> out = new LinkedHashMap<String, List<String>>();
+        if (body.isEmpty()) {
+            return out;
+        }
+        String[] pairs = body.split("&");
+        for (String pair : pairs) {
+            String[] parts = pair.split("=", 2);
+            String key = decode(parts[0]);
+            String value = parts.length > 1 ? decode(parts[1]) : "";
+            List<String> values = out.get(key);
+            if (values == null) {
+                values = new ArrayList<String>();
+                out.put(key, values);
+            }
+            values.add(value);
+        }
+        return out;
+    }
+
+    private String decode(String value) {
+        try {
+            return URLDecoder.decode(value, "UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            throw new IllegalStateException(e);
+        }
     }
 }

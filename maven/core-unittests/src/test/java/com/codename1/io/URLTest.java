@@ -1,11 +1,10 @@
 package com.codename1.io;
 
-import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.junit.EdtTest;
+import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestCodenameOneImplementation.TestConnection;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -14,58 +13,19 @@ import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
-class URLTest {
-    private CodenameOneImplementation implementation;
-    private Map<String, byte[]> files;
+class URLTest extends UITestBase {
 
     @BeforeEach
     void setUp() {
-        implementation = TestImplementationProvider.installImplementation(true);
-        files = new ConcurrentHashMap<String, byte[]>();
-
-        when(implementation.getAppHomePath()).thenReturn("file://app/");
-        when(implementation.exists(anyString())).thenAnswer(invocation -> files.containsKey(invocation.getArgument(0)));
-        when(implementation.getFileLength(anyString())).thenAnswer(invocation -> {
-            byte[] data = files.get(invocation.getArgument(0));
-            return data == null ? 0L : data.length;
-        });
-
-        try {
-            when(implementation.openFileOutputStream(anyString())).thenAnswer(invocation -> {
-                final String key = invocation.getArgument(0);
-                return new ByteArrayOutputStream() {
-                    @Override
-                    public void close() throws IOException {
-                        files.put(key, toByteArray());
-                        super.close();
-                    }
-                };
-            });
-
-            when(implementation.openFileInputStream(anyString())).thenAnswer(invocation -> {
-                String key = invocation.getArgument(0);
-                byte[] data = files.get(key);
-                if (data == null) {
-                    throw new IOException("Missing file " + key);
-                }
-                return new ByteArrayInputStream(data);
-            });
-        } catch (IOException e) {
-            throw new AssertionError(e);
-        }
+        implementation.clearConnections();
+        implementation.clearFileSystem();
+        implementation.setAppHomePath("file://app/");
     }
 
-    @Test
+    @EdtTest
     void parsesUrlComponents() throws URISyntaxException {
         URL url = new URL("https://user:secret@example.com:8443/path/resource?x=1");
 
@@ -83,12 +43,12 @@ class URLTest {
         assertFalse(url.sameFile(new URL("https://example.com")));
     }
 
-    @Test
+    @EdtTest
     void fileConnectionReadsAndWritesUsingFileSystemStorage() throws Exception {
         URL url = new URL("file:/virtual/test.txt");
         String key = "file:/" + url.toURI().getPath();
         byte[] initial = "seed".getBytes(StandardCharsets.UTF_8);
-        files.put(key, initial);
+        implementation.putFile(key, initial);
 
         URL.URLConnection connection = url.openConnection();
         connection.connect();
@@ -105,55 +65,48 @@ class URLTest {
         output.write(updated);
         output.close();
 
-        assertArrayEquals(updated, files.get(key));
+        assertArrayEquals(updated, implementation.getFileContent(key));
     }
 
-    @Test
+    @EdtTest
     void httpConnectionDelegatesToImplementation() throws Exception {
-        final Object nativeConnection = new Object();
-        when(implementation.connect(anyString(), anyBoolean(), anyBoolean())).thenReturn(nativeConnection);
-        when(implementation.openInputStream(nativeConnection)).thenReturn(new ByteArrayInputStream("body".getBytes(StandardCharsets.UTF_8)));
-        when(implementation.openOutputStream(nativeConnection)).thenAnswer(invocation -> new ByteArrayOutputStream());
-        when(implementation.getHeaderField(anyString(), any())).thenReturn(null);
-        when(implementation.getHeaderFieldNames(nativeConnection)).thenReturn(new String[]{"Content-Type"});
-        when(implementation.getHeaderFields("Content-Type", nativeConnection)).thenReturn(new String[]{"text/plain"});
-        when(implementation.getContentLength(nativeConnection)).thenReturn(4);
-
         URL url = new URL("http://example.com/service");
-        URL.HttpURLConnection connection = (URL.HttpURLConnection) url.openConnection();
-        connection.setDoOutput(true);
-        connection.setRequestProperty("Accept", "text/plain");
-        connection.connect();
+        TestConnection connection = implementation.createConnection("http://example.com/service");
+        connection.setInputData("body".getBytes(StandardCharsets.UTF_8));
+        connection.setContentLength(4);
+        connection.setHeader("Content-Type", "text/plain");
 
-        verify(implementation).connect("http://example.com/service", true, true);
-        verify(implementation).setHttpMethod(nativeConnection, "GET");
-        verify(implementation).setHeader(nativeConnection, "Accept", "text/plain");
+        URL.HttpURLConnection http = (URL.HttpURLConnection) url.openConnection();
+        http.setDoOutput(true);
+        http.setRequestProperty("Accept", "text/plain");
+        http.connect();
 
-        connection.setRequestMethod("POST");
-        verify(implementation).setHttpMethod(nativeConnection, "POST");
+        assertTrue(connection.isReadRequested());
+        assertTrue(connection.isWriteRequested());
+        assertEquals("GET", connection.getHttpMethod());
+        assertEquals("text/plain", connection.getHeaders().get("Accept"));
 
-        InputStream input = connection.getInputStream();
+        http.setRequestMethod("POST");
+        assertEquals("POST", connection.getHttpMethod());
+
+        InputStream input = http.getInputStream();
         byte[] data = new byte[4];
         assertEquals(4, input.read(data));
         assertEquals("body", new String(data, StandardCharsets.UTF_8));
 
-        assertEquals(4, connection.getContentLength());
-        Map<String, List<String>> headers = connection.getHeaderFields();
+        assertEquals(4, http.getContentLength());
+        Map<String, List<String>> headers = http.getHeaderFields();
         assertEquals(Collections.singletonList("text/plain"), headers.get("Content-Type"));
     }
 
-    @Test
+    @EdtTest
     void setRequestMethodThrowsOnFailureAfterConnect() throws Exception {
-        final Object nativeConnection = new Object();
-        when(implementation.connect(anyString(), anyBoolean(), anyBoolean())).thenReturn(nativeConnection);
-        doAnswer(invocation -> {
-            throw new IOException("unsupported");
-        }).when(implementation).setHttpMethod(nativeConnection, "DELETE");
-
         URL url = new URL("http://example.com/delete");
-        URL.HttpURLConnection connection = (URL.HttpURLConnection) url.openConnection();
-        connection.connect();
+        TestConnection connection = implementation.createConnection("http://example.com/delete");
+        URL.HttpURLConnection http = (URL.HttpURLConnection) url.openConnection();
+        http.connect();
+        connection.failOnNextHttpMethod(new IOException("unsupported"));
 
-        assertThrows(IllegalArgumentException.class, () -> connection.setRequestMethod("DELETE"));
+        assertThrows(IllegalArgumentException.class, () -> http.setRequestMethod("DELETE"));
     }
 }

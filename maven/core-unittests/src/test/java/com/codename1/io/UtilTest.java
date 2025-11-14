@@ -1,8 +1,8 @@
 package com.codename1.io;
 
-import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.junit.EdtTest;
+import com.codename1.junit.UITestBase;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -13,21 +13,19 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.verify;
 
-class UtilTest {
-    private CodenameOneImplementation implementation;
+class UtilTest extends UITestBase {
 
     @BeforeEach
     void setUp() {
-        implementation = TestImplementationProvider.installImplementation(true);
+        implementation.resetCleanupCalls();
     }
 
-    @Test
+    @EdtTest
     void copyClosesStreamsAndInvokesCleanup() throws IOException {
         byte[] source = "payload".getBytes(StandardCharsets.UTF_8);
         InputStream input = new ByteArrayInputStream(source);
@@ -36,11 +34,12 @@ class UtilTest {
         Util.copy(input, output);
 
         assertArrayEquals(source, output.toByteArray());
-        verify(implementation, atLeastOnce()).cleanup(input);
-        verify(implementation, atLeastOnce()).cleanup(output);
+        List<Object> cleanup = implementation.getCleanupCalls();
+        assertTrue(cleanup.contains(input));
+        assertTrue(cleanup.contains(output));
     }
 
-    @Test
+    @EdtTest
     void copyNoCloseKeepsStreamsOpenAndReportsProgress() throws IOException {
         byte[] source = new byte[32];
         for (int i = 0; i < source.length; i++) {
@@ -56,26 +55,27 @@ class UtilTest {
         assertEquals(source.length, updates[0]);
     }
 
-    @Test
+    @EdtTest
     void cleanupHandlesNullValues() {
         Util.cleanup(null);
-        verify(implementation).cleanup(null);
+        List<Object> cleanup = implementation.getCleanupCalls();
+        assertTrue(cleanup.contains(null));
     }
 
-    @Test
+    @EdtTest
     void ignoreCharsWhileEncodingCanBeConfigured() {
         Util.setIgnorCharsWhileEncoding("abc");
         assertEquals("abc", Util.getIgnorCharsWhileEncoding());
         Util.setIgnorCharsWhileEncoding("");
     }
 
-    @Test
+    @EdtTest
     void splitBreaksStringIntoComponents() {
         String[] parts = Util.split("one,two,three", ",");
         assertArrayEquals(new String[]{"one", "two", "three"}, parts);
     }
 
-    @Test
+    @EdtTest
     void mergeAndInsertAndRemoveArrayOperationsWork() {
         String[] first = new String[]{"a", "b"};
         String[] second = new String[]{"c"};
@@ -95,7 +95,7 @@ class UtilTest {
         assertArrayEquals(new String[]{"x", "b", "c"}, removed);
     }
 
-    @Test
+    @EdtTest
     void readFullyReadsExactNumberOfBytes() throws IOException {
         byte[] source = new byte[]{1, 2, 3, 4};
         byte[] target = new byte[4];
@@ -103,14 +103,14 @@ class UtilTest {
         assertArrayEquals(source, target);
     }
 
-    @Test
+    @EdtTest
     void readFullyThrowsOnShortStream() {
         byte[] source = new byte[]{1, 2};
         byte[] target = new byte[4];
         assertThrows(EOFException.class, () -> Util.readFully(new ByteArrayInputStream(source), target));
     }
 
-    @Test
+    @EdtTest
     void readAllReturnsCountUntilStreamEnds() throws IOException {
         byte[] source = new byte[]{1, 2, 3};
         byte[] target = new byte[5];
@@ -120,7 +120,7 @@ class UtilTest {
         assertEquals(3, target[2]);
     }
 
-    @Test
+    @EdtTest
     void writeAndReadObjectRoundTripsSupportedTypes() throws IOException {
         Map<String, Object> payload = new HashMap<String, Object>();
         payload.put("name", "Alice");
@@ -142,7 +142,7 @@ class UtilTest {
         assertEquals(30, ((Integer) roundTrip.get("age")).intValue());
     }
 
-    @Test
+    @EdtTest
     void readToStringUsesProvidedCharset() throws IOException {
         byte[] data = "héllo".getBytes("UTF-16BE");
         String value = Util.readToString(new ByteArrayInputStream(data), "UTF-16BE");

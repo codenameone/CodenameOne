@@ -1,21 +1,17 @@
 package com.codename1.io;
 
+import com.codename1.junit.EdtTest;
+import com.codename1.junit.UITestBase;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class MultipartRequestTest {
-    @BeforeEach
-    void resetImplementation() {
-        TestImplementationProvider.installImplementation(true);
-    }
+class MultipartRequestTest extends UITestBase {
 
-    @Test
+    @EdtTest
     void buildRequestBodyIncludesArgumentsAndBinaryData() throws IOException {
         MultipartRequest request = new MultipartRequest();
         request.setBoundary("test-boundary");
@@ -46,7 +42,7 @@ class MultipartRequestTest {
         assertEquals(payload.length, request.calculateContentLength());
     }
 
-    @Test
+    @EdtTest
     void base64ToggleControlsEncoding() throws IOException {
         MultipartRequest request = new MultipartRequest();
         request.setBoundary("boundary");
@@ -61,7 +57,7 @@ class MultipartRequestTest {
         assertFalse(payload.contains("encode+me"));
     }
 
-    @Test
+    @EdtTest
     void manualRedirectFlagIsHonored() {
         MultipartRequest request = new MultipartRequest();
         assertTrue(request.isManualRedirect());
@@ -72,7 +68,7 @@ class MultipartRequestTest {
         assertFalse(request.onRedirect("http://example.com"));
     }
 
-    @Test
+    @EdtTest
     void calculateContentLengthMatchesStreamForInputStreamData() throws IOException {
         MultipartRequest request = new MultipartRequest();
         request.setBoundary("stream-boundary");

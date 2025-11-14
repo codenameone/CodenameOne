@@ -4,6 +4,7 @@ import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Util;
+import com.codename1.payment.Purchase;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
 import com.codename1.media.Media;
@@ -32,10 +33,14 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 /**
@@ -47,6 +52,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private final Map<String, byte[]> storageEntries = new ConcurrentHashMap<>();
     private final Map<String, TestFile> fileSystem = new ConcurrentHashMap<>();
     private final Map<String, TestConnection> connections = new ConcurrentHashMap<>();
+    private final Map<String, TestSocket> sockets = new ConcurrentHashMap<>();
+    private final CopyOnWriteArrayList<ConnectionRequest> queuedRequests = new CopyOnWriteArrayList<ConnectionRequest>();
 
     private final TestFont defaultFont = new TestFont(8, 16);
     private int displayWidth = 1080;
@@ -88,6 +95,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private Media backgroundMedia;
     private Media media;
     private AsyncResource<Media> mediaAsync;
+    private Purchase inAppPurchase;
     private int startRemoteControlInvocations;
     private int stopRemoteControlInvocations;
     private boolean mutableImagesFast = true;
@@ -115,6 +123,12 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private final Map<Object, HeavyButtonPeerState> heavyButtonPeers = new HashMap<Object, HeavyButtonPeerState>();
     private boolean requiresHeavyButton;
     private boolean allowKeyEventReentry;
+    private final List<Object> cleanupCalls = new ArrayList<Object>();
+    private int flushStorageCacheInvocations;
+    private boolean socketAvailable = true;
+    private boolean serverSocketAvailable;
+    private String appHomePath = "file://app/";
+    private String hostOrIp;
 
 
     public TestCodenameOneImplementation() {
@@ -568,6 +582,81 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public TestCodenameOneImplementation(boolean timeoutSupported) {
         this.timeoutSupported = timeoutSupported;
+    }
+
+    private String socketKey(String host, int port) {
+        return host + ":" + port;
+    }
+
+    public void setSocketAvailable(boolean socketAvailable) {
+        this.socketAvailable = socketAvailable;
+    }
+
+    public void setServerSocketAvailable(boolean serverSocketAvailable) {
+        this.serverSocketAvailable = serverSocketAvailable;
+    }
+
+    public TestSocket registerSocket(String host, int port) {
+        String key = socketKey(host, port);
+        TestSocket socket = new TestSocket(host, port);
+        sockets.put(key, socket);
+        return socket;
+    }
+
+    public TestSocket getSocket(String host, int port) {
+        return sockets.get(socketKey(host, port));
+    }
+
+    public void clearSockets() {
+        sockets.clear();
+    }
+
+    public void setAppHomePath(String appHomePath) {
+        if (appHomePath == null) {
+            this.appHomePath = "";
+        } else {
+            this.appHomePath = appHomePath;
+        }
+    }
+
+    public void setHostOrIP(String hostOrIp) {
+        this.hostOrIp = hostOrIp;
+    }
+
+    public void putFile(String path, byte[] data) {
+        if (data == null) {
+            fileSystem.remove(path);
+            return;
+        }
+        fileSystem.put(path, TestFile.file(Arrays.copyOf(data, data.length)));
+    }
+
+    public byte[] getFileContent(String path) {
+        TestFile file = fileSystem.get(path);
+        if (file == null) {
+            return null;
+        }
+        return Arrays.copyOf(file.content, file.content.length);
+    }
+
+    public void clearFileSystem() {
+        fileSystem.clear();
+    }
+
+    public List<Object> getCleanupCalls() {
+        return new ArrayList<Object>(cleanupCalls);
+    }
+
+    public void resetCleanupCalls() {
+        cleanupCalls.clear();
+    }
+
+    public int getFlushStorageCacheInvocations() {
+        return flushStorageCacheInvocations;
+    }
+
+    public void resetFlushStorageCacheInvocations() {
+        flushStorageCacheInvocations = 0;
     }
 
     public void setDisplaySize(int width, int height) {
@@ -1323,10 +1412,19 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean shouldWriteUTFAsGetBytes() {
+        return true;
+    }
+
+    @Override
     public Object connect(String url, boolean read, boolean write) throws IOException {
         TestConnection connection = connections.computeIfAbsent(url, TestConnection::new);
-        connection.readRequested = read;
-        connection.writeRequested = write;
+        if (read) {
+            connection.readRequested = true;
+        }
+        if (write) {
+            connection.writeRequested = true;
+        }
         return connection;
     }
 
@@ -1339,13 +1437,106 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return connection;
     }
 
+    public Collection<TestConnection> getConnections() {
+        return new ArrayList<TestConnection>(connections.values());
+    }
+
     public void clearConnections() {
         connections.clear();
     }
 
     @Override
+    public Object connectSocket(String host, int port, int connectTimeout) {
+        TestSocket socket = sockets.get(socketKey(host, port));
+        if (socket == null) {
+            return null;
+        }
+        socket.connect();
+        return socket;
+    }
+
+    @Override
+    public void disconnectSocket(Object socket) {
+        if (socket instanceof TestSocket) {
+            ((TestSocket) socket).disconnect();
+        }
+    }
+
+    @Override
+    public boolean isSocketConnected(Object socket) {
+        return socket instanceof TestSocket && ((TestSocket) socket).isConnected();
+    }
+
+    @Override
+    public boolean isSocketAvailable() {
+        return socketAvailable;
+    }
+
+    @Override
+    public boolean isServerSocketAvailable() {
+        return serverSocketAvailable;
+    }
+
+    @Override
+    public String getSocketErrorMessage(Object socket) {
+        if (socket instanceof TestSocket) {
+            return ((TestSocket) socket).getErrorMessage();
+        }
+        return null;
+    }
+
+    @Override
+    public String getHostOrIP() {
+        return hostOrIp;
+    }
+
+    @Override
+    public int getSocketErrorCode(Object socket) {
+        if (socket instanceof TestSocket) {
+            return ((TestSocket) socket).getErrorCode();
+        }
+        return -1;
+    }
+
+    @Override
+    public int getSocketAvailableInput(Object socket) {
+        if (socket instanceof TestSocket) {
+            return ((TestSocket) socket).getAvailableInput();
+        }
+        return 0;
+    }
+
+    @Override
+    public byte[] readFromSocketStream(Object socket) {
+        if (socket instanceof TestSocket) {
+            return ((TestSocket) socket).read();
+        }
+        return null;
+    }
+
+    @Override
+    public void writeToSocketStream(Object socket, byte[] data) {
+        if (socket instanceof TestSocket) {
+            ((TestSocket) socket).write(data);
+        }
+    }
+
+    @Override
     public void setHeader(Object connection, String key, String val) {
         ((TestConnection) connection).headers.put(key, val);
+    }
+
+    @Override
+    public void setHttpMethod(Object connection, String method) throws IOException {
+        if (connection instanceof TestConnection) {
+            TestConnection conn = (TestConnection) connection;
+            if (conn.httpMethodException != null) {
+                IOException ex = conn.httpMethodException;
+                conn.httpMethodException = null;
+                throw ex;
+            }
+            conn.setHttpMethod(method);
+        }
     }
 
     @Override
@@ -1475,6 +1666,34 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public long getRootAvailableSpace(String root) {
         return 1024 * 512;
+    }
+
+    @Override
+    public String getAppHomePath() {
+        return appHomePath;
+    }
+
+    @Override
+    public OutputStream openFileOutputStream(String path) {
+        final String key = path;
+        fileSystem.putIfAbsent(key, TestFile.file(new byte[0]));
+        return new ByteArrayOutputStream() {
+            @Override
+            public void close() throws IOException {
+                super.close();
+                byte[] data = toByteArray();
+                fileSystem.put(key, TestFile.file(data));
+            }
+        };
+    }
+
+    @Override
+    public InputStream openFileInputStream(String path) throws IOException {
+        TestFile file = fileSystem.get(path);
+        if (file == null || file.directory) {
+            throw new IOException("Missing file " + path);
+        }
+        return new ByteArrayInputStream(file.content);
     }
 
     @Override
@@ -1619,6 +1838,18 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         this.mediaRecorder = mediaRecorder;
     }
 
+    public void setInAppPurchase(Purchase purchase) {
+        this.inAppPurchase = purchase;
+    }
+
+    @Override
+    public Purchase getInAppPurchase() {
+        if (inAppPurchase != null) {
+            return inAppPurchase;
+        }
+        return super.getInAppPurchase();
+    }
+
     @Override
     public Media createMediaRecorder(MediaRecorderBuilder builder) {
         return mediaRecorder;
@@ -1636,6 +1867,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void flushStorageCache() {
+        flushStorageCacheInvocations++;
     }
 
     @Override
@@ -1654,11 +1886,23 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void cleanup(Object obj) {
+        cleanupCalls.add(obj);
     }
 
     @Override
     public void addConnectionToQueue(ConnectionRequest r) {
+        if (r != null) {
+            queuedRequests.add(r);
+        }
         super.addConnectionToQueue(r);
+    }
+
+    public void clearQueuedRequests() {
+        queuedRequests.clear();
+    }
+
+    public java.util.List<ConnectionRequest> getQueuedRequests() {
+        return new java.util.ArrayList<ConnectionRequest>(queuedRequests);
     }
 
     @Override
@@ -1979,6 +2223,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         final Map<String, List<String>> multiHeaders = new HashMap<>();
         byte[] inputData;
         ByteArrayOutputStream output;
+        com.codename1.io.BufferedOutputStream bufferedOutput;
         boolean readRequested;
         boolean writeRequested;
         boolean postRequest;
@@ -1986,6 +2231,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         String responseMessage = "OK";
         int contentLength;
         int outputOffset;
+        String httpMethod = "GET";
+        IOException httpMethodException;
 
         TestConnection(String url) {
             this.url = url;
@@ -1997,10 +2244,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
 
         OutputStream openOutputStream() {
-            if (output == null) {
+            if (bufferedOutput == null) {
                 output = new ByteArrayOutputStream();
+                bufferedOutput = new com.codename1.io.BufferedOutputStream(output);
             }
-            return output;
+            return bufferedOutput;
         }
 
         public String getUrl() {
@@ -2009,6 +2257,14 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
         public Map<String, String> getHeaders() {
             return new HashMap<String, String>(headers);
+        }
+
+        public void setHeader(String name, String value) {
+            headers.put(name, value);
+        }
+
+        public void setHeaderValues(String name, List<String> values) {
+            multiHeaders.put(name, new ArrayList<String>(values));
         }
 
         public boolean isReadRequested() {
@@ -2025,6 +2281,18 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
         public void setPostRequest(boolean postRequest) {
             this.postRequest = postRequest;
+        }
+
+        public void setHttpMethod(String method) {
+            this.httpMethod = method;
+        }
+
+        public String getHttpMethod() {
+            return httpMethod;
+        }
+
+        public void failOnNextHttpMethod(IOException exception) {
+            this.httpMethodException = exception;
         }
 
         public int getResponseCode() {
@@ -2052,6 +2320,13 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
 
         public byte[] getOutputData() {
+            if (bufferedOutput != null) {
+                try {
+                    bufferedOutput.flushBuffer();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
             if (output == null) {
                 return new byte[0];
             }
@@ -2078,6 +2353,92 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
         static TestFile directory() {
             return new TestFile(true, new byte[0]);
+        }
+    }
+
+    public static final class TestSocket {
+        private final String host;
+        private final int port;
+        private final Queue<byte[]> inbound = new ConcurrentLinkedQueue<byte[]>();
+        private final List<byte[]> outbound = new ArrayList<byte[]>();
+        private boolean connected;
+        private int errorCode = -1;
+        private String errorMessage;
+
+        TestSocket(String host, int port) {
+            this.host = host;
+            this.port = port;
+        }
+
+        void connect() {
+            connected = true;
+        }
+
+        public void disconnect() {
+            connected = false;
+        }
+
+        public boolean isConnected() {
+            return connected;
+        }
+
+        public String getHost() {
+            return host;
+        }
+
+        public int getPort() {
+            return port;
+        }
+
+        public void enqueue(byte[] data) {
+            if (data == null) {
+                return;
+            }
+            inbound.add(Arrays.copyOf(data, data.length));
+        }
+
+        public void enqueue(String text) {
+            if (text == null) {
+                return;
+            }
+            enqueue(text.getBytes());
+        }
+
+        byte[] read() {
+            byte[] data = inbound.poll();
+            if (data == null) {
+                return new byte[0];
+            }
+            return data;
+        }
+
+        int getAvailableInput() {
+            byte[] data = inbound.peek();
+            return data == null ? 0 : data.length;
+        }
+
+        void write(byte[] data) {
+            if (data == null) {
+                return;
+            }
+            outbound.add(Arrays.copyOf(data, data.length));
+        }
+
+        public List<byte[]> getOutboundMessages() {
+            return new ArrayList<byte[]>(outbound);
+        }
+
+        public void setError(int code, String message) {
+            this.errorCode = code;
+            this.errorMessage = message;
+        }
+
+        public int getErrorCode() {
+            return errorCode;
+        }
+
+        public String getErrorMessage() {
+            return errorMessage;
         }
     }
 }
