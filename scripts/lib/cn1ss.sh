@@ -252,6 +252,12 @@ cn1ss_file_size() {
 cn1ss_post_pr_comment() {
   local body_file="$1"
   local preview_dir="$2"
+
+  if [ "${CN1SS_SKIP_COMMENT:-0}" != "0" ]; then
+    cn1ss_log "Skipping PR comment post (CN1SS_SKIP_COMMENT=${CN1SS_SKIP_COMMENT})"
+    return 0
+  fi
+
   if [ -z "$body_file" ] || [ ! -s "$body_file" ]; then
     cn1ss_log "Skipping PR comment post (no content)."
     return 0

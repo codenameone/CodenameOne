@@ -265,6 +265,7 @@ for test in "${TEST_NAMES[@]}"; do
   if source_label="$(cn1ss_decode_test_png "$test" "$dest" "${CN1SS_SOURCES[@]}")"; then
     TEST_OUTPUTS["$test"]="$dest"
     TEST_SOURCES["$test"]="$source_label"
+    TEST_DECODE_OK["$test"]=1
     ra_log "Decoded screenshot for '$test' (source=${source_label}, size: $(cn1ss_file_size "$dest") bytes)"
     preview_dest="$SCREENSHOT_PREVIEW_DIR/${test}.jpg"
     if preview_source="$(cn1ss_decode_test_preview "$test" "$preview_dest" "${CN1SS_SOURCES[@]}")"; then
@@ -292,7 +293,10 @@ done
 COMPARE_ARGS=()
 for test in "${TEST_NAMES[@]}"; do
   dest="${TEST_OUTPUTS[$test]:-}"
-  [ -n "$dest" ] || continue
+  if [ -z "$dest" ]; then
+    # Fabricate a non-existent path so ProcessScreenshots marks this as missing_actual
+    dest="$SCREENSHOT_TMP_DIR/${test}.missing.png"
+  fi
   COMPARE_ARGS+=("--actual" "${test}=${dest}")
 done
 
