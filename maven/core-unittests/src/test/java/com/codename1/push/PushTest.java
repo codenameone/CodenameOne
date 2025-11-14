@@ -64,9 +64,9 @@ class PushTest extends UITestBase {
         assertSame(push, result);
         assertTrue(sendPush(push));
 
-        Push.PushConnection request = findLatestPushRequest();
-        assertNotNull(request);
-        Map<String, List<String>> body = parseBody(request);
+        TestConnection connection = findPushConnection();
+        assertNotNull(connection);
+        Map<String, List<String>> body = parseBody(connection);
         assertEquals("secret", body.get("auth").get(0));
     }
 
@@ -78,9 +78,9 @@ class PushTest extends UITestBase {
         assertSame(push, returned);
         assertTrue(sendPush(push));
 
-        Push.PushConnection request = findLatestPushRequest();
-        assertNotNull(request);
-        Map<String, List<String>> body = parseBody(request);
+        TestConnection connection = findPushConnection();
+        assertNotNull(connection);
+        Map<String, List<String>> body = parseBody(connection);
         assertEquals("https://cert", body.get("cert").get(0));
         assertEquals("pass", body.get("certPassword").get(0));
         assertEquals("true", body.get("production").get(0));
@@ -93,9 +93,9 @@ class PushTest extends UITestBase {
         push.wnsAuth("sid", "client");
         assertTrue(sendPush(push));
 
-        Push.PushConnection request = findLatestPushRequest();
-        assertNotNull(request);
-        Map<String, List<String>> body = parseBody(request);
+        TestConnection connection = findPushConnection();
+        assertNotNull(connection);
+        Map<String, List<String>> body = parseBody(connection);
         assertEquals("sid", body.get("sid").get(0));
         assertEquals("client", body.get("client_secret").get(0));
     }
@@ -107,9 +107,9 @@ class PushTest extends UITestBase {
         push.pushType(7);
         assertTrue(sendPush(push));
 
-        Push.PushConnection request = findLatestPushRequest();
-        assertNotNull(request);
-        Map<String, List<String>> body = parseBody(request);
+        TestConnection connection = findPushConnection();
+        assertNotNull(connection);
+        Map<String, List<String>> body = parseBody(connection);
         assertEquals("7", body.get("type").get(0));
     }
 
@@ -123,9 +123,9 @@ class PushTest extends UITestBase {
         push.pushType(5);
         assertTrue(sendPush(push));
 
-        Push.PushConnection request = findLatestPushRequest();
-        assertNotNull(request);
-        Map<String, List<String>> arguments = parseBody(request);
+        TestConnection connection = findPushConnection();
+        assertNotNull(connection);
+        Map<String, List<String>> arguments = parseBody(connection);
         assertEquals("token", arguments.get("token").get(0));
         assertEquals(2, arguments.get("device").size());
         assertTrue(arguments.get("device").contains("d1"));
@@ -147,9 +147,9 @@ class PushTest extends UITestBase {
         push.apnsAuth("https://cert", "pass", false);
         assertTrue(sendPush(push));
 
-        Push.PushConnection request = findLatestPushRequest();
-        assertNotNull(request);
-        Map<String, List<String>> arguments = parseBody(request);
+        TestConnection connection = findPushConnection();
+        assertNotNull(connection);
+        Map<String, List<String>> arguments = parseBody(connection);
         assertEquals("false", arguments.get("production").get(0));
     }
 
@@ -264,14 +264,12 @@ class PushTest extends UITestBase {
         return connection;
     }
 
-    private Map<String, List<String>> parseBody(Push.PushConnection request) {
-        java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
-        try {
-            request.buildRequestBody(buffer);
-        } catch (java.io.IOException e) {
-            throw new IllegalStateException(e);
+    private Map<String, List<String>> parseBody(TestConnection connection) {
+        byte[] output = connection.getOutputData();
+        if (output == null || output.length == 0) {
+            return new LinkedHashMap<String, List<String>>();
         }
-        String body = new String(buffer.toByteArray(), StandardCharsets.UTF_8);
+        String body = new String(output, StandardCharsets.UTF_8);
         Map<String, List<String>> out = new LinkedHashMap<String, List<String>>();
         if (body.isEmpty()) {
             return out;
