@@ -45,7 +45,6 @@ public class HelloCodenameOneInstrumentedTest {
 
     private static void println(String s) {
         System.out.println(s);
-        android.util.Log.i("CN1SS", s);
     }
 
     private static void settle(long millis) {
@@ -252,13 +251,11 @@ public class HelloCodenameOneInstrumentedTest {
                             + ":"
                             + chunk;
             System.out.println(line);
-            android.util.Log.i("CN1SS", line);
             count++;
         }
         println("CN1SS:INFO:test=" + safeName + " chunks=" + count + " total_b64_len=" + b64.length());
         String endLine = prefix + ":END:" + safeName;
         System.out.println(endLine);
-        android.util.Log.i("CN1SS", endLine);
         System.out.flush();
     }
 
