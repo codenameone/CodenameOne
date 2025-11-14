@@ -7,6 +7,7 @@ import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation.TestConnection;
 import com.codename1.util.Base64;
 import com.codename1.io.rest.Response;
+import com.codename1.ui.CN;
 import org.junit.jupiter.api.BeforeEach;
 
 import java.nio.charset.StandardCharsets;
@@ -31,7 +32,11 @@ class RequestBuilderTest extends UITestBase {
     void createRequestPopulatesConnection() throws Exception {
         RequestBuilder previewBuilder = createConfiguredBuilder();
         ConnectionRequest preview = previewBuilder.fetchAsString(response -> { });
-        NetworkManager.getInstance().killAndWait(preview);
+        CN.invokeAndBlock(new Runnable() {
+            public void run() {
+                NetworkManager.getInstance().killAndWait(preview);
+            }
+        });
         implementation.clearConnections();
 
         assertEquals(ConnectionRequest.CachingMode.MANUAL, preview.getCacheMode());
