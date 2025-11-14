@@ -255,6 +255,7 @@ ra_log "Detected CN1SS test streams: ${TEST_NAMES[*]}"
 declare -A TEST_OUTPUTS=()
 declare -A TEST_SOURCES=()
 declare -A PREVIEW_OUTPUTS=()
+declare -A TEST_DECODE_OK=()
 
 ensure_dir "$SCREENSHOT_PREVIEW_DIR"
 
@@ -265,8 +266,8 @@ for test in "${TEST_NAMES[@]}"; do
   if source_label="$(cn1ss_decode_test_png "$test" "$dest" "${CN1SS_SOURCES[@]}")"; then
     TEST_OUTPUTS["$test"]="$dest"
     TEST_SOURCES["$test"]="$source_label"
-    TEST_DECODE_OK["$test"]=1
     ra_log "Decoded screenshot for '$test' (source=${source_label}, size: $(cn1ss_file_size "$dest") bytes)"
+
     preview_dest="$SCREENSHOT_PREVIEW_DIR/${test}.jpg"
     if preview_source="$(cn1ss_decode_test_preview "$test" "$preview_dest" "${CN1SS_SOURCES[@]}")"; then
       PREVIEW_OUTPUTS["$test"]="$preview_dest"
@@ -274,6 +275,7 @@ for test in "${TEST_NAMES[@]}"; do
     else
       rm -f "$preview_dest" 2>/dev/null || true
     fi
+    TEST_DECODE_OK["$test"]=1
   else
     ra_log "ERROR: Failed to extract/decode CN1SS payload for test '$test'"
     RAW_B64_OUT="$SCREENSHOT_TMP_DIR/${test}.raw.b64"
@@ -284,17 +286,16 @@ for test in "${TEST_NAMES[@]}"; do
       fi
     fi
     decode_rc=12
-    continue
   fi
 done
 
 # ---- Compare against stored references ------------------------------------
-
 COMPARE_ARGS=()
 for test in "${TEST_NAMES[@]}"; do
-  dest="${TEST_OUTPUTS[$test]:-}"
+  # Safe under `set -u`: if key is missing, default to empty string
+  dest="${TEST_OUTPUTS[$test]-}"
   if [ -z "$dest" ]; then
-    # Fabricate a non-existent path so ProcessScreenshots marks this as missing_actual
+    # Fabricate a non-existent path so ProcessScreenshots reports missing_actual
     dest="$SCREENSHOT_TMP_DIR/${test}.missing.png"
   fi
   COMPARE_ARGS+=("--actual" "${test}=${dest}")
