@@ -1419,8 +1419,12 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public Object connect(String url, boolean read, boolean write) throws IOException {
         TestConnection connection = connections.computeIfAbsent(url, TestConnection::new);
-        connection.readRequested = read;
-        connection.writeRequested = write;
+        if (read) {
+            connection.readRequested = true;
+        }
+        if (write) {
+            connection.writeRequested = true;
+        }
         return connection;
     }
 
