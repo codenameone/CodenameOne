@@ -50,6 +50,7 @@ class PushTest extends UITestBase {
         }
         Display.getInstance().setProperty("cn1_push_prefix", null);
         implementation.clearConnections();
+        implementation.clearQueuedRequests();
         implementation.clearStorage();
         Storage.getInstance().clearCache();
         NetworkManager.getInstance().shutdownSync();
@@ -198,7 +199,22 @@ class PushTest extends UITestBase {
                 result[0] = push.send();
             }
         });
+        Push.PushConnection executed = findLatestPushRequest();
+        if (executed != null) {
+            return executed.successful;
+        }
         return result[0];
+    }
+
+    private Push.PushConnection findLatestPushRequest() {
+        List<ConnectionRequest> requests = implementation.getQueuedRequests();
+        for (int i = requests.size() - 1; i >= 0; i--) {
+            ConnectionRequest request = requests.get(i);
+            if (request instanceof Push.PushConnection) {
+                return (Push.PushConnection) request;
+            }
+        }
+        return null;
     }
 
     private TestConnection preparePushConnection() {
