@@ -1,6 +1,6 @@
 package com.codename1.io;
 
-import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.testing.TestCodenameOneImplementation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -9,20 +9,21 @@ import java.util.Arrays;
 import java.util.Vector;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 class StorageTest {
-    private CodenameOneImplementation implementation;
+    private TestCodenameOneImplementation implementation;
     private Storage storage;
 
     @BeforeEach
     void setUp() {
-        implementation = TestImplementationProvider.installImplementation(true);
+        implementation = new TestCodenameOneImplementation();
+        Util.setImplementation(implementation);
+        Storage.setStorageInstance(null);
         storage = Storage.getInstance();
         storage.clearStorage();
         storage.clearCache();
         storage.setNormalizeNames(true);
+        implementation.resetFlushStorageCacheInvocations();
     }
 
     @Test
@@ -81,7 +82,7 @@ class StorageTest {
     @Test
     void flushStorageCacheDelegatesToImplementation() {
         storage.flushStorageCache();
-        verify(implementation).flushStorageCache();
+        assertEquals(1, implementation.getFlushStorageCacheInvocations());
     }
 
     @Test
@@ -107,7 +108,7 @@ class StorageTest {
     @Test
     void existsDelegatesToImplementationWithNormalization() {
         String key = "needs?normalization";
-        when(implementation.storageFileExists("needs_normalization")).thenReturn(true);
+        implementation.putStorageEntry("needs_normalization", new byte[]{1});
         assertTrue(storage.exists(key));
     }
 }

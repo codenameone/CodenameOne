@@ -2,11 +2,11 @@ package com.codename1.properties;
 
 import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
-import com.codename1.io.TestImplementationProvider;
+import com.codename1.junit.EdtTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.xml.Element;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -18,32 +18,35 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class PropertiesPackageTest {
+class PropertiesPackageTest extends UITestBase {
 
     private String originalPreferencesLocation;
 
     @BeforeEach
-    void setup() throws Exception {
-        TestImplementationProvider.installImplementation(true);
-        resetPreferencesState();
-        resetMetadata();
+    void setup() {
+        originalPreferencesLocation = Preferences.getPreferencesLocation();
+        Preferences.setPreferencesLocation("PropertiesTest-" + System.nanoTime());
+        Preferences.clearAll();
+        implementation.clearStorage();
+        Storage.getInstance().clearStorage();
+        Storage.getInstance().clearCache();
         PropertyBase.bindGlobalGetListener(null);
         PropertyBase.bindGlobalSetListener(null);
     }
 
     @AfterEach
-    void tearDown() throws Exception {
+    void tearDown() {
         PropertyBase.bindGlobalGetListener(null);
         PropertyBase.bindGlobalSetListener(null);
-        resetPreferencesState();
+        Preferences.clearAll();
         if (originalPreferencesLocation != null) {
             Preferences.setPreferencesLocation(originalPreferencesLocation);
         }
-        Storage.setStorageInstance(null);
-        resetMetadata();
+        Storage.getInstance().clearCache();
+        implementation.clearStorage();
     }
 
-    @Test
+    @EdtTest
     void propertyChangeListenersCanBeRemoved() {
         Person person = new Person();
         List<PropertyBase> triggered = new ArrayList<PropertyBase>();
@@ -63,7 +66,7 @@ class PropertiesPackageTest {
         assertTrue(triggered.isEmpty());
     }
 
-    @Test
+    @EdtTest
     void globalGetAndSetListenersFire() {
         Person person = new Person();
         AtomicReference<PropertyBase> lastGet = new AtomicReference<PropertyBase>();
@@ -86,7 +89,7 @@ class PropertiesPackageTest {
         assertSame(person.name, lastSet.get());
     }
 
-    @Test
+    @EdtTest
     void clientPropertiesAndLabelsPersist() {
         Person person = new Person();
         assertEquals("name", person.name.getLabel());
@@ -96,19 +99,19 @@ class PropertiesPackageTest {
         assertEquals("enter name", person.name.getClientProperty("hint"));
     }
 
-    @Test
+    @EdtTest
     void validateCollectionTypeRejectsInvalidTypes() {
         assertThrows(IllegalArgumentException.class, () -> new ListProperty<Object, Person>("bad", Object.class));
     }
 
-    @Test
+    @EdtTest
     void numericPropertyHonorsNullability() {
         IntProperty<Person> score = new IntProperty<Person>("score");
         score.setNullable(false);
         assertThrows(NullPointerException.class, () -> score.set(null));
     }
 
-    @Test
+    @EdtTest
     void propertyEqualityUsesNameAndValue() {
         Property<String, Person> a = new Property<String, Person>("name", "value");
         Property<String, Person> b = new Property<String, Person>("name", "value");
@@ -117,7 +120,7 @@ class PropertiesPackageTest {
         assertFalse(a.equals(b));
     }
 
-    @Test
+    @EdtTest
     void listAndMapPropertiesSupportMutation() {
         Person person = new Person();
         person.tags.add("alpha");
@@ -137,7 +140,7 @@ class PropertiesPackageTest {
         assertEquals("2", exploded.get("second"));
     }
 
-    @Test
+    @EdtTest
     void propertyIndexToMapJsonAndXmlRoundTrip() {
         Person person = new Person();
         person.name.set("Dana");
@@ -193,7 +196,7 @@ class PropertiesPackageTest {
         assertEquals(28, fromXml.age.get().intValue());
     }
 
-    @Test
+    @EdtTest
     void xmlTextElementConfigurationIsHonored() {
         Person person = new Person();
         person.name.set("Eva");
@@ -208,7 +211,7 @@ class PropertiesPackageTest {
         assertNull(index.getXmlTextElement());
     }
 
-    @Test
+    @EdtTest
     void initPopulatesPropertiesInOrder() {
         Person person = new Person();
         Address addr = new Address();
@@ -225,7 +228,7 @@ class PropertiesPackageTest {
         assertEquals(1, person.history.size());
     }
 
-    @Test
+    @EdtTest
     void preferencesObjectSynchronizesValues() {
         Settings settings = new Settings();
         settings.title.set("Initial");
@@ -244,41 +247,6 @@ class PropertiesPackageTest {
         assertEquals("Updated", Preferences.get("prefs.title", ""));
         assertFalse(Preferences.get("prefs.enabled", true));
         assertEquals(7, Preferences.get("prefs.total", 0));
-    }
-
-    private void resetPreferencesState() throws Exception {
-        FieldAccessor.resetStaticField(Preferences.class, "p", null);
-        FieldAccessor.resetStaticMap(Preferences.class, "listenerMap");
-        if (originalPreferencesLocation == null) {
-            originalPreferencesLocation = Preferences.getPreferencesLocation();
-        }
-        Preferences.setPreferencesLocation("PropertiesTest-" + System.nanoTime());
-        Storage.setStorageInstance(null);
-    }
-
-    private void resetMetadata() throws Exception {
-        FieldAccessor.resetStaticMap(PropertyIndex.class, "metadata");
-    }
-
-    private static class FieldAccessor {
-        private FieldAccessor() {
-        }
-
-        static void resetStaticField(Class<?> type, String name, Object value) throws Exception {
-            java.lang.reflect.Field field = type.getDeclaredField(name);
-            field.setAccessible(true);
-            field.set(null, value);
-        }
-
-        @SuppressWarnings("unchecked")
-        static void resetStaticMap(Class<?> type, String name) throws Exception {
-            java.lang.reflect.Field field = type.getDeclaredField(name);
-            field.setAccessible(true);
-            Object obj = field.get(null);
-            if (obj instanceof Map) {
-                ((Map) obj).clear();
-            }
-        }
     }
 
     static class Address implements PropertyBusinessObject {

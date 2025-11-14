@@ -1,6 +1,6 @@
 package com.codename1.io;
 
-import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.testing.TestCodenameOneImplementation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -13,18 +13,19 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.atLeastOnce;
-import static org.mockito.Mockito.verify;
 
 class UtilTest {
-    private CodenameOneImplementation implementation;
+    private TestCodenameOneImplementation implementation;
 
     @BeforeEach
     void setUp() {
-        implementation = TestImplementationProvider.installImplementation(true);
+        implementation = new TestCodenameOneImplementation();
+        Util.setImplementation(implementation);
+        implementation.resetCleanupCalls();
     }
 
     @Test
@@ -36,8 +37,9 @@ class UtilTest {
         Util.copy(input, output);
 
         assertArrayEquals(source, output.toByteArray());
-        verify(implementation, atLeastOnce()).cleanup(input);
-        verify(implementation, atLeastOnce()).cleanup(output);
+        List<Object> cleanup = implementation.getCleanupCalls();
+        assertTrue(cleanup.contains(input));
+        assertTrue(cleanup.contains(output));
     }
 
     @Test
@@ -59,7 +61,8 @@ class UtilTest {
     @Test
     void cleanupHandlesNullValues() {
         Util.cleanup(null);
-        verify(implementation).cleanup(null);
+        List<Object> cleanup = implementation.getCleanupCalls();
+        assertTrue(cleanup.contains(null));
     }
 
     @Test

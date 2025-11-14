@@ -1,6 +1,6 @@
 package com.codename1.io;
 
-import java.lang.reflect.Field;
+import com.codename1.testing.TestCodenameOneImplementation;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -11,16 +11,29 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PreferencesTest {
+    private TestCodenameOneImplementation implementation;
+    private String originalLocation;
 
     @BeforeEach
-    void setUp() throws Exception {
-        TestImplementationProvider.installImplementation(true);
-        resetPreferencesState();
+    void setUp() {
+        implementation = new TestCodenameOneImplementation();
+        Util.setImplementation(implementation);
+        Storage.setStorageInstance(null);
+        Storage.getInstance().clearCache();
+        implementation.clearStorage();
+        originalLocation = Preferences.getPreferencesLocation();
+        Preferences.setPreferencesLocation("PreferencesTest-" + System.nanoTime());
+        Preferences.clearAll();
     }
 
     @AfterEach
-    void tearDown() throws Exception {
-        resetPreferencesState();
+    void tearDown() {
+        Preferences.clearAll();
+        if (originalLocation != null) {
+            Preferences.setPreferencesLocation(originalLocation);
+        }
+        Storage.getInstance().clearCache();
+        implementation.clearStorage();
     }
 
     @Test
@@ -67,10 +80,13 @@ class PreferencesTest {
     void deleteAndClearAllTriggerListeners() {
         AtomicReference<Object> prior = new AtomicReference<>();
         AtomicReference<Object> current = new AtomicReference<>();
-        Preferences.addPreferenceListener("key", (pref, oldValue, newValue) -> {
-            prior.set(oldValue);
-            current.set(newValue);
-        });
+        Preferences.PreferenceListener listener = new Preferences.PreferenceListener() {
+            public void preferenceChanged(String pref, Object oldValue, Object newValue) {
+                prior.set(oldValue);
+                current.set(newValue);
+            }
+        };
+        Preferences.addPreferenceListener("key", listener);
         Preferences.set("key", "first");
         Preferences.set("key", "second");
         assertEquals("first", prior.get());
@@ -84,6 +100,7 @@ class PreferencesTest {
         Preferences.clearAll();
         assertEquals("restored", prior.get());
         assertNull(current.get());
+        Preferences.removePreferenceListener("key", listener);
     }
 
     @Test
@@ -97,22 +114,5 @@ class PreferencesTest {
 
         Preferences.setPreferencesLocation(defaultLocation);
         assertEquals("original", Preferences.get("shared", ""));
-    }
-
-    @SuppressWarnings("unchecked")
-    private void resetPreferencesState() throws Exception {
-        Field pField = Preferences.class.getDeclaredField("p");
-        pField.setAccessible(true);
-        pField.set(null, null);
-
-        Field listenerField = Preferences.class.getDeclaredField("listenerMap");
-        listenerField.setAccessible(true);
-        ((Map) listenerField.get(null)).clear();
-
-        Field locationField = Preferences.class.getDeclaredField("preferencesLocation");
-        locationField.setAccessible(true);
-        locationField.set(null, "CN1Preferences");
-
-        Storage.setStorageInstance(null);
     }
 }

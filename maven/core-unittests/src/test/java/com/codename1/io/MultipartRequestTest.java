@@ -1,5 +1,6 @@
 package com.codename1.io;
 
+import com.codename1.testing.TestCodenameOneImplementation;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -10,9 +11,12 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MultipartRequestTest {
+    private TestCodenameOneImplementation implementation;
+
     @BeforeEach
     void resetImplementation() {
-        TestImplementationProvider.installImplementation(true);
+        implementation = new TestCodenameOneImplementation();
+        Util.setImplementation(implementation);
     }
 
     @Test

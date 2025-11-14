@@ -1,51 +1,44 @@
 package com.codename1.io;
 
-import com.codename1.impl.CodenameOneImplementation;
-import com.codename1.ui.Display;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import com.codename1.junit.EdtTest;
+import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestCodenameOneImplementation.TestSocket;
 
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.when;
 
-class SocketTest {
-    private CodenameOneImplementation implementation;
+class SocketTest extends UITestBase {
 
-    @BeforeEach
-    void setUp() {
-        implementation = TestImplementationProvider.installImplementation(true);
-        Display.getInstance();
+    @Override
+    protected void setUpDisplay() throws Exception {
+        super.setUpDisplay();
+        implementation.clearSockets();
+        implementation.setSocketAvailable(true);
+        implementation.setServerSocketAvailable(true);
+        implementation.setHostOrIP("device.local");
     }
 
-    @Test
+    @EdtTest
     void supportedFlagsDelegateToImplementation() {
-        when(implementation.isSocketAvailable()).thenReturn(true);
+        implementation.setSocketAvailable(true);
         assertTrue(Socket.isSupported());
-        when(implementation.isSocketAvailable()).thenReturn(false);
+        implementation.setSocketAvailable(false);
         assertFalse(Socket.isSupported());
 
-        when(implementation.isServerSocketAvailable()).thenReturn(true);
+        implementation.setServerSocketAvailable(true);
         assertTrue(Socket.isServerSocketSupported());
     }
 
-    @Test
+    @EdtTest
     void connectRejectsHostsContainingPort() {
         SocketConnection connection = new SocketConnection() {
             public void connectionError(int errorCode, String message) {
@@ -57,9 +50,8 @@ class SocketTest {
         assertThrows(IllegalArgumentException.class, () -> Socket.connect("example.com:8080", 80, connection));
     }
 
-    @Test
+    @EdtTest
     void connectFailureInvokesErrorCallback() throws InterruptedException {
-        when(implementation.connectSocket(anyString(), anyInt(), anyInt())).thenReturn(null);
         CountDownLatch latch = new CountDownLatch(1);
         AtomicInteger errorCode = new AtomicInteger();
         AtomicReference<String> message = new AtomicReference<String>();
@@ -82,9 +74,9 @@ class SocketTest {
         assertEquals("Failed to connect", message.get());
     }
 
-    @Test
+    @EdtTest
     void connectEstablishesStreamsAndAllowsReadWrite() throws Exception {
-        FakeSocketState state = prepareSocketState("example.com", 1234);
+        TestSocket socket = implementation.registerSocket("example.com", 1234);
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<InputStream> inputRef = new AtomicReference<InputStream>();
         AtomicReference<OutputStream> outputRef = new AtomicReference<OutputStream>();
@@ -105,7 +97,7 @@ class SocketTest {
         assertTrue(latch.await(2, TimeUnit.SECONDS));
         assertTrue(connection.isConnected());
 
-        state.enqueue("hi".getBytes(StandardCharsets.UTF_8));
+        socket.enqueue("hi".getBytes(StandardCharsets.UTF_8));
         byte[] buffer = new byte[4];
         int read = inputRef.get().read(buffer);
         assertEquals(2, read);
@@ -113,26 +105,26 @@ class SocketTest {
 
         outputRef.get().write(new byte[]{1, 2, 3});
         outputRef.get().flush();
-        assertEquals(1, state.outbound.size());
-        assertArrayEquals(new byte[]{1, 2, 3}, state.outbound.get(0));
-
         outputRef.get().write(new byte[]{9, 8, 7}, 1, 2);
         outputRef.get().write(255);
         outputRef.get().flush();
-        assertEquals(3, state.outbound.size());
-        assertArrayEquals(new byte[]{8, 7}, state.outbound.get(1));
-        assertArrayEquals(new byte[]{(byte) 255}, state.outbound.get(2));
+
+        List<byte[]> outbound = socket.getOutboundMessages();
+        assertEquals(3, outbound.size());
+        assertArrayEquals(new byte[]{1, 2, 3}, outbound.get(0));
+        assertArrayEquals(new byte[]{8, 7}, outbound.get(1));
+        assertArrayEquals(new byte[]{(byte) 255}, outbound.get(2));
 
         outputRef.get().close();
         assertFalse(connection.isConnected());
-        assertFalse(state.connected);
+        assertFalse(socket.isConnected());
 
         assertEquals(-1, inputRef.get().read(new byte[4]));
     }
 
-    @Test
+    @EdtTest
     void connectWithCloseDisconnectsSocket() throws Exception {
-        FakeSocketState state = prepareSocketState("close.me", 9000);
+        TestSocket socket = implementation.registerSocket("close.me", 9000);
         CountDownLatch latch = new CountDownLatch(1);
         SocketConnection connection = new SocketConnection() {
             public void connectionError(int errorCode, String message) {
@@ -147,12 +139,12 @@ class SocketTest {
         Socket.Close closeHandle = Socket.connectWithClose("close.me", 9000, connection);
         assertTrue(latch.await(2, TimeUnit.SECONDS));
         closeHandle.close();
-        assertFalse(state.connected);
+        assertFalse(socket.isConnected());
     }
 
-    @Test
+    @EdtTest
     void inputStreamCloseDisconnectsSocket() throws Exception {
-        FakeSocketState state = prepareSocketState("input", 1100);
+        TestSocket socket = implementation.registerSocket("input", 1100);
         CountDownLatch latch = new CountDownLatch(1);
         AtomicReference<InputStream> inputRef = new AtomicReference<InputStream>();
 
@@ -170,65 +162,12 @@ class SocketTest {
         Socket.connect("input", 1100, connection);
         assertTrue(latch.await(2, TimeUnit.SECONDS));
         inputRef.get().close();
-        assertFalse(state.connected);
+        assertFalse(socket.isConnected());
     }
 
-    @Test
+    @EdtTest
     void getHostOrIpDelegatesToImplementation() {
-        when(implementation.getHostOrIP()).thenReturn("device.local");
+        implementation.setHostOrIP("device.local");
         assertEquals("device.local", Socket.getHostOrIP());
-    }
-
-    private FakeSocketState prepareSocketState(String host, int port) {
-        FakeSocketState state = new FakeSocketState();
-        when(implementation.isSocketAvailable()).thenReturn(true);
-        when(implementation.connectSocket(eq(host), eq(port), anyInt())).thenReturn(state);
-        when(implementation.isSocketConnected(state)).thenAnswer(invocation -> state.connected);
-        when(implementation.getSocketAvailableInput(state)).thenAnswer(invocation -> state.available());
-        when(implementation.readFromSocketStream(state)).thenAnswer(invocation -> state.read());
-        when(implementation.getSocketErrorCode(state)).thenReturn(0);
-        when(implementation.getSocketErrorMessage(state)).thenReturn(null);
-
-        doAnswer(invocation -> {
-            state.write(invocation.getArgument(1));
-            return null;
-        }).when(implementation).writeToSocketStream(eq(state), any(byte[].class));
-
-        doAnswer(invocation -> {
-            state.connected = false;
-            return null;
-        }).when(implementation).disconnectSocket(eq(state));
-
-        return state;
-    }
-
-    private static class FakeSocketState {
-        private final ConcurrentLinkedQueue<byte[]> inbound = new ConcurrentLinkedQueue<byte[]>();
-        private final List<byte[]> outbound = new ArrayList<byte[]>();
-        private volatile boolean connected = true;
-
-        void enqueue(byte[] data) {
-            inbound.add(data);
-        }
-
-        int available() {
-            int total = 0;
-            for (byte[] bytes : inbound) {
-                total += bytes.length;
-            }
-            return total;
-        }
-
-        byte[] read() {
-            byte[] data = inbound.poll();
-            if (data == null) {
-                return new byte[0];
-            }
-            return data;
-        }
-
-        void write(byte[] data) {
-            outbound.add(Arrays.copyOf(data, data.length));
-        }
     }
 }
