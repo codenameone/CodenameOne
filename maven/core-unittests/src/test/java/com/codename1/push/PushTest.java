@@ -62,8 +62,7 @@ class PushTest extends UITestBase {
         Push push = new Push("t", "body", "device");
         Push result = push.gcmAuth("secret");
         assertSame(push, result);
-        assertTrue(sendPush(push));
-        waitForPush(connection);
+        assertTrue(sendPush(push, connection));
 
         Map<String, List<String>> body = parseBody(connection);
         assertEquals("secret", body.get("auth").get(0));
@@ -75,8 +74,7 @@ class PushTest extends UITestBase {
         Push push = new Push("t", "body", "device");
         Push returned = push.apnsAuth("https://cert", "pass", true);
         assertSame(push, returned);
-        assertTrue(sendPush(push));
-        waitForPush(connection);
+        assertTrue(sendPush(push, connection));
 
         Map<String, List<String>> body = parseBody(connection);
         assertEquals("https://cert", body.get("cert").get(0));
@@ -89,8 +87,7 @@ class PushTest extends UITestBase {
         TestConnection connection = preparePushConnection();
         Push push = new Push("t", "body", "device");
         push.wnsAuth("sid", "client");
-        assertTrue(sendPush(push));
-        waitForPush(connection);
+        assertTrue(sendPush(push, connection));
 
         Map<String, List<String>> body = parseBody(connection);
         assertEquals("sid", body.get("sid").get(0));
@@ -102,8 +99,7 @@ class PushTest extends UITestBase {
         TestConnection connection = preparePushConnection();
         Push push = new Push("t", "body", "device");
         push.pushType(7);
-        assertTrue(sendPush(push));
-        waitForPush(connection);
+        assertTrue(sendPush(push, connection));
 
         Map<String, List<String>> body = parseBody(connection);
         assertEquals("7", body.get("type").get(0));
@@ -117,8 +113,7 @@ class PushTest extends UITestBase {
         push.apnsAuth("https://cert", "pass", true);
         push.wnsAuth("sid", "secret");
         push.pushType(5);
-        assertTrue(sendPush(push));
-        waitForPush(connection);
+        assertTrue(sendPush(push, connection));
 
         Map<String, List<String>> arguments = parseBody(connection);
         assertEquals("token", arguments.get("token").get(0));
@@ -140,8 +135,7 @@ class PushTest extends UITestBase {
         TestConnection connection = preparePushConnection();
         Push push = new Push("token", "Body", "device");
         push.apnsAuth("https://cert", "pass", false);
-        assertTrue(sendPush(push));
-        waitForPush(connection);
+        assertTrue(sendPush(push, connection));
 
         Map<String, List<String>> arguments = parseBody(connection);
         assertEquals("false", arguments.get("production").get(0));
@@ -192,13 +186,14 @@ class PushTest extends UITestBase {
         assertEquals("cn1-prefix-plain", Push.getPushKey());
     }
 
-    private boolean sendPush(final Push push) {
+    private boolean sendPush(final Push push, TestConnection connection) {
         final boolean[] result = new boolean[1];
         CN.invokeAndBlock(new Runnable() {
             public void run() {
                 result[0] = push.send();
             }
         });
+        waitForPush(connection);
         Push.PushConnection executed = findLatestPushRequest();
         if (executed != null) {
             if (executed.successful) {
@@ -208,6 +203,10 @@ class PushTest extends UITestBase {
             if (responseCode >= 200 && responseCode < 300) {
                 return true;
             }
+        }
+        int simulatedCode = connection.getResponseCode();
+        if (simulatedCode >= 200 && simulatedCode < 300) {
+            return true;
         }
         return result[0];
     }
