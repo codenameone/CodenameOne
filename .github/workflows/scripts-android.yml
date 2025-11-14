@@ -92,6 +92,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         env:
           CN1SS_SKIP_COMMENT: "1"
+          RUN_CONNECTED_TESTS: "1"
         with:
           api-level: 31
           arch: x86_64
