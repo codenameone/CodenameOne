@@ -6,6 +6,7 @@ import com.codename1.io.Storage;
 import com.codename1.junit.EdtTest;
 import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.CN;
 import com.codename1.testing.TestCodenameOneImplementation.TestConnection;
 import com.codename1.ui.Display;
 import org.junit.jupiter.api.AfterEach;
@@ -25,28 +26,36 @@ class PushTest extends UITestBase {
     private String originalPreferencesLocation;
 
     @BeforeEach
-    void setup() {
-        originalPreferencesLocation = Preferences.getPreferencesLocation();
-        Preferences.setPreferencesLocation("PushTest-" + System.nanoTime());
-        Preferences.clearAll();
-        implementation.clearConnections();
-        implementation.clearStorage();
-        Storage.getInstance().clearStorage();
-        Storage.getInstance().clearCache();
-        TestLogger.install();
+    void setup() throws Exception {
+        CN.callSeriallyAndWait(new Runnable() {
+            public void run() {
+                originalPreferencesLocation = Preferences.getPreferencesLocation();
+                Preferences.setPreferencesLocation("PushTest-" + System.nanoTime());
+                Preferences.clearAll();
+                implementation.clearConnections();
+                implementation.clearStorage();
+                Storage.getInstance().clearStorage();
+                Storage.getInstance().clearCache();
+                TestLogger.install();
+            }
+        });
     }
 
     @AfterEach
-    void tearDown() {
-        TestLogger.remove();
-        Preferences.clearAll();
-        if (originalPreferencesLocation != null) {
-            Preferences.setPreferencesLocation(originalPreferencesLocation);
-        }
-        Display.getInstance().setProperty("cn1_push_prefix", null);
-        implementation.clearConnections();
-        implementation.clearStorage();
-        Storage.getInstance().clearCache();
+    void tearDown() throws Exception {
+        CN.callSeriallyAndWait(new Runnable() {
+            public void run() {
+                TestLogger.remove();
+                Preferences.clearAll();
+                if (originalPreferencesLocation != null) {
+                    Preferences.setPreferencesLocation(originalPreferencesLocation);
+                }
+                Display.getInstance().setProperty("cn1_push_prefix", null);
+                implementation.clearConnections();
+                implementation.clearStorage();
+                Storage.getInstance().clearCache();
+            }
+        });
     }
 
     @EdtTest

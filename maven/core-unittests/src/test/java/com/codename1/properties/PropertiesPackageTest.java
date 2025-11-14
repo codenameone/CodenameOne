@@ -4,6 +4,7 @@ import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
 import com.codename1.junit.EdtTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.CN;
 import com.codename1.xml.Element;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,27 +24,35 @@ class PropertiesPackageTest extends UITestBase {
     private String originalPreferencesLocation;
 
     @BeforeEach
-    void setup() {
-        originalPreferencesLocation = Preferences.getPreferencesLocation();
-        Preferences.setPreferencesLocation("PropertiesTest-" + System.nanoTime());
-        Preferences.clearAll();
-        implementation.clearStorage();
-        Storage.getInstance().clearStorage();
-        Storage.getInstance().clearCache();
-        PropertyBase.bindGlobalGetListener(null);
-        PropertyBase.bindGlobalSetListener(null);
+    void setup() throws Exception {
+        CN.callSeriallyAndWait(new Runnable() {
+            public void run() {
+                originalPreferencesLocation = Preferences.getPreferencesLocation();
+                Preferences.setPreferencesLocation("PropertiesTest-" + System.nanoTime());
+                Preferences.clearAll();
+                implementation.clearStorage();
+                Storage.getInstance().clearStorage();
+                Storage.getInstance().clearCache();
+                PropertyBase.bindGlobalGetListener(null);
+                PropertyBase.bindGlobalSetListener(null);
+            }
+        });
     }
 
     @AfterEach
-    void tearDown() {
-        PropertyBase.bindGlobalGetListener(null);
-        PropertyBase.bindGlobalSetListener(null);
-        Preferences.clearAll();
-        if (originalPreferencesLocation != null) {
-            Preferences.setPreferencesLocation(originalPreferencesLocation);
-        }
-        Storage.getInstance().clearCache();
-        implementation.clearStorage();
+    void tearDown() throws Exception {
+        CN.callSeriallyAndWait(new Runnable() {
+            public void run() {
+                PropertyBase.bindGlobalGetListener(null);
+                PropertyBase.bindGlobalSetListener(null);
+                Preferences.clearAll();
+                if (originalPreferencesLocation != null) {
+                    Preferences.setPreferencesLocation(originalPreferencesLocation);
+                }
+                Storage.getInstance().clearCache();
+                implementation.clearStorage();
+            }
+        });
     }
 
     @EdtTest

@@ -4,6 +4,7 @@ import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
 import com.codename1.junit.EdtTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.CN;
 import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.testing.TestCodenameOneImplementation.TestConnection;
 import com.codename1.util.Base64;
@@ -26,8 +27,12 @@ class RequestBuilderTest extends UITestBase {
     private static final String BASE_URL = "https://example.com";
 
     @BeforeEach
-    void clearConnections() {
-        implementation.clearConnections();
+    void clearConnections() throws Exception {
+        CN.callSeriallyAndWait(new Runnable() {
+            public void run() {
+                implementation.clearConnections();
+            }
+        });
     }
 
     @EdtTest

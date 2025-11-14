@@ -4,6 +4,7 @@ import com.codename1.io.Storage;
 import com.codename1.junit.EdtTest;
 import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.CN;
 import com.codename1.util.SuccessCallback;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,24 +26,35 @@ class PurchaseTest extends UITestBase {
     private TestPurchase purchase;
 
     @BeforeEach
-    void setUpPurchase() {
-        TestLogger.install();
-        Storage.setStorageInstance(null);
-        Storage.getInstance().clearStorage();
-        Storage.getInstance().clearCache();
-        purchase = new TestPurchase();
-        implementation.setInAppPurchase(purchase);
-        Receipt.registerExternalizable();
-        resetPurchaseState();
+    void setUpPurchase() throws Exception {
+        CN.callSeriallyAndWait(new Runnable() {
+            public void run() {
+                TestLogger.install();
+                Storage.setStorageInstance(null);
+                Storage.getInstance().clearStorage();
+                Storage.getInstance().clearCache();
+                purchase = new TestPurchase();
+                implementation.setInAppPurchase(purchase);
+                Receipt.registerExternalizable();
+                resetPurchaseState();
+            }
+        });
     }
 
     @AfterEach
-    void tearDownPurchase() {
-        purchase.setReceiptStore(null);
-        implementation.setInAppPurchase(null);
-        Storage.getInstance().clearCache();
-        Storage.getInstance().clearStorage();
-        TestLogger.remove();
+    void tearDownPurchase() throws Exception {
+        final TestPurchase current = purchase;
+        CN.callSeriallyAndWait(new Runnable() {
+            public void run() {
+                if (current != null) {
+                    current.setReceiptStore(null);
+                }
+                implementation.setInAppPurchase(null);
+                Storage.getInstance().clearCache();
+                Storage.getInstance().clearStorage();
+                TestLogger.remove();
+            }
+        });
     }
 
     private void resetPurchaseState() {
