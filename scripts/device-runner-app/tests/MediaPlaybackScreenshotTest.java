@@ -1,14 +1,11 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.io.FileSystemStorage;
-import com.codename1.io.Log;
 import com.codename1.media.Media;
 import com.codename1.media.MediaManager;
-import com.codename1.system.NativeLookup;
 import com.codename1.testing.AbstractTest;
 import com.codename1.testing.TestUtils;
 import com.codename1.ui.Container;
-import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
@@ -31,8 +28,8 @@ public class MediaPlaybackScreenshotTest extends AbstractTest {
             Form form = new Form("Media Playback", new BorderLayout());
             Container content = new Container(BoxLayout.y());
             content.getAllStyles().setPadding(6, 6, 6, 6);
-            content.add(new Label("Android media playback regression"));
-            content.add(new Label("Verifies createMedia() with a content:// URI"));
+            content.add(new Label("Media playback regression"));
+            content.add(new Label("Verifies createMedia() against filesystem URI"));
             content.add(statusLabel);
             form.add(BorderLayout.CENTER, content);
             formHolder[0] = form;
@@ -45,18 +42,12 @@ public class MediaPlaybackScreenshotTest extends AbstractTest {
             return false;
         }
 
-        String contentUri = toContentUri(tonePath);
-        if (contentUri == null) {
-            updateStatus(statusLabel, formHolder[0], "Failed to resolve content URI");
-            FileSystemStorage.getInstance().delete(tonePath);
-            return false;
-        }
-
+        final String mediaPath = tonePath;
         final Media[] mediaHolder = new Media[1];
         final boolean[] playbackFailed = new boolean[1];
         Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {
             try {
-                Media media = MediaManager.createMedia(contentUri, false);
+                Media media = MediaManager.createMedia(mediaPath, false);
                 if (media == null) {
                     updateStatus(statusLabel, formHolder[0], "Media creation returned null");
                     playbackFailed[0] = true;
@@ -76,7 +67,7 @@ public class MediaPlaybackScreenshotTest extends AbstractTest {
 
         if (playbackFailed[0]) {
             cleanupMedia(mediaHolder[0]);
-            FileSystemStorage.getInstance().delete(tonePath);
+            FileSystemStorage.getInstance().delete(mediaPath);
             return false;
         }
 
@@ -103,7 +94,7 @@ public class MediaPlaybackScreenshotTest extends AbstractTest {
         boolean screenshotSuccess = Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("MediaPlayback");
 
         cleanupMedia(mediaHolder[0]);
-        FileSystemStorage.getInstance().delete(tonePath);
+        FileSystemStorage.getInstance().delete(mediaPath);
 
         return playbackStarted[0] && screenshotSuccess;
     }
@@ -197,27 +188,4 @@ public class MediaPlaybackScreenshotTest extends AbstractTest {
         out.write(value & 0xff);
         out.write((value >> 8) & 0xff);
     }
-
-    private static String toContentUri(String filePath) {
-        if (filePath == null) {
-            return null;
-        }
-        FileSystemStorage storage = FileSystemStorage.getInstance();
-        if (!storage.exists(filePath)) {
-            return null;
-        }
-        Display display = Display.getInstance();
-        String platform = display != null ? display.getPlatformName() : null;
-        if (platform == null || !platform.startsWith("and")) {
-            // Only Android exposes content URIs through the FileProvider.
-            return filePath;
-        }
-        MediaPlaybackNative nativeBridge = NativeLookup.create(MediaPlaybackNative.class);
-        if (nativeBridge == null || !nativeBridge.isSupported()) {
-            return filePath;
-        }
-        String resolved = nativeBridge.resolveContentUri(filePath);
-        return resolved != null && resolved.length() > 0 ? resolved : filePath;
-    }
-
 }
