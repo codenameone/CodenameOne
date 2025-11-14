@@ -44,10 +44,11 @@ extern void repaintUI();
 
 @implementation METALView
 
+@synthesize device;
 @synthesize commandQueue;
 @synthesize commandBuffer;
 @synthesize renderPassDescriptor;
-@synthesize renderCommandEncoder;
+@synthesize drawable;
 @synthesize peerComponentsLayer;
 
 // You must implement this method
@@ -116,11 +117,12 @@ extern BOOL isRetinaBug();
             }
         }
         CAMetalLayer *metalLayer = (CAMetalLayer *)self.layer;
-        metalLayer.device = MTLCreateSystemDefaultDevice();
+        self.device = MTLCreateSystemDefaultDevice();
+        metalLayer.device = self.device;
         metalLayer.opaque = TRUE;
         metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
         metalLayer.framebufferOnly = YES;
-        self.commandQueue = [metalLayer.device makeCommandQueue];
+        self.commandQueue = [self.device newCommandQueue];
         
     }
     
@@ -149,49 +151,62 @@ extern BOOL isRetinaBug();
 }
 
 -(void)createRenderPassDescriptor {
-    if (self.renderPassDescriptor != nil) {
+    CAMetalLayer *layer = (CAMetalLayer*)self.layer;
+    self.drawable = [layer nextDrawable];
+    if (self.drawable == nil) {
+        NSLog(@"METALView: Failed to get drawable");
         return;
     }
-    CAMetalLayer *layer = (CAMetalLayer*)self.layer;
+
     self.renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
-    self.drawable = [layer nextDrawable];
-    MTLRenderPipelineColorAttachmentDescriptor* colorAttachment = self.renderPassDescriptor.colorAttachments[0];
+    MTLRenderPassColorAttachmentDescriptor* colorAttachment = self.renderPassDescriptor.colorAttachments[0];
     colorAttachment.texture = self.drawable.texture;
     colorAttachment.loadAction = MTLLoadActionClear;
-    colorAttachment.isBlendingEnabled = YES;
+    colorAttachment.clearColor = MTLClearColorMake(1.0, 1.0, 1.0, 1.0);
+    colorAttachment.storeAction = MTLStoreActionStore;
+
+    // Enable blending for transparency
+    colorAttachment.blendingEnabled = YES;
     colorAttachment.sourceRGBBlendFactor = MTLBlendFactorOne;
     colorAttachment.destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    colorAttachment.rgbBlendOperation = MTLBlendOperationAdd;
     colorAttachment.sourceAlphaBlendFactor = MTLBlendFactorOne;
     colorAttachment.destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+    colorAttachment.alphaBlendOperation = MTLBlendOperationAdd;
 }
 
 - (void)setFramebuffer
 {
-    
     CAMetalLayer *layer = (CAMetalLayer*)self.layer;
-    self.commandBuffer = [self.commandQueue makeCommandBuffer];
+
+    // Create command buffer for this frame
+    self.commandBuffer = [self.commandQueue commandBuffer];
+
+    // Get drawable and create render pass descriptor
     [self createRenderPassDescriptor];
-    self.renderCommandEncoder = [self.commandBuffer makeRenderCommandEncoderWithDescriptor:self.renderPassDescriptor];
-    [self.renderCommandEncoder setViewport: (MTLViewport){ 0.0, 0.0, layer.drawableSize.width, layer.drawableSize.height, 0.0, 1.0 }];
-    
-    _glMatrixMode(GL_PROJECTION);
-    _glLoadIdentity();
-    _glOrthof(0, framebufferWidth, 0, framebufferHeight, -1, 1);
-    _glMatrixMode(GL_MODELVIEW);
-    _glLoadIdentity();
+
+    // Update framebuffer size
+    framebufferWidth = (int)layer.drawableSize.width;
+    framebufferHeight = (int)layer.drawableSize.height;
+
+    // Matrix initialization will be done by CN1METALTransform
 }
 
 - (BOOL)presentFramebuffer
 {
-    BOOL success = FALSE;
-    
-    if (self.renderCommandEncoder) {
-        [self.renderCommandEncoder ]
-        [self.commandBuffer present:self.drawable];
+    if (self.commandBuffer && self.drawable) {
+        [self.commandBuffer presentDrawable:self.drawable];
         [self.commandBuffer commit];
+
+        // Clear for next frame
+        self.commandBuffer = nil;
+        self.renderPassDescriptor = nil;
+        self.drawable = nil;
+
+        return YES;
     }
-    
-    return success;
+
+    return NO;
 }
 
 /**
@@ -322,6 +337,13 @@ extern int currentlyEditingMaxLength;
  [[CodenameOne_GLViewController instance] drawFrame:rect];
  }*/
 
+-(id<MTLRenderCommandEncoder>)makeRenderCommandEncoder {
+    if (self.renderPassDescriptor == nil) {
+        NSLog(@"METALView: Cannot create encoder, render pass descriptor is nil");
+        return nil;
+    }
+    return [self.commandBuffer renderCommandEncoderWithDescriptor:self.renderPassDescriptor];
+}
 
 @end
 #endif
