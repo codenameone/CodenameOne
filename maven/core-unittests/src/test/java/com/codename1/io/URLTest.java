@@ -74,7 +74,7 @@ class URLTest extends UITestBase {
         TestConnection connection = implementation.createConnection("http://example.com/service");
         connection.setInputData("body".getBytes(StandardCharsets.UTF_8));
         connection.setContentLength(4);
-        connection.setHeaderValues("Content-Type", Collections.singletonList("text/plain"));
+        connection.setHeader("Content-Type", "text/plain");
 
         URL.HttpURLConnection http = (URL.HttpURLConnection) url.openConnection();
         http.setDoOutput(true);

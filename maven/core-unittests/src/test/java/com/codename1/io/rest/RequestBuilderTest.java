@@ -16,8 +16,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -25,7 +23,7 @@ class RequestBuilderTest extends UITestBase {
     private static final String BASE_URL = "https://example.com";
 
     @BeforeEach
-    void clearConnections() throws Exception {
+    void clearConnections() {
         implementation.clearConnections();
     }
 
@@ -82,16 +80,13 @@ class RequestBuilderTest extends UITestBase {
         connection.setInputData(data);
         connection.setContentLength(data.length);
 
-        CountDownLatch latch = new CountDownLatch(1);
         final Response<String>[] holder = new Response[1];
         RequestBuilder builder = new RequestBuilder("GET", BASE_URL);
         builder.onErrorCodeString(response -> {
             holder[0] = response;
-            latch.countDown();
         });
 
         builder.getAsString();
-        assertTrue(latch.await(5, TimeUnit.SECONDS));
         Response<String> response = holder[0];
         assertNotNull(response);
         assertEquals(500, response.getResponseCode());
@@ -108,18 +103,15 @@ class RequestBuilderTest extends UITestBase {
         connection.setInputData(payload);
         connection.setContentLength(payload.length);
 
-        CountDownLatch latch = new CountDownLatch(1);
         final Response<Map>[] holder = new Response[1];
         RequestBuilder builder = new RequestBuilder("GET", BASE_URL);
         builder.useBoolean(true)
                 .useLongs(true)
                 .onErrorCodeJSON(response -> {
                     holder[0] = response;
-                    latch.countDown();
                 });
 
         builder.getAsJsonMap();
-        assertTrue(latch.await(5, TimeUnit.SECONDS));
         Response<Map> response = holder[0];
         assertNotNull(response);
         Map data = response.getResponseData();
