@@ -3,6 +3,7 @@ package com.codename1.push;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
+import com.codename1.io.NetworkManager;
 import com.codename1.junit.EdtTest;
 import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
@@ -51,6 +52,7 @@ class PushTest extends UITestBase {
         implementation.clearConnections();
         implementation.clearStorage();
         Storage.getInstance().clearCache();
+        NetworkManager.getInstance().shutdownSync();
     }
 
     @EdtTest
