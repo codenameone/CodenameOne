@@ -19,6 +19,7 @@ import com.codename1.ui.Stroke;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.TextSelection;
+import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.util.ImageIO;
@@ -123,12 +124,22 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private final Map<Object, HeavyButtonPeerState> heavyButtonPeers = new HashMap<Object, HeavyButtonPeerState>();
     private boolean requiresHeavyButton;
     private boolean allowKeyEventReentry;
+    private final List<String> systemOutMessages = new ArrayList<String>();
+    private ActionListener logListener;
     private final List<Object> cleanupCalls = new ArrayList<Object>();
     private int flushStorageCacheInvocations;
     private boolean socketAvailable = true;
     private boolean serverSocketAvailable;
     private String appHomePath = "file://app/";
     private String hostOrIp;
+    private int openGalleryCallCount;
+    private ActionListener lastOpenGalleryResponse;
+    private int lastOpenGalleryType;
+    private int openImageGalleryCallCount;
+    private ActionListener lastOpenImageGalleryResponse;
+    private int galleryTypeSupportedCallCount;
+    private int lastGalleryTypeQuery;
+    private final Map<Integer, Boolean> galleryTypeSupport = new HashMap<Integer, Boolean>();
 
 
     public TestCodenameOneImplementation() {
@@ -200,6 +211,35 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         copySelectionInvocations = 0;
         lastCopiedTextSelection = null;
         lastCopiedText = null;
+    }
+
+    @Override
+    public void systemOut(String content) {
+        systemOutMessages.add(content);
+    }
+
+    public List<String> getSystemOutMessages() {
+        return systemOutMessages;
+    }
+
+    public void clearSystemOutMessages() {
+        systemOutMessages.clear();
+    }
+
+    @Override
+    public void setLogListener(ActionListener al) {
+        super.setLogListener(al);
+        logListener = al;
+    }
+
+    public ActionListener getLogListener() {
+        return logListener;
+    }
+
+    public void fireLogEvent(String message) {
+        if (logListener != null) {
+            logListener.actionPerformed(new ActionEvent(message, ActionEvent.Type.Log));
+        }
     }
 
     public int getInitializeTextSelectionCount() {
@@ -2336,6 +2376,73 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         public void setContentLength(int contentLength) {
             this.contentLength = contentLength;
         }
+    }
+
+    @Override
+    public void openGallery(ActionListener response, int type) {
+        openGalleryCallCount++;
+        lastOpenGalleryResponse = response;
+        lastOpenGalleryType = type;
+    }
+
+    public int getOpenGalleryCallCount() {
+        return openGalleryCallCount;
+    }
+
+    public ActionListener getLastOpenGalleryResponse() {
+        return lastOpenGalleryResponse;
+    }
+
+    public int getLastOpenGalleryType() {
+        return lastOpenGalleryType;
+    }
+
+    @Override
+    public void openImageGallery(ActionListener response) {
+        openImageGalleryCallCount++;
+        lastOpenImageGalleryResponse = response;
+    }
+
+    public int getOpenImageGalleryCallCount() {
+        return openImageGalleryCallCount;
+    }
+
+    public ActionListener getLastOpenImageGalleryResponse() {
+        return lastOpenImageGalleryResponse;
+    }
+
+    @Override
+    public boolean isGalleryTypeSupported(int type) {
+        galleryTypeSupportedCallCount++;
+        lastGalleryTypeQuery = type;
+        Boolean value = galleryTypeSupport.get(Integer.valueOf(type));
+        if (value != null) {
+            return value.booleanValue();
+        }
+        return false;
+    }
+
+    public void setGalleryTypeSupported(int type, boolean supported) {
+        galleryTypeSupport.put(Integer.valueOf(type), Boolean.valueOf(supported));
+    }
+
+    public int getGalleryTypeSupportedCallCount() {
+        return galleryTypeSupportedCallCount;
+    }
+
+    public int getLastGalleryTypeQuery() {
+        return lastGalleryTypeQuery;
+    }
+
+    public void resetGalleryTracking() {
+        openGalleryCallCount = 0;
+        lastOpenGalleryResponse = null;
+        lastOpenGalleryType = 0;
+        openImageGalleryCallCount = 0;
+        lastOpenImageGalleryResponse = null;
+        galleryTypeSupportedCallCount = 0;
+        lastGalleryTypeQuery = 0;
+        galleryTypeSupport.clear();
     }
 
     public static final class TestFile {

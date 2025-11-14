@@ -1,88 +1,44 @@
 package com.codename1.io;
 
-import com.codename1.impl.CodenameOneImplementation;
-import com.codename1.ui.events.ActionEvent;
-import com.codename1.ui.events.ActionListener;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestCodenameOneImplementation;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
 
-class LogTest {
+class LogTest extends UITestBase {
     private Log originalLog;
-    private CodenameOneImplementation originalImplementation;
-    private CodenameOneImplementation mockImplementation;
     private TestLog testLog;
-    private Field initializedField;
-    private boolean originalInitialized;
-    private final List<String> systemOutMessages = new ArrayList<>();
-    private final AtomicReference<ActionListener> listenerRef = new AtomicReference<>();
 
     @BeforeEach
-    void setup() throws Exception {
+    void installTestLog() throws Exception {
         originalLog = Log.getInstance();
-        originalImplementation = Util.getImplementation();
-
-        mockImplementation = mock(CodenameOneImplementation.class);
-        doAnswer(invocation -> {
-            systemOutMessages.add(invocation.getArgument(0, String.class));
-            return null;
-        }).when(mockImplementation).systemOut(anyString());
-        doAnswer(invocation -> null).when(mockImplementation).cleanup(any());
-        doAnswer(invocation -> {
-            Writer writer = invocation.getArgument(1);
-            writer.write("stack");
-            return null;
-        }).when(mockImplementation).printStackTraceToStream(any(), any());
-        doAnswer(invocation -> {
-            listenerRef.set(invocation.getArgument(0));
-            return null;
-        }).when(mockImplementation).setLogListener(any());
-
-        Util.setImplementation(mockImplementation);
-
         testLog = new TestLog();
         Log.install(testLog);
-
-        initializedField = Log.class.getDeclaredField("initialized");
-        initializedField.setAccessible(true);
-        originalInitialized = initializedField.getBoolean(null);
-        initializedField.setBoolean(null, true);
-
-        systemOutMessages.clear();
-        listenerRef.set(null);
         Log.setLevel(Log.DEBUG);
+        implementation.clearSystemOutMessages();
     }
 
     @AfterEach
-    void tearDown() throws Exception {
+    void restoreLog() {
         Log.install(originalLog);
-        Util.setImplementation(originalImplementation);
-        if (initializedField != null) {
-            initializedField.setBoolean(null, originalInitialized);
-        }
         Log.setLevel(Log.DEBUG);
+        implementation.clearSystemOutMessages();
     }
 
-    @Test
-    void printRespectsLogLevelAndWritesToWriter() throws IOException {
+    @FormTest
+    void printRespectsLogLevelAndWritesToWriter() throws Exception {
         testLog.resetContent();
-        systemOutMessages.clear();
+        implementation.clearSystemOutMessages();
         Log.setLevel(Log.WARNING);
 
         Log.p("ignored", Log.INFO);
@@ -91,11 +47,11 @@ class LogTest {
         Log.p("accepted", Log.ERROR);
         String content = testLog.getWrittenContent();
         assertTrue(content.contains("accepted"));
-        assertTrue(systemOutMessages.stream().anyMatch(s -> s.contains("accepted")));
+        assertTrue(containsMessage(implementation, "accepted"));
     }
 
-    @Test
-    void setFileURLRecreatesWriter() throws IOException {
+    @FormTest
+    void setFileURLRecreatesWriter() throws Exception {
         testLog.resetContent();
         Log.p("initial", Log.INFO);
         int createdInitially = testLog.getCreateWriterCalls();
@@ -109,21 +65,27 @@ class LogTest {
         assertTrue(testLog.getWrittenContent().contains("after"));
     }
 
-    @Test
-    void trackFileSystemLogsEvents() throws IOException {
+    @FormTest
+    void trackFileSystemLogsEvents() throws Exception {
         Log.p("warmup", Log.INFO);
         testLog.resetContent();
-        systemOutMessages.clear();
+        implementation.clearSystemOutMessages();
 
         testLog.trackFileSystem();
-        ActionListener listener = listenerRef.get();
-        assertNotNull(listener);
-
-        listener.actionPerformed(new ActionEvent("stream opened"));
+        implementation.fireLogEvent("stream opened");
 
         String content = testLog.getWrittenContent();
         assertTrue(content.contains("stream opened"));
-        assertTrue(systemOutMessages.stream().anyMatch(s -> s.contains("stream opened")));
+        assertTrue(containsMessage(implementation, "stream opened"));
+    }
+
+    private boolean containsMessage(TestCodenameOneImplementation impl, String text) {
+        for (String message : impl.getSystemOutMessages()) {
+            if (message.contains(text)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static class TestLog extends Log {
