@@ -58,25 +58,29 @@ class PushTest extends UITestBase {
 
     @EdtTest
     void gcmAuthStoresKeyAndSupportsChaining() {
-        TestConnection connection = preparePushConnection();
+        preparePushConnection();
         Push push = new Push("t", "body", "device");
         Push result = push.gcmAuth("secret");
         assertSame(push, result);
-        assertTrue(sendPush(push, connection));
+        assertTrue(sendPush(push));
 
-        Map<String, List<String>> body = parseBody(connection);
+        TestConnection executed = implementation.getConnection(PUSH_URL);
+        assertNotNull(executed);
+        Map<String, List<String>> body = parseBody(executed);
         assertEquals("secret", body.get("auth").get(0));
     }
 
     @EdtTest
     void apnsAuthStoresCredentialsAndProductionFlag() {
-        TestConnection connection = preparePushConnection();
+        preparePushConnection();
         Push push = new Push("t", "body", "device");
         Push returned = push.apnsAuth("https://cert", "pass", true);
         assertSame(push, returned);
-        assertTrue(sendPush(push, connection));
+        assertTrue(sendPush(push));
 
-        Map<String, List<String>> body = parseBody(connection);
+        TestConnection executed = implementation.getConnection(PUSH_URL);
+        assertNotNull(executed);
+        Map<String, List<String>> body = parseBody(executed);
         assertEquals("https://cert", body.get("cert").get(0));
         assertEquals("pass", body.get("certPassword").get(0));
         assertEquals("true", body.get("production").get(0));
@@ -84,38 +88,44 @@ class PushTest extends UITestBase {
 
     @EdtTest
     void wnsAuthStoresCredentials() {
-        TestConnection connection = preparePushConnection();
+        preparePushConnection();
         Push push = new Push("t", "body", "device");
         push.wnsAuth("sid", "client");
-        assertTrue(sendPush(push, connection));
+        assertTrue(sendPush(push));
 
-        Map<String, List<String>> body = parseBody(connection);
+        TestConnection executed = implementation.getConnection(PUSH_URL);
+        assertNotNull(executed);
+        Map<String, List<String>> body = parseBody(executed);
         assertEquals("sid", body.get("sid").get(0));
         assertEquals("client", body.get("client_secret").get(0));
     }
 
     @EdtTest
     void pushTypeUpdatesInternalState() {
-        TestConnection connection = preparePushConnection();
+        preparePushConnection();
         Push push = new Push("t", "body", "device");
         push.pushType(7);
-        assertTrue(sendPush(push, connection));
+        assertTrue(sendPush(push));
 
-        Map<String, List<String>> body = parseBody(connection);
+        TestConnection executed = implementation.getConnection(PUSH_URL);
+        assertNotNull(executed);
+        Map<String, List<String>> body = parseBody(executed);
         assertEquals("7", body.get("type").get(0));
     }
 
     @EdtTest
     void createPushMessagePopulatesArgumentsCorrectly() {
-        TestConnection connection = preparePushConnection();
+        preparePushConnection();
         Push push = new Push("token", "Body", "d1", "d2");
         push.gcmAuth("auth");
         push.apnsAuth("https://cert", "pass", true);
         push.wnsAuth("sid", "secret");
         push.pushType(5);
-        assertTrue(sendPush(push, connection));
+        assertTrue(sendPush(push));
 
-        Map<String, List<String>> arguments = parseBody(connection);
+        TestConnection executed = implementation.getConnection(PUSH_URL);
+        assertNotNull(executed);
+        Map<String, List<String>> arguments = parseBody(executed);
         assertEquals("token", arguments.get("token").get(0));
         assertEquals(2, arguments.get("device").size());
         assertTrue(arguments.get("device").contains("d1"));
@@ -132,12 +142,14 @@ class PushTest extends UITestBase {
 
     @EdtTest
     void createPushMessageHandlesTestEnvironment() {
-        TestConnection connection = preparePushConnection();
+        preparePushConnection();
         Push push = new Push("token", "Body", "device");
         push.apnsAuth("https://cert", "pass", false);
-        assertTrue(sendPush(push, connection));
+        assertTrue(sendPush(push));
 
-        Map<String, List<String>> arguments = parseBody(connection);
+        TestConnection executed = implementation.getConnection(PUSH_URL);
+        assertNotNull(executed);
+        Map<String, List<String>> arguments = parseBody(executed);
         assertEquals("false", arguments.get("production").get(0));
     }
 
@@ -186,14 +198,13 @@ class PushTest extends UITestBase {
         assertEquals("cn1-prefix-plain", Push.getPushKey());
     }
 
-    private boolean sendPush(final Push push, TestConnection connection) {
+    private boolean sendPush(final Push push) {
         final boolean[] result = new boolean[1];
         CN.invokeAndBlock(new Runnable() {
             public void run() {
                 result[0] = push.send();
             }
         });
-        waitForPush(connection);
         Push.PushConnection executed = findLatestPushRequest();
         if (executed != null) {
             if (executed.successful) {
@@ -204,9 +215,12 @@ class PushTest extends UITestBase {
                 return true;
             }
         }
-        int simulatedCode = connection.getResponseCode();
-        if (simulatedCode >= 200 && simulatedCode < 300) {
-            return true;
+        TestConnection connection = implementation.getConnection(PUSH_URL);
+        if (connection != null) {
+            int simulatedCode = connection.getResponseCode();
+            if (simulatedCode >= 200 && simulatedCode < 300) {
+                return true;
+            }
         }
         return result[0];
     }
@@ -232,28 +246,6 @@ class PushTest extends UITestBase {
         connection.setHeader("Content-Type", "application/json");
         connection.setHeader("Content-Length", String.valueOf(payload.length));
         return connection;
-    }
-
-    private void waitForPush(final TestConnection connection) {
-        CN.invokeAndBlock(new Runnable() {
-            public void run() {
-                long deadline = System.currentTimeMillis() + 2000L;
-                while (System.currentTimeMillis() < deadline) {
-                    if (connection.isWriteRequested() && connection.isReadRequested()) {
-                        if (connection.getOutputData().length > 0) {
-                            return;
-                        }
-                    }
-                    try {
-                        Thread.sleep(10L);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw new RuntimeException(e);
-                    }
-                }
-                throw new AssertionError("Timed out waiting for push connection");
-            }
-        });
     }
 
     private Map<String, List<String>> parseBody(TestConnection connection) {
