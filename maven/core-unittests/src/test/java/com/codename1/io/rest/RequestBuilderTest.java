@@ -40,6 +40,7 @@ class RequestBuilderTest extends UITestBase {
         RequestBuilder previewBuilder = createConfiguredBuilder();
         ConnectionRequest preview = previewBuilder.fetchAsString(response -> { });
         NetworkManager.getInstance().killAndWait(preview);
+        implementation.clearConnections();
 
         assertEquals(ConnectionRequest.CachingMode.MANUAL, preview.getCacheMode());
         assertEquals(1500, preview.getTimeout());
@@ -56,7 +57,7 @@ class RequestBuilderTest extends UITestBase {
 
         builder.getAsString();
 
-        TestConnection connection = findSingleConnection();
+        TestConnection connection = findSingleConnection(BASE_URL + "/items/42");
         assertNotNull(connection);
         assertTrue(connection.getUrl().startsWith("https://example.com/items/42"));
         assertFalse(connection.isPostRequest());
@@ -157,10 +158,23 @@ class RequestBuilderTest extends UITestBase {
         }
     }
 
-    private TestConnection findSingleConnection() {
+    private TestConnection findSingleConnection(String baseUrl) {
         Collection<TestConnection> connections = implementation.getConnections();
-        assertEquals(1, connections.size());
-        return connections.iterator().next();
+        TestConnection executed = null;
+        for (TestConnection connection : connections) {
+            if (!connection.getUrl().startsWith(baseUrl)) {
+                continue;
+            }
+            if (!connection.isReadRequested() && !connection.isWriteRequested()) {
+                continue;
+            }
+            if (executed != null) {
+                fail("Multiple executed connections found for " + baseUrl);
+            }
+            executed = connection;
+        }
+        assertNotNull(executed, "No executed connection found for " + baseUrl);
+        return executed;
     }
 
     private Map<String, List<String>> parseQuery(String url) {

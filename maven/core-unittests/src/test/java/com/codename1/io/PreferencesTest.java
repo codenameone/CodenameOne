@@ -1,42 +1,54 @@
 package com.codename1.io;
 
-import com.codename1.testing.TestCodenameOneImplementation;
+import com.codename1.junit.EdtTest;
+import com.codename1.junit.UITestBase;
+import com.codename1.ui.CN;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class PreferencesTest {
-    private TestCodenameOneImplementation implementation;
+class PreferencesTest extends UITestBase {
     private String originalLocation;
 
     @BeforeEach
-    void setUp() {
-        implementation = new TestCodenameOneImplementation();
-        Util.setImplementation(implementation);
-        Storage.setStorageInstance(null);
-        Storage.getInstance().clearCache();
-        implementation.clearStorage();
-        originalLocation = Preferences.getPreferencesLocation();
-        Preferences.setPreferencesLocation("PreferencesTest-" + System.nanoTime());
-        Preferences.clearAll();
+    void setUpPreferences() throws Exception {
+        CN.callSeriallyAndWait(new Runnable() {
+            public void run() {
+                Storage.setStorageInstance(null);
+                Storage storage = Storage.getInstance();
+                storage.clearCache();
+                storage.clearStorage();
+                implementation.clearStorage();
+                originalLocation = Preferences.getPreferencesLocation();
+                Preferences.setPreferencesLocation("PreferencesTest-" + System.nanoTime());
+                Preferences.clearAll();
+            }
+        });
     }
 
     @AfterEach
-    void tearDown() {
-        Preferences.clearAll();
-        if (originalLocation != null) {
-            Preferences.setPreferencesLocation(originalLocation);
-        }
-        Storage.getInstance().clearCache();
-        implementation.clearStorage();
+    void tearDownPreferences() throws Exception {
+        CN.callSeriallyAndWait(new Runnable() {
+            public void run() {
+                Preferences.clearAll();
+                if (originalLocation != null) {
+                    Preferences.setPreferencesLocation(originalLocation);
+                }
+                Storage storage = Storage.getInstance();
+                storage.clearCache();
+                storage.clearStorage();
+                implementation.clearStorage();
+            }
+        });
     }
 
-    @Test
+    @EdtTest
     void setAndGetVariousTypes() {
         Preferences.set("string", "value");
         Preferences.set("int", 42);
@@ -53,7 +65,7 @@ class PreferencesTest {
         assertTrue(Preferences.get("bool", false));
     }
 
-    @Test
+    @EdtTest
     void getAndSetPersistsDefaults() {
         assertEquals("fallback", Preferences.getAndSet("missingString", "fallback"));
         assertEquals("fallback", Preferences.get("missingString", ""));
@@ -65,9 +77,9 @@ class PreferencesTest {
         assertEquals(20, Preferences.getAndSet("missingInt", 0));
     }
 
-    @Test
+    @EdtTest
     void batchSetUpdatesMultipleValues() {
-        Map<String, Object> updates = new HashMap<>();
+        Map<String, Object> updates = new HashMap<String, Object>();
         updates.put("one", "1");
         updates.put("two", 2);
         Preferences.set(updates);
@@ -76,11 +88,11 @@ class PreferencesTest {
         assertEquals(2, Preferences.get("two", 0));
     }
 
-    @Test
+    @EdtTest
     void deleteAndClearAllTriggerListeners() {
-        AtomicReference<Object> prior = new AtomicReference<>();
-        AtomicReference<Object> current = new AtomicReference<>();
-        Preferences.PreferenceListener listener = new Preferences.PreferenceListener() {
+        final AtomicReference<Object> prior = new AtomicReference<Object>();
+        final AtomicReference<Object> current = new AtomicReference<Object>();
+        PreferenceListener listener = new PreferenceListener() {
             public void preferenceChanged(String pref, Object oldValue, Object newValue) {
                 prior.set(oldValue);
                 current.set(newValue);
@@ -103,7 +115,7 @@ class PreferencesTest {
         Preferences.removePreferenceListener("key", listener);
     }
 
-    @Test
+    @EdtTest
     void preferenceLocationIsolation() {
         Preferences.set("shared", "original");
         String defaultLocation = Preferences.getPreferencesLocation();
