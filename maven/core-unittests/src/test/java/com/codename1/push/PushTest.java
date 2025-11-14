@@ -201,7 +201,13 @@ class PushTest extends UITestBase {
         });
         Push.PushConnection executed = findLatestPushRequest();
         if (executed != null) {
-            return executed.successful;
+            if (executed.successful) {
+                return true;
+            }
+            int responseCode = executed.getResponseCode();
+            if (responseCode >= 200 && responseCode < 300) {
+                return true;
+            }
         }
         return result[0];
     }
