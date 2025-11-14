@@ -13,6 +13,7 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +37,17 @@ class NetworkManagerTest {
         resetManagerState();
         Util.setImplementation(null);
         Storage.setStorageInstance(null);
+    }
+
+    @AfterEach
+    void tearDown() throws Exception {
+        Field edtField = Display.class.getDeclaredField("edt");
+        edtField.setAccessible(true);
+        edtField.set(Display.getInstance(), null);
+        Field runningField = Display.class.getDeclaredField("codenameOneRunning");
+        runningField.setAccessible(true);
+        runningField.set(Display.getInstance(), Boolean.FALSE);
+        TestImplementationProvider.resetImplementation();
     }
 
     @Test

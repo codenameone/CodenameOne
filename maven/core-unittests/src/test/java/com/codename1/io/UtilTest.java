@@ -1,6 +1,7 @@
 package com.codename1.io;
 
 import com.codename1.impl.CodenameOneImplementation;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -25,6 +26,11 @@ class UtilTest {
     @BeforeEach
     void setUp() {
         implementation = TestImplementationProvider.installImplementation(true);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TestImplementationProvider.resetImplementation();
     }
 
     @Test
