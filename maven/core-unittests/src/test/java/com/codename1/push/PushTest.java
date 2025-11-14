@@ -97,7 +97,7 @@ class PushTest extends UITestBase {
     @EdtTest
     void pushTypeUpdatesInternalState() {
         TestConnection connection = preparePushConnection();
-        Push push = new Push("t", "body");
+        Push push = new Push("t", "body", "device");
         push.pushType(7);
         assertTrue(sendPush(push));
         waitForPush(connection);

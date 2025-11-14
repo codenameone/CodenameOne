@@ -1412,6 +1412,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean shouldWriteUTFAsGetBytes() {
+        return true;
+    }
+
+    @Override
     public Object connect(String url, boolean read, boolean write) throws IOException {
         TestConnection connection = connections.computeIfAbsent(url, TestConnection::new);
         connection.readRequested = read;
@@ -2214,6 +2219,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         final Map<String, List<String>> multiHeaders = new HashMap<>();
         byte[] inputData;
         ByteArrayOutputStream output;
+        com.codename1.io.BufferedOutputStream bufferedOutput;
         boolean readRequested;
         boolean writeRequested;
         boolean postRequest;
@@ -2234,10 +2240,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
 
         OutputStream openOutputStream() {
-            if (output == null) {
+            if (bufferedOutput == null) {
                 output = new ByteArrayOutputStream();
+                bufferedOutput = new com.codename1.io.BufferedOutputStream(output);
             }
-            return output;
+            return bufferedOutput;
         }
 
         public String getUrl() {
@@ -2309,6 +2316,13 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
 
         public byte[] getOutputData() {
+            if (bufferedOutput != null) {
+                try {
+                    bufferedOutput.flushBuffer();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
             if (output == null) {
                 return new byte[0];
             }
