@@ -64,9 +64,9 @@ class PushTest extends UITestBase {
         assertSame(push, result);
         assertTrue(sendPush(push));
 
-        TestConnection executed = implementation.getConnection(PUSH_URL);
-        assertNotNull(executed);
-        Map<String, List<String>> body = parseBody(executed);
+        Push.PushConnection request = findLatestPushRequest();
+        assertNotNull(request);
+        Map<String, List<String>> body = parseBody(request);
         assertEquals("secret", body.get("auth").get(0));
     }
 
@@ -78,9 +78,9 @@ class PushTest extends UITestBase {
         assertSame(push, returned);
         assertTrue(sendPush(push));
 
-        TestConnection executed = implementation.getConnection(PUSH_URL);
-        assertNotNull(executed);
-        Map<String, List<String>> body = parseBody(executed);
+        Push.PushConnection request = findLatestPushRequest();
+        assertNotNull(request);
+        Map<String, List<String>> body = parseBody(request);
         assertEquals("https://cert", body.get("cert").get(0));
         assertEquals("pass", body.get("certPassword").get(0));
         assertEquals("true", body.get("production").get(0));
@@ -93,9 +93,9 @@ class PushTest extends UITestBase {
         push.wnsAuth("sid", "client");
         assertTrue(sendPush(push));
 
-        TestConnection executed = implementation.getConnection(PUSH_URL);
-        assertNotNull(executed);
-        Map<String, List<String>> body = parseBody(executed);
+        Push.PushConnection request = findLatestPushRequest();
+        assertNotNull(request);
+        Map<String, List<String>> body = parseBody(request);
         assertEquals("sid", body.get("sid").get(0));
         assertEquals("client", body.get("client_secret").get(0));
     }
@@ -107,9 +107,9 @@ class PushTest extends UITestBase {
         push.pushType(7);
         assertTrue(sendPush(push));
 
-        TestConnection executed = implementation.getConnection(PUSH_URL);
-        assertNotNull(executed);
-        Map<String, List<String>> body = parseBody(executed);
+        Push.PushConnection request = findLatestPushRequest();
+        assertNotNull(request);
+        Map<String, List<String>> body = parseBody(request);
         assertEquals("7", body.get("type").get(0));
     }
 
@@ -123,9 +123,9 @@ class PushTest extends UITestBase {
         push.pushType(5);
         assertTrue(sendPush(push));
 
-        TestConnection executed = implementation.getConnection(PUSH_URL);
-        assertNotNull(executed);
-        Map<String, List<String>> arguments = parseBody(executed);
+        Push.PushConnection request = findLatestPushRequest();
+        assertNotNull(request);
+        Map<String, List<String>> arguments = parseBody(request);
         assertEquals("token", arguments.get("token").get(0));
         assertEquals(2, arguments.get("device").size());
         assertTrue(arguments.get("device").contains("d1"));
@@ -147,9 +147,9 @@ class PushTest extends UITestBase {
         push.apnsAuth("https://cert", "pass", false);
         assertTrue(sendPush(push));
 
-        TestConnection executed = implementation.getConnection(PUSH_URL);
-        assertNotNull(executed);
-        Map<String, List<String>> arguments = parseBody(executed);
+        Push.PushConnection request = findLatestPushRequest();
+        assertNotNull(request);
+        Map<String, List<String>> arguments = parseBody(request);
         assertEquals("false", arguments.get("production").get(0));
     }
 
@@ -215,7 +215,7 @@ class PushTest extends UITestBase {
                 return true;
             }
         }
-        TestConnection connection = implementation.getConnection(PUSH_URL);
+        TestConnection connection = findPushConnection();
         if (connection != null) {
             int simulatedCode = connection.getResponseCode();
             if (simulatedCode >= 200 && simulatedCode < 300) {
@@ -223,6 +223,22 @@ class PushTest extends UITestBase {
             }
         }
         return result[0];
+    }
+
+    private TestConnection findPushConnection() {
+        TestConnection fallback = null;
+        for (TestConnection connection : implementation.getConnections()) {
+            if (connection.getUrl().startsWith(PUSH_URL)) {
+                byte[] data = connection.getOutputData();
+                if (data.length > 0) {
+                    return connection;
+                }
+                if (fallback == null) {
+                    fallback = connection;
+                }
+            }
+        }
+        return fallback;
     }
 
     private Push.PushConnection findLatestPushRequest() {
@@ -248,8 +264,14 @@ class PushTest extends UITestBase {
         return connection;
     }
 
-    private Map<String, List<String>> parseBody(TestConnection connection) {
-        String body = new String(connection.getOutputData(), StandardCharsets.UTF_8);
+    private Map<String, List<String>> parseBody(Push.PushConnection request) {
+        java.io.ByteArrayOutputStream buffer = new java.io.ByteArrayOutputStream();
+        try {
+            request.buildRequestBody(buffer);
+        } catch (java.io.IOException e) {
+            throw new IllegalStateException(e);
+        }
+        String body = new String(buffer.toByteArray(), StandardCharsets.UTF_8);
         Map<String, List<String>> out = new LinkedHashMap<String, List<String>>();
         if (body.isEmpty()) {
             return out;
