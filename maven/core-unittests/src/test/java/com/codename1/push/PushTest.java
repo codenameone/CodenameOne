@@ -7,6 +7,7 @@ import com.codename1.junit.EdtTest;
 import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation.TestConnection;
+import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,6 +31,7 @@ class PushTest extends UITestBase {
         Preferences.setPreferencesLocation("PushTest-" + System.nanoTime());
         Preferences.clearAll();
         implementation.clearConnections();
+        implementation.clearQueuedRequests();
         implementation.clearStorage();
         Storage.setStorageInstance(null);
         Storage storage = Storage.getInstance();
@@ -58,6 +60,7 @@ class PushTest extends UITestBase {
         Push result = push.gcmAuth("secret");
         assertSame(push, result);
         assertTrue(push.send());
+        waitForPush(connection);
 
         Map<String, List<String>> body = parseBody(connection);
         assertEquals("secret", body.get("auth").get(0));
@@ -70,6 +73,7 @@ class PushTest extends UITestBase {
         Push returned = push.apnsAuth("https://cert", "pass", true);
         assertSame(push, returned);
         assertTrue(push.send());
+        waitForPush(connection);
 
         Map<String, List<String>> body = parseBody(connection);
         assertEquals("https://cert", body.get("cert").get(0));
@@ -83,6 +87,7 @@ class PushTest extends UITestBase {
         Push push = new Push("t", "body", "device");
         push.wnsAuth("sid", "client");
         assertTrue(push.send());
+        waitForPush(connection);
 
         Map<String, List<String>> body = parseBody(connection);
         assertEquals("sid", body.get("sid").get(0));
@@ -95,6 +100,7 @@ class PushTest extends UITestBase {
         Push push = new Push("t", "body");
         push.pushType(7);
         assertTrue(push.send());
+        waitForPush(connection);
 
         Map<String, List<String>> body = parseBody(connection);
         assertEquals("7", body.get("type").get(0));
@@ -109,6 +115,7 @@ class PushTest extends UITestBase {
         push.wnsAuth("sid", "secret");
         push.pushType(5);
         assertTrue(push.send());
+        waitForPush(connection);
 
         Map<String, List<String>> arguments = parseBody(connection);
         assertEquals("token", arguments.get("token").get(0));
@@ -131,6 +138,7 @@ class PushTest extends UITestBase {
         Push push = new Push("token", "Body", "device");
         push.apnsAuth("https://cert", "pass", false);
         assertTrue(push.send());
+        waitForPush(connection);
 
         Map<String, List<String>> arguments = parseBody(connection);
         assertEquals("false", arguments.get("production").get(0));
@@ -188,7 +196,31 @@ class PushTest extends UITestBase {
         byte[] payload = "{\"result\":\"ok\"}".getBytes(StandardCharsets.UTF_8);
         connection.setInputData(payload);
         connection.setContentLength(payload.length);
+        connection.setHeader("Content-Type", "application/json");
+        connection.setHeader("Content-Length", String.valueOf(payload.length));
         return connection;
+    }
+
+    private void waitForPush(final TestConnection connection) {
+        CN.invokeAndBlock(new Runnable() {
+            public void run() {
+                long deadline = System.currentTimeMillis() + 2000L;
+                while (System.currentTimeMillis() < deadline) {
+                    if (connection.isWriteRequested() && connection.isReadRequested()) {
+                        if (connection.getOutputData().length > 0) {
+                            return;
+                        }
+                    }
+                    try {
+                        Thread.sleep(10L);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(e);
+                    }
+                }
+                throw new AssertionError("Timed out waiting for push connection");
+            }
+        });
     }
 
     private Map<String, List<String>> parseBody(TestConnection connection) {

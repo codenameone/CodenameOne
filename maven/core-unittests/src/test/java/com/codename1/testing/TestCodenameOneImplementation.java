@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 /**
@@ -52,6 +53,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private final Map<String, TestFile> fileSystem = new ConcurrentHashMap<>();
     private final Map<String, TestConnection> connections = new ConcurrentHashMap<>();
     private final Map<String, TestSocket> sockets = new ConcurrentHashMap<>();
+    private final CopyOnWriteArrayList<ConnectionRequest> queuedRequests = new CopyOnWriteArrayList<ConnectionRequest>();
 
     private final TestFont defaultFont = new TestFont(8, 16);
     private int displayWidth = 1080;
@@ -1880,7 +1882,18 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void addConnectionToQueue(ConnectionRequest r) {
+        if (r != null) {
+            queuedRequests.add(r);
+        }
         super.addConnectionToQueue(r);
+    }
+
+    public void clearQueuedRequests() {
+        queuedRequests.clear();
+    }
+
+    public java.util.List<ConnectionRequest> getQueuedRequests() {
+        return new java.util.ArrayList<ConnectionRequest>(queuedRequests);
     }
 
     @Override

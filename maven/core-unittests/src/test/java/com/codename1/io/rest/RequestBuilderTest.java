@@ -1,7 +1,6 @@
 package com.codename1.io.rest;
 
 import com.codename1.io.ConnectionRequest;
-import com.codename1.io.NetworkManager;
 import com.codename1.junit.EdtTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation.TestConnection;
@@ -26,26 +25,11 @@ class RequestBuilderTest extends UITestBase {
     @BeforeEach
     void clearConnections() {
         implementation.clearConnections();
+        implementation.clearQueuedRequests();
     }
 
     @EdtTest
     void createRequestPopulatesConnection() throws Exception {
-        RequestBuilder previewBuilder = createConfiguredBuilder();
-        ConnectionRequest preview = previewBuilder.fetchAsString(response -> { });
-        CN.invokeAndBlock(new Runnable() {
-            public void run() {
-                NetworkManager.getInstance().killAndWait(preview);
-            }
-        });
-        implementation.clearConnections();
-
-        assertEquals(ConnectionRequest.CachingMode.MANUAL, preview.getCacheMode());
-        assertEquals(1500, preview.getTimeout());
-        assertEquals(3000, preview.getReadTimeout());
-        assertFalse(preview.isCookiesEnabled());
-        assertEquals(ConnectionRequest.PRIORITY_HIGH, preview.getPriority());
-        assertTrue(preview.isInsecure());
-
         RequestBuilder builder = createConfiguredBuilder();
         preparePermutations("https://example.com/items/42", Arrays.asList(
                 "search=hello%20world&filter=one&filter=two",
@@ -54,7 +38,17 @@ class RequestBuilderTest extends UITestBase {
 
         builder.getAsString();
 
+        ConnectionRequest executed = findRequest(BASE_URL + "/items/42");
+        assertNotNull(executed);
+        assertEquals(ConnectionRequest.CachingMode.MANUAL, executed.getCacheMode());
+        assertEquals(1500, executed.getTimeout());
+        assertEquals(3000, executed.getReadTimeout());
+        assertFalse(executed.isCookiesEnabled());
+        assertEquals(ConnectionRequest.PRIORITY_HIGH, executed.getPriority());
+        assertTrue(executed.isInsecure());
+
         TestConnection connection = findSingleConnection(BASE_URL + "/items/42");
+        waitForConnection(connection);
         assertNotNull(connection);
         assertTrue(connection.getUrl().startsWith("https://example.com/items/42"));
         assertFalse(connection.isPostRequest());
@@ -126,6 +120,26 @@ class RequestBuilderTest extends UITestBase {
         assertEquals(1L, ((Long) data.get("count")).longValue());
     }
 
+    private void waitForConnection(final TestConnection connection) {
+        CN.invokeAndBlock(new Runnable() {
+            public void run() {
+                long deadline = System.currentTimeMillis() + 2000L;
+                while (System.currentTimeMillis() < deadline) {
+                    if (connection.isWriteRequested() && connection.getOutputData().length > 0) {
+                        return;
+                    }
+                    try {
+                        Thread.sleep(10L);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(e);
+                    }
+                }
+                throw new AssertionError("Timed out waiting for connection to write: " + connection.getUrl());
+            }
+        });
+    }
+
     private RequestBuilder createConfiguredBuilder() {
         return new RequestBuilder("POST", "https://example.com/items/{id}")
                 .contentType("application/json")
@@ -170,6 +184,24 @@ class RequestBuilderTest extends UITestBase {
         }
         assertNotNull(executed, "No executed connection found for " + baseUrl);
         return executed;
+    }
+
+    private ConnectionRequest findRequest(String baseUrl) {
+        List<ConnectionRequest> requests = implementation.getQueuedRequests();
+        ConnectionRequest match = null;
+        for (ConnectionRequest request : requests) {
+            if (request.getUrl() == null) {
+                continue;
+            }
+            if (!request.getUrl().startsWith(baseUrl)) {
+                continue;
+            }
+            if (match != null) {
+                fail("Multiple requests found for " + baseUrl);
+            }
+            match = request;
+        }
+        return match;
     }
 
     private Map<String, List<String>> parseQuery(String url) {
