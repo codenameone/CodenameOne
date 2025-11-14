@@ -4,7 +4,7 @@ import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
 import com.codename1.io.NetworkManager;
-import com.codename1.junit.EdtTest;
+import com.codename1.junit.FormTest;
 import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation.TestConnection;
@@ -56,7 +56,7 @@ class PushTest extends UITestBase {
         NetworkManager.getInstance().shutdownSync();
     }
 
-    @EdtTest
+    @FormTest
     void gcmAuthStoresKeyAndSupportsChaining() {
         preparePushConnection();
         Push push = new Push("t", "body", "device");
@@ -70,7 +70,7 @@ class PushTest extends UITestBase {
         assertEquals("secret", body.get("auth").get(0));
     }
 
-    @EdtTest
+    @FormTest
     void apnsAuthStoresCredentialsAndProductionFlag() {
         preparePushConnection();
         Push push = new Push("t", "body", "device");
@@ -81,12 +81,19 @@ class PushTest extends UITestBase {
         TestConnection connection = findPushConnection();
         assertNotNull(connection);
         Map<String, List<String>> body = parseBody(connection);
+        assertNotNull(body);
+        assertNotNull(body.get("cert"));
+        assertFalse(body.get("cert").isEmpty());
         assertEquals("https://cert", body.get("cert").get(0));
+        assertNotNull(body.get("certPassword"));
+        assertFalse(body.get("certPassword").isEmpty());
         assertEquals("pass", body.get("certPassword").get(0));
+        assertNotNull(body.get("production"));
+        assertFalse(body.get("production").isEmpty());
         assertEquals("true", body.get("production").get(0));
     }
 
-    @EdtTest
+    @FormTest
     void wnsAuthStoresCredentials() {
         preparePushConnection();
         Push push = new Push("t", "body", "device");
@@ -100,7 +107,7 @@ class PushTest extends UITestBase {
         assertEquals("client", body.get("client_secret").get(0));
     }
 
-    @EdtTest
+    @FormTest
     void pushTypeUpdatesInternalState() {
         preparePushConnection();
         Push push = new Push("t", "body", "device");
@@ -113,7 +120,7 @@ class PushTest extends UITestBase {
         assertEquals("7", body.get("type").get(0));
     }
 
-    @EdtTest
+    @FormTest
     void createPushMessagePopulatesArgumentsCorrectly() {
         preparePushConnection();
         Push push = new Push("token", "Body", "d1", "d2");
@@ -140,7 +147,7 @@ class PushTest extends UITestBase {
         assertEquals("true", arguments.get("production").get(0));
     }
 
-    @EdtTest
+    @FormTest
     void createPushMessageHandlesTestEnvironment() {
         preparePushConnection();
         Push push = new Push("token", "Body", "device");
@@ -153,21 +160,21 @@ class PushTest extends UITestBase {
         assertEquals("false", arguments.get("production").get(0));
     }
 
-    @EdtTest
+    @FormTest
     void pushConnectionSuccessfulWhenNoError() throws Exception {
         Push.PushConnection connection = new Push.PushConnection();
         connection.readResponse(new java.io.ByteArrayInputStream("{\"result\":\"ok\"}".getBytes(StandardCharsets.UTF_8)));
         assertTrue(connection.successful);
     }
 
-    @EdtTest
+    @FormTest
     void pushConnectionFailsWhenErrorPresent() throws Exception {
         Push.PushConnection connection = new Push.PushConnection();
         connection.readResponse(new java.io.ByteArrayInputStream("{\"error\":\"denied\"}".getBytes(StandardCharsets.UTF_8)));
         assertFalse(connection.successful);
     }
 
-    @EdtTest
+    @FormTest
     void pushConnectionHandlesNetworkFailures() {
         Push.PushConnection connection = new Push.PushConnection();
         connection.handleErrorResponseCode(500, "server");
@@ -176,19 +183,19 @@ class PushTest extends UITestBase {
         assertFalse(connection.successful);
     }
 
-    @EdtTest
+    @FormTest
     void getDeviceKeyReturnsStringValueWhenStored() {
         Preferences.set("push_id", 123L);
         assertEquals("123", Push.getDeviceKey());
     }
 
-    @EdtTest
+    @FormTest
     void getDeviceKeyReturnsNullWhenMissing() {
         Preferences.delete("push_id");
         assertNull(Push.getDeviceKey());
     }
 
-    @EdtTest
+    @FormTest
     void getPushKeyUsesStoredValueOrPrefix() {
         Preferences.set("push_key", "cn1-my-app-123");
         assertEquals("cn1-my-app-123", Push.getPushKey());

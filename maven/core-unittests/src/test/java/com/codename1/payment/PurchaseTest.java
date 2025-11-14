@@ -2,8 +2,10 @@ package com.codename1.payment;
 
 import com.codename1.io.Storage;
 import com.codename1.junit.EdtTest;
+import com.codename1.junit.FormTest;
 import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.Display;
 import com.codename1.util.SuccessCallback;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -78,9 +80,10 @@ class PurchaseTest extends UITestBase {
         return receipt;
     }
 
-    @EdtTest
+    @FormTest
     void testPostReceiptStoresPendingReceipt() {
         long purchaseTime = System.currentTimeMillis();
+        assertNotNull(Display.getInstance().getInAppPurchase());
         Purchase.postReceipt(Receipt.STORE_CODE_SIMULATOR, "pro", "txn-1", purchaseTime, "order-data");
         flushSerialCalls();
 
