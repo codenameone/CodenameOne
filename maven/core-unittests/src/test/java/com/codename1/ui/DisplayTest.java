@@ -13,7 +13,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-class DisplayTest extends UITestBase {
+public class DisplayTest extends UITestBase {
+
+    public static void flushEdt() {
+        Display.getInstance().flushEdt();
+    }
 
     @AfterEach
     void resetStatics() {

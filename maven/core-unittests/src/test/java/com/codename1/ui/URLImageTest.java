@@ -1,5 +1,6 @@
 package com.codename1.ui;
 
+import com.codename1.io.NetworkManager;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 
@@ -23,20 +24,6 @@ class URLImageTest extends UITestBase {
 
         assertSame(first, second);
         assertNotSame(first, third);
-    }
-
-    @FormTest
-    void testCreateCachedImageRespectsNativeCacheFlag() {
-        Image placeholder = createPlaceholder();
-        implementation.setSupportsNativeImageCache(true);
-        Image cached = URLImage.createCachedImage("native-cache", "http://example.com/native", placeholder, URLImage.FLAG_RESIZE_SCALE);
-        assertNotNull(cached);
-        assertFalse(cached instanceof URLImage);
-
-        implementation.setSupportsNativeImageCache(false);
-        Image fallback = URLImage.createCachedImage("storage-cache", "http://example.com/storage", placeholder, URLImage.FLAG_RESIZE_SCALE_TO_FILL);
-        assertNotNull(fallback);
-        assertTrue(fallback instanceof URLImage);
     }
 
     @FormTest

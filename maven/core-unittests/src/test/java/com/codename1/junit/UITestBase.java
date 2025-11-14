@@ -4,6 +4,7 @@ import com.codename1.impl.ImplementationFactory;
 import com.codename1.io.Util;
 import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.Display;
+import com.codename1.ui.DisplayTest;
 import com.codename1.ui.plaf.UIManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -41,6 +42,7 @@ public abstract class UITestBase {
 
     @AfterEach
     protected void tearDownDisplay() throws Exception {
+        DisplayTest.flushEdt();
         resetUIManager();
         Display.deinitialize();
     }

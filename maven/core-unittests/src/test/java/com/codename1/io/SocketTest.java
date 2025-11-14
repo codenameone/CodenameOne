@@ -3,6 +3,7 @@ package com.codename1.io;
 import com.codename1.junit.EdtTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation.TestSocket;
+import org.junit.jupiter.api.BeforeEach;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -18,9 +19,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class SocketTest extends UITestBase {
 
-    @Override
-    protected void setUpDisplay() throws Exception {
-        super.setUpDisplay();
+    @BeforeEach
+    protected void initSockets() throws Exception {
         implementation.clearSockets();
         implementation.setSocketAvailable(true);
         implementation.setServerSocketAvailable(true);

@@ -3,6 +3,7 @@ package com.codename1.components;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestUtils;
 import com.codename1.ui.Image;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -53,6 +54,12 @@ class FileEncodedImageAsyncTest extends UITestBase {
             // File doesn't exist, so getImageData should return placeholder or null
             byte[] data = img.getImageData();
             assertTrue(data == null || data.length >= 0);
+            int timeout = 0;
+            while (TestLogger.getPrinted().isEmpty()) {
+                TestUtils.waitFor(10);
+                timeout++;
+                assertNotEquals(timeout, 100);
+            }
         } finally {
             TestLogger.remove();
         }
