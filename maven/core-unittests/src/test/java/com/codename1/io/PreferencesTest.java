@@ -1,8 +1,8 @@
 package com.codename1.io;
 
+import com.codename1.io.PreferenceListener;
 import com.codename1.junit.EdtTest;
 import com.codename1.junit.UITestBase;
-import com.codename1.ui.CN;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -18,34 +18,26 @@ class PreferencesTest extends UITestBase {
 
     @BeforeEach
     void setUpPreferences() throws Exception {
-        CN.callSeriallyAndWait(new Runnable() {
-            public void run() {
-                Storage.setStorageInstance(null);
-                Storage storage = Storage.getInstance();
-                storage.clearCache();
-                storage.clearStorage();
-                implementation.clearStorage();
-                originalLocation = Preferences.getPreferencesLocation();
-                Preferences.setPreferencesLocation("PreferencesTest-" + System.nanoTime());
-                Preferences.clearAll();
-            }
-        });
+        Storage.setStorageInstance(null);
+        Storage storage = Storage.getInstance();
+        storage.clearCache();
+        storage.clearStorage();
+        implementation.clearStorage();
+        originalLocation = Preferences.getPreferencesLocation();
+        Preferences.setPreferencesLocation("PreferencesTest-" + System.nanoTime());
+        Preferences.clearAll();
     }
 
     @AfterEach
     void tearDownPreferences() throws Exception {
-        CN.callSeriallyAndWait(new Runnable() {
-            public void run() {
-                Preferences.clearAll();
-                if (originalLocation != null) {
-                    Preferences.setPreferencesLocation(originalLocation);
-                }
-                Storage storage = Storage.getInstance();
-                storage.clearCache();
-                storage.clearStorage();
-                implementation.clearStorage();
-            }
-        });
+        Preferences.clearAll();
+        if (originalLocation != null) {
+            Preferences.setPreferencesLocation(originalLocation);
+        }
+        Storage storage = Storage.getInstance();
+        storage.clearCache();
+        storage.clearStorage();
+        implementation.clearStorage();
     }
 
     @EdtTest

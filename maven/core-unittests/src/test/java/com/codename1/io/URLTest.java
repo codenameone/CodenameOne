@@ -1,9 +1,9 @@
 package com.codename1.io;
 
-import com.codename1.testing.TestCodenameOneImplementation;
+import com.codename1.junit.EdtTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation.TestConnection;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,19 +16,16 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class URLTest {
-    private TestCodenameOneImplementation implementation;
+class URLTest extends UITestBase {
 
     @BeforeEach
     void setUp() {
-        implementation = new TestCodenameOneImplementation();
-        Util.setImplementation(implementation);
         implementation.clearConnections();
         implementation.clearFileSystem();
         implementation.setAppHomePath("file://app/");
     }
 
-    @Test
+    @EdtTest
     void parsesUrlComponents() throws URISyntaxException {
         URL url = new URL("https://user:secret@example.com:8443/path/resource?x=1");
 
@@ -46,7 +43,7 @@ class URLTest {
         assertFalse(url.sameFile(new URL("https://example.com")));
     }
 
-    @Test
+    @EdtTest
     void fileConnectionReadsAndWritesUsingFileSystemStorage() throws Exception {
         URL url = new URL("file:/virtual/test.txt");
         String key = "file:/" + url.toURI().getPath();
@@ -71,7 +68,7 @@ class URLTest {
         assertArrayEquals(updated, implementation.getFileContent(key));
     }
 
-    @Test
+    @EdtTest
     void httpConnectionDelegatesToImplementation() throws Exception {
         URL url = new URL("http://example.com/service");
         TestConnection connection = implementation.createConnection("http://example.com/service");
@@ -102,7 +99,7 @@ class URLTest {
         assertEquals(Collections.singletonList("text/plain"), headers.get("Content-Type"));
     }
 
-    @Test
+    @EdtTest
     void setRequestMethodThrowsOnFailureAfterConnect() throws Exception {
         URL url = new URL("http://example.com/delete");
         TestConnection connection = implementation.createConnection("http://example.com/delete");

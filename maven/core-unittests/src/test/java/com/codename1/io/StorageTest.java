@@ -1,8 +1,8 @@
 package com.codename1.io;
 
-import com.codename1.testing.TestCodenameOneImplementation;
+import com.codename1.junit.EdtTest;
+import com.codename1.junit.UITestBase;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -10,14 +10,11 @@ import java.util.Vector;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class StorageTest {
-    private TestCodenameOneImplementation implementation;
+class StorageTest extends UITestBase {
     private Storage storage;
 
     @BeforeEach
     void setUp() {
-        implementation = new TestCodenameOneImplementation();
-        Util.setImplementation(implementation);
         Storage.setStorageInstance(null);
         storage = Storage.getInstance();
         storage.clearStorage();
@@ -26,7 +23,7 @@ class StorageTest {
         implementation.resetFlushStorageCacheInvocations();
     }
 
-    @Test
+    @EdtTest
     void writeObjectCachesAndPersistsEntries() {
         Vector<String> payload = new Vector<String>();
         payload.add("alpha");
@@ -45,12 +42,12 @@ class StorageTest {
         assertNotSame(firstRead, secondRead);
     }
 
-    @Test
+    @EdtTest
     void createInputStreamThrowsWhenEntryMissing() {
         assertThrows(IOException.class, () -> storage.createInputStream("missing"));
     }
 
-    @Test
+    @EdtTest
     void clearStoragePurgesEntriesAndCache() {
         storage.writeObject("transient", "value");
         assertNotNull(storage.readObject("transient"));
@@ -61,7 +58,7 @@ class StorageTest {
         assertNull(storage.readObject("transient"));
     }
 
-    @Test
+    @EdtTest
     void normalizedNamesAreUsedByDefault() {
         String originalKey = "dir/with:illegal*chars";
         storage.writeObject(originalKey, "data");
@@ -70,7 +67,7 @@ class StorageTest {
         assertTrue(Arrays.asList(storage.listEntries()).contains("dir_with_illegal_chars"));
     }
 
-    @Test
+    @EdtTest
     void disablingNormalizationUsesRawKey() {
         storage.setNormalizeNames(false);
         String rawKey = "raw/name=kept";
@@ -79,13 +76,13 @@ class StorageTest {
         assertTrue(Arrays.asList(storage.listEntries()).contains(rawKey));
     }
 
-    @Test
+    @EdtTest
     void flushStorageCacheDelegatesToImplementation() {
         storage.flushStorageCache();
         assertEquals(1, implementation.getFlushStorageCacheInvocations());
     }
 
-    @Test
+    @EdtTest
     void entrySizeReflectsStoredObjectSize() {
         String key = "sized";
         storage.writeObject(key, "payload");
@@ -93,7 +90,7 @@ class StorageTest {
         assertTrue(size > 0);
     }
 
-    @Test
+    @EdtTest
     void deleteStorageFileRemovesEntryAndCache() {
         String key = "toDelete";
         storage.writeObject(key, "data");
@@ -105,7 +102,7 @@ class StorageTest {
         assertNull(storage.readObject(key));
     }
 
-    @Test
+    @EdtTest
     void existsDelegatesToImplementationWithNormalization() {
         String key = "needs?normalization";
         implementation.putStorageEntry("needs_normalization", new byte[]{1});

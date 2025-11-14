@@ -4,8 +4,6 @@ import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
 import com.codename1.junit.EdtTest;
 import com.codename1.junit.UITestBase;
-import com.codename1.ui.CN;
-import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.testing.TestCodenameOneImplementation.TestConnection;
 import com.codename1.util.Base64;
 import com.codename1.io.rest.Response;
@@ -28,11 +26,7 @@ class RequestBuilderTest extends UITestBase {
 
     @BeforeEach
     void clearConnections() throws Exception {
-        CN.callSeriallyAndWait(new Runnable() {
-            public void run() {
-                implementation.clearConnections();
-            }
-        });
+        implementation.clearConnections();
     }
 
     @EdtTest
@@ -84,7 +78,9 @@ class RequestBuilderTest extends UITestBase {
         TestConnection connection = implementation.createConnection(BASE_URL);
         connection.setResponseCode(500);
         connection.setResponseMessage("Server Error");
-        connection.setInputData("failure".getBytes(StandardCharsets.UTF_8));
+        byte[] data = "failure".getBytes(StandardCharsets.UTF_8);
+        connection.setInputData(data);
+        connection.setContentLength(data.length);
 
         CountDownLatch latch = new CountDownLatch(1);
         final Response<String>[] holder = new Response[1];
@@ -108,7 +104,9 @@ class RequestBuilderTest extends UITestBase {
         TestConnection connection = implementation.createConnection(BASE_URL);
         connection.setResponseCode(400);
         connection.setResponseMessage("Bad Request");
-        connection.setInputData("{\"flag\":true,\"count\":1}".getBytes(StandardCharsets.UTF_8));
+        byte[] payload = "{\"flag\":true,\"count\":1}".getBytes(StandardCharsets.UTF_8);
+        connection.setInputData(payload);
+        connection.setContentLength(payload.length);
 
         CountDownLatch latch = new CountDownLatch(1);
         final Response<Map>[] holder = new Response[1];

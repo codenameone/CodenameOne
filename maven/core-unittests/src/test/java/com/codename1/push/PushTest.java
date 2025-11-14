@@ -6,7 +6,6 @@ import com.codename1.io.Storage;
 import com.codename1.junit.EdtTest;
 import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
-import com.codename1.ui.CN;
 import com.codename1.testing.TestCodenameOneImplementation.TestConnection;
 import com.codename1.ui.Display;
 import org.junit.jupiter.api.AfterEach;
@@ -27,35 +26,29 @@ class PushTest extends UITestBase {
 
     @BeforeEach
     void setup() throws Exception {
-        CN.callSeriallyAndWait(new Runnable() {
-            public void run() {
-                originalPreferencesLocation = Preferences.getPreferencesLocation();
-                Preferences.setPreferencesLocation("PushTest-" + System.nanoTime());
-                Preferences.clearAll();
-                implementation.clearConnections();
-                implementation.clearStorage();
-                Storage.getInstance().clearStorage();
-                Storage.getInstance().clearCache();
-                TestLogger.install();
-            }
-        });
+        originalPreferencesLocation = Preferences.getPreferencesLocation();
+        Preferences.setPreferencesLocation("PushTest-" + System.nanoTime());
+        Preferences.clearAll();
+        implementation.clearConnections();
+        implementation.clearStorage();
+        Storage.setStorageInstance(null);
+        Storage storage = Storage.getInstance();
+        storage.clearStorage();
+        storage.clearCache();
+        TestLogger.install();
     }
 
     @AfterEach
     void tearDown() throws Exception {
-        CN.callSeriallyAndWait(new Runnable() {
-            public void run() {
-                TestLogger.remove();
-                Preferences.clearAll();
-                if (originalPreferencesLocation != null) {
-                    Preferences.setPreferencesLocation(originalPreferencesLocation);
-                }
-                Display.getInstance().setProperty("cn1_push_prefix", null);
-                implementation.clearConnections();
-                implementation.clearStorage();
-                Storage.getInstance().clearCache();
-            }
-        });
+        TestLogger.remove();
+        Preferences.clearAll();
+        if (originalPreferencesLocation != null) {
+            Preferences.setPreferencesLocation(originalPreferencesLocation);
+        }
+        Display.getInstance().setProperty("cn1_push_prefix", null);
+        implementation.clearConnections();
+        implementation.clearStorage();
+        Storage.getInstance().clearCache();
     }
 
     @EdtTest
@@ -192,7 +185,9 @@ class PushTest extends UITestBase {
         TestConnection connection = implementation.createConnection(PUSH_URL);
         connection.setResponseCode(200);
         connection.setResponseMessage("OK");
-        connection.setInputData("{\"result\":\"ok\"}".getBytes(StandardCharsets.UTF_8));
+        byte[] payload = "{\"result\":\"ok\"}".getBytes(StandardCharsets.UTF_8);
+        connection.setInputData(payload);
+        connection.setContentLength(payload.length);
         return connection;
     }
 
