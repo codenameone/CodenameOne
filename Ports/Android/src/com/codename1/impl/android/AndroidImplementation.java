@@ -3623,8 +3623,25 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
 
         // The document picker grants temporary permissions for content URIs. Requesting
         // READ_EXTERNAL_STORAGE again would surface a redundant prompt on Android 13+, so we only
-        // ask for classic file paths that require the legacy permission.
-        if(!isContentUri && !uri.startsWith(FileSystemStorage.getInstance().getAppHomePath())) {
+        // ask for classic file paths that require the legacy permission. MediaStore URIs still
+        // require an explicit permission grant, so they remain subject to the legacy check even
+        // though they also use the content:// scheme.
+        boolean requiresLegacyPermission = !uri.startsWith(FileSystemStorage.getInstance().getAppHomePath());
+        if (isContentUri && parsedUri != null) {
+            String authority = parsedUri.getAuthority();
+            if (authority != null) {
+                authority = authority.toLowerCase();
+                if (!"media".equals(authority) && !authority.startsWith("media.")) {
+                    if (!"com.android.providers.media.documents".equals(authority)) {
+                        requiresLegacyPermission = false;
+                    }
+                }
+            } else {
+                requiresLegacyPermission = false;
+            }
+        }
+
+        if(requiresLegacyPermission) {
             if(!PermissionsHelper.checkForPermission(isVideo ? DevicePermission.PERMISSION_READ_VIDEO : DevicePermission.PERMISSION_READ_AUDIO, "This is required to play media")){
                 return null;
             }
