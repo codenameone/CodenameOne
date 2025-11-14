@@ -258,6 +258,8 @@ declare -A PREVIEW_OUTPUTS=()
 
 ensure_dir "$SCREENSHOT_PREVIEW_DIR"
 
+decode_rc=0
+
 for test in "${TEST_NAMES[@]}"; do
   dest="$SCREENSHOT_TMP_DIR/${test}.png"
   if source_label="$(cn1ss_decode_test_png "$test" "$dest" "${CN1SS_SOURCES[@]}")"; then
@@ -272,7 +274,7 @@ for test in "${TEST_NAMES[@]}"; do
       rm -f "$preview_dest" 2>/dev/null || true
     fi
   else
-    ra_log "FATAL: Failed to extract/decode CN1SS payload for test '$test'"
+    ra_log "ERROR: Failed to extract/decode CN1SS payload for test '$test'"
     RAW_B64_OUT="$SCREENSHOT_TMP_DIR/${test}.raw.b64"
     if cn1ss_extract_base64 "$TEST_LOG" "$test" > "$RAW_B64_OUT" 2>/dev/null; then
       if [ -s "$RAW_B64_OUT" ]; then
@@ -280,7 +282,8 @@ for test in "${TEST_NAMES[@]}"; do
         ra_log "Partial base64 saved at: $RAW_B64_OUT"
       fi
     fi
-    exit 12
+    decode_rc=12
+    continue
   fi
 done
 
@@ -519,4 +522,13 @@ fi
 cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner-logcat.txt" 2>/dev/null || true
 [ -n "${TEST_EXEC_LOG:-}" ] && cp -f "$TEST_EXEC_LOG" "$ARTIFACTS_DIR/test-results.log" 2>/dev/null || true
 
-exit $comment_rc
+# --- Final status: fail if decode failed, even if coverage+comment succeeded ---
+final_rc=$comment_rc
+if [ "${decode_rc:-0}" -ne 0 ]; then
+  # If decode failed, that should make the job fail, even if comment_rc==0
+  if [ "$final_rc" -eq 0 ]; then
+    final_rc="$decode_rc"
+  fi
+fi
+
+exit "$final_rc"
