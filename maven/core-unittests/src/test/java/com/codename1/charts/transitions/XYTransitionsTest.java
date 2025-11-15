@@ -103,7 +103,6 @@ class XYTransitionsTest extends UITestBase {
         buffer.getSeriesAt(0).add(1, 12);
         buffer.getSeriesAt(1).add(0, 8);
         buffer.getSeriesAt(1).add(1, 9);
-        transition.setBuffer(buffer);
 
         transition.setDuration(5);
         transition.animateChart();
