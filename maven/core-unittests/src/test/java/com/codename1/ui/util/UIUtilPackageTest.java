@@ -63,22 +63,35 @@ class UIUtilPackageTest extends UITestBase {
         Form form = new Form();
         form.show();
 
+        DisplayTest.flushEdt();
+        flushSerialCalls();
+
         CountingRunnable counting = new CountingRunnable();
         UITimer timer = new UITimer(counting);
-        timer.schedule(10, false, form);
-        assertTrue(awaitCount(counting, 1, 20));
+        timer.schedule(5, false, form);
+        Thread.sleep(15);
+        timer.testEllapse();
+        assertEquals(1, counting.count);
+
         timer.cancel();
         int singleCount = counting.count;
+        Thread.sleep(15);
         timer.testEllapse();
         assertEquals(singleCount, counting.count);
 
         counting.count = 0;
         UITimer repeating = new UITimer(counting);
         repeating.schedule(5, true, form);
-        assertTrue(awaitCount(counting, 1, 20));
+        Thread.sleep(15);
+        repeating.testEllapse();
+        assertEquals(1, counting.count);
+        Thread.sleep(15);
+        repeating.testEllapse();
+        assertEquals(2, counting.count);
+
         repeating.cancel();
-        long before = counting.count;
-        drainEdtTicks(3);
+        int before = counting.count;
+        Thread.sleep(15);
         repeating.testEllapse();
         assertEquals(before, counting.count);
     }
@@ -99,23 +112,4 @@ class UIUtilPackageTest extends UITestBase {
         }
     }
 
-    private boolean awaitCount(CountingRunnable counting, int minimum, int iterations) throws InterruptedException {
-        for (int i = 0; i < iterations; i++) {
-            DisplayTest.flushEdt();
-            flushSerialCalls();
-            if (counting.count >= minimum) {
-                return true;
-            }
-            Thread.sleep(5);
-        }
-        return counting.count >= minimum;
-    }
-
-    private void drainEdtTicks(int iterations) throws InterruptedException {
-        for (int i = 0; i < iterations; i++) {
-            DisplayTest.flushEdt();
-            flushSerialCalls();
-            Thread.sleep(5);
-        }
-    }
 }

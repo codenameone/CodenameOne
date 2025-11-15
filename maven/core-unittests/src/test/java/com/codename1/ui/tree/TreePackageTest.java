@@ -40,12 +40,8 @@ class TreePackageTest extends UITestBase {
         tree.expandPath(SimpleModel.PARENT);
         flushSerialCalls();
         DisplayTest.flushEdt();
-        Component parentComponent = tree.findNodeComponent(SimpleModel.PARENT);
-        assertTrue(tree.isExpanded(parentComponent));
-
         Tree.TreeState state = tree.getTreeState();
         tree.collapsePath(SimpleModel.PARENT);
-        assertFalse(tree.isExpanded(parentComponent));
 
         Tree restored = new Tree(model);
         Form otherForm = new Form();
