@@ -13,24 +13,6 @@ preview_base = os.environ.get("ANDROID_PREVIEW_BASE_URL", "").strip()
 if preview_base.endswith("/"):
     preview_base = preview_base.rstrip("/")
 
-attachment_payloads = {}
-if compare_path.is_file():
-    try:
-        compare_data = json.loads(compare_path.read_text())
-        for item in compare_data.get("results", []):
-            if not isinstance(item, dict):
-                continue
-            preview = item.get("preview") or {}
-            preview_name = preview.get("name") or preview.get("path")
-            if isinstance(preview_name, str) and "/" in preview_name:
-                preview_name = preview_name.split("/")[-1]
-            base64_data = item.get("base64")
-            mime = item.get("base64_mime", "image/png")
-            if isinstance(base64_data, str) and base64_data:
-                if preview_name:
-                    attachment_payloads.setdefault(preview_name, (mime, base64_data))
-    except json.JSONDecodeError:
-        attachment_payloads = {}
 if screenshot_path.is_file():
     screenshot_text = screenshot_path.read_text().strip()
     screenshot_text = screenshot_text.replace("<!-- CN1SS_SCREENSHOT_COMMENT -->", "").strip()
@@ -38,21 +20,6 @@ if screenshot_path.is_file():
         screenshot_text = "✅ Native Android screenshot tests passed."
 else:
     screenshot_text = "✅ Native Android screenshot tests passed."
-
-if screenshot_text:
-    pattern = re.compile(r"\(attachment:([^)]+)\)")
-
-    def replace_attachment(match: re.Match) -> str:
-        name = match.group(1)
-        if preview_base:
-            return f"({preview_base}/{name})"
-        payload = attachment_payloads.get(name)
-        if payload:
-            mime, data = payload
-            return f"(data:{mime};base64,{data})"
-        return match.group(0)
-
-    screenshot_text = pattern.sub(replace_attachment, screenshot_text)
 
 comment_lines.append(screenshot_text)
 comment_lines.append("")
