@@ -23,12 +23,17 @@
 #import "CN1ES2compat.h"
 #import <UIKit/UIKit.h>
 
+#ifdef CN1_USE_METAL
+#import "METALView.h"
+#else
 #import <OpenGLES/EAGL.h>
 #import "EAGLView.h"
 #import <OpenGLES/ES1/gl.h>
 #import <OpenGLES/ES1/glext.h>
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES2/glext.h>
+#endif
+
 #import "ExecutableOp.h"
 #import "PaintOp.h"
 #import "GLUIImage.h"
@@ -159,7 +164,11 @@
 #define CN1_CAP_ROUND 1
 #define CN1_CAP_SQUARE 2
 
+#ifdef CN1_USE_METAL
+#define METALVIEW [[CodenameOne_GLViewController instance] metalView]
+#else
 #define EAGLVIEW [[CodenameOne_GLViewController instance] eaglView]
+#endif
 
 //ADD_INCLUDE
 
@@ -191,8 +200,10 @@ MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecord
 #endif
 > {
 @private
+#ifndef CN1_USE_METAL
     EAGLContext *context;
     GLuint program;
+#endif
     
     BOOL animating;
     NSInteger animationFrameInterval;
@@ -227,7 +238,13 @@ MFMessageComposeViewControllerDelegate, CLLocationManagerDelegate, AVAudioRecord
 - (void)signIn:(GIDSignIn *)signIn didDisconnectWithUser:(GIDGoogleUser *)user withError:(NSError *)error;
 #endif
 
+#ifdef CN1_USE_METAL
+-(METALView*)metalView;
+-(void)setScissorRect:(MTLScissorRect)rect enabled:(BOOL)enabled;
+#else
 -(EAGLView*)eaglView;
+#endif
+
 -(void)startAnimation;
 -(void)stopAnimation;
 +(BOOL)isDrawTextureSupported;

@@ -25,6 +25,12 @@
 #include "xmlvm.h"
 #include "TargetConditionals.h"
 
+#ifdef CN1_USE_METAL
+#import <Metal/Metal.h>
+#import <simd/simd.h>
+#import "CN1METALTransform.h"
+#endif
+
 #ifdef USE_ES2
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
@@ -105,7 +111,76 @@ static GLuint getOGLProgram(){
     height = h;
     return self;
 }
-#ifdef USE_ES2
+
+#ifdef CN1_USE_METAL
+-(void)execute {
+    // Metal rendering path
+    id<MTLRenderCommandEncoder> encoder = [self makeRenderCommandEncoder];
+    if (!encoder) {
+        return;
+    }
+
+    // Get the Metal device and create pipeline state if needed
+    static id<MTLRenderPipelineState> pipelineState = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        id<MTLDevice> device = [self device];
+        id<MTLLibrary> library = [device newDefaultLibrary];
+
+        MTLRenderPipelineDescriptor *pipelineDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
+        pipelineDescriptor.vertexFunction = [library newFunctionWithName:@"solidColor_vertex"];
+        pipelineDescriptor.fragmentFunction = [library newFunctionWithName:@"solidColor_fragment"];
+        pipelineDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+
+        // Enable blending for alpha
+        pipelineDescriptor.colorAttachments[0].blendingEnabled = YES;
+        pipelineDescriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
+        pipelineDescriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
+        pipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOne;
+        pipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
+        pipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+        pipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+
+        NSError *error = nil;
+        pipelineState = [device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:&error];
+        if (error) {
+            NSLog(@"Error creating FillRect pipeline state: %@", error);
+        }
+#ifndef CN1_USE_ARC
+        [pipelineDescriptor release];
+#endif
+    });
+
+    [encoder setRenderPipelineState:pipelineState];
+
+    // Create vertex data (2 triangles forming a rectangle)
+    float vertices[] = {
+        (float)x,         (float)y,          // Top-left
+        (float)(x+width), (float)y,          // Top-right
+        (float)x,         (float)(y+height), // Bottom-left
+        (float)(x+width), (float)(y+height)  // Bottom-right
+    };
+
+    // Set vertex buffer
+    [encoder setVertexBytes:vertices length:sizeof(vertices) atIndex:0];
+
+    // Set uniforms (MVP matrix + color)
+    typedef struct {
+        simd_float4x4 mvpMatrix;
+        simd_float4 color;
+    } Uniforms;
+
+    Uniforms uniforms;
+    uniforms.mvpMatrix = [self getMVPMatrix];
+    uniforms.color = [self colorToFloat4:color alpha:alpha];
+
+    [encoder setVertexBytes:&uniforms length:sizeof(uniforms) atIndex:1];
+
+    // Draw rectangle as triangle strip
+    [encoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
+}
+
+#elif USE_ES2
 -(void)execute {
     //[UIColorFromRGB(color, alpha) set];
     //CGContextFillRect(context, CGRectMake(x, y, width, height));

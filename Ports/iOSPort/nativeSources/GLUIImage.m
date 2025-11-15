@@ -34,7 +34,11 @@ extern int nextPowerOf2(int val);
 #ifndef CN1_USE_ARC
     [img retain];
 #endif
+#ifndef CN1_USE_METAL
     textureName = 0;
+#else
+    metalTexture = nil;
+#endif
     textureWidth = -1;
     textureHeight = -1;
     return self;
@@ -52,6 +56,53 @@ extern int nextPowerOf2(int val);
     return textureHeight;
 }
 
+#ifdef CN1_USE_METAL
+-(id<MTLTexture>)getMetalTexture {
+    // Delegate to getMetalTextureWithDevice with the system default device
+    // This is deprecated - callers should use getMetalTextureWithDevice: instead
+    return [self getMetalTextureWithDevice:MTLCreateSystemDefaultDevice()];
+}
+
+-(id<MTLTexture>)getMetalTextureWithDevice:(id<MTLDevice>)device {
+    if (metalTexture == nil) {
+
+        // Calculate texture dimensions (power of 2)
+        int w = (int)img.size.width;
+        int h = (int)img.size.height;
+        int p2w = nextPowerOf2(w);
+        int p2h = nextPowerOf2(h);
+
+        textureWidth = w;
+        textureHeight = h;
+
+        // Create image data
+        CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+        void* imageData = malloc(p2h * p2w * 4);
+        CGContextRef context = CGBitmapContextCreate(imageData, p2w, p2h, 8, 4 * p2w, colorSpace, kCGImageAlphaPremultipliedLast);
+        CGContextTranslateCTM(context, 0, p2h);
+        CGContextScaleCTM(context, 1, -1);
+        CGColorSpaceRelease(colorSpace);
+        CGContextClearRect(context, CGRectMake(0, 0, p2w, p2h));
+        CGContextDrawImage(context, CGRectMake(0, p2h - h, w, h), img.CGImage);
+
+        // Create Metal texture
+        MTLTextureDescriptor *textureDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
+                                                                                                      width:p2w
+                                                                                                     height:p2h
+                                                                                                  mipmapped:NO];
+        textureDescriptor.usage = MTLTextureUsageShaderRead;
+
+        metalTexture = [device newTextureWithDescriptor:textureDescriptor];
+
+        MTLRegion region = MTLRegionMake2D(0, 0, p2w, p2h);
+        [metalTexture replaceRegion:region mipmapLevel:0 withBytes:imageData bytesPerRow:4 * p2w];
+
+        CGContextRelease(context);
+        free(imageData);
+    }
+    return metalTexture;
+}
+#else
 -(GLuint)getTexture:(int)texWidth texHeight:(int)texHeight {
     if(textureName == 0) {
         textureWidth = texWidth;
@@ -121,6 +172,7 @@ extern int nextPowerOf2(int val);
     }
     return textureName;
 }
+#endif
 
 -(void)setImage:(UIImage*)i {
     if(img != nil) {
@@ -132,6 +184,11 @@ extern int nextPowerOf2(int val);
 #ifndef CN1_USE_ARC
     [img retain];
 #endif
+#ifdef CN1_USE_METAL
+    if(metalTexture != nil) {
+        metalTexture = nil; // ARC or manual release will handle cleanup
+    }
+#else
     if(textureName != 0) {
         int tname = textureName;
         textureName = 0;
@@ -147,6 +204,7 @@ extern int nextPowerOf2(int val);
             });
         }
     }
+#endif
 }
 
 -(void)setName:(NSString*)s {
@@ -158,11 +216,16 @@ extern int nextPowerOf2(int val);
 
 -(void)dealloc {
     if(name != nil) {
-        //CN1Log(@"Deleting image name %@", name); 
+        //CN1Log(@"Deleting image name %@", name);
 #ifndef CN1_USE_ARC
         [name release];
 #endif
     }
+#ifdef CN1_USE_METAL
+    if(metalTexture != nil) {
+        metalTexture = nil; // ARC or manual cleanup
+    }
+#else
     if(textureName != 0) {
         int tname = textureName;
         textureName = 0;
@@ -174,10 +237,11 @@ extern int nextPowerOf2(int val);
                 //int fm = [ExecutableOp get_free_memory];
                 glDeleteTextures(1, &tname);
                 GLErrorLog;
-                //CN1Log(@"Texture deletion freed up: %i", [ExecutableOp get_free_memory] - fm); 
+                //CN1Log(@"Texture deletion freed up: %i", [ExecutableOp get_free_memory] - fm);
             });
         }
     }
+#endif
 #ifndef CN1_USE_ARC
     [img release];
     [super dealloc];

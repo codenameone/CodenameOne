@@ -46,6 +46,8 @@
 @property (nonatomic, strong) MTLRenderPassDescriptor* renderPassDescriptor;
 @property (nonatomic, strong) id<CAMetalDrawable> drawable;
 @property (nonatomic, strong) UIView* peerComponentsLayer;
+@property (nonatomic, assign) MTLScissorRect scissorRect;
+@property (nonatomic, assign) BOOL scissorEnabled;
 
 -(void)textViewDidChange:(UITextView *)textView;
 -(void)deleteFramebuffer;

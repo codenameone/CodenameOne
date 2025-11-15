@@ -50,6 +50,8 @@ extern void repaintUI();
 @synthesize renderPassDescriptor;
 @synthesize drawable;
 @synthesize peerComponentsLayer;
+@synthesize scissorRect;
+@synthesize scissorEnabled;
 
 // You must implement this method
 + (Class)layerClass
