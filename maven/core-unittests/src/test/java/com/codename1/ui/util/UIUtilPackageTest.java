@@ -2,8 +2,8 @@ package com.codename1.ui.util;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.AnimationAwareForm;
 import com.codename1.ui.DisplayTest;
-import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 
@@ -60,7 +60,7 @@ class UIUtilPackageTest extends UITestBase {
 
     @FormTest
     void uiTimerSchedulesAndCancelsTasks() throws Exception {
-        Form form = new Form();
+        AnimationAwareForm form = new AnimationAwareForm();
         form.show();
 
         DisplayTest.flushEdt();
@@ -68,27 +68,29 @@ class UIUtilPackageTest extends UITestBase {
 
         CountingRunnable counting = new CountingRunnable();
         UITimer timer = new UITimer(counting);
-        timer.schedule(1000, false, form);
-        assertEquals(0, counting.count);
+        timer.schedule(0, false, form);
+        assertTrue(form.hasAnimationsExposed());
         timer.testEllapse();
         assertEquals(1, counting.count);
-
-        timer.cancel();
-        int singleCount = counting.count;
-        timer.testEllapse();
-        assertEquals(singleCount, counting.count);
+        flushSerialCalls();
+        DisplayTest.flushEdt();
+        assertFalse(form.hasAnimationsExposed());
 
         counting.count = 0;
         UITimer repeating = new UITimer(counting);
-        repeating.schedule(1000, true, form);
+        repeating.schedule(0, true, form);
+        assertTrue(form.hasAnimationsExposed());
         repeating.testEllapse();
         assertEquals(1, counting.count);
         repeating.testEllapse();
         assertEquals(2, counting.count);
+        assertTrue(form.hasAnimationsExposed());
 
         repeating.cancel();
+        assertFalse(form.hasAnimationsExposed());
         int before = counting.count;
-        repeating.testEllapse();
+        flushSerialCalls();
+        DisplayTest.flushEdt();
         assertEquals(before, counting.count);
     }
 

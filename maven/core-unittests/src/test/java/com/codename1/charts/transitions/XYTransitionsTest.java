@@ -29,10 +29,9 @@ class XYTransitionsTest extends UITestBase {
         form.show();
 
         XYSeriesTransition transition = new XYSeriesTransition(chartComponent, series);
-        XYSeries buffer = new XYSeries("Series");
+        XYSeries buffer = transition.getBuffer();
         buffer.add(0, 5);
         buffer.add(1, 7);
-        transition.setBuffer(buffer);
 
         transition.setDuration(5);
         transition.animateChart();
@@ -60,10 +59,9 @@ class XYTransitionsTest extends UITestBase {
         form.show();
 
         XYValueSeriesTransition transition = new XYValueSeriesTransition(chartComponent, valueSeries);
-        XYValueSeries buffer = new XYValueSeries("Values");
+        XYValueSeries buffer = transition.getBuffer();
         buffer.add(0, 3, 30);
         buffer.add(1, 4, 40);
-        transition.setBuffer(buffer);
 
         transition.setDuration(5);
         transition.animateChart();
