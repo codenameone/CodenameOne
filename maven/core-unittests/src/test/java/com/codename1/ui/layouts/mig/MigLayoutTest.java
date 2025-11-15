@@ -4,7 +4,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
-import com.codename1.ui.PainterChain;
+import com.codename1.ui.painter.PainterChain;
 
 import static org.junit.jupiter.api.Assertions.*;
 
