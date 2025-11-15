@@ -50,8 +50,8 @@ class OpenGalleryTest extends UITestBase {
         assertEquals(1, implementation.getOpenGalleryCallCount());
         assertSame(response, implementation.getLastOpenGalleryResponse());
         assertEquals(type, implementation.getLastOpenGalleryType());
-        assertEquals(1, plugin.events.size());
-        PluginEvent event = plugin.events.get(0);
+        assertEquals(1, plugin.getEvents().size());
+        PluginEvent event = plugin.getEvents().get(0);
         assertTrue(event instanceof OpenGalleryEvent);
         OpenGalleryEvent openEvent = (OpenGalleryEvent) event;
         assertEquals(type, openEvent.getType());
@@ -69,9 +69,9 @@ class OpenGalleryTest extends UITestBase {
         display.openGallery(response, type);
 
         assertEquals(0, implementation.getOpenGalleryCallCount());
-        assertEquals(1, plugin.events.size());
-        assertTrue(plugin.events.get(0).isConsumed());
-        OpenGalleryEvent openEvent = (OpenGalleryEvent) plugin.events.get(0);
+        assertEquals(1, plugin.getEvents().size());
+        assertTrue(plugin.getEvents().get(0).isConsumed());
+        OpenGalleryEvent openEvent = (OpenGalleryEvent) plugin.getEvents().get(0);
         assertEquals(type, openEvent.getType());
         assertSame(response, openEvent.getResponse());
     }
@@ -86,8 +86,8 @@ class OpenGalleryTest extends UITestBase {
 
         assertEquals(1, implementation.getOpenImageGalleryCallCount());
         assertSame(response, implementation.getLastOpenImageGalleryResponse());
-        assertEquals(1, plugin.events.size());
-        PluginEvent event = plugin.events.get(0);
+        assertEquals(1, plugin.getEvents().size());
+        PluginEvent event = plugin.getEvents().get(0);
         assertTrue(event instanceof OpenGalleryEvent);
         OpenGalleryEvent openEvent = (OpenGalleryEvent) event;
         assertEquals(Display.GALLERY_IMAGE, openEvent.getType());
@@ -104,9 +104,9 @@ class OpenGalleryTest extends UITestBase {
         display.openImageGallery(response);
 
         assertEquals(0, implementation.getOpenImageGalleryCallCount());
-        assertEquals(1, plugin.events.size());
-        assertTrue(plugin.events.get(0).isConsumed());
-        OpenGalleryEvent openEvent = (OpenGalleryEvent) plugin.events.get(0);
+        assertEquals(1, plugin.getEvents().size());
+        assertTrue(plugin.getEvents().get(0).isConsumed());
+        OpenGalleryEvent openEvent = (OpenGalleryEvent) plugin.getEvents().get(0);
         assertEquals(Display.GALLERY_IMAGE, openEvent.getType());
         assertSame(response, openEvent.getResponse());
     }
@@ -123,8 +123,8 @@ class OpenGalleryTest extends UITestBase {
 
             assertEquals(supported, actual);
             assertEquals(0, implementation.getGalleryTypeSupportedCallCount());
-            assertEquals(1, plugin.events.size());
-            PluginEvent event = plugin.events.get(0);
+            assertEquals(1, plugin.getEvents().size());
+            PluginEvent event = plugin.getEvents().get(0);
             assertTrue(event instanceof IsGalleryTypeSupportedEvent);
             assertTrue(event.isConsumed());
             assertEquals(type, ((IsGalleryTypeSupportedEvent) event).getType());
@@ -150,8 +150,8 @@ class OpenGalleryTest extends UITestBase {
             assertEquals(supported, actual);
             assertEquals(1, implementation.getGalleryTypeSupportedCallCount());
             assertEquals(type, implementation.getLastGalleryTypeQuery());
-            assertEquals(1, plugin.events.size());
-            PluginEvent event = plugin.events.get(0);
+            assertEquals(1, plugin.getEvents().size());
+            PluginEvent event = plugin.getEvents().get(0);
             assertTrue(event instanceof IsGalleryTypeSupportedEvent);
             assertFalse(event.isConsumed());
             assertEquals(type, ((IsGalleryTypeSupportedEvent) event).getType());
@@ -176,6 +176,10 @@ class OpenGalleryTest extends UITestBase {
 
         public void actionPerformed(PluginEvent evt) {
             events.add(evt);
+        }
+
+        List<PluginEvent> getEvents() {
+            return events;
         }
     }
 

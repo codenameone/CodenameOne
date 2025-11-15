@@ -2419,7 +2419,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         if (value != null) {
             return value.booleanValue();
         }
-        return false;
+        return super.isGalleryTypeSupported(type);
     }
 
     public void setGalleryTypeSupported(int type, boolean supported) {
