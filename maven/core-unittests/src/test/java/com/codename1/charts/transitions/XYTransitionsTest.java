@@ -10,9 +10,6 @@ import com.codename1.charts.views.LineChart;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Form;
-import com.codename1.ui.animations.Motion;
-
-import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -37,11 +34,11 @@ class XYTransitionsTest extends UITestBase {
         buffer.add(0, 5);
         buffer.add(1, 7);
 
+        transition.setDuration(5);
         transition.animateChart();
-        Motion motion = extractMotion(transition);
 
         assertTrue(transition.animate());
-        motion.setCurrentMotionTime(transition.getDuration() + 10);
+        Thread.sleep(10);
         assertTrue(transition.animate());
         assertFalse(transition.animate());
 
@@ -70,11 +67,11 @@ class XYTransitionsTest extends UITestBase {
         buffer.add(0, 3, 30);
         buffer.add(1, 4, 40);
 
+        transition.setDuration(5);
         transition.animateChart();
-        Motion motion = extractMotion(transition);
 
         assertTrue(transition.animate());
-        motion.setCurrentMotionTime(transition.getDuration() + 10);
+        Thread.sleep(10);
         assertTrue(transition.animate());
         assertFalse(transition.animate());
 
@@ -111,11 +108,11 @@ class XYTransitionsTest extends UITestBase {
         buffer.getSeriesAt(1).add(0, 8);
         buffer.getSeriesAt(1).add(1, 9);
 
+        transition.setDuration(5);
         transition.animateChart();
-        Motion motion = extractMotion(transition);
 
         assertTrue(transition.animate());
-        motion.setCurrentMotionTime(transition.getDuration() + 10);
+        Thread.sleep(10);
         assertTrue(transition.animate());
         assertFalse(transition.animate());
 
@@ -139,9 +136,4 @@ class XYTransitionsTest extends UITestBase {
         return component;
     }
 
-    private Motion extractMotion(SeriesTransition transition) throws Exception {
-        Field motionField = SeriesTransition.class.getDeclaredField("motion");
-        motionField.setAccessible(true);
-        return (Motion) motionField.get(transition);
-    }
 }

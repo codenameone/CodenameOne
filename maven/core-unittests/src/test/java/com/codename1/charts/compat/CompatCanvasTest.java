@@ -14,6 +14,7 @@ class CompatCanvasTest extends UITestBase {
         Image image = Image.createImage(6, 6);
         Canvas canvas = new Canvas();
         canvas.g = image.getGraphics();
+        canvas.g.setAlpha(255);
         canvas.bounds = new Rectangle(0, 0, 6, 6);
 
         Paint fillPaint = new Paint();
@@ -24,6 +25,7 @@ class CompatCanvasTest extends UITestBase {
 
         Image strokeImage = Image.createImage(6, 6);
         canvas.g = strokeImage.getGraphics();
+        canvas.g.setAlpha(255);
         Paint strokePaint = new Paint();
         strokePaint.setColor(0xFF00FF00);
         strokePaint.setStyle(Paint.Style.STROKE);
@@ -38,6 +40,7 @@ class CompatCanvasTest extends UITestBase {
         Image image = Image.createImage(4, 4);
         Canvas canvas = new Canvas();
         canvas.g = image.getGraphics();
+        canvas.g.setAlpha(255);
         canvas.bounds = new Rectangle(0, 0, 4, 4);
 
         GradientDrawable horizontal = new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
@@ -50,6 +53,7 @@ class CompatCanvasTest extends UITestBase {
 
         Image fallbackImage = Image.createImage(4, 4);
         canvas.g = fallbackImage.getGraphics();
+        canvas.g.setAlpha(255);
         GradientDrawable fallback = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
                 new int[]{0xFF00FF00, 0xFF000000});
         fallback.setBounds(0, 0, 4, 4);

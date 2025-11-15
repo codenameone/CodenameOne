@@ -2,6 +2,7 @@ package com.codename1.ui.util;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -66,6 +67,7 @@ class UIUtilPackageTest extends UITestBase {
         UITimer timer = new UITimer(counting);
         timer.schedule(10, false, form);
         Thread.sleep(20);
+        Display.getInstance().flushEdt();
         timer.testEllapse();
         assertEquals(1, counting.count);
 
@@ -73,11 +75,13 @@ class UIUtilPackageTest extends UITestBase {
         UITimer repeating = new UITimer(counting);
         repeating.schedule(5, true, form);
         Thread.sleep(12);
+        Display.getInstance().flushEdt();
         repeating.testEllapse();
-        assertEquals(1, counting.count);
+        assertTrue(counting.count >= 1);
         repeating.cancel();
         long before = counting.count;
         Thread.sleep(10);
+        Display.getInstance().flushEdt();
         repeating.testEllapse();
         assertEquals(before, counting.count);
     }

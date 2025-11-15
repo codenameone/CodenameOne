@@ -104,7 +104,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private MediaRecorderBuilderHandler mediaRecorderBuilderHandler;
     private MediaRecorderHandler mediaRecorderHandler;
     private boolean animation;
-    private String[] availableRecordingMimeTypes;
+    private String[] availableRecordingMimeTypes = new String[]{"audio/wav"};
     private Media mediaRecorder;
     private boolean trueTypeSupported = true;
     private static TestCodenameOneImplementation instance;

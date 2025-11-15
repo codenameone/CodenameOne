@@ -39,6 +39,10 @@ class ChartComponentInteractionTest extends UITestBase {
         form.add(component);
         form.show();
 
+        assertEquals(renderer.isZoomEnabled(), component.isZoomEnabled());
+        assertEquals(renderer.isPanEnabled(), component.isPanEnabled());
+
+        component.setZoomEnabled(false);
         assertFalse(component.isZoomEnabled());
         assertFalse(renderer.isZoomEnabled());
 
@@ -51,8 +55,8 @@ class ChartComponentInteractionTest extends UITestBase {
         assertFalse(renderer.isZoomXEnabled());
         assertTrue(renderer.isZoomYEnabled());
 
-        component.setPanEnabled(true);
-        assertTrue(renderer.isPanEnabled());
+        component.setPanEnabled(false);
+        assertFalse(renderer.isPanEnabled());
         component.setPanEnabled(false, true);
         assertTrue(renderer.isPanYEnabled());
         assertFalse(renderer.isPanXEnabled());

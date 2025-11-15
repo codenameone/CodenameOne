@@ -68,8 +68,14 @@ class TreePackageTest extends UITestBase {
     private boolean fireAction(Component component) {
         if (component instanceof Button) {
             Button button = (Button) component;
-            button.pressed();
-            button.released(0, 0);
+            Form form = button.getComponentForm();
+            if (form == null) {
+                return false;
+            }
+            int targetX = button.getAbsoluteX() + Math.max(1, button.getWidth() / 2);
+            int targetY = button.getAbsoluteY() + Math.max(1, button.getHeight() / 2);
+            implementation.dispatchPointerPressAndRelease(targetX, targetY);
+            flushSerialCalls();
             return true;
         }
         if (component instanceof Container) {
