@@ -7,6 +7,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
+import com.codename1.ui.DisplayTest;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 
@@ -30,6 +31,7 @@ class TreePackageTest extends UITestBase {
         Component leafComponent = tree.findNodeComponent(SimpleModel.LEAF);
         assertNotNull(leafComponent);
         assertTrue(fireAction(leafComponent));
+        DisplayTest.flushEdt();
         assertEquals(SimpleModel.LEAF, recordingListener.lastSource);
 
         tree.expandPath(SimpleModel.PARENT);
@@ -45,6 +47,8 @@ class TreePackageTest extends UITestBase {
         otherForm.add(restored);
         otherForm.show();
         restored.setTreeState(state);
+
+        DisplayTest.flushEdt();
 
         Component restoredParent = restored.findNodeComponent(SimpleModel.PARENT);
         assertTrue(restored.isExpanded(restoredParent));
@@ -76,6 +80,7 @@ class TreePackageTest extends UITestBase {
             int targetY = button.getAbsoluteY() + Math.max(1, button.getHeight() / 2);
             implementation.dispatchPointerPressAndRelease(targetX, targetY);
             flushSerialCalls();
+            DisplayTest.flushEdt();
             return true;
         }
         if (component instanceof Container) {

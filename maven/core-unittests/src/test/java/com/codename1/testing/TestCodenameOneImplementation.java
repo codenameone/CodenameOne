@@ -1352,10 +1352,79 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void fillRect(Object graphics, int x, int y, int width, int height) {
+        if (!(graphics instanceof TestGraphics)) {
+            return;
+        }
+        TestGraphics g = (TestGraphics) graphics;
+        fillArea(g, x, y, width, height);
     }
 
     @Override
     public void drawRect(Object graphics, int x, int y, int width, int height) {
+        if (!(graphics instanceof TestGraphics)) {
+            return;
+        }
+        TestGraphics g = (TestGraphics) graphics;
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        int drawWidth = Math.max(1, width);
+        int drawHeight = Math.max(1, height);
+        fillArea(g, x, y, drawWidth, 1);
+        if (drawHeight > 1) {
+            fillArea(g, x, y + drawHeight - 1, drawWidth, 1);
+        }
+        if (drawHeight > 2) {
+            fillArea(g, x, y + 1, 1, drawHeight - 2);
+            if (drawWidth > 1) {
+                fillArea(g, x + drawWidth - 1, y + 1, 1, drawHeight - 2);
+            }
+        }
+    }
+
+    private void fillArea(TestGraphics g, int x, int y, int width, int height) {
+        if (g.image == null || width <= 0 || height <= 0) {
+            return;
+        }
+        int argb = currentColor(g);
+        int translatedX = x + g.translateX;
+        int translatedY = y + g.translateY;
+        int clipLeft = g.clipX;
+        int clipTop = g.clipY;
+        int clipRight = clipLeft + Math.max(0, g.clipWidth);
+        int clipBottom = clipTop + Math.max(0, g.clipHeight);
+
+        int startX = Math.max(translatedX, clipLeft);
+        int startY = Math.max(translatedY, clipTop);
+        int endX = Math.min(translatedX + width, clipRight);
+        int endY = Math.min(translatedY + height, clipBottom);
+
+        if (startX >= endX || startY >= endY) {
+            return;
+        }
+
+        for (int row = startY; row < endY; row++) {
+            if (row < 0 || row >= g.image.height) {
+                continue;
+            }
+            int offset = row * g.image.width;
+            for (int col = startX; col < endX; col++) {
+                if (col < 0 || col >= g.image.width) {
+                    continue;
+                }
+                g.image.argb[offset + col] = argb;
+            }
+        }
+    }
+
+    private int currentColor(TestGraphics g) {
+        int alpha = g.alpha;
+        if (alpha < 0) {
+            alpha = 0;
+        } else if (alpha > 255) {
+            alpha = 255;
+        }
+        return (alpha << 24) | (g.color & 0x00ffffff);
     }
 
     @Override
@@ -1402,6 +1471,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         if (img.graphics == null) {
             img.graphics = new TestGraphics(img.width, img.height);
         }
+        img.graphics.image = img;
+        img.graphics.clipX = 0;
+        img.graphics.clipY = 0;
+        img.graphics.clipWidth = img.width;
+        img.graphics.clipHeight = img.height;
         return img.graphics;
     }
 
@@ -2607,6 +2681,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         int translateX;
         int translateY;
         TestFont font;
+        TestImage image;
 
         TestGraphics(int width, int height) {
             this.clipWidth = width;

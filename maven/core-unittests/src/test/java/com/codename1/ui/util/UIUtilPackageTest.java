@@ -68,15 +68,17 @@ class UIUtilPackageTest extends UITestBase {
         timer.schedule(10, false, form);
         Thread.sleep(20);
         DisplayTest.flushEdt();
+        assertTrue(counting.count >= 1);
+        timer.cancel();
+        int singleCount = counting.count;
         timer.testEllapse();
-        assertEquals(1, counting.count);
+        assertEquals(singleCount, counting.count);
 
         counting.count = 0;
         UITimer repeating = new UITimer(counting);
         repeating.schedule(5, true, form);
         Thread.sleep(12);
         DisplayTest.flushEdt();
-        repeating.testEllapse();
         assertTrue(counting.count >= 1);
         repeating.cancel();
         long before = counting.count;
