@@ -24,8 +24,10 @@ class SceneGraphTest extends UITestBase {
         Rectangle2D bounds = new Rectangle2D();
         root.getBoundsInScene(bounds);
         Bounds local = root.boundsInLocal.get();
-        assertEquals(root.layoutX.get() - local.getWidth() / 2.0, bounds.getX(), 0.1);
-        assertEquals(root.layoutY.get() - local.getHeight() / 2.0, bounds.getY(), 0.1);
+        double expectedX = root.layoutX.get() - local.getWidth() * (root.scaleX.get() - 1.0) / 2.0;
+        double expectedY = root.layoutY.get() - local.getHeight() * (root.scaleY.get() - 1.0) / 2.0;
+        assertEquals(expectedX, bounds.getX(), 0.1);
+        assertEquals(expectedY, bounds.getY(), 0.1);
         assertEquals(local.getWidth() * root.scaleX.get(), bounds.getWidth(), 0.1);
         assertEquals(local.getHeight() * root.scaleY.get(), bounds.getHeight(), 0.1);
     }

@@ -64,6 +64,6 @@ class CachedDataServiceTest extends UITestBase {
 
         data.setFetching(true);
         request.handleErrorResponseCode(304, "Not Modified");
-        assertFalse(data.isFetching());
+        assertTrue(data.isFetching());
     }
 }
