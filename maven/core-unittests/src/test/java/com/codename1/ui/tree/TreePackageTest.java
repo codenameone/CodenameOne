@@ -47,7 +47,13 @@ class TreePackageTest extends UITestBase {
         Form otherForm = new Form();
         otherForm.add(restored);
         otherForm.show();
+
+        flushSerialCalls();
+        DisplayTest.flushEdt();
+        flushSerialCalls();
+
         restored.setTreeState(state);
+        otherForm.revalidate();
 
         flushSerialCalls();
         DisplayTest.flushEdt();
@@ -56,7 +62,8 @@ class TreePackageTest extends UITestBase {
 
         Component restoredParent = restored.findNodeComponent(SimpleModel.PARENT);
         assertNotNull(restoredParent);
-        Component restoredChild = restored.findNodeComponent("Child 1", restoredParent.getParent());
+        assertEquals(Boolean.TRUE, restoredParent.getClientProperty("TREE_NODE_EXPANDED"));
+        Component restoredChild = restored.findNodeComponent("Child 1");
         assertNotNull(restoredChild);
     }
 

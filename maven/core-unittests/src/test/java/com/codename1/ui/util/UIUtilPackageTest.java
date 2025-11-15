@@ -68,30 +68,26 @@ class UIUtilPackageTest extends UITestBase {
 
         CountingRunnable counting = new CountingRunnable();
         UITimer timer = new UITimer(counting);
-        timer.schedule(5, false, form);
-        Thread.sleep(15);
+        timer.schedule(1000, false, form);
+        assertEquals(0, counting.count);
         timer.testEllapse();
         assertEquals(1, counting.count);
 
         timer.cancel();
         int singleCount = counting.count;
-        Thread.sleep(15);
         timer.testEllapse();
         assertEquals(singleCount, counting.count);
 
         counting.count = 0;
         UITimer repeating = new UITimer(counting);
-        repeating.schedule(5, true, form);
-        Thread.sleep(15);
+        repeating.schedule(1000, true, form);
         repeating.testEllapse();
         assertEquals(1, counting.count);
-        Thread.sleep(15);
         repeating.testEllapse();
         assertEquals(2, counting.count);
 
         repeating.cancel();
         int before = counting.count;
-        Thread.sleep(15);
         repeating.testEllapse();
         assertEquals(before, counting.count);
     }
