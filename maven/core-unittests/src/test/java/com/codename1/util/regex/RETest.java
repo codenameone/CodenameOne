@@ -29,7 +29,7 @@ class RETest extends UITestBase {
 
         assertEquals("12:item and 34:item", replaced);
 
-        String[] split = REUtil.split(expression, input);
+        String[] split = expression.split(input);
         assertArrayEquals(new String[]{"", " and ", ""}, split);
     }
 }

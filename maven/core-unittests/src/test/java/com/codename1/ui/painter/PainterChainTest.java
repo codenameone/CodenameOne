@@ -3,6 +3,7 @@ package com.codename1.ui.painter;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
 import com.codename1.ui.geom.Rectangle;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -18,7 +19,8 @@ class PainterChainTest extends UITestBase {
         PainterChain chain = new PainterChain(new com.codename1.ui.Painter[]{first, second});
         chain = chain.addPainter(third);
 
-        chain.paint(new Graphics(), new Rectangle(0, 0, 10, 10));
+        Image image = Image.createImage(10, 10);
+        chain.paint(image.getGraphics(), new Rectangle(0, 0, 10, 10));
         assertEquals("first,second,third", first.getOrder());
     }
 

@@ -17,7 +17,6 @@ class PromiseTest extends UITestBase {
         Promise<String> promise = new Promise<String>(new ExecutorFunction() {
             public void call(Functor resolve, Functor reject) {
                 resolve.call("done");
-                return null;
             }
         });
 
@@ -38,7 +37,6 @@ class PromiseTest extends UITestBase {
         Promise<String> promise = new Promise<String>(new ExecutorFunction() {
             public void call(Functor resolve, Functor reject) {
                 reject.call(new RuntimeException("fail"));
-                return null;
             }
         });
 
@@ -59,13 +57,11 @@ class PromiseTest extends UITestBase {
         Promise<String> first = new Promise<String>(new ExecutorFunction() {
             public void call(Functor resolve, Functor reject) {
                 resolve.call("A");
-                return null;
             }
         });
         Promise<String> second = new Promise<String>(new ExecutorFunction() {
             public void call(Functor resolve, Functor reject) {
                 resolve.call("B");
-                return null;
             }
         });
 
@@ -87,7 +83,6 @@ class PromiseTest extends UITestBase {
         Promise<String> promise = new Promise<String>(new ExecutorFunction() {
             public void call(Functor resolve, Functor reject) {
                 resolve.call("value");
-                return null;
             }
         });
 
