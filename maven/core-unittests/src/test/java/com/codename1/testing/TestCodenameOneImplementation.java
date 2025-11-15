@@ -1,5 +1,9 @@
 package com.codename1.testing;
 
+import com.codename1.contacts.Contact;
+import com.codename1.db.Cursor;
+import com.codename1.db.Database;
+import com.codename1.db.Row;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
@@ -14,6 +18,8 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.messaging.Message;
+import com.codename1.notifications.LocalNotification;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.TextArea;
@@ -36,12 +42,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 /**
@@ -50,11 +58,21 @@ import java.util.function.Consumer;
  * tests exercising {@link NetworkManager} and related infrastructure.
  */
 public class TestCodenameOneImplementation extends CodenameOneImplementation {
-    private final Map<String, byte[]> storageEntries = new ConcurrentHashMap<>();
-    private final Map<String, TestFile> fileSystem = new ConcurrentHashMap<>();
-    private final Map<String, TestConnection> connections = new ConcurrentHashMap<>();
-    private final Map<String, TestSocket> sockets = new ConcurrentHashMap<>();
+    private final Map<String, byte[]> storageEntries = new ConcurrentHashMap<byte[]>();
+    private final Map<String, TestFile> fileSystem = new ConcurrentHashMap<String, TestFile>();
+    private final Map<String, TestConnection> connections = new ConcurrentHashMap<String, TestConnection>();
+    private final Map<String, TestSocket> sockets = new ConcurrentHashMap<String, TestSocket>();
     private final CopyOnWriteArrayList<ConnectionRequest> queuedRequests = new CopyOnWriteArrayList<ConnectionRequest>();
+    private final Map<String, TestDatabase> databases = new ConcurrentHashMap<String, TestDatabase>();
+    private final Map<String, Contact> contacts = new ConcurrentHashMap<String, Contact>();
+    private final List<ScheduledNotification> scheduledNotifications = new CopyOnWriteArrayList<ScheduledNotification>();
+    private final AtomicInteger contactIdCounter = new AtomicInteger(1);
+    private boolean getAllContactsFast;
+    private boolean databaseCustomPathSupported;
+    private String[] lastSentMessageRecipients;
+    private String lastSentMessageSubject;
+    private Message lastSentMessage;
+    private int refreshContactsCount;
 
     private final TestFont defaultFont = new TestFont(8, 16);
     private int displayWidth = 1080;
@@ -1930,6 +1948,246 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public Database openOrCreateDB(String databaseName) throws IOException {
+        TestDatabase database = databases.get(databaseName);
+        if (database == null) {
+            database = new TestDatabase(databaseName);
+            databases.put(databaseName, database);
+        }
+        return database;
+    }
+
+    @Override
+    public void deleteDB(String databaseName) throws IOException {
+        databases.remove(databaseName);
+    }
+
+    @Override
+    public boolean existsDB(String databaseName) {
+        return databases.containsKey(databaseName);
+    }
+
+    @Override
+    public String getDatabasePath(String databaseName) {
+        return appHomePath + databaseName;
+    }
+
+    public TestDatabase getTestDatabase(String databaseName) {
+        return databases.get(databaseName);
+    }
+
+    public void clearDatabases() {
+        databases.clear();
+    }
+
+    public void setDatabaseCustomPathSupported(boolean supported) {
+        this.databaseCustomPathSupported = supported;
+    }
+
+    @Override
+    public boolean isDatabaseCustomPathSupported() {
+        return databaseCustomPathSupported;
+    }
+
+    @Override
+    public String[] getAllContacts(boolean withNumbers) {
+        ArrayList<String> ids = new ArrayList<String>();
+        for (Contact contact : contacts.values()) {
+            if (!withNumbers || hasPhoneNumber(contact)) {
+                ids.add(contact.getId());
+            }
+        }
+        return ids.toArray(new String[ids.size()]);
+    }
+
+    private boolean hasPhoneNumber(Contact contact) {
+        if (contact == null) {
+            return false;
+        }
+        if (contact.getPrimaryPhoneNumber() != null && contact.getPrimaryPhoneNumber().length() > 0) {
+            return true;
+        }
+        if (contact.getPhoneNumbers() != null && !contact.getPhoneNumbers().isEmpty()) {
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public Contact getContactById(String id) {
+        return getContactById(id, true, true, true, true, true);
+    }
+
+    @Override
+    public Contact getContactById(String id, boolean includesFullName, boolean includesPicture,
+                                  boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
+        Contact stored = contacts.get(id);
+        if (stored == null) {
+            return null;
+        }
+        return copyContact(stored, includesFullName, includesPicture, includesNumbers, includesEmail, includeAddress);
+    }
+
+    private Contact copyContact(Contact source, boolean includesFullName, boolean includesPicture,
+                                boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
+        Contact copy = new Contact();
+        copy.setId(source.getId());
+        if (includesFullName) {
+            copy.setFirstName(source.getFirstName());
+            copy.setFamilyName(source.getFamilyName());
+            copy.setDisplayName(source.getDisplayName());
+        }
+        copy.setPrimaryPhoneNumber(source.getPrimaryPhoneNumber());
+        copy.setPrimaryEmail(source.getPrimaryEmail());
+        if (includesNumbers && source.getPhoneNumbers() != null) {
+            copy.setPhoneNumbers((Hashtable) source.getPhoneNumbers().clone());
+        }
+        if (includesEmail && source.getEmails() != null) {
+            copy.setEmails((Hashtable) source.getEmails().clone());
+        }
+        if (includeAddress && source.getAddresses() != null) {
+            copy.setAddresses((Hashtable) source.getAddresses().clone());
+        }
+        if (includesPicture) {
+            copy.setPhoto(source.getPhoto());
+        }
+        copy.setBirthday(source.getBirthday());
+        copy.setNote(source.getNote());
+        copy.setUrls(source.getUrls());
+        copy.setLinkedIds(source.getLinkedIds());
+        return copy;
+    }
+
+    @Override
+    public Contact[] getAllContacts(boolean withNumbers, boolean includesFullName, boolean includesPicture,
+                                    boolean includesNumbers, boolean includesEmail, boolean includeAddress) {
+        String[] ids = getAllContacts(withNumbers);
+        Contact[] result = new Contact[ids.length];
+        for (int i = 0; i < ids.length; i++) {
+            result[i] = getContactById(ids[i], includesFullName, includesPicture, includesNumbers, includesEmail, includeAddress);
+        }
+        return result;
+    }
+
+    @Override
+    public boolean isGetAllContactsFast() {
+        return getAllContactsFast;
+    }
+
+    public void setGetAllContactsFast(boolean fast) {
+        this.getAllContactsFast = fast;
+    }
+
+    @Override
+    public String createContact(String firstName, String surname, String officePhone, String homePhone, String cellPhone, String email) {
+        String id = "contact-" + contactIdCounter.getAndIncrement();
+        Contact contact = new Contact();
+        contact.setId(id);
+        contact.setFirstName(firstName);
+        contact.setFamilyName(surname);
+        if (firstName != null || surname != null) {
+            contact.setDisplayName(null);
+        }
+        Hashtable numbers = new Hashtable();
+        if (officePhone != null) {
+            numbers.put("work", officePhone);
+        }
+        if (homePhone != null) {
+            numbers.put("home", homePhone);
+        }
+        if (cellPhone != null) {
+            numbers.put("mobile", cellPhone);
+        }
+        if (!numbers.isEmpty()) {
+            contact.setPhoneNumbers(numbers);
+            contact.setPrimaryPhoneNumber((String) numbers.elements().nextElement());
+        }
+        Hashtable emails = new Hashtable();
+        if (email != null) {
+            emails.put("main", email);
+            contact.setEmails(emails);
+            contact.setPrimaryEmail(email);
+        }
+        contacts.put(id, contact);
+        return id;
+    }
+
+    @Override
+    public boolean deleteContact(String id) {
+        return contacts.remove(id) != null;
+    }
+
+    public void clearContacts() {
+        contacts.clear();
+    }
+
+    public void putContact(Contact contact) {
+        if (contact.getId() == null) {
+            contact.setId("contact-" + contactIdCounter.getAndIncrement());
+        }
+        contacts.put(contact.getId(), contact);
+    }
+
+    @Override
+    public void refreshContacts() {
+        refreshContactsCount++;
+    }
+
+    public int getRefreshContactsCount() {
+        return refreshContactsCount;
+    }
+
+    @Override
+    public void sendMessage(String[] recipients, String subject, Message msg) {
+        if (recipients == null) {
+            lastSentMessageRecipients = null;
+        } else {
+            lastSentMessageRecipients = new String[recipients.length];
+            System.arraycopy(recipients, 0, lastSentMessageRecipients, 0, recipients.length);
+        }
+        lastSentMessageSubject = subject;
+        lastSentMessage = msg;
+    }
+
+    public String[] getLastSentMessageRecipients() {
+        return lastSentMessageRecipients;
+    }
+
+    public String getLastSentMessageSubject() {
+        return lastSentMessageSubject;
+    }
+
+    public Message getLastSentMessage() {
+        return lastSentMessage;
+    }
+
+    @Override
+    public void scheduleLocalNotification(LocalNotification notif, long firstTime, int repeat) {
+        scheduledNotifications.add(new ScheduledNotification(notif, firstTime, repeat));
+    }
+
+    @Override
+    public void cancelLocalNotification(String notificationId) {
+        if (notificationId == null) {
+            return;
+        }
+        for (int i = scheduledNotifications.size() - 1; i >= 0; i--) {
+            ScheduledNotification scheduled = scheduledNotifications.get(i);
+            if (notificationId.equals(scheduled.getNotification().getId())) {
+                scheduledNotifications.remove(i);
+            }
+        }
+    }
+
+    public List<ScheduledNotification> getScheduledNotifications() {
+        return new ArrayList<ScheduledNotification>(scheduledNotifications);
+    }
+
+    public void clearScheduledNotifications() {
+        scheduledNotifications.clear();
+    }
+
+    @Override
     public void addConnectionToQueue(ConnectionRequest r) {
         if (r != null) {
             queuedRequests.add(r);
@@ -1943,6 +2201,30 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public java.util.List<ConnectionRequest> getQueuedRequests() {
         return new java.util.ArrayList<ConnectionRequest>(queuedRequests);
+    }
+
+    public static final class ScheduledNotification {
+        private final LocalNotification notification;
+        private final long firstTime;
+        private final int repeat;
+
+        ScheduledNotification(LocalNotification notification, long firstTime, int repeat) {
+            this.notification = notification;
+            this.firstTime = firstTime;
+            this.repeat = repeat;
+        }
+
+        public LocalNotification getNotification() {
+            return notification;
+        }
+
+        public long getFirstTime() {
+            return firstTime;
+        }
+
+        public int getRepeat() {
+            return repeat;
+        }
     }
 
     @Override
@@ -1979,6 +2261,318 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         public void close() throws IOException {
             super.close();
             storageEntries.put(name, toByteArray());
+        }
+    }
+
+    public TestDatabase createDatabaseWithRows(String name, String[] columnNames, List<Object[]> rows) {
+        TestDatabase database = new TestDatabase(name);
+        database.setQueryResult(columnNames, rows);
+        databases.put(name, database);
+        return database;
+    }
+
+    public final class TestDatabase extends Database {
+        private final String name;
+        private boolean inTransaction;
+        private boolean closed;
+        private final List<String> statements = new ArrayList<String>();
+        private final List<String[]> parameters = new ArrayList<String[]>();
+        private TestCursor cursor = new TestCursor(new String[0], new ArrayList<Object[]>());
+        private String lastQuery;
+        private String[] lastQueryParams;
+
+        TestDatabase(String name) {
+            this.name = name;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public boolean isInTransaction() {
+            return inTransaction;
+        }
+
+        public boolean isClosed() {
+            return closed;
+        }
+
+        public List<String> getExecutedStatements() {
+            return new ArrayList<String>(statements);
+        }
+
+        public List<String[]> getExecutedParameters() {
+            return new ArrayList<String[]>(parameters);
+        }
+
+        public String getLastQuery() {
+            return lastQuery;
+        }
+
+        public String[] getLastQueryParams() {
+            return lastQueryParams == null ? null : Arrays.copyOf(lastQueryParams, lastQueryParams.length);
+        }
+
+        public void setQueryResult(String[] columnNames, List<Object[]> rows) {
+            cursor = new TestCursor(columnNames == null ? new String[0] : Arrays.copyOf(columnNames, columnNames.length),
+                    rows == null ? new ArrayList<Object[]>() : new ArrayList<Object[]>(rows));
+        }
+
+        public void setQueryResult(String[] columnNames, Object[][] rows) {
+            List<Object[]> list = new ArrayList<Object[]>();
+            if (rows != null) {
+                for (int i = 0; i < rows.length; i++) {
+                    list.add(Arrays.copyOf(rows[i], rows[i].length));
+                }
+            }
+            setQueryResult(columnNames, list);
+        }
+
+        @Override
+        public void beginTransaction() throws IOException {
+            inTransaction = true;
+        }
+
+        @Override
+        public void commitTransaction() throws IOException {
+            inTransaction = false;
+        }
+
+        @Override
+        public void rollbackTransaction() throws IOException {
+            inTransaction = false;
+        }
+
+        @Override
+        public void close() throws IOException {
+            closed = true;
+            inTransaction = false;
+        }
+
+        @Override
+        public void execute(String sql) throws IOException {
+            statements.add(sql);
+        }
+
+        @Override
+        public void execute(String sql, String[] params) throws IOException {
+            statements.add(sql);
+            if (params == null) {
+                parameters.add(new String[0]);
+            } else {
+                parameters.add(Arrays.copyOf(params, params.length));
+            }
+        }
+
+        @Override
+        public Cursor executeQuery(String sql, String[] params) throws IOException {
+            lastQuery = sql;
+            lastQueryParams = params == null ? null : Arrays.copyOf(params, params.length);
+            return cursor.copy();
+        }
+
+        @Override
+        public Cursor executeQuery(String sql) throws IOException {
+            lastQuery = sql;
+            lastQueryParams = null;
+            return cursor.copy();
+        }
+    }
+
+    private static final class TestCursor implements Cursor {
+        private final String[] columnNames;
+        private final List<Object[]> rows;
+        private int position = -1;
+        private boolean closed;
+
+        TestCursor(String[] columnNames, List<Object[]> rows) {
+            this.columnNames = columnNames;
+            this.rows = rows;
+        }
+
+        TestCursor copy() {
+            List<Object[]> cloneRows = new ArrayList<Object[]>();
+            for (int i = 0; i < rows.size(); i++) {
+                Object[] row = rows.get(i);
+                cloneRows.add(row == null ? null : Arrays.copyOf(row, row.length));
+            }
+            return new TestCursor(Arrays.copyOf(columnNames, columnNames.length), cloneRows);
+        }
+
+        public boolean first() throws IOException {
+            if (rows.isEmpty()) {
+                position = -1;
+                return false;
+            }
+            position = 0;
+            return true;
+        }
+
+        public boolean last() throws IOException {
+            if (rows.isEmpty()) {
+                position = -1;
+                return false;
+            }
+            position = rows.size() - 1;
+            return true;
+        }
+
+        public boolean next() throws IOException {
+            if (position + 1 >= rows.size()) {
+                position = rows.size();
+                return false;
+            }
+            position++;
+            return true;
+        }
+
+        public boolean prev() throws IOException {
+            if (position <= 0) {
+                position = -1;
+                return false;
+            }
+            position--;
+            return true;
+        }
+
+        public int getColumnIndex(String columnName) throws IOException {
+            if (columnName == null) {
+                return -1;
+            }
+            for (int i = 0; i < columnNames.length; i++) {
+                if (columnName.equals(columnNames[i])) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        public String getColumnName(int columnIndex) throws IOException {
+            if (columnIndex < 0 || columnIndex >= columnNames.length) {
+                throw new IOException("Invalid column index");
+            }
+            return columnNames[columnIndex];
+        }
+
+        public int getColumnCount() throws IOException {
+            return columnNames.length;
+        }
+
+        public int getPosition() throws IOException {
+            return position;
+        }
+
+        public boolean position(int row) throws IOException {
+            if (row < 0 || row >= rows.size()) {
+                position = rows.size();
+                return false;
+            }
+            position = row;
+            return true;
+        }
+
+        public void close() throws IOException {
+            closed = true;
+        }
+
+        public Row getRow() throws IOException {
+            if (position < 0 || position >= rows.size()) {
+                throw new IOException("Cursor not positioned on a row");
+            }
+            Object[] data = rows.get(position);
+            if (data == null) {
+                data = new Object[columnNames.length];
+            }
+            return new TestRow(data);
+        }
+    }
+
+    private static final class TestRow implements Row {
+        private final Object[] data;
+
+        TestRow(Object[] data) {
+            this.data = data == null ? new Object[0] : data;
+        }
+
+        public byte[] getBlob(int index) throws IOException {
+            Object value = valueAt(index);
+            if (value == null) {
+                return null;
+            }
+            if (value instanceof byte[]) {
+                return Arrays.copyOf((byte[]) value, ((byte[]) value).length);
+            }
+            return value.toString().getBytes();
+        }
+
+        public double getDouble(int index) throws IOException {
+            Object value = valueAt(index);
+            if (value == null) {
+                return 0d;
+            }
+            if (value instanceof Number) {
+                return ((Number) value).doubleValue();
+            }
+            return Double.parseDouble(value.toString());
+        }
+
+        public float getFloat(int index) throws IOException {
+            Object value = valueAt(index);
+            if (value == null) {
+                return 0f;
+            }
+            if (value instanceof Number) {
+                return ((Number) value).floatValue();
+            }
+            return Float.parseFloat(value.toString());
+        }
+
+        public int getInteger(int index) throws IOException {
+            Object value = valueAt(index);
+            if (value == null) {
+                return 0;
+            }
+            if (value instanceof Number) {
+                return ((Number) value).intValue();
+            }
+            return Integer.parseInt(value.toString());
+        }
+
+        public long getLong(int index) throws IOException {
+            Object value = valueAt(index);
+            if (value == null) {
+                return 0L;
+            }
+            if (value instanceof Number) {
+                return ((Number) value).longValue();
+            }
+            return Long.parseLong(value.toString());
+        }
+
+        public short getShort(int index) throws IOException {
+            Object value = valueAt(index);
+            if (value == null) {
+                return 0;
+            }
+            if (value instanceof Number) {
+                return ((Number) value).shortValue();
+            }
+            return Short.parseShort(value.toString());
+        }
+
+        public String getString(int index) throws IOException {
+            Object value = valueAt(index);
+            if (value == null) {
+                return null;
+            }
+            return value.toString();
+        }
+
+        private Object valueAt(int index) throws IOException {
+            if (index < 0 || index >= data.length) {
+                throw new IOException("Invalid column index");
+            }
+            return data[index];
         }
     }
 
