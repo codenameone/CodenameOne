@@ -21,24 +21,38 @@
  * need additional information or have any questions.
  */
 #import <Foundation/Foundation.h>
-#import <OpenGLES/EAGL.h>
 
+#ifndef CN1_USE_METAL
+#import <OpenGLES/EAGL.h>
 #import <OpenGLES/ES1/gl.h>
 #import <OpenGLES/ES1/glext.h>
 #import <OpenGLES/ES2/gl.h>
 #import <OpenGLES/ES2/glext.h>
+#else
+#import <Metal/Metal.h>
+#endif
+
 #import <UIKit/UIKit.h>
 
 @interface GLUIImage : NSObject {
     UIImage* img;
+#ifndef CN1_USE_METAL
     GLuint textureName;
+#else
+    id<MTLTexture> metalTexture;
+#endif
     NSString* name;
     int textureWidth;
     int textureHeight;
 }
 -(id)initWithImage:(UIImage*)i;
 -(UIImage*)getImage;
+#ifndef CN1_USE_METAL
 -(GLuint)getTexture:(int)texWidth texHeight:(int)texHeight;
+#else
+-(id<MTLTexture>)getMetalTexture;
+-(id<MTLTexture>)getMetalTextureWithDevice:(id<MTLDevice>)device;
+#endif
 -(void)setName:(NSString*)s;
 -(void)setImage:(UIImage*)i;
 -(int)getTextureWidth;

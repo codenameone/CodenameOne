@@ -120,4 +120,41 @@ static BOOL blockDrawing = NO;
     return nil;
 }
 
+#ifdef CN1_USE_METAL
+// Metal helper method implementations
+#import "METALView.h"
+#import "CN1METALTransform.h"
+
+-(id<MTLDevice>)device {
+    METALView *metalView = [[CodenameOne_GLViewController instance] metalView];
+    return metalView.device;
+}
+
+-(id<MTLRenderCommandEncoder>)makeRenderCommandEncoder {
+    METALView *metalView = [[CodenameOne_GLViewController instance] metalView];
+    return [metalView makeRenderCommandEncoder];
+}
+
+-(void)applyClip:(id<MTLRenderCommandEncoder>)encoder {
+    // TODO: Implement clipping via scissor rectangle or stencil buffer
+    // For now, no clipping is applied
+    // This will be implemented when ClipRect ExecutableOp is done
+}
+
+-(simd_float4x4)getMVPMatrix {
+    return CN1_Metal_GetMVPMatrix();
+}
+
+-(simd_float4)colorToFloat4:(int)color alpha:(int)alpha {
+    float alph = ((float)alpha) / 255.0;
+    return simd_make_float4(
+        ((float)((color >> 16) & 0xff)) / 255.0 * alph,
+        ((float)((color >> 8) & 0xff)) / 255.0 * alph,
+        ((float)(color & 0xff)) / 255.0 * alph,
+        alph
+    );
+}
+
+#endif
+
 @end

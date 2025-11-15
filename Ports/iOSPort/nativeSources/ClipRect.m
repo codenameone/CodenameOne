@@ -23,6 +23,9 @@
 #import "ClipRect.h"
 #import "CodenameOne_GLViewController.h"
 #import "FillRect.h"
+#ifdef CN1_USE_METAL
+#import <Metal/Metal.h>
+#endif
 #ifdef USE_ES2
 #import "DrawTextureAlphaMask.h"
 #import "FillPolygon.h"
@@ -92,7 +95,74 @@ static CGRect drawingRect;
 }
 
 -(void)execute {
-#ifdef USE_ES2
+#ifdef CN1_USE_METAL
+    // Metal implementation using scissor rectangle
+    // For polygon/texture clipping, we'd need stencil buffer - not implemented yet
+    if (texture != 0 || numPoints > 0) {
+        NSLog(@"ClipRect: Polygon/texture clipping not yet implemented in Metal");
+        return;
+    }
+
+    clipIsTexture = NO;
+    int x2 = x + width;
+    int y2 = y + height;
+    int orX = drawingRect.origin.x;
+    int orY = drawingRect.origin.y;
+    if(x < orX) {
+        x = orX;
+        width = x2 - x;
+    }
+    if(y < orY) {
+        y = orY;
+        height = y2 - y;
+    }
+    int destX2 = (int)(drawingRect.origin.x + drawingRect.size.width);
+    int destY2 = (int)(drawingRect.origin.y + drawingRect.size.height);
+    if(x2 > destX2) {
+        width = destX2 - x;
+    }
+    if(y2 > destY2) {
+        height = destY2 - y;
+    }
+
+    if(width > 0 && height > 0) {
+        [super clipBlock:NO];
+        int scale = scaleValue;
+        int displayHeight = [CodenameOne_GLViewController instance].view.bounds.size.height * scale;
+
+        // Check if this is full screen - if so, disable scissor
+        if(width == [CodenameOne_GLViewController instance].view.bounds.size.width * scale && height == displayHeight) {
+            MTLScissorRect fullScreenRect = {0, 0, 0, 0};
+            [[CodenameOne_GLViewController instance] setScissorRect:fullScreenRect enabled:NO];
+            return;
+        }
+
+        // Set scissor rectangle for Metal
+        clipX = x;
+        clipW = width;
+        if (clipX < 0) {
+            clipX = 0;
+            clipW = width;
+        }
+
+        clipY = y;
+        clipH = height;
+        if (clipY < 0) {
+            clipY = 0;
+            clipH = height;
+        }
+
+        [ClipRect updateClipToScale];
+
+        // Apply scissor to Metal encoder
+        MTLScissorRect scissor = {clipX, clipY, clipW, clipH};
+        [[CodenameOne_GLViewController instance] setScissorRect:scissor enabled:YES];
+
+        clipApplied = YES;
+    } else {
+        [super clipBlock:YES];
+    }
+#elif defined(USE_ES2)
     if ( texture != 0 || numPoints > 0 ){
         clipX = x; clipY=y; clipW=width; clipH=height;
         glClearStencil(0x0);
@@ -131,8 +201,9 @@ static CGRect drawingRect;
         return;
     }
 
-    
+
 #endif
+#ifndef CN1_USE_METAL
     clipIsTexture = NO;
     int x2 = x + width;
     int y2 = y + height;
@@ -210,6 +281,7 @@ static CGRect drawingRect;
 #endif
         clipApplied = NO;
     }
+#endif  // #ifndef CN1_USE_METAL
 
 }
 

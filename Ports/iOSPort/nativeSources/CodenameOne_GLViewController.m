@@ -425,7 +425,11 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 utf.font = (BRIDGE_CAST UIFont*)font;
             }
             utf.text = [NSString stringWithUTF8String:str];
+#ifdef CN1_USE_METAL
+            utf.delegate = [[CodenameOne_GLViewController instance] metalView];
+#else
             utf.delegate = [[CodenameOne_GLViewController instance] eaglView];
+#endif
             [utf setBackgroundColor:[UIColor clearColor]];
             
 #ifndef NEW_CODENAME_ONE_VM
@@ -548,8 +552,12 @@ void Java_com_codename1_impl_ios_IOSImplementation_editStringAtImpl
                 utv.font = (BRIDGE_CAST UIFont*)font;
             }
             utv.text = [NSString stringWithUTF8String:str];
+#ifdef CN1_USE_METAL
+            utv.delegate = [[CodenameOne_GLViewController instance] metalView];
+#else
             utv.delegate = [[CodenameOne_GLViewController instance] eaglView];
-            
+#endif
+
             // Apply constraints for multiline text view
             // INITIAL_CAPS_WORD
             if((constraint & 0x100000) == 0x100000) {
@@ -1994,7 +2002,14 @@ bool lockDrawing;
     // the display width/height each time to match the view, without performing other resizing
     // details, so it is possible that the size change event still needs to be sent
     // even if the display width already matches the value we're given here.
+#ifdef CN1_USE_METAL
+    // Metal updates drawable size automatically via CAMetalLayer
+    int framebufferWidth = (int)([[self metalView] drawableSize].width);
+    int framebufferHeight = (int)([[self metalView] drawableSize].height);
+    CN1_Metal_InitMatrices(framebufferWidth, framebufferHeight);
+#else
     [[self eaglView] updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
+#endif
     displayWidth = currentWidth;
     displayHeight = (int)self.view.bounds.size.height * scaleValue;
     screenSizeChanged(displayWidth, displayHeight);
@@ -2118,6 +2133,55 @@ extern BOOL cn1CompareMatrices(GLKMatrix4 m1, GLKMatrix4 m2);
     return img;
 }
 
+#ifdef CN1_USE_METAL
+METALView* lastFoundMetalView;
+/**
+ * By default the view of the CodenameOne_GLViewController is a METALView object.  But
+ * if there are peer components, and they are to be painted behind, then the view hierarchy
+ * is re-rooted with a parent.  This method is a convenience method in cases where
+ * we need to obtain the METALView.
+ */
+-(METALView*) metalView {
+    if ([self.view class] == [METALView class]) {
+        lastFoundMetalView = (METALView*)self.view;
+        return (METALView*)self.view;
+    }
+    for (UIView* child in self.view.subviews) {
+
+        if ([child class] == [METALView class]) {
+            lastFoundMetalView = (METALView*)child;
+            return (METALView*)child;
+        }
+    }
+    if (lastFoundMetalView != nil && lastFoundMetalView.peerComponentsLayer != nil) {
+        // This is an edge case that occurs if we add a peer component for the first time while
+        // the app is in transition.  In this case, the new root would be added
+        // to the UITransitionView, and when the transition is complete, the
+        // AutoLayoutView has the original METAL view added to it, but our view controller
+        // would lose the reference to the metal view.
+        // We need to re-do the re-rooting of the METAL view and peer components layer in this case.
+        UIView* parent = [lastFoundMetalView superview];
+        UIView* newRoot = [lastFoundMetalView.peerComponentsLayer superview];
+        [lastFoundMetalView removeFromSuperview];
+        [newRoot addSubview:lastFoundMetalView];
+        [parent addSubview:newRoot];
+        self.view = newRoot;
+        return lastFoundMetalView;
+    }
+    NSLog(@"METALView not found.  This is not good!!");
+    return nil;
+}
+
+-(void)setScissorRect:(MTLScissorRect)rect enabled:(BOOL)enabled {
+    METALView* view = [self metalView];
+    view.scissorRect = rect;
+    view.scissorEnabled = enabled;
+
+    // Apply scissor to the current encoder if it exists
+    // Note: The iOSPort version doesn't use currentEncoder, so we'll store the state
+    // and it will be applied when the next encoder is created
+}
+#else
 EAGLView* lastFoundEaglView;
 /**
  * By default the view of the CodenameOne_GLViewController is an EAGLView object.  But
@@ -2131,7 +2195,7 @@ EAGLView* lastFoundEaglView;
         return (EAGLView*)self.view;
     }
     for (UIView* child in self.view.subviews) {
-        
+
         if ([child class] == [EAGLView class]) {
             lastFoundEaglView = (EAGLView*)child;
             return (EAGLView*)child;
@@ -2140,7 +2204,7 @@ EAGLView* lastFoundEaglView;
     if (lastFoundEaglView != nil && lastFoundEaglView.peerComponentsLayer != nil) {
         // This is an edge case that occurs if we add a peer component for the first time while
         // the app is in transition.  In this case, the new root would be added
-        // to the UITransitionView, and when the transition is complete, the 
+        // to the UITransitionView, and when the transition is complete, the
         // AutoLayoutView has the original EAGL view added to it, but our view controller
         // would lose the reference to the eagl view.
         // We need to re-do the re-rooting of the EAGL view and peer components layer in this case.
@@ -2155,9 +2219,27 @@ EAGLView* lastFoundEaglView;
     NSLog(@"EAGLView not found.  This is not good!!");
     return nil;
 }
+#endif
 
 - (void)awakeFromNib
 {
+#ifdef CN1_USE_METAL
+    // Metal initialization
+    retinaBug = isRetinaBug();
+    if(retinaBug) {
+        scaleValue = 1;
+    } else {
+        scaleValue = [UIScreen mainScreen].scale;
+    }
+    sharedSingleton = self;
+    [self initVars];
+
+    // Initialize Metal matrices
+    METALView *metalView = [self metalView];
+    int framebufferWidth = (int)metalView.drawableSize.width;
+    int framebufferHeight = (int)metalView.drawableSize.height;
+    CN1_Metal_InitMatrices(framebufferWidth, framebufferHeight);
+#else
 #ifdef USE_ES2
     if (!cn1CompareMatrices(GLKMatrix4Identity, CN1transformMatrix)) {
         CN1transformMatrix = GLKMatrix4Identity;
@@ -2176,7 +2258,7 @@ EAGLView* lastFoundEaglView;
     EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
 #else
     EAGLContext *aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
-    
+
     if (!aContext) {
         aContext = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES1];
     }
@@ -2185,14 +2267,15 @@ EAGLView* lastFoundEaglView;
         CN1Log(@"Failed to create ES context");
     else if (![EAGLContext setCurrentContext:aContext])
         CN1Log(@"Failed to set ES context current");
-    
+
 	self.context = aContext;
 #ifndef CN1_USE_ARC
     [aContext release];
 #endif
-	
+
     [[self eaglView] setContext:context];
     [[self eaglView] setFramebuffer];
+#endif
     //self.view.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     //self.view.autoresizesSubviews = YES;
     
@@ -2203,10 +2286,15 @@ EAGLView* lastFoundEaglView;
     animating = FALSE;
     animationFrameInterval = 1;
     self.displayLink = nil;
-    
+
+#ifndef CN1_USE_METAL
     const char* extensions = (const char*)glGetString(GL_EXTENSIONS);
     drawTextureSupported = extensions == 0 || strstr(extensions, "OES_draw_texture") != 0;
     //CN1Log(@"Draw texture extension %i", (int)drawTextureSupported);
+#else
+    // Metal doesn't need texture extension checks
+    drawTextureSupported = YES;
+#endif
     
     // register for keyboard notifications
     [[NSNotificationCenter defaultCenter] addObserver:self
@@ -2251,7 +2339,9 @@ EAGLView* lastFoundEaglView;
             
             gl = [[GLUIImage alloc] initWithImage:img];
             dr = [[DrawImage alloc] initWithArgs:255 xpos:0 ypos:0 i:gl w:img.size.width h:img.size.height];
+#ifndef CN1_USE_METAL
             [[self eaglView] setFramebuffer];
+#endif
         } else {
             //add statusbar fix 20 pix only if not an iPad a iPad Launch images height is without statusbar
             
@@ -2275,31 +2365,41 @@ EAGLView* lastFoundEaglView;
             }
             
             CN1Log(@"Drew image on %i, %i for display %i, %i", imgHeight, imgWidth, wi, he);
+#ifndef CN1_USE_METAL
             [[self eaglView] setFramebuffer];
+#endif
         }
 
-        
+#ifndef CN1_USE_METAL
         GLErrorLog;
-        
+
         _glScalef(xScale, -1, 1);
         GLErrorLog;
         _glTranslatef(0, -he, 0);
         GLErrorLog;
-        
+
         [dr execute];
 #ifndef CN1_USE_ARC
         [gl release];
         [dr release];
 #endif
-        
+
         _glTranslatef(0, he, 0);
         GLErrorLog;
-        
+
         _glScalef(xScale, -1, 1);
         GLErrorLog;
-        
+
         [[self eaglView] presentFramebuffer];
         GLErrorLog;
+#else
+        // TODO: Implement Metal splash screen rendering
+        // For now, skip splash screen in Metal mode
+#ifndef CN1_USE_ARC
+        [gl release];
+        [dr release];
+#endif
+#endif
     }
 #ifdef CN1_USE_STOREKIT
     [[SKPaymentQueue defaultQueue] addTransactionObserver:[CodenameOne_GLViewController instance]];
@@ -2467,17 +2567,19 @@ BOOL prefersStatusBarHidden = NO;
 
 - (void)dealloc
 {
+#ifndef CN1_USE_METAL
     if (program) {
         glDeleteProgram(program);
         program = 0;
     }
-    
+
     // Tear down context.
     if ([EAGLContext currentContext] == context)
         [EAGLContext setCurrentContext:nil];
-    
+
 #ifndef CN1_USE_ARC
     [context release];
+#endif
 #endif
     
 #ifdef INCLUDE_MOPUB
@@ -2520,16 +2622,18 @@ BOOL prefersStatusBarHidden = NO;
 - (void)viewDidUnload
 {
 	[super viewDidUnload];
-	
+
+#ifndef CN1_USE_METAL
     if (program) {
         glDeleteProgram(program);
         program = 0;
     }
-    
+
     // Tear down context.
     if ([EAGLContext currentContext] == context)
         [EAGLContext setCurrentContext:nil];
 	self.context = nil;
+#endif
 }
 
 - (NSInteger)animationFrameInterval
@@ -2710,9 +2814,16 @@ BOOL prefersStatusBarHidden = NO;
     }
     
     // simply create a property of 'BOOL' type
+#ifdef CN1_USE_METAL
+    // Metal updates drawable size automatically
+    int framebufferWidth = (int)([[self metalView] drawableSize].width);
+    int framebufferHeight = (int)([[self metalView] drawableSize].height);
+    CN1_Metal_InitMatrices(framebufferWidth, framebufferHeight);
+#else
     [[self eaglView] updateFrameBufferSize:(int)size.width h:(int)size.height];
     [[self eaglView] deleteFramebuffer];
-    
+#endif
+
     displayWidth = (int)size.width * scaleValue;
     displayHeight = (int)size.height * scaleValue;
     
@@ -2749,9 +2860,16 @@ BOOL prefersStatusBarHidden = NO;
 }
 
 -(void)didRotateFromInterfaceOrientation:(UIInterfaceOrientation)fromInterfaceOrientation {
-    
+
+#ifdef CN1_USE_METAL
+    // Metal updates drawable size automatically
+    int framebufferWidth = (int)([[self metalView] drawableSize].width);
+    int framebufferHeight = (int)([[self metalView] drawableSize].height);
+    CN1_Metal_InitMatrices(framebufferWidth, framebufferHeight);
+#else
     [[self eaglView] updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
     [[self eaglView] deleteFramebuffer];
+#endif
 
     displayWidth = (int)self.view.bounds.size.width * scaleValue;
     displayHeight = (int)self.view.bounds.size.height * scaleValue;
@@ -2789,6 +2907,31 @@ BOOL prefersStatusBarHidden = NO;
     if([UIApplication sharedApplication].applicationState != UIApplicationStateActive) {
         return;
     }
+#ifdef CN1_USE_METAL
+    // Metal rendering path
+    METALView *metalView = [self metalView];
+    [metalView beginFrame];
+
+    if(currentTarget != nil) {
+        if([currentTarget count] > 0) {
+            [ClipRect setDrawRect:rect];
+
+            NSMutableArray* cp = nil;
+            @synchronized([CodenameOne_GLViewController instance]) {
+                cp = [currentTarget copy];
+                [currentTarget removeAllObjects];
+            }
+
+            for(ExecutableOp* ex in cp) {
+                [ex executeWithClipping];
+                //[ex executeWithLog];
+            }
+
+#ifndef CN1_USE_ARC
+            [cp release];
+#endif
+#else
+    // OpenGL ES rendering path
     [[self eaglView] setFramebuffer];
     GLErrorLog;
     if(currentTarget != nil) {
@@ -2799,14 +2942,14 @@ BOOL prefersStatusBarHidden = NO;
             GLErrorLog;
             _glTranslatef(0, -displayHeight, 0);
             GLErrorLog;
-            
+
             /*if(((int)rect.size.width) != displayWidth || ((int)rect.size.height) != displayHeight) {
              glScissor(rect.origin.x, displayHeight - rect.origin.y - rect.size.height, rect.size.width, rect.size.height);
              glEnable(GL_SCISSOR_TEST);
              glClearColor(1, 1, 1, 1);
              glClear(GL_COLOR_BUFFER_BIT);
              }*/
-            
+
             //CN1Log(@"self.view.bounds.size.height %i displayHeight %i", (int)self.view.bounds.size.height, displayHeight);
             NSMutableArray* cp = nil;
             @synchronized([CodenameOne_GLViewController instance]) {
@@ -2827,6 +2970,7 @@ BOOL prefersStatusBarHidden = NO;
             GLErrorLog;
             _glScalef(1, -1, 1);
             GLErrorLog;
+#endif
             
             [DrawGradientTextureCache flushDeleted];
             [DrawStringTextureCache flushDeleted];
@@ -2886,10 +3030,15 @@ BOOL prefersStatusBarHidden = NO;
             }
         }
     }
+#ifdef CN1_USE_METAL
+    METALView *metalView = [self metalView];
+    [metalView presentFramebuffer];
+#else
     GLErrorLog;
-    
+
     [[self eaglView] presentFramebuffer];
     GLErrorLog;
+#endif
 }
 
 
