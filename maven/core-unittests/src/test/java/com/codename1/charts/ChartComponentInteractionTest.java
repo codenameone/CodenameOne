@@ -117,7 +117,7 @@ class ChartComponentInteractionTest extends UITestBase {
         }
 
         @Override
-        public void drawSeries(Canvas canvas, Paint paint, List<Float> points, SimpleSeriesRenderer seriesRenderer, float yAxisValue,
+        public void drawSeries(Canvas canvas, Paint paint, List<Float> points, XYSeriesRenderer seriesRenderer, float yAxisValue,
                                int seriesIndex, int startIndex) {
         }
 

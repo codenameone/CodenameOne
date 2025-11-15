@@ -5,6 +5,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -28,7 +29,7 @@ class TreePackageTest extends UITestBase {
 
         Component leafComponent = tree.findNodeComponent(SimpleModel.LEAF);
         assertNotNull(leafComponent);
-        fireAction(leafComponent);
+        assertTrue(fireAction(leafComponent));
         assertEquals(SimpleModel.LEAF, recordingListener.lastSource);
 
         tree.expandPath(SimpleModel.PARENT);
@@ -64,24 +65,23 @@ class TreePackageTest extends UITestBase {
         assertTrue(node instanceof SpanButton);
     }
 
-    private void fireAction(Component component) {
+    private boolean fireAction(Component component) {
         if (component instanceof Button) {
             Button button = (Button) component;
             button.pressed();
             button.released(0, 0);
-            return;
+            return true;
         }
-        Component lead = component.getLeadComponent();
-        if (lead != null && lead != component) {
-            fireAction(lead);
-            return;
-        }
-        if (component instanceof com.codename1.ui.Container) {
-            com.codename1.ui.Container container = (com.codename1.ui.Container) component;
-            if (container.getComponentCount() > 0) {
-                fireAction(container.getComponentAt(0));
+        if (component instanceof Container) {
+            Container container = (Container) component;
+            int count = container.getComponentCount();
+            for (int i = 0; i < count; i++) {
+                if (fireAction(container.getComponentAt(i))) {
+                    return true;
+                }
             }
         }
+        return false;
     }
 
     private static class SimpleModel implements TreeModel {
