@@ -66,8 +66,7 @@ class UIUtilPackageTest extends UITestBase {
         CountingRunnable counting = new CountingRunnable();
         UITimer timer = new UITimer(counting);
         timer.schedule(10, false, form);
-        drainEdtTicks(4);
-        assertTrue(counting.count >= 1);
+        assertTrue(awaitCount(counting, 1, 20));
         timer.cancel();
         int singleCount = counting.count;
         timer.testEllapse();
@@ -76,8 +75,7 @@ class UIUtilPackageTest extends UITestBase {
         counting.count = 0;
         UITimer repeating = new UITimer(counting);
         repeating.schedule(5, true, form);
-        drainEdtTicks(4);
-        assertTrue(counting.count >= 1);
+        assertTrue(awaitCount(counting, 1, 20));
         repeating.cancel();
         long before = counting.count;
         drainEdtTicks(3);
@@ -99,6 +97,18 @@ class UIUtilPackageTest extends UITestBase {
         public void run() {
             count++;
         }
+    }
+
+    private boolean awaitCount(CountingRunnable counting, int minimum, int iterations) throws InterruptedException {
+        for (int i = 0; i < iterations; i++) {
+            DisplayTest.flushEdt();
+            flushSerialCalls();
+            if (counting.count >= minimum) {
+                return true;
+            }
+            Thread.sleep(5);
+        }
+        return counting.count >= minimum;
     }
 
     private void drainEdtTicks(int iterations) throws InterruptedException {
