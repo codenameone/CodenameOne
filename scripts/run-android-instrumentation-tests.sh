@@ -516,24 +516,26 @@ if [ -d "$SCREENSHOT_PREVIEW_DIR" ]; then
 fi
 
 ra_log "STAGE:COMMENT_POST -> Submitting PR feedback"
-comment_rc=0
 export CN1SS_COMMENT_MARKER="<!-- CN1SS_ANDROID_COMMENT -->"
 export CN1SS_COMMENT_LOG_PREFIX="[run-android-device-tests]"
 export CN1SS_PREVIEW_SUBDIR="android"
+
+# Best-effort: never fail the script because comment POST failed
 if ! cn1ss_post_pr_comment "$COMMENT_FILE" "$SCREENSHOT_PREVIEW_DIR"; then
-  comment_rc=$?
+  ra_log "STAGE:COMMENT_POST_FAILED (see stderr for details)"
 fi
 
 # Copy useful artifacts for GH Actions
 cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner-logcat.txt" 2>/dev/null || true
 [ -n "${TEST_EXEC_LOG:-}" ] && cp -f "$TEST_EXEC_LOG" "$ARTIFACTS_DIR/test-results.log" 2>/dev/null || true
 
-# --- Final status: fail if and only if screenshot decoding failed ---
-final_rc=0
+# Copy useful artifacts for GH Actions
+cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner-logcat.txt" 2>/dev/null || true
+[ -n "${TEST_EXEC_LOG:-}" ] && cp -f "$TEST_EXEC_LOG" "$ARTIFACTS_DIR/test-results.log" 2>/dev/null || true
 
-# If any CN1SS stream failed to decode into a PNG/JPEG, we fail the step.
+# --- Final status: fail ONLY if screenshot decoding failed ---
 if [ "${decode_rc:-0}" -ne 0 ]; then
-  final_rc="$decode_rc"
+  exit "$decode_rc"
 fi
 
-exit "$final_rc"
+exit 0
