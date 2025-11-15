@@ -109,7 +109,7 @@ public class RenderScreenshotReport {
                             message,
                             previewName, previewPath, previewMime,
                             previewNote, previewQuality,
-                            null, base64Omitted, base64Length, base64Mime, base64Codec,
+                            base64, base64Omitted, base64Length, base64Mime, base64Codec,
                             base64Quality, base64Note,
                             test + ".png"
                     ));
