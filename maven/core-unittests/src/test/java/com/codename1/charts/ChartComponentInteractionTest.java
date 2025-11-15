@@ -19,8 +19,6 @@ import com.codename1.ui.Image;
 import com.codename1.ui.Transform;
 import com.codename1.ui.geom.Rectangle;
 
-import java.util.List;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 class ChartComponentInteractionTest extends UITestBase {
@@ -114,11 +112,6 @@ class ChartComponentInteractionTest extends UITestBase {
         @Override
         public int getLegendShapeWidth(int seriesIndex) {
             return 0;
-        }
-
-        @Override
-        public void drawSeries(Canvas canvas, Paint paint, List<Float> points, XYSeriesRenderer seriesRenderer, float yAxisValue,
-                               int seriesIndex, int startIndex) {
         }
 
         @Override
