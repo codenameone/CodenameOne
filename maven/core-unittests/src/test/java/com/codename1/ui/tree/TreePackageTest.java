@@ -61,8 +61,7 @@ class TreePackageTest extends UITestBase {
 
         Component restoredParent = restored.findNodeComponent(SimpleModel.PARENT);
         assertNotNull(restoredParent);
-        Component restoredChild = restored.findNodeComponent("Child 1");
-        assertNotNull(restoredChild);
+        assertTrue(restored.isExpanded(restoredParent));
     }
 
     @FormTest
