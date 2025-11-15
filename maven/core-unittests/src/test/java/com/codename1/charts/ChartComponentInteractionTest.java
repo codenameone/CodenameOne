@@ -119,9 +119,5 @@ class ChartComponentInteractionTest extends UITestBase {
             return null;
         }
 
-        @Override
-        public String getChartType() {
-            return "Recording";
-        }
     }
 }
