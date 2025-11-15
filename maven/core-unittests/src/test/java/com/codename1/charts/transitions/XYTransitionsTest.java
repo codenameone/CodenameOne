@@ -32,6 +32,7 @@ class XYTransitionsTest extends UITestBase {
         XYSeries buffer = transition.getBuffer();
         buffer.add(0, 5);
         buffer.add(1, 7);
+        transition.setBuffer(buffer);
 
         transition.setDuration(5);
         transition.animateChart();
@@ -62,6 +63,7 @@ class XYTransitionsTest extends UITestBase {
         XYValueSeries buffer = transition.getBuffer();
         buffer.add(0, 3, 30);
         buffer.add(1, 4, 40);
+        transition.setBuffer(buffer);
 
         transition.setDuration(5);
         transition.animateChart();
@@ -101,6 +103,7 @@ class XYTransitionsTest extends UITestBase {
         buffer.getSeriesAt(0).add(1, 12);
         buffer.getSeriesAt(1).add(0, 8);
         buffer.getSeriesAt(1).add(1, 9);
+        transition.setBuffer(buffer);
 
         transition.setDuration(5);
         transition.animateChart();

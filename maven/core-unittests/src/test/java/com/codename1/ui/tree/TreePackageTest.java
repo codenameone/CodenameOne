@@ -44,11 +44,15 @@ class TreePackageTest extends UITestBase {
         tree.collapsePath(SimpleModel.PARENT);
 
         Tree restored = new Tree(model);
-        restored.setTreeState(state);
 
         Form otherForm = new Form();
         otherForm.add(restored);
         otherForm.show();
+
+        flushSerialCalls();
+        DisplayTest.flushEdt();
+
+        restored.setTreeState(state);
 
         flushSerialCalls();
         DisplayTest.flushEdt();
