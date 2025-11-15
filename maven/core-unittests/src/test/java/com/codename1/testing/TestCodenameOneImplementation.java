@@ -1,5 +1,6 @@
 package com.codename1.testing;
 
+import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Cursor;
 import com.codename1.db.Database;
@@ -159,6 +160,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private int galleryTypeSupportedCallCount;
     private int lastGalleryTypeQuery;
     private final Map<Integer, Boolean> galleryTypeSupport = new HashMap<Integer, Boolean>();
+    private String nextCapturePhotoPath = "file://test-photo.jpg";
+    private String nextCaptureVideoPath = "file://test-video.mp4";
+    private String nextCaptureAudioPath = "file://test-audio.wav";
+    private MediaRecorderBuilder lastMediaRecorderBuilder;
+    private VideoCaptureConstraints lastVideoConstraints;
 
 
     public TestCodenameOneImplementation() {
@@ -3052,6 +3058,56 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         galleryTypeSupportedCallCount = 0;
         lastGalleryTypeQuery = 0;
         galleryTypeSupport.clear();
+    }
+
+    @Override
+    public void capturePhoto(ActionListener response) {
+        response.actionPerformed(new ActionEvent(nextCapturePhotoPath));
+    }
+
+    @Override
+    public void captureAudio(ActionListener response) {
+        captureAudio(new MediaRecorderBuilder(), response);
+    }
+
+    @Override
+    public void captureAudio(MediaRecorderBuilder recordingOptions, ActionListener response) {
+        if (recordingOptions == null) {
+            recordingOptions = new MediaRecorderBuilder();
+        }
+        lastMediaRecorderBuilder = recordingOptions;
+        response.actionPerformed(new ActionEvent(nextCaptureAudioPath));
+    }
+
+    @Override
+    public void captureVideo(ActionListener response) {
+        response.actionPerformed(new ActionEvent(nextCaptureVideoPath));
+    }
+
+    @Override
+    public void captureVideo(VideoCaptureConstraints constraints, ActionListener response) {
+        lastVideoConstraints = constraints;
+        captureVideo(response);
+    }
+
+    public void setNextCapturePhotoPath(String path) {
+        nextCapturePhotoPath = path;
+    }
+
+    public void setNextCaptureVideoPath(String path) {
+        nextCaptureVideoPath = path;
+    }
+
+    public void setNextCaptureAudioPath(String path) {
+        nextCaptureAudioPath = path;
+    }
+
+    public MediaRecorderBuilder getLastMediaRecorderBuilder() {
+        return lastMediaRecorderBuilder;
+    }
+
+    public VideoCaptureConstraints getLastVideoConstraints() {
+        return lastVideoConstraints;
     }
 
     public static final class TestFile {
