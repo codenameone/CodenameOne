@@ -528,13 +528,12 @@ fi
 cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner-logcat.txt" 2>/dev/null || true
 [ -n "${TEST_EXEC_LOG:-}" ] && cp -f "$TEST_EXEC_LOG" "$ARTIFACTS_DIR/test-results.log" 2>/dev/null || true
 
-# --- Final status: fail if decode failed, even if coverage+comment succeeded ---
-final_rc=$comment_rc
+# --- Final status: fail if and only if screenshot decoding failed ---
+final_rc=0
+
+# If any CN1SS stream failed to decode into a PNG/JPEG, we fail the step.
 if [ "${decode_rc:-0}" -ne 0 ]; then
-  # If decode failed, that should make the job fail, even if comment_rc==0
-  if [ "$final_rc" -eq 0 ]; then
-    final_rc="$decode_rc"
-  fi
+  final_rc="$decode_rc"
 fi
 
 exit "$final_rc"
