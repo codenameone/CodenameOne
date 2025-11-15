@@ -1,168 +1,211 @@
 package com.codename1.plugin;
 
-import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.plugin.event.IsGalleryTypeSupportedEvent;
 import com.codename1.plugin.event.OpenGalleryEvent;
 import com.codename1.plugin.event.PluginEvent;
-import com.codename1.test.helpers.DisplayContext;
 import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.ArgumentCaptor;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.*;
 
-public class OpenGalleryTest {
-
+class OpenGalleryTest extends UITestBase {
     private Display display;
-
     private PluginSupport pluginSupport;
-
-    private CodenameOneImplementation impl;
+    private final List<Plugin> registeredPlugins = new ArrayList<Plugin>();
 
     @BeforeEach
-    public void beforeEach() throws Exception {
-        DisplayContext context = new DisplayContext();
-        display = context.makeDisplay();
-        pluginSupport = context.getPluginSupport();
-        impl = context.getImpl();
-        doAnswer((i) -> {
-            ActionListener response = i.getArgument(0);
-            int type = i.getArgument(1);
-            return null;
-        }).when(impl).openGallery(any(ActionListener.class), anyInt());
+    void setUpDisplayContext() {
+        display = Display.getInstance();
+        pluginSupport = display.getPluginSupport();
+        implementation.resetGalleryTracking();
     }
 
-    @Test
-    public void testOpenGalleryWithNoPlugins() throws Exception {
-        ArgumentCaptor<OpenGalleryEvent> captor = ArgumentCaptor.forClass(OpenGalleryEvent.class);
-        ActionListener response = mock(ActionListener.class);
+    @AfterEach
+    void tearDownPlugins() {
+        for (int i = registeredPlugins.size() - 1; i >= 0; i--) {
+            pluginSupport.deregisterPlugin(registeredPlugins.get(i));
+        }
+        registeredPlugins.clear();
+        implementation.resetGalleryTracking();
+    }
+
+    @FormTest
+    void openGalleryDispatchesToImplementationWhenNotConsumed() {
+        RecordingPlugin plugin = new RecordingPlugin();
+        registerPlugin(plugin);
+
+        ActionListener response = new EmptyActionListener();
         int type = Display.GALLERY_IMAGE;
         display.openGallery(response, type);
-        verify(impl, times(1)).openGallery(response, type);
-        verify(pluginSupport, times(1)).firePluginEvent(captor.capture());
-        OpenGalleryEvent capturedEvent = captor.getValue();
-        assertEquals(type, capturedEvent.getType());
-        assertEquals(response, capturedEvent.getResponse());
+
+        assertEquals(1, implementation.getOpenGalleryCallCount());
+        assertSame(response, implementation.getLastOpenGalleryResponse());
+        assertEquals(type, implementation.getLastOpenGalleryType());
+        assertEquals(1, plugin.getEvents().size());
+        PluginEvent event = plugin.getEvents().get(0);
+        assertTrue(event instanceof OpenGalleryEvent);
+        OpenGalleryEvent openEvent = (OpenGalleryEvent) event;
+        assertEquals(type, openEvent.getType());
+        assertSame(response, openEvent.getResponse());
+        assertFalse(event.isConsumed());
     }
 
-    @Test
-    public void testOpenGalleryDoesNotCallImplementationWhenPluginConsumesEvent() throws Exception {
-        ArgumentCaptor<OpenGalleryEvent> captor = ArgumentCaptor.forClass(OpenGalleryEvent.class);
-        Plugin openGalleryPlugin = new Plugin() {
-            @Override
-            public void actionPerformed(PluginEvent evt) {
-                evt.consume();
-            }
-        };
-        Plugin openGalleryPluginSpy = spy(openGalleryPlugin);
-        pluginSupport.registerPlugin(openGalleryPluginSpy);
+    @FormTest
+    void openGalleryDoesNotCallImplementationWhenPluginConsumesEvent() {
+        ConsumingPlugin plugin = new ConsumingPlugin();
+        registerPlugin(plugin);
 
-        ActionListener response = mock(ActionListener.class);
+        ActionListener response = new EmptyActionListener();
         int type = Display.GALLERY_IMAGE;
         display.openGallery(response, type);
-        verify(impl, times(0)).openGallery(response, type);
-        verify(pluginSupport, times(1)).firePluginEvent(captor.capture());
-        verify(openGalleryPluginSpy, times(1)).actionPerformed(any(OpenGalleryEvent.class));
 
-        OpenGalleryEvent capturedEvent = captor.getValue();
-        assertEquals(type, capturedEvent.getType());
-        assertEquals(response, capturedEvent.getResponse());
+        assertEquals(0, implementation.getOpenGalleryCallCount());
+        assertEquals(1, plugin.getEvents().size());
+        assertTrue(plugin.getEvents().get(0).isConsumed());
+        OpenGalleryEvent openEvent = (OpenGalleryEvent) plugin.getEvents().get(0);
+        assertEquals(type, openEvent.getType());
+        assertSame(response, openEvent.getResponse());
     }
 
-    @Test
-    public void testOpenImageGalleryWithNoPlugins() throws Exception {
-        ArgumentCaptor<OpenGalleryEvent> captor = ArgumentCaptor.forClass(OpenGalleryEvent.class);
-        ActionListener response = mock(ActionListener.class);
-        int type = Display.GALLERY_IMAGE;
+    @FormTest
+    void openImageGalleryDispatchesToImplementationWhenNotConsumed() {
+        RecordingPlugin plugin = new RecordingPlugin();
+        registerPlugin(plugin);
+
+        ActionListener response = new EmptyActionListener();
         display.openImageGallery(response);
-        verify(impl, times(1)).openImageGallery(response);
-        verify(pluginSupport, times(1)).firePluginEvent(captor.capture());
-        OpenGalleryEvent capturedEvent = captor.getValue();
-        assertEquals(type, capturedEvent.getType());
-        assertEquals(response, capturedEvent.getResponse());
+
+        assertEquals(1, implementation.getOpenImageGalleryCallCount());
+        assertSame(response, implementation.getLastOpenImageGalleryResponse());
+        assertEquals(1, plugin.getEvents().size());
+        PluginEvent event = plugin.getEvents().get(0);
+        assertTrue(event instanceof OpenGalleryEvent);
+        OpenGalleryEvent openEvent = (OpenGalleryEvent) event;
+        assertEquals(Display.GALLERY_IMAGE, openEvent.getType());
+        assertSame(response, openEvent.getResponse());
+        assertFalse(event.isConsumed());
     }
 
-    @Test
-    public void testOpenImageGalleryDoesNotCallImplementationWhenPluginConsumesEvent() throws Exception {
-        ArgumentCaptor<OpenGalleryEvent> captor = ArgumentCaptor.forClass(OpenGalleryEvent.class);
-        Plugin openGalleryPlugin = new Plugin() {
-            @Override
-            public void actionPerformed(PluginEvent evt) {
+    @FormTest
+    void openImageGalleryDoesNotCallImplementationWhenPluginConsumesEvent() {
+        ConsumingPlugin plugin = new ConsumingPlugin();
+        registerPlugin(plugin);
+
+        ActionListener response = new EmptyActionListener();
+        display.openImageGallery(response);
+
+        assertEquals(0, implementation.getOpenImageGalleryCallCount());
+        assertEquals(1, plugin.getEvents().size());
+        assertTrue(plugin.getEvents().get(0).isConsumed());
+        OpenGalleryEvent openEvent = (OpenGalleryEvent) plugin.getEvents().get(0);
+        assertEquals(Display.GALLERY_IMAGE, openEvent.getType());
+        assertSame(response, openEvent.getResponse());
+    }
+
+    @FormTest
+    void isGalleryTypeSupportedHandledByPlugin() {
+        for (int i = 0; i < 2; i++) {
+            boolean supported = (i == 0);
+            SupportingPlugin plugin = new SupportingPlugin(supported);
+            registerPlugin(plugin);
+
+            int type = Display.GALLERY_IMAGE;
+            boolean actual = display.isGalleryTypeSupported(type);
+
+            assertEquals(supported, actual);
+            assertEquals(0, implementation.getGalleryTypeSupportedCallCount());
+            assertEquals(1, plugin.getEvents().size());
+            PluginEvent event = plugin.getEvents().get(0);
+            assertTrue(event instanceof IsGalleryTypeSupportedEvent);
+            assertTrue(event.isConsumed());
+            assertEquals(type, ((IsGalleryTypeSupportedEvent) event).getType());
+
+            pluginSupport.deregisterPlugin(plugin);
+            registeredPlugins.remove(plugin);
+        }
+    }
+
+    @FormTest
+    void isGalleryTypeSupportedFallsBackToImplementation() {
+        for (int i = 0; i < 2; i++) {
+            boolean supported = (i == 0);
+            RecordingPlugin plugin = new RecordingPlugin();
+            registerPlugin(plugin);
+
+            int type = Display.GALLERY_IMAGE;
+            implementation.resetGalleryTracking();
+            implementation.setGalleryTypeSupported(type, supported);
+
+            boolean actual = display.isGalleryTypeSupported(type);
+
+            assertEquals(supported, actual);
+            assertEquals(1, implementation.getGalleryTypeSupportedCallCount());
+            assertEquals(type, implementation.getLastGalleryTypeQuery());
+            assertEquals(1, plugin.getEvents().size());
+            PluginEvent event = plugin.getEvents().get(0);
+            assertTrue(event instanceof IsGalleryTypeSupportedEvent);
+            assertFalse(event.isConsumed());
+            assertEquals(type, ((IsGalleryTypeSupportedEvent) event).getType());
+
+            pluginSupport.deregisterPlugin(plugin);
+            registeredPlugins.remove(plugin);
+        }
+    }
+
+    private void registerPlugin(Plugin plugin) {
+        pluginSupport.registerPlugin(plugin);
+        registeredPlugins.add(plugin);
+    }
+
+    private static class EmptyActionListener implements ActionListener {
+        public void actionPerformed(ActionEvent evt) {
+        }
+    }
+
+    private static class RecordingPlugin implements Plugin {
+        private final List<PluginEvent> events = new ArrayList<PluginEvent>();
+
+        public void actionPerformed(PluginEvent evt) {
+            events.add(evt);
+        }
+
+        List<PluginEvent> getEvents() {
+            return events;
+        }
+    }
+
+    private static class ConsumingPlugin extends RecordingPlugin {
+        @Override
+        public void actionPerformed(PluginEvent evt) {
+            super.actionPerformed(evt);
+            evt.consume();
+        }
+    }
+
+    private static class SupportingPlugin extends RecordingPlugin {
+        private final boolean supported;
+
+        SupportingPlugin(boolean supported) {
+            this.supported = supported;
+        }
+
+        @Override
+        public void actionPerformed(PluginEvent evt) {
+            super.actionPerformed(evt);
+            if (evt instanceof IsGalleryTypeSupportedEvent) {
+                IsGalleryTypeSupportedEvent supportedEvent = (IsGalleryTypeSupportedEvent) evt;
+                supportedEvent.setPluginEventResponse(supported);
                 evt.consume();
             }
-        };
-        Plugin openGalleryPluginSpy = spy(openGalleryPlugin);
-        pluginSupport.registerPlugin(openGalleryPluginSpy);
-
-        ActionListener response = mock(ActionListener.class);
-        int type = Display.GALLERY_IMAGE;
-        display.openImageGallery(response);
-        verify(impl, times(0)).openImageGallery(response);
-        verify(pluginSupport, times(1)).firePluginEvent(captor.capture());
-        verify(openGalleryPluginSpy, times(1)).actionPerformed(any(OpenGalleryEvent.class));
-
-        OpenGalleryEvent capturedEvent = captor.getValue();
-        assertEquals(type, capturedEvent.getType());
-        assertEquals(response, capturedEvent.getResponse());
-    }
-
-    @ParameterizedTest
-    @ValueSource(booleans = {true, false})
-    public void testIsGalleryTypeSupportedSupportedByPlugin(final boolean supported) throws Exception {
-        ArgumentCaptor<IsGalleryTypeSupportedEvent> captor = ArgumentCaptor.forClass(IsGalleryTypeSupportedEvent.class);
-        Plugin openGalleryPlugin = new Plugin() {
-            @Override
-            public void actionPerformed(PluginEvent evt) {
-                if (evt.getEventType() == ActionEvent.Type.IsGalleryTypeSupported) {
-                    evt.setPluginEventResponse(supported);
-                }
-            }
-        };
-        Plugin openGalleryPluginSpy = spy(openGalleryPlugin);
-        pluginSupport.registerPlugin(openGalleryPluginSpy);
-
-        int type = Display.GALLERY_IMAGE;
-        boolean actual = display.isGalleryTypeSupported(type);
-        verify(impl, times(0)).isGalleryTypeSupported(type);
-        verify(pluginSupport, times(1)).firePluginEvent(captor.capture());
-        verify(openGalleryPluginSpy, times(1)).actionPerformed(any(PluginEvent.class));
-
-        IsGalleryTypeSupportedEvent capturedEvent = captor.getValue();
-        assertEquals(type, capturedEvent.getType());
-        assertEquals(supported, actual);
-    }
-
-    @ParameterizedTest
-    @ValueSource(booleans = {true, false})
-    public void testIsGalleryTypeSupportedSupportedByImplementation(final boolean supported) throws Exception {
-        ArgumentCaptor<IsGalleryTypeSupportedEvent> captor = ArgumentCaptor.forClass(IsGalleryTypeSupportedEvent.class);
-        Plugin openGalleryPlugin = new Plugin() {
-            @Override
-            public void actionPerformed(PluginEvent evt) {
-
-            }
-        };
-        Plugin openGalleryPluginSpy = spy(openGalleryPlugin);
-        pluginSupport.registerPlugin(openGalleryPluginSpy);
-
-        doReturn( supported).when(impl).isGalleryTypeSupported(anyInt());
-
-        int type = Display.GALLERY_IMAGE;
-        boolean actual = display.isGalleryTypeSupported(type);
-        verify(impl, times(1)).isGalleryTypeSupported(type);
-        verify(pluginSupport, times(1)).firePluginEvent(captor.capture());
-        verify(openGalleryPluginSpy, times(1)).actionPerformed(any(PluginEvent.class));
-
-        IsGalleryTypeSupportedEvent capturedEvent = captor.getValue();
-        assertEquals(type, capturedEvent.getType());
-        assertEquals(supported, actual);
+        }
     }
 }
