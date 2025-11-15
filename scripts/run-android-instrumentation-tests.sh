@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run instrumentation tests and reconstruct screenshot emitted as chunked Base64 (NO ADB)
-set -euo pipefail
+set -eo pipefail
 
 ra_log() { echo "[run-android-instrumentation-tests] $1"; }
 
@@ -297,18 +297,6 @@ for test in "${TEST_NAMES[@]}"; do
   dest="${TEST_OUTPUTS[$test]-}"
   if [ -z "$dest" ]; then
     # Use a non-existent path so ProcessScreenshots reports missing_actual
-    dest="$SCREENSHOT_TMP_DIR/${test}.missing.png"
-  fi
-  COMPARE_ARGS+=("--actual" "${test}=${dest}")
-done
-
-# ---- Compare against stored references ------------------------------------
-COMPARE_ARGS=()
-for test in "${TEST_NAMES[@]}"; do
-  # Safe under `set -u`: if key is missing, default to empty string
-  dest="${TEST_OUTPUTS[$test]-}"
-  if [ -z "$dest" ]; then
-    # Fabricate a non-existent path so ProcessScreenshots reports missing_actual
     dest="$SCREENSHOT_TMP_DIR/${test}.missing.png"
   fi
   COMPARE_ARGS+=("--actual" "${test}=${dest}")
