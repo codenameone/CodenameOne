@@ -24,7 +24,7 @@ class LocalNotificationTest extends UITestBase {
         notification.setAlertImage("/icon.png");
         notification.setForeground(true);
 
-        long triggerTime = 123456L;
+        long triggerTime = System.currentTimeMillis() + 60000L;
         Display.getInstance().scheduleLocalNotification(notification, triggerTime, LocalNotification.REPEAT_DAY);
 
         List<ScheduledNotification> scheduled = implementation.getScheduledNotifications();
@@ -52,8 +52,9 @@ class LocalNotificationTest extends UITestBase {
         LocalNotification evening = new LocalNotification();
         evening.setId("evening");
 
-        Display.getInstance().scheduleLocalNotification(morning, 10L, LocalNotification.REPEAT_NONE);
-        Display.getInstance().scheduleLocalNotification(evening, 20L, LocalNotification.REPEAT_WEEK);
+        long now = System.currentTimeMillis();
+        Display.getInstance().scheduleLocalNotification(morning, now + 60000L, LocalNotification.REPEAT_NONE);
+        Display.getInstance().scheduleLocalNotification(evening, now + 120000L, LocalNotification.REPEAT_WEEK);
         assertEquals(2, implementation.getScheduledNotifications().size());
 
         Display.getInstance().cancelLocalNotification("morning");

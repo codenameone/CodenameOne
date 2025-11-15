@@ -1,5 +1,6 @@
 package com.codename1.system;
 
+import com.codename1.io.Log;
 import com.codename1.io.Preferences;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
@@ -53,8 +54,15 @@ class SystemPackageTest extends UITestBase {
 
         DefaultCrashReporter.setErrorText("Crash detected");
         assertEquals("Crash detected", DefaultCrashReporter.getErrorText());
-        DefaultCrashReporter.init(false, 0);
-        assertNotNull(Display.getInstance().getCrashReporter());
+        int previousLevel = Log.getReportingLevel();
+        try {
+            Log.setReportingLevel(Log.REPORTING_DEBUG);
+            DefaultCrashReporter.init(false, 0);
+            assertNotNull(Display.getInstance().getCrashReporter());
+        } finally {
+            Log.setReportingLevel(previousLevel);
+            Display.getInstance().setCrashReporter(null);
+        }
     }
 
     private static class TestLifecycle extends Lifecycle {

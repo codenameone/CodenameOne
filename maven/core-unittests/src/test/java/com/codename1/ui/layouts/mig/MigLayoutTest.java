@@ -4,6 +4,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
+import com.codename1.ui.Painter;
 import com.codename1.ui.painter.PainterChain;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -39,9 +40,17 @@ class MigLayoutTest extends UITestBase {
 
         PainterChain.installGlassPane(form, second);
         assertTrue(form.getGlassPane() instanceof PainterChain);
+        PainterChain chain = (PainterChain) form.getGlassPane();
+        Painter[] chainEntries = chain.getChain();
+        assertEquals(2, chainEntries.length);
+        assertSame(first, chainEntries[0]);
+        assertSame(second, chainEntries[1]);
 
         PainterChain.removeGlassPane(form, second);
-        assertSame(first, form.getGlassPane());
+        assertTrue(form.getGlassPane() instanceof PainterChain);
+        Painter[] remainingEntries = ((PainterChain) form.getGlassPane()).getChain();
+        assertEquals(1, remainingEntries.length);
+        assertSame(first, remainingEntries[0]);
 
         PainterChain.removeGlassPane(form, first);
         assertNull(form.getGlassPane());

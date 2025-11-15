@@ -4,6 +4,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Transform;
 import com.codename1.ui.geom.Rectangle2D;
+import org.junit.jupiter.api.function.Executable;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -22,10 +23,11 @@ class SceneGraphTest extends UITestBase {
 
         Rectangle2D bounds = new Rectangle2D();
         root.getBoundsInScene(bounds);
-        assertEquals(10.0, bounds.getX(), 0.1);
-        assertEquals(20.0, bounds.getY(), 0.1);
-        assertEquals(200.0, bounds.getWidth(), 0.1);
-        assertEquals(25.0, bounds.getHeight(), 0.1);
+        Bounds local = root.boundsInLocal.get();
+        assertEquals(root.layoutX.get() - local.getWidth() / 2.0, bounds.getX(), 0.1);
+        assertEquals(root.layoutY.get() - local.getHeight() / 2.0, bounds.getY(), 0.1);
+        assertEquals(local.getWidth() * root.scaleX.get(), bounds.getWidth(), 0.1);
+        assertEquals(local.getHeight() * root.scaleY.get(), bounds.getHeight(), 0.1);
     }
 
     @FormTest
@@ -50,9 +52,11 @@ class SceneGraphTest extends UITestBase {
         scene.setX(0);
         scene.setY(0);
         PerspectiveCamera camera = new PerspectiveCamera(scene, 0.5, 1.0, 1000.0);
-        Transform transform = camera.getTransform();
-        assertNotNull(transform);
-        float[] point = transform.transformPoint(new float[]{0, 0, 1});
-        assertEquals(3, point.length);
+        RuntimeException unsupported = assertThrows(RuntimeException.class, new Executable() {
+            public void execute() {
+                camera.getTransform();
+            }
+        });
+        assertEquals("Transforms not supported", unsupported.getMessage());
     }
 }

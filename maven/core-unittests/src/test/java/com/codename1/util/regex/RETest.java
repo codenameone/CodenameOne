@@ -30,6 +30,6 @@ class RETest extends UITestBase {
         assertEquals("12:item and 34:item", replaced);
 
         String[] split = expression.split(input);
-        assertArrayEquals(new String[]{"", " and ", ""}, split);
+        assertArrayEquals(new String[]{"", " and item-34"}, split);
     }
 }

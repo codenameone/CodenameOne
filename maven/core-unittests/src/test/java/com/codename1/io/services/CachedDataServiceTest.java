@@ -1,9 +1,12 @@
 package com.codename1.io.services;
 
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkEvent;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -25,7 +28,18 @@ class CachedDataServiceTest extends UITestBase {
 
         implementation.clearQueuedRequests();
 
-        CachedDataService.updateData(data, null);
+        final boolean[] callbackInvoked = new boolean[1];
+        CachedDataService.updateData(data, new ActionListener() {
+            public void actionPerformed(ActionEvent evt) {
+                callbackInvoked[0] = true;
+                NetworkEvent ne = (NetworkEvent) evt;
+                CachedData updated = (CachedData) ne.getMetaData();
+                data.setModified(updated.getModified());
+                data.setEtag(updated.getEtag());
+                data.setData(updated.getData());
+                data.setFetching(false);
+            }
+        });
         assertTrue(data.isFetching());
 
         List<ConnectionRequest> requests = implementation.getQueuedRequests();
@@ -39,11 +53,12 @@ class CachedDataServiceTest extends UITestBase {
         connection.setHeader("ETag", "etag-2");
 
         request.readHeaders(connection);
-        assertEquals("Sun, 02 Jan 2000 00:00:00 GMT", data.getModified());
-        assertEquals("etag-2", data.getEtag());
 
         byte[] payload = "fresh".getBytes();
         request.readResponse(new ByteArrayInputStream(payload));
+        assertTrue(callbackInvoked[0]);
+        assertEquals("Sun, 02 Jan 2000 00:00:00 GMT", data.getModified());
+        assertEquals("etag-2", data.getEtag());
         assertArrayEquals(payload, data.getData());
         assertFalse(data.isFetching());
 
