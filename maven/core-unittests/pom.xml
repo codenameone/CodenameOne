@@ -38,6 +38,20 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.7</version> <!-- Use the latest version -->
+                <configuration>
+                    <excludes>
+                        <exclude>com/codename1/impl/**</exclude>
+                        <exclude>com/codename1/ui/html/**</exclude>
+                        <exclude>com/codename1/ads/**</exclude>
+                        <exclude>com/codename1/facebook/**</exclude>
+                        <exclude>com/codename1/maps/**</exclude>
+                        <exclude>com/codename1/cloud/**</exclude>
+                        <exclude>com/codename1/maps/layers/**</exclude>
+                        <exclude>com/codename1/maps/providers/**</exclude>
+                        <exclude>com/codename1/facebook/ui/**</exclude>
+                        <exclude>com/codename1/codescan/**</exclude>
+                    </excludes>
+                </configuration>
                 <executions>
                     <execution>
                         <goals>
