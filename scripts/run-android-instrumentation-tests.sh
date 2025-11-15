@@ -275,6 +275,7 @@ for test in "${TEST_NAMES[@]}"; do
     else
       rm -f "$preview_dest" 2>/dev/null || true
     fi
+
     TEST_DECODE_OK["$test"]=1
   else
     ra_log "ERROR: Failed to extract/decode CN1SS payload for test '$test'"
@@ -287,6 +288,18 @@ for test in "${TEST_NAMES[@]}"; do
     fi
     decode_rc=12
   fi
+done
+
+# ---- Compare against stored references ------------------------------------
+COMPARE_ARGS=()
+for test in "${TEST_NAMES[@]}"; do
+  # Safe under set -u: default empty if key not present
+  dest="${TEST_OUTPUTS[$test]-}"
+  if [ -z "$dest" ]; then
+    # Use a non-existent path so ProcessScreenshots reports missing_actual
+    dest="$SCREENSHOT_TMP_DIR/${test}.missing.png"
+  fi
+  COMPARE_ARGS+=("--actual" "${test}=${dest}")
 done
 
 # ---- Compare against stored references ------------------------------------

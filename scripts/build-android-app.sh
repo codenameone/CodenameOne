@@ -323,6 +323,12 @@ else
   ba_log "WARNING: Instrumentation test template missing at $INSTRUMENTATION_TEMPLATE"
 fi
 
+# Remove any stock ExampleInstrumentedTest that the template may have created
+DEFAULT_TESTS_DIR="$GRADLE_PROJECT_DIR/app/src/androidTest/java"
+if [ -d "$DEFAULT_TESTS_DIR" ]; then
+  find "$DEFAULT_TESTS_DIR" -type f -name 'ExampleInstrumentedTest.java' -print -delete || true
+fi
+
 ba_log "Invoking Gradle build in $GRADLE_PROJECT_DIR"
 chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 ORIGINAL_JAVA_HOME="$JAVA_HOME"
