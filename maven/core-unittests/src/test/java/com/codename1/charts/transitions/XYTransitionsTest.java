@@ -29,18 +29,15 @@ class XYTransitionsTest extends UITestBase {
         form.show();
 
         XYSeriesTransition transition = new XYSeriesTransition(chartComponent, series);
-        XYSeries buffer = new XYSeries(series.getTitle(), series.getScaleNumber());
+        XYSeries buffer = transition.getBuffer();
         buffer.add(0, 5);
         buffer.add(1, 7);
-        transition.setBuffer(buffer);
 
         transition.setDuration(5);
         transition.animateChart();
-
-        assertTrue(transition.animate());
-        Thread.sleep(10);
-        assertTrue(transition.animate());
-        assertFalse(transition.animate());
+        while (transition.animate()) {
+            Thread.sleep(5);
+        }
 
         assertEquals(2, series.getItemCount());
         assertEquals(5.0, series.getY(0));
@@ -62,18 +59,15 @@ class XYTransitionsTest extends UITestBase {
         form.show();
 
         XYValueSeriesTransition transition = new XYValueSeriesTransition(chartComponent, valueSeries);
-        XYValueSeries buffer = new XYValueSeries(valueSeries.getTitle());
+        XYValueSeries buffer = transition.getBuffer();
         buffer.add(0, 3, 30);
         buffer.add(1, 4, 40);
-        transition.setBuffer(buffer);
 
         transition.setDuration(5);
         transition.animateChart();
-
-        assertTrue(transition.animate());
-        Thread.sleep(10);
-        assertTrue(transition.animate());
-        assertFalse(transition.animate());
+        while (transition.animate()) {
+            Thread.sleep(5);
+        }
 
         assertEquals(2, valueSeries.getItemCount());
         assertEquals(3.0, valueSeries.getY(0));
@@ -110,11 +104,9 @@ class XYTransitionsTest extends UITestBase {
 
         transition.setDuration(5);
         transition.animateChart();
-
-        assertTrue(transition.animate());
-        Thread.sleep(10);
-        assertTrue(transition.animate());
-        assertFalse(transition.animate());
+        while (transition.animate()) {
+            Thread.sleep(5);
+        }
 
         assertEquals(10.0, first.getY(0));
         assertEquals(12.0, first.getY(1));

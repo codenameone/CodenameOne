@@ -66,8 +66,7 @@ class UIUtilPackageTest extends UITestBase {
         CountingRunnable counting = new CountingRunnable();
         UITimer timer = new UITimer(counting);
         timer.schedule(10, false, form);
-        Thread.sleep(20);
-        DisplayTest.flushEdt();
+        drainEdtTicks(4);
         assertTrue(counting.count >= 1);
         timer.cancel();
         int singleCount = counting.count;
@@ -77,13 +76,11 @@ class UIUtilPackageTest extends UITestBase {
         counting.count = 0;
         UITimer repeating = new UITimer(counting);
         repeating.schedule(5, true, form);
-        Thread.sleep(12);
-        DisplayTest.flushEdt();
+        drainEdtTicks(4);
         assertTrue(counting.count >= 1);
         repeating.cancel();
         long before = counting.count;
-        Thread.sleep(10);
-        DisplayTest.flushEdt();
+        drainEdtTicks(3);
         repeating.testEllapse();
         assertEquals(before, counting.count);
     }
@@ -101,6 +98,14 @@ class UIUtilPackageTest extends UITestBase {
 
         public void run() {
             count++;
+        }
+    }
+
+    private void drainEdtTicks(int iterations) throws InterruptedException {
+        for (int i = 0; i < iterations; i++) {
+            DisplayTest.flushEdt();
+            flushSerialCalls();
+            Thread.sleep(5);
         }
     }
 }

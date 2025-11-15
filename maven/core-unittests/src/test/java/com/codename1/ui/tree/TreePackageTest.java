@@ -31,10 +31,15 @@ class TreePackageTest extends UITestBase {
         Component leafComponent = tree.findNodeComponent(SimpleModel.LEAF);
         assertNotNull(leafComponent);
         assertTrue(fireAction(leafComponent));
+        flushSerialCalls();
+        DisplayTest.flushEdt();
+        flushSerialCalls();
         DisplayTest.flushEdt();
         assertEquals(SimpleModel.LEAF, recordingListener.lastSource);
 
         tree.expandPath(SimpleModel.PARENT);
+        flushSerialCalls();
+        DisplayTest.flushEdt();
         Component parentComponent = tree.findNodeComponent(SimpleModel.PARENT);
         assertTrue(tree.isExpanded(parentComponent));
 
@@ -48,9 +53,13 @@ class TreePackageTest extends UITestBase {
         otherForm.show();
         restored.setTreeState(state);
 
+        flushSerialCalls();
+        DisplayTest.flushEdt();
+        flushSerialCalls();
         DisplayTest.flushEdt();
 
         Component restoredParent = restored.findNodeComponent(SimpleModel.PARENT);
+        assertNotNull(restoredParent);
         assertTrue(restored.isExpanded(restoredParent));
     }
 
@@ -81,6 +90,7 @@ class TreePackageTest extends UITestBase {
             implementation.dispatchPointerPressAndRelease(targetX, targetY);
             flushSerialCalls();
             DisplayTest.flushEdt();
+            flushSerialCalls();
             return true;
         }
         if (component instanceof Container) {

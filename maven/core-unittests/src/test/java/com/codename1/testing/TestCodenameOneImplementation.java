@@ -39,12 +39,14 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Enumeration;
+import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -94,6 +96,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private Shape lastDrawShape;
     private Shape lastFillShape;
     private Stroke lastDrawStroke;
+    private final Deque<FillOperation> fillOperations = new ArrayDeque<FillOperation>();
+    private final Deque<GradientOperation> gradientOperations = new ArrayDeque<GradientOperation>();
     private String[] accessPointIds = new String[0];
     private final Map<String, Integer> accessPointTypes = new HashMap<>();
     private final Map<String, String> accessPointNames = new HashMap<>();
@@ -831,6 +835,23 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return lastDrawStroke;
     }
 
+    public void clearGraphicsOperations() {
+        fillOperations.clear();
+        gradientOperations.clear();
+    }
+
+    public List<FillOperation> getFillOperationsSnapshot() {
+        return new ArrayList<FillOperation>(fillOperations);
+    }
+
+    public List<GradientOperation> getGradientOperationsSnapshot() {
+        return new ArrayList<GradientOperation>(gradientOperations);
+    }
+
+    public GradientOperation getLastGradientOperation() {
+        return gradientOperations.isEmpty() ? null : gradientOperations.peekLast();
+    }
+
     public void resetShapeTracking() {
         drawShapeInvoked = false;
         fillShapeInvoked = false;
@@ -1383,10 +1404,13 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     private void fillArea(TestGraphics g, int x, int y, int width, int height) {
+        fillArea(g, x, y, width, height, currentColor(g));
+    }
+
+    private void fillArea(TestGraphics g, int x, int y, int width, int height, int argb) {
         if (g.image == null || width <= 0 || height <= 0) {
             return;
         }
-        int argb = currentColor(g);
         int translatedX = x + g.translateX;
         int translatedY = y + g.translateY;
         int clipLeft = g.clipX;
@@ -1402,6 +1426,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         if (startX >= endX || startY >= endY) {
             return;
         }
+
+        int recordedWidth = endX - startX;
+        int recordedHeight = endY - startY;
+        recordFillOperation(startX, startY, recordedWidth, recordedHeight, argb);
 
         for (int row = startY; row < endY; row++) {
             if (row < 0 || row >= g.image.height) {
@@ -1427,6 +1455,23 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return (alpha << 24) | (g.color & 0x00ffffff);
     }
 
+    private void recordFillOperation(int x, int y, int width, int height, int color) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        if (fillOperations.size() >= 256) {
+            fillOperations.removeFirst();
+        }
+        fillOperations.addLast(new FillOperation(x, y, width, height, color));
+    }
+
+    private void recordGradientOperation(GradientOperation operation) {
+        if (gradientOperations.size() >= 64) {
+            gradientOperations.removeFirst();
+        }
+        gradientOperations.addLast(operation);
+    }
+
     @Override
     public void drawRoundRect(Object graphics, int x, int y, int width, int height, int arcWidth, int arcHeight) {
     }
@@ -1450,6 +1495,30 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void drawString(Object graphics, String str, int x, int y) {
+    }
+
+    @Override
+    public void fillLinearGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
+        if (graphics instanceof TestGraphics) {
+            TestGraphics g = (TestGraphics) graphics;
+            int translatedX = x + g.translateX;
+            int translatedY = y + g.translateY;
+            recordGradientOperation(new GradientOperation(translatedX, translatedY, Math.max(0, width), Math.max(0, height), startColor, endColor, horizontal));
+            if (width <= 0 || height <= 0) {
+                return;
+            }
+            if (horizontal) {
+                int split = Math.max(1, width / 2);
+                fillArea(g, x, y, split, height, startColor);
+                fillArea(g, x + split, y, Math.max(0, width - split), height, endColor);
+            } else {
+                int split = Math.max(1, height / 2);
+                fillArea(g, x, y, width, split, startColor);
+                fillArea(g, x, y + split, width, Math.max(0, height - split), endColor);
+            }
+            return;
+        }
+        super.fillLinearGradient(graphics, startColor, endColor, x, y, width, height, horizontal);
     }
 
     @Override
@@ -2668,6 +2737,90 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         public void close() throws IOException {
             super.close();
             storageEntries.put(name, toByteArray());
+        }
+    }
+
+    public static final class FillOperation {
+        private final int x;
+        private final int y;
+        private final int width;
+        private final int height;
+        private final int color;
+
+        FillOperation(int x, int y, int width, int height, int color) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.color = color;
+        }
+
+        public int getX() {
+            return x;
+        }
+
+        public int getY() {
+            return y;
+        }
+
+        public int getWidth() {
+            return width;
+        }
+
+        public int getHeight() {
+            return height;
+        }
+
+        public int getColor() {
+            return color;
+        }
+    }
+
+    public static final class GradientOperation {
+        private final int x;
+        private final int y;
+        private final int width;
+        private final int height;
+        private final int startColor;
+        private final int endColor;
+        private final boolean horizontal;
+
+        GradientOperation(int x, int y, int width, int height, int startColor, int endColor, boolean horizontal) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.startColor = startColor;
+            this.endColor = endColor;
+            this.horizontal = horizontal;
+        }
+
+        public int getX() {
+            return x;
+        }
+
+        public int getY() {
+            return y;
+        }
+
+        public int getWidth() {
+            return width;
+        }
+
+        public int getHeight() {
+            return height;
+        }
+
+        public int getStartColor() {
+            return startColor;
+        }
+
+        public int getEndColor() {
+            return endColor;
+        }
+
+        public boolean isHorizontal() {
+            return horizontal;
         }
     }
 
