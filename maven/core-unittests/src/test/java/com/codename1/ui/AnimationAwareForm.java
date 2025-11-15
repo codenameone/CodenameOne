@@ -1,7 +1,7 @@
 package com.codename1.ui;
 
-class AnimationAwareForm extends Form {
-    boolean hasAnimationsExposed() {
+public class AnimationAwareForm extends Form {
+    public boolean hasAnimationsExposed() {
         return hasAnimations();
     }
 }
