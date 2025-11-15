@@ -203,23 +203,48 @@ cn1ss_decode_test_asset() {
   local entry source_type source_path count
 
   rm -f "$dest" 2>/dev/null || true
+
   for entry in "$@"; do
     source_type="${entry%%:*}"
     source_path="${entry#*:}"
     [ -s "$source_path" ] || continue
+
     count="$(cn1ss_count_chunks "$source_path" "$test" "$channel")"
     count="${count//[^0-9]/}"; : "${count:=0}"
     [ "$count" -gt 0 ] || continue
+
     cn1ss_log "Reassembling test '$test' from ${source_type} source: $source_path (chunks=$count)"
-    # <-- drop 2>/dev/null here
+
+    # --- Primary path: let Cn1ssChunkTools do the decode ---
     if cn1ss_decode_binary "$source_path" "$test" "$channel" > "$dest"; then
       if [ -z "$verifier" ] || "$verifier" "$dest"; then
         echo "${source_type}:$(basename "$source_path")"
         return 0
       fi
+      # If verifier failed, drop the broken file before trying fallback
+      rm -f "$dest" 2>/dev/null || true
+    fi
+
+    # --- Fallback path: extract raw base64 and decode with coreutils base64 ---
+    if command -v base64 >/dev/null 2>&1; then
+      local tmp_b64="${dest}.b64"
+
+      if cn1ss_extract_base64 "$source_path" "$test" "$channel" > "$tmp_b64" 2>/dev/null && [ -s "$tmp_b64" ]; then
+        if base64 -d "$tmp_b64" > "$dest" 2>/dev/null; then
+          if [ -z "$verifier" ] || "$verifier" "$dest"; then
+            cn1ss_log "Fallback base64 decoder succeeded for test '$test' from ${source_type}"
+            rm -f "$tmp_b64" 2>/dev/null || true
+            echo "${source_type}:$(basename "$source_path")"
+            return 0
+          fi
+        fi
+      fi
+
+      rm -f "$tmp_b64" "$dest" 2>/dev/null || true
     fi
   done
-  rm -f "$dest" 2>/dev/null || true
+
+  # If we got here, both decode paths failed for all sources
   return 1
 }
 
