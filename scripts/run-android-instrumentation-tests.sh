@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run instrumentation tests and reconstruct screenshot emitted as chunked Base64 (NO ADB)
-set -eo pipefail
+set -o pipefail
 
 ra_log() { echo "[run-android-instrumentation-tests] $1"; }
 
@@ -529,9 +529,7 @@ fi
 cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner-logcat.txt" 2>/dev/null || true
 [ -n "${TEST_EXEC_LOG:-}" ] && cp -f "$TEST_EXEC_LOG" "$ARTIFACTS_DIR/test-results.log" 2>/dev/null || true
 
-# Copy useful artifacts for GH Actions
-cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner-logcat.txt" 2>/dev/null || true
-[ -n "${TEST_EXEC_LOG:-}" ] && cp -f "$TEST_EXEC_LOG" "$ARTIFACTS_DIR/test-results.log" 2>/dev/null || true
+ra_log "FINAL: decode_rc=${decode_rc:-0}"
 
 # --- Final status: fail ONLY if screenshot decoding failed ---
 if [ "${decode_rc:-0}" -ne 0 ]; then
