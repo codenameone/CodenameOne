@@ -3,6 +3,7 @@ package com.codename1.charts;
 import com.codename1.charts.compat.Canvas;
 import com.codename1.charts.compat.Paint;
 import com.codename1.charts.models.Point;
+import com.codename1.charts.models.SeriesSelection;
 import com.codename1.charts.models.XYMultipleSeriesDataset;
 import com.codename1.charts.models.XYSeries;
 import com.codename1.charts.renderers.SimpleSeriesRenderer;

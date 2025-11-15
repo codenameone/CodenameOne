@@ -66,11 +66,14 @@ class TreePackageTest extends UITestBase {
 
     private void fireAction(Component component) {
         if (component instanceof Button) {
-            ((Button) component).fireActionEvent();
+            Button button = (Button) component;
+            button.pressed();
+            button.released(0, 0);
             return;
         }
-        if (component instanceof SpanButton) {
-            ((SpanButton) component).fireActionEvent();
+        Component lead = component.getLeadComponent();
+        if (lead != null && lead != component) {
+            fireAction(lead);
             return;
         }
         if (component instanceof com.codename1.ui.Container) {
