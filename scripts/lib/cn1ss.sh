@@ -211,7 +211,8 @@ cn1ss_decode_test_asset() {
     count="${count//[^0-9]/}"; : "${count:=0}"
     [ "$count" -gt 0 ] || continue
     cn1ss_log "Reassembling test '$test' from ${source_type} source: $source_path (chunks=$count)"
-    if cn1ss_decode_binary "$source_path" "$test" "$channel" > "$dest" 2>/dev/null; then
+    # <-- drop 2>/dev/null here
+    if cn1ss_decode_binary "$source_path" "$test" "$channel" > "$dest"; then
       if [ -z "$verifier" ] || "$verifier" "$dest"; then
         echo "${source_type}:$(basename "$source_path")"
         return 0
