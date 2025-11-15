@@ -100,11 +100,19 @@ public class RenderScreenshotReport {
                             base64Quality, base64Note, test + ".png"));
                 }
                 case "error" -> {
-                    message = "Comparison error: " + stringValue(result.get("message"), "unknown error");
+                    String raw = stringValue(result.get("message"), "unknown error");
+                    message = "Comparison failed: " + raw;
                     copyFlag = "1";
-                    commentEntries.add(commentEntry(test, "comparison error", message, previewName, previewPath, previewMime,
-                            previewNote, previewQuality, null, base64Omitted, base64Length, base64Mime, base64Codec,
-                            base64Quality, base64Note, test + ".png"));
+                    commentEntries.add(commentEntry(
+                            test,
+                            "comparison error",
+                            message,
+                            previewName, previewPath, previewMime,
+                            previewNote, previewQuality,
+                            null, base64Omitted, base64Length, base64Mime, base64Codec,
+                            base64Quality, base64Note,
+                            test + ".png"
+                    ));
                 }
                 case "missing_actual" -> {
                     message = "Actual screenshot missing (test did not produce output).";

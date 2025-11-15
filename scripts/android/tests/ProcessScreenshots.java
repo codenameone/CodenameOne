@@ -87,6 +87,14 @@ public class ProcessScreenshots {
                 } catch (Exception ex) {
                     record.put("status", "error");
                     record.put("message", ex.getMessage());
+                    if (emitBase64 && Files.exists(actualPath)) {
+                        try {
+                            CommentPayload payload = loadPreviewOrBuild(testName, actualPath, previewDir);
+                            recordPayload(record, payload, actualPath.getFileName().toString(), previewDir);
+                        } catch (Exception ignored) {
+                            // Don't let preview generation failure hide the comparison error
+                        }
+                    }
                 }
             }
             results.add(record);

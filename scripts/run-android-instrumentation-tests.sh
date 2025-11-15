@@ -383,21 +383,48 @@ PY
 add_classfile_source() {
   local path="$1"
   [ -n "$path" ] || return
-  if is_instrumented_class_path "$path"; then ra_log "Skipping instrumented class path: $path"; return; fi
-  [ -z "${CLASSFILE_SEEN[$path]:-}" ] || return
+  if is_instrumented_class_path "$path"; then
+    ra_log "Skipping instrumented class path: $path"
+    return
+  fi
+
+  # We'll track the actual key we add (may differ from $path for directories)
+  local key="$path"
+
   if [ -d "$path" ]; then
-    if find "$path" -type f -name '*.class' -path "$PORT_PACKAGE_GLOB" -print -quit >/dev/null 2>&1; then
-      CLASSFILE_ARGS+=(--classfiles "$path"); CLASSFILE_SOURCES+=("$path (directory)"); CLASSFILE_SEEN[$path]=1
+    # Prefer the specific package subtree, if present
+    local candidate="$path"
+    if [ -d "$path/$PORT_PACKAGE_PATH" ]; then
+      candidate="$path/$PORT_PACKAGE_PATH"
     fi
+    key="$candidate"
+    [ -z "${CLASSFILE_SEEN[$key]:-}" ] || return
+
+    if find "$candidate" -type f -name '*.class' -path "$PORT_PACKAGE_GLOB" -print -quit >/dev/null 2>&1; then
+      CLASSFILE_ARGS+=(--classfiles "$candidate")
+      CLASSFILE_SOURCES+=("$candidate (directory)")
+      CLASSFILE_SEEN[$key]=1
+    fi
+
   elif [ -f "$path" ]; then
+    # JAR: extract only com/codename1/impl/android/* into a temp dir, as you already do
+    [ -z "${CLASSFILE_SEEN[$path]:-}" ] || return
     if unzip -l "$path" "${PORT_PACKAGE_PATH}/*" >/dev/null 2>&1; then
       local jar_dir="$CLASSFILE_TMP_DIR/jar-$(( ${#CLASSFILE_SOURCES[@]} + 1 ))"
-      rm -rf "$jar_dir" 2>/dev/null || true; ensure_dir "$jar_dir"
+      rm -rf "$jar_dir" 2>/dev/null || true
+      ensure_dir "$jar_dir"
       if unzip -qo "$path" "${PORT_PACKAGE_PATH}/*" -d "$jar_dir" >/dev/null 2>&1; then
         if find "$jar_dir" -type f -name '*.class' -path "$PORT_PACKAGE_GLOB" -print -quit >/dev/null 2>&1; then
-          CLASSFILE_ARGS+=(--classfiles "$jar_dir"); CLASSFILE_SOURCES+=("$path (jar extracted to $jar_dir)"); CLASSFILE_SEEN[$path]=1
-        else rm -rf "$jar_dir" 2>/dev/null || true; fi
-      else rm -rf "$jar_dir" 2>/dev/null || true; ra_log "WARN: Failed to extract Codename One classes from jar $path"; fi
+          CLASSFILE_ARGS+=(--classfiles "$jar_dir")
+          CLASSFILE_SOURCES+=("$path (jar extracted to $jar_dir)")
+          CLASSFILE_SEEN[$path]=1
+        else
+          rm -rf "$jar_dir" 2>/dev/null || true
+        fi
+      else
+        rm -rf "$jar_dir" 2>/dev/null || true
+        ra_log "WARN: Failed to extract Codename One classes from jar $path"
+      fi
     fi
   fi
 }
