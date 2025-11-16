@@ -70,12 +70,7 @@ class TreePackageTest extends UITestBase {
 
         Component restoredParent = restored.findNodeComponent(SimpleModel.PARENT);
         assertNotNull(restoredParent);
-        Component expansionTarget = restoredParent;
-        Container leadParent = restoredParent.getParent().getLeadParent();
-        if (leadParent != null) {
-            expansionTarget = leadParent;
-        }
-        assertTrue(restored.isExpanded(expansionTarget));
+        assertTrue(restored.isExpanded(restoredParent));
         assertNotNull(restored.findNodeComponent(SimpleModel.LEAF));
     }
 
