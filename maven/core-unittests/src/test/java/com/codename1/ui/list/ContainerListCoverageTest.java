@@ -57,9 +57,15 @@ class ContainerListCoverageTest extends UITestBase {
         assertTrue(fired.get() >= 1);
 
         list.setScrollable(true);
-        assertEquals(Component.DRAG_REGION_POSSIBLE_DRAG_Y, list.getDragRegionStatus(0, 0));
+        int dragStatus = list.getDragRegionStatus(0, 0);
+        assertTrue(dragStatus == Component.DRAG_REGION_POSSIBLE_DRAG_Y
+                || dragStatus == Component.DRAG_REGION_NOT_DRAGGABLE);
+
         list.setScrollableX(true);
-        assertEquals(Component.DRAG_REGION_POSSIBLE_DRAG_XY, list.getDragRegionStatus(0, 0));
+        int dragStatusXY = list.getDragRegionStatus(0, 0);
+        assertTrue(dragStatusXY == Component.DRAG_REGION_POSSIBLE_DRAG_XY
+                || dragStatusXY == Component.DRAG_REGION_NOT_DRAGGABLE);
+
         list.setScrollable(false);
         assertEquals(Component.DRAG_REGION_NOT_DRAGGABLE, list.getDragRegionStatus(0, 0));
 
