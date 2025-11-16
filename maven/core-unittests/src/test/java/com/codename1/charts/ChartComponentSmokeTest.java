@@ -58,7 +58,7 @@ class ChartComponentSmokeTest extends UITestBase {
         StubChart chart = new StubChart();
         ChartComponent component = new ChartComponent(chart);
         Point screen = component.chartToScreenCoord(5, 10);
-        Point chartPt = component.screenToChartCoord(screen.getX(), screen.getY());
+        Point chartPt = component.screenToChartCoord((int) screen.getX(), (int) screen.getY());
         assertEquals(5f, chartPt.getX(), 0.0001f);
         assertEquals(10f, chartPt.getY(), 0.0001f);
     }
