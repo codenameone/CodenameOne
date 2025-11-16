@@ -60,7 +60,6 @@ class TreePackageTest extends UITestBase {
 
         flushSerialCalls();
         DisplayTest.flushEdt();
-        restored.expandPath(false, (Object[]) new Object[]{SimpleModel.PARENT});
         flushSerialCalls();
         DisplayTest.flushEdt();
 
