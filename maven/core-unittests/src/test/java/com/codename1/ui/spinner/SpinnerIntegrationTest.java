@@ -57,6 +57,6 @@ class SpinnerIntegrationTest extends UITestBase {
         spinner.setValue(3);
         spinner.revalidate();
         assertEquals(3, spinner.getValue());
-        assertNotNull(renderer.getListCellRendererComponent(spinner, spinner.getModel(), spinner.getValue(), 0, true));
+        assertNotNull(renderer.getCellRendererComponent(spinner, spinner.getModel(), spinner.getValue(), 0, true));
     }
 }
