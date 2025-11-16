@@ -26,14 +26,20 @@ class DatabaseTest extends UITestBase {
         testDb.setQueryResult(new String[]{"id", "name"}, rows);
 
         Cursor cursor = db.executeQuery("select * from users");
+        assertEquals(2, cursor.getColumnCount());
+        assertEquals("id", cursor.getColumnName(0));
+        assertEquals(0, cursor.getColumnIndex("id"));
         assertTrue(cursor.first());
         Row row = cursor.getRow();
         assertEquals(1, row.getInteger(0));
         assertEquals("Alice", row.getString(1));
+        assertEquals(1.0d, row.getDouble(0));
         assertTrue(cursor.next());
         row = cursor.getRow();
         assertEquals(2, row.getInteger(0));
         assertEquals("Bob", row.getString(1));
+        assertEquals(2L, row.getLong(0));
+        assertFalse(cursor.next());
         cursor.close();
 
         db.beginTransaction();

@@ -1,5 +1,6 @@
 package com.codename1.testing;
 
+import com.codename1.capture.VideoCaptureConstraints;
 import com.codename1.contacts.Contact;
 import com.codename1.db.Cursor;
 import com.codename1.db.Database;
@@ -38,12 +39,14 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.Enumeration;
+import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
@@ -93,6 +96,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private Shape lastDrawShape;
     private Shape lastFillShape;
     private Stroke lastDrawStroke;
+    private final Deque<FillOperation> fillOperations = new ArrayDeque<FillOperation>();
+    private final Deque<GradientOperation> gradientOperations = new ArrayDeque<GradientOperation>();
     private String[] accessPointIds = new String[0];
     private final Map<String, Integer> accessPointTypes = new HashMap<>();
     private final Map<String, String> accessPointNames = new HashMap<>();
@@ -103,7 +108,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private MediaRecorderBuilderHandler mediaRecorderBuilderHandler;
     private MediaRecorderHandler mediaRecorderHandler;
     private boolean animation;
-    private String[] availableRecordingMimeTypes;
+    private String[] availableRecordingMimeTypes = new String[]{"audio/wav"};
     private Media mediaRecorder;
     private boolean trueTypeSupported = true;
     private static TestCodenameOneImplementation instance;
@@ -159,6 +164,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private int galleryTypeSupportedCallCount;
     private int lastGalleryTypeQuery;
     private final Map<Integer, Boolean> galleryTypeSupport = new HashMap<Integer, Boolean>();
+    private String nextCapturePhotoPath = "file://test-photo.jpg";
+    private String nextCaptureVideoPath = "file://test-video.mp4";
+    private String nextCaptureAudioPath = "file://test-audio.wav";
+    private MediaRecorderBuilder lastMediaRecorderBuilder;
+    private VideoCaptureConstraints lastVideoConstraints;
 
 
     public TestCodenameOneImplementation() {
@@ -825,6 +835,23 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return lastDrawStroke;
     }
 
+    public void clearGraphicsOperations() {
+        fillOperations.clear();
+        gradientOperations.clear();
+    }
+
+    public List<FillOperation> getFillOperationsSnapshot() {
+        return new ArrayList<FillOperation>(fillOperations);
+    }
+
+    public List<GradientOperation> getGradientOperationsSnapshot() {
+        return new ArrayList<GradientOperation>(gradientOperations);
+    }
+
+    public GradientOperation getLastGradientOperation() {
+        return gradientOperations.isEmpty() ? null : gradientOperations.peekLast();
+    }
+
     public void resetShapeTracking() {
         drawShapeInvoked = false;
         fillShapeInvoked = false;
@@ -1346,10 +1373,103 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void fillRect(Object graphics, int x, int y, int width, int height) {
+        if (!(graphics instanceof TestGraphics)) {
+            return;
+        }
+        TestGraphics g = (TestGraphics) graphics;
+        fillArea(g, x, y, width, height);
     }
 
     @Override
     public void drawRect(Object graphics, int x, int y, int width, int height) {
+        if (!(graphics instanceof TestGraphics)) {
+            return;
+        }
+        TestGraphics g = (TestGraphics) graphics;
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        int drawWidth = Math.max(1, width);
+        int drawHeight = Math.max(1, height);
+        fillArea(g, x, y, drawWidth, 1);
+        if (drawHeight > 1) {
+            fillArea(g, x, y + drawHeight - 1, drawWidth, 1);
+        }
+        if (drawHeight > 2) {
+            fillArea(g, x, y + 1, 1, drawHeight - 2);
+            if (drawWidth > 1) {
+                fillArea(g, x + drawWidth - 1, y + 1, 1, drawHeight - 2);
+            }
+        }
+    }
+
+    private void fillArea(TestGraphics g, int x, int y, int width, int height) {
+        fillArea(g, x, y, width, height, currentColor(g));
+    }
+
+    private void fillArea(TestGraphics g, int x, int y, int width, int height, int argb) {
+        if (g.image == null || width <= 0 || height <= 0) {
+            return;
+        }
+        int translatedX = x + g.translateX;
+        int translatedY = y + g.translateY;
+        int clipLeft = g.clipX;
+        int clipTop = g.clipY;
+        int clipRight = clipLeft + Math.max(0, g.clipWidth);
+        int clipBottom = clipTop + Math.max(0, g.clipHeight);
+
+        int startX = Math.max(translatedX, clipLeft);
+        int startY = Math.max(translatedY, clipTop);
+        int endX = Math.min(translatedX + width, clipRight);
+        int endY = Math.min(translatedY + height, clipBottom);
+
+        if (startX >= endX || startY >= endY) {
+            return;
+        }
+
+        int recordedWidth = endX - startX;
+        int recordedHeight = endY - startY;
+        recordFillOperation(startX, startY, recordedWidth, recordedHeight, argb);
+
+        for (int row = startY; row < endY; row++) {
+            if (row < 0 || row >= g.image.height) {
+                continue;
+            }
+            int offset = row * g.image.width;
+            for (int col = startX; col < endX; col++) {
+                if (col < 0 || col >= g.image.width) {
+                    continue;
+                }
+                g.image.argb[offset + col] = argb;
+            }
+        }
+    }
+
+    private int currentColor(TestGraphics g) {
+        int alpha = g.alpha;
+        if (alpha < 0) {
+            alpha = 0;
+        } else if (alpha > 255) {
+            alpha = 255;
+        }
+        return (alpha << 24) | (g.color & 0x00ffffff);
+    }
+
+    private void recordFillOperation(int x, int y, int width, int height, int color) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        if (fillOperations.size() >= 256) {
+            fillOperations.removeFirst();
+        }
+        fillOperations.addLast(new FillOperation(x, y, width, height, color));
+    }
+
+    private void recordGradientOperation(GradientOperation operation) {
+        if (gradientOperations.size() >= 64) {
+            gradientOperations.removeFirst();
+        }
+        gradientOperations.addLast(operation);
     }
 
     @Override
@@ -1378,6 +1498,30 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public void fillLinearGradient(Object graphics, int startColor, int endColor, int x, int y, int width, int height, boolean horizontal) {
+        if (graphics instanceof TestGraphics) {
+            TestGraphics g = (TestGraphics) graphics;
+            int translatedX = x + g.translateX;
+            int translatedY = y + g.translateY;
+            recordGradientOperation(new GradientOperation(translatedX, translatedY, Math.max(0, width), Math.max(0, height), startColor, endColor, horizontal));
+            if (width <= 0 || height <= 0) {
+                return;
+            }
+            if (horizontal) {
+                int split = Math.max(1, width / 2);
+                fillArea(g, x, y, split, height, startColor);
+                fillArea(g, x + split, y, Math.max(0, width - split), height, endColor);
+            } else {
+                int split = Math.max(1, height / 2);
+                fillArea(g, x, y, width, split, startColor);
+                fillArea(g, x, y + split, width, Math.max(0, height - split), endColor);
+            }
+            return;
+        }
+        super.fillLinearGradient(graphics, startColor, endColor, x, y, width, height, horizontal);
+    }
+
+    @Override
     public void drawImage(Object graphics, Object img, int x, int y) {
     }
 
@@ -1396,6 +1540,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         if (img.graphics == null) {
             img.graphics = new TestGraphics(img.width, img.height);
         }
+        img.graphics.image = img;
+        img.graphics.clipX = 0;
+        img.graphics.clipY = 0;
+        img.graphics.clipWidth = img.width;
+        img.graphics.clipHeight = img.height;
         return img.graphics;
     }
 
@@ -2591,6 +2740,90 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
     }
 
+    public static final class FillOperation {
+        private final int x;
+        private final int y;
+        private final int width;
+        private final int height;
+        private final int color;
+
+        FillOperation(int x, int y, int width, int height, int color) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.color = color;
+        }
+
+        public int getX() {
+            return x;
+        }
+
+        public int getY() {
+            return y;
+        }
+
+        public int getWidth() {
+            return width;
+        }
+
+        public int getHeight() {
+            return height;
+        }
+
+        public int getColor() {
+            return color;
+        }
+    }
+
+    public static final class GradientOperation {
+        private final int x;
+        private final int y;
+        private final int width;
+        private final int height;
+        private final int startColor;
+        private final int endColor;
+        private final boolean horizontal;
+
+        GradientOperation(int x, int y, int width, int height, int startColor, int endColor, boolean horizontal) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.startColor = startColor;
+            this.endColor = endColor;
+            this.horizontal = horizontal;
+        }
+
+        public int getX() {
+            return x;
+        }
+
+        public int getY() {
+            return y;
+        }
+
+        public int getWidth() {
+            return width;
+        }
+
+        public int getHeight() {
+            return height;
+        }
+
+        public int getStartColor() {
+            return startColor;
+        }
+
+        public int getEndColor() {
+            return endColor;
+        }
+
+        public boolean isHorizontal() {
+            return horizontal;
+        }
+    }
+
     public static final class TestGraphics {
         int color = 0x000000;
         int alpha = 0xff;
@@ -2601,6 +2834,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         int translateX;
         int translateY;
         TestFont font;
+        TestImage image;
 
         TestGraphics(int width, int height) {
             this.clipWidth = width;
@@ -3052,6 +3286,56 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         galleryTypeSupportedCallCount = 0;
         lastGalleryTypeQuery = 0;
         galleryTypeSupport.clear();
+    }
+
+    @Override
+    public void capturePhoto(ActionListener response) {
+        response.actionPerformed(new ActionEvent(nextCapturePhotoPath));
+    }
+
+    @Override
+    public void captureAudio(ActionListener response) {
+        captureAudio(new MediaRecorderBuilder(), response);
+    }
+
+    @Override
+    public void captureAudio(MediaRecorderBuilder recordingOptions, ActionListener response) {
+        if (recordingOptions == null) {
+            recordingOptions = new MediaRecorderBuilder();
+        }
+        lastMediaRecorderBuilder = recordingOptions;
+        response.actionPerformed(new ActionEvent(nextCaptureAudioPath));
+    }
+
+    @Override
+    public void captureVideo(ActionListener response) {
+        response.actionPerformed(new ActionEvent(nextCaptureVideoPath));
+    }
+
+    @Override
+    public void captureVideo(VideoCaptureConstraints constraints, ActionListener response) {
+        lastVideoConstraints = constraints;
+        captureVideo(response);
+    }
+
+    public void setNextCapturePhotoPath(String path) {
+        nextCapturePhotoPath = path;
+    }
+
+    public void setNextCaptureVideoPath(String path) {
+        nextCaptureVideoPath = path;
+    }
+
+    public void setNextCaptureAudioPath(String path) {
+        nextCaptureAudioPath = path;
+    }
+
+    public MediaRecorderBuilder getLastMediaRecorderBuilder() {
+        return lastMediaRecorderBuilder;
+    }
+
+    public VideoCaptureConstraints getLastVideoConstraints() {
+        return lastVideoConstraints;
     }
 
     public static final class TestFile {
