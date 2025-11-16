@@ -251,6 +251,10 @@ ba_log "Installed DeviceRunner UI tests in $TEST_JAVA_DIR"
 # --- Install Android instrumentation harness for coverage ---
 ANDROID_TEST_SOURCE_DIR="$SCRIPT_DIR/device-runner-app/androidTest"
 ANDROID_TEST_JAVA_DIR="$APP_DIR/app/src/androidTest/java/${PACKAGE_PATH}"
+if [ -d "$APP_DIR/app/src/androidTest" ]; then
+  ba_log "Removing template Android instrumentation tests from $APP_DIR/app/src/androidTest"
+  rm -rf "$APP_DIR/app/src/androidTest"
+fi
 mkdir -p "$ANDROID_TEST_JAVA_DIR"
 if [ ! -d "$ANDROID_TEST_SOURCE_DIR" ]; then
   ba_log "Android instrumentation test sources not found: $ANDROID_TEST_SOURCE_DIR" >&2
