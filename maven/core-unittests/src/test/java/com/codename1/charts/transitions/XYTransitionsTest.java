@@ -9,7 +9,6 @@ import com.codename1.charts.renderers.XYSeriesRenderer;
 import com.codename1.charts.views.LineChart;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
-import com.codename1.testing.TestUtils;
 import com.codename1.ui.Display;
 import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
@@ -34,17 +33,13 @@ class XYTransitionsTest extends UITestBase {
         flushSerialCalls();
         DisplayTest.flushEdt();
 
-        XYSeriesTransition transition = new XYSeriesTransition(chartComponent, series);
+        ImmediateXYSeriesTransition transition = new ImmediateXYSeriesTransition(chartComponent, series);
         XYSeries buffer = new XYSeries(series.getTitle(), series.getScaleNumber());
         buffer.add(0, 5);
         buffer.add(1, 7);
         transition.setBuffer(buffer);
 
-        transition.setDuration(5);
-        transition.animateChart();
-        while (transition.animate()) {
-            TestUtils.waitFor(5);
-        }
+        transition.runToEnd();
 
         assertEquals(2, series.getItemCount());
         assertEquals(5.0, series.getY(0));
@@ -68,17 +63,13 @@ class XYTransitionsTest extends UITestBase {
         flushSerialCalls();
         DisplayTest.flushEdt();
 
-        XYValueSeriesTransition transition = new XYValueSeriesTransition(chartComponent, valueSeries);
+        ImmediateXYValueSeriesTransition transition = new ImmediateXYValueSeriesTransition(chartComponent, valueSeries);
         XYValueSeries buffer = new XYValueSeries(valueSeries.getTitle());
         buffer.add(0, 3, 30);
         buffer.add(1, 4, 40);
         transition.setBuffer(buffer);
 
-        transition.setDuration(5);
-        transition.animateChart();
-        while (transition.animate()) {
-            TestUtils.waitFor(5);
-        }
+        transition.runToEnd();
 
         assertEquals(2, valueSeries.getItemCount());
         assertEquals(3.0, valueSeries.getY(0));
@@ -108,7 +99,7 @@ class XYTransitionsTest extends UITestBase {
         flushSerialCalls();
         DisplayTest.flushEdt();
 
-        XYMultiSeriesTransition transition = new XYMultiSeriesTransition(chartComponent, dataset);
+        ImmediateXYMultiSeriesTransition transition = new ImmediateXYMultiSeriesTransition(chartComponent, dataset);
         XYMultipleSeriesDataset buffer = transition.getBuffer();
         assertEquals(2, buffer.getSeriesCount());
         buffer.getSeriesAt(0).add(0, 10);
@@ -116,11 +107,7 @@ class XYTransitionsTest extends UITestBase {
         buffer.getSeriesAt(1).add(0, 8);
         buffer.getSeriesAt(1).add(1, 9);
 
-        transition.setDuration(5);
-        transition.animateChart();
-        while (transition.animate()) {
-            TestUtils.waitFor(5);
-        }
+        transition.runToEnd();
 
         assertEquals(10.0, first.getY(0));
         assertEquals(12.0, first.getY(1));
@@ -140,6 +127,42 @@ class XYTransitionsTest extends UITestBase {
         component.setWidth(100);
         component.setHeight(100);
         return component;
+    }
+
+    private static class ImmediateXYSeriesTransition extends XYSeriesTransition {
+        ImmediateXYSeriesTransition(ChartComponent chart, XYSeries series) {
+            super(chart, series);
+        }
+
+        void runToEnd() {
+            initTransition();
+            update(100);
+            cleanup();
+        }
+    }
+
+    private static class ImmediateXYValueSeriesTransition extends XYValueSeriesTransition {
+        ImmediateXYValueSeriesTransition(ChartComponent chart, XYValueSeries series) {
+            super(chart, series);
+        }
+
+        void runToEnd() {
+            initTransition();
+            update(100);
+            cleanup();
+        }
+    }
+
+    private static class ImmediateXYMultiSeriesTransition extends XYMultiSeriesTransition {
+        ImmediateXYMultiSeriesTransition(ChartComponent chart, XYMultipleSeriesDataset dataset) {
+            super(chart, dataset);
+        }
+
+        void runToEnd() {
+            initTransition();
+            update(100);
+            cleanup();
+        }
     }
 
 }
