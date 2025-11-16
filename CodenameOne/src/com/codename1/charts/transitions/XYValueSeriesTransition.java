@@ -128,11 +128,11 @@ public class XYValueSeriesTransition extends SeriesTransition {
             double val = endVals.getValue(i);
             int startIndex = startVals.getIndexForKey(x);
 
-            double startY = startIndex < 0 ? 0.0 : startVals.getY(startIndex);
+            double startY = startIndex == -1 ? 0.0 : startVals.getY(startIndex);
             double endY = y;
             double tweenY = startY + (endY - startY) * dProgress / 100.0;
 
-            double startVal = startIndex < 0 ? 0.0 : startVals.getValue(startIndex);
+            double startVal = startIndex == -1 ? 0.0 : startVals.getValue(startIndex);
             double endVal = val;
             double tweenVal = startVal + (endVal - startVal) * dProgress / 100.0;
 
