@@ -7,6 +7,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
+import com.codename1.ui.Display;
 import com.codename1.ui.DisplayTest;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
@@ -21,9 +22,14 @@ class TreePackageTest extends UITestBase {
     void treeStateRestoresExpansionAndLeafEvents() {
         SimpleModel model = new SimpleModel();
         Tree tree = new Tree(model);
-        Form form = new Form();
+        Form form = Display.getInstance().getCurrent();
+        form.removeAll();
         form.add(tree);
-        form.show();
+        form.revalidate();
+        flushSerialCalls();
+        DisplayTest.flushEdt();
+        flushSerialCalls();
+        DisplayTest.flushEdt();
 
         RecordingListener recordingListener = new RecordingListener();
         tree.addLeafListener(recordingListener);
@@ -37,18 +43,16 @@ class TreePackageTest extends UITestBase {
         DisplayTest.flushEdt();
         assertEquals(SimpleModel.LEAF, recordingListener.lastSource);
 
-        tree.expandPath(SimpleModel.PARENT);
+        tree.expandPath(false, SimpleModel.PARENT);
         flushSerialCalls();
         DisplayTest.flushEdt();
         Tree.TreeState state = tree.getTreeState();
         tree.collapsePath(SimpleModel.PARENT);
 
         Tree restored = new Tree(model);
-
-        Form otherForm = new Form();
-        otherForm.add(restored);
-        otherForm.show();
-
+        form.removeAll();
+        form.add(restored);
+        form.revalidate();
         flushSerialCalls();
         DisplayTest.flushEdt();
 
@@ -62,15 +66,19 @@ class TreePackageTest extends UITestBase {
         Component restoredParent = restored.findNodeComponent(SimpleModel.PARENT);
         assertNotNull(restoredParent);
         assertTrue(restored.isExpanded(restoredParent));
+        assertNotNull(restored.findNodeComponent(SimpleModel.LEAF));
     }
 
     @FormTest
     void multilineModeUsesSpanButtons() {
         SimpleModel model = new SimpleModel();
         Tree tree = new Tree(model);
-        Form form = new Form();
+        Form form = Display.getInstance().getCurrent();
+        form.removeAll();
         form.add(tree);
-        form.show();
+        form.revalidate();
+        flushSerialCalls();
+        DisplayTest.flushEdt();
 
         tree.setMultilineMode(true);
         tree.setModel(model);
