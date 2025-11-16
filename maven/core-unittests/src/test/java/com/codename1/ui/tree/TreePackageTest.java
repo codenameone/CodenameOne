@@ -43,7 +43,7 @@ class TreePackageTest extends UITestBase {
         DisplayTest.flushEdt();
         assertEquals(SimpleModel.LEAF, recordingListener.lastSource);
 
-        tree.expandPath(false, (Object[]) new Object[]{SimpleModel.PARENT});
+        tree.expandPath(false, SimpleModel.PARENT);
         flushSerialCalls();
         DisplayTest.flushEdt();
         Tree.TreeState state = tree.getTreeState();
