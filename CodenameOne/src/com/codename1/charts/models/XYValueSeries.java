@@ -119,15 +119,6 @@ public class XYValueSeries extends XYSeries {
     }
 
     /**
-     * Returns the number of stored values in this series.
-     *
-     * @return the size of the value list
-     */
-    public synchronized int getValueCount() {
-        return mValue.size();
-    }
-
-    /**
      * Returns the minimum value.
      *
      * @return the minimum value

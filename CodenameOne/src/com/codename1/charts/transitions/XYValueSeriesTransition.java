@@ -92,15 +92,13 @@ public class XYValueSeriesTransition extends SeriesTransition {
 
     private void copyValues(XYValueSeries source, XYValueSeries target) {
         int len = source.getItemCount();
-        int valueLen = source.getValueCount();
 
         for (int i = 0; i < len; i++) {
             int index = target.getIndexForKey(source.getX(i));
             if (index > -1) {
                 target.remove(index);
             }
-            double value = i < valueLen ? source.getValue(i) : 0.0;
-            target.add(source.getX(i), source.getY(i), value);
+            target.add(source.getX(i), source.getY(i), source.getValue(i));
         }
     }
 

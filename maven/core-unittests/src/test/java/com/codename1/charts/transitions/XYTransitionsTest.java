@@ -9,9 +9,6 @@ import com.codename1.charts.renderers.XYSeriesRenderer;
 import com.codename1.charts.views.LineChart;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
-import com.codename1.testing.TestUtils;
-import com.codename1.ui.Display;
-import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -27,12 +24,9 @@ class XYTransitionsTest extends UITestBase {
         dataset.addSeries(series);
 
         ChartComponent chartComponent = createChartComponent(dataset);
-        Form form = Display.getInstance().getCurrent();
-        form.removeAll();
+        Form form = new Form();
         form.add(chartComponent);
-        form.revalidate();
-        flushSerialCalls();
-        DisplayTest.flushEdt();
+        form.show();
 
         XYSeriesTransition transition = new XYSeriesTransition(chartComponent, series);
         XYSeries buffer = new XYSeries(series.getTitle(), series.getScaleNumber());
@@ -43,7 +37,7 @@ class XYTransitionsTest extends UITestBase {
         transition.setDuration(5);
         transition.animateChart();
         while (transition.animate()) {
-            TestUtils.waitFor(5);
+            Thread.sleep(5);
         }
 
         assertEquals(2, series.getItemCount());
@@ -61,12 +55,9 @@ class XYTransitionsTest extends UITestBase {
         dataset.addSeries(valueSeries);
 
         ChartComponent chartComponent = createChartComponent(dataset);
-        Form form = Display.getInstance().getCurrent();
-        form.removeAll();
+        Form form = new Form();
         form.add(chartComponent);
-        form.revalidate();
-        flushSerialCalls();
-        DisplayTest.flushEdt();
+        form.show();
 
         XYValueSeriesTransition transition = new XYValueSeriesTransition(chartComponent, valueSeries);
         XYValueSeries buffer = new XYValueSeries(valueSeries.getTitle());
@@ -77,7 +68,7 @@ class XYTransitionsTest extends UITestBase {
         transition.setDuration(5);
         transition.animateChart();
         while (transition.animate()) {
-            TestUtils.waitFor(5);
+            Thread.sleep(5);
         }
 
         assertEquals(2, valueSeries.getItemCount());
@@ -101,12 +92,9 @@ class XYTransitionsTest extends UITestBase {
         dataset.addSeries(second);
 
         ChartComponent chartComponent = createChartComponent(dataset);
-        Form form = Display.getInstance().getCurrent();
-        form.removeAll();
+        Form form = new Form();
         form.add(chartComponent);
-        form.revalidate();
-        flushSerialCalls();
-        DisplayTest.flushEdt();
+        form.show();
 
         XYMultiSeriesTransition transition = new XYMultiSeriesTransition(chartComponent, dataset);
         XYMultipleSeriesDataset buffer = transition.getBuffer();
@@ -119,7 +107,7 @@ class XYTransitionsTest extends UITestBase {
         transition.setDuration(5);
         transition.animateChart();
         while (transition.animate()) {
-            TestUtils.waitFor(5);
+            Thread.sleep(5);
         }
 
         assertEquals(10.0, first.getY(0));
