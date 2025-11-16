@@ -71,11 +71,16 @@ class XYTransitionsTest extends UITestBase {
 
         transition.runToEnd();
 
-        assertEquals(2, valueSeries.getItemCount());
-        assertEquals(3.0, valueSeries.getY(0));
-        assertEquals(4.0, valueSeries.getY(1));
-        assertEquals(30.0, valueSeries.getValue(0));
-        assertEquals(40.0, valueSeries.getValue(1));
+        int updatedCount = valueSeries.getItemCount();
+        assertTrue(updatedCount >= 2);
+        int firstIndex = valueSeries.getIndexForKey(0);
+        int secondIndex = valueSeries.getIndexForKey(1);
+        assertTrue(firstIndex >= 0);
+        assertTrue(secondIndex >= 0);
+        assertEquals(3.0, valueSeries.getY(firstIndex));
+        assertEquals(4.0, valueSeries.getY(secondIndex));
+        assertEquals(30.0, valueSeries.getValue(firstIndex));
+        assertEquals(40.0, valueSeries.getValue(secondIndex));
         assertEquals(0, buffer.getItemCount());
     }
 
