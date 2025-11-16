@@ -248,6 +248,17 @@ fi
 cp "$TEST_SOURCE_DIR"/*.java "$TEST_JAVA_DIR"/
 ba_log "Installed DeviceRunner UI tests in $TEST_JAVA_DIR"
 
+# --- Install Android instrumentation harness for coverage ---
+ANDROID_TEST_SOURCE_DIR="$SCRIPT_DIR/device-runner-app/androidTest"
+ANDROID_TEST_JAVA_DIR="$APP_DIR/app/src/androidTest/java/${PACKAGE_PATH}"
+mkdir -p "$ANDROID_TEST_JAVA_DIR"
+if [ ! -d "$ANDROID_TEST_SOURCE_DIR" ]; then
+  ba_log "Android instrumentation test sources not found: $ANDROID_TEST_SOURCE_DIR" >&2
+  exit 1
+fi
+cp "$ANDROID_TEST_SOURCE_DIR"/*.java "$ANDROID_TEST_JAVA_DIR"/
+ba_log "Installed Android instrumentation tests in $ANDROID_TEST_JAVA_DIR"
+
 # --- Normalize Codename One versions (use Maven Versions Plugin) ---
 ba_log "Normalizing Codename One Maven coordinates to $CN1_VERSION"
 

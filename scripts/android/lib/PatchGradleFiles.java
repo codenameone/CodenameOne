@@ -106,6 +106,10 @@ public class PatchGradleFiles {
         content = r.content();
         changed |= r.changed();
 
+        r = ensureJacocoConfiguration(content);
+        content = r.content();
+        changed |= r.changed();
+
         if (changed) {
             Files.writeString(path, ensureTrailingNewline(content), StandardCharsets.UTF_8);
         }
@@ -245,6 +249,68 @@ public class PatchGradleFiles {
             content += "\n";
         }
         return new Result(content + block, true);
+    }
+
+    private static Result ensureJacocoConfiguration(String content) {
+        if (content.contains("jacocoAndroidReport")) {
+            return new Result(content, false);
+        }
+
+        String jacocoBlock = """
+apply plugin: 'jacoco'
+
+android {
+    buildTypes {
+        debug {
+            testCoverageEnabled true
+        }
+    }
+}
+
+jacoco {
+    toolVersion = "0.8.11"
+}
+
+tasks.register("jacocoAndroidReport", JacocoReport) {
+    group = "verification"
+    description = "Generates Jacoco coverage report for the debug variant"
+    dependsOn("connectedDebugAndroidTest")
+
+    reports {
+        xml.required = true
+        html.required = true
+        html.outputLocation = layout.buildDirectory.dir("reports/jacoco/jacocoAndroidReport/html")
+    }
+
+    def excludes = [
+            "**/R.class",
+            "**/R$*.class",
+            "**/BuildConfig.*",
+            "**/Manifest*.*",
+            "**/*Test*.*",
+            "**/androidx/**/*",
+            "**/com/google/**/*"
+    ]
+
+    def javaClasses = fileTree(dir: "$buildDir/intermediates/javac/debug/classes", exclude: excludes)
+    def kotlinClasses = fileTree(dir: "$buildDir/tmp/kotlin-classes/debug", exclude: excludes)
+
+    classDirectories.setFrom(files(javaClasses, kotlinClasses).asFileTree.matching {
+        include "com/codename1/impl/android/**"
+    })
+
+    sourceDirectories.setFrom(files("src/main/java"))
+
+    executionData.setFrom(fileTree(dir: "$buildDir", includes: [
+            "outputs/code_coverage/debugAndroidTest/connected/*coverage.ec",
+            "outputs/code_coverage/connected/*coverage.ec",
+            "jacoco/testDebugUnitTest.exec",
+            "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec"
+    ]))
+}
+""".stripTrailing();
+
+        return new Result(ensureTrailingNewline(content) + "\n" + jacocoBlock + "\n", true);
     }
 
     private static String ensureTrailingNewline(String content) {
