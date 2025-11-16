@@ -35,7 +35,7 @@ import java.util.concurrent.TimeUnit;
 @RunWith(AndroidJUnit4.class)
 public class HelloCodenameOneInstrumentedTest {
 
-    private static final int CHUNK_SIZE = 2000;
+    private static final int CHUNK_SIZE = 768;
     private static final String PREVIEW_CHANNEL = "PREVIEW";
     private static final int[] PREVIEW_JPEG_QUALITIES =
             new int[] {60, 50, 40, 35, 30, 25, 20, 18, 16, 14, 12, 10, 8, 6, 5, 4, 3, 2, 1};
