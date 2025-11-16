@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TextPainter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.scene</a> &gt; <span class="el_source">TextPainter.java</span></div><h1>TextPainter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.scene;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.plaf.Style;
+
+/**
+ * A painter for painting text into a Node.
+ *
+ * @author shannah
+ */
+public class TextPainter implements NodePainter {
+    private String text;
+<span class="nc" id="L38">    private int vAlign = Component.CENTER;</span>
+
+    /**
+     * Creates a new TextPainter with the given text and vertical alignment.
+     *
+     * @param text   The text to paint.
+     * @param valign The vertical alignment of the text.  One of {@link Component#CENTER}, {@link Component#TOP}, {@link Component#BOTTOM}.
+     */
+<span class="nc" id="L46">    public TextPainter(String text, int valign) {</span>
+<span class="nc" id="L47">        this.text = text;</span>
+<span class="nc" id="L48">        this.vAlign = valign;</span>
+<span class="nc" id="L49">    }</span>
+
+    /**
+     * Paints the text onto the provided graphics context.
+     *
+     * @param g      The graphics to paint onto.
+     * @param bounds The bounding rect.
+     * @param node   The node whose content we are painting.
+     */
+    @Override
+    public void paint(Graphics g, Rectangle bounds, Node node) {
+<span class="nc" id="L60">        Style style = node.getStyle();</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">        if (style == null) {</span>
+<span class="nc" id="L62">            return;</span>
+        }
+<span class="nc" id="L64">        Font font = style.getFont();</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (font == null) {</span>
+<span class="nc" id="L66">            font = Font.getDefaultFont();</span>
+        }
+<span class="nc" id="L68">        int textWidth = font.stringWidth(text);</span>
+<span class="nc" id="L69">        int textHeight = font.getHeight();</span>
+<span class="nc" id="L70">        int innerX = bounds.getX() + style.getPaddingLeft(false);</span>
+<span class="nc" id="L71">        int innerY = bounds.getY() + style.getPaddingTop();</span>
+<span class="nc" id="L72">        int innerW = bounds.getWidth() - style.getHorizontalPadding();</span>
+<span class="nc" id="L73">        int innerH = bounds.getHeight() - style.getVerticalPadding();</span>
+
+<span class="nc" id="L75">        int x = innerX;</span>
+<span class="nc" id="L76">        int y = innerY;</span>
+<span class="nc bnc" id="L77" title="All 3 branches missed.">        switch (style.getAlignment()) {</span>
+            case Component.CENTER:
+<span class="nc" id="L79">                x = innerX + innerW / 2 - textWidth / 2;</span>
+<span class="nc" id="L80">                break;</span>
+            case Component.RIGHT:
+<span class="nc" id="L82">                x = innerX + innerW - textWidth;</span>
+                break;
+
+        }
+<span class="nc bnc" id="L86" title="All 3 branches missed.">        switch (vAlign) {</span>
+            case Component.CENTER:
+<span class="nc" id="L88">                y = innerY + innerH / 2 - textHeight / 2;</span>
+<span class="nc" id="L89">                break;</span>
+            case Component.BOTTOM:
+<span class="nc" id="L91">                y = innerY + innerH - textHeight;</span>
+                break;
+        }
+<span class="nc" id="L94">        g.setFont(font);</span>
+<span class="nc" id="L95">        g.setColor(style.getFgColor());</span>
+<span class="nc" id="L96">        int alpha = g.concatenateAlpha(style.getFgAlpha());</span>
+<span class="nc" id="L97">        g.drawString(text, x, y);</span>
+<span class="nc" id="L98">        g.setAlpha(alpha);</span>
+<span class="nc" id="L99">    }</span>
+
+    /**
+     * The text of this painter.
+     *
+     * @return the text
+     */
+    public String getText() {
+<span class="nc" id="L107">        return text;</span>
+    }
+
+    /**
+     * Sets the text of this painter
+     *
+     * @param text the text to set
+     */
+    public void setText(String text) {
+<span class="nc" id="L116">        this.text = text;</span>
+<span class="nc" id="L117">    }</span>
+
+    /**
+     * Gets the vertical alignment of this text.  One of {@link Component#CENTER}, {@link Component#TOP}, {@link Component#BOTTOM}.
+     *
+     * @return the vAlign
+     */
+    public int getvAlign() {
+<span class="nc" id="L125">        return vAlign;</span>
+    }
+
+    /**
+     * Sets the vertical alignment. One of {@link Component#CENTER}, {@link Component#TOP}, {@link Component#BOTTOM}.
+     *
+     * @param vAlign the vAlign to set
+     */
+    public void setvAlign(int vAlign) {
+<span class="nc" id="L134">        this.vAlign = vAlign;</span>
+<span class="nc" id="L135">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

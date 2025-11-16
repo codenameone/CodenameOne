@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DeflaterOutputStream.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.gzip</a> &gt; <span class="el_source">DeflaterOutputStream.java</span></div><h1>DeflaterOutputStream.java</h1><pre class="source lang-java linenums">
+/* -*-mode:java; c-basic-offset:2; indent-tabs-mode:nil -*- */
+/*
+Copyright (c) 2011 ymnk, JCraft,Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+  1. Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright 
+     notice, this list of conditions and the following disclaimer in 
+     the documentation and/or other materials provided with the distribution.
+
+  3. The names of the authors may not be used to endorse or promote products
+     derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL JCRAFT,
+INC. OR ANY CONTRIBUTORS TO THIS SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+package com.codename1.io.gzip;
+
+import java.io.IOException;
+import java.io.OutputStream;
+
+public class DeflaterOutputStream extends FilterOutputStream {
+
+    protected static final int DEFAULT_BUFSIZE = 512;
+    protected final Deflater deflater;
+<span class="fc" id="L40">    private final byte[] buf1 = new byte[1];</span>
+    protected byte[] buffer;
+<span class="fc" id="L42">    protected boolean mydeflater = false;</span>
+<span class="fc" id="L43">    private boolean closed = false;</span>
+<span class="fc" id="L44">    private boolean syncFlush = false;</span>
+<span class="fc" id="L45">    private boolean close_out = true;</span>
+
+    public DeflaterOutputStream(OutputStream out) throws IOException {
+<span class="nc" id="L48">        this(out,</span>
+                new Deflater(JZlib.Z_DEFAULT_COMPRESSION),
+                DEFAULT_BUFSIZE, true);
+<span class="nc" id="L51">        mydeflater = true;</span>
+<span class="nc" id="L52">    }</span>
+
+    public DeflaterOutputStream(OutputStream out, Deflater def) throws IOException {
+<span class="nc" id="L55">        this(out, def, DEFAULT_BUFSIZE, true);</span>
+<span class="nc" id="L56">    }</span>
+
+    public DeflaterOutputStream(OutputStream out,
+                                Deflater deflater,
+                                int size) throws IOException {
+<span class="nc" id="L61">        this(out, deflater, size, true);</span>
+<span class="nc" id="L62">    }</span>
+
+    public DeflaterOutputStream(OutputStream out,
+                                Deflater deflater,
+                                int size,
+                                boolean close_out) throws IOException {
+<span class="fc" id="L68">        super(out);</span>
+<span class="pc bpc" id="L69" title="2 of 4 branches missed.">        if (out == null || deflater == null) {</span>
+<span class="nc" id="L70">            throw new NullPointerException();</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        } else if (size &lt;= 0) {</span>
+<span class="nc" id="L72">            throw new IllegalArgumentException(&quot;buffer size must be greater than 0&quot;);</span>
+        }
+<span class="fc" id="L74">        this.deflater = deflater;</span>
+<span class="fc" id="L75">        buffer = new byte[size];</span>
+<span class="fc" id="L76">        this.close_out = close_out;</span>
+<span class="fc" id="L77">    }</span>
+
+    public void write(int b) throws IOException {
+<span class="nc" id="L80">        buf1[0] = (byte) (b &amp; 0xff);</span>
+<span class="nc" id="L81">        write(buf1, 0, 1);</span>
+<span class="nc" id="L82">    }</span>
+
+    public void write(byte[] b, int off, int len) throws IOException {
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if (deflater.finished()) {</span>
+<span class="nc" id="L86">            throw new IOException(&quot;finished&quot;);</span>
+<span class="pc bpc" id="L87" title="4 of 8 branches missed.">        } else if (off &lt; 0 | len &lt; 0 | off + len &gt; b.length) {</span>
+<span class="nc" id="L88">            throw new IndexOutOfBoundsException();</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        } else if (len == 0) {</span>
+        } else {
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            int flush = syncFlush ? JZlib.Z_SYNC_FLUSH : JZlib.Z_NO_FLUSH;</span>
+<span class="fc" id="L92">            deflater.setInput(b, off, len, true);</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">            while (deflater.avail_in &gt; 0) {</span>
+<span class="fc" id="L94">                int err = deflate(flush);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">                if (err == JZlib.Z_STREAM_END)</span>
+<span class="nc" id="L96">                    break;</span>
+<span class="fc" id="L97">            }</span>
+        }
+<span class="fc" id="L99">    }</span>
+
+    public void finish() throws IOException {
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        while (!deflater.finished()) {</span>
+<span class="fc" id="L103">            deflate(JZlib.Z_FINISH);</span>
+        }
+<span class="fc" id="L105">    }</span>
+
+    public void close() throws IOException {
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (!closed) {</span>
+<span class="fc" id="L109">            finish();</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            if (mydeflater) {</span>
+<span class="fc" id="L111">                deflater.end();</span>
+            }
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">            if (close_out)</span>
+<span class="fc" id="L114">                out.close();</span>
+<span class="fc" id="L115">            closed = true;</span>
+        }
+<span class="fc" id="L117">    }</span>
+
+    protected int deflate(int flush) throws IOException {
+<span class="fc" id="L120">        deflater.setOutput(buffer, 0, buffer.length);</span>
+<span class="fc" id="L121">        int err = deflater.deflate(flush);</span>
+<span class="pc bpc" id="L122" title="2 of 3 branches missed.">        switch (err) {</span>
+            case JZlib.Z_OK:
+            case JZlib.Z_STREAM_END:
+<span class="fc" id="L125">                break;</span>
+            case JZlib.Z_BUF_ERROR:
+<span class="nc bnc" id="L127" title="All 4 branches missed.">                if (deflater.avail_in &lt;= 0 &amp;&amp; flush != JZlib.Z_FINISH) {</span>
+                    // flush() without any data
+<span class="nc" id="L129">                    break;</span>
+                }
+            default:
+<span class="nc" id="L132">                throw new IOException(&quot;failed to deflate&quot;);</span>
+        }
+<span class="fc" id="L134">        int len = deflater.next_out_index;</span>
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (len &gt; 0) {</span>
+<span class="fc" id="L136">            out.write(buffer, 0, len);</span>
+        }
+<span class="fc" id="L138">        return err;</span>
+    }
+
+    public void flush() throws IOException {
+<span class="nc bnc" id="L142" title="All 4 branches missed.">        if (syncFlush &amp;&amp; !deflater.finished()) {</span>
+            while (true) {
+<span class="nc" id="L144">                int err = deflate(JZlib.Z_SYNC_FLUSH);</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">                if (deflater.next_out_index &lt; buffer.length)</span>
+<span class="nc" id="L146">                    break;</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">                if (err == JZlib.Z_STREAM_END)</span>
+<span class="nc" id="L148">                    break;</span>
+<span class="nc" id="L149">            }</span>
+        }
+<span class="nc" id="L151">        out.flush();</span>
+<span class="nc" id="L152">    }</span>
+
+    public long getTotalIn() {
+<span class="nc" id="L155">        return deflater.getTotalIn();</span>
+    }
+
+    public long getTotalOut() {
+<span class="nc" id="L159">        return deflater.getTotalOut();</span>
+    }
+
+    public boolean getSyncFlush() {
+<span class="nc" id="L163">        return this.syncFlush;</span>
+    }
+
+    public void setSyncFlush(boolean syncFlush) {
+<span class="nc" id="L167">        this.syncFlush = syncFlush;</span>
+<span class="nc" id="L168">    }</span>
+
+    public Deflater getDeflater() {
+<span class="nc" id="L171">        return deflater;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

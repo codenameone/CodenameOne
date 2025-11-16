@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>REProgram.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util.regex</a> &gt; <span class="el_source">REProgram.java</span></div><h1>REProgram.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.codename1.util.regex;
+
+/**
+ * A class that holds compiled regular expressions.  You should not need to
+ * work directly with this class.
+ *
+ * @author &lt;a href=&quot;mailto:jonl@muppetlabs.com&quot;&gt;Jonathan Locke&lt;/a&gt;
+ * @version $Id: REProgram.java 518156 2007-03-14 14:31:26Z vgritsenko $
+ * @see RE
+ * @see RECompiler
+ */
+public class REProgram {
+    static final int OPT_HASBACKREFS = 1;
+    static final int OPT_HASBOL = 2;
+
+    char[] instruction;         // The compiled regular expression 'program'
+    int lenInstruction;         // The amount of the instruction buffer in use
+    char[] prefix;              // Prefix string optimization
+    int flags;                  // Optimization flags (REProgram.OPT_*)
+<span class="fc" id="L37">    int maxParens = -1;</span>
+
+    /**
+     * Constructs a program object from a character array
+     *
+     * @param instruction Character array with RE opcode instructions in it
+     */
+    public REProgram(char[] instruction) {
+<span class="nc" id="L45">        this(instruction, instruction.length);</span>
+<span class="nc" id="L46">    }</span>
+
+    /**
+     * Constructs a program object from a character array
+     *
+     * @param parens      Count of parens in the program
+     * @param instruction Character array with RE opcode instructions in it
+     */
+    public REProgram(int parens, char[] instruction) {
+<span class="fc" id="L55">        this(instruction, instruction.length);</span>
+<span class="fc" id="L56">        this.maxParens = parens;</span>
+<span class="fc" id="L57">    }</span>
+
+    /**
+     * Constructs a program object from a character array
+     *
+     * @param instruction    Character array with RE opcode instructions in it
+     * @param lenInstruction Amount of instruction array in use
+     */
+<span class="fc" id="L65">    public REProgram(char[] instruction, int lenInstruction) {</span>
+<span class="fc" id="L66">        setInstructions(instruction, lenInstruction);</span>
+<span class="fc" id="L67">    }</span>
+
+    /**
+     * Returns a copy of the current regular expression program in a character
+     * array that is exactly the right length to hold the program.  If there is
+     * no program compiled yet, getInstructions() will return null.
+     *
+     * @return A copy of the current compiled RE program
+     */
+    public char[] getInstructions() {
+        // Ensure program has been compiled!
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (lenInstruction != 0) {</span>
+            // Return copy of program
+<span class="nc" id="L80">            char[] ret = new char[lenInstruction];</span>
+<span class="nc" id="L81">            System.arraycopy(instruction, 0, ret, 0, lenInstruction);</span>
+<span class="nc" id="L82">            return ret;</span>
+        }
+<span class="nc" id="L84">        return null;</span>
+    }
+
+    /**
+     * Sets a new regular expression program to run.  It is this method which
+     * performs any special compile-time search optimizations.  Currently only
+     * two optimizations are in place - one which checks for backreferences
+     * (so that they can be lazily allocated) and another which attempts to
+     * find a prefix anchor string so that substantial amounts of input can
+     * potentially be skipped without running the actual program.
+     *
+     * @param instruction    Program instruction buffer
+     * @param lenInstruction Length of instruction buffer in use
+     */
+    public void setInstructions(char[] instruction, int lenInstruction) {
+        // Save reference to instruction array
+<span class="fc" id="L100">        this.instruction = instruction;</span>
+<span class="fc" id="L101">        this.lenInstruction = lenInstruction;</span>
+
+        // Initialize other program-related variables
+<span class="fc" id="L104">        this.flags = 0;</span>
+<span class="fc" id="L105">        this.prefix = null;</span>
+
+        // Try various compile-time optimizations if there's a program
+<span class="pc bpc" id="L108" title="2 of 4 branches missed.">        if (instruction != null &amp;&amp; lenInstruction != 0) {</span>
+            // If the first node is a branch
+<span class="pc bpc" id="L110" title="2 of 4 branches missed.">            if (lenInstruction &gt;= RE.nodeSize &amp;&amp; instruction[RE.offsetOpcode] == RE.OP_BRANCH) {</span>
+                // to the end node
+<span class="nc" id="L112">                int next = (short) instruction[RE.offsetNext];</span>
+<span class="nc bnc" id="L113" title="All 4 branches missed.">                if (instruction[next + RE.offsetOpcode] == RE.OP_END &amp;&amp; lenInstruction &gt;= (RE.nodeSize * 2)) {</span>
+<span class="nc" id="L114">                    final char nextOp = instruction[RE.nodeSize + RE.offsetOpcode];</span>
+                    // the branch starts with an atom
+<span class="nc bnc" id="L116" title="All 2 branches missed.">                    if (nextOp == RE.OP_ATOM) {</span>
+                        // then get that atom as a prefix because there's no other choice
+<span class="nc" id="L118">                        int lenAtom = instruction[RE.nodeSize + RE.offsetOpdata];</span>
+<span class="nc" id="L119">                        this.prefix = new char[lenAtom];</span>
+<span class="nc" id="L120">                        System.arraycopy(instruction, RE.nodeSize * 2, prefix, 0, lenAtom);</span>
+<span class="nc" id="L121">                    }</span>
+                    // the branch starts with a BOL
+<span class="nc bnc" id="L123" title="All 2 branches missed.">                    else if (nextOp == RE.OP_BOL) {</span>
+                        // then set the flag indicating that BOL is present
+<span class="nc" id="L125">                        this.flags |= OPT_HASBOL;</span>
+                    }
+                }
+            }
+
+            BackrefScanLoop:
+
+            // Check for backreferences
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            for (int i = 0; i &lt; lenInstruction; i += RE.nodeSize) {</span>
+<span class="pc bpc" id="L134" title="1 of 4 branches missed.">                switch (instruction[i + RE.offsetOpcode]) {</span>
+                    case RE.OP_ANYOF:
+<span class="fc" id="L136">                        i += (instruction[i + RE.offsetOpdata] * 2);</span>
+<span class="fc" id="L137">                        break;</span>
+
+                    case RE.OP_ATOM:
+<span class="fc" id="L140">                        i += instruction[i + RE.offsetOpdata];</span>
+<span class="fc" id="L141">                        break;</span>
+
+                    case RE.OP_BACKREF:
+<span class="nc" id="L144">                        flags |= OPT_HASBACKREFS;</span>
+<span class="nc" id="L145">                        break BackrefScanLoop;</span>
+                }
+            }
+        }
+<span class="fc" id="L149">    }</span>
+
+    /**
+     * Returns a copy of the prefix of current regular expression program
+     * in a character array.  If there is no prefix, or there is no program
+     * compiled yet, &lt;code&gt;getPrefix&lt;/code&gt; will return null.
+     *
+     * @return A copy of the prefix of current compiled RE program
+     */
+    public char[] getPrefix() {
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (prefix != null) {</span>
+            // Return copy of prefix
+<span class="nc" id="L161">            char[] ret = new char[prefix.length];</span>
+<span class="nc" id="L162">            System.arraycopy(prefix, 0, ret, 0, prefix.length);</span>
+<span class="nc" id="L163">            return ret;</span>
+        }
+<span class="nc" id="L165">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

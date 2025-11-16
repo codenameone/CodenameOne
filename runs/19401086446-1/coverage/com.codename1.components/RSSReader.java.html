@@ -1,0 +1,546 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RSSReader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">RSSReader.java</span></div><h1>RSSReader.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.components;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkEvent;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.services.ImageDownloadService;
+import com.codename1.io.services.RSSService;
+import com.codename1.ui.Button;
+import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.List;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.list.DefaultListModel;
+import com.codename1.ui.list.GenericListCellRenderer;
+
+import java.util.Hashtable;
+import java.util.Vector;
+
+/**
+ * A List implementing an RSS reader that automatically populates itself with content
+ * from the RSS chanel. When clicking an article it displays the HTML content of said
+ * article in a new Form.
+ *
+ * @author Shai Almog
+ */
+public class RSSReader extends List {
+<span class="fc" id="L60">    private static final Hashtable MORE = new Hashtable();</span>
+
+    static {
+<span class="fc" id="L63">        MORE.put(&quot;title&quot;, &quot;More&quot;);</span>
+<span class="fc" id="L64">        MORE.put(&quot;details&quot;, &quot;Fetch More Elements&quot;);</span>
+<span class="fc" id="L65">    }</span>
+
+    private Vector existingData;
+<span class="fc" id="L68">    private String url = &quot;https://codenameone.blogspot.com/feeds/posts/default?alt=rss&quot;;</span>
+    private RSSService service;
+<span class="fc" id="L70">    private int limit = 20;</span>
+    private boolean waitingForResponseLock;
+    private boolean blockList;
+<span class="fc" id="L73">    private String progressTitle = &quot;Fetching RSS&quot;;</span>
+<span class="fc" id="L74">    private boolean displayProgressPercentage = true;</span>
+    private Image iconPlaceholder;
+    private boolean designMode;
+
+    /**
+     * Sets the form/container to which the RSS will navigate when clicking a RSS
+     * entry
+     */
+    private Container targetContainer;
+
+    /**
+     * Indicates whether a back command should be added implicitly to the target container
+     */
+<span class="fc" id="L87">    private boolean addBackToTaget = true;</span>
+
+    /**
+     * Creates an rss reader instance
+     */
+<span class="fc" id="L92">    public RSSReader() {</span>
+<span class="fc" id="L93">        setUIID(&quot;RSSReader&quot;);</span>
+<span class="fc" id="L94">        setRenderer(new GenericListCellRenderer(createRendererContainer(), createRendererContainer()));</span>
+<span class="fc" id="L95">        addActionListener(new EventHandler());</span>
+<span class="fc" id="L96">    }</span>
+
+
+    /**
+     * Set the description for the &quot;more&quot; request
+     *
+     * @param d the description
+     */
+    public static void setMoreDescription(String d) {
+<span class="nc" id="L105">        MORE.put(&quot;description&quot;, d);</span>
+<span class="nc" id="L106">    }</span>
+
+    /**
+     * Set the title for the &quot;more&quot; request
+     *
+     * @param t new title
+     */
+    public static void setMoreTitle(String t) {
+<span class="nc" id="L114">        MORE.put(&quot;title&quot;, t);</span>
+<span class="nc" id="L115">    }</span>
+
+    private Container createRendererContainer() {
+<span class="fc" id="L118">        Container entries = new Container(new BoxLayout(BoxLayout.Y_AXIS));</span>
+<span class="fc" id="L119">        entries.setUIID(&quot;RSSEntry&quot;);</span>
+<span class="fc" id="L120">        Label title = new Label();</span>
+<span class="fc" id="L121">        title.setName(&quot;title&quot;);</span>
+<span class="fc" id="L122">        title.setUIID(&quot;RSSTitle&quot;);</span>
+<span class="fc" id="L123">        entries.addComponent(title);</span>
+<span class="fc" id="L124">        TextArea description = new TextArea(2, 30);</span>
+<span class="fc" id="L125">        description.setGrowByContent(false);</span>
+<span class="fc" id="L126">        description.setName(&quot;details&quot;);</span>
+<span class="fc" id="L127">        description.setUIID(&quot;RSSDescription&quot;);</span>
+<span class="fc" id="L128">        description.setScrollVisible(false);</span>
+<span class="fc" id="L129">        entries.addComponent(description);</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (iconPlaceholder != null) {</span>
+<span class="fc" id="L131">            Container wrap = new Container(new BorderLayout());</span>
+<span class="fc" id="L132">            wrap.addComponent(BorderLayout.CENTER, entries);</span>
+<span class="fc" id="L133">            Label icon = new Label();</span>
+<span class="fc" id="L134">            icon.setIcon(iconPlaceholder);</span>
+<span class="fc" id="L135">            icon.setUIID(&quot;RSSIcon&quot;);</span>
+<span class="fc" id="L136">            icon.setName(&quot;icon&quot;);</span>
+<span class="fc" id="L137">            wrap.addComponent(BorderLayout.WEST, icon);</span>
+<span class="fc" id="L138">            entries = wrap;</span>
+        }
+<span class="fc" id="L140">        return entries;</span>
+    }
+
+    /**
+     * Send the request to the server, will only work once. This is called implicitly
+     * when the list is initialized
+     */
+    public void sendRequest() {
+<span class="nc bnc" id="L148" title="All 2 branches missed.">        if (service == null) {</span>
+<span class="nc" id="L149">            service = new RSSService(url, limit);</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">            if (iconPlaceholder != null) {</span>
+<span class="nc" id="L151">                service.setIconPlaceholder(iconPlaceholder);</span>
+            }
+<span class="nc" id="L153">            service.addResponseListener(new EventHandler());</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">            if (blockList) {</span>
+<span class="nc" id="L155">                Progress p = new Progress(progressTitle, service, displayProgressPercentage);</span>
+<span class="nc" id="L156">                p.setAutoShow(true);</span>
+<span class="nc" id="L157">                p.setDisposeOnCompletion(true);</span>
+            }
+<span class="nc" id="L159">            setHint(progressTitle);</span>
+<span class="nc" id="L160">            NetworkManager.getInstance().addToQueue(service);</span>
+        }
+<span class="nc" id="L162">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void initComponent() {
+<span class="nc" id="L168">        super.initComponent();</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        if (designMode) {</span>
+<span class="nc" id="L170">            setHint(&quot;RSS Data Will Show Here&quot;);</span>
+        } else {
+<span class="nc" id="L172">            sendRequest();</span>
+        }
+<span class="nc" id="L174">    }</span>
+
+    /**
+     * The URL of the RSS stream
+     *
+     * @return The URL of the RSS stream
+     */
+    public String getURL() {
+<span class="fc" id="L182">        return url;</span>
+    }
+
+    /**
+     * The URL of the RSS stream
+     *
+     * @param url The URL of the RSS stream
+     */
+    public void setURL(String url) {
+<span class="fc" id="L191">        this.url = url;</span>
+<span class="fc" id="L192">    }</span>
+
+    /**
+     * @return the iconPlaceholder
+     */
+    public Image getIconPlaceholder() {
+<span class="fc" id="L198">        return iconPlaceholder;</span>
+    }
+
+    /**
+     * @param iconPlaceholder the iconPlaceholder to set
+     */
+    public void setIconPlaceholder(Image iconPlaceholder) {
+<span class="fc" id="L205">        this.iconPlaceholder = iconPlaceholder;</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if (service != null) {</span>
+<span class="nc" id="L207">            service.setIconPlaceholder(iconPlaceholder);</span>
+        }
+<span class="fc" id="L209">        setRenderer(new GenericListCellRenderer(createRendererContainer(), createRendererContainer()));</span>
+<span class="fc" id="L210">    }</span>
+
+    void updateComponentValues(Container root, Hashtable h) {
+<span class="nc" id="L213">        int c = root.getComponentCount();</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        for (int iter = 0; iter &lt; c; iter++) {</span>
+<span class="nc" id="L215">            Component current = root.getComponentAt(iter);</span>
+
+            // the comparison assumes that other container subclases are really just
+            // custom components e.g. tree, table and HTMLComponent as well as third party
+            // subclasses
+<span class="nc bnc" id="L220" title="All 2 branches missed.">            if (current.getClass() == com.codename1.ui.Container.class ||</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">                    current.getClass() == com.codename1.ui.Tabs.class) {</span>
+<span class="nc" id="L222">                updateComponentValues((Container) current, h);</span>
+<span class="nc" id="L223">                continue;</span>
+            }
+<span class="nc" id="L225">            String n = current.getName();</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">            if (n != null) {</span>
+<span class="nc" id="L227">                String val = (String) h.get(n);</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">                if (val != null) {</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                    if (current instanceof Button) {</span>
+<span class="nc" id="L230">                        final String url = val;</span>
+<span class="nc" id="L231">                        ((Button) current).addActionListener(new Listener(url));</span>
+<span class="nc" id="L232">                        continue;</span>
+                    }
+<span class="nc bnc" id="L234" title="All 2 branches missed.">                    if (current instanceof Label) {</span>
+<span class="nc" id="L235">                        ((Label) current).setText(val);</span>
+<span class="nc" id="L236">                        continue;</span>
+                    }
+<span class="nc bnc" id="L238" title="All 2 branches missed.">                    if (current instanceof TextArea) {</span>
+<span class="nc" id="L239">                        ((TextArea) current).setText(val);</span>
+<span class="nc" id="L240">                        continue;</span>
+                    }
+<span class="nc bnc" id="L242" title="All 2 branches missed.">                    if (current instanceof WebBrowser) {</span>
+<span class="nc" id="L243">                        ((WebBrowser) current).setPage(val, null);</span>
+<span class="nc" id="L244">                        continue;</span>
+                    }
+                }
+            }
+        }
+<span class="nc" id="L249">    }</span>
+
+    /**
+     * Shows a form containing the RSS entry
+     *
+     * @param h the parsed entry
+     */
+    protected void showRSSEntry(Hashtable h) {
+<span class="nc" id="L257">        Form newForm = null;</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">        if (targetContainer != null) {</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">            if (targetContainer instanceof Form) {</span>
+<span class="nc" id="L260">                newForm = (Form) targetContainer;</span>
+            } else {
+<span class="nc" id="L262">                newForm = new Form((String) h.get(&quot;title&quot;));</span>
+<span class="nc" id="L263">                newForm.setLayout(new BorderLayout());</span>
+<span class="nc" id="L264">                newForm.addComponent(BorderLayout.CENTER, targetContainer);</span>
+            }
+<span class="nc" id="L266">            updateComponentValues(newForm, h);</span>
+        } else {
+<span class="nc" id="L268">            newForm = new Form((String) h.get(&quot;title&quot;));</span>
+<span class="nc" id="L269">            newForm.setScrollable(false);</span>
+<span class="nc" id="L270">            WebBrowser c = new WebBrowser();</span>
+<span class="nc" id="L271">            String s = (String) h.get(&quot;description&quot;);</span>
+<span class="nc" id="L272">            s = &quot;&lt;html&gt;&lt;body&gt;&quot; + s + &quot;&lt;/body&gt;&lt;/html&gt;&quot;;</span>
+<span class="nc" id="L273">            c.setPage(s, null);</span>
+<span class="nc" id="L274">            newForm.setLayout(new BorderLayout());</span>
+<span class="nc" id="L275">            newForm.addComponent(BorderLayout.CENTER, c);</span>
+        }
+<span class="nc bnc" id="L277" title="All 2 branches missed.">        if (addBackToTaget) {</span>
+<span class="nc" id="L278">            final Form sourceForm = Display.getInstance().getCurrent();</span>
+<span class="nc" id="L279">            Command back = new BackCommand(sourceForm);</span>
+<span class="nc" id="L280">            newForm.addCommand(back);</span>
+<span class="nc" id="L281">            newForm.setBackCommand(back);</span>
+        }
+<span class="nc" id="L283">        newForm.show();</span>
+<span class="nc" id="L284">    }</span>
+
+    /**
+     * Places a limit on the number of RSS entries requested from the server
+     *
+     * @return the limit
+     */
+    public int getLimit() {
+<span class="fc" id="L292">        return limit;</span>
+    }
+
+    /**
+     * Places a limit on the number of RSS entries requested from the server
+     *
+     * @param limit the limit to set
+     */
+    public void setLimit(int limit) {
+<span class="fc" id="L301">        this.limit = limit;</span>
+<span class="fc" id="L302">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+<span class="nc" id="L308">        return new String[]{&quot;limit&quot;, &quot;url&quot;, &quot;blockList&quot;, &quot;progressTitle&quot;, &quot;displayProgressPercentage&quot;, &quot;target&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L315">        return new Class[]{Integer.class, String.class, Boolean.class, String.class, Boolean.class, Container.class};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+<span class="nc bnc" id="L322" title="All 2 branches missed.">        if (name.equals(&quot;limit&quot;)) {</span>
+<span class="nc" id="L323">            return Integer.valueOf(limit); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor</span>
+        }
+<span class="nc bnc" id="L325" title="All 2 branches missed.">        if (name.equals(&quot;url&quot;)) {</span>
+<span class="nc" id="L326">            return url;</span>
+        }
+<span class="nc bnc" id="L328" title="All 2 branches missed.">        if (name.equals(&quot;blockList&quot;)) {</span>
+<span class="nc bnc" id="L329" title="All 2 branches missed.">            if (blockList) {</span>
+<span class="nc" id="L330">                return Boolean.TRUE;</span>
+            }
+<span class="nc" id="L332">            return Boolean.FALSE;</span>
+        }
+<span class="nc bnc" id="L334" title="All 2 branches missed.">        if (name.equals(&quot;progressTitle&quot;)) {</span>
+<span class="nc" id="L335">            return progressTitle;</span>
+        }
+<span class="nc bnc" id="L337" title="All 2 branches missed.">        if (name.equals(&quot;displayProgressPercentage&quot;)) {</span>
+<span class="nc bnc" id="L338" title="All 2 branches missed.">            if (displayProgressPercentage) {</span>
+<span class="nc" id="L339">                return Boolean.TRUE;</span>
+            }
+<span class="nc" id="L341">            return Boolean.FALSE;</span>
+        }
+<span class="nc bnc" id="L343" title="All 2 branches missed.">        if (name.equals(&quot;target&quot;)) {</span>
+<span class="nc" id="L344">            return targetContainer;</span>
+        }
+<span class="nc bnc" id="L346" title="All 2 branches missed.">        if (name.equals(&quot;$designMode&quot;)) {</span>
+<span class="nc bnc" id="L347" title="All 2 branches missed.">            if (designMode) {</span>
+<span class="nc" id="L348">                return Boolean.TRUE;</span>
+            }
+<span class="nc" id="L350">            return Boolean.FALSE;</span>
+        }
+
+<span class="nc" id="L353">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L360" title="All 2 branches missed.">        if (name.equals(&quot;limit&quot;)) {</span>
+<span class="nc" id="L361">            limit = ((Integer) value).intValue();</span>
+<span class="nc" id="L362">            return null;</span>
+        }
+<span class="nc bnc" id="L364" title="All 2 branches missed.">        if (name.equals(&quot;url&quot;)) {</span>
+<span class="nc" id="L365">            url = (String) value;</span>
+<span class="nc" id="L366">            return null;</span>
+        }
+<span class="nc bnc" id="L368" title="All 2 branches missed.">        if (name.equals(&quot;blockList&quot;)) {</span>
+<span class="nc" id="L369">            blockList = ((Boolean) value).booleanValue();</span>
+<span class="nc" id="L370">            return null;</span>
+        }
+<span class="nc bnc" id="L372" title="All 2 branches missed.">        if (name.equals(&quot;progressTitle&quot;)) {</span>
+<span class="nc" id="L373">            progressTitle = (String) value;</span>
+<span class="nc" id="L374">            return null;</span>
+        }
+<span class="nc bnc" id="L376" title="All 2 branches missed.">        if (name.equals(&quot;displayProgressPercentage&quot;)) {</span>
+<span class="nc" id="L377">            displayProgressPercentage = ((Boolean) value).booleanValue();</span>
+<span class="nc" id="L378">            return null;</span>
+        }
+<span class="nc bnc" id="L380" title="All 2 branches missed.">        if (name.equals(&quot;target&quot;)) {</span>
+<span class="nc" id="L381">            targetContainer = (Container) value;</span>
+<span class="nc" id="L382">            return null;</span>
+        }
+<span class="nc bnc" id="L384" title="All 2 branches missed.">        if (name.equals(&quot;$designMode&quot;)) {</span>
+<span class="nc" id="L385">            designMode = ((Boolean) value).booleanValue();</span>
+<span class="nc" id="L386">            return null;</span>
+        }
+<span class="nc" id="L388">        return super.setPropertyValue(name, value);</span>
+    }
+
+    /**
+     * @return the blockList
+     */
+    public boolean isBlockList() {
+<span class="fc" id="L395">        return blockList;</span>
+    }
+
+    /**
+     * @param blockList the blockList to set
+     */
+    public void setBlockList(boolean blockList) {
+<span class="fc" id="L402">        this.blockList = blockList;</span>
+<span class="fc" id="L403">    }</span>
+
+    /**
+     * @return the progressTitle
+     */
+    public String getProgressTitle() {
+<span class="fc" id="L409">        return progressTitle;</span>
+    }
+
+    /**
+     * @param progressTitle the progressTitle to set
+     */
+    public void setProgressTitle(String progressTitle) {
+<span class="fc" id="L416">        this.progressTitle = progressTitle;</span>
+<span class="fc" id="L417">    }</span>
+
+    /**
+     * The form/container to which the RSS will navigate when clicking a RSS
+     * entry
+     *
+     * @return the targetContainer
+     */
+    public Container getTargetContainer() {
+<span class="nc" id="L426">        return targetContainer;</span>
+    }
+
+    /**
+     * The form/container to which the RSS will navigate when clicking a RSS
+     * entry
+     *
+     * @param targetContainer the targetContainer to set
+     */
+    public void setTargetContainer(Container targetContainer) {
+<span class="nc" id="L436">        this.targetContainer = targetContainer;</span>
+<span class="nc" id="L437">    }</span>
+
+    /**
+     * Indicates whether a back command should be added implicitly to the target container
+     *
+     * @return the addBackToTaget
+     */
+    public boolean isAddBackToTaget() {
+<span class="nc" id="L445">        return addBackToTaget;</span>
+    }
+
+    /**
+     * Indicates whether a back command should be added implicitly to the target container
+     *
+     * @param addBackToTaget the addBackToTaget to set
+     */
+    public void setAddBackToTaget(boolean addBackToTaget) {
+<span class="nc" id="L454">        this.addBackToTaget = addBackToTaget;</span>
+<span class="nc" id="L455">    }</span>
+
+    class Listener implements ActionListener {
+        private final String url;
+
+<span class="nc" id="L460">        public Listener(String url) {</span>
+<span class="nc" id="L461">            this.url = url;</span>
+<span class="nc" id="L462">        }</span>
+
+        public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L465">            Display.getInstance().execute(url);</span>
+<span class="nc" id="L466">        }</span>
+    }
+
+    class BackCommand extends Command {
+        private final Form sourceForm;
+
+<span class="nc" id="L472">        public BackCommand(Form sourceForm) {</span>
+<span class="nc" id="L473">            super(&quot;Back&quot;);</span>
+<span class="nc" id="L474">            this.sourceForm = sourceForm;</span>
+<span class="nc" id="L475">        }</span>
+
+        public void actionPerformed(ActionEvent ev) {
+<span class="nc" id="L478">            sourceForm.showBack();</span>
+<span class="nc" id="L479">        }</span>
+    }
+
+<span class="fc" id="L482">    class EventHandler implements ActionListener {</span>
+        private void downloadImage(Hashtable h, int offset) {
+<span class="nc bnc" id="L484" title="All 2 branches missed.">            if (iconPlaceholder != null) {</span>
+<span class="nc" id="L485">                String url = (String) h.get(&quot;thumb&quot;);</span>
+<span class="nc bnc" id="L486" title="All 2 branches missed.">                if (url != null) {</span>
+<span class="nc" id="L487">                    ImageDownloadService.createImageToStorage(url, RSSReader.this, getModel(), offset, &quot;icon&quot;, url.replace('/', '_').replace(':', '_'), iconPlaceholder, ConnectionRequest.PRIORITY_REDUNDANT);</span>
+                }
+            }
+<span class="nc" id="L490">        }</span>
+
+        public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L493" title="All 2 branches missed.">            if (evt instanceof NetworkEvent) {</span>
+<span class="nc" id="L494">                waitingForResponseLock = false;</span>
+<span class="nc" id="L495">                NetworkEvent e = (NetworkEvent) evt;</span>
+<span class="nc" id="L496">                Vector v = (Vector) e.getMetaData();</span>
+<span class="nc" id="L497">                RSSService s = (RSSService) e.getConnectionRequest();</span>
+
+<span class="nc bnc" id="L499" title="All 2 branches missed.">                if (existingData != null) {</span>
+<span class="nc" id="L500">                    existingData.removeElement(MORE);</span>
+<span class="nc bnc" id="L501" title="All 2 branches missed.">                    for (int iter = 0; iter &lt; v.size(); iter++) {</span>
+<span class="nc" id="L502">                        Hashtable h = (Hashtable) v.elementAt(iter);</span>
+<span class="nc" id="L503">                        existingData.addElement(h);</span>
+                    }
+                } else {
+<span class="nc" id="L506">                    existingData = v;</span>
+                }
+
+<span class="nc bnc" id="L509" title="All 2 branches missed.">                if (s.hasMore()) {</span>
+<span class="nc" id="L510">                    v.addElement(MORE);</span>
+                }
+
+<span class="nc" id="L513">                setModel(new DefaultListModel(existingData));</span>
+
+<span class="nc bnc" id="L515" title="All 2 branches missed.">                for (int iter = 0; iter &lt; existingData.size(); iter++) {</span>
+<span class="nc" id="L516">                    Hashtable h = (Hashtable) existingData.elementAt(iter);</span>
+<span class="nc" id="L517">                    Object icn = h.get(&quot;icon&quot;);</span>
+<span class="nc bnc" id="L518" title="All 4 branches missed.">                    if (icn != null &amp;&amp; icn == iconPlaceholder) {</span>
+<span class="nc" id="L519">                        downloadImage(h, iter);</span>
+                    }
+                }
+<span class="nc" id="L522">                return;</span>
+            }
+
+<span class="nc" id="L525">            Hashtable sel = (Hashtable) getSelectedItem();</span>
+<span class="nc bnc" id="L526" title="All 2 branches missed.">            if (sel == MORE) {</span>
+<span class="nc bnc" id="L527" title="All 2 branches missed.">                if (waitingForResponseLock) {</span>
+<span class="nc" id="L528">                    return;</span>
+                }
+<span class="nc" id="L530">                waitingForResponseLock = true;</span>
+<span class="nc" id="L531">                service = new RSSService(url, limit, existingData.size() - 1);</span>
+<span class="nc bnc" id="L532" title="All 2 branches missed.">                if (iconPlaceholder != null) {</span>
+<span class="nc" id="L533">                    service.setIconPlaceholder(iconPlaceholder);</span>
+                }
+<span class="nc" id="L535">                service.addResponseListener(new EventHandler());</span>
+<span class="nc" id="L536">                Progress p = new Progress(&quot;Fetching RSS&quot;, service, displayProgressPercentage);</span>
+<span class="nc" id="L537">                p.setAutoShow(true);</span>
+<span class="nc" id="L538">                p.setDisposeOnCompletion(true);</span>
+<span class="nc" id="L539">                NetworkManager.getInstance().addToQueue(service);</span>
+<span class="nc" id="L540">            } else {</span>
+<span class="nc" id="L541">                showRSSEntry(sel);</span>
+            }
+<span class="nc" id="L543">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

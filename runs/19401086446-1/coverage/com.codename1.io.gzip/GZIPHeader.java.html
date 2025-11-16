@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GZIPHeader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.gzip</a> &gt; <span class="el_source">GZIPHeader.java</span></div><h1>GZIPHeader.java</h1><pre class="source lang-java linenums">/* -*-mode:java; c-basic-offset:2; -*- */
+/*
+Copyright (c) 2011 ymnk, JCraft,Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+  1. Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright 
+     notice, this list of conditions and the following disclaimer in 
+     the documentation and/or other materials provided with the distribution.
+
+  3. The names of the authors may not be used to endorse or promote products
+     derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL JCRAFT,
+INC. OR ANY CONTRIBUTORS TO THIS SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
+ * This program is based on zlib-1.1.3, so all credit should go authors
+ * Jean-loup Gailly(jloup@gzip.org) and Mark Adler(madler@alumni.caltech.edu)
+ * and contributors of zlib.
+ */
+
+package com.codename1.io.gzip;
+
+import java.io.UnsupportedEncodingException;
+
+/**
+ * @see &quot;http://www.ietf.org/rfc/rfc1952.txt&quot;
+ */
+<span class="fc" id="L42">public class GZIPHeader {</span>
+
+    public static final byte OS_MSDOS = (byte) 0x00;
+    public static final byte OS_AMIGA = (byte) 0x01;
+    public static final byte OS_VMS = (byte) 0x02;
+    public static final byte OS_UNIX = (byte) 0x03;
+    public static final byte OS_ATARI = (byte) 0x05;
+    public static final byte OS_OS2 = (byte) 0x06;
+    public static final byte OS_MACOS = (byte) 0x07;
+    public static final byte OS_TOPS20 = (byte) 0x0a;
+    public static final byte OS_WIN32 = (byte) 0x0b;
+    public static final byte OS_VMCMS = (byte) 0x04;
+    public static final byte OS_ZSYSTEM = (byte) 0x08;
+    public static final byte OS_CPM = (byte) 0x09;
+    public static final byte OS_QDOS = (byte) 0x0c;
+    public static final byte OS_RISCOS = (byte) 0x0d;
+    public static final byte OS_UNKNOWN = (byte) 0xff;
+
+<span class="fc" id="L60">    boolean text = false;</span>
+    long time;
+    int xflags;
+<span class="fc" id="L63">    int os = 255;</span>
+    byte[] extra;
+    byte[] name;
+    byte[] comment;
+    int hcrc;
+    long crc;
+<span class="fc" id="L69">    boolean done = false;</span>
+<span class="fc" id="L70">    long mtime = 0;</span>
+<span class="fc" id="L71">    private boolean fhcrc = false;</span>
+
+    public long getModifiedTime() {
+<span class="fc" id="L74">        return mtime;</span>
+    }
+
+    public void setModifiedTime(long mtime) {
+<span class="fc" id="L78">        this.mtime = mtime;</span>
+<span class="fc" id="L79">    }</span>
+
+    public int getOS() {
+<span class="fc" id="L82">        return os;</span>
+    }
+
+    public void setOS(int os) {
+<span class="pc bpc" id="L86" title="4 of 6 branches missed.">        if ((0 &lt;= os &amp;&amp; os &lt;= 13) || os == 255)</span>
+<span class="fc" id="L87">            this.os = os;</span>
+        else
+<span class="nc" id="L89">            throw new IllegalArgumentException(&quot;os: &quot; + os);</span>
+<span class="fc" id="L90">    }</span>
+
+    public String getName() {
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (name == null) return &quot;&quot;;</span>
+        try {
+<span class="fc" id="L95">            return new String(name, &quot;ISO-8859-1&quot;);</span>
+<span class="nc" id="L96">        } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L97">            throw new RuntimeException(e.toString());</span>
+        }
+    }
+
+    public void setName(String name) {
+        try {
+<span class="fc" id="L103">            this.name = name.getBytes(&quot;ISO-8859-1&quot;);</span>
+<span class="nc" id="L104">        } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L105">            throw new IllegalArgumentException(&quot;name must be in ISO-8859-1 &quot; + name);</span>
+<span class="fc" id="L106">        }</span>
+<span class="fc" id="L107">    }</span>
+
+    public String getComment() {
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (comment == null) return &quot;&quot;;</span>
+        try {
+<span class="fc" id="L112">            return new String(comment, &quot;ISO-8859-1&quot;);</span>
+<span class="nc" id="L113">        } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L114">            throw new RuntimeException(e.toString());</span>
+        }
+    }
+
+    public void setComment(String comment) {
+        try {
+<span class="fc" id="L120">            this.comment = comment.getBytes(&quot;ISO-8859-1&quot;);</span>
+<span class="nc" id="L121">        } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L122">            throw new IllegalArgumentException(&quot;comment must be in ISO-8859-1 &quot; + name);</span>
+<span class="fc" id="L123">        }</span>
+<span class="fc" id="L124">    }</span>
+
+    public long getCRC() {
+<span class="fc" id="L127">        return crc;</span>
+    }
+
+    public void setCRC(long crc) {
+<span class="fc" id="L131">        this.crc = crc;</span>
+<span class="fc" id="L132">    }</span>
+
+    void put(Deflate d) {
+<span class="fc" id="L135">        int flag = 0;</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (text) {</span>
+<span class="nc" id="L137">            flag |= 1;     // FTEXT</span>
+        }
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (fhcrc) {</span>
+<span class="nc" id="L140">            flag |= 2;     // FHCRC</span>
+        }
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (extra != null) {</span>
+<span class="nc" id="L143">            flag |= 4;     // FEXTRA</span>
+        }
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (name != null) {</span>
+<span class="fc" id="L146">            flag |= 8;    // FNAME</span>
+        }
+<span class="fc bfc" id="L148" title="All 2 branches covered.">        if (comment != null) {</span>
+<span class="fc" id="L149">            flag |= 16;   // FCOMMENT</span>
+        }
+<span class="fc" id="L151">        int xfl = 0;</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (d.level == JZlib.Z_BEST_SPEED) {</span>
+<span class="nc" id="L153">            xfl |= 4;</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        } else if (d.level == JZlib.Z_BEST_COMPRESSION) {</span>
+<span class="nc" id="L155">            xfl |= 2;</span>
+        }
+
+<span class="fc" id="L158">        d.put_short((short) 0x8b1f);  // ID1 ID2</span>
+<span class="fc" id="L159">        d.put_byte((byte) 8);         // CM(Compression Method)</span>
+<span class="fc" id="L160">        d.put_byte((byte) flag);</span>
+<span class="fc" id="L161">        d.put_byte((byte) mtime);</span>
+<span class="fc" id="L162">        d.put_byte((byte) (mtime &gt;&gt; 8));</span>
+<span class="fc" id="L163">        d.put_byte((byte) (mtime &gt;&gt; 16));</span>
+<span class="fc" id="L164">        d.put_byte((byte) (mtime &gt;&gt; 24));</span>
+<span class="fc" id="L165">        d.put_byte((byte) xfl);</span>
+<span class="fc" id="L166">        d.put_byte((byte) os);</span>
+
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (extra != null) {</span>
+<span class="nc" id="L169">            d.put_byte((byte) extra.length);</span>
+<span class="nc" id="L170">            d.put_byte((byte) (extra.length &gt;&gt; 8));</span>
+<span class="nc" id="L171">            d.put_byte(extra, 0, extra.length);</span>
+        }
+
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (name != null) {</span>
+<span class="fc" id="L175">            d.put_byte(name, 0, name.length);</span>
+<span class="fc" id="L176">            d.put_byte((byte) 0);</span>
+        }
+
+<span class="fc bfc" id="L179" title="All 2 branches covered.">        if (comment != null) {</span>
+<span class="fc" id="L180">            d.put_byte(comment, 0, comment.length);</span>
+<span class="fc" id="L181">            d.put_byte((byte) 0);</span>
+        }
+<span class="fc" id="L183">    }</span>
+
+    public Object clone() {
+<span class="nc" id="L186">        GZIPHeader gheader = new GZIPHeader();</span>
+        byte[] tmp;
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        if (gheader.extra != null) {</span>
+<span class="nc" id="L189">            tmp = new byte[gheader.extra.length];</span>
+<span class="nc" id="L190">            System.arraycopy(gheader.extra, 0, tmp, 0, tmp.length);</span>
+<span class="nc" id="L191">            gheader.extra = tmp;</span>
+        }
+
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if (gheader.name != null) {</span>
+<span class="nc" id="L195">            tmp = new byte[gheader.name.length];</span>
+<span class="nc" id="L196">            System.arraycopy(gheader.name, 0, tmp, 0, tmp.length);</span>
+<span class="nc" id="L197">            gheader.name = tmp;</span>
+        }
+
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (gheader.comment != null) {</span>
+<span class="nc" id="L201">            tmp = new byte[gheader.comment.length];</span>
+<span class="nc" id="L202">            System.arraycopy(gheader.comment, 0, tmp, 0, tmp.length);</span>
+<span class="nc" id="L203">            gheader.comment = tmp;</span>
+        }
+
+<span class="nc" id="L206">        return gheader;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

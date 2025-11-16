@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SocketConnection.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">SocketConnection.java</span></div><h1>SocketConnection.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.io;
+
+import java.io.InputStream;
+import java.io.OutputStream;
+
+/**
+ * Callback for establishment of a socket connection. Notice this callback
+ * is always invoked on a new separate thread to allow uninterrupted IO.
+ *
+ * @author Shai Almog
+ */
+public abstract class SocketConnection {
+    /**
+     * Keeping member field so the GC won't collect these objects before the socket itself is collected.
+     * This can cause a problem since there's native reliance on these objects.
+     */
+    InputStream input;
+    OutputStream output;
+
+    private int connectTimeout;
+    private boolean connected;
+
+<span class="fc" id="L46">    public SocketConnection() {</span>
+
+<span class="fc" id="L48">    }</span>
+
+    /**
+     * Creates a socket connection, setting the connect timeout.  Timeout of 0 is infinite.
+     *
+     * @param connectTimeout The connect timeout.  0 for infinite.
+     * @since 7.0
+     */
+<span class="fc" id="L56">    public SocketConnection(int connectTimeout) {</span>
+<span class="fc" id="L57">        this.connectTimeout = connectTimeout;</span>
+<span class="fc" id="L58">    }</span>
+
+    /**
+     * Invoked in case of an error in the socket connection, this method is invoked off the EDT
+     *
+     * @param errorCode the error code
+     * @param message   error message if applicable
+     */
+    public abstract void connectionError(int errorCode, String message);
+
+    /**
+     * Invoked when a socket connection is established, this method is invoked off the EDT
+     *
+     * @param is input stream for the socket
+     * @param os output stream for the socket
+     */
+    public abstract void connectionEstablished(InputStream is, OutputStream os);
+
+    /**
+     * Returns true if this connection is currently active
+     *
+     * @return true if connected
+     */
+    public boolean isConnected() {
+<span class="fc" id="L82">        return connected;</span>
+    }
+
+    void setConnected(boolean b) {
+<span class="fc" id="L86">        connected = b;</span>
+<span class="fc" id="L87">    }</span>
+
+    /**
+     * Gets the connect timeout.
+     *
+     * @return The connect timeout.  0 for infinite.
+     */
+    public int getConnectTimeout() {
+<span class="fc" id="L95">        return this.connectTimeout;</span>
+    }
+
+    /**
+     * Sets the connect timeout.
+     *
+     * @param connectTimeout The connect timeout.  0 for infinite timeout.
+     * @since 7.0
+     */
+    public void setConnectTimeout(int connectTimeout) {
+<span class="fc" id="L105">        this.connectTimeout = connectTimeout;</span>
+<span class="fc" id="L106">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

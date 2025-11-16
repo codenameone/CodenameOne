@@ -1,0 +1,865 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PlatformDefaults.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts.mig</a> &gt; <span class="el_source">PlatformDefaults.java</span></div><h1>PlatformDefaults.java</h1><pre class="source lang-java linenums">package com.codename1.ui.layouts.mig;
+
+import com.codename1.ui.Display;
+import com.codename1.util.MathUtil;
+
+import java.util.HashMap;
+
+/*
+ * License (BSD):
+ * ==============
+ *
+ * Copyright (c) 2004, Mikael Grev, MiG InfoCom AB. (miglayout (at) miginfocom (dot) com)
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * Neither the name of the MiG InfoCom AB nor the names of its contributors may be
+ * used to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ *
+ * @version 1.0
+ * @author Mikael Grev, MiG InfoCom AB
+ *         Date: 2006-sep-08
+ * @author Xxxx Xxxx, Xxxx  - Gnome support
+ *         Date: 2008-jan-16
+ */
+
+/**
+ * Currently handles Windows, Mac OS X, and GNOME spacing.
+ */
+public final class PlatformDefaults {
+    public static final int WINDOWS_XP = 0;
+    public static final int MAC_OSX = 1;
+    public static final int GNOME = 2;
+    /**
+     * I value indicating that the size of the font for the container of the component
+     * will be used as a base for calculating the logical pixel size. This is much as how
+     * Windows calculated DLU (dialog units).
+     *
+     * @see net.miginfocom.layout.UnitValue#LPX
+     * @see net.miginfocom.layout.UnitValue#LPY
+     * @see #setLogicalPixelBase(int)
+     */
+    public static final int BASE_FONT_SIZE = 100;
+    /**
+     * I value indicating that the screen DPI will be used as a base for calculating the
+     * logical pixel size.
+     * &lt;p&gt;
+     * This is the default value.
+     *
+     * @see net.miginfocom.layout.UnitValue#LPX
+     * @see net.miginfocom.layout.UnitValue#LPY
+     * @see #setLogicalPixelBase(int)
+     * @see #setVerticalScaleFactor(Float)
+     * @see #setHorizontalScaleFactor(Float)
+     */
+    public static final int BASE_SCALE_FACTOR = 101;
+    /**
+     * I value indicating that the size of a logical pixel should always be a real pixel
+     * and thus no compensation will be made.
+     *
+     * @see net.miginfocom.layout.UnitValue#LPX
+     * @see net.miginfocom.layout.UnitValue#LPY
+     * @see #setLogicalPixelBase(int)
+     */
+    public static final int BASE_REAL_PIXEL = 102;
+    //	private static final UnitValue LPX1 = new UnitValue(1, UnitValue.LPX, null);
+//	private static final UnitValue LPX4 = new UnitValue(4, UnitValue.LPX, null);
+<span class="fc" id="L85">    private static final UnitValue LPX6 = new UnitValue(6, UnitValue.LPX, null);</span>
+<span class="fc" id="L86">    private static final UnitValue LPX7 = new UnitValue(7, UnitValue.LPX, null);</span>
+    //	private static final UnitValue LPX8 = new UnitValue(8, UnitValue.LPX, null);
+//	private static final UnitValue LPX9 = new UnitValue(9, UnitValue.LPX, null);
+//	private static final UnitValue LPX10 = new UnitValue(10, UnitValue.LPX, null);
+<span class="fc" id="L90">    private static final UnitValue LPX11 = new UnitValue(11, UnitValue.LPX, null);</span>
+<span class="fc" id="L91">    private static final UnitValue LPX12 = new UnitValue(12, UnitValue.LPX, null);</span>
+    //	private static final UnitValue LPX14 = new UnitValue(14, UnitValue.LPX, null);
+<span class="fc" id="L93">    private static final UnitValue LPX16 = new UnitValue(16, UnitValue.LPX, null);</span>
+<span class="fc" id="L94">    private static final UnitValue LPX18 = new UnitValue(18, UnitValue.LPX, null);</span>
+<span class="fc" id="L95">    private static final UnitValue LPX20 = new UnitValue(20, UnitValue.LPX, null);</span>
+    //	private static final UnitValue LPY1 = new UnitValue(1, UnitValue.LPY, null);
+//	private static final UnitValue LPY4 = new UnitValue(4, UnitValue.LPY, null);
+<span class="fc" id="L98">    private static final UnitValue LPY6 = new UnitValue(6, UnitValue.LPY, null);</span>
+<span class="fc" id="L99">    private static final UnitValue LPY7 = new UnitValue(7, UnitValue.LPY, null);</span>
+    //	private static final UnitValue LPY8 = new UnitValue(8, UnitValue.LPY, null);
+//	private static final UnitValue LPY9 = new UnitValue(9, UnitValue.LPY, null);
+//	private static final UnitValue LPY10 = new UnitValue(10, UnitValue.LPY, null);
+<span class="fc" id="L103">    private static final UnitValue LPY11 = new UnitValue(11, UnitValue.LPY, null);</span>
+<span class="fc" id="L104">    private static final UnitValue LPY12 = new UnitValue(12, UnitValue.LPY, null);</span>
+<span class="fc" id="L105">    private static final UnitValue LPY14 = new UnitValue(14, UnitValue.LPY, null);</span>
+<span class="fc" id="L106">    private static final UnitValue LPY16 = new UnitValue(16, UnitValue.LPY, null);</span>
+<span class="fc" id="L107">    private static final UnitValue LPY18 = new UnitValue(18, UnitValue.LPY, null);</span>
+<span class="fc" id="L108">    private static final UnitValue LPY20 = new UnitValue(20, UnitValue.LPY, null);</span>
+    // Used for holding values.
+<span class="fc" id="L110">    private final static UnitValue[] PANEL_INS = new UnitValue[4];</span>
+<span class="fc" id="L111">    private final static UnitValue[] DIALOG_INS = new UnitValue[4];</span>
+//	private static final int KDE = 3;
+<span class="fc" id="L113">    private static final HashMap&lt;String, UnitValue&gt; HOR_DEFS = new HashMap&lt;String, UnitValue&gt;(32);</span>
+<span class="fc" id="L114">    private static final HashMap&lt;String, UnitValue&gt; VER_DEFS = new HashMap&lt;String, UnitValue&gt;(32);</span>
+<span class="fc" id="L115">    private static final HashMap&lt;String, int[]&gt; VISUAL_BOUNDS = new HashMap&lt;String, int[]&gt;(64);</span>
+    /**
+     * Property to use in LAF settings and as JComponent client property
+     * to specify the visual padding.
+     * &lt;p&gt;
+     */
+<span class="fc" id="L121">    public static String VISUAL_PADDING_PROPERTY = &quot;visualPadding&quot;;</span>
+<span class="fc" id="L122">    static BoundSize RELATED_X = null, RELATED_Y = null, UNRELATED_X = null, UNRELATED_Y = null;</span>
+<span class="fc" id="L123">    private static int DEF_H_UNIT = UnitValue.LPX;</span>
+<span class="fc" id="L124">    private static int DEF_V_UNIT = UnitValue.LPY;</span>
+<span class="fc" id="L125">    private static InCellGapProvider GAP_PROVIDER = null;</span>
+<span class="fc" id="L126">    private static volatile int MOD_COUNT = 0;</span>
+<span class="fc" id="L127">    private static int CUR_PLAF = WINDOWS_XP;</span>
+<span class="fc" id="L128">    private static String BUTTON_FORMAT = null;</span>
+<span class="fc" id="L129">    private static BoundSize DEF_VGAP = null, DEF_HGAP = null;</span>
+<span class="fc" id="L130">    private static UnitValue BUTT_WIDTH = null;</span>
+<span class="fc" id="L131">    private static Float horScale = null, verScale = null;</span>
+<span class="fc" id="L132">    private static int LP_BASE = BASE_SCALE_FACTOR;</span>
+<span class="fc" id="L133">    private static Integer BASE_DPI_FORCED = null;</span>
+<span class="fc" id="L134">    private static int BASE_DPI = 96;</span>
+<span class="fc" id="L135">    private static boolean dra = true;</span>
+
+    static {
+<span class="fc" id="L138">        setPlatform(getCurrentPlatform());</span>
+<span class="fc" id="L139">        MOD_COUNT = 0;</span>
+<span class="fc" id="L140">    }</span>
+
+    private PlatformDefaults() {
+    }
+
+    /**
+     * Returns the platform that the JRE is running on currently.
+     *
+     * @return The platform that the JRE is running on currently. E.g. {@link #MAC_OSX}, {@link #WINDOWS_XP}, or {@link #GNOME}.
+     */
+    public static int getCurrentPlatform() {
+<span class="fc" id="L151">        final String os = System.getProperty(&quot;os.name&quot;);</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        if (os.startsWith(&quot;Mac OS&quot;)) {</span>
+<span class="nc" id="L153">            return MAC_OSX;</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        } else if (os.startsWith(&quot;Linux&quot;)) {</span>
+<span class="fc" id="L155">            return GNOME;</span>
+        } else {
+<span class="nc" id="L157">            return WINDOWS_XP;</span>
+        }
+    }
+
+    /**
+     * Sets the visual bounds for a component type.
+     *
+     * @param key    The component type. E.g. &quot;TabbedPane.visualPadding&quot; or &quot;ComboBox.editable.isSquare.visualPadding&quot;. See source code for list.
+     * @param insets Top, left, bottom, right. Always length 4 or null.
+     * @see net.miginfocom.layout.ComponentWrapper#getVisualPadding()
+     */
+    public static void setDefaultVisualPadding(String key, int[] insets) {
+<span class="nc" id="L169">        VISUAL_BOUNDS.put(key, insets);</span>
+<span class="nc" id="L170">    }</span>
+
+    /**
+     * Returns the visual bounds for a component type.
+     *
+     * @param key The component type. E.g. &quot;TabbedPane.visualPadding&quot; or &quot;ComboBox.editable.isSquare.visualPadding&quot;. See source code for list.
+     * @return insets Top, left, bottom, right. Always length 4 or null. Live object, MUST NOT BE CHANGED!.
+     * @see net.miginfocom.layout.ComponentWrapper#getVisualPadding()
+     */
+    public static int[] getDefaultVisualPadding(String key) {
+<span class="nc" id="L180">        return VISUAL_BOUNDS.get(key);</span>
+    }
+
+    public static int getPlatformDPI(int plaf) {
+<span class="pc bpc" id="L184" title="6 of 7 branches missed.">        switch (Display.getInstance().getDeviceDensity()) {</span>
+            case Display.DENSITY_HD:
+<span class="nc" id="L186">                return 420;</span>
+            case Display.DENSITY_VERY_HIGH:
+<span class="nc" id="L188">                return 320;</span>
+            case Display.DENSITY_HIGH:
+<span class="nc" id="L190">                return 220;</span>
+            case Display.DENSITY_MEDIUM:
+<span class="fc" id="L192">                return 150;</span>
+            case Display.DENSITY_LOW:
+<span class="nc" id="L194">                return 96;</span>
+            case Display.DENSITY_VERY_LOW:
+<span class="nc" id="L196">                return 72;</span>
+        }
+<span class="nc" id="L198">        return 96;</span>
+    }
+
+    /**
+     * Returns the current platform
+     *
+     * @return &lt;code&gt;PlatformDefaults.WINDOWS&lt;/code&gt; or &lt;code&gt;PlatformDefaults.MAC_OSX&lt;/code&gt;
+     */
+    public static int getPlatform() {
+<span class="nc" id="L207">        return CUR_PLAF;</span>
+    }
+
+    /**
+     * Set the defaults to the default for the platform
+     *
+     * @param plaf The platform. &lt;code&gt;PlatformDefaults.WINDOWS_XP&lt;/code&gt;,
+     *             &lt;code&gt;PlatformDefaults.MAC_OSX&lt;/code&gt;, or
+     *             &lt;code&gt;PlatformDefaults.GNOME&lt;/code&gt;.
+     */
+    public static void setPlatform(int plaf) {
+<span class="pc bpc" id="L218" title="3 of 4 branches missed.">        switch (plaf) {</span>
+            case WINDOWS_XP:
+<span class="nc" id="L220">                setDefaultVisualPadding(&quot;TabbedPane.&quot; + VISUAL_PADDING_PROPERTY, new int[]{1, 0, 1, 2});</span>
+<span class="nc" id="L221">                setRelatedGap(LPX7, LPY7);</span>
+<span class="nc" id="L222">                setUnrelatedGap(LPX11, LPY11);</span>
+<span class="nc" id="L223">                setParagraphGap(LPX20, LPY20);</span>
+<span class="nc" id="L224">                setIndentGap(LPX11, LPY11);</span>
+<span class="nc" id="L225">                setGridCellGap(LPX7, LPY7);</span>
+
+<span class="nc" id="L227">                setMinimumButtonWidth(new UnitValue(75, UnitValue.LPX, null));</span>
+<span class="nc" id="L228">                setButtonOrder(&quot;L_E+U+YNBXOCAH_R&quot;);</span>
+<span class="nc" id="L229">                setDialogInsets(LPY11, LPX11, LPY11, LPX11);</span>
+<span class="nc" id="L230">                setPanelInsets(LPY7, LPX7, LPY7, LPX7);</span>
+<span class="nc" id="L231">                break;</span>
+
+            case MAC_OSX:
+
+<span class="nc" id="L235">                setDefaultVisualPadding(&quot;Button.&quot; + VISUAL_PADDING_PROPERTY, new int[]{3, 6, 5, 6});</span>
+<span class="nc" id="L236">                setDefaultVisualPadding(&quot;Button.icon.&quot; + VISUAL_PADDING_PROPERTY, new int[]{3, 2, 3, 2});</span>
+<span class="nc" id="L237">                setDefaultVisualPadding(&quot;Button.square.&quot; + VISUAL_PADDING_PROPERTY, new int[]{4, 4, 4, 4});</span>
+<span class="nc" id="L238">                setDefaultVisualPadding(&quot;Button.square.icon.&quot; + VISUAL_PADDING_PROPERTY, new int[]{4, 4, 4, 4});</span>
+<span class="nc" id="L239">                setDefaultVisualPadding(&quot;Button.gradient.&quot; + VISUAL_PADDING_PROPERTY, new int[]{5, 4, 5, 4});</span>
+<span class="nc" id="L240">                setDefaultVisualPadding(&quot;Button.gradient.icon.&quot; + VISUAL_PADDING_PROPERTY, new int[]{5, 4, 5, 4});</span>
+<span class="nc" id="L241">                setDefaultVisualPadding(&quot;Button.bevel.&quot; + VISUAL_PADDING_PROPERTY, new int[]{2, 2, 3, 2});</span>
+<span class="nc" id="L242">                setDefaultVisualPadding(&quot;Button.bevel.icon.&quot; + VISUAL_PADDING_PROPERTY, new int[]{2, 2, 3, 2});</span>
+<span class="nc" id="L243">                setDefaultVisualPadding(&quot;Button.textured.&quot; + VISUAL_PADDING_PROPERTY, new int[]{3, 2, 3, 2});</span>
+<span class="nc" id="L244">                setDefaultVisualPadding(&quot;Button.textured.icon.&quot; + VISUAL_PADDING_PROPERTY, new int[]{3, 2, 3, 2});</span>
+<span class="nc" id="L245">                setDefaultVisualPadding(&quot;Button.roundRect.&quot; + VISUAL_PADDING_PROPERTY, new int[]{5, 4, 5, 4});</span>
+<span class="nc" id="L246">                setDefaultVisualPadding(&quot;Button.roundRect.icon.&quot; + VISUAL_PADDING_PROPERTY, new int[]{5, 4, 5, 4});</span>
+<span class="nc" id="L247">                setDefaultVisualPadding(&quot;Button.recessed.&quot; + VISUAL_PADDING_PROPERTY, new int[]{5, 4, 5, 4});</span>
+<span class="nc" id="L248">                setDefaultVisualPadding(&quot;Button.recessed.icon.&quot; + VISUAL_PADDING_PROPERTY, new int[]{5, 4, 5, 4});</span>
+<span class="nc" id="L249">                setDefaultVisualPadding(&quot;Button.help.&quot; + VISUAL_PADDING_PROPERTY, new int[]{4, 3, 3, 4});</span>
+<span class="nc" id="L250">                setDefaultVisualPadding(&quot;Button.help.icon.&quot; + VISUAL_PADDING_PROPERTY, new int[]{4, 3, 3, 4});</span>
+
+<span class="nc" id="L252">                setDefaultVisualPadding(&quot;ComboBox.&quot; + VISUAL_PADDING_PROPERTY, new int[]{2, 4, 4, 5});</span>
+<span class="nc" id="L253">                setDefaultVisualPadding(&quot;ComboBox.isPopDown.&quot; + VISUAL_PADDING_PROPERTY, new int[]{2, 5, 4, 5});</span>
+<span class="nc" id="L254">                setDefaultVisualPadding(&quot;ComboBox.isSquare.&quot; + VISUAL_PADDING_PROPERTY, new int[]{1, 6, 5, 7});</span>
+
+<span class="nc" id="L256">                setDefaultVisualPadding(&quot;ComboBox.editable.&quot; + VISUAL_PADDING_PROPERTY, new int[]{3, 3, 3, 2});</span>
+<span class="nc" id="L257">                setDefaultVisualPadding(&quot;ComboBox.editable.isSquare.&quot; + VISUAL_PADDING_PROPERTY, new int[]{3, 3, 3, 1});</span>
+
+<span class="nc" id="L259">                setDefaultVisualPadding(&quot;TextField.&quot; + VISUAL_PADDING_PROPERTY, new int[]{3, 3, 3, 3});</span>
+<span class="nc" id="L260">                setDefaultVisualPadding(&quot;TabbedPane.&quot; + VISUAL_PADDING_PROPERTY, new int[]{4, 8, 11, 8});</span>
+
+<span class="nc" id="L262">                setDefaultVisualPadding(&quot;Spinner.&quot; + VISUAL_PADDING_PROPERTY, new int[]{3, 3, 3, 1});</span>
+
+<span class="nc" id="L264">                setDefaultVisualPadding(&quot;RadioButton.&quot; + VISUAL_PADDING_PROPERTY, new int[]{4, 6, 3, 5});</span>
+<span class="nc" id="L265">                setDefaultVisualPadding(&quot;RadioButton.small.&quot; + VISUAL_PADDING_PROPERTY, new int[]{4, 6, 3, 5});</span>
+<span class="nc" id="L266">                setDefaultVisualPadding(&quot;RadioButton.mini.&quot; + VISUAL_PADDING_PROPERTY, new int[]{5, 7, 4, 5});</span>
+<span class="nc" id="L267">                setDefaultVisualPadding(&quot;CheckBox.&quot; + VISUAL_PADDING_PROPERTY, new int[]{5, 7, 4, 5});</span>
+<span class="nc" id="L268">                setDefaultVisualPadding(&quot;CheckBox.small.&quot; + VISUAL_PADDING_PROPERTY, new int[]{5, 7, 4, 5});</span>
+<span class="nc" id="L269">                setDefaultVisualPadding(&quot;CheckBox.mini.&quot; + VISUAL_PADDING_PROPERTY, new int[]{6, 7, 3, 5});</span>
+
+<span class="nc" id="L271">                setRelatedGap(LPX7, LPY7);</span>
+<span class="nc" id="L272">                setUnrelatedGap(LPX11, LPY11);</span>
+<span class="nc" id="L273">                setParagraphGap(LPX20, LPY20);</span>
+<span class="nc" id="L274">                setIndentGap(LPX11, LPY11);</span>
+<span class="nc" id="L275">                setGridCellGap(LPX7, LPY7);</span>
+
+<span class="nc" id="L277">                setMinimumButtonWidth(new UnitValue(70, UnitValue.LPX, null));</span>
+<span class="nc" id="L278">                setButtonOrder(&quot;L_HE+U+NYBXCOA_R&quot;);</span>
+<span class="nc" id="L279">                setDialogInsets(LPY14, LPX20, LPY20, LPX20);</span>
+<span class="nc" id="L280">                setPanelInsets(LPY16, LPX16, LPY16, LPX16);</span>
+<span class="nc" id="L281">                break;</span>
+
+            case GNOME:
+<span class="fc" id="L284">                setRelatedGap(LPX6, LPY6);                    // GNOME HIG 8.2.3</span>
+<span class="fc" id="L285">                setUnrelatedGap(LPX12, LPY12);                // GNOME HIG 8.2.3</span>
+<span class="fc" id="L286">                setParagraphGap(LPX18, LPY18);                // GNOME HIG 8.2.3</span>
+<span class="fc" id="L287">                setIndentGap(LPX12, LPY12);                   // GNOME HIG 8.2.3</span>
+<span class="fc" id="L288">                setGridCellGap(LPX6, LPY6);                   // GNOME HIG 8.2.3</span>
+
+                // GtkButtonBox, child-min-width property default value
+<span class="fc" id="L291">                setMinimumButtonWidth(new UnitValue(85, UnitValue.LPX, null));</span>
+<span class="fc" id="L292">                setButtonOrder(&quot;L_HE+UNYACBXIO_R&quot;);           // GNOME HIG 3.4.2, 3.7.1</span>
+<span class="fc" id="L293">                setDialogInsets(LPY12, LPX12, LPY12, LPX12);  // GNOME HIG 3.4.3</span>
+<span class="fc" id="L294">                setPanelInsets(LPY6, LPX6, LPY6, LPX6);       // ???</span>
+<span class="fc" id="L295">                break;</span>
+            default:
+<span class="nc" id="L297">                throw new IllegalArgumentException(&quot;Unknown platform: &quot; + plaf);</span>
+        }
+<span class="fc" id="L299">        CUR_PLAF = plaf;</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        BASE_DPI = BASE_DPI_FORCED != null ? BASE_DPI_FORCED : getPlatformDPI(plaf);</span>
+<span class="fc" id="L301">    }</span>
+
+    public static int getDefaultDPI() {
+<span class="fc" id="L304">        return BASE_DPI;</span>
+    }
+
+    /**
+     * Sets the default platform DPI. Normally this is set in the {@link #setPlatform(int)} for the different platforms
+     * but it can be tweaked here. For instance SWT on Mac does this.
+     * &lt;p&gt;
+     * Note that this is not the actual current DPI, but the base DPI for the toolkit.
+     *
+     * @param dpi The base DPI. If null the default DPI is reset to the platform base DPI.
+     */
+    public static void setDefaultDPI(Integer dpi) {
+<span class="nc bnc" id="L316" title="All 2 branches missed.">        BASE_DPI = dpi != null ? dpi : getPlatformDPI(CUR_PLAF);</span>
+<span class="nc" id="L317">        BASE_DPI_FORCED = dpi;</span>
+<span class="nc" id="L318">    }</span>
+
+    /**
+     * The forced scale factor that all screen relative units (e.g. millimeters, inches and logical pixels) will be multiplied
+     * with. If &lt;code&gt;null&lt;/code&gt; this will default to a scale that will scale the current screen to the default screen resolution
+     * (72 DPI for Mac and 92 DPI for Windows).
+     *
+     * @return The forced scale or &lt;code&gt;null&lt;/code&gt; for default scaling.
+     * @see #getHorizontalScaleFactor()
+     * @see ComponentWrapper#getHorizontalScreenDPI()
+     */
+    public static Float getHorizontalScaleFactor() {
+<span class="fc" id="L330">        return horScale;</span>
+    }
+
+    /**
+     * The forced scale factor that all screen relative units (e.g. millimeters, inches and logical pixels) will be multiplied
+     * with. If &lt;code&gt;null&lt;/code&gt; this will default to a scale that will scale the current screen to the default screen resolution
+     * (72 DPI for Mac and 92 DPI for Windows).
+     *
+     * @param f The forced scale or &lt;code&gt;null&lt;/code&gt; for default scaling.
+     * @see #getHorizontalScaleFactor()
+     * @see ComponentWrapper#getHorizontalScreenDPI()
+     */
+    public static void setHorizontalScaleFactor(Float f) {
+<span class="nc bnc" id="L343" title="All 2 branches missed.">        if (!LayoutUtil.equals(horScale, f)) {</span>
+<span class="nc" id="L344">            horScale = f;</span>
+<span class="nc" id="L345">            MOD_COUNT++;</span>
+        }
+<span class="nc" id="L347">    }</span>
+
+    /**
+     * The forced scale factor that all screen relative units (e.g. millimeters, inches and logical pixels) will be multiplied
+     * with. If &lt;code&gt;null&lt;/code&gt; this will default to a scale that will scale the current screen to the default screen resolution
+     * (72 DPI for Mac and 92 DPI for Windows).
+     *
+     * @return The forced scale or &lt;code&gt;null&lt;/code&gt; for default scaling.
+     * @see #getHorizontalScaleFactor()
+     * @see ComponentWrapper#getVerticalScreenDPI()
+     */
+    public static Float getVerticalScaleFactor() {
+<span class="fc" id="L359">        return verScale;</span>
+    }
+
+    /**
+     * The forced scale factor that all screen relative units (e.g. millimeters, inches and logical pixels) will be multiplied
+     * with. If &lt;code&gt;null&lt;/code&gt; this will default to a scale that will scale the current screen to the default screen resolution
+     * (72 DPI for Mac and 92 DPI for Windows).
+     *
+     * @param f The forced scale or &lt;code&gt;null&lt;/code&gt; for default scaling.
+     * @see #getHorizontalScaleFactor()
+     * @see ComponentWrapper#getVerticalScreenDPI()
+     */
+    public static void setVerticalScaleFactor(Float f) {
+<span class="nc bnc" id="L372" title="All 2 branches missed.">        if (!LayoutUtil.equals(verScale, f)) {</span>
+<span class="nc" id="L373">            verScale = f;</span>
+<span class="nc" id="L374">            MOD_COUNT++;</span>
+        }
+<span class="nc" id="L376">    }</span>
+
+    /**
+     * What base value should be used to calculate logical pixel sizes.
+     *
+     * @return The current base. Default is {@link #BASE_SCALE_FACTOR}
+     * @see #BASE_FONT_SIZE
+     * @see #BASE_SCALE_FACTOR
+     * @see #BASE_REAL_PIXEL
+     */
+    public static int getLogicalPixelBase() {
+<span class="fc" id="L387">        return LP_BASE;</span>
+    }
+
+    /**
+     * What base value should be used to calculate logical pixel sizes.
+     *
+     * @param base The new base. Default is {@link #BASE_SCALE_FACTOR}
+     * @see #BASE_FONT_SIZE
+     * @see #BASE_SCALE_FACTOR
+     * @see #BASE_REAL_PIXEL
+     */
+    public static void setLogicalPixelBase(int base) {
+<span class="nc bnc" id="L399" title="All 2 branches missed.">        if (LP_BASE != base) {</span>
+<span class="nc bnc" id="L400" title="All 4 branches missed.">            if (base &lt; BASE_FONT_SIZE || base &gt; BASE_REAL_PIXEL)</span>
+<span class="nc" id="L401">                throw new IllegalArgumentException(&quot;Unrecognized base: &quot; + base);</span>
+
+<span class="nc" id="L403">            LP_BASE = base;</span>
+<span class="nc" id="L404">            MOD_COUNT++;</span>
+        }
+<span class="nc" id="L406">    }</span>
+
+    /**
+     * Sets gap value for components that are &quot;related&quot;.
+     *
+     * @param x The value that will be transformed to pixels. If &lt;code&gt;null&lt;/code&gt; the current value will not change.
+     * @param y The value that will be transformed to pixels. If &lt;code&gt;null&lt;/code&gt; the current value will not change.
+     */
+    public static void setRelatedGap(UnitValue x, UnitValue y) {
+<span class="fc" id="L415">        setUnitValue(new String[]{&quot;r&quot;, &quot;rel&quot;, &quot;related&quot;}, x, y);</span>
+
+<span class="fc" id="L417">        RELATED_X = new BoundSize(x, x, null, &quot;rel:rel&quot;);</span>
+<span class="fc" id="L418">        RELATED_Y = new BoundSize(y, y, null, &quot;rel:rel&quot;);</span>
+<span class="fc" id="L419">    }</span>
+
+    /**
+     * Sets gap value for components that are &quot;unrelated&quot;.
+     *
+     * @param x The value that will be transformed to pixels. If &lt;code&gt;null&lt;/code&gt; the current value will not change.
+     * @param y The value that will be transformed to pixels. If &lt;code&gt;null&lt;/code&gt; the current value will not change.
+     */
+    public static void setUnrelatedGap(UnitValue x, UnitValue y) {
+<span class="fc" id="L428">        setUnitValue(new String[]{&quot;u&quot;, &quot;unrel&quot;, &quot;unrelated&quot;}, x, y);</span>
+
+<span class="fc" id="L430">        UNRELATED_X = new BoundSize(x, x, null, &quot;unrel:unrel&quot;);</span>
+<span class="fc" id="L431">        UNRELATED_Y = new BoundSize(y, y, null, &quot;unrel:unrel&quot;);</span>
+<span class="fc" id="L432">    }</span>
+
+    /**
+     * Sets paragraph gap value for components.
+     *
+     * @param x The value that will be transformed to pixels. If &lt;code&gt;null&lt;/code&gt; the current value will not change.
+     * @param y The value that will be transformed to pixels. If &lt;code&gt;null&lt;/code&gt; the current value will not change.
+     */
+    public static void setParagraphGap(UnitValue x, UnitValue y) {
+<span class="fc" id="L441">        setUnitValue(new String[]{&quot;p&quot;, &quot;para&quot;, &quot;paragraph&quot;}, x, y);</span>
+<span class="fc" id="L442">    }</span>
+
+    /**
+     * Sets gap value for components that are &quot;intended&quot;.
+     *
+     * @param x The value that will be transformed to pixels. If &lt;code&gt;null&lt;/code&gt; the current value will not change.
+     * @param y The value that will be transformed to pixels. If &lt;code&gt;null&lt;/code&gt; the current value will not change.
+     */
+    public static void setIndentGap(UnitValue x, UnitValue y) {
+<span class="fc" id="L451">        setUnitValue(new String[]{&quot;i&quot;, &quot;ind&quot;, &quot;indent&quot;}, x, y);</span>
+<span class="fc" id="L452">    }</span>
+
+    /**
+     * Sets gap between two cells in the grid. Note that this is not a gap between component IN a cell, that has to be set
+     * on the component constraints. The value will be the min and preferred size of the gap.
+     *
+     * @param x The value that will be transformed to pixels. If &lt;code&gt;null&lt;/code&gt; the current value will not change.
+     * @param y The value that will be transformed to pixels. If &lt;code&gt;null&lt;/code&gt; the current value will not change.
+     */
+    public static void setGridCellGap(UnitValue x, UnitValue y) {
+<span class="pc bpc" id="L462" title="1 of 2 branches missed.">        if (x != null)</span>
+<span class="fc" id="L463">            DEF_HGAP = new BoundSize(x, x, null, null);</span>
+
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">        if (y != null)</span>
+<span class="fc" id="L466">            DEF_VGAP = new BoundSize(y, y, null, null);</span>
+
+<span class="fc" id="L468">        MOD_COUNT++;</span>
+<span class="fc" id="L469">    }</span>
+
+    /**
+     * Returns the recommended minimum button width depending on the current set platform.
+     *
+     * @return The recommended minimum button width depending on the current set platform.
+     */
+    public static UnitValue getMinimumButtonWidth() {
+<span class="nc" id="L477">        return BUTT_WIDTH;</span>
+    }
+
+    /**
+     * Sets the recommended minimum button width.
+     *
+     * @param width The recommended minimum button width.
+     */
+    public static void setMinimumButtonWidth(UnitValue width) {
+<span class="fc" id="L486">        BUTT_WIDTH = width;</span>
+<span class="fc" id="L487">        MOD_COUNT++;</span>
+<span class="fc" id="L488">    }</span>
+
+    /**
+     * Returns the unit value associated with the unit. (E.i. &quot;related&quot; or &quot;indent&quot;). Must be lower case.
+     *
+     * @param unit The unit string.
+     * @return The unit value associated with the unit. &lt;code&gt;null&lt;/code&gt; for unrecognized units.
+     */
+    public static UnitValue getUnitValueX(String unit) {
+<span class="nc" id="L497">        return HOR_DEFS.get(unit);</span>
+    }
+
+    /**
+     * Returns the unit value associated with the unit. (E.i. &quot;related&quot; or &quot;indent&quot;). Must be lower case.
+     *
+     * @param unit The unit string.
+     * @return The unit value associated with the unit. &lt;code&gt;null&lt;/code&gt; for unrecognized units.
+     */
+    public static UnitValue getUnitValueY(String unit) {
+<span class="nc" id="L507">        return VER_DEFS.get(unit);</span>
+    }
+
+    /**
+     * Sets the unit value associated with a unit string. This may be used to store values for new unit strings
+     * or modify old. Note that if a built in unit (such as &quot;related&quot;) is modified all versions of it must be
+     * set (I.e. &quot;r&quot;, &quot;rel&quot; and &quot;related&quot;). The build in values will be reset to the default ones if the platform
+     * is re-set.
+     *
+     * @param unitStrings The unit strings. E.g. &quot;mu&quot;, &quot;myunit&quot;. Will be converted to lower case and trimmed. Not &lt;code&gt;null&lt;/code&gt;.
+     * @param x           The value for the horizontal dimension. If &lt;code&gt;null&lt;/code&gt; the value is not changed.
+     * @param y           The value for the vertical dimension. Might be same object as for &lt;code&gt;x&lt;/code&gt;. If &lt;code&gt;null&lt;/code&gt; the value is not changed.
+     */
+    public static void setUnitValue(String[] unitStrings, UnitValue x, UnitValue y) {
+<span class="fc bfc" id="L521" title="All 2 branches covered.">        for (String unitString : unitStrings) {</span>
+<span class="fc" id="L522">            String s = unitString.toLowerCase().trim();</span>
+<span class="pc bpc" id="L523" title="1 of 2 branches missed.">            if (x != null)</span>
+<span class="fc" id="L524">                HOR_DEFS.put(s, x);</span>
+<span class="pc bpc" id="L525" title="1 of 2 branches missed.">            if (y != null)</span>
+<span class="fc" id="L526">                VER_DEFS.put(s, y);</span>
+        }
+<span class="fc" id="L528">        MOD_COUNT++;</span>
+<span class="fc" id="L529">    }</span>
+
+    /**
+     * Understands (&quot;r&quot;, &quot;rel&quot;, &quot;related&quot;) OR (&quot;u&quot;, &quot;unrel&quot;, &quot;unrelated&quot;) OR (&quot;i&quot;, &quot;ind&quot;, &quot;indent&quot;) OR (&quot;p&quot;, &quot;para&quot;, &quot;paragraph&quot;).
+     */
+    static int convertToPixels(float value, String unit, boolean isHor, float ref, ContainerWrapper parent, ComponentWrapper comp) {
+<span class="nc bnc" id="L535" title="All 2 branches missed.">        UnitValue uv = (isHor ? HOR_DEFS : VER_DEFS).get(unit);</span>
+<span class="nc bnc" id="L536" title="All 2 branches missed.">        return uv != null ? MathUtil.round(value * uv.getPixels(ref, parent, comp)) : UnitConverter.UNABLE;</span>
+    }
+
+    /**
+     * Returns the order for the typical buttons in a standard button bar. It is one letter per button type.
+     *
+     * @return The button order.
+     * @see #setButtonOrder(String)
+     */
+    public static String getButtonOrder() {
+<span class="nc" id="L546">        return BUTTON_FORMAT;</span>
+    }
+
+    /**
+     * Sets the order for the typical buttons in a standard button bar. It is one letter per button type.
+     * &lt;p&gt;
+     * Letter in upper case will get the minimum button width that the {@link #getMinimumButtonWidth()} specifies
+     * and letters in lower case will get the width the current look&amp;amp;feel specifies.
+     * &lt;p&gt;
+     * Gaps will never be added to before the first component or after the last component. However, '+' (push) will be
+     * applied before and after as well, but with a minimum size of 0 if first/last so there will not be a gap
+     * before or after.
+     * &lt;p&gt;
+     * If gaps are explicitly set on buttons they will never be reduced, but they may be increased.
+     * &lt;p&gt;
+     * These are the characters that can be used:
+     * &lt;ul&gt;
+     * &lt;li&gt;&lt;code&gt;'L'&lt;/code&gt; - Buttons with this style tag will staticall end up on the left end of the bar.
+     * &lt;li&gt;&lt;code&gt;'R'&lt;/code&gt; - Buttons with this style tag will staticall end up on the right end of the bar.
+     * &lt;li&gt;&lt;code&gt;'H'&lt;/code&gt; - A tag for the &quot;help&quot; button that normally is supposed to be on the right.
+     * &lt;li&gt;&lt;code&gt;'E'&lt;/code&gt; - A tag for the &quot;help2&quot; button that normally is supposed to be on the left.
+     * &lt;li&gt;&lt;code&gt;'Y'&lt;/code&gt; - A tag for the &quot;yes&quot; button.
+     * &lt;li&gt;&lt;code&gt;'N'&lt;/code&gt; - A tag for the &quot;no&quot; button.
+     * &lt;li&gt;&lt;code&gt;'X'&lt;/code&gt; - A tag for the &quot;next &amp;gt;&quot; or &quot;forward &amp;gt;&quot; button.
+     * &lt;li&gt;&lt;code&gt;'B'&lt;/code&gt; - A tag for the &quot;&amp;lt; back&amp;gt;&quot; or &quot;&amp;lt; previous&quot; button.
+     * &lt;li&gt;&lt;code&gt;'I'&lt;/code&gt; - A tag for the &quot;finish&quot;.
+     * &lt;li&gt;&lt;code&gt;'A'&lt;/code&gt; - A tag for the &quot;apply&quot; button.
+     * &lt;li&gt;&lt;code&gt;'C'&lt;/code&gt; - A tag for the &quot;cancel&quot; or &quot;close&quot; button.
+     * &lt;li&gt;&lt;code&gt;'O'&lt;/code&gt; - A tag for the &quot;ok&quot; or &quot;done&quot; button.
+     * &lt;li&gt;&lt;code&gt;'U'&lt;/code&gt; - All Uncategorized, Other, or &quot;Unknown&quot; buttons. Tag will be &quot;other&quot;.
+     * &lt;li&gt;&lt;code&gt;'+'&lt;/code&gt; - A glue push gap that will take as much space as it can and at least an &quot;unrelated&quot; gap. (Platform dependant)
+     * &lt;li&gt;&lt;code&gt;'_'&lt;/code&gt; - (underscore) An &quot;unrelated&quot; gap. (Platform dependant)
+     * &lt;/ul&gt;
+     * &lt;p&gt;
+     * Even though the style tags are normally applied to buttons this works with all components.
+     * &lt;p&gt;
+     * The normal style for MAC OS X is &lt;code&gt;&quot;L_HE+U+FBI_NYCOA_R&quot;&lt;/code&gt;,
+     * for Windows is &lt;code&gt;&quot;L_E+U+FBI_YNOCAH_R&quot;&lt;/code&gt;, and for GNOME is
+     * &lt;code&gt;&quot;L_HE+UNYACBXIO_R&quot;&lt;/code&gt;.
+     *
+     * @param order The new button order for the current platform.
+     */
+    public static void setButtonOrder(String order) {
+<span class="fc" id="L589">        BUTTON_FORMAT = order;</span>
+<span class="fc" id="L590">        MOD_COUNT++;</span>
+<span class="fc" id="L591">    }</span>
+
+    /**
+     * Returns the tag (used in the {@link CC}) for a char. The char is same as used in {@link #getButtonOrder()}.
+     *
+     * @param c The char. Must be lower case!
+     * @return The tag that corresponds to the char or &lt;code&gt;null&lt;/code&gt; if the char is unrecognized.
+     */
+    static String getTagForChar(char c) {
+<span class="nc bnc" id="L600" title="All 14 branches missed.">        switch (c) {</span>
+            case 'o':
+<span class="nc" id="L602">                return &quot;ok&quot;;</span>
+            case 'c':
+<span class="nc" id="L604">                return &quot;cancel&quot;;</span>
+            case 'h':
+<span class="nc" id="L606">                return &quot;help&quot;;</span>
+            case 'e':
+<span class="nc" id="L608">                return &quot;help2&quot;;</span>
+            case 'y':
+<span class="nc" id="L610">                return &quot;yes&quot;;</span>
+            case 'n':
+<span class="nc" id="L612">                return &quot;no&quot;;</span>
+            case 'a':
+<span class="nc" id="L614">                return &quot;apply&quot;;</span>
+            case 'x':
+<span class="nc" id="L616">                return &quot;next&quot;;  // a.k.a forward</span>
+            case 'b':
+<span class="nc" id="L618">                return &quot;back&quot;;  // a.k.a. previous</span>
+            case 'i':
+<span class="nc" id="L620">                return &quot;finish&quot;;</span>
+            case 'l':
+<span class="nc" id="L622">                return &quot;left&quot;;</span>
+            case 'r':
+<span class="nc" id="L624">                return &quot;right&quot;;</span>
+            case 'u':
+<span class="nc" id="L626">                return &quot;other&quot;;</span>
+            default:
+<span class="nc" id="L628">                return null;</span>
+        }
+    }
+
+    /**
+     * Returns the platform recommended inter-cell gap in the horizontal (x) dimension..
+     *
+     * @return The platform recommended inter-cell gap in the horizontal (x) dimension..
+     */
+    public static BoundSize getGridGapX() {
+<span class="fc" id="L638">        return DEF_HGAP;</span>
+    }
+
+    /**
+     * Returns the platform recommended inter-cell gap in the vertical (x) dimension..
+     *
+     * @return The platform recommended inter-cell gap in the vertical (x) dimension..
+     */
+    public static BoundSize getGridGapY() {
+<span class="fc" id="L647">        return DEF_VGAP;</span>
+    }
+
+    /**
+     * Returns the default dialog inset depending of the current platform.
+     *
+     * @param side top == 0, left == 1, bottom = 2, right = 3.
+     * @return The inset. Never &lt;code&gt;null&lt;/code&gt;.
+     */
+    public static UnitValue getDialogInsets(int side) {
+<span class="nc" id="L657">        return DIALOG_INS[side];</span>
+    }
+
+    /**
+     * Sets the default insets for a dialog. Values that are null will not be changed.
+     *
+     * @param top    The top inset. May be &lt;code&gt;null&lt;/code&gt;.
+     * @param left   The left inset. May be &lt;code&gt;null&lt;/code&gt;.
+     * @param bottom The bottom inset. May be &lt;code&gt;null&lt;/code&gt;.
+     * @param right  The right inset. May be &lt;code&gt;null&lt;/code&gt;.
+     */
+    public static void setDialogInsets(UnitValue top, UnitValue left, UnitValue bottom, UnitValue right) {
+<span class="pc bpc" id="L669" title="1 of 2 branches missed.">        if (top != null)</span>
+<span class="fc" id="L670">            DIALOG_INS[0] = top;</span>
+
+<span class="pc bpc" id="L672" title="1 of 2 branches missed.">        if (left != null)</span>
+<span class="fc" id="L673">            DIALOG_INS[1] = left;</span>
+
+<span class="pc bpc" id="L675" title="1 of 2 branches missed.">        if (bottom != null)</span>
+<span class="fc" id="L676">            DIALOG_INS[2] = bottom;</span>
+
+<span class="pc bpc" id="L678" title="1 of 2 branches missed.">        if (right != null)</span>
+<span class="fc" id="L679">            DIALOG_INS[3] = right;</span>
+
+<span class="fc" id="L681">        MOD_COUNT++;</span>
+<span class="fc" id="L682">    }</span>
+
+    /**
+     * Returns the default panel inset depending of the current platform.
+     *
+     * @param side top == 0, left == 1, bottom = 2, right = 3.
+     * @return The inset. Never &lt;code&gt;null&lt;/code&gt;.
+     */
+    public static UnitValue getPanelInsets(int side) {
+<span class="fc" id="L691">        return PANEL_INS[side];</span>
+    }
+
+    /**
+     * Sets the default insets for a dialog. Values that are null will not be changed.
+     *
+     * @param top    The top inset. May be &lt;code&gt;null&lt;/code&gt;.
+     * @param left   The left inset. May be &lt;code&gt;null&lt;/code&gt;.
+     * @param bottom The bottom inset. May be &lt;code&gt;null&lt;/code&gt;.
+     * @param right  The right inset. May be &lt;code&gt;null&lt;/code&gt;.
+     */
+    public static void setPanelInsets(UnitValue top, UnitValue left, UnitValue bottom, UnitValue right) {
+<span class="pc bpc" id="L703" title="1 of 2 branches missed.">        if (top != null)</span>
+<span class="fc" id="L704">            PANEL_INS[0] = top;</span>
+
+<span class="pc bpc" id="L706" title="1 of 2 branches missed.">        if (left != null)</span>
+<span class="fc" id="L707">            PANEL_INS[1] = left;</span>
+
+<span class="pc bpc" id="L709" title="1 of 2 branches missed.">        if (bottom != null)</span>
+<span class="fc" id="L710">            PANEL_INS[2] = bottom;</span>
+
+<span class="pc bpc" id="L712" title="1 of 2 branches missed.">        if (right != null)</span>
+<span class="fc" id="L713">            PANEL_INS[3] = right;</span>
+
+<span class="fc" id="L715">        MOD_COUNT++;</span>
+<span class="fc" id="L716">    }</span>
+
+    /**
+     * Returns the percentage used for alignment for labels (0 is left, 50 is center and 100 is right).
+     *
+     * @return The percentage used for alignment for labels
+     */
+    public static float getLabelAlignPercentage() {
+<span class="nc bnc" id="L724" title="All 2 branches missed.">        return CUR_PLAF == MAC_OSX ? 1f : 0f;</span>
+    }
+
+    /**
+     * Returns the default gap between two components that &lt;b&gt;are in the same cell&lt;/b&gt;.
+     *
+     * @param comp         The component that the gap is for. Never &lt;code&gt;null&lt;/code&gt;.
+     * @param adjacentComp The adjacent component if any. May be &lt;code&gt;null&lt;/code&gt;.
+     * @param adjacentSide What side the &lt;code&gt;adjacentComp&lt;/code&gt; is on. {@link javax.swing.SwingUtilities#TOP} (1) or
+     *                     {@link javax.swing.SwingUtilities#LEFT} (2) or {@link javax.swing.SwingUtilities#BOTTOM} (3) or {@link javax.swing.SwingUtilities#RIGHT} (4).
+     * @param tag          The tag string that the component might be tagged with in the component constraints. May be &lt;code&gt;null&lt;/code&gt;.
+     * @param isLTR        If it is left-to-right.
+     * @return The default gap between two components or &lt;code&gt;null&lt;/code&gt; if there should be no gap.
+     */
+    static BoundSize getDefaultComponentGap(ComponentWrapper comp, ComponentWrapper adjacentComp, int adjacentSide, String tag, boolean isLTR) {
+<span class="pc bpc" id="L739" title="1 of 2 branches missed.">        if (GAP_PROVIDER != null)</span>
+<span class="nc" id="L740">            return GAP_PROVIDER.getDefaultGap(comp, adjacentComp, adjacentSide, tag, isLTR);</span>
+
+<span class="pc bpc" id="L742" title="1 of 2 branches missed.">        if (adjacentComp == null)</span>
+<span class="fc" id="L743">            return null;</span>
+
+//		if (adjacentComp == null || adjacentSide == SwingConstants.LEFT || adjacentSide == SwingConstants.TOP)
+//			return null;
+
+//		SwingConstants.RIGHT == 4, SwingConstants.LEFT == 2
+<span class="nc bnc" id="L749" title="All 4 branches missed.">        return (adjacentSide == 2 || adjacentSide == 4) ? RELATED_X : RELATED_Y;</span>
+    }
+
+    /**
+     * Returns the current gap provider or &lt;code&gt;null&lt;/code&gt; if none is set and &quot;related&quot; should always be used.
+     *
+     * @return The current gap provider or &lt;code&gt;null&lt;/code&gt; if none is set and &quot;related&quot; should always be used.
+     */
+    public static InCellGapProvider getGapProvider() {
+<span class="nc" id="L758">        return GAP_PROVIDER;</span>
+    }
+
+    /**
+     * Sets the current gap provider or &lt;code&gt;null&lt;/code&gt; if none is set and &quot;related&quot; should always be used.
+     *
+     * @param provider The current gap provider or &lt;code&gt;null&lt;/code&gt; if none is set and &quot;related&quot; should always be used.
+     */
+    public static void setGapProvider(InCellGapProvider provider) {
+<span class="nc" id="L767">        GAP_PROVIDER = provider;</span>
+<span class="nc" id="L768">    }</span>
+
+    /**
+     * Returns how many times the defaults has been changed. This can be used as a light weight check to
+     * see if layout caches needs to be refreshed.
+     *
+     * @return How many times the defaults has been changed.
+     */
+    public static int getModCount() {
+<span class="fc" id="L777">        return MOD_COUNT;</span>
+    }
+
+    /**
+     * Returns the current default unit. The default unit is the unit used if no unit is set. E.g. &quot;width 10&quot;.
+     *
+     * @return The current default unit.
+     * @see UnitValue#PIXEL
+     * @see UnitValue#LPX
+     */
+    public static int getDefaultHorizontalUnit() {
+<span class="fc" id="L788">        return DEF_H_UNIT;</span>
+    }
+
+    /**
+     * Sets the default unit. The default unit is the unit used if no unit is set. E.g. &quot;width 10&quot;.
+     *
+     * @param unit The new default unit.
+     * @see UnitValue#PIXEL
+     * @see UnitValue#LPX
+     */
+    public static void setDefaultHorizontalUnit(int unit) {
+<span class="nc bnc" id="L799" title="All 4 branches missed.">        if (unit &lt; UnitValue.PIXEL || unit &gt; UnitValue.LABEL_ALIGN)</span>
+<span class="nc" id="L800">            throw new IllegalArgumentException(&quot;Illegal Unit: &quot; + unit);</span>
+
+<span class="nc bnc" id="L802" title="All 2 branches missed.">        if (DEF_H_UNIT != unit) {</span>
+<span class="nc" id="L803">            DEF_H_UNIT = unit;</span>
+<span class="nc" id="L804">            MOD_COUNT++;</span>
+        }
+<span class="nc" id="L806">    }</span>
+
+    /**
+     * Returns the current default unit. The default unit is the unit used if no unit is set. E.g. &quot;width 10&quot;.
+     *
+     * @return The current default unit.
+     * @see UnitValue#PIXEL
+     * @see UnitValue#LPY
+     */
+    public static int getDefaultVerticalUnit() {
+<span class="nc" id="L816">        return DEF_V_UNIT;</span>
+    }
+
+    /**
+     * Sets the default unit. The default unit is the unit used if no unit is set. E.g. &quot;width 10&quot;.
+     *
+     * @param unit The new default unit.
+     * @see UnitValue#PIXEL
+     * @see UnitValue#LPY
+     */
+    public static void setDefaultVerticalUnit(int unit) {
+<span class="nc bnc" id="L827" title="All 4 branches missed.">        if (unit &lt; UnitValue.PIXEL || unit &gt; UnitValue.LABEL_ALIGN)</span>
+<span class="nc" id="L828">            throw new IllegalArgumentException(&quot;Illegal Unit: &quot; + unit);</span>
+
+<span class="nc bnc" id="L830" title="All 2 branches missed.">        if (DEF_V_UNIT != unit) {</span>
+<span class="nc" id="L831">            DEF_V_UNIT = unit;</span>
+<span class="nc" id="L832">            MOD_COUNT++;</span>
+        }
+<span class="nc" id="L834">    }</span>
+
+    /**
+     * The default alignment for rows. Pre v3.5 this was &lt;code&gt;false&lt;/code&gt; but now it is
+     * &lt;code&gt;true&lt;/code&gt;.
+     *
+     * @return The current value. Default is &lt;code&gt;true&lt;/code&gt;.
+     * @since 3.5
+     */
+    public static boolean getDefaultRowAlignmentBaseline() {
+<span class="fc" id="L844">        return dra;</span>
+    }
+
+    /**
+     * The default alignment for rows. Pre v3.5 this was &lt;code&gt;false&lt;/code&gt; but now it is
+     * &lt;code&gt;true&lt;/code&gt;.
+     *
+     * @param b The new value. Default is &lt;code&gt;true&lt;/code&gt; from v3.5.
+     * @since 3.5
+     */
+    public static void setDefaultRowAlignmentBaseline(boolean b) {
+<span class="nc" id="L855">        dra = b;</span>
+<span class="nc" id="L856">    }</span>
+
+    /**
+     * Tells all layout manager instances to revalidate and recalculated everything.
+     */
+    public void invalidate() {
+<span class="nc" id="L862">        MOD_COUNT++;</span>
+<span class="nc" id="L863">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

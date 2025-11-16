@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SortableTableModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.table</a> &gt; <span class="el_source">SortableTableModel.java</span></div><h1>SortableTableModel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.table;
+
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.validation.Constraint;
+import com.codename1.ui.validation.Validator;
+
+import java.util.Arrays;
+import java.util.Comparator;
+
+/**
+ * A proxy that wraps the table model providing sorting API that can be leveraged by the table
+ *
+ * @author Shai Almog
+ */
+public class SortableTableModel extends AbstractTableModel {
+    private final TableModel model;
+    private final boolean asc;
+    private final int sortColumn;
+    private int[] sorted;
+    private final Comparator cmp;
+
+    /**
+     * Sorts a table based on the given column
+     *
+     * @param column the column to sort
+     * @param asc    the direction ascending/descending
+     * @param model  the underlying model that will be sorted
+     * @param cmp    a comparator used for comparing the cells in the column
+     */
+<span class="fc" id="L53">    public SortableTableModel(int column, boolean asc, TableModel model, Comparator cmp) {</span>
+<span class="fc" id="L54">        this.model = model;</span>
+<span class="fc" id="L55">        this.asc = asc;</span>
+<span class="fc" id="L56">        this.cmp = cmp;</span>
+<span class="fc" id="L57">        this.sortColumn = column;</span>
+<span class="fc" id="L58">        initTable(model, asc, cmp, column);</span>
+<span class="fc" id="L59">    }</span>
+
+    /**
+     * Returns the underlying table model
+     *
+     * @return the model
+     */
+    public TableModel getUnderlying() {
+<span class="nc" id="L67">        return model;</span>
+    }
+
+    /**
+     * Returns the position of the row when sorted
+     *
+     * @param row the row in the visual table
+     * @return the position in the underlying model
+     */
+    public int getSortedPosition(int row) {
+<span class="fc" id="L77">        return sorted[row];</span>
+    }
+
+    private void initTable(final TableModel model1, final boolean asc,
+                           final Comparator cmp, final int column) {
+<span class="fc" id="L82">        sorted = new int[model1.getRowCount()];</span>
+<span class="fc" id="L83">        Integer[] sortedTemp = new Integer[sorted.length];</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (int iter = 0; iter &lt; sorted.length; iter++) {</span>
+<span class="fc" id="L85">            sortedTemp[iter] = iter;</span>
+        }
+        // sort(int[]) doesn't accept a comparator how stupid is that...
+<span class="fc" id="L88">        Arrays.sort(sortedTemp,</span>
+<span class="fc" id="L89">                new Comparator&lt;Object&gt;() {</span>
+                    public int compare(Object o1, Object o2) {
+<span class="fc" id="L91">                        int i1 = (Integer) o1;</span>
+<span class="fc" id="L92">                        int i2 = (Integer) o2;</span>
+<span class="fc bfc" id="L93" title="All 2 branches covered.">                        if (asc) {</span>
+<span class="fc" id="L94">                            return cmp.compare(model1.getValueAt(i1, column),</span>
+<span class="fc" id="L95">                                    model1.getValueAt(i2, column)) * -1;</span>
+                        }
+<span class="fc" id="L97">                        return cmp.compare(model1.getValueAt(i1, column),</span>
+<span class="fc" id="L98">                                model1.getValueAt(i2, column));</span>
+                    }
+                });
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        for (int iter = 0; iter &lt; sorted.length; iter++) {</span>
+<span class="fc" id="L102">            sorted[iter] = sortedTemp[iter];</span>
+        }
+<span class="fc" id="L104">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public int getRowCount() {
+<span class="nc" id="L111">        return model.getRowCount();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public int getColumnCount() {
+<span class="nc" id="L119">        return model.getColumnCount();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String getColumnName(int i) {
+<span class="nc" id="L127">        return model.getColumnName(i);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean isCellEditable(int row, int column) {
+<span class="nc" id="L135">        return model.isCellEditable(sorted[row], column);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Object getValueAt(int row, int column) {
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        if (model.getRowCount() != sorted.length) {</span>
+<span class="nc" id="L144">            initTable(model, asc, cmp, sortColumn);</span>
+        }
+<span class="fc" id="L146">        return model.getValueAt(sorted[row], column);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void setValueAt(int row, int column, Object o) {
+<span class="nc" id="L154">        model.setValueAt(sorted[row], column, o);</span>
+<span class="nc" id="L155">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void addDataChangeListener(DataChangedListener d) {
+<span class="nc" id="L162">        model.addDataChangeListener(d);</span>
+<span class="nc" id="L163">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void removeDataChangeListener(DataChangedListener d) {
+<span class="nc" id="L170">        model.removeDataChangeListener(d);</span>
+<span class="nc" id="L171">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Constraint getValidationConstraint(int row, int column) {
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (model instanceof AbstractTableModel) {</span>
+<span class="nc" id="L179">            return ((AbstractTableModel) model).getValidationConstraint(row, column);</span>
+        }
+<span class="nc" id="L181">        return super.getValidationConstraint(row, column);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Class getCellType(int row, int column) {
+<span class="nc bnc" id="L189" title="All 2 branches missed.">        if (model instanceof AbstractTableModel) {</span>
+<span class="nc" id="L190">            return ((AbstractTableModel) model).getCellType(row, column);</span>
+        }
+<span class="nc" id="L192">        return super.getCellType(row, column);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String[] getMultipleChoiceOptions(int row, int column) {
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (model instanceof AbstractTableModel) {</span>
+<span class="nc" id="L201">            return ((AbstractTableModel) model).getMultipleChoiceOptions(row, column);</span>
+        }
+<span class="nc" id="L203">        return super.getMultipleChoiceOptions(row, column);</span>
+    }
+
+    @Override
+    public Validator getValidator() {
+<span class="nc bnc" id="L208" title="All 2 branches missed.">        if (model instanceof AbstractTableModel) {</span>
+<span class="nc" id="L209">            return ((AbstractTableModel) model).getValidator();</span>
+        }
+<span class="nc" id="L211">        return super.getValidator();</span>
+    }
+
+    @Override
+    public void setValidator(Validator validator) {
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        if (model instanceof AbstractTableModel) {</span>
+<span class="nc" id="L217">            ((AbstractTableModel) model).setValidator(validator);</span>
+<span class="nc" id="L218">            return;</span>
+        }
+<span class="nc" id="L220">        super.setValidator(validator);</span>
+<span class="nc" id="L221">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

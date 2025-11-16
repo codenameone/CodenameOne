@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TarInputStream.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.tar</a> &gt; <span class="el_source">TarInputStream.java</span></div><h1>TarInputStream.java</h1><pre class="source lang-java linenums">/**
+ * Copyright 2012 Kamran Zafar
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * The original source has been modified by Paul Williams.
+ */
+
+package com.codename1.io.tar;
+
+import com.codename1.io.BufferedInputStream;
+
+import java.io.IOException;
+import java.io.InputStream;
+
+/**
+ * @author Kamran Zafar
+ *
+ */
+public class TarInputStream extends BufferedInputStream {
+
+    private static final int SKIP_BUFFER_SIZE = 2048;
+    private TarEntry currentEntry;
+    private long currentFileSize;
+    private long bytesRead;
+<span class="fc" id="L38">    private boolean defaultSkip = false;</span>
+
+    public TarInputStream(InputStream in) {
+<span class="fc" id="L41">        super(in);</span>
+<span class="fc" id="L42">        currentFileSize = 0;</span>
+<span class="fc" id="L43">        bytesRead = 0;</span>
+<span class="fc" id="L44">    }</span>
+
+    @Override
+    public boolean markSupported() {
+<span class="nc" id="L48">        return false;</span>
+    }
+
+    /**
+     * Not supported
+     *
+     */
+    @Override
+    public synchronized void mark(int readlimit) {
+<span class="nc" id="L57">    }</span>
+
+    /**
+     * Not supported
+     *
+     */
+    @Override
+    public synchronized void reset() throws IOException {
+<span class="nc" id="L65">        throw new IOException(&quot;mark/reset not supported&quot;);</span>
+    }
+
+    /**
+     * Read a byte
+     *
+     * @see java.io.FilterInputStream#read()
+     */
+    @Override
+    public int read() throws IOException {
+<span class="nc" id="L75">        byte[] buf = new byte[1];</span>
+
+<span class="nc" id="L77">        int res = this.read(buf, 0, 1);</span>
+
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (res != -1) {</span>
+<span class="nc" id="L80">            return buf[0];</span>
+        }
+
+<span class="nc" id="L83">        return res;</span>
+    }
+
+    /**
+     * Checks if the bytes being read exceed the entry size and adjusts the byte
+     * array length. Updates the byte counters
+     *
+     *
+     * @see java.io.FilterInputStream#read(byte[], int, int)
+     */
+    @Override
+    public int read(byte[] b, int off, int len) throws IOException {
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (currentEntry != null) {</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">            if (currentFileSize == currentEntry.getSize()) {</span>
+<span class="nc" id="L97">                return -1;</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">            } else if ((currentEntry.getSize() - currentFileSize) &lt; len) {</span>
+<span class="nc" id="L99">                len = (int) (currentEntry.getSize() - currentFileSize);</span>
+            }
+        }
+
+<span class="fc" id="L103">        int br = super.read(b, off, len);</span>
+
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (br != -1) {</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">            if (currentEntry != null) {</span>
+<span class="fc" id="L107">                currentFileSize += br;</span>
+            }
+
+<span class="fc" id="L110">            bytesRead += br;</span>
+        }
+
+<span class="fc" id="L113">        return br;</span>
+    }
+
+    /**
+     * Returns the next entry in the tar file
+     *
+     * @return TarEntry
+     * @throws IOException
+     */
+    public TarEntry getNextEntry() throws IOException {
+<span class="fc" id="L123">        closeCurrentEntry();</span>
+
+<span class="fc" id="L125">        byte[] header = new byte[TarConstants.HEADER_BLOCK];</span>
+<span class="fc" id="L126">        byte[] theader = new byte[TarConstants.HEADER_BLOCK];</span>
+<span class="fc" id="L127">        int tr = 0;</span>
+
+        // Read full header
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        while (tr &lt; TarConstants.HEADER_BLOCK) {</span>
+<span class="fc" id="L131">            int res = read(theader, 0, TarConstants.HEADER_BLOCK - tr);</span>
+
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">            if (res &lt; 0) {</span>
+<span class="nc" id="L134">                break;</span>
+            }
+
+<span class="fc" id="L137">            System.arraycopy(theader, 0, header, tr, res);</span>
+<span class="fc" id="L138">            tr += res;</span>
+<span class="fc" id="L139">        }</span>
+
+        // Check if record is null
+<span class="fc" id="L142">        boolean eof = true;</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        for (byte b : header) {</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">            if (b != 0) {</span>
+<span class="fc" id="L145">                eof = false;</span>
+<span class="fc" id="L146">                break;</span>
+            }
+        }
+
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (!eof) {</span>
+<span class="fc" id="L151">            bytesRead += header.length;</span>
+<span class="fc" id="L152">            currentEntry = new TarEntry(header);</span>
+        }
+
+<span class="fc" id="L155">        return currentEntry;</span>
+    }
+
+    /**
+     * Closes the current tar entry
+     *
+     * @throws IOException
+     */
+    protected void closeCurrentEntry() throws IOException {
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (currentEntry != null) {</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">            if (currentEntry.getSize() &gt; currentFileSize) {</span>
+                // Not fully read, skip rest of the bytes
+<span class="nc" id="L167">                long bs = 0;</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">                while (bs &lt; currentEntry.getSize() - currentFileSize) {</span>
+<span class="nc" id="L169">                    long res = skip(currentEntry.getSize() - currentFileSize - bs);</span>
+
+<span class="nc bnc" id="L171" title="All 4 branches missed.">                    if (res == 0 &amp;&amp; currentEntry.getSize() - currentFileSize &gt; 0) {</span>
+<span class="nc" id="L172">                        throw new IOException(&quot;Possible tar file corruption&quot;);</span>
+                    }
+
+<span class="nc" id="L175">                    bs += res;</span>
+<span class="nc" id="L176">                }</span>
+            }
+
+<span class="nc" id="L179">            currentEntry = null;</span>
+<span class="nc" id="L180">            currentFileSize = 0L;</span>
+<span class="nc" id="L181">            skipPad();</span>
+        }
+<span class="fc" id="L183">    }</span>
+
+    /**
+     * Skips the pad at the end of each tar entry file content
+     *
+     * @throws IOException
+     */
+    protected void skipPad() throws IOException {
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (bytesRead &gt; 0) {</span>
+<span class="nc" id="L192">            int extra = (int) (bytesRead % TarConstants.DATA_BLOCK);</span>
+
+<span class="nc bnc" id="L194" title="All 2 branches missed.">            if (extra &gt; 0) {</span>
+<span class="nc" id="L195">                long bs = 0;</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">                while (bs &lt; TarConstants.DATA_BLOCK - extra) {</span>
+<span class="nc" id="L197">                    long res = skip(TarConstants.DATA_BLOCK - extra - bs);</span>
+<span class="nc" id="L198">                    bs += res;</span>
+<span class="nc" id="L199">                }</span>
+            }
+        }
+<span class="nc" id="L202">    }</span>
+
+    /**
+     * Skips 'n' bytes on the InputStream&lt;br&gt;
+     * Overrides default implementation of skip
+     *
+     */
+    @Override
+    public long skip(long n) throws IOException {
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        if (defaultSkip) {</span>
+            // use skip method of parent stream
+            // may not work if skip not implemented by parent
+<span class="nc" id="L214">            return super.skip(n);</span>
+        }
+
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        if (n &lt;= 0) {</span>
+<span class="nc" id="L218">            return 0;</span>
+        }
+
+<span class="nc" id="L221">        long left = n;</span>
+<span class="nc" id="L222">        byte[] sBuff = new byte[SKIP_BUFFER_SIZE];</span>
+
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        while (left &gt; 0) {</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">            int res = read(sBuff, 0, (int) (left &lt; SKIP_BUFFER_SIZE ? left : SKIP_BUFFER_SIZE));</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">            if (res &lt; 0) {</span>
+<span class="nc" id="L227">                break;</span>
+            }
+<span class="nc" id="L229">            left -= res;</span>
+<span class="nc" id="L230">        }</span>
+
+<span class="nc" id="L232">        return n - left;</span>
+    }
+
+    public boolean isDefaultSkip() {
+<span class="nc" id="L236">        return defaultSkip;</span>
+    }
+
+    public void setDefaultSkip(boolean defaultSkip) {
+<span class="nc" id="L240">        this.defaultSkip = defaultSkip;</span>
+<span class="nc" id="L241">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

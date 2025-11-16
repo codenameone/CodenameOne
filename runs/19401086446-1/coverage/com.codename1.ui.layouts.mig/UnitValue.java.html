@@ -1,0 +1,626 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UnitValue.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts.mig</a> &gt; <span class="el_source">UnitValue.java</span></div><h1>UnitValue.java</h1><pre class="source lang-java linenums">package com.codename1.ui.layouts.mig;
+/*
+ * License (BSD):
+ * ==============
+ *
+ * Copyright (c) 2004, Mikael Grev, MiG InfoCom AB. (miglayout (at) miginfocom (dot) com)
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * Neither the name of the MiG InfoCom AB nor the names of its contributors may be
+ * used to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ *
+ * @version 1.0
+ * @author Mikael Grev, MiG InfoCom AB
+ *         Date: 2006-sep-08
+ */
+
+import com.codename1.util.MathUtil;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+
+public final class UnitValue {
+    /**
+     * An operation indicating a static value.
+     */
+    public static final int STATIC = 100;
+    /**
+     * An operation indicating a addition of two sub units.
+     */
+    public static final int ADD = 101; // Must have &quot;sub-unit values&quot;
+    /**
+     * An operation indicating a subtraction of two sub units
+     */
+    public static final int SUB = 102; // Must have &quot;sub-unit values&quot;
+    /**
+     * An operation indicating a multiplication of two sub units.
+     */
+    public static final int MUL = 103; // Must have &quot;sub-unit values&quot;
+    /**
+     * An operation indicating a division of two sub units.
+     */
+    public static final int DIV = 104; // Must have &quot;sub-unit values&quot;
+    /**
+     * An operation indicating the minimum of two sub units
+     */
+    public static final int MIN = 105; // Must have &quot;sub-unit values&quot;
+    /**
+     * An operation indicating the maximum of two sub units
+     */
+    public static final int MAX = 106; // Must have &quot;sub-unit values&quot;
+    /**
+     * An operation indicating the middle value of two sub units
+     */
+    public static final int MID = 107; // Must have &quot;sub-unit values&quot;
+    /**
+     * A unit indicating pixels.
+     */
+    public static final int PIXEL = 0;
+    /**
+     * A unit indicating logical horizontal pixels.
+     */
+    public static final int LPX = 1;
+    /**
+     * A unit indicating logical vertical pixels.
+     */
+    public static final int LPY = 2;
+    /**
+     * A unit indicating millimeters.
+     */
+    public static final int MM = 3;
+    /**
+     * A unit indicating centimeters.
+     */
+    public static final int CM = 4;
+    /**
+     * A unit indicating inches.
+     */
+    public static final int INCH = 5;
+    /**
+     * A unit indicating percent.
+     */
+    public static final int PERCENT = 6;
+    /**
+     * A unit indicating points.
+     */
+    public static final int PT = 7;
+    /**
+     * A unit indicating screen percentage width.
+     */
+    public static final int SPX = 8;
+    /**
+     * A unit indicating screen percentage height.
+     */
+    public static final int SPY = 9;
+    /**
+     * A unit indicating alignment.
+     */
+    public static final int ALIGN = 12;
+    /**
+     * A unit indicating minimum size.
+     */
+    public static final int MIN_SIZE = 13;
+    /**
+     * A unit indicating preferred size.
+     */
+    public static final int PREF_SIZE = 14;
+    /**
+     * A unit indicating maximum size.
+     */
+    public static final int MAX_SIZE = 15;
+    /**
+     * A unit indicating botton size.
+     */
+    public static final int BUTTON = 16;
+    /**
+     * A unit indicating linking to x.
+     */
+    public static final int LINK_X = 18;   // First link
+    /**
+     * A unit indicating linking to y.
+     */
+    public static final int LINK_Y = 19;
+    /**
+     * A unit indicating linking to width.
+     */
+    public static final int LINK_W = 20;
+    /**
+     * A unit indicating linking to height.
+     */
+    public static final int LINK_H = 21;
+    /**
+     * A unit indicating linking to x2.
+     */
+    public static final int LINK_X2 = 22;
+    /**
+     * A unit indicating linking to y2.
+     */
+    public static final int LINK_Y2 = 23;
+    /**
+     * A unit indicating linking to x position on screen.
+     */
+    public static final int LINK_XPOS = 24;
+    /**
+     * A unit indicating linking to y position on screen.
+     */
+    public static final int LINK_YPOS = 25;    // Last link
+    /**
+     * A unit indicating a lookup.
+     */
+    public static final int LOOKUP = 26;
+    /**
+     * A unit indicating label alignment.
+     */
+    public static final int LABEL_ALIGN = 27;
+<span class="fc" id="L174">    static final UnitValue ZERO = new UnitValue(0, null, PIXEL, true, STATIC, null, null, &quot;0px&quot;);</span>
+<span class="fc" id="L175">    static final UnitValue TOP = new UnitValue(0, null, PERCENT, false, STATIC, null, null, &quot;top&quot;);</span>
+<span class="fc" id="L176">    static final UnitValue LEADING = new UnitValue(0, null, PERCENT, true, STATIC, null, null, &quot;leading&quot;);</span>
+<span class="fc" id="L177">    static final UnitValue LEFT = new UnitValue(0, null, PERCENT, true, STATIC, null, null, &quot;left&quot;);</span>
+<span class="fc" id="L178">    static final UnitValue CENTER = new UnitValue(50, null, PERCENT, true, STATIC, null, null, &quot;center&quot;);</span>
+<span class="fc" id="L179">    static final UnitValue TRAILING = new UnitValue(100, null, PERCENT, true, STATIC, null, null, &quot;trailing&quot;);</span>
+<span class="fc" id="L180">    static final UnitValue RIGHT = new UnitValue(100, null, PERCENT, true, STATIC, null, null, &quot;right&quot;);</span>
+<span class="fc" id="L181">    static final UnitValue BOTTOM = new UnitValue(100, null, PERCENT, false, STATIC, null, null, &quot;bottom&quot;);</span>
+<span class="fc" id="L182">    static final UnitValue LABEL = new UnitValue(0, null, LABEL_ALIGN, false, STATIC, null, null, &quot;label&quot;);</span>
+<span class="fc" id="L183">    static final UnitValue INF = new UnitValue(LayoutUtil.INF, null, PIXEL, true, STATIC, null, null, &quot;inf&quot;);</span>
+<span class="fc" id="L184">    private static final HashMap&lt;String, Integer&gt; UNIT_MAP = new HashMap&lt;String, Integer&gt;(32);</span>
+<span class="fc" id="L185">    private static final ArrayList&lt;UnitConverter&gt; CONVERTERS = new ArrayList&lt;UnitConverter&gt;();</span>
+    private static final int IDENTITY = -1;
+<span class="fc" id="L187">    static final UnitValue BASELINE_IDENTITY = new UnitValue(0, null, IDENTITY, false, STATIC, null, null, &quot;baseline&quot;);</span>
+<span class="fc" id="L188">    private static final float[] SCALE = new float[]{25.4f, 2.54f, 1f, 0f, 72f};</span>
+
+    static {
+<span class="fc" id="L191">        UNIT_MAP.put(&quot;px&quot;, Integer.valueOf(PIXEL));</span>
+<span class="fc" id="L192">        UNIT_MAP.put(&quot;lpx&quot;, Integer.valueOf(LPX));</span>
+<span class="fc" id="L193">        UNIT_MAP.put(&quot;lpy&quot;, Integer.valueOf(LPY));</span>
+<span class="fc" id="L194">        UNIT_MAP.put(&quot;%&quot;, Integer.valueOf(PERCENT));</span>
+<span class="fc" id="L195">        UNIT_MAP.put(&quot;cm&quot;, Integer.valueOf(CM));</span>
+<span class="fc" id="L196">        UNIT_MAP.put(&quot;in&quot;, Integer.valueOf(INCH));</span>
+<span class="fc" id="L197">        UNIT_MAP.put(&quot;spx&quot;, Integer.valueOf(SPX));</span>
+<span class="fc" id="L198">        UNIT_MAP.put(&quot;spy&quot;, Integer.valueOf(SPY));</span>
+<span class="fc" id="L199">        UNIT_MAP.put(&quot;al&quot;, Integer.valueOf(ALIGN));</span>
+<span class="fc" id="L200">        UNIT_MAP.put(&quot;mm&quot;, Integer.valueOf(MM));</span>
+<span class="fc" id="L201">        UNIT_MAP.put(&quot;pt&quot;, Integer.valueOf(PT));</span>
+<span class="fc" id="L202">        UNIT_MAP.put(&quot;min&quot;, Integer.valueOf(MIN_SIZE));</span>
+<span class="fc" id="L203">        UNIT_MAP.put(&quot;minimum&quot;, Integer.valueOf(MIN_SIZE));</span>
+<span class="fc" id="L204">        UNIT_MAP.put(&quot;p&quot;, Integer.valueOf(PREF_SIZE));</span>
+<span class="fc" id="L205">        UNIT_MAP.put(&quot;pref&quot;, Integer.valueOf(PREF_SIZE));</span>
+<span class="fc" id="L206">        UNIT_MAP.put(&quot;max&quot;, Integer.valueOf(MAX_SIZE));</span>
+<span class="fc" id="L207">        UNIT_MAP.put(&quot;maximum&quot;, Integer.valueOf(MAX_SIZE));</span>
+<span class="fc" id="L208">        UNIT_MAP.put(&quot;button&quot;, Integer.valueOf(BUTTON));</span>
+<span class="fc" id="L209">        UNIT_MAP.put(&quot;label&quot;, Integer.valueOf(LABEL_ALIGN));</span>
+<span class="fc" id="L210">    }</span>
+
+    private final transient float value;
+    private final transient int unit;
+    private final transient int oper;
+    private final transient String unitStr;
+    private final transient boolean isHor;
+    private final transient UnitValue[] subUnits;
+<span class="fc" id="L218">    private transient String linkId = null; // Should be final, but initializes in a sub method.</span>
+
+    // Pixel
+    public UnitValue(float value)  // If hor/ver does not matter.
+    {
+<span class="nc" id="L223">        this(value, null, PIXEL, true, STATIC, null, null, value + &quot;px&quot;);</span>
+<span class="nc" id="L224">    }</span>
+
+    public UnitValue(float value, int unit, String createString)  // If hor/ver does not matter.
+    {
+<span class="fc" id="L228">        this(value, null, unit, true, STATIC, null, null, createString);</span>
+<span class="fc" id="L229">    }</span>
+
+    UnitValue(float value, String unitStr, boolean isHor, int oper, String createString) {
+<span class="fc" id="L232">        this(value, unitStr, -1, isHor, oper, null, null, createString);</span>
+<span class="fc" id="L233">    }</span>
+
+    UnitValue(boolean isHor, int oper, UnitValue sub1, UnitValue sub2, String createString) {
+<span class="nc" id="L236">        this(0, &quot;&quot;, -1, isHor, oper, sub1, sub2, createString);</span>
+<span class="nc bnc" id="L237" title="All 4 branches missed.">        if (sub1 == null || sub2 == null)</span>
+<span class="nc" id="L238">            throw new IllegalArgumentException(&quot;Sub units is null!&quot;);</span>
+<span class="nc" id="L239">    }</span>
+
+<span class="fc" id="L241">    private UnitValue(float value, String unitStr, int unit, boolean isHor, int oper, UnitValue sub1, UnitValue sub2, String createString) {</span>
+<span class="pc bpc" id="L242" title="2 of 4 branches missed.">        if (oper &lt; STATIC || oper &gt; MID)</span>
+<span class="nc" id="L243">            throw new IllegalArgumentException(&quot;Unknown Operation: &quot; + oper);</span>
+
+<span class="pc bpc" id="L245" title="7 of 8 branches missed.">        if (oper &gt;= ADD &amp;&amp; oper &lt;= MID &amp;&amp; (sub1 == null || sub2 == null))</span>
+<span class="nc" id="L246">            throw new IllegalArgumentException(oper + &quot; Operation may not have null sub-UnitValues.&quot;);</span>
+
+<span class="fc" id="L248">        this.value = value;</span>
+<span class="fc" id="L249">        this.oper = oper;</span>
+<span class="fc" id="L250">        this.isHor = isHor;</span>
+<span class="fc" id="L251">        this.unitStr = unitStr;</span>
+<span class="fc bfc" id="L252" title="All 2 branches covered.">        this.unit = unitStr != null ? parseUnitString() : unit;</span>
+<span class="pc bpc" id="L253" title="3 of 4 branches missed.">        this.subUnits = sub1 != null &amp;&amp; sub2 != null ? new UnitValue[]{sub1, sub2} : null;</span>
+
+<span class="fc" id="L255">        LayoutUtil.putCCString(this, createString);    // &quot;this&quot; escapes!! Safe though.</span>
+<span class="fc" id="L256">    }</span>
+
+    /**
+     * Adds a global unit converter that can convert from some &lt;code&gt;unit&lt;/code&gt; to pixels.
+     * &lt;p&gt;
+     * This converter will be asked before the platform converter so the values for it (e.g. &quot;related&quot; and &quot;unrelated&quot;)
+     * can be overridden. It is however not possible to override the built in ones (e.g. &quot;mm&quot;, &quot;pixel&quot; or &quot;lp&quot;).
+     *
+     * @param conv The converter. Not &lt;code&gt;null&lt;/code&gt;.
+     */
+    public synchronized static void addGlobalUnitConverter(UnitConverter conv) {
+<span class="nc bnc" id="L267" title="All 2 branches missed.">        if (conv == null)</span>
+<span class="nc" id="L268">            throw new NullPointerException();</span>
+<span class="nc" id="L269">        CONVERTERS.add(conv);</span>
+<span class="nc" id="L270">    }</span>
+
+    /**
+     * Removed the converter.
+     *
+     * @param unit The converter.
+     * @return If there was a converter found and thus removed.
+     */
+    public synchronized static boolean removeGlobalUnitConverter(UnitConverter unit) {
+<span class="nc" id="L279">        return CONVERTERS.remove(unit);</span>
+    }
+
+    /**
+     * Returns the global converters currently registered. The platform converter will not be in this list.
+     *
+     * @return The converters. Never &lt;code&gt;null&lt;/code&gt;.
+     */
+    public synchronized static UnitConverter[] getGlobalUnitConverters() {
+<span class="nc" id="L288">        return CONVERTERS.toArray(new UnitConverter[CONVERTERS.size()]);</span>
+    }
+
+    /**
+     * Returns the current default unit. The default unit is the unit used if no unit is set. E.g. &quot;width 10&quot;.
+     *
+     * @return The current default unit.
+     * @see #PIXEL
+     * @see #LPX
+     * @deprecated Use {@link PlatformDefaults#getDefaultHorizontalUnit()} and {@link PlatformDefaults#getDefaultVerticalUnit()} instead.
+     */
+    public static int getDefaultUnit() {
+<span class="nc" id="L300">        return PlatformDefaults.getDefaultHorizontalUnit();</span>
+    }
+
+    /**
+     * Sets the default unit. The default unit is the unit used if no unit is set. E.g. &quot;width 10&quot;.
+     *
+     * @param unit The new default unit.
+     * @see #PIXEL
+     * @see #LPX
+     * @deprecated Use {@link PlatformDefaults#setDefaultHorizontalUnit(int)} and {@link PlatformDefaults#setDefaultVerticalUnit(int)} instead.
+     */
+    public static void setDefaultUnit(int unit) {
+<span class="nc" id="L312">        PlatformDefaults.setDefaultHorizontalUnit(unit);</span>
+<span class="nc" id="L313">        PlatformDefaults.setDefaultVerticalUnit(unit);</span>
+<span class="nc" id="L314">    }</span>
+
+    /**
+     * Returns the size in pixels rounded.
+     *
+     * @param refValue The reference value. Normally the size of the parent. For unit {@link #ALIGN} the current size of the component should be sent in.
+     * @param parent   The parent. May be &lt;code&gt;null&lt;/code&gt; for testing the validity of the value, but should normally not and are not
+     *                 required to return any usable value if &lt;code&gt;null&lt;/code&gt;.
+     * @param comp     The component, if any, that the value is for. Might be &lt;code&gt;null&lt;/code&gt; if the value is not
+     *                 connected to any component.
+     * @return The size in pixels.
+     */
+    public int getPixels(float refValue, ContainerWrapper parent, ComponentWrapper comp) {
+<span class="fc" id="L327">        return MathUtil.round(getPixelsExact(refValue, parent, comp));</span>
+    }
+
+    /**
+     * Returns the size in pixels.
+     *
+     * @param refValue The reference value. Normally the size of the parent. For unit {@link #ALIGN} the current size of the component should be sent in.
+     * @param parent   The parent. May be &lt;code&gt;null&lt;/code&gt; for testing the validity of the value, but should normally not and are not
+     *                 required to return any usable value if &lt;code&gt;null&lt;/code&gt;.
+     * @param comp     The component, if any, that the value is for. Might be &lt;code&gt;null&lt;/code&gt; if the value is not
+     *                 connected to any component.
+     * @return The size in pixels.
+     */
+    public float getPixelsExact(float refValue, ContainerWrapper parent, ComponentWrapper comp) {
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">        if (parent == null)</span>
+<span class="nc" id="L342">            return 1;</span>
+
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">        if (oper == STATIC) {</span>
+<span class="pc bpc" id="L345" title="12 of 14 branches missed.">            switch (unit) {</span>
+                case PIXEL:
+<span class="nc" id="L347">                    return value;</span>
+
+                case LPX:
+                case LPY:
+<span class="fc bfc" id="L351" title="All 2 branches covered.">                    return parent.getPixelUnitFactor(unit == LPX) * value;</span>
+
+                case MM:
+                case CM:
+                case INCH:
+                case PT:
+<span class="nc" id="L357">                    float f = SCALE[unit - MM];</span>
+<span class="nc bnc" id="L358" title="All 2 branches missed.">                    Float s = isHor ? PlatformDefaults.getHorizontalScaleFactor() : PlatformDefaults.getVerticalScaleFactor();</span>
+<span class="nc bnc" id="L359" title="All 2 branches missed.">                    if (s != null)</span>
+<span class="nc" id="L360">                        f *= s;</span>
+
+<span class="nc bnc" id="L362" title="All 2 branches missed.">                    return (isHor ? parent.getHorizontalScreenDPI() : parent.getVerticalScreenDPI()) * value / f;</span>
+
+                case PERCENT:
+<span class="fc" id="L365">                    return value * refValue * 0.01f;</span>
+
+                case SPX:
+                case SPY:
+<span class="nc bnc" id="L369" title="All 2 branches missed.">                    return (unit == SPX ? parent.getScreenWidth() : parent.getScreenHeight()) * value * 0.01f;</span>
+
+                case ALIGN:
+<span class="nc bnc" id="L372" title="All 2 branches missed.">                    Integer st = LinkHandler.getValue(parent.getLayout(), &quot;visual&quot;, isHor ? LinkHandler.X : LinkHandler.Y);</span>
+<span class="nc bnc" id="L373" title="All 2 branches missed.">                    Integer sz = LinkHandler.getValue(parent.getLayout(), &quot;visual&quot;, isHor ? LinkHandler.WIDTH : LinkHandler.HEIGHT);</span>
+<span class="nc bnc" id="L374" title="All 4 branches missed.">                    if (st == null || sz == null)</span>
+<span class="nc" id="L375">                        return 0;</span>
+<span class="nc" id="L376">                    return value * (Math.max(0, sz.intValue()) - refValue) + st;</span>
+
+                case MIN_SIZE:
+<span class="nc bnc" id="L379" title="All 2 branches missed.">                    if (comp == null)</span>
+<span class="nc" id="L380">                        return 0;</span>
+<span class="nc bnc" id="L381" title="All 2 branches missed.">                    return isHor ? comp.getMinimumWidth(comp.getHeight()) : comp.getMinimumHeight(comp.getWidth());</span>
+
+                case PREF_SIZE:
+<span class="nc bnc" id="L384" title="All 2 branches missed.">                    if (comp == null)</span>
+<span class="nc" id="L385">                        return 0;</span>
+<span class="nc bnc" id="L386" title="All 2 branches missed.">                    return isHor ? comp.getPreferredWidth(comp.getHeight()) : comp.getPreferredHeight(comp.getWidth());</span>
+
+                case MAX_SIZE:
+<span class="nc bnc" id="L389" title="All 2 branches missed.">                    if (comp == null)</span>
+<span class="nc" id="L390">                        return 0;</span>
+<span class="nc bnc" id="L391" title="All 2 branches missed.">                    return isHor ? comp.getMaximumWidth(comp.getHeight()) : comp.getMaximumHeight(comp.getWidth());</span>
+
+                case BUTTON:
+<span class="nc" id="L394">                    return PlatformDefaults.getMinimumButtonWidth().getPixels(refValue, parent, comp);</span>
+
+                case LINK_X:
+                case LINK_Y:
+                case LINK_W:
+                case LINK_H:
+                case LINK_X2:
+                case LINK_Y2:
+                case LINK_XPOS:
+                case LINK_YPOS:
+<span class="nc bnc" id="L404" title="All 2 branches missed.">                    Integer v = LinkHandler.getValue(parent.getLayout(), getLinkTargetId(), unit - (unit &gt;= LINK_XPOS ? LINK_XPOS : LINK_X));</span>
+<span class="nc bnc" id="L405" title="All 2 branches missed.">                    if (v == null)</span>
+<span class="nc" id="L406">                        return 0;</span>
+
+<span class="nc bnc" id="L408" title="All 2 branches missed.">                    if (unit == LINK_XPOS)</span>
+<span class="nc" id="L409">                        return parent.getScreenLocationX() + v;</span>
+<span class="nc bnc" id="L410" title="All 2 branches missed.">                    if (unit == LINK_YPOS)</span>
+<span class="nc" id="L411">                        return parent.getScreenLocationY() + v;</span>
+
+<span class="nc" id="L413">                    return v;</span>
+
+                case LOOKUP:
+<span class="nc" id="L416">                    float res = lookup(refValue, parent, comp);</span>
+<span class="nc bnc" id="L417" title="All 2 branches missed.">                    if (res != UnitConverter.UNABLE)</span>
+<span class="nc" id="L418">                        return res;</span>
+
+                case LABEL_ALIGN:
+<span class="nc" id="L421">                    return PlatformDefaults.getLabelAlignPercentage() * refValue;</span>
+
+                case IDENTITY:
+            }
+<span class="nc" id="L425">            throw new IllegalArgumentException(&quot;Unknown/illegal unit: &quot; + unit + &quot;, unitStr: &quot; + unitStr);</span>
+        }
+
+<span class="nc bnc" id="L428" title="All 4 branches missed.">        if (subUnits != null &amp;&amp; subUnits.length == 2) {</span>
+<span class="nc" id="L429">            float r1 = subUnits[0].getPixelsExact(refValue, parent, comp);</span>
+<span class="nc" id="L430">            float r2 = subUnits[1].getPixelsExact(refValue, parent, comp);</span>
+<span class="nc bnc" id="L431" title="All 8 branches missed.">            switch (oper) {</span>
+                case ADD:
+<span class="nc" id="L433">                    return r1 + r2;</span>
+                case SUB:
+<span class="nc" id="L435">                    return r1 - r2;</span>
+                case MUL:
+<span class="nc" id="L437">                    return r1 * r2;</span>
+                case DIV:
+<span class="nc" id="L439">                    return r1 / r2;</span>
+                case MIN:
+<span class="nc bnc" id="L441" title="All 2 branches missed.">                    return r1 &lt; r2 ? r1 : r2;</span>
+                case MAX:
+<span class="nc bnc" id="L443" title="All 2 branches missed.">                    return r1 &gt; r2 ? r1 : r2;</span>
+                case MID:
+<span class="nc" id="L445">                    return (r1 + r2) * 0.5f;</span>
+            }
+        }
+
+<span class="nc" id="L449">        throw new IllegalArgumentException(&quot;Internal: Unknown Oper: &quot; + oper);</span>
+    }
+
+    private float lookup(float refValue, ContainerWrapper parent, ComponentWrapper comp) {
+<span class="nc" id="L453">        float res = UnitConverter.UNABLE;</span>
+<span class="nc bnc" id="L454" title="All 2 branches missed.">        for (int i = CONVERTERS.size() - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L455">            res = CONVERTERS.get(i).convertToPixels(value, unitStr, isHor, refValue, parent, comp);</span>
+<span class="nc bnc" id="L456" title="All 2 branches missed.">            if (res != UnitConverter.UNABLE)</span>
+<span class="nc" id="L457">                return res;</span>
+        }
+<span class="nc" id="L459">        return PlatformDefaults.convertToPixels(value, unitStr, isHor, refValue, parent, comp);</span>
+    }
+
+    private int parseUnitString() {
+<span class="fc" id="L463">        int len = unitStr.length();</span>
+<span class="pc bpc" id="L464" title="1 of 2 branches missed.">        if (len == 0)</span>
+<span class="pc bpc" id="L465" title="1 of 2 branches missed.">            return isHor ? PlatformDefaults.getDefaultHorizontalUnit() : PlatformDefaults.getDefaultVerticalUnit();</span>
+
+<span class="nc" id="L467">        Integer u = UNIT_MAP.get(unitStr);</span>
+<span class="nc bnc" id="L468" title="All 2 branches missed.">        if (u != null) {</span>
+<span class="nc bnc" id="L469" title="All 6 branches missed.">            if (!isHor &amp;&amp; (u == BUTTON || u == LABEL_ALIGN))</span>
+<span class="nc" id="L470">                throw new IllegalArgumentException(&quot;Not valid in vertical contexts: '&quot; + unitStr + &quot;'&quot;);</span>
+
+<span class="nc" id="L472">            return u;</span>
+        }
+
+<span class="nc bnc" id="L475" title="All 2 branches missed.">        if (unitStr.equals(&quot;lp&quot;))</span>
+<span class="nc bnc" id="L476" title="All 2 branches missed.">            return isHor ? LPX : LPY;</span>
+
+<span class="nc bnc" id="L478" title="All 2 branches missed.">        if (unitStr.equals(&quot;sp&quot;))</span>
+<span class="nc bnc" id="L479" title="All 2 branches missed.">            return isHor ? SPX : SPY;</span>
+
+<span class="nc bnc" id="L481" title="All 2 branches missed.">        if (lookup(0, null, null) != UnitConverter.UNABLE)    // To test so we can fail fast</span>
+<span class="nc" id="L482">            return LOOKUP;</span>
+
+        // Only link left. E.g. &quot;otherID.width&quot;
+
+<span class="nc" id="L486">        int pIx = unitStr.indexOf('.');</span>
+<span class="nc bnc" id="L487" title="All 2 branches missed.">        if (pIx != -1) {</span>
+<span class="nc" id="L488">            linkId = unitStr.substring(0, pIx);</span>
+<span class="nc" id="L489">            String e = unitStr.substring(pIx + 1);</span>
+
+<span class="nc bnc" id="L491" title="All 2 branches missed.">            if (e.equals(&quot;x&quot;))</span>
+<span class="nc" id="L492">                return LINK_X;</span>
+<span class="nc bnc" id="L493" title="All 2 branches missed.">            if (e.equals(&quot;y&quot;))</span>
+<span class="nc" id="L494">                return LINK_Y;</span>
+<span class="nc bnc" id="L495" title="All 4 branches missed.">            if (e.equals(&quot;w&quot;) || e.equals(&quot;width&quot;))</span>
+<span class="nc" id="L496">                return LINK_W;</span>
+<span class="nc bnc" id="L497" title="All 4 branches missed.">            if (e.equals(&quot;h&quot;) || e.equals(&quot;height&quot;))</span>
+<span class="nc" id="L498">                return LINK_H;</span>
+<span class="nc bnc" id="L499" title="All 2 branches missed.">            if (e.equals(&quot;x2&quot;))</span>
+<span class="nc" id="L500">                return LINK_X2;</span>
+<span class="nc bnc" id="L501" title="All 2 branches missed.">            if (e.equals(&quot;y2&quot;))</span>
+<span class="nc" id="L502">                return LINK_Y2;</span>
+<span class="nc bnc" id="L503" title="All 2 branches missed.">            if (e.equals(&quot;xpos&quot;))</span>
+<span class="nc" id="L504">                return LINK_XPOS;</span>
+<span class="nc bnc" id="L505" title="All 2 branches missed.">            if (e.equals(&quot;ypos&quot;))</span>
+<span class="nc" id="L506">                return LINK_YPOS;</span>
+        }
+
+<span class="nc" id="L509">        throw new IllegalArgumentException(&quot;Unknown keyword: &quot; + unitStr);</span>
+    }
+
+    boolean isAbsolute() {
+<span class="nc bnc" id="L513" title="All 3 branches missed.">        switch (unit) {</span>
+            case PIXEL:
+            case LPX:
+            case LPY:
+            case MM:
+            case CM:
+            case INCH:
+            case PT:
+<span class="nc" id="L521">                return true;</span>
+
+            case SPX:
+            case SPY:
+            case PERCENT:
+            case ALIGN:
+            case MIN_SIZE:
+            case PREF_SIZE:
+            case MAX_SIZE:
+            case BUTTON:
+            case LINK_X:
+            case LINK_Y:
+            case LINK_W:
+            case LINK_H:
+            case LINK_X2:
+            case LINK_Y2:
+            case LINK_XPOS:
+            case LINK_YPOS:
+            case LOOKUP:
+            case LABEL_ALIGN:
+<span class="nc" id="L541">                return false;</span>
+
+            case IDENTITY:
+        }
+<span class="nc" id="L545">        throw new IllegalArgumentException(&quot;Unknown/illegal unit: &quot; + unit + &quot;, unitStr: &quot; + unitStr);</span>
+    }
+
+    boolean isAbsoluteDeep() {
+<span class="nc bnc" id="L549" title="All 2 branches missed.">        if (subUnits != null) {</span>
+<span class="nc bnc" id="L550" title="All 2 branches missed.">            for (UnitValue subUnit : subUnits) {</span>
+<span class="nc bnc" id="L551" title="All 2 branches missed.">                if (subUnit.isAbsoluteDeep())</span>
+<span class="nc" id="L552">                    return true;</span>
+            }
+        }
+<span class="nc" id="L555">        return isAbsolute();</span>
+    }
+
+    boolean isLinked() {
+<span class="pc bpc" id="L559" title="1 of 2 branches missed.">        return linkId != null;</span>
+    }
+
+    boolean isLinkedDeep() {
+<span class="pc bpc" id="L563" title="1 of 2 branches missed.">        if (subUnits != null) {</span>
+<span class="nc bnc" id="L564" title="All 2 branches missed.">            for (UnitValue subUnit : subUnits) {</span>
+<span class="nc bnc" id="L565" title="All 2 branches missed.">                if (subUnit.isLinkedDeep())</span>
+<span class="nc" id="L566">                    return true;</span>
+            }
+        }
+<span class="fc" id="L569">        return isLinked();</span>
+    }
+
+    String getLinkTargetId() {
+<span class="nc" id="L573">        return linkId;</span>
+    }
+
+    UnitValue getSubUnitValue(int i) {
+<span class="nc" id="L577">        return subUnits[i];</span>
+    }
+
+    int getSubUnitCount() {
+<span class="nc bnc" id="L581" title="All 2 branches missed.">        return subUnits != null ? subUnits.length : 0;</span>
+    }
+
+    public UnitValue[] getSubUnits() {
+<span class="nc" id="L585">        return subUnits;</span>
+    }
+
+    public int getUnit() {
+<span class="fc" id="L589">        return unit;</span>
+    }
+
+    public String getUnitString() {
+<span class="nc" id="L593">        return unitStr;</span>
+    }
+
+    public int getOperation() {
+<span class="nc" id="L597">        return oper;</span>
+    }
+
+    public float getValue() {
+<span class="nc" id="L601">        return value;</span>
+    }
+
+    public boolean isHorizontal() {
+<span class="nc" id="L605">        return isHor;</span>
+    }
+
+    public String toString() {
+<span class="nc" id="L609">        return getClass().getName() + &quot;. Value=&quot; + value + &quot;, unit=&quot; + unit + &quot;, unitString: &quot; + unitStr + &quot;, oper=&quot; + oper + &quot;, isHor: &quot; + isHor;</span>
+    }
+
+    /**
+     * Returns the creation string for this object. Note that {@link LayoutUtil#setDesignTime(ContainerWrapper, boolean)} must be
+     * set to &lt;code&gt;true&lt;/code&gt; for the creation strings to be stored.
+     *
+     * @return The constraint string or &lt;code&gt;null&lt;/code&gt; if none is registered.
+     */
+    public String getConstraintString() {
+<span class="nc" id="L619">        return LayoutUtil.getCCString(this);</span>
+    }
+
+    public int hashCode() {
+<span class="nc" id="L623">        return (int) (value * 12345) + (oper &gt;&gt;&gt; 5) + unit &gt;&gt;&gt; 17;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

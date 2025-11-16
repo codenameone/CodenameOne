@@ -1,0 +1,505 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AudioRecorderComponent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">AudioRecorderComponent.java</span></div><h1>AudioRecorderComponent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.io.Log;
+import com.codename1.media.Media;
+import com.codename1.media.MediaManager;
+import com.codename1.media.MediaRecorderBuilder;
+import com.codename1.ui.Button;
+import com.codename1.ui.CN;
+import com.codename1.ui.Container;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Label;
+import com.codename1.ui.Sheet;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.util.EventDispatcher;
+
+import java.io.IOException;
+
+import static com.codename1.ui.ComponentSelector.$;
+
+/**
+ * A component for recording Audio from the device microphone.
+ *
+ * &lt;p&gt;Example usage&lt;/p&gt;
+ *
+ * &lt;script src=&quot;https://gist.github.com/shannah/3e4d6448a6baf5684c736fd018f76f87.js&quot;&gt;&lt;/script&gt;
+ *
+ * &lt;p&gt;This component enables a full recording workflow. When the component is first displayed, it provides a &quot;Record&quot;
+ * button to begin the recording.&lt;/p&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-audiorecordercomponent1.png&quot; alt=&quot;AudioRecorderComponent while recording&quot; /&gt;
+ *
+ * &lt;p&gt;While the recording is in progress, it provides a &quot;Done&quot; button and a &quot;Pause&quot; button.  The &quot;Pause&quot; button allows pausing and
+ * continuing the recording.  The &quot;Done&quot; button indicates the recording is done.&lt;/p&gt;
+ *
+ * &lt;p&gt;After the user presses &quot;Done&quot;, a preview screen is shown that allows the user to listen to the recording.  Then can choose
+ * to either accept the recording, cancel it, or try again.&lt;/p&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-audiorecordercomponent2.png&quot; alt=&quot;AudioRecorderComponent accept/reject screen&quot; /&gt;
+ *
+ * @author Steve Hannah
+ * @since 7.0
+ */
+public class AudioRecorderComponent extends Container implements ActionSource {
+    private Media media;
+    private final Button record;
+    private final Button pause;
+    private final Button done;
+    private final Label recordingInProgress;
+    private final Label recordingOff;
+<span class="fc" id="L78">    private final EventDispatcher actionListeners = new EventDispatcher();</span>
+    private RecorderState state;
+<span class="fc" id="L80">    private double recordAlpha = 1.0;</span>
+    private long recordingLength;
+    private long lastRecordingStartTime;
+    private final Label recordingTime;
+<span class="fc" id="L84">    private int counter = 0;</span>
+
+    /**
+     * Creates a new audio recorder for the settings specified by the given builder.
+     *
+     * @param builder The settings for creating the media recorder.
+     */
+    public AudioRecorderComponent(final MediaRecorderBuilder builder) {
+<span class="fc" id="L92">        super(new BorderLayout());</span>
+<span class="fc" id="L93">        CN.callSerially(new Runnable() {</span>
+            public void run() {
+                try {
+<span class="fc" id="L96">                    media = MediaManager.createMediaRecorder(builder);</span>
+<span class="fc" id="L97">                    setState(RecorderState.Initialized);</span>
+<span class="fc" id="L98">                    setState(RecorderState.Paused);</span>
+<span class="nc" id="L99">                } catch (IOException ex) {</span>
+<span class="nc" id="L100">                    Log.e(ex);</span>
+<span class="nc" id="L101">                    setState(RecorderState.NotInitialized);</span>
+<span class="fc" id="L102">                }</span>
+<span class="fc" id="L103">            }</span>
+
+        });
+
+<span class="fc" id="L107">        addActionListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="fc bfc" id="L110" title="All 2 branches covered.">                switch (state) {</span>
+                    case Accepted:
+                    case Canceled:
+<span class="fc" id="L113">                        break;</span>
+                    default:
+<span class="fc" id="L115">                        evt.consume();</span>
+                }
+<span class="pc bpc" id="L117" title="3 of 7 branches missed.">                switch (state) {</span>
+                    case NotInitialized:
+<span class="nc" id="L119">                        evt.consume();</span>
+<span class="nc" id="L120">                        removeAll();</span>
+<span class="nc" id="L121">                        add(BorderLayout.CENTER, new SpanLabel(&quot;Failed to initialize media recorder.&quot;));</span>
+<span class="nc" id="L122">                        revalidateLater();</span>
+<span class="nc" id="L123">                        break;</span>
+
+                    case Initializing:
+<span class="nc" id="L126">                        recordingLength = 0;</span>
+<span class="nc" id="L127">                        done.setEnabled(false);</span>
+<span class="nc" id="L128">                        recordingInProgress.setVisible(false);</span>
+<span class="nc" id="L129">                        evt.consume();</span>
+<span class="nc" id="L130">                        removeAll();</span>
+<span class="nc" id="L131">                        add(BorderLayout.CENTER, new SpanLabel(&quot;Preparing media.  Please wait...&quot;));</span>
+<span class="nc" id="L132">                        revalidateLater();</span>
+<span class="nc" id="L133">                        break;</span>
+
+                    case Initialized:
+<span class="fc" id="L136">                        evt.consume();</span>
+<span class="fc" id="L137">                        removeAll();</span>
+<span class="fc" id="L138">                        add(BorderLayout.CENTER, buildUI());</span>
+<span class="fc" id="L139">                        revalidateLater();</span>
+<span class="fc" id="L140">                        break;</span>
+
+                    case Accepted:
+                    case Canceled:
+<span class="fc" id="L144">                        removeAll();</span>
+<span class="fc" id="L145">                        revalidateLater();</span>
+<span class="fc" id="L146">                        break;</span>
+
+                    case Paused:
+                        //recordingTime.setVisible(false);
+<span class="fc bfc" id="L150" title="All 2 branches covered.">                        if (lastRecordingStartTime &gt; 0) {</span>
+<span class="fc" id="L151">                            recordingLength += System.currentTimeMillis() - lastRecordingStartTime;</span>
+<span class="fc" id="L152">                            lastRecordingStartTime = 0;</span>
+                        }
+<span class="fc" id="L154">                        recordingInProgress.setVisible(false);</span>
+<span class="fc" id="L155">                        recordingOff.setVisible(true);</span>
+<span class="fc" id="L156">                        record.setHidden(false);</span>
+<span class="fc" id="L157">                        record.setEnabled(true);</span>
+<span class="fc" id="L158">                        record.setVisible(true);</span>
+<span class="fc" id="L159">                        pause.setHidden(true);</span>
+<span class="fc" id="L160">                        pause.setVisible(false);</span>
+<span class="fc" id="L161">                        pause.setEnabled(false);</span>
+<span class="fc" id="L162">                        revalidateLater();</span>
+<span class="fc" id="L163">                        break;</span>
+
+                    case Recording:
+<span class="fc" id="L166">                        recordingTime.setVisible(true);</span>
+<span class="fc" id="L167">                        lastRecordingStartTime = System.currentTimeMillis();</span>
+<span class="fc" id="L168">                        recordingInProgress.setVisible(true);</span>
+<span class="fc" id="L169">                        recordingOff.setVisible(false);</span>
+<span class="fc" id="L170">                        done.setEnabled(true);</span>
+<span class="fc" id="L171">                        record.setHidden(true);</span>
+<span class="fc" id="L172">                        record.setEnabled(false);</span>
+<span class="fc" id="L173">                        record.setVisible(false);</span>
+<span class="fc" id="L174">                        pause.setHidden(false);</span>
+<span class="fc" id="L175">                        pause.setVisible(true);</span>
+<span class="fc" id="L176">                        pause.setEnabled(true);</span>
+<span class="fc" id="L177">                        revalidateLater();</span>
+                        break;
+                }
+<span class="fc" id="L180">            }</span>
+
+        });
+<span class="fc" id="L183">        recordingInProgress = new Label(&quot;Recording&quot;) {</span>
+            @Override
+            public void paint(Graphics g) {
+<span class="nc" id="L186">                int opacity = g.getAlpha();</span>
+<span class="nc" id="L187">                double alpha = opacity * recordAlpha;</span>
+<span class="nc" id="L188">                g.setAlpha((int) Math.round(alpha));</span>
+<span class="nc" id="L189">                super.paint(g);</span>
+<span class="nc" id="L190">                g.setAlpha(opacity);</span>
+
+<span class="nc" id="L192">            }</span>
+
+        };
+<span class="fc" id="L195">        $(recordingInProgress).selectAllStyles()</span>
+<span class="fc" id="L196">                .setFgColor(0xff0000);</span>
+<span class="fc" id="L197">        FontImage.setMaterialIcon(recordingInProgress, FontImage.MATERIAL_MIC);</span>
+<span class="fc" id="L198">        recordingOff = new Label(&quot;&quot;);</span>
+<span class="fc" id="L199">        $(recordingOff).selectAllStyles()</span>
+<span class="fc" id="L200">                .setFgColor(0x666666);</span>
+<span class="fc" id="L201">        FontImage.setMaterialIcon(recordingOff, FontImage.MATERIAL_MIC_OFF);</span>
+<span class="fc" id="L202">        recordingTime = new Label();</span>
+
+<span class="fc" id="L204">        record = new Button(FontImage.MATERIAL_FIBER_MANUAL_RECORD);</span>
+
+<span class="fc" id="L206">        record.addActionListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent t) {
+<span class="fc" id="L209">                media.play();</span>
+<span class="fc" id="L210">                setState(RecorderState.Recording);</span>
+<span class="fc" id="L211">            }</span>
+
+        });
+
+<span class="fc" id="L215">        pause = new Button(FontImage.MATERIAL_PAUSE);</span>
+<span class="fc" id="L216">        pause.addActionListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent t) {
+<span class="fc" id="L219">                media.pause();</span>
+<span class="fc" id="L220">                setState(RecorderState.Paused);</span>
+<span class="fc" id="L221">            }</span>
+
+        });
+
+<span class="fc" id="L225">        $(record).selectAllStyles()</span>
+<span class="fc" id="L226">                .setFgColor(0xff0000)</span>
+
+<span class="fc" id="L228">                .setMaterialIcon(FontImage.MATERIAL_FIBER_MANUAL_RECORD, 10)</span>
+
+        ;
+
+<span class="fc" id="L232">        $(pause).selectAllStyles()</span>
+<span class="fc" id="L233">                .setFgColor(0x666666)</span>
+<span class="fc" id="L234">                .setMaterialIcon(FontImage.MATERIAL_PAUSE_CIRCLE_OUTLINE, 10);</span>
+
+<span class="fc" id="L236">        done = new Button(&quot;Done&quot;);</span>
+<span class="fc" id="L237">        done.addActionListener(new ActionListener() {</span>
+            @Override
+            public void actionPerformed(ActionEvent t) {
+
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">                if (builder.isRedirectToAudioBuffer()) {</span>
+                    // We were just redirecting to the audio buffer so we don't have any previews to speak of
+<span class="fc" id="L243">                    media.cleanup();</span>
+<span class="fc" id="L244">                    setState(RecorderState.Paused);</span>
+<span class="fc" id="L245">                    setState(RecorderState.Accepted);</span>
+<span class="fc" id="L246">                    return;</span>
+                }
+
+<span class="nc" id="L249">                final boolean[] closeHandled = new boolean[1];</span>
+<span class="nc" id="L250">                media.pause();</span>
+<span class="nc" id="L251">                setState(RecorderState.Paused);</span>
+<span class="nc" id="L252">                setState(RecorderState.Pending);</span>
+<span class="nc" id="L253">                final Sheet processingSheet = new Sheet(Sheet.findContainingSheet(done), &quot;Preview&quot;);</span>
+<span class="nc" id="L254">                processingSheet.getContentPane().setLayout(new BorderLayout());</span>
+<span class="nc" id="L255">                Container center = BorderLayout.center(new SpanLabel(&quot;Processing... please wait&quot;));</span>
+<span class="nc" id="L256">                processingSheet.getContentPane().add(BorderLayout.CENTER, center);</span>
+<span class="nc" id="L257">                processingSheet.show();</span>
+<span class="nc" id="L258">                final Sheet sheet = new Sheet(Sheet.findContainingSheet(done), &quot;Preview&quot;);</span>
+
+<span class="nc" id="L260">                Button cancel = new Button(&quot;Cancel&quot;);</span>
+<span class="nc" id="L261">                cancel.addActionListener(new ActionListener() {</span>
+                    public void actionPerformed(ActionEvent e) {
+<span class="nc" id="L263">                        closeHandled[0] = true;</span>
+<span class="nc" id="L264">                        sheet.back();</span>
+<span class="nc" id="L265">                        setState(RecorderState.Canceled);</span>
+
+<span class="nc" id="L267">                    }</span>
+                });
+<span class="nc" id="L269">                Button startOver = new Button(&quot;Start over&quot;);</span>
+<span class="nc" id="L270">                startOver.addActionListener(new ActionListener() {</span>
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L273">                        closeHandled[0] = true;</span>
+<span class="nc" id="L274">                        sheet.back();</span>
+<span class="nc" id="L275">                        setState(RecorderState.Initializing);</span>
+
+                        try {
+<span class="nc" id="L278">                            media = MediaManager.createMediaRecorder(builder);</span>
+<span class="nc" id="L279">                            setState(RecorderState.Initialized);</span>
+<span class="nc" id="L280">                            setState(RecorderState.Paused);</span>
+<span class="nc" id="L281">                        } catch (IOException ex) {</span>
+<span class="nc" id="L282">                            setState(RecorderState.NotInitialized);</span>
+<span class="nc" id="L283">                        }</span>
+<span class="nc" id="L284">                    }</span>
+
+                });
+<span class="nc" id="L287">                Button accept = new Button(&quot;Accept&quot;);</span>
+<span class="nc" id="L288">                accept.addActionListener(new ActionListener() {</span>
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L291">                        closeHandled[0] = true;</span>
+<span class="nc" id="L292">                        sheet.back();</span>
+<span class="nc" id="L293">                        setState(RecorderState.Accepted);</span>
+<span class="nc" id="L294">                    }</span>
+
+                });
+<span class="nc" id="L297">                sheet.getContentPane().setLayout(new BorderLayout());</span>
+
+<span class="nc" id="L299">                Container mpContainer = new Container(BoxLayout.y());</span>
+<span class="nc" id="L300">                sheet.getContentPane().add(BorderLayout.CENTER, BoxLayout.encloseY(mpContainer, accept, startOver, cancel));</span>
+
+<span class="nc" id="L302">                media.cleanup();</span>
+                try {
+<span class="nc" id="L304">                    MediaPlayer mp = new MediaPlayer(MediaManager.createMedia(builder.getPath(), false));</span>
+<span class="nc" id="L305">                    mp.setOnTopMode(false);</span>
+
+<span class="nc" id="L307">                    mpContainer.add(mp);</span>
+<span class="nc" id="L308">                } catch (IOException ex) {</span>
+<span class="nc" id="L309">                    mpContainer.add(new Label(&quot;No Audio Received&quot;));</span>
+<span class="nc" id="L310">                    accept.setEnabled(false);</span>
+
+<span class="nc" id="L312">                }</span>
+<span class="nc" id="L313">                sheet.addBackListener(new ActionListener() {</span>
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L316" title="All 2 branches missed.">                        if (!closeHandled[0]) {</span>
+<span class="nc" id="L317">                            closeHandled[0] = true;</span>
+<span class="nc" id="L318">                            setState(RecorderState.Initializing);</span>
+                            try {
+<span class="nc" id="L320">                                media = MediaManager.createMediaRecorder(builder);</span>
+<span class="nc" id="L321">                                setState(RecorderState.Initialized);</span>
+<span class="nc" id="L322">                                setState(RecorderState.Paused);</span>
+<span class="nc" id="L323">                            } catch (IOException ex) {</span>
+<span class="nc" id="L324">                                setState(RecorderState.NotInitialized);</span>
+<span class="nc" id="L325">                            }</span>
+                        }
+<span class="nc" id="L327">                    }</span>
+
+                });
+<span class="nc" id="L330">                sheet.addCloseListener(new ActionListener() {</span>
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L333" title="All 2 branches missed.">                        if (!closeHandled[0]) {</span>
+<span class="nc" id="L334">                            closeHandled[0] = true;</span>
+<span class="nc" id="L335">                            setState(RecorderState.Canceled);</span>
+                        }
+<span class="nc" id="L337">                    }</span>
+
+                });
+<span class="nc" id="L340">                sheet.show();</span>
+
+
+<span class="nc" id="L343">            }</span>
+
+        });
+
+
+<span class="fc" id="L348">    }</span>
+
+    @Override
+    protected void initComponent() {
+<span class="nc" id="L352">        super.initComponent();</span>
+<span class="nc" id="L353">        getComponentForm().registerAnimated(this);</span>
+<span class="nc" id="L354">    }</span>
+
+    @Override
+    protected void deinitialize() {
+<span class="nc" id="L358">        getComponentForm().deregisterAnimated(this);</span>
+<span class="nc" id="L359">        super.deinitialize();</span>
+<span class="nc" id="L360">    }</span>
+
+    @Override
+    public boolean animate() {
+
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">        if (state == RecorderState.Recording) {</span>
+<span class="fc" id="L366">            recordAlpha = 0.6 + 0.4 * Math.sin(counter * Math.PI / 180);</span>
+<span class="fc" id="L367">            counter += 2;</span>
+<span class="fc" id="L368">            counter = counter % 360;</span>
+<span class="pc bpc" id="L369" title="1 of 2 branches missed.">            if (recordingTime != null) {</span>
+<span class="fc" id="L370">                int milli = recordingLength();</span>
+<span class="fc" id="L371">                int sec = milli / 1000;</span>
+<span class="fc" id="L372">                int seconds = sec % 60;</span>
+<span class="fc" id="L373">                int minutes = sec / 60;</span>
+
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">                String secStr = seconds &lt; 10 ? &quot;0&quot; + seconds : &quot;&quot; + seconds;</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">                String minStr = minutes &lt; 10 ? &quot;0&quot; + minutes : &quot;&quot; + minutes;</span>
+
+<span class="fc" id="L378">                String txt = minStr + &quot;:&quot; + secStr + &quot;.&quot; + (milli % 1000);</span>
+
+<span class="fc" id="L380">                recordingTime.setText(txt);</span>
+            }
+<span class="fc" id="L382">            return true;</span>
+        } else {
+<span class="nc" id="L384">            recordAlpha = 1.0;</span>
+        }
+<span class="nc" id="L386">        return super.animate();</span>
+    }
+
+    private int recordingLength() {
+<span class="pc bpc" id="L390" title="1 of 2 branches missed.">        if (lastRecordingStartTime &gt; 0) {</span>
+<span class="nc" id="L391">            return (int) ((System.currentTimeMillis() - lastRecordingStartTime) + recordingLength);</span>
+        } else {
+<span class="fc" id="L393">            return (int) recordingLength;</span>
+        }
+    }
+
+    /**
+     * Gets the recording state.  Use this method to check whether the user accepted
+     * the recording, or canceled the recording.
+     *
+     * @return A RecorderState.
+     */
+    public RecorderState getState() {
+<span class="fc" id="L404">        return state;</span>
+    }
+
+    private void setState(RecorderState state) {
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">        if (this.state != state) {</span>
+<span class="fc" id="L409">            this.state = state;</span>
+<span class="fc" id="L410">            actionListeners.fireActionEvent(new ActionEvent(this));</span>
+        }
+<span class="fc" id="L412">    }</span>
+
+    private Container buildUI() {
+<span class="fc" id="L415">        Container out = new Container(new BorderLayout());</span>
+<span class="fc" id="L416">        done.remove();</span>
+<span class="fc" id="L417">        recordingOff.remove();</span>
+<span class="fc" id="L418">        recordingInProgress.remove();</span>
+<span class="fc" id="L419">        out.add(BorderLayout.NORTH, BorderLayout.centerEastWest(null, done, LayeredLayout.encloseIn(recordingOff, recordingInProgress)));</span>
+<span class="fc" id="L420">        record.remove();</span>
+<span class="fc" id="L421">        Container center = new Container(new LayeredLayout());</span>
+<span class="fc" id="L422">        center.add(record);</span>
+<span class="fc" id="L423">        pause.remove();</span>
+<span class="fc" id="L424">        center.add(pause);</span>
+<span class="fc" id="L425">        out.add(BorderLayout.CENTER, BorderLayout.centerAbsolute(center));</span>
+
+<span class="fc" id="L427">        recordingTime.remove();</span>
+<span class="fc" id="L428">        out.add(BorderLayout.SOUTH, FlowLayout.encloseCenter(recordingTime));</span>
+
+<span class="fc" id="L430">        return out;</span>
+    }
+
+    /**
+     * Adds a listener to be notified when the state changes. Only transitions to the {@link RecorderState#Accepted}
+     * and {@link RecorderState#Canceled} states result in an event.
+     *
+     * @param l The listener
+     */
+    public void addActionListener(ActionListener l) {
+<span class="fc" id="L440">        actionListeners.addListener(l);</span>
+<span class="fc" id="L441">    }</span>
+
+    /**
+     * Removes an action listener.
+     *
+     * @param l The listener.
+     */
+    public void removeActionListener(ActionListener l) {
+<span class="nc" id="L449">        actionListeners.removeListener(l);</span>
+<span class="nc" id="L450">    }</span>
+
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="nc" id="L454">        return new Dimension(CN.convertToPixels(100), CN.convertToPixels(50));</span>
+    }
+
+    /**
+     * Enum for tracking the recorder state.
+     */
+<span class="fc" id="L460">    public enum RecorderState { // PMD Fix: UnnecessaryModifier removed redundant static</span>
+        /**
+         * The recorder is initializing.
+         */
+<span class="fc" id="L464">        Initializing,</span>
+
+        /**
+         * The recorder is currently recording.
+         */
+<span class="fc" id="L469">        Recording,</span>
+
+        /**
+         * The recorder is currently paused.
+         */
+<span class="fc" id="L474">        Paused,</span>
+
+        /**
+         * The recording is currently pending.  This recorder is in this state while the user is deciding whether to accept
+         * the recording.
+         */
+<span class="fc" id="L480">        Pending,</span>
+
+        /**
+         * The user chose to cancel the recording.
+         */
+<span class="fc" id="L485">        Canceled,</span>
+
+        /**
+         * The user has accepted the recording.
+         */
+<span class="fc" id="L490">        Accepted,</span>
+
+        /**
+         * The recorder is initialized.
+         */
+<span class="fc" id="L495">        Initialized,</span>
+
+        /**
+         * The recorder is not initialized yet.
+         */
+<span class="fc" id="L500">        NotInitialized</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

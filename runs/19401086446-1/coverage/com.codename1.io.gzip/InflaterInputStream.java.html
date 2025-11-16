@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InflaterInputStream.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.gzip</a> &gt; <span class="el_source">InflaterInputStream.java</span></div><h1>InflaterInputStream.java</h1><pre class="source lang-java linenums">
+/* -*-mode:java; c-basic-offset:2; indent-tabs-mode:nil -*- */
+/*
+Copyright (c) 2011 ymnk, JCraft,Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+  1. Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright 
+     notice, this list of conditions and the following disclaimer in 
+     the documentation and/or other materials provided with the distribution.
+
+  3. The names of the authors may not be used to endorse or promote products
+     derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL JCRAFT,
+INC. OR ANY CONTRIBUTORS TO THIS SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+package com.codename1.io.gzip;
+
+import java.io.IOException;
+import java.io.InputStream;
+
+public class InflaterInputStream extends FilterInputStream {
+    protected static final int DEFAULT_BUFSIZE = 512;
+    protected final Inflater inflater;
+    protected byte[] buf;
+<span class="fc" id="L40">    protected boolean myinflater = false;</span>
+<span class="fc" id="L41">    private boolean closed = false;</span>
+<span class="fc" id="L42">    private boolean eof = false;</span>
+<span class="fc" id="L43">    private boolean close_in = true;</span>
+<span class="fc" id="L44">    private final byte[] byte1 = new byte[1];</span>
+<span class="fc" id="L45">    private final byte[] b = new byte[512];</span>
+
+    public InflaterInputStream(InputStream in) throws IOException {
+<span class="nc" id="L48">        this(in, false);</span>
+<span class="nc" id="L49">    }</span>
+
+    public InflaterInputStream(InputStream in, boolean nowrap) throws IOException {
+<span class="nc" id="L52">        this(in, new Inflater(nowrap));</span>
+<span class="nc" id="L53">        myinflater = true;</span>
+<span class="nc" id="L54">    }</span>
+
+    public InflaterInputStream(InputStream in, Inflater inflater) throws IOException {
+<span class="nc" id="L57">        this(in, inflater, DEFAULT_BUFSIZE);</span>
+<span class="nc" id="L58">    }</span>
+
+    public InflaterInputStream(InputStream in,
+                               Inflater inflater, int size) throws IOException {
+<span class="nc" id="L62">        this(in, inflater, size, true);</span>
+<span class="nc" id="L63">    }</span>
+
+    public InflaterInputStream(InputStream in,
+                               Inflater inflater,
+                               int size, boolean close_in) throws IOException {
+<span class="fc" id="L68">        super(in);</span>
+<span class="pc bpc" id="L69" title="2 of 4 branches missed.">        if (in == null || inflater == null) {</span>
+<span class="nc" id="L70">            throw new NullPointerException();</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        } else if (size &lt;= 0) {</span>
+<span class="nc" id="L72">            throw new IllegalArgumentException(&quot;buffer size must be greater than 0&quot;);</span>
+        }
+<span class="fc" id="L74">        this.inflater = inflater;</span>
+<span class="fc" id="L75">        buf = new byte[size];</span>
+<span class="fc" id="L76">        this.close_in = close_in;</span>
+<span class="fc" id="L77">    }</span>
+
+    public int read() throws IOException {
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L81">            throw new IOException(&quot;Stream closed&quot;);</span>
+        }
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        return read(byte1, 0, 1) == -1 ? -1 : byte1[0] &amp; 0xff;</span>
+    }
+
+    public int read(byte[] b, int off, int len) throws IOException {
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L88">            throw new IOException(&quot;Stream closed&quot;);</span>
+        }
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        if (b == null) {</span>
+<span class="nc" id="L91">            throw new NullPointerException();</span>
+<span class="pc bpc" id="L92" title="3 of 6 branches missed.">        } else if (off &lt; 0 || len &lt; 0 || len &gt; b.length - off) {</span>
+<span class="nc" id="L93">            throw new IndexOutOfBoundsException();</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        } else if (len == 0) {</span>
+<span class="nc" id="L95">            return 0;</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        } else if (eof) {</span>
+<span class="fc" id="L97">            return -1;</span>
+        }
+
+<span class="fc" id="L100">        int n = 0;</span>
+<span class="fc" id="L101">        inflater.setOutput(b, off, len);</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        while (!eof) {</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">            if (inflater.avail_in == 0)</span>
+<span class="fc" id="L104">                fill();</span>
+<span class="fc" id="L105">            int err = inflater.inflate(JZlib.Z_NO_FLUSH);</span>
+<span class="fc" id="L106">            n += inflater.next_out_index - off;</span>
+<span class="fc" id="L107">            off = inflater.next_out_index;</span>
+<span class="pc bpc" id="L108" title="2 of 3 branches missed.">            switch (err) {</span>
+                case JZlib.Z_DATA_ERROR:
+<span class="nc" id="L110">                    throw new IOException(inflater.msg);</span>
+                case JZlib.Z_STREAM_END:
+                case JZlib.Z_NEED_DICT:
+<span class="fc" id="L113">                    eof = true;</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                    if (err == JZlib.Z_NEED_DICT)</span>
+<span class="nc" id="L115">                        return -1;</span>
+                    break;
+                default:
+            }
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">            if (inflater.avail_out == 0)</span>
+<span class="nc" id="L120">                break;</span>
+<span class="fc" id="L121">        }</span>
+<span class="fc" id="L122">        return n;</span>
+    }
+
+    public int available() throws IOException {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L127">            throw new IOException(&quot;Stream closed&quot;);</span>
+        }
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (eof) {</span>
+<span class="nc" id="L130">            return 0;</span>
+        } else {
+<span class="nc" id="L132">            return 1;</span>
+        }
+    }
+
+    public long skip(long n) throws IOException {
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if (n &lt; 0) {</span>
+<span class="nc" id="L138">            throw new IllegalArgumentException(&quot;negative skip length&quot;);</span>
+        }
+
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L142">            throw new IOException(&quot;Stream closed&quot;);</span>
+        }
+
+<span class="nc" id="L145">        int max = (int) Math.min(n, Integer.MAX_VALUE);</span>
+<span class="nc" id="L146">        int total = 0;</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        while (total &lt; max) {</span>
+<span class="nc" id="L148">            int len = max - total;</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">            if (len &gt; b.length) {</span>
+<span class="nc" id="L150">                len = b.length;</span>
+            }
+<span class="nc" id="L152">            len = read(b, 0, len);</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">            if (len == -1) {</span>
+<span class="nc" id="L154">                eof = true;</span>
+<span class="nc" id="L155">                break;</span>
+            }
+<span class="nc" id="L157">            total += len;</span>
+<span class="nc" id="L158">        }</span>
+<span class="nc" id="L159">        return total;</span>
+    }
+
+    public void close() throws IOException {
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (!closed) {</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">            if (myinflater)</span>
+<span class="nc" id="L165">                inflater.end();</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">            if (close_in)</span>
+<span class="nc" id="L167">                in.close();</span>
+<span class="nc" id="L168">            closed = true;</span>
+        }
+<span class="nc" id="L170">    }</span>
+
+    protected void fill() throws IOException {
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (closed) {</span>
+<span class="nc" id="L174">            throw new IOException(&quot;Stream closed&quot;);</span>
+        }
+<span class="fc" id="L176">        int len = in.read(buf, 0, buf.length);</span>
+<span class="pc bpc" id="L177" title="1 of 2 branches missed.">        if (len == -1) {</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">            if (inflater.istate.wrap == 0 &amp;&amp;</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">                    !inflater.finished()) {</span>
+<span class="nc" id="L180">                buf[0] = 0;</span>
+<span class="nc" id="L181">                len = 1;</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">            } else if (inflater.istate.was != -1) {  // in reading trailer</span>
+<span class="nc" id="L183">                throw new IOException(&quot;footer is not found&quot;);</span>
+            } else {
+<span class="nc" id="L185">                throw new IOException(&quot;Unexpected end of ZLIB input stream&quot;);</span>
+            }
+        }
+<span class="fc" id="L188">        inflater.setInput(buf, 0, len, true);</span>
+<span class="fc" id="L189">    }</span>
+
+    public boolean markSupported() {
+<span class="nc" id="L192">        return false;</span>
+    }
+
+    public synchronized void mark(int readlimit) {
+<span class="nc" id="L196">    }</span>
+
+    public synchronized void reset() throws IOException {
+<span class="nc" id="L199">        throw new IOException(&quot;mark/reset not supported&quot;);</span>
+    }
+
+    public long getTotalIn() {
+<span class="nc" id="L203">        return inflater.getTotalIn();</span>
+    }
+
+    public long getTotalOut() {
+<span class="nc" id="L207">        return inflater.getTotalOut();</span>
+    }
+
+    public byte[] getAvailIn() {
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        if (inflater.avail_in &lt;= 0)</span>
+<span class="nc" id="L212">            return null;</span>
+<span class="nc" id="L213">        byte[] tmp = new byte[inflater.avail_in];</span>
+<span class="nc" id="L214">        System.arraycopy(inflater.next_in, inflater.next_in_index,</span>
+                tmp, 0, inflater.avail_in);
+<span class="nc" id="L216">        return tmp;</span>
+    }
+
+    public void readHeader() throws IOException {
+
+<span class="nc" id="L221">        byte[] empty = &quot;&quot;.getBytes();</span>
+<span class="nc" id="L222">        inflater.setInput(empty, 0, 0, false);</span>
+<span class="nc" id="L223">        inflater.setOutput(empty, 0, 0);</span>
+
+<span class="nc" id="L225">        inflater.inflate(JZlib.Z_NO_FLUSH);</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        if (!inflater.istate.inParsingHeader()) {</span>
+<span class="nc" id="L227">            return;</span>
+        }
+
+<span class="nc" id="L230">        byte[] b1 = new byte[1];</span>
+        do {
+<span class="nc" id="L232">            int i = in.read(b1);</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">            if (i &lt;= 0)</span>
+<span class="nc" id="L234">                throw new IOException(&quot;no input&quot;);</span>
+<span class="nc" id="L235">            inflater.setInput(b1);</span>
+<span class="nc" id="L236">            int err = inflater.inflate(JZlib.Z_NO_FLUSH);</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">            if (err != 0/*Z_OK*/)</span>
+<span class="nc" id="L238">                throw new IOException(inflater.msg);</span>
+        }
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        while (inflater.istate.inParsingHeader());</span>
+<span class="nc" id="L241">    }</span>
+
+    public Inflater getInflater() {
+<span class="nc" id="L244">        return inflater;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

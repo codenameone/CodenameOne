@@ -1,0 +1,310 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EasyThread.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">EasyThread.java</span></div><h1>EasyThread.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.util;
+
+import com.codename1.io.Util;
+import com.codename1.ui.Display;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * An easy API for working with threads similar to call serially/and wait that allows us to
+ * create a thread and dispatch tasks to it.
+ *
+ * @author Shai Almog
+ */
+public class EasyThread {
+    private static List&lt;ErrorListener&gt; globalErrorListenenrs;
+<span class="fc" id="L40">    private final Object LOCK = new Object();</span>
+    private List&lt;ErrorListener&gt; errorListenenrs;
+    private final Thread t;
+<span class="fc" id="L43">    private boolean running = true;</span>
+<span class="fc" id="L44">    private final ArrayList&lt;Object&gt; queue = new ArrayList&lt;Object&gt;();</span>
+
+<span class="fc" id="L46">    private EasyThread(String name) {</span>
+<span class="fc" id="L47">        t = Display.getInstance().startThread(new Runnable() {</span>
+            public void run() {
+<span class="fc" id="L49">                Object current = null;</span>
+<span class="fc" id="L50">                Object resultCallback = null;</span>
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">                while (running) {</span>
+                    try {
+<span class="fc" id="L53">                        synchronized (LOCK) {</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">                            if (queue.size() &gt; 0) {</span>
+<span class="nc" id="L55">                                current = queue.get(0);</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">                                if (current instanceof RunnableWithResult) {</span>
+<span class="nc" id="L57">                                    resultCallback = queue.get(1);</span>
+<span class="nc" id="L58">                                    queue.remove(0);</span>
+                                }
+<span class="nc" id="L60">                                queue.remove(0);</span>
+                            } else {
+<span class="nc" id="L62">                                Util.wait(LOCK);</span>
+                            }
+<span class="nc" id="L64">                        }</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">                        if (current != null) {</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">                            if (current instanceof Runnable) {</span>
+<span class="nc" id="L67">                                ((Runnable) current).run();</span>
+                            } else {
+<span class="nc" id="L69">                                ((RunnableWithResult) current).run((SuccessCallback) resultCallback);</span>
+                            }
+                        }
+<span class="nc" id="L72">                    } catch (Throwable t) {</span>
+<span class="nc" id="L73">                        fireEvent(errorListenenrs, current, t);</span>
+<span class="nc" id="L74">                        fireEvent(globalErrorListenenrs, current, t);</span>
+<span class="nc" id="L75">                    }</span>
+<span class="nc" id="L76">                    current = null;</span>
+<span class="nc" id="L77">                    resultCallback = null;</span>
+                }
+<span class="nc" id="L79">            }</span>
+        }, name);
+<span class="fc" id="L81">        t.start();</span>
+<span class="fc" id="L82">    }</span>
+
+    /**
+     * Starts a new thread
+     *
+     * @param name the display name for the thread
+     * @return a new thread instance
+     */
+    public static EasyThread start(String name) {
+<span class="fc" id="L91">        return new EasyThread(name);</span>
+    }
+
+    /**
+     * Adds a callback for error events, notice that this code isn't thread
+     * safe and should be invoked synchronously. This method must never be
+     * invoked from within the resulting callback code!
+     *
+     * @param err the error callback
+     */
+    public static void addGlobalErrorListener(ErrorListener err) {
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (globalErrorListenenrs == null) {</span>
+<span class="nc" id="L103">            globalErrorListenenrs = new ArrayList&lt;ErrorListener&gt;();</span>
+        }
+<span class="nc" id="L105">        globalErrorListenenrs.add(err);</span>
+<span class="nc" id="L106">    }</span>
+
+    /**
+     * Removes a callback for error events, notice that this code isn't thread
+     * safe and should be invoked synchronously. This method must never be
+     * invoked from within the resulting callback code!
+     *
+     * @param err the error callback
+     */
+    public static void removeGlobalErrorListener(ErrorListener err) {
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        if (globalErrorListenenrs == null) {</span>
+<span class="nc" id="L117">            return;</span>
+        }
+<span class="nc" id="L119">        List&lt;ErrorListener&gt; l = new ArrayList&lt;ErrorListener&gt;();</span>
+<span class="nc" id="L120">        l.addAll(globalErrorListenenrs);</span>
+<span class="nc" id="L121">        l.remove(err);</span>
+<span class="nc" id="L122">        globalErrorListenenrs = l;</span>
+<span class="nc" id="L123">    }</span>
+
+    private void fireEvent(List&lt;ErrorListener&gt; lst, Object current, Throwable t) {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (lst != null) {</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">            for (ErrorListener e : lst) {</span>
+<span class="nc" id="L128">                e.onError(this, current, t);</span>
+<span class="nc" id="L129">            }</span>
+        }
+<span class="nc" id="L131">    }</span>
+
+    /**
+     * Runs the given object asynchronously on the thread and returns the result object
+     *
+     * @param r runs this method
+     * @param t object is passed to the success callback
+     */
+    public &lt;T&gt; void run(RunnableWithResult&lt;T&gt; r, SuccessCallback&lt;T&gt; t) {
+<span class="nc" id="L140">        synchronized (LOCK) {</span>
+<span class="nc" id="L141">            queue.add(r);</span>
+<span class="nc" id="L142">            queue.add(t);</span>
+<span class="nc" id="L143">            LOCK.notify();</span>
+<span class="nc" id="L144">        }</span>
+<span class="nc" id="L145">    }</span>
+
+    /**
+     * Runs the given runnable on the thread, the method returns immediately
+     *
+     * @param r the runnable
+     */
+    public void run(Runnable r) {
+<span class="nc" id="L153">        synchronized (LOCK) {</span>
+<span class="nc" id="L154">            queue.add(r);</span>
+<span class="nc" id="L155">            LOCK.notify();</span>
+<span class="nc" id="L156">        }</span>
+<span class="nc" id="L157">    }</span>
+
+    /**
+     * Runs the given runnable on the thread and blocks until it completes, returns the value object
+     *
+     * @param r the runnable with result that will execute on the thread
+     * @return value returned by r
+     */
+    public &lt;T&gt; T run(final RunnableWithResultSync&lt;T&gt; r) {
+        // we need the flag and can't use the result object. Since null would be a valid value for the result
+        // we would have a hard time of detecting the case of the code completing before the wait call
+<span class="nc" id="L168">        final boolean[] flag = new boolean[1];</span>
+<span class="nc" id="L169">        final Object[] result = new Object[1];</span>
+<span class="nc" id="L170">        final SuccessCallback&lt;T&gt; sc = new SuccessCallback&lt;T&gt;() {</span>
+            public void onSucess(T value) {
+<span class="nc" id="L172">                synchronized (flag) {</span>
+<span class="nc" id="L173">                    result[0] = value;</span>
+<span class="nc" id="L174">                    flag[0] = true;</span>
+<span class="nc" id="L175">                    flag.notify();</span>
+<span class="nc" id="L176">                }</span>
+<span class="nc" id="L177">            }</span>
+        };
+<span class="nc" id="L179">        RunnableWithResult&lt;T&gt; rr = new RunnableWithResult&lt;T&gt;() {</span>
+            public void run(SuccessCallback&lt;T&gt; onSuccess) {
+<span class="nc" id="L181">                sc.onSucess(r.run());</span>
+<span class="nc" id="L182">            }</span>
+        };
+<span class="nc" id="L184">        synchronized (LOCK) {</span>
+<span class="nc" id="L185">            queue.add(rr);</span>
+<span class="nc" id="L186">            queue.add(sc);</span>
+<span class="nc" id="L187">            LOCK.notify();</span>
+<span class="nc" id="L188">        }</span>
+<span class="nc" id="L189">        Display.getInstance().invokeAndBlock(new Runnable() {</span>
+            public void run() {
+<span class="nc" id="L191">                synchronized (flag) {</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                    if (!flag[0]) {</span>
+<span class="nc" id="L193">                        Util.wait(flag);</span>
+                    }
+<span class="nc" id="L195">                }</span>
+<span class="nc" id="L196">            }</span>
+        });
+<span class="nc" id="L198">        return (T) result[0];</span>
+    }
+
+    /**
+     * Invokes the given runnable on the thread and waits for its execution to complete
+     *
+     * @param r the runnable
+     */
+    public void runAndWait(final Runnable r) {
+<span class="nc" id="L207">        final boolean[] flag = new boolean[1];</span>
+<span class="nc" id="L208">        synchronized (LOCK) {</span>
+<span class="nc" id="L209">            queue.add(new Runnable() {</span>
+                public void run() {
+                    try {
+<span class="nc" id="L212">                        r.run();</span>
+                    } finally {
+<span class="nc" id="L214">                        synchronized (flag) {</span>
+<span class="nc" id="L215">                            flag[0] = true;</span>
+<span class="nc" id="L216">                            flag.notify();</span>
+<span class="nc" id="L217">                        }</span>
+                    }
+<span class="nc" id="L219">                }</span>
+            });
+<span class="nc" id="L221">            LOCK.notify();</span>
+<span class="nc" id="L222">        }</span>
+<span class="nc" id="L223">        Display.getInstance().invokeAndBlock(new Runnable() {</span>
+            public void run() {
+<span class="nc" id="L225">                synchronized (flag) {</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">                    if (!flag[0]) {</span>
+<span class="nc" id="L227">                        Util.wait(flag);</span>
+                    }
+<span class="nc" id="L229">                }</span>
+<span class="nc" id="L230">            }</span>
+        });
+<span class="nc" id="L232">    }</span>
+
+    /**
+     * Stops the thread once the current task completes
+     */
+    public void kill() {
+<span class="nc" id="L238">        synchronized (LOCK) {</span>
+<span class="nc" id="L239">            running = false;</span>
+<span class="nc" id="L240">            LOCK.notify();</span>
+<span class="nc" id="L241">        }</span>
+<span class="nc" id="L242">    }</span>
+
+    /**
+     * Returns true if the current thread is the easy thread and false othewise similar
+     * to the isEDT method
+     *
+     * @return true if we are currently within this easy thread
+     */
+    public boolean isThisIt() {
+<span class="nc bnc" id="L251" title="All 2 branches missed.">        return t == Thread.currentThread();</span>
+    }
+
+    /**
+     * Adds a callback for error events, notice that this code isn't thread
+     * safe and should be invoked synchronously. This method must never be
+     * invoked from within the resulting callback code!
+     *
+     * @param err the error callback
+     */
+    public void addErrorListener(ErrorListener err) {
+<span class="nc bnc" id="L262" title="All 2 branches missed.">        if (errorListenenrs == null) {</span>
+<span class="nc" id="L263">            errorListenenrs = new ArrayList&lt;ErrorListener&gt;();</span>
+        }
+<span class="nc" id="L265">        errorListenenrs.add(err);</span>
+<span class="nc" id="L266">    }</span>
+
+    /**
+     * Removes a callback for error events, notice that this code isn't thread
+     * safe and should be invoked synchronously. This method must never be
+     * invoked from within the resulting callback code!
+     *
+     * @param err the error callback
+     */
+    public void removeErrorListener(ErrorListener err) {
+<span class="nc bnc" id="L276" title="All 2 branches missed.">        if (errorListenenrs == null) {</span>
+<span class="nc" id="L277">            return;</span>
+        }
+<span class="nc" id="L279">        List&lt;ErrorListener&gt; l = new ArrayList&lt;ErrorListener&gt;();</span>
+<span class="nc" id="L280">        l.addAll(errorListenenrs);</span>
+<span class="nc" id="L281">        l.remove(err);</span>
+<span class="nc" id="L282">        errorListenenrs = l;</span>
+<span class="nc" id="L283">    }</span>
+
+    /**
+     * Changes the priority of this EasyThread.
+     *
+     * @param newPriority priority to set this thread to
+     */
+    public final void setPriority(int newPriority) {
+<span class="nc" id="L291">        t.setPriority(newPriority);</span>
+<span class="nc" id="L292">    }</span>
+
+    /**
+     * Callback listener for errors on easy thread
+     */
+    public interface ErrorListener&lt;T&gt; {
+        /**
+         * Invoked when an exception is thrown on an easy thread. Notice
+         * this callback occurs within the thread and not on the EDT. This
+         * method blocks the current easy thread until it completes.
+         *
+         * @param t        the thread
+         * @param callback the callback that triggered the exception
+         * @param error    the exception that occurred
+         */
+        void onError(EasyThread t, T callback, Throwable error);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

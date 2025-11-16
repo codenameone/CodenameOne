@@ -1,0 +1,574 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AC.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts.mig</a> &gt; <span class="el_source">AC.java</span></div><h1>AC.java</h1><pre class="source lang-java linenums">package com.codename1.ui.layouts.mig;
+
+import java.util.ArrayList;
+import java.util.Collections;
+
+/*
+ * License (BSD):
+ * ==============
+ *
+ * Copyright (c) 2004, Mikael Grev, MiG InfoCom AB. (miglayout (at) miginfocom (dot) com)
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * Neither the name of the MiG InfoCom AB nor the names of its contributors may be
+ * used to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ *
+ * @version 1.0
+ * @author Mikael Grev, MiG InfoCom AB
+ *         Date: 2006-sep-08
+ */
+
+/**
+ * A constraint that holds the column &lt;b&gt;or&lt;/b&gt; row constraints for the grid. It also holds the gaps between the rows and columns.
+ * &lt;p&gt;
+ * This class is a holder and builder for a number of {@link net.miginfocom.layout.DimConstraint}s.
+ * &lt;p&gt;
+ * For a more thorough explanation of what these constraints do, and how to build the constraints, see the White Paper or Cheat Sheet at www.migcomponents.com.
+ * &lt;p&gt;
+ * Note that there are two way to build this constraint. Through String (e.g. &lt;code&gt;&quot;[100]3[200,fill]&quot;&lt;/code&gt; or through API (E.g.
+ * &lt;code&gt;new AC().size(&quot;100&quot;).gap(&quot;3&quot;).size(&quot;200&quot;).fill()&lt;/code&gt;.
+ */
+public final class AC {
+<span class="fc" id="L51">    private final ArrayList&lt;DimConstraint&gt; cList = new ArrayList&lt;DimConstraint&gt;(8);</span>
+
+<span class="fc" id="L53">    private transient int curIx = 0;</span>
+
+    /**
+     * Constructor. Creates an instance that can be configured manually. Will be initialized with a default
+     * {@link net.miginfocom.layout.DimConstraint}.
+     */
+<span class="fc" id="L59">    public AC() {</span>
+<span class="fc" id="L60">        cList.add(new DimConstraint());</span>
+<span class="fc" id="L61">    }</span>
+
+    /**
+     * Property. The different {@link net.miginfocom.layout.DimConstraint}s that this object consists of.
+     * These &lt;code&gt;DimConstraints&lt;/code&gt; contains all information in this class.
+     * &lt;p&gt;
+     * Yes, we are embarrassingly aware that the method is misspelled.
+     *
+     * @return The different {@link net.miginfocom.layout.DimConstraint}s that this object consists of. A new list and
+     * never &lt;code&gt;null&lt;/code&gt;.
+     */
+    public DimConstraint[] getConstaints() {
+<span class="fc" id="L73">        return cList.toArray(new DimConstraint[cList.size()]);</span>
+    }
+
+    /**
+     * Sets the different {@link net.miginfocom.layout.DimConstraint}s that this object should consists of.
+     * &lt;p&gt;
+     * Yes, we are embarrassingly aware that the method is misspelled.
+     *
+     * @param constr The different {@link net.miginfocom.layout.DimConstraint}s that this object consists of. The list
+     *               will be copied for storage. &lt;code&gt;null&lt;/code&gt; or and empty array will reset the constraints to one &lt;code&gt;DimConstraint&lt;/code&gt;
+     *               with default values.
+     */
+    public void setConstaints(DimConstraint[] constr) {
+<span class="pc bpc" id="L86" title="2 of 4 branches missed.">        if (constr == null || constr.length &lt; 1)</span>
+<span class="nc" id="L87">            constr = new DimConstraint[]{new DimConstraint()};</span>
+
+<span class="fc" id="L89">        cList.clear();</span>
+<span class="fc" id="L90">        cList.ensureCapacity(constr.length);</span>
+<span class="fc" id="L91">        Collections.addAll(cList, constr);</span>
+<span class="fc" id="L92">    }</span>
+
+    /**
+     * Returns the number of rows/columns that this constraints currently have.
+     *
+     * @return The number of rows/columns that this constraints currently have. At least 1.
+     */
+    public int getCount() {
+<span class="fc" id="L100">        return cList.size();</span>
+    }
+
+    /**
+     * Sets the total number of rows/columns to &lt;code&gt;size&lt;/code&gt;. If the number of rows/columns is already more
+     * than &lt;code&gt;size&lt;/code&gt; nothing will happen.
+     *
+     * @param size The total number of rows/columns
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC count(int size) {
+<span class="nc" id="L111">        makeSize(size);</span>
+<span class="nc" id="L112">        return this;</span>
+    }
+
+    /**
+     * Specifies that the current row/column should not be grid-like. The while row/colum will have its components layed out
+     * in one single cell. It is the same as to say that the cells in this column/row will all be merged (a.k.a spanned).
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC noGrid() {
+<span class="nc" id="L124">        return noGrid(curIx);</span>
+    }
+
+    /**
+     * Specifies that the indicated rows/columns should not be grid-like. The while row/colum will have its components layed out
+     * in one single cell. It is the same as to say that the cells in this column/row will all be merged (a.k.a spanned).
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC noGrid(int... indexes) {
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        for (int i = indexes.length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L138">            int ix = indexes[i];</span>
+<span class="nc" id="L139">            makeSize(ix);</span>
+<span class="nc" id="L140">            cList.get(ix).setNoGrid(true);</span>
+        }
+<span class="nc" id="L142">        return this;</span>
+    }
+
+    /**
+     * Sets the current row/column to &lt;code&gt;i&lt;/code&gt;. If the current number of rows/columns is less than &lt;code&gt;i&lt;/code&gt; a call
+     * to {@link #count(int)} will set the size accordingly.
+     * &lt;p&gt;
+     * The next call to any of the constraint methods (e.g. {@link net.miginfocom.layout.AC#noGrid}) will be carried
+     * out on this new row/column.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param i The new current row/column.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC index(int i) {
+<span class="nc" id="L158">        makeSize(i);</span>
+<span class="nc" id="L159">        curIx = i;</span>
+<span class="nc" id="L160">        return this;</span>
+    }
+
+    /**
+     * Specifies that the current row/column's component should grow by default. It does not affect the size of the row/column.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC fill() {
+<span class="nc" id="L171">        return fill(curIx);</span>
+    }
+
+    /**
+     * Specifies that the indicated rows'/columns' component should grow by default. It does not affect the size of the row/column.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC fill(int... indexes) {
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        for (int i = indexes.length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L184">            int ix = indexes[i];</span>
+<span class="nc" id="L185">            makeSize(ix);</span>
+<span class="nc" id="L186">            cList.get(ix).setFill(true);</span>
+        }
+<span class="nc" id="L188">        return this;</span>
+    }
+
+//	/** Specifies that the current row/column should be put in the end group &lt;code&gt;s&lt;/code&gt; and will thus share the same ending
+//	 * coordinate within the group.
+//	 * &lt;p&gt;
+//	 * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+//	 * @param s A name to associate on the group that should be the same for other rows/columns in the same group.
+//	 * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+//	 */
+//	public final AxisConstraint endGroup(String s)
+//	{
+//		return endGroup(s, curIx);
+//	}
+//
+//	/** Specifies that the indicated rows/columns should be put in the end group &lt;code&gt;s&lt;/code&gt; and will thus share the same ending
+//	 * coordinate within the group.
+//	 * &lt;p&gt;
+//	 * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+//	 * @param s A name to associate on the group that should be the same for other rows/columns in the same group.
+//	 * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
+//	 * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+//	 */
+//	public final AxisConstraint endGroup(String s, int... indexes)
+//	{
+//		for (int i = indexes.length - 1; i &gt;= 0; i--) {
+//			int ix = indexes[i];
+//			makeSize(ix);
+//			cList.get(ix).setEndGroup(s);
+//		}
+//		return this;
+//	}
+
+    /**
+     * Specifies that the current row/column should be put in the size group &lt;code&gt;s&lt;/code&gt; and will thus share the same size
+     * constraints as the other components in the group.
+     * &lt;p&gt;
+     * Same as &lt;code&gt;sizeGroup(&quot;&quot;)&lt;/code&gt;
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public AC sizeGroup() {
+<span class="nc" id="L233">        return sizeGroup(&quot;&quot;, curIx);</span>
+    }
+
+    /**
+     * Specifies that the current row/column should be put in the size group &lt;code&gt;s&lt;/code&gt; and will thus share the same size
+     * constraints as the other components in the group.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param s A name to associate on the group that should be the same for other rows/columns in the same group.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC sizeGroup(String s) {
+<span class="nc" id="L246">        return sizeGroup(s, curIx);</span>
+    }
+
+    /**
+     * Specifies that the indicated rows/columns should be put in the size group &lt;code&gt;s&lt;/code&gt; and will thus share the same size
+     * constraints as the other components in the group.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param s       A name to associate on the group that should be the same for other rows/columns in the same group.
+     * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC sizeGroup(String s, int... indexes) {
+<span class="nc bnc" id="L260" title="All 2 branches missed.">        for (int i = indexes.length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L261">            int ix = indexes[i];</span>
+<span class="nc" id="L262">            makeSize(ix);</span>
+<span class="nc" id="L263">            cList.get(ix).setSizeGroup(s);</span>
+        }
+<span class="nc" id="L265">        return this;</span>
+    }
+
+    /**
+     * Specifies the current row/column's min and/or preferred and/or max size. E.g. &lt;code&gt;&quot;10px&quot;&lt;/code&gt; or &lt;code&gt;&quot;50:100:200&quot;&lt;/code&gt;.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param s The minimum and/or preferred and/or maximum size of this row. The string will be interpreted
+     *          as a &lt;b&gt;BoundSize&lt;/b&gt;. For more info on how &lt;b&gt;BoundSize&lt;/b&gt; is formatted see the documentation.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC size(String s) {
+<span class="nc" id="L278">        return size(s, curIx);</span>
+    }
+
+    /**
+     * Specifies the indicated rows'/columns' min and/or preferred and/or max size. E.g. &lt;code&gt;&quot;10px&quot;&lt;/code&gt; or &lt;code&gt;&quot;50:100:200&quot;&lt;/code&gt;.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param size    The minimum and/or preferred and/or maximum size of this row. The string will be interpreted
+     *                as a &lt;b&gt;BoundSize&lt;/b&gt;. For more info on how &lt;b&gt;BoundSize&lt;/b&gt; is formatted see the documentation.
+     * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC size(String size, int... indexes) {
+<span class="nc" id="L292">        BoundSize bs = ConstraintParser.parseBoundSize(size, false, true);</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">        for (int i = indexes.length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L294">            int ix = indexes[i];</span>
+<span class="nc" id="L295">            makeSize(ix);</span>
+<span class="nc" id="L296">            cList.get(ix).setSize(bs);</span>
+        }
+<span class="nc" id="L298">        return this;</span>
+    }
+
+    /**
+     * Specifies the gap size to be the default one &lt;b&gt;AND&lt;/b&gt; moves to the next column/row. The method is called &lt;code&gt;.gap()&lt;/code&gt;
+     * rather the more natural &lt;code&gt;.next()&lt;/code&gt; to indicate that it is very much related to the other &lt;code&gt;.gap(..)&lt;/code&gt; methods.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC gap() {
+<span class="nc" id="L310">        curIx++;</span>
+<span class="nc" id="L311">        return this;</span>
+    }
+
+    /**
+     * Specifies the gap size to &lt;code&gt;size&lt;/code&gt; &lt;b&gt;AND&lt;/b&gt; moves to the next column/row.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param size minimum and/or preferred and/or maximum size of the gap between this and the next row/column.
+     *             The string will be interpreted as a &lt;b&gt;BoundSize&lt;/b&gt;. For more info on how &lt;b&gt;BoundSize&lt;/b&gt; is formatted see the documentation.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC gap(String size) {
+<span class="nc" id="L324">        return gap(size, curIx++);</span>
+    }
+
+    /**
+     * Specifies the indicated rows'/columns' gap size to &lt;code&gt;size&lt;/code&gt;.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param size    minimum and/or preferred and/or maximum size of the gap between this and the next row/column.
+     *                The string will be interpreted as a &lt;b&gt;BoundSize&lt;/b&gt;. For more info on how &lt;b&gt;BoundSize&lt;/b&gt; is formatted see the documentation.
+     * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC gap(String size, int... indexes) {
+<span class="nc bnc" id="L338" title="All 2 branches missed.">        BoundSize bsa = size != null ? ConstraintParser.parseBoundSize(size, true, true) : null;</span>
+
+<span class="nc bnc" id="L340" title="All 2 branches missed.">        for (int i = indexes.length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L341">            int ix = indexes[i];</span>
+<span class="nc" id="L342">            makeSize(ix);</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">            if (bsa != null)</span>
+<span class="nc" id="L344">                cList.get(ix).setGapAfter(bsa);</span>
+        }
+<span class="nc" id="L346">        return this;</span>
+    }
+
+    /**
+     * Specifies the current row/column's columns default alignment &lt;b&gt;for its components&lt;/b&gt;. It does not affect the positioning
+     * or size of the columns/row itself. For columns it is the horizonal alignment (e.g. &quot;left&quot;) and for rows it is the vertical
+     * alignment (e.g. &quot;top&quot;).
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param side The default side to align the components. E.g. &quot;top&quot; or &quot;left&quot;, or &quot;leading&quot; or &quot;trailing&quot; or &quot;bottom&quot; or &quot;right&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC align(String side) {
+<span class="nc" id="L360">        return align(side, curIx);</span>
+    }
+
+    /**
+     * Specifies the indicated rows'/columns' columns default alignment &lt;b&gt;for its components&lt;/b&gt;. It does not affect the positioning
+     * or size of the columns/row itself. For columns it is the horizonal alignment (e.g. &quot;left&quot;) and for rows it is the vertical
+     * alignment (e.g. &quot;top&quot;).
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param side    The default side to align the components. E.g. &quot;top&quot; or &quot;left&quot;, or &quot;before&quot; or &quot;after&quot; or &quot;bottom&quot; or &quot;right&quot;.
+     * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC align(String side, int... indexes) {
+<span class="nc" id="L375">        UnitValue al = ConstraintParser.parseAlignKeywords(side, true);</span>
+<span class="nc bnc" id="L376" title="All 2 branches missed.">        if (al == null)</span>
+<span class="nc" id="L377">            al = ConstraintParser.parseAlignKeywords(side, false);</span>
+
+<span class="nc bnc" id="L379" title="All 2 branches missed.">        for (int i = indexes.length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L380">            int ix = indexes[i];</span>
+<span class="nc" id="L381">            makeSize(ix);</span>
+<span class="nc" id="L382">            cList.get(ix).setAlign(al);</span>
+        }
+<span class="nc" id="L384">        return this;</span>
+    }
+
+    /**
+     * Specifies the current row/column's grow priority.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param p The new grow priority.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC growPrio(int p) {
+<span class="nc" id="L396">        return growPrio(p, curIx);</span>
+    }
+
+    /**
+     * Specifies the indicated rows'/columns' grow priority.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param p       The new grow priority.
+     * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC growPrio(int p, int... indexes) {
+<span class="nc bnc" id="L409" title="All 2 branches missed.">        for (int i = indexes.length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L410">            int ix = indexes[i];</span>
+<span class="nc" id="L411">            makeSize(ix);</span>
+<span class="nc" id="L412">            cList.get(ix).setGrowPriority(p);</span>
+        }
+<span class="nc" id="L414">        return this;</span>
+    }
+
+    /**
+     * Specifies the current row/column's grow weight within columns/rows with the &lt;code&gt;grow priority&lt;/code&gt; 100f.
+     * &lt;p&gt;
+     * Same as &lt;code&gt;grow(100f)&lt;/code&gt;
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public AC grow() {
+<span class="nc" id="L428">        return grow(1f, curIx);</span>
+    }
+
+    /**
+     * Specifies the current row/column's grow weight within columns/rows with the same &lt;code&gt;grow priority&lt;/code&gt;.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param w The new grow weight.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC grow(float w) {
+<span class="nc" id="L440">        return grow(w, curIx);</span>
+    }
+
+    /**
+     * Specifies the indicated rows'/columns' grow weight within columns/rows with the same &lt;code&gt;grow priority&lt;/code&gt;.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param w       The new grow weight.
+     * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC grow(float w, int... indexes) {
+<span class="nc" id="L453">        Float gw = new Float(w);</span>
+<span class="nc bnc" id="L454" title="All 2 branches missed.">        for (int i = indexes.length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L455">            int ix = indexes[i];</span>
+<span class="nc" id="L456">            makeSize(ix);</span>
+<span class="nc" id="L457">            cList.get(ix).setGrow(gw);</span>
+        }
+<span class="nc" id="L459">        return this;</span>
+    }
+
+    /**
+     * Specifies the current row/column's shrink priority.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param p The new shrink priority.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC shrinkPrio(int p) {
+<span class="nc" id="L471">        return shrinkPrio(p, curIx);</span>
+    }
+
+    /**
+     * Specifies the indicated rows'/columns' shrink priority.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param p       The new shrink priority.
+     * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public AC shrinkPrio(int p, int... indexes) {
+<span class="nc bnc" id="L484" title="All 2 branches missed.">        for (int i = indexes.length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L485">            int ix = indexes[i];</span>
+<span class="nc" id="L486">            makeSize(ix);</span>
+<span class="nc" id="L487">            cList.get(ix).setShrinkPriority(p);</span>
+        }
+<span class="nc" id="L489">        return this;</span>
+    }
+
+    /**
+     * Specifies that the current row/column's shrink weight withing the columns/rows with the &lt;code&gt;shrink priority&lt;/code&gt; 100f.
+     * &lt;p&gt;
+     * Same as &lt;code&gt;shrink(100f)&lt;/code&gt;.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the White Paper or Cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public AC shrink() {
+<span class="nc" id="L503">        return shrink(100f, curIx);</span>
+    }
+
+    /**
+     * Specifies that the current row/column's shrink weight withing the columns/rows with the same &lt;code&gt;shrink priority&lt;/code&gt;.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the White Paper or Cheat Sheet at www.migcomponents.com.
+     *
+     * @param w The shrink weight.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public AC shrink(float w) {
+<span class="nc" id="L516">        return shrink(w, curIx);</span>
+    }
+
+    /**
+     * Specifies the indicated rows'/columns' shrink weight withing the columns/rows with the same &lt;code&gt;shrink priority&lt;/code&gt;.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the White Paper or Cheat Sheet at www.migcomponents.com.
+     *
+     * @param w       The shrink weight.
+     * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public AC shrink(float w, int... indexes) {
+<span class="nc" id="L530">        Float sw = new Float(w);</span>
+<span class="nc bnc" id="L531" title="All 2 branches missed.">        for (int i = indexes.length - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L532">            int ix = indexes[i];</span>
+<span class="nc" id="L533">            makeSize(ix);</span>
+<span class="nc" id="L534">            cList.get(ix).setShrink(sw);</span>
+        }
+<span class="nc" id="L536">        return this;</span>
+    }
+
+    /**
+     * Specifies that the current row/column's shrink weight withing the columns/rows with the same &lt;code&gt;shrink priority&lt;/code&gt;.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the White Paper or Cheat Sheet at www.migcomponents.com.
+     *
+     * @param w The shrink weight.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @deprecated in 3.7.2. Use {@link #shrink(float)} instead.
+     */
+    public AC shrinkWeight(float w) {
+<span class="nc" id="L549">        return shrink(w);</span>
+    }
+
+    /**
+     * Specifies the indicated rows'/columns' shrink weight withing the columns/rows with the same &lt;code&gt;shrink priority&lt;/code&gt;.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the White Paper or Cheat Sheet at www.migcomponents.com.
+     *
+     * @param w       The shrink weight.
+     * @param indexes The index(es) (0-based) of the columns/rows that should be affected by this constraint.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new AxisConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @deprecated in 3.7.2. Use {@link #shrink(float, int...)} instead.
+     */
+    public AC shrinkWeight(float w, int... indexes) {
+<span class="nc" id="L563">        return shrink(w, indexes);</span>
+    }
+
+    private void makeSize(int sz) {
+<span class="nc bnc" id="L567" title="All 2 branches missed.">        if (cList.size() &lt;= sz) {</span>
+<span class="nc" id="L568">            cList.ensureCapacity(sz);</span>
+<span class="nc bnc" id="L569" title="All 2 branches missed.">            for (int i = cList.size(); i &lt;= sz; i++)</span>
+<span class="nc" id="L570">                cList.add(new DimConstraint());</span>
+        }
+<span class="nc" id="L572">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

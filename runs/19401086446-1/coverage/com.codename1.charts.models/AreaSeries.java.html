@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AreaSeries.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.models</a> &gt; <span class="el_source">AreaSeries.java</span></div><h1>AreaSeries.java</h1><pre class="source lang-java linenums">/**
+ * Copyright (C) 2019 dj6082013
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.codename1.charts.models;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * A series for the category charts like the radar ones.
+ */
+<span class="fc" id="L26">public class AreaSeries {</span>
+
+    /**
+     * The series data table.
+     */
+<span class="fc" id="L31">    private final Map&lt;String, HashMap&lt;Integer, Double&gt;&gt; mTable = new HashMap&lt;String, HashMap&lt;Integer, Double&gt;&gt;();</span>
+
+    /**
+     * The categories.
+     */
+<span class="fc" id="L36">    private final List&lt;String&gt; mCategories = new ArrayList&lt;String&gt;();</span>
+    /**
+     * The series.
+     */
+<span class="fc" id="L40">    private final List&lt;String&gt; mSeries = new ArrayList&lt;String&gt;();</span>
+
+    /**
+     * Adds a new Category series to the table.
+     *
+     * @param series the Category series to add
+     */
+    public synchronized void addSeries(CategorySeries series) {
+<span class="fc" id="L48">        int length = series.getItemCount();</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L50">            String category = series.getCategory(i);</span>
+            HashMap&lt;Integer, Double&gt; col;
+<span class="pc bpc" id="L52" title="1 of 2 branches missed.">            if (!mTable.containsKey(category)) {</span>
+<span class="fc" id="L53">                mCategories.add(category);</span>
+<span class="fc" id="L54">                col = new HashMap&lt;Integer, Double&gt;();</span>
+            } else {
+<span class="nc" id="L56">                col = mTable.get(category);</span>
+            }
+<span class="fc" id="L58">            col.put(mSeries.size(), series.getValue(i));</span>
+<span class="fc" id="L59">            mTable.put(category, col);</span>
+        }
+<span class="fc" id="L61">        mSeries.add(series.getTitle());</span>
+<span class="fc" id="L62">    }</span>
+
+    /**
+     * Removes all data.
+     */
+    public synchronized void clear() {
+<span class="nc" id="L68">        mTable.clear();</span>
+<span class="nc" id="L69">        mCategories.clear();</span>
+<span class="nc" id="L70">        mSeries.clear();</span>
+<span class="nc" id="L71">    }</span>
+
+    /**
+     * Returns the Categories count.
+     *
+     * @return the Categories count
+     */
+    public synchronized int getCategoriesCount() {
+<span class="nc" id="L79">        return mCategories.size();</span>
+    }
+
+    /**
+     * Returns the Series count.
+     *
+     * @return the Series series count
+     */
+    public synchronized int getSeriesCount() {
+<span class="fc" id="L88">        return mSeries.size();</span>
+    }
+
+    /**
+     * Returns an array of the Categories.
+     *
+     * @return the Categories array
+     */
+    public synchronized String[] getCategories() {
+<span class="nc" id="L97">        return mCategories.toArray(new String[mCategories.size()]);</span>
+    }
+
+    /**
+     * Returns an array of the Series.
+     *
+     * @return the Series array
+     */
+    public synchronized String[] getSeries() {
+<span class="nc" id="L106">        return mSeries.toArray(new String[mSeries.size()]);</span>
+    }
+
+    /**
+     * Returns the value at the specific index and category.
+     *
+     * @param index the index
+     * @param category the category
+     * @return the value
+     */
+    public synchronized double getValue(int index, String category) {
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        if (!mTable.containsKey(category)) {</span>
+<span class="nc" id="L118">            return 0;</span>
+        }
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (!mTable.get(category).containsKey(index)) {</span>
+<span class="nc" id="L121">            return 0;</span>
+        }
+<span class="nc" id="L123">        return mTable.get(category).get(index);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

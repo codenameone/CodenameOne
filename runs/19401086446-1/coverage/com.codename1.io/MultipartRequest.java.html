@@ -1,0 +1,501 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MultipartRequest.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">MultipartRequest.java</span></div><h1>MultipartRequest.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.UnsupportedEncodingException;
+import java.io.Writer;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Vector;
+
+/**
+ * &lt;p&gt;A multipart post request allows a developer to submit large binary data
+ * files to the server in a multipart mime post request. This is a standard method
+ * for large binary file uploads to webservers and data services. &lt;br&gt;
+ * The sample code below includes both the client code using the upload capabilities as
+ * well as a simple sample servlet that can accept multipart data:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/9cad1248365512416101.js&quot;&gt;&lt;/script&gt;
+ *
+ * &lt;p&gt;
+ * The sample code below demonstrates uploading to the
+ * &lt;a href=&quot;https://www.filestack.com/features-upload&quot; target=&quot;_blank&quot;&gt;filestack.com&lt;/a&gt; API.&lt;/p&gt;
+ *
+ * &lt;script src=&quot;https://gist.github.com/codenameone/7f6e07dadbdd169648ed.js&quot;&gt;&lt;/script&gt;
+ *
+ * @author Shai Almog
+ */
+public class MultipartRequest extends ConnectionRequest {
+
+    private static final String CRLF = &quot;\r\n&quot;;
+<span class="fc" id="L58">    private static boolean canFlushStream = true;</span>
+    /**
+     * Special flag to keep input stream files open after they are read
+     */
+    private static boolean leaveInputStreamsOpen;
+    private String boundary;
+<span class="fc" id="L64">    private LinkedHashMap args = new LinkedHashMap();</span>
+<span class="fc" id="L65">    private Hashtable filenames = new Hashtable();</span>
+<span class="fc" id="L66">    private Hashtable filesizes = new Hashtable();</span>
+<span class="fc" id="L67">    private Hashtable mimeTypes = new Hashtable();</span>
+<span class="fc" id="L68">    private long contentLength = -1L;</span>
+<span class="fc" id="L69">    private boolean manualRedirect = true;</span>
+<span class="fc" id="L70">    private Vector ignoreEncoding = new Vector();</span>
+    /**
+     * Set to true to encode binary data as base 64
+     */
+<span class="fc" id="L74">    private boolean base64Binaries = true;</span>
+
+    /**
+     * Initialize variables
+     */
+<span class="fc" id="L79">    public MultipartRequest() {</span>
+<span class="fc" id="L80">        setPost(true);</span>
+<span class="fc" id="L81">        setWriteRequest(true);</span>
+
+        // Just generate some unique random value.
+<span class="fc" id="L84">        boundary = Long.toString(System.currentTimeMillis(), 16);</span>
+
+        // Line separator required by multipart/form-data.
+<span class="fc" id="L87">        setContentType(&quot;multipart/form-data; boundary=&quot; + boundary);</span>
+<span class="fc" id="L88">    }</span>
+
+    /**
+     * Special flag to keep input stream files open after they are read
+     *
+     * @return the leaveInputStreamsOpen
+     */
+    public static boolean isLeaveInputStreamsOpen() {
+<span class="nc" id="L96">        return leaveInputStreamsOpen;</span>
+    }
+
+    /**
+     * Special flag to keep input stream files open after they are read
+     *
+     * @param aLeaveInputStreamsOpen the leaveInputStreamsOpen to set
+     */
+    public static void setLeaveInputStreamsOpen(boolean aLeaveInputStreamsOpen) {
+<span class="nc" id="L105">        leaveInputStreamsOpen = aLeaveInputStreamsOpen;</span>
+<span class="nc" id="L106">    }</span>
+
+    /**
+     * Sending large files requires flushing the writer once in a while to prevent
+     * Out Of Memory Errors, Some J2ME implementation are not able to flush the
+     * streams causing the upload to fail.
+     * This method can indicate to the upload to not use the flushing mechanism.
+     */
+    public static void setCanFlushStream(boolean flush) {
+<span class="nc" id="L115">        canFlushStream = flush;</span>
+<span class="nc" id="L116">    }</span>
+
+    /**
+     * Returns the boundary string which is normally generated based on system time
+     *
+     * @return the multipart boundary string
+     */
+    public String getBoundary() {
+<span class="nc" id="L124">        return boundary;</span>
+    }
+
+    /**
+     * Sets the boundary string, normally you don't need this method. Its useful to
+     * workaround server issues only. Notice that this method must be invoked before adding
+     * any elements.
+     *
+     * @param boundary the boundary string
+     */
+    public void setBoundary(String boundary) {
+<span class="fc" id="L135">        this.boundary = boundary;</span>
+<span class="fc" id="L136">        setContentType(&quot;multipart/form-data; boundary=&quot; + boundary);</span>
+<span class="fc" id="L137">    }</span>
+
+    protected void initConnection(Object connection) {
+<span class="nc" id="L140">        contentLength = calculateContentLength();</span>
+<span class="nc" id="L141">        addRequestHeader(&quot;Content-Length&quot;, Long.toString(contentLength));</span>
+<span class="nc" id="L142">        super.initConnection(connection);</span>
+<span class="nc" id="L143">    }</span>
+
+    /**
+     * Adds a binary argument to the arguments
+     *
+     * @param name     the name of the data
+     * @param data     the data as bytes
+     * @param mimeType the mime type for the content
+     */
+    public void addData(String name, byte[] data, String mimeType) {
+<span class="fc" id="L153">        args.put(name, data);</span>
+<span class="fc" id="L154">        mimeTypes.put(name, mimeType);</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (!filenames.containsKey(name)) {</span>
+<span class="fc" id="L156">            filenames.put(name, name);</span>
+        }
+<span class="fc" id="L158">        filesizes.put(name, String.valueOf(data.length));</span>
+<span class="fc" id="L159">    }</span>
+
+    /**
+     * Adds a binary argument to the arguments
+     *
+     * @param name     the name of the file data
+     * @param filePath the path of the file to upload
+     * @param mimeType the mime type for the content
+     * @throws IOException if the file cannot be opened
+     */
+    public void addData(String name, String filePath, String mimeType) throws IOException {
+<span class="nc" id="L170">        addData(name, FileSystemStorage.getInstance().openInputStream(filePath),</span>
+<span class="nc" id="L171">                FileSystemStorage.getInstance().getLength(filePath), mimeType);</span>
+<span class="nc" id="L172">    }</span>
+
+    /**
+     * Adds a binary argument to the arguments, notice the input stream will be
+     * read only during submission
+     *
+     * @param name     the name of the data
+     * @param data     the data stream
+     * @param dataSize the byte size of the data stream, if the data stream is a file
+     *                 the file size can be obtained using the
+     *                 FileSystemStorage.getInstance().getLength(file) method
+     * @param mimeType the mime type for the content
+     */
+    public void addData(String name, InputStream data, long dataSize, String mimeType) {
+<span class="fc" id="L186">        args.put(name, data);</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (!filenames.containsKey(name)) {</span>
+<span class="fc" id="L188">            filenames.put(name, name);</span>
+        }
+<span class="fc" id="L190">        filesizes.put(name, String.valueOf(dataSize));</span>
+<span class="fc" id="L191">        mimeTypes.put(name, mimeType);</span>
+<span class="fc" id="L192">    }</span>
+
+    /**
+     * Sets the filename for the given argument
+     *
+     * @param arg      the argument name
+     * @param filename the file name
+     */
+    public void setFilename(String arg, String filename) {
+<span class="fc" id="L201">        filenames.put(arg, filename);</span>
+<span class="fc" id="L202">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addArgumentNoEncoding(String key, String value) {
+<span class="fc" id="L208">        args.put(key, value);</span>
+<span class="pc bpc" id="L209" title="1 of 2 branches missed.">        if (!filenames.containsKey(key)) {</span>
+<span class="fc" id="L210">            filenames.put(key, key);</span>
+        }
+<span class="fc" id="L212">        ignoreEncoding.addElement(key);</span>
+<span class="fc" id="L213">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void addArgumentNoEncoding(String key, String[] value) {
+<span class="nc" id="L220">        addArgument(key, value);</span>
+<span class="nc" id="L221">        ignoreEncoding.add(key);</span>
+<span class="nc" id="L222">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void addArgumentNoEncodingArray(String key, String... value) {
+<span class="nc" id="L229">        addArgumentNoEncoding(key, (String[]) value);</span>
+<span class="nc" id="L230">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addArgument(String name, String[] value) {
+<span class="fc" id="L236">        args.put(name, value);</span>
+<span class="fc" id="L237">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addArgument(String name, String value) {
+<span class="fc" id="L243">        args.put(name, value);</span>
+<span class="pc bpc" id="L244" title="1 of 2 branches missed.">        if (!filenames.containsKey(name)) {</span>
+<span class="fc" id="L245">            filenames.put(name, name);</span>
+        }
+<span class="fc" id="L247">    }</span>
+
+    protected long calculateContentLength() {
+<span class="fc" id="L250">        long length = 0L;</span>
+<span class="fc" id="L251">        Iterator entries = args.entrySet().iterator();</span>
+
+<span class="fc" id="L253">        long dLength = &quot;Content-Disposition: form-data; name=\&quot;\&quot;; filename=\&quot;\&quot;&quot;.length() + 2; // 2 = CRLF</span>
+<span class="fc" id="L254">        long ctLength = &quot;Content-Type: &quot;.length() + 2; // 2 = CRLF</span>
+<span class="fc" id="L255">        long cteLength = &quot;Content-Transfer-Encoding: binary&quot;.length() + 4; // 4 = 2 * CRLF</span>
+<span class="fc" id="L256">        long bLength = boundary.length() + 4; // -- + boundary + CRLF</span>
+<span class="fc" id="L257">        long baseBinaryLength = dLength + ctLength + cteLength + bLength + 2; // 2 = CRLF at end of part</span>
+<span class="fc" id="L258">        dLength = &quot;Content-Disposition: form-data; name=\&quot;\&quot;&quot;.length() + 2;  // 2 = CRLF</span>
+<span class="fc" id="L259">        ctLength = &quot;Content-Type: text/plain; charset=UTF-8&quot;.length() + 4; // 4 = 2 * CRLF</span>
+<span class="fc" id="L260">        long baseTextLength = dLength + ctLength + bLength + 2;  // 2 = CRLF at end of part</span>
+
+<span class="fc bfc" id="L262" title="All 2 branches covered.">        while (entries.hasNext()) {</span>
+<span class="fc" id="L263">            Map.Entry entry = (Map.Entry) entries.next();</span>
+<span class="fc" id="L264">            String key = (String) entry.getKey();</span>
+<span class="fc" id="L265">            Object value = entry.getValue();</span>
+<span class="fc bfc" id="L266" title="All 2 branches covered.">            if (value instanceof String) {</span>
+<span class="fc" id="L267">                length += baseTextLength;</span>
+<span class="fc" id="L268">                length += key.length();</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">                if (ignoreEncoding.contains(key)) {</span>
+                    try {
+<span class="fc" id="L271">                        length += value.toString().getBytes(&quot;UTF-8&quot;).length;</span>
+<span class="nc" id="L272">                    } catch (UnsupportedEncodingException ex) {</span>
+<span class="nc" id="L273">                        length += value.toString().getBytes().length;</span>
+<span class="pc" id="L274">                    }</span>
+                } else {
+<span class="pc bpc" id="L276" title="1 of 2 branches missed.">                    if (base64Binaries) {</span>
+<span class="fc" id="L277">                        length += Util.encodeBody((String) value).length();</span>
+                    } else {
+<span class="nc" id="L279">                        length += ((String) value).length();</span>
+                    }
+                }
+            } else {
+<span class="fc bfc" id="L283" title="All 2 branches covered.">                if (value instanceof String[]) {</span>
+<span class="fc bfc" id="L284" title="All 2 branches covered.">                    for (String s : (String[]) value) {</span>
+<span class="fc" id="L285">                        length += baseTextLength;</span>
+<span class="fc" id="L286">                        length += key.length();</span>
+<span class="pc bpc" id="L287" title="1 of 2 branches missed.">                        if (ignoreEncoding.contains(key)) {</span>
+                            try {
+<span class="nc" id="L289">                                length += s.toString().getBytes(&quot;UTF-8&quot;).length;</span>
+<span class="nc" id="L290">                            } catch (UnsupportedEncodingException ex) {</span>
+<span class="nc" id="L291">                                length += value.toString().getBytes().length;</span>
+<span class="nc" id="L292">                            }</span>
+                        } else {
+<span class="pc bpc" id="L294" title="1 of 2 branches missed.">                            if (base64Binaries) {</span>
+<span class="fc" id="L295">                                length += Util.encodeBody(s).length();</span>
+                            } else {
+<span class="nc" id="L297">                                length += s.length();</span>
+                            }
+                        }
+                    }
+                } else {
+<span class="fc" id="L302">                    length += baseBinaryLength;</span>
+<span class="fc" id="L303">                    length += key.length();</span>
+                    try {
+<span class="fc" id="L305">                        length += ((String) filenames.get(key)).getBytes(&quot;UTF-8&quot;).length;</span>
+<span class="nc" id="L306">                    } catch (UnsupportedEncodingException ex) {</span>
+<span class="nc" id="L307">                        length += ((String) filenames.get(key)).getBytes().length;</span>
+<span class="fc" id="L308">                    }</span>
+<span class="fc" id="L309">                    length += ((String) mimeTypes.get(key)).length();</span>
+<span class="fc" id="L310">                    length += Long.parseLong((String) filesizes.get(key));</span>
+                }
+            }
+<span class="fc" id="L313">        }</span>
+<span class="fc" id="L314">        length += bLength + 2; // same as part boundaries, suffixed with: --</span>
+<span class="fc" id="L315">        return length;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void buildRequestBody(OutputStream os) throws IOException {
+<span class="fc" id="L322">        Writer writer = null;</span>
+<span class="fc" id="L323">        writer = new OutputStreamWriter(os, &quot;UTF-8&quot;);</span>
+<span class="fc" id="L324">        Iterator entries = args.entrySet().iterator();</span>
+<span class="fc bfc" id="L325" title="All 2 branches covered.">        while (entries.hasNext()) {</span>
+<span class="pc bpc" id="L326" title="1 of 2 branches missed.">            if (shouldStop()) {</span>
+<span class="nc" id="L327">                break;</span>
+            }
+<span class="fc" id="L329">            Map.Entry entry = (Map.Entry) entries.next();</span>
+<span class="fc" id="L330">            String key = (String) entry.getKey();</span>
+<span class="fc" id="L331">            Object value = entry.getValue();</span>
+
+<span class="fc" id="L333">            writer.write(&quot;--&quot;);</span>
+<span class="fc" id="L334">            writer.write(boundary);</span>
+<span class="fc" id="L335">            writer.write(CRLF);</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">            if (value instanceof String) {</span>
+<span class="fc" id="L337">                writer.write(&quot;Content-Disposition: form-data; name=\&quot;&quot;);</span>
+<span class="fc" id="L338">                writer.write(key);</span>
+<span class="fc" id="L339">                writer.write(&quot;\&quot;&quot;);</span>
+<span class="fc" id="L340">                writer.write(CRLF);</span>
+<span class="fc" id="L341">                writer.write(&quot;Content-Type: text/plain; charset=UTF-8&quot;);</span>
+<span class="fc" id="L342">                writer.write(CRLF);</span>
+<span class="fc" id="L343">                writer.write(CRLF);</span>
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">                if (canFlushStream) {</span>
+<span class="fc" id="L345">                    writer.flush();</span>
+                }
+<span class="fc bfc" id="L347" title="All 2 branches covered.">                if (ignoreEncoding.contains(key)) {</span>
+<span class="fc" id="L348">                    writer.write((String) value);</span>
+                } else {
+<span class="fc bfc" id="L350" title="All 2 branches covered.">                    if (base64Binaries) {</span>
+<span class="fc" id="L351">                        writer.write(Util.encodeBody((String) value));</span>
+                    } else {
+<span class="fc" id="L353">                        writer.write((String) value);</span>
+                    }
+                }
+                //writer.write(CRLF);
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">                if (canFlushStream) {</span>
+<span class="fc" id="L358">                    writer.flush();</span>
+                }
+            } else {
+<span class="fc bfc" id="L361" title="All 2 branches covered.">                if (value instanceof String[]) {</span>
+<span class="fc" id="L362">                    boolean first = true;</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">                    for (String s : (String[]) value) {</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">                        if (!first) {</span>
+<span class="fc" id="L365">                            writer.write(CRLF);</span>
+<span class="fc" id="L366">                            writer.write(&quot;--&quot;);</span>
+<span class="fc" id="L367">                            writer.write(boundary);</span>
+<span class="fc" id="L368">                            writer.write(CRLF);</span>
+                        }
+<span class="fc" id="L370">                        first = false;</span>
+<span class="fc" id="L371">                        writer.write(&quot;Content-Disposition: form-data; name=\&quot;&quot;);</span>
+<span class="fc" id="L372">                        writer.write(key);</span>
+<span class="fc" id="L373">                        writer.write(&quot;\&quot;&quot;);</span>
+<span class="fc" id="L374">                        writer.write(CRLF);</span>
+<span class="fc" id="L375">                        writer.write(&quot;Content-Type: text/plain; charset=UTF-8&quot;);</span>
+<span class="fc" id="L376">                        writer.write(CRLF);</span>
+<span class="fc" id="L377">                        writer.write(CRLF);</span>
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">                        if (canFlushStream) {</span>
+<span class="fc" id="L379">                            writer.flush();</span>
+                        }
+<span class="pc bpc" id="L381" title="1 of 2 branches missed.">                        if (ignoreEncoding.contains(key)) {</span>
+<span class="nc" id="L382">                            writer.write(s);</span>
+                        } else {
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">                            if (base64Binaries) {</span>
+<span class="fc" id="L385">                                writer.write(Util.encodeBody(s));</span>
+                            } else {
+<span class="nc" id="L387">                                writer.write(s);</span>
+                            }
+                        }
+                        //writer.write(CRLF);
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">                        if (canFlushStream) {</span>
+<span class="fc" id="L392">                            writer.flush();</span>
+                        }
+                    }
+<span class="fc" id="L395">                } else {</span>
+<span class="fc" id="L396">                    writer.write(&quot;Content-Disposition: form-data; name=\&quot;&quot; + key + &quot;\&quot;; filename=\&quot;&quot; + filenames.get(key) + &quot;\&quot;&quot;);</span>
+<span class="fc" id="L397">                    writer.write(CRLF);</span>
+<span class="fc" id="L398">                    writer.write(&quot;Content-Type: &quot;);</span>
+<span class="fc" id="L399">                    writer.write((String) mimeTypes.get(key));</span>
+<span class="fc" id="L400">                    writer.write(CRLF);</span>
+<span class="fc" id="L401">                    writer.write(&quot;Content-Transfer-Encoding: binary&quot;);</span>
+<span class="fc" id="L402">                    writer.write(CRLF);</span>
+<span class="fc" id="L403">                    writer.write(CRLF);</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">                    if (canFlushStream) {</span>
+<span class="fc" id="L405">                        writer.flush();</span>
+                    }
+                    InputStream i;
+<span class="fc bfc" id="L408" title="All 2 branches covered.">                    if (value instanceof InputStream) {</span>
+<span class="fc" id="L409">                        i = (InputStream) value;</span>
+                    } else {
+<span class="fc" id="L411">                        i = new ByteArrayInputStream((byte[]) value);</span>
+                    }
+<span class="fc" id="L413">                    byte[] buffer = new byte[8192];</span>
+<span class="fc" id="L414">                    int s = i.read(buffer);</span>
+<span class="fc bfc" id="L415" title="All 2 branches covered.">                    while (s &gt; -1) {</span>
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">                        if (shouldStop()) {</span>
+<span class="nc" id="L417">                            break;</span>
+                        }
+<span class="fc" id="L419">                        os.write(buffer, 0, s);</span>
+<span class="pc bpc" id="L420" title="1 of 2 branches missed.">                        if (canFlushStream) {</span>
+<span class="fc" id="L421">                            writer.flush();</span>
+                        }
+<span class="fc" id="L423">                        s = i.read(buffer);</span>
+                    }
+<span class="fc bfc" id="L425" title="All 2 branches covered.">                    if (value instanceof InputStream) {</span>
+<span class="pc bpc" id="L426" title="1 of 2 branches missed.">                        if (!leaveInputStreamsOpen) {</span>
+<span class="fc" id="L427">                            Util.cleanup(i);</span>
+                        }
+                    } else {
+<span class="fc" id="L430">                        Util.cleanup(i);</span>
+                    }
+                    //args.remove(key);
+<span class="fc" id="L433">                    value = null;</span>
+<span class="pc bpc" id="L434" title="1 of 2 branches missed.">                    if (canFlushStream) {</span>
+<span class="fc" id="L435">                        writer.flush();</span>
+                    }
+                }
+            }
+<span class="fc" id="L439">            writer.write(CRLF);</span>
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">            if (canFlushStream) {</span>
+<span class="fc" id="L441">                writer.flush();</span>
+            }
+<span class="fc" id="L443">        }</span>
+
+<span class="fc" id="L445">        writer.write(&quot;--&quot; + boundary + &quot;--&quot;);</span>
+<span class="fc" id="L446">        writer.write(CRLF);</span>
+<span class="fc" id="L447">        writer.close();</span>
+<span class="fc" id="L448">    }</span>
+
+    /* (non-Javadoc)
+     * @see com.codename1.io.ConnectionRequest#getContentLength()
+     */
+    public int getContentLength() {
+<span class="nc" id="L454">        return (int) contentLength;</span>
+    }
+
+    /* (non-Javadoc)
+     * @see com.codename1.io.ConnectionRequest#onRedirect(java.lang.String)
+     */
+    public boolean onRedirect(String url) {
+<span class="fc" id="L461">        return manualRedirect;</span>
+    }
+
+    /**
+     * By default redirect responses (302 etc.) are handled manually in multipart requests
+     *
+     * @return the autoRedirect
+     */
+    public boolean isManualRedirect() {
+<span class="fc" id="L470">        return manualRedirect;</span>
+    }
+
+    /**
+     * By default redirect responses (302 etc.) are handled manually in multipart requests, set this
+     * to false to handle the redirect. Notice that a redirect converts a post to a get.
+     *
+     * @param autoRedirect the autoRedirect to set
+     */
+    public void setManualRedirect(boolean autoRedirect) {
+<span class="fc" id="L480">        this.manualRedirect = autoRedirect;</span>
+<span class="fc" id="L481">    }</span>
+
+    /**
+     * Set to true to encode binary data as base 64
+     *
+     * @return the base64Binaries
+     */
+    public boolean isBase64Binaries() {
+<span class="nc" id="L489">        return base64Binaries;</span>
+    }
+
+    /**
+     * Set to true to encode binary data as base 64
+     *
+     * @param base64Binaries the base64Binaries to set
+     */
+    public void setBase64Binaries(boolean base64Binaries) {
+<span class="fc" id="L498">        this.base64Binaries = base64Binaries;</span>
+<span class="fc" id="L499">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

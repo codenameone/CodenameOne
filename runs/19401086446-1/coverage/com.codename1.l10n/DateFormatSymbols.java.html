@@ -1,0 +1,419 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DateFormatSymbols.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.l10n</a> &gt; <span class="el_source">DateFormatSymbols.java</span></div><h1>DateFormatSymbols.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Eric Coolman, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.l10n;
+
+import java.util.Calendar;
+import java.util.Hashtable;
+import java.util.TimeZone;
+
+/**
+ * @author Eric Coolman
+ */
+<span class="fc" id="L32">public class DateFormatSymbols implements Cloneable {</span>
+    public static final int ZONE_ID = 0;
+    public static final int ZONE_LONGNAME = 1;
+    public static final int ZONE_SHORTNAME = 2;
+    public static final int ZONE_LONGNAME_DST = 3;
+    public static final int ZONE_SHORTNAME_DST = 4;
+    private static final String L10N_ZONE_LONGNAME = &quot;ZONE_LONGNAME_&quot;;
+    private static final String L10N_ZONE_SHORTNAME = &quot;ZONE_SHORTNAME_&quot;;
+    private static final String L10N_ZONE_LONGNAME_DST = &quot;ZONE_LONGNAME_DST_&quot;;
+    private static final String L10N_ZONE_SHORTNAME_DST = &quot;ZONE_SHORTNAME_DST_&quot;;
+    private static final String L10N_WEEKDAY_LONGNAME = &quot;WEEKDAY_LONGNAME_&quot;;
+    private static final String L10N_WEEKDAY_SHORTNAME = &quot;WEEKDAY_SHORTNAME_&quot;;
+    private static final String L10N_MONTH_LONGNAME = &quot;MONTH_LONGNAME_&quot;;
+    private static final String L10N_MONTH_SHORTNAME = &quot;MONTH_SHORTNAME_&quot;;
+    private static final String L10N_AMPM = &quot;AMPM_&quot;;
+    private static final String L10N_ERA = &quot;ERA_&quot;;
+<span class="fc" id="L48">    private static final String[] MONTHS = {&quot;January&quot;, &quot;February&quot;, &quot;March&quot;, &quot;April&quot;, &quot;May&quot;, &quot;June&quot;, &quot;July&quot;, &quot;August&quot;,</span>
+            &quot;September&quot;, &quot;October&quot;, &quot;November&quot;, &quot;December&quot;};
+<span class="fc" id="L50">    private static final String[] WEEKDAYS = {&quot;Sunday&quot;, &quot;Monday&quot;, &quot;Tuesday&quot;, &quot;Wednesday&quot;, &quot;Thursday&quot;, &quot;Friday&quot;,</span>
+            &quot;Saturday&quot;};
+<span class="fc" id="L52">    private static final String[] AMPMS = {&quot;AM&quot;, &quot;PM&quot;};</span>
+<span class="fc" id="L53">    private static final String[] ERAS = {&quot;AD&quot;, &quot;BC&quot;};</span>
+
+    private Hashtable&lt;String, String&gt; resourceBundle;
+    private String[] ampms;
+    private String[] months;
+    private String[][] zoneStrings;
+    private String[] shortMonths;
+    private String[] weekdays;
+    private String[] shortWeekdays;
+    private String[] eras;
+
+    /**
+     * Allows turning localization on/off defaults to localization
+     */
+<span class="fc" id="L67">    private boolean localized = true;</span>
+    private String[] platformLocalizedMonths;
+    private String[] platformLocalizedShortMonths;
+
+    public String[] getAmPmStrings() {
+<span class="nc" id="L72">        synchronized (this) {</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">            if (ampms == null) {</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">                if (resourceBundle == null) {</span>
+<span class="nc" id="L75">                    return AMPMS;</span>
+                }
+<span class="nc" id="L77">                String[] newAmpms = new String[2];</span>
+<span class="nc" id="L78">                newAmpms[0] = getLocalizedValue(L10N_AMPM + &quot;AM&quot;, AMPMS[0]);</span>
+<span class="nc" id="L79">                newAmpms[1] = getLocalizedValue(L10N_AMPM + &quot;PM&quot;, AMPMS[1]);</span>
+<span class="nc" id="L80">                ampms = newAmpms;</span>
+            }
+<span class="nc" id="L82">        }</span>
+<span class="nc" id="L83">        return ampms;</span>
+    }
+
+    public void setAmPmStrings(String[] newAmpms) {
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">        if (newAmpms.length != 2) {</span>
+<span class="nc" id="L88">            throw new IllegalArgumentException(&quot;Expecting array size of 2&quot;);</span>
+        }
+<span class="fc" id="L90">        ampms = newAmpms;</span>
+<span class="fc" id="L91">    }</span>
+
+    public Hashtable&lt;String, String&gt; getResourceBundle() {
+<span class="fc" id="L94">        return resourceBundle;</span>
+    }
+
+    public void setResourceBundle(Hashtable&lt;String, String&gt; newResourceBundle) {
+<span class="fc" id="L98">        this.resourceBundle = newResourceBundle;</span>
+        // force rebuild
+<span class="fc" id="L100">        ampms = null;</span>
+<span class="fc" id="L101">        months = null;</span>
+<span class="fc" id="L102">        zoneStrings = null;</span>
+<span class="fc" id="L103">        shortMonths = null;</span>
+<span class="fc" id="L104">        weekdays = null;</span>
+<span class="fc" id="L105">        shortWeekdays = null;</span>
+<span class="fc" id="L106">        eras = null;</span>
+<span class="fc" id="L107">    }</span>
+
+    String getLocalizedValue(String key, String defaultValue) {
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (localized) {</span>
+<span class="fc" id="L111">            Hashtable&lt;String, String&gt; resourceBundle = getResourceBundle();</span>
+<span class="pc bpc" id="L112" title="1 of 4 branches missed.">            if (resourceBundle == null || !resourceBundle.containsKey(key)) {</span>
+<span class="fc" id="L113">                return defaultValue;</span>
+            }
+<span class="fc" id="L115">            String v = (resourceBundle.get(key));</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            return (v.length() &gt; 0) ? v : defaultValue;</span>
+        }
+<span class="nc" id="L118">        return defaultValue;</span>
+    }
+
+    public String[][] getZoneStrings() {
+<span class="fc" id="L122">        synchronized (this) {</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (zoneStrings == null) {</span>
+<span class="fc" id="L124">                String[] ids = TimeZone.getAvailableIDs();</span>
+<span class="fc" id="L125">                String[][] newZoneStrings = new String[ids.length][5];</span>
+<span class="fc" id="L126">                int ilen = ids.length;</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">                for (int i = 0; i &lt; ilen; i++) {</span>
+<span class="fc" id="L128">                    newZoneStrings[i][ZONE_ID] = ids[i]; // - time zone ID</span>
+<span class="fc" id="L129">                    String key = ids[i].toUpperCase();</span>
+<span class="fc" id="L130">                    newZoneStrings[i][ZONE_LONGNAME] = getLocalizedValue(L10N_ZONE_LONGNAME + key, ids[i]);</span>
+<span class="fc" id="L131">                    newZoneStrings[i][ZONE_SHORTNAME] = getLocalizedValue(L10N_ZONE_SHORTNAME + key, ids[i]);</span>
+<span class="fc" id="L132">                    newZoneStrings[i][ZONE_LONGNAME_DST] = getLocalizedValue(L10N_ZONE_LONGNAME_DST + key, ids[i]);</span>
+<span class="fc" id="L133">                    newZoneStrings[i][ZONE_SHORTNAME_DST] = getLocalizedValue(L10N_ZONE_SHORTNAME_DST + key, ids[i]);</span>
+                }
+<span class="fc" id="L135">                zoneStrings = newZoneStrings;</span>
+            }
+<span class="fc" id="L137">        }</span>
+<span class="fc" id="L138">        return zoneStrings;</span>
+    }
+
+    public void setZoneStrings(String[][] newZoneStrings) {
+<span class="nc bnc" id="L142" title="All 2 branches missed.">        if (newZoneStrings != null) {</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">            for (String[] zone : newZoneStrings) {</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">                if (zone.length &lt; 5) {</span>
+<span class="nc" id="L145">                    throw new IllegalArgumentException(&quot;Expecting inner array size of 5&quot;);</span>
+                }
+            }
+        }
+<span class="nc" id="L149">        zoneStrings = newZoneStrings;</span>
+<span class="nc" id="L150">    }</span>
+
+    /**
+     * Adds a timezone mapping so that SimpleDateFormat can recognize abbreviated timezones.
+     *
+     * @param zoneId       The TimeZone ID.  E.g. America/New_York
+     * @param longName     The long name of the mapping.  E.g. Eastern Standard Time
+     * @param longNameDST  The long name of the mapping in daylight saving time.  E.g. Eastern Daylight Time
+     * @param shortName    The short name of the mapping.  E.g. EST
+     * @param shortNameDST The short name of the mapping in daylight saving time. E.g. EDT
+     */
+    public void addZoneMapping(String zoneId, String longName, String longNameDST, String shortName, String shortNameDST) {
+<span class="fc" id="L162">        localized = true;</span>
+<span class="fc" id="L163">        Hashtable&lt;String, String&gt; h = getResourceBundle();</span>
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (h == null) {</span>
+<span class="fc" id="L165">            h = new Hashtable&lt;String, String&gt;();</span>
+<span class="fc" id="L166">            setResourceBundle(h);</span>
+        }
+<span class="fc" id="L168">        zoneId = zoneId.toUpperCase();</span>
+<span class="fc" id="L169">        h.put(L10N_ZONE_LONGNAME + zoneId, longName);</span>
+<span class="fc" id="L170">        h.put(L10N_ZONE_LONGNAME_DST + zoneId, longNameDST);</span>
+<span class="fc" id="L171">        h.put(L10N_ZONE_SHORTNAME + zoneId, shortName);</span>
+<span class="fc" id="L172">        h.put(L10N_ZONE_SHORTNAME_DST + zoneId, shortNameDST);</span>
+<span class="fc" id="L173">    }</span>
+
+    /**
+     * Gets the short name of a given timezone.
+     *
+     * @param zoneId       The timezone ID.  E.g. America/Vancouver
+     * @param defaultValue A default value if no mapping is found.
+     * @return The short name of the timezone.  E.g. PST
+     */
+    public String getZoneShortName(String zoneId, String defaultValue) {
+<span class="nc" id="L183">        zoneId = zoneId.toUpperCase();</span>
+<span class="nc" id="L184">        return getLocalizedValue(L10N_ZONE_SHORTNAME + zoneId, defaultValue);</span>
+    }
+
+    /**
+     * Gets the short name of a given timezone in daylight saving time.
+     *
+     * @param zoneId       The timezone ID.  E.g. America/Vancouver
+     * @param defaultValue A default value if no mapping is found.
+     * @return The short name of the timezone in daylight saving time.  E.g. PDT
+     */
+    public String getZoneShortNameDST(String zoneId, String defaultValue) {
+<span class="nc" id="L195">        zoneId = zoneId.toUpperCase();</span>
+<span class="nc" id="L196">        return getLocalizedValue(L10N_ZONE_SHORTNAME_DST + zoneId, defaultValue);</span>
+    }
+
+    /**
+     * Gets the long name of a given timezone.
+     *
+     * @param zoneId       The timezone ID.  E.g. America/Vancouver
+     * @param defaultValue A default value if no mapping is found.
+     * @return The short name of the timezone.  E.g. Pacific Standard Time
+     */
+    public String getZoneLongName(String zoneId, String defaultValue) {
+<span class="nc" id="L207">        zoneId = zoneId.toUpperCase();</span>
+<span class="nc" id="L208">        return getLocalizedValue(L10N_ZONE_LONGNAME + zoneId, defaultValue);</span>
+    }
+
+    /**
+     * Gets the long name of a given timezone in daylight saving time.
+     *
+     * @param zoneId       The timezone ID.  E.g. America/Vancouver
+     * @param defaultValue A default value if no mapping is found.
+     * @return The short name of the timezone.  E.g. Pacific Daylight Time
+     */
+    public String getZoneLongNameDST(String zoneId, String defaultValue) {
+<span class="nc" id="L219">        zoneId = zoneId.toUpperCase();</span>
+<span class="nc" id="L220">        return getLocalizedValue(L10N_ZONE_LONGNAME_DST + zoneId, defaultValue);</span>
+    }
+
+    String[] createShortforms(String[] longForms, String l10nKey) {
+<span class="fc" id="L224">        String[] shortForms = new String[longForms.length];</span>
+<span class="fc" id="L225">        int sflen = shortForms.length;</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        for (int i = 0; i &lt; sflen; i++) {</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">            String defaultVal = longForms == MONTHS ? getPlatformLocalizedShortMonths()[i] : null;</span>
+<span class="fc" id="L228">            String shortForm = getLocalizedValue(l10nKey + longForms[i].toUpperCase(), defaultVal);</span>
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">            if (shortForm != null) {</span>
+<span class="nc" id="L230">                shortForms[i] = shortForm;</span>
+            } else {
+<span class="fc" id="L232">                int len = longForms[i].length();</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">                if (len &lt; 3) {</span>
+<span class="nc" id="L234">                    shortForms[i] = longForms[i];</span>
+                } else {
+<span class="fc" id="L236">                    shortForms[i] = limitLength(longForms[i], 3);</span>
+                }
+            }
+        }
+<span class="fc" id="L240">        return shortForms;</span>
+    }
+
+    public String[] getShortWeekdays() {
+<span class="nc" id="L244">        synchronized (this) {</span>
+<span class="nc bnc" id="L245" title="All 2 branches missed.">            if (shortWeekdays == null) {</span>
+<span class="nc" id="L246">                shortWeekdays = createShortforms(getWeekdays(), L10N_WEEKDAY_SHORTNAME);</span>
+            }
+<span class="nc" id="L248">        }</span>
+<span class="nc" id="L249">        return shortWeekdays;</span>
+    }
+
+    public void setShortWeekdays(String[] newShortWeekdays) {
+<span class="nc bnc" id="L253" title="All 2 branches missed.">        if (newShortWeekdays.length != 7) {</span>
+<span class="nc" id="L254">            throw new IllegalArgumentException(&quot;Expecting array size of 7&quot;);</span>
+        }
+<span class="nc" id="L256">        shortWeekdays = newShortWeekdays;</span>
+<span class="nc" id="L257">    }</span>
+
+    public String[] getWeekdays() {
+<span class="nc" id="L260">        synchronized (this) {</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">            if (weekdays == null) {</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">                if (resourceBundle == null) {</span>
+<span class="nc" id="L263">                    return WEEKDAYS;</span>
+                }
+<span class="nc" id="L265">                int wlen = WEEKDAYS.length;</span>
+<span class="nc" id="L266">                String[] newWeekdays = new String[wlen];</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">                for (int i = 0; i &lt; wlen; i++) {</span>
+<span class="nc" id="L268">                    String key = WEEKDAYS[i].toUpperCase();</span>
+<span class="nc" id="L269">                    newWeekdays[i] = getLocalizedValue(L10N_WEEKDAY_LONGNAME + key, WEEKDAYS[i]);</span>
+                }
+<span class="nc" id="L271">                weekdays = newWeekdays;</span>
+            }
+<span class="nc" id="L273">        }</span>
+<span class="nc" id="L274">        return weekdays;</span>
+    }
+
+    public void setWeekdays(String[] newWeekdays) {
+<span class="nc bnc" id="L278" title="All 4 branches missed.">        if (newWeekdays != null &amp;&amp; newWeekdays.length != 7) {</span>
+<span class="nc" id="L279">            throw new IllegalArgumentException(&quot;Expecting array size of 7&quot;);</span>
+        }
+<span class="nc" id="L281">        weekdays = newWeekdays;</span>
+<span class="nc" id="L282">    }</span>
+
+    public String[] getShortMonths() {
+<span class="fc" id="L285">        synchronized (this) {</span>
+<span class="fc bfc" id="L286" title="All 2 branches covered.">            if (shortMonths == null) {</span>
+<span class="fc" id="L287">                shortMonths = createShortforms(MONTHS, L10N_MONTH_SHORTNAME);</span>
+            }
+<span class="fc" id="L289">        }</span>
+<span class="fc" id="L290">        return shortMonths;</span>
+    }
+
+    public void setShortMonths(String[] newShortMonths) {
+<span class="nc bnc" id="L294" title="All 4 branches missed.">        if (newShortMonths != null &amp;&amp; newShortMonths.length != 12) {</span>
+<span class="nc" id="L295">            throw new IllegalArgumentException(&quot;Expecting array size of 12&quot;);</span>
+        }
+<span class="nc" id="L297">        shortMonths = newShortMonths;</span>
+<span class="nc" id="L298">    }</span>
+
+    private String[] getPlatformLocalizedMonths() {
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        if (!localized) {</span>
+<span class="nc" id="L302">            return MONTHS;</span>
+        }
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        if (platformLocalizedMonths == null) {</span>
+<span class="fc" id="L305">            int len = MONTHS.length;</span>
+<span class="fc" id="L306">            platformLocalizedMonths = new String[len];</span>
+<span class="fc" id="L307">            L10NManager l10n = L10NManager.getInstance();</span>
+<span class="fc" id="L308">            Calendar cal = Calendar.getInstance();</span>
+<span class="fc" id="L309">            cal.set(Calendar.DAY_OF_MONTH, 15);</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L311">                cal.set(Calendar.MONTH, i);</span>
+<span class="fc" id="L312">                platformLocalizedMonths[i] = l10n.getLongMonthName(cal.getTime());</span>
+            }
+        }
+<span class="fc" id="L315">        return platformLocalizedMonths;</span>
+    }
+
+    private String[] getPlatformLocalizedShortMonths() {
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">        if (!localized) {</span>
+<span class="nc" id="L320">            return MONTHS;</span>
+        }
+<span class="fc bfc" id="L322" title="All 2 branches covered.">        if (platformLocalizedShortMonths == null) {</span>
+<span class="fc" id="L323">            int len = MONTHS.length;</span>
+<span class="fc" id="L324">            platformLocalizedShortMonths = new String[len];</span>
+<span class="fc" id="L325">            L10NManager l10n = L10NManager.getInstance();</span>
+<span class="fc" id="L326">            Calendar cal = Calendar.getInstance();</span>
+<span class="fc" id="L327">            cal.set(Calendar.DAY_OF_MONTH, 15);</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L329">                cal.set(Calendar.MONTH, i);</span>
+<span class="fc" id="L330">                platformLocalizedMonths[i] = l10n.getShortMonthName(cal.getTime());</span>
+            }
+        }
+<span class="fc" id="L333">        return platformLocalizedShortMonths;</span>
+    }
+
+    public String[] getMonths() {
+<span class="fc" id="L337">        synchronized (this) {</span>
+<span class="fc bfc" id="L338" title="All 2 branches covered.">            if (months == null) {</span>
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">                if (resourceBundle == null) {</span>
+<span class="nc" id="L340">                    return getPlatformLocalizedMonths();</span>
+                }
+<span class="fc" id="L342">                int mlen = MONTHS.length;</span>
+<span class="fc" id="L343">                String[] newMonths = new String[mlen];</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">                for (int i = 0; i &lt; mlen; i++) {</span>
+<span class="fc" id="L345">                    String key = MONTHS[i].toUpperCase();</span>
+<span class="fc" id="L346">                    newMonths[i] = getLocalizedValue(L10N_MONTH_LONGNAME + key, getPlatformLocalizedMonths()[i]);</span>
+                }
+<span class="fc" id="L348">                months = newMonths;</span>
+            }
+<span class="fc" id="L350">        }</span>
+<span class="fc" id="L351">        return months;</span>
+    }
+
+    public void setMonths(String[] newMonths) {
+<span class="nc bnc" id="L355" title="All 4 branches missed.">        if (newMonths != null &amp;&amp; newMonths.length != 12) {</span>
+<span class="nc" id="L356">            throw new IllegalArgumentException(&quot;Expecting array size of 12&quot;);</span>
+        }
+<span class="nc" id="L358">        months = newMonths;</span>
+<span class="nc" id="L359">    }</span>
+
+    public String[] getEras() {
+<span class="nc" id="L362">        synchronized (this) {</span>
+<span class="nc bnc" id="L363" title="All 2 branches missed.">            if (eras == null) {</span>
+<span class="nc bnc" id="L364" title="All 2 branches missed.">                if (resourceBundle == null) {</span>
+<span class="nc" id="L365">                    return ERAS;</span>
+                }
+<span class="nc" id="L367">                String[] newEras = new String[2];</span>
+<span class="nc" id="L368">                newEras[0] = getLocalizedValue(L10N_ERA + &quot;BC&quot;, ERAS[0]);</span>
+<span class="nc" id="L369">                newEras[1] = getLocalizedValue(L10N_ERA + &quot;AD&quot;, ERAS[1]);</span>
+<span class="nc" id="L370">                eras = newEras;</span>
+            }
+<span class="nc" id="L372">        }</span>
+<span class="nc" id="L373">        return eras;</span>
+    }
+
+    public void setEras(String[] newEras) {
+<span class="nc" id="L377">        eras = newEras;</span>
+<span class="nc" id="L378">    }</span>
+
+    public Object clone() {
+<span class="nc" id="L381">        DateFormatSymbols dfs = new DateFormatSymbols();</span>
+        // TODO: do a deep clone
+<span class="nc" id="L383">        dfs.ampms = ampms;</span>
+<span class="nc" id="L384">        dfs.eras = eras;</span>
+<span class="nc" id="L385">        dfs.months = months;</span>
+<span class="nc" id="L386">        dfs.shortMonths = shortMonths;</span>
+<span class="nc" id="L387">        dfs.shortWeekdays = shortWeekdays;</span>
+<span class="nc" id="L388">        dfs.weekdays = weekdays;</span>
+<span class="nc" id="L389">        dfs.zoneStrings = zoneStrings;</span>
+<span class="nc" id="L390">        dfs.resourceBundle = resourceBundle;</span>
+<span class="nc" id="L391">        return dfs;</span>
+    }
+
+    /**
+     * Allows turning localization on/off defaults to localization
+     *
+     * @return the localized
+     */
+    public boolean isLocalized() {
+<span class="nc" id="L400">        return localized;</span>
+    }
+
+    /**
+     * Allows turning localization on/off defaults to localization
+     *
+     * @param localized the localized to set
+     */
+    public void setLocalized(boolean localized) {
+<span class="nc" id="L409">        this.localized = localized;</span>
+<span class="nc" id="L410">    }</span>
+
+    String limitLength(String s, int len) {
+<span class="fc bfc" id="L413" title="All 2 branches covered.">        if (s.length() &gt; len) {</span>
+<span class="fc" id="L414">            return s.substring(0, len);</span>
+        }
+<span class="fc" id="L416">        return s;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

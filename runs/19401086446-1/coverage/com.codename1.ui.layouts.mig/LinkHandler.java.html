@@ -1,0 +1,199 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LinkHandler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts.mig</a> &gt; <span class="el_source">LinkHandler.java</span></div><h1>LinkHandler.java</h1><pre class="source lang-java linenums">package com.codename1.ui.layouts.mig;
+
+import com.codename1.ui.Display;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+/*
+ * License (BSD):
+ * ==============
+ *
+ * Copyright (c) 2004, Mikael Grev, MiG InfoCom AB. (miglayout (at) miginfocom (dot) com)
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * Neither the name of the MiG InfoCom AB nor the names of its contributors may be
+ * used to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ *
+ * @version 1.0
+ * @author Mikael Grev, MiG InfoCom AB
+ *         Date: 2006-sep-08
+ */
+
+/**
+ *
+ */
+public final class LinkHandler {
+    public static final int X = 0;
+    public static final int Y = 1;
+    public static final int WIDTH = 2;
+    public static final int HEIGHT = 3;
+    public static final int X2 = 4;
+    public static final int Y2 = 5;
+
+<span class="fc" id="L52">    private static final ArrayList&lt;Object&gt; LAYOUTS = new ArrayList&lt;Object&gt;(4);</span>
+<span class="fc" id="L53">    private static final ArrayList&lt;HashMap&lt;String, int[]&gt;&gt; VALUES = new ArrayList&lt;HashMap&lt;String, int[]&gt;&gt;(4);</span>
+<span class="fc" id="L54">    private static final ArrayList&lt;HashMap&lt;String, int[]&gt;&gt; VALUES_TEMP = new ArrayList&lt;HashMap&lt;String, int[]&gt;&gt;(4);</span>
+
+    private LinkHandler() {
+    }
+
+    public synchronized static Integer getValue(Object layout, String key, int type) {
+<span class="nc" id="L60">        Integer ret = null;</span>
+<span class="nc" id="L61">        boolean cont = true;</span>
+
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        for (int i = LAYOUTS.size() - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L64">            Object l = Display.getInstance().extractHardRef(LAYOUTS.get(i));</span>
+<span class="nc bnc" id="L65" title="All 4 branches missed.">            if (ret == null &amp;&amp; l == layout) {</span>
+<span class="nc" id="L66">                int[] rect = VALUES_TEMP.get(i).get(key);</span>
+<span class="nc bnc" id="L67" title="All 6 branches missed.">                if (cont &amp;&amp; rect != null &amp;&amp; rect[type] != LayoutUtil.NOT_SET) {</span>
+<span class="nc" id="L68">                    ret = Integer.valueOf(rect[type]);</span>
+                } else {
+<span class="nc" id="L70">                    rect = VALUES.get(i).get(key);</span>
+<span class="nc bnc" id="L71" title="All 4 branches missed.">                    ret = (rect != null &amp;&amp; rect[type] != LayoutUtil.NOT_SET) ? Integer.valueOf(rect[type]) : null;</span>
+                }
+<span class="nc" id="L73">                cont = false;</span>
+            }
+
+<span class="nc bnc" id="L76" title="All 2 branches missed.">            if (l == null) {</span>
+<span class="nc" id="L77">                LAYOUTS.remove(i);</span>
+<span class="nc" id="L78">                VALUES.remove(i);</span>
+<span class="nc" id="L79">                VALUES_TEMP.remove(i);</span>
+            }
+        }
+<span class="nc" id="L82">        return ret;</span>
+    }
+
+    /**
+     * Sets a key that can be linked to from any component.
+     *
+     * @param layout The MigLayout instance
+     * @param key    The key to link to. This is the same as the ID in a component constraint.
+     * @param x      x
+     * @param y      y
+     * @param width  Width
+     * @param height Height
+     * @return If the value was changed
+     */
+    public synchronized static boolean setBounds(Object layout, String key, int x, int y, int width, int height) {
+<span class="nc" id="L97">        return setBounds(layout, key, x, y, width, height, false, false);</span>
+    }
+
+    synchronized static boolean setBounds(Object layout, String key, int x, int y, int width, int height, boolean temporary, boolean incCur) {
+<span class="pc bfc" id="L101" title="All 2 branches covered.">        for (int i = LAYOUTS.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L102">            Object l = Display.getInstance().extractHardRef(LAYOUTS.get(i));</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">            if (l == layout) {</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">                HashMap&lt;String, int[]&gt; map = (temporary ? VALUES_TEMP : VALUES).get(i);</span>
+<span class="fc" id="L105">                int[] old = map.get(key);</span>
+
+<span class="pc bpc" id="L107" title="9 of 10 branches missed.">                if (old == null || old[X] != x || old[Y] != y || old[WIDTH] != width || old[HEIGHT] != height) {</span>
+<span class="pc bpc" id="L108" title="3 of 4 branches missed.">                    if (old == null || !incCur) {</span>
+<span class="fc" id="L109">                        map.put(key, new int[]{x, y, width, height, x + width, y + height});</span>
+<span class="fc" id="L110">                        return true;</span>
+                    } else {
+<span class="nc" id="L112">                        boolean changed = false;</span>
+
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                        if (x != LayoutUtil.NOT_SET) {</span>
+<span class="nc bnc" id="L115" title="All 4 branches missed.">                            if (old[X] == LayoutUtil.NOT_SET || x &lt; old[X]) {</span>
+<span class="nc" id="L116">                                old[X] = x;</span>
+<span class="nc" id="L117">                                old[WIDTH] = old[X2] - x;</span>
+<span class="nc" id="L118">                                changed = true;</span>
+                            }
+
+<span class="nc bnc" id="L121" title="All 2 branches missed.">                            if (width != LayoutUtil.NOT_SET) {</span>
+<span class="nc" id="L122">                                int x2 = x + width;</span>
+<span class="nc bnc" id="L123" title="All 4 branches missed.">                                if (old[X2] == LayoutUtil.NOT_SET || x2 &gt; old[X2]) {</span>
+<span class="nc" id="L124">                                    old[X2] = x2;</span>
+<span class="nc" id="L125">                                    old[WIDTH] = x2 - old[X];</span>
+<span class="nc" id="L126">                                    changed = true;</span>
+                                }
+                            }
+                        }
+
+<span class="nc bnc" id="L131" title="All 2 branches missed.">                        if (y != LayoutUtil.NOT_SET) {</span>
+<span class="nc bnc" id="L132" title="All 4 branches missed.">                            if (old[Y] == LayoutUtil.NOT_SET || y &lt; old[Y]) {</span>
+<span class="nc" id="L133">                                old[Y] = y;</span>
+<span class="nc" id="L134">                                old[HEIGHT] = old[Y2] - y;</span>
+<span class="nc" id="L135">                                changed = true;</span>
+                            }
+
+<span class="nc bnc" id="L138" title="All 2 branches missed.">                            if (height != LayoutUtil.NOT_SET) {</span>
+<span class="nc" id="L139">                                int y2 = y + height;</span>
+<span class="nc bnc" id="L140" title="All 4 branches missed.">                                if (old[Y2] == LayoutUtil.NOT_SET || y2 &gt; old[Y2]) {</span>
+<span class="nc" id="L141">                                    old[Y2] = y2;</span>
+<span class="nc" id="L142">                                    old[HEIGHT] = y2 - old[Y];</span>
+<span class="nc" id="L143">                                    changed = true;</span>
+                                }
+                            }
+                        }
+<span class="nc" id="L147">                        return changed;</span>
+                    }
+                }
+<span class="nc" id="L150">                return false;</span>
+            }
+        }
+
+<span class="fc" id="L154">        LAYOUTS.add(Display.getInstance().createSoftWeakRef(layout));</span>
+<span class="fc" id="L155">        int[] bounds = new int[]{x, y, width, height, x + width, y + height};</span>
+
+<span class="fc" id="L157">        HashMap&lt;String, int[]&gt; values = new HashMap&lt;String, int[]&gt;(4);</span>
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        if (temporary)</span>
+<span class="fc" id="L159">            values.put(key, bounds);</span>
+<span class="fc" id="L160">        VALUES_TEMP.add(values);</span>
+
+<span class="fc" id="L162">        values = new HashMap&lt;String, int[]&gt;(4);</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if (!temporary)</span>
+<span class="nc" id="L164">            values.put(key, bounds);</span>
+<span class="fc" id="L165">        VALUES.add(values);</span>
+
+<span class="fc" id="L167">        return true;</span>
+    }
+
+    /**
+     * This method clear any weak references right away instead of waiting for the GC. This might be advantageous
+     * if lots of layout are created and disposed of quickly to keep memory consumption down.
+     *
+     * @since 3.7.4
+     */
+    public synchronized static void clearWeakReferencesNow() {
+<span class="nc" id="L177">        LAYOUTS.clear();</span>
+<span class="nc" id="L178">    }</span>
+
+    public synchronized static boolean clearBounds(Object layout, String key) {
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        for (int i = LAYOUTS.size() - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L182">            Object l = Display.getInstance().extractHardRef(LAYOUTS.get(i));</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">            if (l == layout)</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">                return VALUES.get(i).remove(key) != null;</span>
+        }
+<span class="nc" id="L186">        return false;</span>
+    }
+
+    synchronized static void clearTemporaryBounds(Object layout) {
+<span class="pc bfc" id="L190" title="All 2 branches covered.">        for (int i = LAYOUTS.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L191">            Object l = Display.getInstance().extractHardRef(LAYOUTS.get(i));</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            if (l == layout) {</span>
+<span class="fc" id="L193">                VALUES_TEMP.get(i).clear();</span>
+<span class="fc" id="L194">                return;</span>
+            }
+        }
+<span class="fc" id="L197">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

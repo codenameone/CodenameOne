@@ -1,0 +1,457 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Push.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.push</a> &gt; <span class="el_source">Push.java</span></div><h1>Push.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.push;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.JSONParser;
+import com.codename1.io.Log;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.Preferences;
+import com.codename1.ui.Display;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+
+import java.util.Map;
+
+/**
+ * Utility class for sending a push message to a different device
+ * through the Codename One push servers.
+ *
+ * @author Shai Almog
+ */
+public class Push {
+
+    /**
+     * Key for the hashtable argument when pushing to the google play store
+     */
+    public static final String GOOGLE_PUSH_KEY = &quot;googlePlay&quot;;
+    private final String token;
+    private final String body;
+    private final String[] deviceKeys;
+    private boolean production;
+<span class="fc" id="L54">    private String googleAuthKey = &quot;&quot;;</span>
+<span class="fc" id="L55">    private String iosCertificateURL = &quot;&quot;;</span>
+<span class="fc" id="L56">    private String iosCertificatePassword = &quot;&quot;;</span>
+<span class="fc" id="L57">    private String wnsSID = &quot;&quot;;</span>
+<span class="fc" id="L58">    private String wnsClientSecret = &quot;&quot;;</span>
+<span class="fc" id="L59">    private int pushType = 1;</span>
+
+    /**
+     * Creates a new push notification.
+     *
+     * @param token      the authorization token from the account settings in the CodenameOne website, this is used
+     *                   to associate push quotas with your app
+     * @param body       the body of the message
+     * @param deviceKeys Device keys when sending to specific devices.
+     */
+<span class="fc" id="L69">    public Push(String token, String body, String... deviceKeys) {</span>
+<span class="fc" id="L70">        this.token = token;</span>
+<span class="fc" id="L71">        this.body = body;</span>
+<span class="fc" id="L72">        this.deviceKeys = deviceKeys;</span>
+<span class="fc" id="L73">    }</span>
+
+    /**
+     * Sends a push message and returns true if server delivery succeeded, notice that the
+     * push message isn't guaranteed to reach all devices.
+     *
+     * @param body                   the body of the message
+     * @param deviceKey              an optional parameter (can be null) when sending to a specific device
+     * @param production             whether pushing to production or test/sandbox environment
+     * @param googleAuthKey          authorization key from the google play store
+     * @param iosCertificateURL      a URL where you host the iOS certificate for this applications push capabilities.
+     * @param iosCertificatePassword the password for the push certificate
+     * @return true if the message reached the Codename One server successfully, this makes no guarantee
+     * of delivery.
+     * @deprecated this method sends a push using the old push servers which will be retired, you need to switch
+     * to the equivalent method that accepts a push token
+     */
+    public static boolean sendPushMessage(String body, String deviceKey, boolean production, String googleAuthKey,
+                                          String iosCertificateURL, String iosCertificatePassword) {
+<span class="nc" id="L92">        ConnectionRequest cr = createPushMessage(body, deviceKey, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;);</span>
+<span class="nc" id="L93">        NetworkManager.getInstance().addToQueueAndWait(cr);</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        return cr.getResposeCode() == 200;</span>
+    }
+
+    /**
+     * Sends a push message and returns true if server delivery succeeded, notice that the
+     * push message isn't guaranteed to reach all devices.
+     *
+     * @param body                   the body of the message
+     * @param deviceKey              an optional parameter (can be null) when sending to a specific device
+     * @param production             whether pushing to production or test/sandbox environment
+     * @param googleAuthKey          authorization key from the google play store
+     * @param iosCertificateURL      a URL where you host the iOS certificate for this applications push capabilities.
+     * @param iosCertificatePassword the password for the push certificate
+     * @param bbUrl                  the URL to which the push should be submitted when sending a blackberry push for evaluation use https://pushapi.eval.blackberry.com
+     *                               for production you will need to apply at https://cp310.pushapi.na.blackberry.com
+     * @param bbApp                  the application id to authenticate on push for RIM devices
+     * @param bbPass                 the application password credentials authenticate on push for RIM devices
+     * @param bbPort                 the port of the blackberry push
+     * @return true if the message reached the Codename One server successfully, this makes no guarantee
+     * of delivery.
+     * @deprecated this method sends a push using the old push servers which will be retired, you need to switch
+     * to the equivalent method that accepts a push token
+     */
+    public static boolean sendPushMessage(String body, String deviceKey, boolean production, String googleAuthKey,
+                                          String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
+<span class="nc" id="L119">        ConnectionRequest cr = createPushMessage(body, deviceKey, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass, bbPort);</span>
+<span class="nc" id="L120">        NetworkManager.getInstance().addToQueueAndWait(cr);</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        return cr.getResposeCode() == 200;</span>
+    }
+
+    /**
+     * Sends a push message and returns true if server delivery succeeded, notice that the
+     * push message isn't guaranteed to reach all devices.
+     *
+     * @param body                   the body of the message
+     * @param deviceKey              an optional parameter (can be null) when sending to a specific device
+     * @param production             whether pushing to production or test/sandbox environment
+     * @param googleAuthKey          authorization key from the google play store
+     * @param iosCertificateURL      a URL where you host the iOS certificate for this applications push capabilities.
+     * @param iosCertificatePassword the password for the push certificate
+     * @deprecated this method sends a push using the old push servers which will be retired, you need to switch
+     * to the equivalent method that accepts a push token
+     */
+    public static void sendPushMessageAsync(String body, String deviceKey, boolean production, String googleAuthKey,
+                                            String iosCertificateURL, String iosCertificatePassword) {
+<span class="nc" id="L139">        NetworkManager.getInstance().addToQueue(createPushMessage(body, deviceKey, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;));</span>
+<span class="nc" id="L140">    }</span>
+
+    /**
+     * Sends a push message and returns true if server delivery succeeded, notice that the
+     * push message isn't guaranteed to reach all devices.
+     *
+     * @param body                   the body of the message
+     * @param deviceKey              an optional parameter (can be null) when sending to a specific device
+     * @param production             whether pushing to production or test/sandbox environment
+     * @param googleAuthKey          authorization key from the google play store
+     * @param iosCertificateURL      a URL where you host the iOS certificate for this applications push capabilities.
+     * @param iosCertificatePassword the password for the push certificate
+     * @param bbUrl                  the URL to which the push should be submitted when sending a blackberry push for evaluation use https://pushapi.eval.blackberry.com
+     *                               for production you will need to apply at https://cp310.pushapi.na.blackberry.com
+     * @param bbApp                  the application id to authenticate on push for RIM devices
+     * @param bbPass                 the application password credentials authenticate on push for RIM devices
+     * @param bbPort                 the port of the blackberry push
+     * @deprecated this method sends a push using the old push servers which will be retired, you need to switch
+     * to the equivalent method that accepts a push token
+     */
+    public static void sendPushMessageAsync(String body, String deviceKey, boolean production, String googleAuthKey,
+                                            String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
+<span class="nc" id="L162">        NetworkManager.getInstance().addToQueue(createPushMessage(body, deviceKey, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass, bbPort));</span>
+<span class="nc" id="L163">    }</span>
+
+    private static ConnectionRequest createPushMessage(String body, String deviceKey, boolean production, String googleAuthKey,
+                                                       String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
+<span class="nc" id="L167">        throw new RuntimeException(&quot;The old push servers no longer work! Please migrate to the new Push servers!&quot;);</span>
+    }
+
+    /**
+     * Returns the push device key if the device was previously successfully registered for push
+     * otherwise returns null
+     *
+     * @return the device key that can be used to push to this specific device.
+     * @deprecated this method sends a push using the old push servers which will be retired, you need to switch
+     * to getPushKey()
+     */
+    public static String getDeviceKey() {
+<span class="fc" id="L179">        long l = Preferences.get(&quot;push_id&quot;, (long) -1);</span>
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (l == -1) {</span>
+<span class="fc" id="L181">            return null;</span>
+        }
+<span class="fc" id="L183">        return &quot;&quot; + l;</span>
+    }
+
+    /**
+     * Returns the push device key if the device was previously successfully registered for push
+     * otherwise returns null
+     *
+     * @return the device key that can be used to push to this specific device.
+     */
+    public static String getPushKey() {
+<span class="fc" id="L193">        String key = Preferences.get(&quot;push_key&quot;, null);</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">        if (key != null) {</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">            if (!key.startsWith(&quot;cn1-&quot;)) {</span>
+<span class="fc" id="L196">                String pushPrefix = Display.getInstance().getProperty(&quot;cn1_push_prefix&quot;, null);</span>
+<span class="pc bpc" id="L197" title="1 of 2 branches missed.">                if (pushPrefix != null) {</span>
+<span class="fc" id="L198">                    return &quot;cn1-&quot; + pushPrefix + &quot;-&quot; + key;</span>
+                }
+<span class="nc" id="L200">            } else {</span>
+<span class="fc" id="L201">                return key;</span>
+            }
+        }
+<span class="nc" id="L204">        return null;</span>
+    }
+
+    /**
+     * Sends a push message and returns true if server delivery succeeded, notice that the
+     * push message isn't guaranteed to reach all devices.
+     * This method uses the new push servers
+     *
+     * @param token                  the authorization token from the account settings in the CodenameOne website, this is used
+     *                               to associate push quotas with your app
+     * @param body                   the body of the message
+     * @param deviceKey              the device key that will receive the push message (can't be null!)
+     * @param production             whether pushing to production or test/sandbox environment
+     * @param googleAuthKey          authorization key from the google play store
+     * @param iosCertificateURL      a URL where you host the iOS certificate for this applications push capabilities.
+     * @param iosCertificatePassword the password for the push certificate
+     * @return true if the message reached the Codename One server successfully, this makes no guarantee
+     * of delivery.
+     * @deprecated Please use new builder syntax with {@link #send()} which includes parameters for new platforms such as UWP.
+     */
+    public static boolean sendPushMessage(String token, String body, String deviceKey, boolean production, String googleAuthKey,
+                                          String iosCertificateURL, String iosCertificatePassword) {
+<span class="nc" id="L226">        PushConnection cr = createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, 1, deviceKey);</span>
+<span class="nc" id="L227">        NetworkManager.getInstance().addToQueueAndWait(cr);</span>
+<span class="nc" id="L228">        return cr.successful;</span>
+    }
+
+    /**
+     * Sends a push message and returns true if server delivery succeeded, notice that the
+     * push message isn't guaranteed to reach all devices.
+     * This method uses the new push servers
+     *
+     * @param token                  the authorization token from the account settings in the CodenameOne website, this is used
+     *                               to associate push quotas with your app
+     * @param body                   the body of the message
+     * @param production             whether pushing to production or test/sandbox environment
+     * @param googleAuthKey          authorization key from the google play store
+     * @param iosCertificateURL      a URL where you host the iOS certificate for this applications push capabilities.
+     * @param iosCertificatePassword the password for the push certificate
+     * @param pushType               the type for the push in the server, this is useful for sending hidden pushes (type 2) should default
+     *                               to 0 or 1
+     * @param deviceKey              set of devices that should receive the push
+     * @return true if the message reached the Codename One server successfully, this makes no guarantee
+     * of delivery.
+     * @deprecated Please use new builder syntax with {@link #send()} which includes parameters for new platforms such as UWP.
+     */
+    public static boolean sendPushMessage(String token, String body, boolean production, String googleAuthKey,
+                                          String iosCertificateURL, String iosCertificatePassword, int pushType, String... deviceKey) {
+<span class="nc" id="L252">        PushConnection cr = createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, pushType, deviceKey);</span>
+<span class="nc" id="L253">        NetworkManager.getInstance().addToQueueAndWait(cr);</span>
+<span class="nc" id="L254">        return cr.successful;</span>
+    }
+
+    /**
+     * Sends a push message and returns true if server delivery succeeded, notice that the
+     * push message isn't guaranteed to reach all devices.
+     * This method uses the new push servers
+     *
+     * @param token                  the authorization token from the account settings in the CodenameOne website, this is used
+     *                               to associate push quotas with your app
+     * @param body                   the body of the message
+     * @param deviceKey              an optional parameter (can be null) when sending to a specific device
+     * @param production             whether pushing to production or test/sandbox environment
+     * @param googleAuthKey          authorization key from the google play store
+     * @param iosCertificateURL      a URL where you host the iOS certificate for this applications push capabilities.
+     * @param iosCertificatePassword the password for the push certificate
+     * @param bbUrl                  the URL to which the push should be submitted when sending a blackberry push for evaluation use https://pushapi.eval.blackberry.com
+     *                               for production you will need to apply at https://cp310.pushapi.na.blackberry.com
+     * @param bbApp                  the application id to authenticate on push for RIM devices
+     * @param bbPass                 the application password credentials authenticate on push for RIM devices
+     * @param bbPort                 the port of the blackberry push
+     * @return true if the message reached the Codename One server successfully, this makes no guarantee
+     * of delivery.
+     * @deprecated Please use new builder syntax with {@link #send()} which includes parameters for new platforms such as UWP.
+     */
+    public static boolean sendPushMessage(String token, String body, String deviceKey, boolean production, String googleAuthKey,
+                                          String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
+<span class="nc" id="L281">        PushConnection cr = createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass, bbPort, &quot;&quot;, &quot;&quot;, 1, deviceKey);</span>
+<span class="nc" id="L282">        NetworkManager.getInstance().addToQueueAndWait(cr);</span>
+<span class="nc" id="L283">        return cr.successful;</span>
+    }
+
+    /**
+     * Sends a push message and returns true if server delivery succeeded, notice that the
+     * push message isn't guaranteed to reach all devices.
+     * This method uses the new push servers
+     *
+     * @param token                  the authorization token from the account settings in the CodenameOne website, this is used
+     *                               to associate push quotas with your app
+     * @param body                   the body of the message
+     * @param deviceKey              an optional parameter (can be null) when sending to a specific device
+     * @param production             whether pushing to production or test/sandbox environment
+     * @param googleAuthKey          authorization key from the google play store
+     * @param iosCertificateURL      a URL where you host the iOS certificate for this applications push capabilities.
+     * @param iosCertificatePassword the password for the push certificate
+     * @deprecated Please use new builder syntax with {@link #sendAsync()} which includes parameters for new platforms such as UWP.
+     */
+    public static void sendPushMessageAsync(String token, String body, String deviceKey, boolean production, String googleAuthKey,
+                                            String iosCertificateURL, String iosCertificatePassword) {
+<span class="nc" id="L303">        NetworkManager.getInstance().addToQueue(createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, 1, deviceKey));</span>
+<span class="nc" id="L304">    }</span>
+
+    /**
+     * Sends a push message and returns true if server delivery succeeded, notice that the
+     * push message isn't guaranteed to reach all devices.
+     * This method uses the new push servers
+     *
+     * @param token                  the authorization token from the account settings in the CodenameOne website, this is used
+     *                               to associate push quotas with your app
+     * @param body                   the body of the message
+     * @param deviceKey              an optional parameter (can be null) when sending to a specific device
+     * @param production             whether pushing to production or test/sandbox environment
+     * @param googleAuthKey          authorization key from the google play store
+     * @param iosCertificateURL      a URL where you host the iOS certificate for this applications push capabilities.
+     * @param iosCertificatePassword the password for the push certificate
+     * @param bbUrl                  the URL to which the push should be submitted when sending a blackberry push for evaluation use https://pushapi.eval.blackberry.com
+     *                               for production you will need to apply at https://cp310.pushapi.na.blackberry.com
+     * @param bbApp                  the application id to authenticate on push for RIM devices
+     * @param bbPass                 the application password credentials authenticate on push for RIM devices
+     * @param bbPort                 the port of the blackberry push
+     * @deprecated Please use new builder syntax with {@link #sendAsync()} which includes parameters for new platforms such as UWP.
+     */
+    public static void sendPushMessageAsync(String token, String body, String deviceKey, boolean production, String googleAuthKey,
+                                            String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort) {
+<span class="nc" id="L328">        NetworkManager.getInstance().addToQueue(createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, bbUrl, bbApp, bbPass, bbPort, &quot;&quot;, &quot;&quot;, 1, deviceKey));</span>
+<span class="nc" id="L329">    }</span>
+
+    private static PushConnection createPushMessage(String token, String body, boolean production, String googleAuthKey,
+                                                    String iosCertificateURL, String iosCertificatePassword, String bbUrl, String bbApp, String bbPass, String bbPort, String wnsSID, String wnsClientSecret, int type, String... deviceKeys) {
+<span class="fc" id="L333">        PushConnection cr = new PushConnection();</span>
+<span class="fc" id="L334">        cr.setPost(true);</span>
+<span class="fc" id="L335">        cr.setUrl(&quot;https://push.codenameone.com/push/push&quot;);</span>
+<span class="fc" id="L336">        cr.addArgument(&quot;token&quot;, token);</span>
+<span class="fc" id="L337">        cr.addArguments(&quot;device&quot;, deviceKeys);</span>
+<span class="fc" id="L338">        cr.addArgument(&quot;type&quot;, &quot;&quot; + type);</span>
+<span class="fc" id="L339">        cr.addArgument(&quot;auth&quot;, googleAuthKey);</span>
+<span class="fc" id="L340">        cr.addArgument(&quot;certPassword&quot;, iosCertificatePassword);</span>
+<span class="fc" id="L341">        cr.addArgument(&quot;cert&quot;, iosCertificateURL);</span>
+<span class="fc" id="L342">        cr.addArgument(&quot;body&quot;, body);</span>
+<span class="fc" id="L343">        cr.addArgument(&quot;burl&quot;, bbUrl);</span>
+<span class="fc" id="L344">        cr.addArgument(&quot;bbAppId&quot;, bbApp);</span>
+<span class="fc" id="L345">        cr.addArgument(&quot;bbPass&quot;, bbPass);</span>
+<span class="fc" id="L346">        cr.addArgument(&quot;bbPort&quot;, bbPort);</span>
+<span class="fc" id="L347">        cr.addArgument(&quot;sid&quot;, wnsSID);</span>
+<span class="fc" id="L348">        cr.addArgument(&quot;client_secret&quot;, wnsClientSecret);</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        if (production) {</span>
+<span class="fc" id="L350">            cr.addArgument(&quot;production&quot;, &quot;true&quot;);</span>
+        } else {
+<span class="fc" id="L352">            cr.addArgument(&quot;production&quot;, &quot;false&quot;);</span>
+        }
+<span class="fc" id="L354">        cr.setFailSilently(true);</span>
+<span class="fc" id="L355">        return cr;</span>
+    }
+
+    /**
+     * Sets authentication for GMS (Android and Chrome)
+     *
+     * @param googleAuthKey authorization key from the google play store
+     * @return self for chaining
+     */
+    public Push gcmAuth(String googleAuthKey) {
+<span class="fc" id="L365">        this.googleAuthKey = googleAuthKey;</span>
+<span class="fc" id="L366">        return this;</span>
+    }
+
+    /**
+     * Sets authentication for APNS (iOS)
+     *
+     * @param iosCertificateURL      a URL where you host the iOS certificate for this applications push capabilities.
+     * @param iosCertificatePassword the password for the push certificate
+     * @param production             True if this is a production certificate.  False if this is a development certificate.
+     * @return Self for chaining
+     */
+    public Push apnsAuth(String iosCertificateURL, String iosCertificatePassword, boolean production) {
+<span class="fc" id="L378">        this.iosCertificateURL = iosCertificateURL;</span>
+<span class="fc" id="L379">        this.iosCertificatePassword = iosCertificatePassword;</span>
+<span class="fc" id="L380">        this.production = production;</span>
+<span class="fc" id="L381">        return this;</span>
+    }
+
+    /**
+     * Sets authenticaton for WNS (Windows 10/UWP)
+     *
+     * @param wnsSID          The SID from the Windows store.
+     * @param wnsClientSecret The client secret from the windows store
+     * @return self for chaining.
+     */
+    public Push wnsAuth(String wnsSID, String wnsClientSecret) {
+<span class="fc" id="L392">        this.wnsSID = wnsSID;</span>
+<span class="fc" id="L393">        this.wnsClientSecret = wnsClientSecret;</span>
+<span class="fc" id="L394">        return this;</span>
+    }
+
+    /**
+     * Sets the type of push to use.  See developer guide for details of different push types.  Default is 1
+     *
+     * @param pushType
+     * @return Self for chaining.
+     */
+    public Push pushType(int pushType) {
+<span class="fc" id="L404">        this.pushType = pushType;</span>
+<span class="fc" id="L405">        return this;</span>
+    }
+
+    /**
+     * Sends push message.
+     *
+     * @return True if the request was successful.
+     */
+    public boolean send() {
+<span class="fc" id="L414">        PushConnection cr = createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, wnsSID, wnsClientSecret, pushType, deviceKeys);</span>
+<span class="fc" id="L415">        NetworkManager.getInstance().addToQueueAndWait(cr);</span>
+<span class="fc" id="L416">        return cr.successful;</span>
+    }
+
+    /**
+     * Sends push message asynchronously.
+     */
+    public void sendAsync() {
+<span class="nc" id="L423">        NetworkManager.getInstance().addToQueue(createPushMessage(token, body, production, googleAuthKey, iosCertificateURL, iosCertificatePassword, &quot;&quot;, &quot;&quot;, &quot;&quot;, &quot;&quot;, wnsSID, wnsClientSecret, pushType, deviceKeys));</span>
+<span class="nc" id="L424">    }</span>
+
+<span class="fc" id="L426">    static class PushConnection extends ConnectionRequest {</span>
+        boolean successful;
+
+        @Override
+        protected void readResponse(InputStream input) throws IOException {
+<span class="fc" id="L431">            JSONParser jp = new JSONParser();</span>
+<span class="fc" id="L432">            Map&lt;String, Object&gt; data = jp.parseJSON(new InputStreamReader(input, &quot;UTF-8&quot;));</span>
+<span class="fc" id="L433">            String error = (String) data.get(&quot;error&quot;);</span>
+<span class="fc bfc" id="L434" title="All 2 branches covered.">            if (error != null) {</span>
+                // this is an error response...
+<span class="fc" id="L436">                Log.p(error);</span>
+<span class="fc" id="L437">                Log.p(&quot;Full error: &quot; + data);</span>
+<span class="fc" id="L438">                successful = false;</span>
+            } else {
+<span class="fc" id="L440">                successful = true;</span>
+            }
+<span class="fc" id="L442">        }</span>
+
+        @Override
+        protected void handleErrorResponseCode(int code, String message) {
+<span class="fc" id="L446">            successful = false;</span>
+<span class="fc" id="L447">        }</span>
+
+        @Override
+        protected void handleException(Exception err) {
+<span class="fc" id="L451">            successful = false;</span>
+<span class="fc" id="L452">            Log.e(err);</span>
+<span class="fc" id="L453">        }</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

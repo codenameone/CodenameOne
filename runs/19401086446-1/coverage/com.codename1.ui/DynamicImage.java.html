@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DynamicImage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">DynamicImage.java</span></div><h1>DynamicImage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.plaf.Style;
+
+/**
+ * A base class for images that dynamically painted, just like a normal component. Subclasses
+ * just need to implement the {@link #drawImageImpl(com.codename1.ui.Graphics, java.lang.Object, int, int, int, int) }
+ * method.
+ *
+ * @author shannah
+ */
+public abstract class DynamicImage extends Image {
+
+<span class="fc" id="L36">    private int w = 250, h = 250;</span>
+    private Style style;
+
+    /**
+     * Constructor.  Creates image of default size: 250x250 pixels.
+     */
+    public DynamicImage() {
+<span class="fc" id="L43">        super(null);</span>
+<span class="fc" id="L44">    }</span>
+
+    /**
+     * Constructor with width and height.
+     *
+     * @param w The width of the image.
+     * @param h The height of the image.
+     */
+    public DynamicImage(int w, int h) {
+<span class="fc" id="L53">        super(null);</span>
+<span class="fc" id="L54">        this.w = w;</span>
+<span class="fc" id="L55">        this.h = h;</span>
+<span class="fc" id="L56">    }</span>
+
+    /**
+     * Sets the given image as the icon for the specified label.  This will link the
+     * label's style with the image just before each call the {@link #drawImageImpl(com.codename1.ui.Graphics, java.lang.Object, int, int, int, int) }
+     * so that the image can correctly adapt to the label's style.
+     */
+    public static void setIcon(final Label lbl, final DynamicImage img) {
+
+<span class="fc" id="L65">        DynamicImage wrapper = new DynamicImage() {</span>
+
+            @Override
+            protected void drawImageImpl(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
+<span class="fc" id="L69">                img.setStyle(lbl.getStyle());</span>
+<span class="fc" id="L70">                img.drawImageImpl(g, nativeGraphics, x, y, w, h);</span>
+<span class="fc" id="L71">            }</span>
+
+        };
+<span class="fc" id="L74">        wrapper.w = img.w;</span>
+<span class="fc" id="L75">        wrapper.h = img.h;</span>
+<span class="fc" id="L76">        lbl.setIcon(wrapper);</span>
+<span class="fc" id="L77">    }</span>
+
+    /**
+     * Gets the style for this image.
+     *
+     * @return
+     */
+    public Style getStyle() {
+<span class="fc" id="L85">        return style;</span>
+    }
+
+    /**
+     * Sets the style to be used for drawing the image.  The {@link #drawImageImpl(com.codename1.ui.Graphics, java.lang.Object, int, int, int, int) }
+     * can use any aspect of this style to customize the drawing.
+     *
+     * @param s The style.
+     */
+    public void setStyle(Style s) {
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        style = s == null ? null : new Style(s);</span>
+<span class="fc" id="L96">    }</span>
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public int getWidth() {
+<span class="fc" id="L103">        return w;</span>
+    }
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public int getHeight() {
+<span class="fc" id="L111">        return h;</span>
+    }
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public void scale(int width, int height) {
+<span class="fc" id="L119">        w = width;</span>
+<span class="fc" id="L120">        h = height;</span>
+<span class="fc" id="L121">    }</span>
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public Image fill(int width, int height) {
+        try {
+<span class="fc" id="L129">            DynamicImage img = (DynamicImage) this.getClass().newInstance();</span>
+<span class="fc" id="L130">            img.w = width;</span>
+<span class="fc" id="L131">            img.h = height;</span>
+<span class="fc" id="L132">            img.setStyle(style);</span>
+<span class="fc" id="L133">            return img;</span>
+<span class="nc" id="L134">        } catch (Throwable t) {</span>
+<span class="nc" id="L135">            throw new RuntimeException(t.getMessage());</span>
+        }
+    }
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public Image applyMask(Object mask) {
+<span class="fc" id="L144">        return fill(w, h);</span>
+    }
+
+    @Override
+    public boolean requiresDrawImage() {
+<span class="fc" id="L149">        return true;</span>
+    }
+
+    /**
+     * This method should be overridden by subclasses to perform the actual drawing of
+     * the image on a graphics context.
+     *
+     * @param g              The graphics context
+     * @param nativeGraphics THe native graphics context.
+     * @param x              x-coordinate of the bounds to draw.
+     * @param y              y-coordinate of the bounds to draw.
+     * @param w              width of the bounds
+     * @param h              height of the bounds
+     */
+    protected abstract void drawImageImpl(Graphics g, Object nativeGraphics, int x, int y, int w, int h);
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
+<span class="fc" id="L170">        drawImageImpl(g, nativeGraphics, x, y, w, h);</span>
+<span class="fc" id="L171">    }</span>
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
+<span class="nc" id="L178">        drawImageImpl(g, nativeGraphics, x, y, w, h);</span>
+<span class="nc" id="L179">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

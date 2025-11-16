@@ -1,0 +1,609 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ComboBox.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">ComboBox.java</span></div><h1>ComboBox.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.list.DefaultListCellRenderer;
+import com.codename1.ui.list.DefaultListModel;
+import com.codename1.ui.list.ListCellRenderer;
+import com.codename1.ui.list.ListModel;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+import java.util.Vector;
+
+/**
+ * &lt;p&gt;A {@code ComboBox} is a list that allows only one selection at a time, when a user clicks
+ * the {@code ComboBox} a popup button with the full list of elements allows the selection of
+ * a single element. The {@code ComboBox} is driven by the list model and allows all the renderer
+ * features of the List as well. &lt;br&gt;
+ * The {@code ComboBox} is notoriously hard to style properly as it relies on a complex dynamic of
+ * popup renderer and instantly visible renderer. The UIID for the {@code ComboBox}  is &quot;{@code ComboBox}&quot;
+ * however if you set it to something else all the other UIID's will also change their prefix. E.g. the &quot;{@code ComboBoxPopup}&quot;
+ * UIID will become &quot;{@code MyNewUIIDPopup}&quot;. &lt;br&gt;
+ * The combo box defines the following UIID's by default:
+ * &lt;/p&gt;
+ * &lt;ul&gt;
+ *  &lt;li&gt;{@code ComboBox}&lt;/li&gt;
+ *  &lt;li&gt;{@code ComboBoxItem}&lt;/li&gt;
+ *  &lt;li&gt;{@code ComboBoxFocus}&lt;/li&gt;
+ *  &lt;li&gt;{@code PopupContentPane}&lt;/li&gt;
+ *  &lt;li&gt;{@code PopupItem}&lt;/li&gt;
+ *  &lt;li&gt;{@code PopupFocus}&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * This class also defines theme constants that allow some native themes to manipulate its behavior e.g.:
+ * &lt;/p&gt;
+ * &lt;ul&gt;
+ *    &lt;li&gt;popupTitleBool - shows the &quot;label for&quot; value as the title of the popup dialog&lt;/li&gt;
+ *    &lt;li&gt;popupCancelBodyBool - Adds a cancel button into the popup dialog&lt;/li&gt;
+ *    &lt;li&gt;centeredPopupBool - shows the popup dialog in the center of the screen instead of under the popup&lt;/li&gt;
+ *    &lt;li&gt;otherPopupRendererBool - Uses a different list cell render for the popup than the one used for the {@code ComboBox}
+ * itself. When this is false {@code PopupItem} &amp;amp; {@code PopupFocus}  become irrelevant. Notice that the
+ * Android native theme defines this to true.&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * &lt;strong&gt;iOS doesn't use combo boxes as part of its UI paradigm&lt;/strong&gt;. Its available there mostly in web applications and feels
+ * unnatural in iOS which is why we recommend using the {@link com.codename1.ui.spinner.Picker} class.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * The sample code below uses the {@link com.codename1.ui.list.GenericListCellRenderer} to create a richer
+ * {@code ComboBox} UI.
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/7aa88182d6a7f63cbd4e.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-combobox.png&quot; alt=&quot;Rich ComboBox&quot; /&gt;
+ *
+ * @author Chen Fishbein
+ * @see List
+ */
+public class ComboBox&lt;T&gt; extends List&lt;T&gt; implements ActionSource {
+
+    private static boolean defaultActAsSpinnerDialog;
+    /**
+     * Indicates whethe the soft buttons for select/cancel should appear for the combo box by default
+     */
+<span class="fc" id="L90">    private static boolean defaultIncludeSelectCancel = true;</span>
+    private Image comboBoxImage;
+<span class="fc" id="L92">    private boolean actAsSpinnerDialog = defaultActAsSpinnerDialog;</span>
+    /**
+     * Indicates whethe the soft buttons for select/cancel should appear for the combo box
+     */
+<span class="fc" id="L96">    private boolean includeSelectCancel = defaultIncludeSelectCancel;</span>
+    private boolean showingPopupDialog;
+
+    /**
+     * Creates a new instance of ComboBox
+     *
+     * @param items set of items placed into the combo box model
+     */
+    public ComboBox(Vector&lt;T&gt; items) {
+<span class="fc" id="L105">        this(new DefaultListModel(items));</span>
+<span class="fc" id="L106">    }</span>
+
+    /**
+     * Creates a new instance of ComboBox
+     *
+     * @param items set of items placed into the combo box model
+     */
+    public ComboBox(Object... items) {
+<span class="fc" id="L114">        this(new DefaultListModel(items));</span>
+<span class="fc" id="L115">    }</span>
+
+    /**
+     * Constructs an empty combo box
+     */
+    public ComboBox() {
+<span class="fc" id="L121">        this(new DefaultListModel&lt;T&gt;());</span>
+<span class="fc" id="L122">    }</span>
+
+    /**
+     * Creates a new instance of ComboBox
+     *
+     * @param model the model for the combo box elements and selection
+     */
+    public ComboBox(ListModel&lt;T&gt; model) {
+<span class="fc" id="L130">        super(model);</span>
+<span class="fc" id="L131">        super.setUIID(&quot;ComboBox&quot;);</span>
+<span class="fc" id="L132">        ((DefaultListCellRenderer) super.getRenderer()).setShowNumbers(false);</span>
+
+<span class="fc" id="L134">        setInputOnFocus(false);</span>
+<span class="fc" id="L135">        setIsScrollVisible(false);</span>
+<span class="fc" id="L136">        setFixedSelection(FIXED_NONE_CYCLIC);</span>
+<span class="fc" id="L137">        ListCellRenderer&lt;T&gt; r = getRenderer();</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (r instanceof Component) {</span>
+<span class="fc" id="L139">            Component c = (Component) getRenderer();</span>
+<span class="fc" id="L140">            c.setUIID(&quot;ComboBoxItem&quot;);</span>
+        }
+<span class="fc" id="L142">        Component c = getRenderer().getListFocusComponent(this);</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        if (c != null) {</span>
+<span class="fc" id="L144">            c.setUIID(&quot;ComboBoxFocus&quot;);</span>
+        }
+
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (UIManager.getInstance().isThemeConstant(&quot;comboBoxUseMaterialArrowDropDownBool&quot;, false)) {</span>
+<span class="nc" id="L148">            Style comboImageStyle = new Style(getStyle());</span>
+<span class="nc" id="L149">            comboImageStyle.setBgTransparency(0);</span>
+<span class="nc" id="L150">            setComboBoxImage(FontImage.createMaterial(FontImage.MATERIAL_ARROW_DROP_DOWN, comboImageStyle));</span>
+        }
+
+<span class="fc" id="L153">    }</span>
+
+    /**
+     * When this flag is active the combo box acts as a button that opens a dialog that looks like a spinner
+     * this allows creating user interfaces for touch devices where a spinner UI approach is more common than
+     * a combo box paradigm.
+     *
+     * @return the defaultActAsSpinnerDialog
+     */
+    public static boolean isDefaultActAsSpinnerDialog() {
+<span class="fc" id="L163">        return defaultActAsSpinnerDialog;</span>
+    }
+
+    /**
+     * When this flag is active the combo box acts as a button that opens a dialog that looks like a spinner
+     * this allows creating user interfaces for touch devices where a spinner UI approach is more common than
+     * a combo box paradigm.
+     *
+     * @param aDefaultActAsSpinnerDialog the defaultActAsSpinnerDialog to set
+     */
+    public static void setDefaultActAsSpinnerDialog(boolean aDefaultActAsSpinnerDialog) {
+<span class="fc" id="L174">        defaultActAsSpinnerDialog = aDefaultActAsSpinnerDialog;</span>
+<span class="fc" id="L175">    }</span>
+
+    /**
+     * Indicates whethe the soft buttons for select/cancel should appear for the combo box by default
+     *
+     * @return true if the soft buttons for select/cancel should appear for the combo box
+     */
+    public static boolean isDefaultIncludeSelectCancel() {
+<span class="fc" id="L183">        return defaultIncludeSelectCancel;</span>
+    }
+
+    /**
+     * Indicates whethe the soft buttons for select/cancel should appear for the combo box by default
+     *
+     * @param aDefaultIncludeSelectCancel the new value
+     */
+    public static void setDefaultIncludeSelectCancel(boolean aDefaultIncludeSelectCancel) {
+<span class="fc" id="L192">        defaultIncludeSelectCancel = aDefaultIncludeSelectCancel;</span>
+<span class="fc" id="L193">    }</span>
+
+    /**
+     * Gets the ComboBox drop down icon
+     *
+     * @return the drop down icon
+     */
+    public Image getComboBoxImage() {
+<span class="fc" id="L201">        return comboBoxImage;</span>
+    }
+
+    /**
+     * Sets the ComboBox drop down icon
+     *
+     * @param comboBoxImage the drop down icon
+     */
+    public void setComboBoxImage(Image comboBoxImage) {
+<span class="fc" id="L210">        this.comboBoxImage = comboBoxImage;</span>
+<span class="fc" id="L211">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setUIID(String uiid) {
+<span class="fc" id="L217">        super.setUIID(uiid);</span>
+<span class="fc" id="L218">        ListCellRenderer r = getRenderer();</span>
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (r instanceof Component) {</span>
+<span class="fc" id="L220">            Component c = (Component) getRenderer();</span>
+<span class="fc" id="L221">            c.setUIID(uiid + &quot;Item&quot;);</span>
+        }
+<span class="fc" id="L223">        Component c = getRenderer().getListFocusComponent(this);</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">        if (c != null) {</span>
+<span class="fc" id="L225">            c.setUIID(uiid + &quot;Focus&quot;);</span>
+        }
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (UIManager.getInstance().isThemeConstant(&quot;comboBoxUseMaterialArrowDropDownBool&quot;, false)) {</span>
+<span class="nc" id="L228">            Style comboImageStyle = new Style(getStyle());</span>
+<span class="nc" id="L229">            comboImageStyle.setBgTransparency(0);</span>
+<span class="nc" id="L230">            setComboBoxImage(FontImage.createMaterial(FontImage.MATERIAL_ARROW_DROP_DOWN, comboImageStyle));</span>
+        }
+<span class="fc" id="L232">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getBaseline(int width, int height) {
+        Component selected;
+<span class="nc bnc" id="L239" title="All 2 branches missed.">        if (getRenderingPrototype() != null) {</span>
+<span class="nc" id="L240">            selected = getRenderer().getListCellRendererComponent(this, getRenderingPrototype(), 0, true);</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">        } else if (getModel().getSize() &gt; 0) {</span>
+<span class="nc" id="L242">            selected = getRenderer().getListCellRendererComponent(this, getModel().getItemAt(0), 0, true);</span>
+        } else {
+<span class="nc" id="L244">            selected = getRenderer().getListCellRendererComponent(this, &quot;XXXXXXXXXXX&quot;, 0, true);</span>
+        }
+<span class="nc" id="L246">        return getHeight() - getStyle().getPaddingBottom() - selected.getStyle().getPaddingBottom();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void laidOut() {
+<span class="fc" id="L253">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Rectangle getSelectedRect() {
+        // the implemenation from list doesn't make sense here, restore the component implementation
+<span class="nc" id="L260">        return new Rectangle(getAbsoluteX(), getAbsoluteY(), getBounds().getSize());</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected Rectangle getVisibleBounds() {
+<span class="nc" id="L267">        return getBounds();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setSelectedIndex(int selection) {
+<span class="fc" id="L274">        super.setSelectedIndex(selection, false);</span>
+<span class="fc" id="L275">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setSelectedIndex(int selection, boolean scroll) {
+<span class="nc" id="L281">        super.setSelectedIndex(selection, false);</span>
+<span class="nc" id="L282">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void pointerHover(int[] x, int[] y) {
+<span class="nc" id="L288">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void pointerHoverReleased(int[] x, int[] y) {
+<span class="nc" id="L294">    }</span>
+
+    /**
+     * Subclasses can override this method to change the creation of the dialog
+     *
+     * @param l the list of the popup
+     * @return a dialog instance
+     */
+    protected Dialog createPopupDialog(List&lt;T&gt; l) {
+<span class="nc" id="L303">        Dialog popupDialog = new Dialog(getUIID() + &quot;Popup&quot;, getUIID() + &quot;PopupTitle&quot;) {</span>
+
+            void sizeChangedInternal(int w, int h) {
+                //if only height changed it's the virtual keyboard, no need to
+                //resize the popup just resize the parent form
+<span class="nc bnc" id="L308" title="All 4 branches missed.">                if (getWidth() == w &amp;&amp; getHeight() != h) {</span>
+<span class="nc" id="L309">                    Form frm = getPreviousForm();</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">                    if (frm != null) {</span>
+<span class="nc" id="L311">                        frm.sizeChangedInternal(w, h);</span>
+                    }
+<span class="nc" id="L313">                    setSize(new Dimension(w, h));</span>
+<span class="nc" id="L314">                    repaint();</span>
+<span class="nc" id="L315">                } else {</span>
+<span class="nc" id="L316">                    dispose();</span>
+                }
+<span class="nc" id="L318">            }</span>
+
+        };
+<span class="nc" id="L321">        popupDialog.setScrollable(false);</span>
+<span class="nc" id="L322">        popupDialog.getContentPane().setAlwaysTensile(false);</span>
+<span class="nc" id="L323">        popupDialog.setAlwaysTensile(false);</span>
+<span class="nc" id="L324">        popupDialog.getContentPane().setUIID(&quot;PopupContentPane&quot;);</span>
+<span class="nc" id="L325">        popupDialog.setDisposeWhenPointerOutOfBounds(true);</span>
+<span class="nc" id="L326">        popupDialog.setTransitionInAnimator(CommonTransitions.createEmpty());</span>
+<span class="nc" id="L327">        popupDialog.setTransitionOutAnimator(CommonTransitions.createEmpty());</span>
+<span class="nc" id="L328">        popupDialog.setLayout(new BorderLayout());</span>
+<span class="nc" id="L329">        popupDialog.addComponent(BorderLayout.CENTER, l);</span>
+<span class="nc" id="L330">        return popupDialog;</span>
+    }
+
+    /**
+     * Returns true if the popup dialog is currently showing for this combobox.
+     *
+     * @return
+     * @since 8.0
+     */
+    public boolean isShowingPopupDialog() {
+<span class="nc" id="L340">        return showingPopupDialog;</span>
+    }
+
+    /**
+     * Shows the popup dialog for the combo box and returns the resulting command.
+     * This method can be overriden by subclasses to modify the behavior of the class.
+     *
+     * @param popupDialog the popup dialog
+     * @param l           the list within
+     * @return the selected command
+     */
+    protected Command showPopupDialog(Dialog popupDialog, List l) {
+<span class="nc bnc" id="L352" title="All 2 branches missed.">        if (getUIManager().isThemeConstant(&quot;popupTitleBool&quot;, false)) {</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">            if (getLabelForComponent() != null) {</span>
+<span class="nc" id="L354">                popupDialog.setTitle(getLabelForComponent().getText());</span>
+            }
+        }
+
+<span class="nc bnc" id="L358" title="All 2 branches missed.">        if (includeSelectCancel) {</span>
+<span class="nc" id="L359">            popupDialog.setBackCommand(popupDialog.getMenuBar().getCancelMenuItem());</span>
+<span class="nc bnc" id="L360" title="All 2 branches missed.">            if (Display.getInstance().isTouchScreenDevice()) {</span>
+<span class="nc bnc" id="L361" title="All 2 branches missed.">                if (getUIManager().isThemeConstant(&quot;popupCancelBodyBool&quot;, false)) {</span>
+<span class="nc" id="L362">                    popupDialog.placeButtonCommands(new Command[]{popupDialog.getMenuBar().getCancelMenuItem()});</span>
+                }
+            } else {
+<span class="nc bnc" id="L365" title="All 2 branches missed.">                if (Display.getInstance().isThirdSoftButton()) {</span>
+<span class="nc" id="L366">                    popupDialog.addCommand(popupDialog.getMenuBar().getSelectMenuItem());</span>
+<span class="nc" id="L367">                    popupDialog.addCommand(popupDialog.getMenuBar().getCancelMenuItem());</span>
+                } else {
+<span class="nc" id="L369">                    popupDialog.addCommand(popupDialog.getMenuBar().getCancelMenuItem());</span>
+<span class="nc" id="L370">                    popupDialog.addCommand(popupDialog.getMenuBar().getSelectMenuItem());</span>
+                }
+            }
+        }
+
+<span class="nc bnc" id="L375" title="All 2 branches missed.">        if (actAsSpinnerDialog) {</span>
+<span class="nc" id="L376">            l.setFixedSelection(List.FIXED_CENTER);</span>
+<span class="nc" id="L377">            l.setUIID(&quot;Spinner&quot;);</span>
+<span class="nc" id="L378">            l.spinnerOverlay = getUIManager().getComponentStyle(&quot;SpinnerOverlay&quot;);</span>
+<span class="nc" id="L379">            l.spinnerOverlay.setMargin(0, 0, 0, 0);</span>
+<span class="nc" id="L380">            l.setAlwaysTensile(false);</span>
+<span class="nc" id="L381">            l.installDefaultPainter(l.spinnerOverlay);</span>
+<span class="nc" id="L382">            popupDialog.setDialogUIID(&quot;Container&quot;);</span>
+<span class="nc" id="L383">            popupDialog.setUIID(&quot;Container&quot;);</span>
+<span class="nc" id="L384">            popupDialog.getTitleComponent().setUIID(&quot;Container&quot;);</span>
+<span class="nc" id="L385">            popupDialog.setTransitionInAnimator(CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, true, 200));</span>
+<span class="nc" id="L386">            popupDialog.setTransitionOutAnimator(CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, false, 200));</span>
+<span class="nc" id="L387">            showingPopupDialog = true;</span>
+<span class="nc" id="L388">            Command out = popupDialog.show(Display.getInstance().getDisplayHeight() - popupDialog.getDialogComponent().getPreferredH(), 0, 0, 0, true, true);</span>
+<span class="nc" id="L389">            showingPopupDialog = false;</span>
+<span class="nc" id="L390">            return out;</span>
+        }
+
+<span class="nc bnc" id="L393" title="All 2 branches missed.">        if (getUIManager().isThemeConstant(&quot;centeredPopupBool&quot;, false)) {</span>
+<span class="nc" id="L394">            showingPopupDialog = true;</span>
+<span class="nc" id="L395">            Command out = popupDialog.showPacked(BorderLayout.CENTER, true);</span>
+<span class="nc" id="L396">            showingPopupDialog = false;</span>
+<span class="nc" id="L397">            return out;</span>
+        } else {
+            int top, bottom, left, right;
+<span class="nc" id="L400">            Form parentForm = getComponentForm();</span>
+
+<span class="nc" id="L402">            int listW = Math.max(getWidth(), l.getPreferredW());</span>
+<span class="nc" id="L403">            listW = Math.min(listW + l.getSideGap(), parentForm.getContentPane().getWidth());</span>
+
+
+<span class="nc" id="L406">            Component content = popupDialog.getDialogComponent();</span>
+<span class="nc" id="L407">            Style contentStyle = content.getStyle();</span>
+
+<span class="nc" id="L409">            int listH = content.getPreferredH()</span>
+<span class="nc" id="L410">                    + contentStyle.getVerticalMargins();</span>
+
+<span class="nc" id="L412">            Component title = popupDialog.getTitleArea();</span>
+<span class="nc" id="L413">            listH += title.getPreferredH()</span>
+<span class="nc" id="L414">                    + title.getStyle().getVerticalMargins();</span>
+
+<span class="nc" id="L416">            bottom = 0;</span>
+<span class="nc" id="L417">            top = getAbsoluteY();</span>
+<span class="nc" id="L418">            int formHeight = parentForm.getHeight();</span>
+<span class="nc bnc" id="L419" title="All 2 branches missed.">            if (parentForm.getSoftButtonCount() &gt; 1) {</span>
+<span class="nc" id="L420">                Component c = parentForm.getSoftButton(0).getParent();</span>
+<span class="nc" id="L421">                formHeight -= c.getHeight();</span>
+<span class="nc" id="L422">                Style s = c.getStyle();</span>
+<span class="nc" id="L423">                formHeight -= (s.getVerticalMargins());</span>
+            }
+
+<span class="nc bnc" id="L426" title="All 2 branches missed.">            if (listH &lt; formHeight) {</span>
+                // pop up or down?
+<span class="nc bnc" id="L428" title="All 2 branches missed.">                if (top &gt; formHeight / 2) {</span>
+<span class="nc" id="L429">                    bottom = formHeight - top;</span>
+<span class="nc" id="L430">                    top = top - listH;</span>
+                } else {
+<span class="nc" id="L432">                    top += getHeight();</span>
+<span class="nc" id="L433">                    bottom = formHeight - top - listH;</span>
+                }
+            } else {
+<span class="nc" id="L436">                top = 0;</span>
+            }
+
+<span class="nc" id="L439">            left = getAbsoluteX();</span>
+<span class="nc" id="L440">            right = parentForm.getWidth() - left - listW;</span>
+<span class="nc bnc" id="L441" title="All 2 branches missed.">            if (right &lt; 0) {</span>
+<span class="nc" id="L442">                left += right;</span>
+<span class="nc" id="L443">                right = 0;</span>
+            }
+<span class="nc" id="L445">            popupDialog.setBackCommand(popupDialog.getMenuBar().getCancelMenuItem());</span>
+<span class="nc" id="L446">            showingPopupDialog = true;</span>
+<span class="nc" id="L447">            Command out = popupDialog.show(Math.max(top, 0),</span>
+<span class="nc" id="L448">                    Math.max(bottom, 0),</span>
+<span class="nc" id="L449">                    Math.max(left, 0),</span>
+<span class="nc" id="L450">                    Math.max(right, 0), false, true);</span>
+<span class="nc" id="L451">            showingPopupDialog = false;</span>
+<span class="nc" id="L452">            return out;</span>
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void fireClicked() {
+<span class="nc" id="L460">        List&lt;T&gt; l = createPopupList();</span>
+<span class="nc" id="L461">        l.dispatcher = dispatcher;</span>
+<span class="nc" id="L462">        l.eventSource = this;</span>
+<span class="nc" id="L463">        l.disposeDialogOnSelection = true;</span>
+<span class="nc" id="L464">        Form parentForm = getComponentForm();</span>
+        //l.getSelectedStyle().setBorder(null);
+
+<span class="nc" id="L467">        int tint = parentForm.getTintColor();</span>
+<span class="nc" id="L468">        parentForm.setTintColor(0);</span>
+<span class="nc" id="L469">        Dialog popupDialog = createPopupDialog(l);</span>
+<span class="nc" id="L470">        int originalSel = getSelectedIndex();</span>
+<span class="nc" id="L471">        Form.comboLock = includeSelectCancel;</span>
+<span class="nc" id="L472">        float rr = Dialog.getDefaultBlurBackgroundRadius();</span>
+<span class="nc" id="L473">        Dialog.setDefaultBlurBackgroundRadius(-1);</span>
+<span class="nc" id="L474">        Command result = showPopupDialog(popupDialog, l);</span>
+<span class="nc" id="L475">        Dialog.setDefaultBlurBackgroundRadius(rr);</span>
+<span class="nc" id="L476">        Form.comboLock = false;</span>
+<span class="nc" id="L477">        parentForm.setTintColor(tint);</span>
+<span class="nc bnc" id="L478" title="All 4 branches missed.">        if (result == popupDialog.getMenuBar().getCancelMenuItem() || popupDialog.wasDisposedDueToOutOfBoundsTouch() ||</span>
+<span class="nc bnc" id="L479" title="All 2 branches missed.">                popupDialog.wasDisposedDueToRotation()) {</span>
+<span class="nc" id="L480">            setSelectedIndex(originalSel);</span>
+        }
+<span class="nc" id="L482">    }</span>
+
+    /**
+     * Creates the list object used within the popup dialog. This method allows subclasses
+     * to customize the list creation for the popup dialog shown when the combo box is pressed.
+     *
+     * @return a newly created list object used when the user presses the combo box.
+     */
+    protected List&lt;T&gt; createPopupList() {
+<span class="fc" id="L491">        List&lt;T&gt; l = new List&lt;T&gt;(getModel());</span>
+<span class="fc" id="L492">        l.setCommandList(isCommandList());</span>
+<span class="fc" id="L493">        l.setSmoothScrolling(isSmoothScrolling());</span>
+<span class="fc" id="L494">        l.setFixedSelection(getFixedSelection());</span>
+<span class="fc" id="L495">        l.setListCellRenderer(getRenderer());</span>
+<span class="fc" id="L496">        l.setItemGap(getItemGap());</span>
+<span class="fc" id="L497">        l.setUIID(&quot;ComboBoxList&quot;);</span>
+<span class="pc bpc" id="L498" title="1 of 2 branches missed.">        if (getUIManager().isThemeConstant(&quot;otherPopupRendererBool&quot;, false)) {</span>
+<span class="fc" id="L499">            DefaultListCellRenderer renderer = new DefaultListCellRenderer();</span>
+<span class="fc" id="L500">            renderer.setUIID(&quot;PopupItem&quot;);</span>
+<span class="fc" id="L501">            renderer.getListFocusComponent(l).setUIID(&quot;PopupFocus&quot;);</span>
+<span class="fc" id="L502">            l.setListCellRenderer(renderer);</span>
+        }
+
+<span class="fc" id="L505">        return l;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void keyReleased(int keyCode) {
+        // other events are in keyReleased to prevent the next event from reaching the next form
+<span class="nc" id="L513">        int gameAction = Display.getInstance().getGameAction(keyCode);</span>
+<span class="nc bnc" id="L514" title="All 2 branches missed.">        if (gameAction == Display.GAME_FIRE) {</span>
+<span class="nc" id="L515">            fireClicked();</span>
+<span class="nc" id="L516">            return;</span>
+        }
+<span class="nc" id="L518">        super.keyPressed(keyCode);</span>
+<span class="nc" id="L519">    }</span>
+
+    /**
+     * Prevent the combo box from losing selection in some use cases
+     */
+    void selectElement(int selectedIndex) {
+<span class="nc" id="L525">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void pointerPressed(int x, int y) {
+<span class="nc" id="L531">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void pointerDragged(int x, int y) {
+<span class="nc" id="L537">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void pointerReleased(int x, int y) {
+<span class="nc bnc" id="L543" title="All 4 branches missed.">        if (isEnabled() &amp;&amp; !Display.impl.isScrollWheeling()) {</span>
+<span class="nc" id="L544">            fireClicked();</span>
+        }
+<span class="nc" id="L546">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void paint(Graphics g) {
+<span class="fc" id="L552">        getUIManager().getLookAndFeel().drawComboBox(g, this);</span>
+<span class="fc" id="L553">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L559">        return getUIManager().getLookAndFeel().getComboBoxPreferredSize(this);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getOrientation() {
+<span class="fc" id="L566">        return COMBO;</span>
+    }
+
+    /**
+     * Indicates whethe the soft buttons for select/cancel should appear for the combo box
+     *
+     * @return true if the soft buttons for select/cancel should appear for the combo box
+     */
+    public boolean isIncludeSelectCancel() {
+<span class="fc" id="L575">        return includeSelectCancel;</span>
+    }
+
+    /**
+     * Indicates whethe the soft buttons for select/cancel should appear for the combo box
+     *
+     * @param includeSelectCancel the new value
+     */
+    public void setIncludeSelectCancel(boolean includeSelectCancel) {
+<span class="fc" id="L584">        this.includeSelectCancel = includeSelectCancel;</span>
+<span class="fc" id="L585">    }</span>
+
+    /**
+     * When this flag is active the combo box acts as a button that opens a dialog that looks like a spinner
+     * this allows creating user interfaces for touch devices where a spinner UI approach is more common than
+     * a combo box paradigm.
+     *
+     * @return the actAsSpinnerDialog
+     */
+    public boolean isActAsSpinnerDialog() {
+<span class="fc" id="L595">        return actAsSpinnerDialog;</span>
+    }
+
+    /**
+     * When this flag is active the combo box acts as a button that opens a dialog that looks like a spinner
+     * this allows creating user interfaces for touch devices where a spinner UI approach is more common than
+     * a combo box paradigm.
+     *
+     * @param actAsSpinnerDialog the actAsSpinnerDialog to set
+     */
+    public void setActAsSpinnerDialog(boolean actAsSpinnerDialog) {
+<span class="fc" id="L606">        this.actAsSpinnerDialog = actAsSpinnerDialog;</span>
+<span class="fc" id="L607">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

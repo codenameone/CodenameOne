@@ -1,0 +1,243 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ScaleImageButton.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">ScaleImageButton.java</span></div><h1>ScaleImageButton.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.components;
+
+import com.codename1.ui.Button;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.Style;
+
+/**
+ * &lt;p&gt;Button that simplifies the usage of scale to fill/fit. This is effectively equivalent to just setting the style image
+ * on a button but more convenient for some special circumstances. One major difference is that preferred size
+ * equals the image in this case.&lt;/p&gt;
+ * &lt;p&gt;
+ * The UIID of this class is {@code ScaleImageButton}, the original {@code Button} UIID isn't preserved since it
+ * might cause an issue with the border.
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/7289bbe5dad9e279eabb.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-scaleimage.png&quot; alt=&quot;ScaleImageButton and ScaleImageLabel samples&quot; /&gt;
+ *
+ * @author Shai Almog
+ */
+public class ScaleImageButton extends Button {
+
+    /**
+     * Default constructor
+     */
+<span class="fc" id="L51">    public ScaleImageButton() {</span>
+<span class="fc" id="L52">        setUIID(&quot;ScaleImageButton&quot;);</span>
+<span class="fc" id="L53">        setShowEvenIfBlank(true);</span>
+<span class="fc" id="L54">        getAllStyles().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FIT);</span>
+<span class="fc" id="L55">        getAllStyles().setBgTransparency(255);</span>
+<span class="fc" id="L56">    }</span>
+
+    /**
+     * Create a version with the given image
+     *
+     * @param i image
+     */
+<span class="fc" id="L63">    public ScaleImageButton(Image i) {</span>
+<span class="fc" id="L64">        setUIID(&quot;ScaleImageButton&quot;);</span>
+<span class="fc" id="L65">        setShowEvenIfBlank(true);</span>
+<span class="fc" id="L66">        getAllStyles().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FIT);</span>
+<span class="fc" id="L67">        getAllStyles().setBgTransparency(255);</span>
+<span class="fc" id="L68">        setIcon(i);</span>
+<span class="fc" id="L69">    }</span>
+
+    /**
+     * Returns the background type for the component
+     *
+     * @return One of Style.BACKGROUND_IMAGE_SCALED_FIT,
+     * Style.BACKGROUND_IMAGE_SCALED_FILL or Style.BACKGROUND_IMAGE_SCALE
+     */
+    public byte getBackgroundType() {
+<span class="fc" id="L78">        return getUnselectedStyle().getBackgroundType();</span>
+    }
+
+    /**
+     * Sets the behavior of the background to one of Style.BACKGROUND_IMAGE_SCALED_FIT,
+     * Style.BACKGROUND_IMAGE_SCALED_FILL, Style.BACKGROUND_IMAGE_SCALE
+     *
+     * @param behavior the background behavior
+     */
+    public void setBackgroundType(byte behavior) {
+<span class="fc" id="L88">        getAllStyles().setBackgroundType(behavior);</span>
+<span class="fc" id="L89">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L96">        Image i = getIcon();</span>
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (i == null) {</span>
+<span class="fc" id="L98">            return new Dimension();</span>
+        }
+<span class="fc" id="L100">        int dw = Display.getInstance().getDisplayWidth();</span>
+<span class="fc" id="L101">        int iw = i.getWidth();</span>
+<span class="fc" id="L102">        int ih = i.getHeight();</span>
+
+        // a huge preferred width might be requested that is bigger than screen size. Normally this isn't a problem but in
+        // a scrollable container the vertical height might be granted providing so much space as to make this unrealistic...
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (iw &gt; dw) {</span>
+<span class="nc" id="L107">            float ratio = ((float) iw) / ((float) dw);</span>
+<span class="nc" id="L108">            iw = (int) (((float) iw) / ratio);</span>
+<span class="nc" id="L109">            ih = (int) (((float) ih) / ratio);</span>
+        }
+<span class="fc" id="L111">        Style s = getStyle();</span>
+<span class="fc" id="L112">        return new Dimension(iw + s.getPaddingLeftNoRTL() + s.getPaddingRightNoRTL(), ih +</span>
+<span class="fc" id="L113">                s.getPaddingTop() + s.getPaddingBottom());</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     * Overriden to prevent the setUIID from replacing the code
+     */
+    @Override
+    public void setUIID(String id) {
+<span class="fc" id="L122">        byte type = getBackgroundType();</span>
+<span class="fc" id="L123">        Image icon = getIcon();</span>
+<span class="fc" id="L124">        super.setUIID(id);</span>
+<span class="fc" id="L125">        setIcon(icon);</span>
+<span class="fc" id="L126">        getAllStyles().setBackgroundType(type);</span>
+<span class="fc" id="L127">        getAllStyles().setBgTransparency(255);</span>
+<span class="fc" id="L128">    }</span>
+
+    @Override
+    protected void refreshTheme(String id, boolean merge) {
+<span class="nc" id="L132">        byte type = getBackgroundType();</span>
+<span class="nc" id="L133">        Image icon = getIcon();</span>
+<span class="nc" id="L134">        super.refreshTheme(id, merge);</span>
+<span class="nc" id="L135">        setIcon(icon);</span>
+<span class="nc" id="L136">        getAllStyles().setBackgroundType(type);</span>
+<span class="nc" id="L137">        getAllStyles().setBgTransparency(255);</span>
+<span class="nc" id="L138">    }</span>
+
+    /**
+     * {@inheritDoc}
+     * &lt;p&gt;
+     * Overriden to support animations
+     */
+    @Override
+    protected void initComponent() {
+<span class="nc" id="L147">        super.initComponent();</span>
+<span class="nc" id="L148">        checkAnimation(getIcon());</span>
+<span class="nc" id="L149">    }</span>
+
+    void checkAnimation(Image icon) {
+<span class="nc bnc" id="L152" title="All 4 branches missed.">        if (icon != null &amp;&amp; icon.isAnimation()) {</span>
+<span class="nc" id="L153">            Form parent = getComponentForm();</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">            if (parent != null) {</span>
+                // animations are always running so the internal animation isn't
+                // good enough. We never want to stop this sort of animation
+<span class="nc" id="L157">                parent.registerAnimated(this);</span>
+            }
+        }
+<span class="nc" id="L160">    }</span>
+
+    /**
+     * Returns the background image
+     *
+     * @return the bg image
+     */
+    public Image getIcon() {
+<span class="fc" id="L168">        return getUnselectedStyle().getBgImage();</span>
+    }
+
+    /**
+     * Instead of setting the icon sets the background image
+     *
+     * @param i the image
+     */
+    public void setIcon(Image i) {
+<span class="fc" id="L177">        setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L178">        getAllStyles().setBgImage(i);</span>
+<span class="pc bpc" id="L179" title="1 of 4 branches missed.">        if (i != null &amp;&amp; i.isAnimation()) {</span>
+<span class="nc" id="L180">            checkAnimation(i);</span>
+        }
+<span class="fc" id="L182">    }</span>
+
+    /**
+     * Scale image label doesn't support text this method is overriden to do nothing
+     */
+    @Override
+    public void setText(String text) {
+<span class="nc" id="L189">    }</span>
+
+    /**
+     * {@inheritDoc }
+     * Overriden to return getIcon always.
+     */
+    @Override
+    public Image getIconFromState() {
+<span class="nc" id="L197">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+<span class="nc" id="L204">        return new String[]{&quot;backgroundType&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L211">        return new Class[]{Byte.class};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyTypeNames() {
+<span class="nc" id="L218">        return new String[]{&quot;Byte&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+<span class="nc bnc" id="L225" title="All 2 branches missed.">        if (name.equals(&quot;backgroundType&quot;)) {</span>
+<span class="nc" id="L226">            return getBackgroundType();</span>
+        }
+<span class="nc" id="L228">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        if (name.equals(&quot;backgroundType&quot;)) {</span>
+<span class="nc" id="L236">            setBackgroundType(((Byte) value).byteValue());</span>
+<span class="nc" id="L237">            return null;</span>
+        }
+<span class="nc" id="L239">        return super.setPropertyValue(name, value);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

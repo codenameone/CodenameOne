@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Base64.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">Base64.java</span></div><h1>Base64.java</h1><pre class="source lang-java linenums">/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the &quot;License&quot;); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+/**
+ * @author Alexander Y. Kleymenov
+ */
+
+package com.codename1.util;
+
+/**
+ * This class implements Base64 encoding/decoding functionality
+ * as specified in RFC 2045 (http://www.ietf.org/rfc/rfc2045.txt).
+ */
+<span class="nc" id="L28">public class Base64 {</span>
+
+<span class="fc" id="L30">    private static final byte[] map = new byte[]</span>
+            {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
+                    'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b',
+                    'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
+                    'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '0', '1', '2', '3',
+                    '4', '5', '6', '7', '8', '9', '+', '/'};
+
+    public static byte[] decode(byte[] in) {
+<span class="fc" id="L38">        return decode(in, in.length);</span>
+    }
+
+    /**
+     * Decodes an array of bytes containing a Base64 ascii string into binary data
+     * @param in the array
+     * @param len the length of the array
+     * @return the decoded array
+     */
+    public static byte[] decode(byte[] in, int len) {
+        // approximate output length
+<span class="fc" id="L49">        int length = len / 4 * 3;</span>
+        // return an empty array on emtpy or short input without padding
+<span class="pc bpc" id="L51" title="1 of 2 branches missed.">        if (length == 0) {</span>
+<span class="nc" id="L52">            return new byte[0];</span>
+        }
+        // temporary array
+<span class="fc" id="L55">        byte[] out = new byte[length];</span>
+        // number of padding characters ('=')
+<span class="fc" id="L57">        int pad = 0;</span>
+        byte chr;
+        // compute the number of the padding characters
+        // and adjust the length of the input
+<span class="nc" id="L61">        for (; ; len--) {</span>
+<span class="fc" id="L62">            chr = in[len - 1];</span>
+            // skip the neutral characters
+<span class="pc bpc" id="L64" title="4 of 8 branches missed.">            if ((chr == '\n') || (chr == '\r') ||</span>
+                    (chr == ' ') || (chr == '\t')) {
+<span class="nc" id="L66">                continue;</span>
+            }
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            if (chr == '=') {</span>
+<span class="nc" id="L69">                pad++;</span>
+            } else {
+                break;
+            }
+        }
+        // index in the output array
+<span class="fc" id="L75">        int out_index = 0;</span>
+        // index in the input array
+<span class="fc" id="L77">        int in_index = 0;</span>
+        // holds the value of the input character
+<span class="fc" id="L79">        int bits = 0;</span>
+        // holds the value of the input quantum
+<span class="fc" id="L81">        int quantum = 0;</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L83">            chr = in[i];</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            if (chr == '=') {</span>
+<span class="nc" id="L85">                break;</span>
+            }
+            // skip the neutral characters
+<span class="pc bpc" id="L88" title="4 of 8 branches missed.">            if ((chr == '\n') || (chr == '\r') ||</span>
+                    (chr == ' ') || (chr == '\t')) {
+<span class="nc" id="L90">                continue;</span>
+            }
+<span class="fc bfc" id="L92" title="All 4 branches covered.">            if ((chr &gt;= 'A') &amp;&amp; (chr &lt;= 'Z')) {</span>
+                // char ASCII value
+                //  A    65    0
+                //  Z    90    25 (ASCII - 65)
+<span class="fc" id="L96">                bits = chr - 65;</span>
+<span class="pc bpc" id="L97" title="1 of 4 branches missed.">            } else if ((chr &gt;= 'a') &amp;&amp; (chr &lt;= 'z')) {</span>
+                // char ASCII value
+                //  a    97    26
+                //  z    122   51 (ASCII - 71)
+<span class="fc" id="L101">                bits = chr - 71;</span>
+<span class="pc bpc" id="L102" title="1 of 4 branches missed.">            } else if ((chr &gt;= '0') &amp;&amp; (chr &lt;= '9')) {</span>
+                // char ASCII value
+                //  0    48    52
+                //  9    57    61 (ASCII + 4)
+<span class="fc" id="L106">                bits = chr + 4;</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">            } else if (chr == '+') {</span>
+<span class="fc" id="L108">                bits = 62;</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">            } else if (chr == '/') {</span>
+<span class="nc" id="L110">                bits = 63;</span>
+            } else {
+<span class="nc" id="L112">                return null;</span>
+            }
+            // append the value to the quantum
+<span class="fc" id="L115">            quantum = (quantum &lt;&lt; 6) | (byte) bits;</span>
+<span class="fc bfc" id="L116" title="All 2 branches covered.">            if (in_index % 4 == 3) {</span>
+                // 4 characters were read, so make the output:
+<span class="fc" id="L118">                out[out_index++] = (byte) ((quantum &amp; 0x00FF0000) &gt;&gt; 16);</span>
+<span class="fc" id="L119">                out[out_index++] = (byte) ((quantum &amp; 0x0000FF00) &gt;&gt; 8);</span>
+<span class="fc" id="L120">                out[out_index++] = (byte) (quantum &amp; 0x000000FF);</span>
+            }
+<span class="fc" id="L122">            in_index++;</span>
+        }
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (pad &gt; 0) {</span>
+            // adjust the quantum value according to the padding
+<span class="nc" id="L126">            quantum = quantum &lt;&lt; (6 * pad);</span>
+            // make output
+<span class="nc" id="L128">            out[out_index++] = (byte) ((quantum &amp; 0x00FF0000) &gt;&gt; 16);</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">            if (pad == 1) {</span>
+<span class="nc" id="L130">                out[out_index++] = (byte) ((quantum &amp; 0x0000FF00) &gt;&gt; 8);</span>
+            }
+        }
+        // create the resulting array
+<span class="fc" id="L134">        byte[] result = new byte[out_index];</span>
+<span class="fc" id="L135">        System.arraycopy(out, 0, result, 0, out_index);</span>
+<span class="fc" id="L136">        return result;</span>
+    }
+
+    /**
+     * Encodes the given array as a base64 string
+     * @param in the array to encode
+     * @return the String containing the array
+     */
+    public static String encode(byte[] in) {
+<span class="nc" id="L145">        int length = in.length * 4 / 3;</span>
+<span class="nc" id="L146">        length += length / 76 + 3; // for crlr</span>
+<span class="nc" id="L147">        byte[] out = new byte[length];</span>
+<span class="nc" id="L148">        int index = 0, i, crlr = 0, end = in.length - in.length % 3;</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        for (i = 0; i &lt; end; i += 3) {</span>
+<span class="nc" id="L150">            out[index++] = map[(in[i] &amp; 0xff) &gt;&gt; 2];</span>
+<span class="nc" id="L151">            out[index++] = map[((in[i] &amp; 0x03) &lt;&lt; 4)</span>
+                    | ((in[i + 1] &amp; 0xff) &gt;&gt; 4)];
+<span class="nc" id="L153">            out[index++] = map[((in[i + 1] &amp; 0x0f) &lt;&lt; 2)</span>
+                    | ((in[i + 2] &amp; 0xff) &gt;&gt; 6)];
+<span class="nc" id="L155">            out[index++] = map[(in[i + 2] &amp; 0x3f)];</span>
+<span class="nc bnc" id="L156" title="All 4 branches missed.">            if (((index - crlr) % 76 == 0) &amp;&amp; (index != 0)) {</span>
+<span class="nc" id="L157">                out[index++] = '\n';</span>
+<span class="nc" id="L158">                crlr++;</span>
+                //out[index++] = '\r';
+                //crlr++;
+            }
+        }
+<span class="nc bnc" id="L163" title="All 3 branches missed.">        switch (in.length % 3) {</span>
+            case 1:
+<span class="nc" id="L165">                out[index++] = map[(in[end] &amp; 0xff) &gt;&gt; 2];</span>
+<span class="nc" id="L166">                out[index++] = map[(in[end] &amp; 0x03) &lt;&lt; 4];</span>
+<span class="nc" id="L167">                out[index++] = '=';</span>
+<span class="nc" id="L168">                out[index++] = '=';</span>
+<span class="nc" id="L169">                break;</span>
+            case 2:
+<span class="nc" id="L171">                out[index++] = map[(in[end] &amp; 0xff) &gt;&gt; 2];</span>
+<span class="nc" id="L172">                out[index++] = map[((in[end] &amp; 0x03) &lt;&lt; 4)</span>
+                        | ((in[end + 1] &amp; 0xff) &gt;&gt; 4)];
+<span class="nc" id="L174">                out[index++] = map[((in[end + 1] &amp; 0x0f) &lt;&lt; 2)];</span>
+<span class="nc" id="L175">                out[index++] = '=';</span>
+                break;
+        }
+<span class="nc" id="L178">        return new String(out, 0, index);</span>
+    }
+
+    /**
+     * Encodes the given array as a base64 string without breaking lines
+     * @param in the array to encode
+     * @return the String containing the array
+     */
+    public static String encodeNoNewline(byte[] in) {
+        // notice that this method isn't genric to increase performance slightly
+<span class="fc" id="L188">        int length = in.length * 4 / 3;</span>
+<span class="fc" id="L189">        length += length / 76 + 3;</span>
+<span class="fc" id="L190">        byte[] out = new byte[length];</span>
+<span class="fc" id="L191">        int index = 0, i, end = in.length - in.length % 3;</span>
+<span class="fc bfc" id="L192" title="All 2 branches covered.">        for (i = 0; i &lt; end; i += 3) {</span>
+<span class="fc" id="L193">            out[index++] = map[(in[i] &amp; 0xff) &gt;&gt; 2];</span>
+<span class="fc" id="L194">            out[index++] = map[((in[i] &amp; 0x03) &lt;&lt; 4)</span>
+                    | ((in[i + 1] &amp; 0xff) &gt;&gt; 4)];
+<span class="fc" id="L196">            out[index++] = map[((in[i + 1] &amp; 0x0f) &lt;&lt; 2)</span>
+                    | ((in[i + 2] &amp; 0xff) &gt;&gt; 6)];
+<span class="fc" id="L198">            out[index++] = map[(in[i + 2] &amp; 0x3f)];</span>
+        }
+<span class="pc bpc" id="L200" title="2 of 3 branches missed.">        switch (in.length % 3) {</span>
+            case 1:
+<span class="nc" id="L202">                out[index++] = map[(in[end] &amp; 0xff) &gt;&gt; 2];</span>
+<span class="nc" id="L203">                out[index++] = map[(in[end] &amp; 0x03) &lt;&lt; 4];</span>
+<span class="nc" id="L204">                out[index++] = '=';</span>
+<span class="nc" id="L205">                out[index++] = '=';</span>
+<span class="nc" id="L206">                break;</span>
+            case 2:
+<span class="nc" id="L208">                out[index++] = map[(in[end] &amp; 0xff) &gt;&gt; 2];</span>
+<span class="nc" id="L209">                out[index++] = map[((in[end] &amp; 0x03) &lt;&lt; 4)</span>
+                        | ((in[end + 1] &amp; 0xff) &gt;&gt; 4)];
+<span class="nc" id="L211">                out[index++] = map[((in[end + 1] &amp; 0x0f) &lt;&lt; 2)];</span>
+<span class="nc" id="L212">                out[index++] = '=';</span>
+                break;
+        }
+<span class="fc" id="L215">        return new String(out, 0, index);</span>
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

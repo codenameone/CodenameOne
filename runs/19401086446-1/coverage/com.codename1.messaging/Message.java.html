@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Message.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.messaging</a> &gt; <span class="el_source">Message.java</span></div><h1>Message.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.messaging;
+
+import com.codename1.ui.Display;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * &lt;p&gt;Represents a message to be sent using underlying platform e-mail client or the cloud.&lt;br&gt;
+ * The code below demonstrates sending a simple message with attachments using the devices
+ * native email client:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/3db47a2ff8b35cae6410.js&quot;&gt;&lt;/script&gt;
+ *
+ * &lt;p&gt;
+ * The following code demonstrates sending an email via the Codename One cloud, notice that this is a pro
+ * specific feature:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/8229c1d4627ab3a1f17e.js&quot;&gt;&lt;/script&gt;
+ *
+ * @author Chen
+ */
+public class Message {
+
+    public static final String MIME_TEXT = &quot;text/plain&quot;;
+    public static final String MIME_HTML = &quot;text/html&quot;;
+    public static final String MIME_IMAGE_JPG = &quot;image/jpeg&quot;;
+    public static final String MIME_IMAGE_PNG = &quot;image/png&quot;;
+<span class="fc" id="L51">    private String content = &quot;&quot;;</span>
+<span class="fc" id="L52">    private String fileUri = &quot;&quot;;</span>
+<span class="fc" id="L53">    private String mimeType = MIME_TEXT;</span>
+<span class="fc" id="L54">    private String attachmentMimeType = MIME_IMAGE_JPG;</span>
+    private HashMap&lt;String, String&gt; attachments;
+<span class="fc" id="L56">    private boolean cloudMessageFailSilently = false;</span>
+
+    /**
+     * Constructor with the message body content
+     *
+     * @param content the message content
+     */
+<span class="fc" id="L63">    public Message(String content) {</span>
+<span class="fc" id="L64">        this.content = content;</span>
+<span class="fc" id="L65">    }</span>
+
+    /**
+     * Send an email using the platform mail client
+     *
+     * @param recipients array of e-mail addresses
+     * @param subject    e-mail subject
+     * @param msg        the Message to send
+     */
+    public static void sendMessage(String[] recipients, String subject, Message msg) {
+<span class="fc" id="L75">        Display.getInstance().sendMessage(recipients, subject, msg);</span>
+<span class="fc" id="L76">    }</span>
+
+    /**
+     * Gets the message content
+     *
+     * @return content
+     */
+    public String getContent() {
+<span class="nc" id="L84">        return content;</span>
+    }
+
+    /**
+     * Returns the attachment map which can be used to add multiple attachments.
+     * The path needs to point at a full absolute file URI within {@link com.codename1.io.FileSystemStorage},
+     * it will not work with {@link com.codename1.io.Storage} files!
+     *
+     * @return a map of full file paths to mime type that can be used to add attachments
+     */
+    public Map&lt;String, String&gt; getAttachments() {
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (attachments == null) {</span>
+<span class="fc" id="L96">            attachments = new HashMap&lt;String, String&gt;();</span>
+        }
+<span class="pc bpc" id="L98" title="4 of 10 branches missed.">        if (fileUri != null &amp;&amp; attachmentMimeType != null &amp;&amp; fileUri.length() &gt; 0 &amp;&amp; attachmentMimeType.length() &gt; 0 &amp;&amp; !attachments.containsKey(fileUri)) {</span>
+<span class="fc" id="L99">            attachments.put(fileUri, attachmentMimeType);</span>
+        }
+<span class="fc" id="L101">        return attachments;</span>
+    }
+
+    /**
+     * Gets the message mime type
+     *
+     * @return the mime type
+     */
+    public String getMimeType() {
+<span class="fc" id="L110">        return mimeType;</span>
+    }
+
+    /**
+     * Sets the message mime type.
+     *
+     * @param mimeType
+     */
+    public void setMimeType(String mimeType) {
+<span class="fc" id="L119">        this.mimeType = mimeType;</span>
+<span class="fc" id="L120">    }</span>
+
+    /**
+     * Gets the attachment mime type
+     *
+     * @return
+     */
+    public String getAttachmentMimeType() {
+<span class="nc" id="L128">        return attachmentMimeType;</span>
+    }
+
+    /**
+     * Sets the attachment mime type.
+     *
+     * @param mimeType
+     */
+    public void setAttachmentMimeType(String mimeType) {
+<span class="fc" id="L137">        this.attachmentMimeType = mimeType;</span>
+<span class="fc" id="L138">    }</span>
+
+    /**
+     * Gets the message attachment file path
+     *
+     * @return the file path of the attachment
+     */
+    public String getAttachment() {
+<span class="nc" id="L146">        return fileUri;</span>
+    }
+
+    /**
+     * Sets the message attachment if exists
+     *
+     * @param fileUri the file to attach to the message
+     */
+    public void setAttachment(String fileUri) {
+<span class="fc" id="L155">        this.fileUri = fileUri;</span>
+<span class="fc" id="L156">    }</span>
+
+    /**
+     * &lt;p&gt;Send an email message using the Codename One cloud to send the message, notice that this API
+     * will only work for pro accounts.&lt;/p&gt;
+     * &lt;script src=&quot;https://gist.github.com/codenameone/8229c1d4627ab3a1f17e.js&quot;&gt;&lt;/script&gt;
+     *
+     * @param sender        the name of the sender, notice all email will arrive from Codename One to avoid spam issues
+     * @param recipient     the email for the recipient
+     * @param recipientName the display name for the recipient
+     * @param subject       e-mail subject
+     * @param plainTextBody when sending an HTML message you should also attach a plain text fallback message,
+     *                      this is redundant if the email is a plain text message to begin with
+     * @deprecated this functionality is retired and no longer works. You can use the sendgrid cn1lib or similar libraries
+     */
+    public void sendMessageViaCloud(String sender, String recipient, String recipientName, String subject, String plainTextBody) {
+<span class="nc" id="L172">    }</span>
+
+    /**
+     * &lt;p&gt;Send an email message using the Codename One cloud to send the message, notice that this API
+     * will only work for pro accounts.&lt;/p&gt;
+     * &lt;script src=&quot;https://gist.github.com/codenameone/8229c1d4627ab3a1f17e.js&quot;&gt;&lt;/script&gt;
+     *
+     * @param sender        the name of the sender, notice all email will arrive from Codename One to avoid spam issues
+     * @param recipient     the email for the recipient
+     * @param recipientName the display name for the recipient
+     * @param subject       e-mail subject
+     * @param plainTextBody when sending an HTML message you should also attach a plain text fallback message,
+     *                      this is redundant if the email is a plain text message to begin with
+     * @return true if sending succeeded
+     * @deprecated this functionality is retired and no longer works. You can use the sendgrid cn1lib or similar libraries
+     */
+    public boolean sendMessageViaCloudSync(String sender, String recipient, String recipientName, String subject, String plainTextBody) {
+<span class="nc" id="L189">        return false;</span>
+    }
+
+    /**
+     * Indicates whether the cloud message should produce an error dialog if sending failed
+     *
+     * @return the cloudMessageFailSilently
+     */
+    public boolean isCloudMessageFailSilently() {
+<span class="fc" id="L198">        return cloudMessageFailSilently;</span>
+    }
+
+    /**
+     * Indicates whether the cloud message should produce an error dialog if sending failed
+     *
+     * @param cloudMessageFailSilently the cloudMessageFailSilently to set
+     */
+    public void setCloudMessageFailSilently(boolean cloudMessageFailSilently) {
+<span class="fc" id="L207">        this.cloudMessageFailSilently = cloudMessageFailSilently;</span>
+<span class="fc" id="L208">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

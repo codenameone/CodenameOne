@@ -1,0 +1,401 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PropertyXMLElement.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.properties</a> &gt; <span class="el_source">PropertyXMLElement.java</span></div><h1>PropertyXMLElement.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.properties;
+
+import com.codename1.io.Util;
+import com.codename1.xml.Element;
+
+import java.util.Enumeration;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.Vector;
+
+/**
+ * An XML element mapping to a property
+ *
+ * @author shai
+ */
+class PropertyXMLElement extends Element {
+    private final PropertyIndex parent;
+<span class="pc" id="L41">    private int index = -1;</span>
+    private PropertyXMLElement parentElement;
+
+<span class="fc" id="L44">    PropertyXMLElement(PropertyIndex parent) {</span>
+<span class="fc" id="L45">        this.parent = parent;</span>
+<span class="fc" id="L46">    }</span>
+
+<span class="nc" id="L48">    PropertyXMLElement(PropertyXMLElement parentElement, PropertyIndex parent) {</span>
+<span class="nc" id="L49">        this.parent = parent;</span>
+<span class="nc" id="L50">        this.parentElement = parentElement;</span>
+<span class="nc" id="L51">    }</span>
+
+    @Override
+    public void addChild(Element childElement) {
+<span class="nc" id="L55">        throw new IllegalStateException();</span>
+    }
+
+    @Override
+    public boolean contains(Element element) {
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (this == element) {</span>
+<span class="nc" id="L61">            return true;</span>
+        }
+<span class="nc" id="L63">        Vector children = getChildren();</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        if (children != null) {</span>
+<span class="nc" id="L65">            int i = 0;</span>
+<span class="nc bnc" id="L66" title="All 2 branches missed.">            while (i &lt; children.size()) {</span>
+<span class="nc" id="L67">                Element child = (Element) children.get(i);</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">                if (child.contains(element)) {</span>
+<span class="nc" id="L69">                    return true;</span>
+                }
+<span class="nc" id="L71">                i++;</span>
+<span class="nc" id="L72">            }</span>
+        }
+<span class="nc" id="L74">        return false;</span>
+    }
+
+    @Override
+    public String getAttribute(String name) {
+<span class="fc" id="L79">        Object o = parent.get(name);</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (o == null) return null;</span>
+<span class="fc" id="L81">        return o.toString();</span>
+    }
+
+    @Override
+    public int getAttributeAsInt(String name, int def) {
+<span class="nc" id="L86">        Object o = parent.get(name);</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        if (o == null) {</span>
+<span class="nc" id="L88">            return def;</span>
+        }
+<span class="nc" id="L90">        return Util.toIntValue(o);</span>
+    }
+
+    @Override
+    public Hashtable getAttributes() {
+<span class="fc" id="L95">        Hashtable h = new Hashtable();</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        for (PropertyBase b : parent) {</span>
+<span class="pc bpc" id="L97" title="1 of 8 branches missed.">            if (b.getGenericType() != null &amp;&amp; b.getGenericType().isAssignableFrom(PropertyBusinessObject.class) || b instanceof CollectionProperty || b instanceof MapProperty) {</span>
+<span class="fc" id="L98">                continue;</span>
+            }
+<span class="fc" id="L100">            Object o = b.get();</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            if (o != null) {</span>
+<span class="fc" id="L102">                h.put(b.getName(), o.toString());</span>
+            }
+<span class="fc" id="L104">        }</span>
+<span class="fc" id="L105">        return super.getAttributes();</span>
+    }
+
+    @Override
+    public Element getChildAt(int index) {
+<span class="nc" id="L110">        int current = -1;</span>
+<span class="nc" id="L111">        PropertyBase text = parent.getXmlTextElement();</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        for (PropertyBase b : parent) {</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">            if (b == text) {</span>
+<span class="nc" id="L114">                current++;</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">                if (current == index) {</span>
+<span class="nc" id="L116">                    Element e = new Element(b.getName(), true);</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">                    if (b.get() != null) {</span>
+<span class="nc" id="L118">                        e.setText(b.get().toString());</span>
+                    }
+<span class="nc" id="L120">                    return e;</span>
+                }
+            }
+<span class="nc bnc" id="L123" title="All 4 branches missed.">            if (b.getGenericType() != null &amp;&amp; b.getGenericType().isAssignableFrom(PropertyBusinessObject.class)) {</span>
+<span class="nc" id="L124">                Object o = b.get();</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                if (o != null) {</span>
+<span class="nc" id="L126">                    current++;</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">                    if (current == index) {</span>
+<span class="nc" id="L128">                        PropertyXMLElement i = new PropertyXMLElement(this, ((PropertyBusinessObject) o).getPropertyIndex());</span>
+<span class="nc" id="L129">                        i.index = current;</span>
+<span class="nc" id="L130">                        return i;</span>
+                    }
+                }
+            }
+<span class="nc" id="L134">        }</span>
+<span class="nc" id="L135">        return null;</span>
+    }
+
+    @Override
+    public int getChildIndex(Element child) {
+<span class="nc" id="L140">        return ((PropertyXMLElement) child).index;</span>
+    }
+
+    @Override
+    protected Vector getChildren() {
+<span class="nc" id="L145">        Vector v = new Vector();</span>
+
+<span class="nc" id="L147">        int n = getNumChildren();</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">        for (int iter = 0; iter &lt; n; iter++) {</span>
+<span class="nc" id="L149">            v.add(getChildAt(iter));</span>
+        }
+
+<span class="nc" id="L152">        return v;</span>
+    }
+
+    @Override
+    protected void setChildren(Vector children) {
+<span class="nc" id="L157">        throw new RuntimeException();</span>
+    }
+
+    @Override
+    public Vector getChildrenByTagName(String name) {
+<span class="nc" id="L162">        Vector v = new Vector();</span>
+<span class="nc" id="L163">        PropertyBase p = parent.get(name);</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">        if (p != null) {</span>
+<span class="nc" id="L165">            Object o = p.get();</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">            if (o != null) {</span>
+<span class="nc" id="L167">                v.add(new PropertyXMLElement(this, ((PropertyBusinessObject) o).getPropertyIndex()));</span>
+            }
+        }
+<span class="nc" id="L170">        return v;</span>
+    }
+
+    @Override
+    public Vector getDescendantsByTagName(String name) {
+<span class="nc" id="L175">        throw new RuntimeException();</span>
+    }
+
+    @Override
+    public Vector getDescendantsByTagName(String name, int depth) {
+<span class="nc" id="L180">        throw new RuntimeException();</span>
+    }
+
+    @Override
+    public Vector getDescendantsByTagNameAndAttribute(String name,
+                                                      String attributeName, int depth) {
+<span class="nc" id="L186">        throw new RuntimeException();</span>
+    }
+
+    @Override
+    public Element getElementById(String id) {
+<span class="nc" id="L191">        String thisId = getAttribute(&quot;id&quot;);</span>
+<span class="nc bnc" id="L192" title="All 4 branches missed.">        if ((thisId != null) &amp;&amp; (thisId.equals(id))) {</span>
+<span class="nc" id="L193">            return this;</span>
+        }
+<span class="nc" id="L195">        Vector children = getChildren();</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">        if (children != null) {</span>
+<span class="nc" id="L197">            int i = 0;</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">            while (i &lt; children.size()) {</span>
+<span class="nc" id="L199">                Element child = (Element) children.get(i);</span>
+<span class="nc" id="L200">                Element match = child.getElementById(id);</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">                if (match != null) {</span>
+<span class="nc" id="L202">                    return match;</span>
+                }
+<span class="nc" id="L204">                i++;</span>
+<span class="nc" id="L205">            }</span>
+
+        }
+<span class="nc" id="L208">        return null;</span>
+    }
+
+    @Override
+    public Element getFirstChildByTagName(String name) {
+<span class="nc" id="L213">        PropertyBase p = parent.get(name);</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (p != null) {</span>
+<span class="nc" id="L215">            Object o = p.get();</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">            if (o != null) {</span>
+<span class="nc" id="L217">                return new PropertyXMLElement(this, ((PropertyBusinessObject) o).getPropertyIndex());</span>
+            }
+        }
+<span class="nc" id="L220">        return null;</span>
+    }
+
+    @Override
+    public int getNumChildren() {
+<span class="fc" id="L225">        int current = 0;</span>
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        for (PropertyBase b : parent) {</span>
+<span class="pc bpc" id="L227" title="1 of 4 branches missed.">            if (b.getGenericType() != null &amp;&amp; b.getGenericType().isAssignableFrom(PropertyBusinessObject.class)) {</span>
+<span class="nc" id="L228">                Object o = b.get();</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                if (o != null) {</span>
+<span class="nc" id="L230">                    current++;</span>
+                }
+            }
+<span class="fc" id="L233">        }</span>
+<span class="fc" id="L234">        PropertyBase text = parent.getXmlTextElement();</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (text != null) {</span>
+<span class="nc" id="L236">            return current + 1;</span>
+        }
+<span class="fc" id="L238">        return current;</span>
+    }
+
+    @Override
+    public Element getParent() {
+<span class="nc" id="L243">        return parentElement;</span>
+    }
+
+    @Override
+    protected void setParent(Element parent) {
+<span class="nc" id="L248">    }</span>
+
+    @Override
+    public String getTagName() {
+<span class="fc" id="L252">        return parent.getName();</span>
+    }
+
+    @Override
+    protected void setTagName(String name) {
+<span class="nc" id="L257">    }</span>
+
+    @Override
+    public String getText() {
+<span class="fc" id="L261">        Object o = parent.getXmlTextElement().get();</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        return o == null ? null : o.toString();</span>
+    }
+
+    @Override
+    public void setText(String str) {
+<span class="nc" id="L267">    }</span>
+
+    @Override
+    public Vector getTextChildren(String text, boolean caseSensitive) {
+<span class="nc" id="L271">        throw new RuntimeException();</span>
+    }
+
+    @Override
+    public Vector getTextDescendants(String text,
+                                     boolean caseSensitive) {
+<span class="nc" id="L277">        throw new RuntimeException();</span>
+    }
+
+    @Override
+    public Vector getTextDescendants(String text,
+                                     boolean caseSensitive, int depth) {
+<span class="nc" id="L283">        throw new RuntimeException();</span>
+    }
+
+    @Override
+    public boolean hasTextChild() {
+<span class="pc bpc" id="L288" title="1 of 4 branches missed.">        return parent.getXmlTextElement() != null &amp;&amp; parent.getXmlTextElement().get() != null;</span>
+    }
+
+    @Override
+    public void insertChildAt(Element child, int index) {
+<span class="nc" id="L293">        throw new RuntimeException();</span>
+    }
+
+    @Override
+    public boolean isEmpty() {
+<span class="fc" id="L298">        return false;</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L303">        return parent.hashCode();</span>
+    }
+
+    @Override
+    public boolean isTextElement() {
+<span class="fc" id="L308">        return false;</span>
+    }
+
+    @Override
+    protected void setTextElement(boolean textElement) {
+<span class="nc" id="L313">    }</span>
+
+    @Override
+    protected void removeAttribute(Object id) {
+<span class="nc" id="L317">        throw new RuntimeException();</span>
+    }
+
+    @Override
+    public void removeAttribute(String attribute) {
+<span class="nc" id="L322">        throw new RuntimeException();</span>
+    }
+
+    @Override
+    public Iterator&lt;Element&gt; iterator() {
+<span class="fc" id="L327">        final int num = getNumChildren();</span>
+<span class="fc" id="L328">        return new Iterator&lt;Element&gt;() {</span>
+<span class="fc" id="L329">            private int offset = 0;</span>
+
+            @Override
+            public boolean hasNext() {
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">                return offset &lt; num;</span>
+            }
+
+            @Override
+            public Element next() {
+<span class="nc" id="L338">                offset++;</span>
+<span class="nc" id="L339">                return getChildAt(index);</span>
+            }
+
+            @Override
+            public void remove() {
+<span class="nc" id="L344">            }</span>
+        };
+    }
+
+    @Override
+    public void removeChildAt(int index) {
+<span class="nc" id="L350">        throw new RuntimeException();</span>
+    }
+
+    @Override
+    public void replaceChild(Element oldChild, Element newChild) {
+<span class="nc" id="L355">        throw new RuntimeException();</span>
+    }
+
+    @Override
+    protected void setAttribute(Object id, String value) {
+<span class="nc" id="L360">        throw new RuntimeException();</span>
+    }
+
+    @Override
+    public int setAttribute(String attribute, String value) {
+<span class="nc" id="L365">        PropertyBase pb = parent.get(attribute);</span>
+<span class="nc bnc" id="L366" title="All 2 branches missed.">        if (parent.setSimpleObject(pb, value)) {</span>
+<span class="nc" id="L367">            return -1;</span>
+        }
+<span class="nc" id="L369">        return 1;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L374">        return toString(&quot;&quot;);</span>
+    }
+
+    @Override
+    public String toString(String spacing) {
+
+<span class="nc" id="L380">        String str = spacing;</span>
+<span class="nc" id="L381">        str += &quot;&lt;&quot; + getTagName();</span>
+<span class="nc" id="L382">        Hashtable attributes = getAttributes();</span>
+<span class="nc bnc" id="L383" title="All 2 branches missed.">        if (attributes != null) {</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">            for (Enumeration e = attributes.keys(); e.hasMoreElements(); ) {</span>
+<span class="nc" id="L385">                String attrStr = (String) e.nextElement();</span>
+<span class="nc" id="L386">                String val = (String) attributes.get(attrStr);</span>
+<span class="nc" id="L387">                str += &quot; &quot; + attrStr + &quot;='&quot; + val + &quot;'&quot;;</span>
+<span class="nc" id="L388">            }</span>
+        }
+<span class="nc" id="L390">        str += &quot;&gt;\n&quot;;</span>
+<span class="nc" id="L391">        Vector children = getChildren();</span>
+<span class="nc bnc" id="L392" title="All 2 branches missed.">        if (children != null) {</span>
+<span class="nc bnc" id="L393" title="All 2 branches missed.">            for (int i = 0; i &lt; children.size(); i++) {</span>
+<span class="nc" id="L394">                str += ((Element) children.get(i)).toString(spacing + ' ');</span>
+            }
+        }
+<span class="nc" id="L397">        str += spacing + &quot;&lt;/&quot; + getTagName() + &quot;&gt;\n&quot;;</span>
+<span class="nc" id="L398">        return str;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

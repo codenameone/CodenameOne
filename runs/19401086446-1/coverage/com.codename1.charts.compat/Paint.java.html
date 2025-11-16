@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Paint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.compat</a> &gt; <span class="el_source">Paint.java</span></div><h1>Paint.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.charts.compat;
+
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Stroke;
+import com.codename1.ui.geom.Rectangle2D;
+
+/**
+ * DO NOT USE.  Compatibility class used internally by the Charts API.
+ *
+ * @author shannah
+ * @deprecated
+ */
+<span class="fc" id="L38">public class Paint { // PMD Fix: UnusedPrivateField removed redundant antiAlias flag</span>
+
+
+    static Graphics g;
+<span class="fc" id="L42">    private Font typeface = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL);</span>
+<span class="fc" id="L43">    private int strokeCap = Cap.BUTT;</span>
+<span class="fc" id="L44">    private int strokeJoin = Join.BEVEL;</span>
+<span class="fc" id="L45">    private float strokeMiter = 1f;</span>
+
+<span class="fc" id="L47">    private Style style = Style.STROKE;</span>
+<span class="fc" id="L48">    private float strokeWidth = 1f;</span>
+
+    private int color;
+    private int align;
+<span class="fc" id="L52">    private float textSize = 12f;</span>
+
+    public void getTextWidths(String text, float[] widths) {
+<span class="fc" id="L55">        Font f = getTypeface();</span>
+<span class="pc bpc" id="L56" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="fc" id="L57">            char[] chars = text.toCharArray();</span>
+<span class="fc" id="L58">            int clen = chars.length;</span>
+<span class="fc" id="L59">            int wlen = widths.length;</span>
+<span class="pc bpc" id="L60" title="1 of 4 branches missed.">            for (int i = 0; i &lt; clen &amp;&amp; i &lt; wlen; i++) {</span>
+<span class="fc" id="L61">                widths[i] = f.charWidth(chars[i]);</span>
+            }
+<span class="fc" id="L63">        } else {</span>
+<span class="nc" id="L64">            throw new RuntimeException(&quot;Faild to get cn1 font&quot;);</span>
+        }
+
+<span class="fc" id="L67">    }</span>
+
+    public int breakText(String text, boolean measureForwards, float maxWidth, float[] measuredWidth) {
+<span class="fc" id="L70">        char[] chars = text.toCharArray();</span>
+<span class="fc" id="L71">        Font f = getTypeface();</span>
+<span class="fc" id="L72">        float tmp = 0;</span>
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">            int start = measureForwards ? 0 : chars.length - 1;</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">            int inc = measureForwards ? 1 : -1;</span>
+
+<span class="fc" id="L77">            float currWidth = 0f;</span>
+<span class="fc" id="L78">            int clen = chars.length;</span>
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            int wlen = measuredWidth != null ? measuredWidth.length : -1;</span>
+<span class="pc bpc" id="L80" title="6 of 8 branches missed.">            for (int i = start; (measureForwards &amp;&amp; i &lt; clen) || (!measureForwards &amp;&amp; i &gt;= 0); i += inc) {</span>
+<span class="fc" id="L81">                tmp = f.charWidth(chars[i]);</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">                if (currWidth + tmp &gt; maxWidth) {</span>
+<span class="fc" id="L83">                    return i;</span>
+                }
+<span class="nc bnc" id="L85" title="All 2 branches missed.">                if (i &lt; wlen) {</span>
+<span class="nc" id="L86">                    measuredWidth[i] = tmp;</span>
+                }
+<span class="nc" id="L88">                currWidth += tmp;</span>
+            }
+
+<span class="nc" id="L91">        } else {</span>
+<span class="nc" id="L92">            throw new RuntimeException(&quot;Failed to get font&quot;);</span>
+        }
+<span class="nc" id="L94">        return chars.length;</span>
+    }
+
+    public void getTextBounds(String string, int start, int count, Rectangle2D rect) {
+<span class="fc" id="L98">        Font f = getTypeface();</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="fc" id="L100">            getCN1TextBounds(string, start, count, rect);</span>
+        } else {
+<span class="nc" id="L102">            throw new RuntimeException(&quot;Failed to get font&quot;);</span>
+
+        }
+<span class="fc" id="L105">    }</span>
+
+    void getCN1TextBounds(String string, int start, int count, Rectangle2D rect) {
+<span class="fc" id="L108">        Font f = getTypeface();</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="fc" id="L110">            int w = f.substringWidth(string, start, count);</span>
+<span class="fc" id="L111">            int h = f.getHeight();</span>
+<span class="fc" id="L112">            rect.setBounds(0, 0, w, h);</span>
+        }
+<span class="fc" id="L114">    }</span>
+
+
+    float measureTextHeight(char[] chars, int start, int count) {
+<span class="nc" id="L118">        Font f = getTypeface();</span>
+<span class="nc" id="L119">        float h = 0f;</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (f != null) {</span>
+<span class="nc" id="L121">            int clen = chars.length;</span>
+<span class="nc bnc" id="L122" title="All 4 branches missed.">            for (int i = start; i &lt; clen &amp;&amp; i &lt; start + count; i++) {</span>
+<span class="nc" id="L123">                float nh = f.getHeight();</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">                h = nh &gt; h ? nh : h;</span>
+            }
+<span class="nc" id="L126">        } else {</span>
+<span class="nc" id="L127">            throw new RuntimeException(&quot;Failed to get font&quot;);</span>
+        }
+<span class="nc" id="L129">        return h;</span>
+    }
+
+
+    public float measureText(String newText) {
+<span class="nc" id="L134">        return measureText(newText.toCharArray(), 0, newText.length());</span>
+    }
+
+    public float measureText(char[] chars, int start, int count) {
+<span class="nc" id="L138">        float out = 0f;</span>
+<span class="nc" id="L139">        Font f = getTypeface();</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        if (f != null) {</span>
+<span class="nc" id="L141">            int clen = chars.length;</span>
+<span class="nc bnc" id="L142" title="All 4 branches missed.">            for (int i = start; i &lt; clen &amp;&amp; i &lt; start + count; i++) {</span>
+<span class="nc" id="L143">                out += f.charWidth(chars[i]);</span>
+            }
+<span class="nc" id="L145">        } else {</span>
+<span class="nc" id="L146">            throw new RuntimeException(&quot;Failed to get font&quot;);</span>
+        }
+<span class="nc" id="L148">        return out;</span>
+    }
+
+
+    public void setAntiAlias(boolean antialiasing) {
+        // No-op for compatibility.
+<span class="fc" id="L154">    }</span>
+
+    public Font getTypeface() {
+<span class="fc" id="L157">        return typeface;</span>
+    }
+
+    public void setTypeface(Font textTypeface) {
+<span class="fc" id="L161">        typeface = textTypeface;</span>
+<span class="fc" id="L162">    }</span>
+
+
+    public int getStrokeCap() {
+<span class="fc" id="L166">        return strokeCap;</span>
+    }
+
+    public void setStrokeCap(int cap) {
+<span class="nc" id="L170">        strokeCap = cap;</span>
+<span class="nc" id="L171">    }</span>
+
+    public int getStrokeJoin() {
+<span class="fc" id="L174">        return strokeJoin;</span>
+    }
+
+    public void setStrokeJoin(int join) {
+<span class="nc" id="L178">        strokeJoin = join;</span>
+<span class="nc" id="L179">    }</span>
+
+    public float getStrokeMiter() {
+<span class="fc" id="L182">        return strokeMiter;</span>
+    }
+
+    public void setStrokeMiter(float miter) {
+<span class="nc" id="L186">        strokeMiter = miter;</span>
+<span class="nc" id="L187">    }</span>
+
+    public Style getStyle() {
+<span class="fc" id="L190">        return style;</span>
+    }
+
+    public void setStyle(Style style) {
+<span class="fc" id="L194">        this.style = style;</span>
+<span class="fc" id="L195">    }</span>
+
+    public float getStrokeWidth() {
+<span class="fc" id="L198">        return strokeWidth;</span>
+    }
+
+    public void setStrokeWidth(float i) {
+<span class="fc" id="L202">        strokeWidth = i;</span>
+<span class="fc" id="L203">    }</span>
+
+    public int getColor() {
+<span class="fc" id="L206">        return color;</span>
+    }
+
+    public void setColor(int color) {
+<span class="fc" id="L210">        this.color = color;</span>
+<span class="fc" id="L211">    }</span>
+
+    public int getTextAlign() {
+<span class="fc" id="L214">        return this.align;</span>
+    }
+
+    public void setTextAlign(int align) {
+<span class="fc" id="L218">        this.align = align;</span>
+<span class="fc" id="L219">    }</span>
+
+    public float getTextSize() {
+<span class="fc" id="L222">        return textSize;</span>
+    }
+
+    public void setTextSize(float size) {
+<span class="fc" id="L226">        textSize = size;</span>
+<span class="pc bpc" id="L227" title="1 of 2 branches missed.">        if (this.typeface != null) {</span>
+<span class="fc" id="L228">            this.typeface = this.typeface.derive(size, Font.STYLE_PLAIN);</span>
+
+        }
+<span class="fc" id="L231">    }</span>
+
+    public String toString() {
+<span class="nc" id="L234">        return &quot;Paint[ color:&quot; + color + &quot;, align:&quot; + align + &quot;, textSize:&quot; + textSize + &quot;, style:&quot; + style + &quot;, strokeWidth:&quot; + strokeWidth + &quot;,, strokeMiter:&quot; + strokeMiter + &quot;, strokeJoin:&quot; + strokeJoin + &quot; strokeCap:&quot; + strokeCap + &quot;]&quot;;</span>
+    }
+
+<span class="fc" id="L237">    public enum Style { // PMD Fix: UnnecessaryModifier removed redundant static</span>
+<span class="fc" id="L238">        FILL,</span>
+<span class="fc" id="L239">        FILL_AND_STROKE,</span>
+<span class="fc" id="L240">        STROKE</span>
+    }
+
+<span class="nc" id="L243">    public static class Align {</span>
+        public static final int CENTER = Component.CENTER;
+        public static final int LEFT = Component.LEFT;
+        public static final int RIGHT = Component.RIGHT;
+    }
+
+<span class="nc" id="L249">    public static class Cap {</span>
+        public static final int BUTT = Stroke.CAP_BUTT;
+        public static final int ROUND = Stroke.CAP_ROUND;
+        public static final int SQUARE = Stroke.CAP_SQUARE;
+    }
+
+<span class="nc" id="L255">    public static class Join {</span>
+        public static final int BEVEL = Stroke.JOIN_BEVEL;
+        public static final int MITER = Stroke.JOIN_MITER;
+        public static final int ROUND = Stroke.JOIN_ROUND;
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

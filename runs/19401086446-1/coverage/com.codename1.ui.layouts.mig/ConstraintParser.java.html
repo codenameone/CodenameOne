@@ -1,0 +1,1631 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConstraintParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts.mig</a> &gt; <span class="el_source">ConstraintParser.java</span></div><h1>ConstraintParser.java</h1><pre class="source lang-java linenums">package com.codename1.ui.layouts.mig;
+
+import com.codename1.io.Log;
+import com.codename1.util.StringUtil;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+/*
+ * License (BSD):
+ * ==============
+ *
+ * Copyright (c) 2004, Mikael Grev, MiG InfoCom AB. (miglayout (at) miginfocom (dot) com)
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * Neither the name of the MiG InfoCom AB nor the names of its contributors may be
+ * used to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ *
+ * @version 1.0
+ * @author Mikael Grev, MiG InfoCom AB
+ *         Date: 2006-sep-08
+ */
+
+/**
+ * Parses string constraints.
+ */
+public final class ConstraintParser {
+
+    private ConstraintParser() {
+    }
+
+    /**
+     * Parses the layout constraints and stores the parsed values in the
+     * transient (cache) member varables.
+     *
+     * @param s The String to parse. Should not be &lt;code&gt;null&lt;/code&gt; and &lt;b&gt;must
+     *          be lower case and trimmed&lt;/b&gt;.
+     * @return The parsed constraint. Never &lt;code&gt;null&lt;/code&gt;.
+     * @throws RuntimeException if the constaint was not valid.
+     */
+    public static LC parseLayoutConstraint(String s) {
+<span class="fc" id="L61">        LC lc = new LC();</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (s.length() == 0) {</span>
+<span class="nc" id="L63">            return lc;</span>
+        }
+
+<span class="fc" id="L66">        String[] parts = toTrimmedTokens(s, ',');</span>
+
+        // First check for &quot;ltr&quot; or &quot;rtl&quot; since that will affect the interpretation of the other constraints.
+<span class="fc bfc" id="L69" title="All 2 branches covered.">        for (int i = 0; i &lt; parts.length; i++) {</span>
+<span class="fc" id="L70">            String part = parts[i];</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">            if (part == null) {</span>
+<span class="nc" id="L72">                continue;</span>
+            }
+
+<span class="fc" id="L75">            int len = part.length();</span>
+<span class="pc bpc" id="L76" title="2 of 4 branches missed.">            if (len == 3 || len == 11) {   // Optimization</span>
+<span class="nc bnc" id="L77" title="All 8 branches missed.">                if (part.equals(&quot;ltr&quot;) || part.equals(&quot;rtl&quot;) || part.equals(&quot;lefttoright&quot;) || part.equals(&quot;righttoleft&quot;)) {</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">                    lc.setLeftToRight(part.charAt(0) == 'l' ? Boolean.TRUE : Boolean.FALSE);</span>
+<span class="nc" id="L79">                    parts[i] = null;    // So we will not try to interpret it again</span>
+                }
+
+<span class="nc bnc" id="L82" title="All 8 branches missed.">                if (part.equals(&quot;ttb&quot;) || part.equals(&quot;btt&quot;) || part.equals(&quot;toptobottom&quot;) || part.equals(&quot;bottomtotop&quot;)) {</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">                    lc.setTopToBottom(part.charAt(0) == 't');</span>
+<span class="nc" id="L84">                    parts[i] = null;    // So we will not try to interpret it again</span>
+                }
+            }
+        }
+
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        for (String part : parts) {</span>
+<span class="pc bpc" id="L90" title="2 of 4 branches missed.">            if (part == null || part.length() == 0) {</span>
+<span class="nc" id="L91">                continue;</span>
+            }
+
+            try {
+<span class="fc" id="L95">                int ix = -1;</span>
+<span class="fc" id="L96">                char c = part.charAt(0);</span>
+
+<span class="pc bpc" id="L98" title="3 of 4 branches missed.">                if (c == 'w' || c == 'h') {</span>
+
+<span class="fc" id="L100">                    ix = startsWithLenient(part, &quot;wrap&quot;, -1, true);</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="fc" id="L102">                        String num = part.substring(ix).trim();</span>
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">                        lc.setWrapAfter(num.length() != 0 ? Integer.parseInt(num) : 0);</span>
+<span class="fc" id="L104">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                    boolean isHor = c == 'w';</span>
+<span class="nc bnc" id="L108" title="All 6 branches missed.">                    if (isHor &amp;&amp; (part.startsWith(&quot;w &quot;) || part.startsWith(&quot;width &quot;))) {</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">                        String sz = part.substring(part.charAt(1) == ' ' ? 2 : 6).trim();</span>
+<span class="nc" id="L110">                        lc.setWidth(parseBoundSize(sz, false, true));</span>
+<span class="nc" id="L111">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L114" title="All 6 branches missed.">                    if (!isHor &amp;&amp; (part.startsWith(&quot;h &quot;) || part.startsWith(&quot;height &quot;))) {</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">                        String uvStr = part.substring(part.charAt(1) == ' ' ? 2 : 7).trim();</span>
+<span class="nc" id="L116">                        lc.setHeight(parseBoundSize(uvStr, false, false));</span>
+<span class="nc" id="L117">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L120" title="All 2 branches missed.">                    if (part.length() &gt; 5) {</span>
+<span class="nc" id="L121">                        String sz = part.substring(5).trim();</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">                        if (part.startsWith(&quot;wmin &quot;)) {</span>
+<span class="nc" id="L123">                            lc.minWidth(sz);</span>
+<span class="nc" id="L124">                            continue;</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                        } else if (part.startsWith(&quot;wmax &quot;)) {</span>
+<span class="nc" id="L126">                            lc.maxWidth(sz);</span>
+<span class="nc" id="L127">                            continue;</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">                        } else if (part.startsWith(&quot;hmin &quot;)) {</span>
+<span class="nc" id="L129">                            lc.minHeight(sz);</span>
+<span class="nc" id="L130">                            continue;</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">                        } else if (part.startsWith(&quot;hmax &quot;)) {</span>
+<span class="nc" id="L132">                            lc.maxHeight(sz);</span>
+<span class="nc" id="L133">                            continue;</span>
+                        }
+                    }
+
+<span class="nc bnc" id="L137" title="All 2 branches missed.">                    if (part.startsWith(&quot;hidemode &quot;)) {</span>
+<span class="nc" id="L138">                        lc.setHideMode(Integer.parseInt(part.substring(9)));</span>
+<span class="nc" id="L139">                        continue;</span>
+                    }
+                }
+
+<span class="nc bnc" id="L143" title="All 2 branches missed.">                if (c == 'g') {</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">                    if (part.startsWith(&quot;gapx &quot;)) {</span>
+<span class="nc" id="L145">                        lc.setGridGapX(parseBoundSize(part.substring(5).trim(), true, true));</span>
+<span class="nc" id="L146">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                    if (part.startsWith(&quot;gapy &quot;)) {</span>
+<span class="nc" id="L150">                        lc.setGridGapY(parseBoundSize(part.substring(5).trim(), true, false));</span>
+<span class="nc" id="L151">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                    if (part.startsWith(&quot;gap &quot;)) {</span>
+<span class="nc" id="L155">                        String[] gaps = toTrimmedTokens(part.substring(4).trim(), ' ');</span>
+<span class="nc" id="L156">                        lc.setGridGapX(parseBoundSize(gaps[0], true, true));</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">                        lc.setGridGapY(gaps.length &gt; 1 ? parseBoundSize(gaps[1], true, false) : lc.getGridGapX());</span>
+<span class="nc" id="L158">                        continue;</span>
+                    }
+                }
+
+<span class="nc bnc" id="L162" title="All 2 branches missed.">                if (c == 'd') {</span>
+<span class="nc" id="L163">                    ix = startsWithLenient(part, &quot;debug&quot;, 5, true);</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L165">                        String millis = part.substring(ix).trim();</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">                        lc.setDebugMillis(millis.length() &gt; 0 ? Integer.parseInt(millis) : 1000);</span>
+<span class="nc" id="L167">                        continue;</span>
+                    }
+                }
+
+<span class="nc bnc" id="L171" title="All 2 branches missed.">                if (c == 'n') {</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">                    if (part.equals(&quot;nogrid&quot;)) {</span>
+<span class="nc" id="L173">                        lc.setNoGrid(true);</span>
+<span class="nc" id="L174">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L177" title="All 2 branches missed.">                    if (part.equals(&quot;nocache&quot;)) {</span>
+<span class="nc" id="L178">                        lc.setNoCache(true);</span>
+<span class="nc" id="L179">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L182" title="All 2 branches missed.">                    if (part.equals(&quot;novisualpadding&quot;)) {</span>
+<span class="nc" id="L183">                        lc.setVisualPadding(false);</span>
+<span class="nc" id="L184">                        continue;</span>
+                    }
+                }
+
+<span class="nc bnc" id="L188" title="All 2 branches missed.">                if (c == 'f') {</span>
+<span class="nc bnc" id="L189" title="All 6 branches missed.">                    if (part.equals(&quot;fill&quot;) || part.equals(&quot;fillx&quot;) || part.equals(&quot;filly&quot;)) {</span>
+<span class="nc bnc" id="L190" title="All 4 branches missed.">                        lc.setFillX(part.length() == 4 || part.charAt(4) == 'x');</span>
+<span class="nc bnc" id="L191" title="All 4 branches missed.">                        lc.setFillY(part.length() == 4 || part.charAt(4) == 'y');</span>
+<span class="nc" id="L192">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L195" title="All 2 branches missed.">                    if (part.equals(&quot;flowy&quot;)) {</span>
+<span class="nc" id="L196">                        lc.setFlowX(false);</span>
+<span class="nc" id="L197">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L200" title="All 2 branches missed.">                    if (part.equals(&quot;flowx&quot;)) {</span>
+<span class="nc" id="L201">                        lc.setFlowX(true); // This is the default but added for consistency</span>
+<span class="nc" id="L202">                        continue;</span>
+                    }
+                }
+
+<span class="nc bnc" id="L206" title="All 2 branches missed.">                if (c == 'i') {</span>
+<span class="nc" id="L207">                    ix = startsWithLenient(part, &quot;insets&quot;, 3, true);</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L209">                        String insStr = part.substring(ix).trim();</span>
+<span class="nc" id="L210">                        UnitValue[] ins = parseInsets(insStr, true);</span>
+<span class="nc" id="L211">                        LayoutUtil.putCCString(ins, insStr);</span>
+<span class="nc" id="L212">                        lc.setInsets(ins);</span>
+<span class="nc" id="L213">                        continue;</span>
+                    }
+                }
+
+<span class="nc bnc" id="L217" title="All 2 branches missed.">                if (c == 'a') {</span>
+<span class="nc" id="L218">                    ix = startsWithLenient(part, new String[]{&quot;aligny&quot;, &quot;ay&quot;}, new int[]{6, 2}, true);</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L220">                        UnitValue align = parseUnitValueOrAlign(part.substring(ix).trim(), false, null);</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">                        if (align == UnitValue.BASELINE_IDENTITY) {</span>
+<span class="nc" id="L222">                            throw new IllegalArgumentException(&quot;'baseline' can not be used to align the whole component group.&quot;);</span>
+                        }
+<span class="nc" id="L224">                        lc.setAlignY(align);</span>
+<span class="nc" id="L225">                        continue;</span>
+                    }
+
+<span class="nc" id="L228">                    ix = startsWithLenient(part, new String[]{&quot;alignx&quot;, &quot;ax&quot;}, new int[]{6, 2}, true);</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L230">                        lc.setAlignX(parseUnitValueOrAlign(part.substring(ix).trim(), true, null));</span>
+<span class="nc" id="L231">                        continue;</span>
+                    }
+
+<span class="nc" id="L234">                    ix = startsWithLenient(part, &quot;align&quot;, 2, true);</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L236">                        String[] gaps = toTrimmedTokens(part.substring(ix).trim(), ' ');</span>
+<span class="nc" id="L237">                        lc.setAlignX(parseUnitValueOrAlign(gaps[0], true, null));</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">                        if (gaps.length &gt; 1) {</span>
+<span class="nc" id="L239">                            lc.setAlignY(parseUnitValueOrAlign(gaps[1], false, null));</span>
+                        }
+<span class="nc" id="L241">                        continue;</span>
+                    }
+                }
+
+<span class="nc bnc" id="L245" title="All 2 branches missed.">                if (c == 'p') {</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">                    if (part.startsWith(&quot;packalign &quot;)) {</span>
+<span class="nc" id="L247">                        String[] packs = toTrimmedTokens(part.substring(10).trim(), ' ');</span>
+<span class="nc bnc" id="L248" title="All 2 branches missed.">                        lc.setPackWidthAlign(packs[0].length() &gt; 0 ? Float.parseFloat(packs[0]) : 0.5f);</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">                        if (packs.length &gt; 1) {</span>
+<span class="nc" id="L250">                            lc.setPackHeightAlign(Float.parseFloat(packs[1]));</span>
+                        }
+<span class="nc" id="L252">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L255" title="All 4 branches missed.">                    if (part.startsWith(&quot;pack &quot;) || part.equals(&quot;pack&quot;)) {</span>
+<span class="nc" id="L256">                        String ps = part.substring(4).trim();</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">                        String[] packs = toTrimmedTokens(ps.length() &gt; 0 ? ps : &quot;pref pref&quot;, ' ');</span>
+<span class="nc" id="L258">                        lc.setPackWidth(parseBoundSize(packs[0], false, true));</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">                        if (packs.length &gt; 1) {</span>
+<span class="nc" id="L260">                            lc.setPackHeight(parseBoundSize(packs[1], false, false));</span>
+                        }
+
+<span class="nc" id="L263">                        continue;</span>
+                    }
+                }
+
+<span class="nc bnc" id="L267" title="All 2 branches missed.">                if (lc.getAlignX() == null) {</span>
+<span class="nc" id="L268">                    UnitValue alignX = parseAlignKeywords(part, true);</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">                    if (alignX != null) {</span>
+<span class="nc" id="L270">                        lc.setAlignX(alignX);</span>
+<span class="nc" id="L271">                        continue;</span>
+                    }
+                }
+
+<span class="nc" id="L275">                UnitValue alignY = parseAlignKeywords(part, false);</span>
+<span class="nc bnc" id="L276" title="All 2 branches missed.">                if (alignY != null) {</span>
+<span class="nc" id="L277">                    lc.setAlignY(alignY);</span>
+<span class="nc" id="L278">                    continue;</span>
+                }
+
+<span class="nc" id="L281">                throw new IllegalArgumentException(&quot;Unknown Constraint: '&quot; + part + &quot;'\n&quot;);</span>
+
+<span class="nc" id="L283">            } catch (Exception ex) {</span>
+<span class="nc" id="L284">                throw new IllegalArgumentException(&quot;Illegal Constraint: '&quot; + part + &quot;'\n&quot; + ex.getMessage());</span>
+            }
+        }
+
+//		lc = (LC) serializeTest(lc);
+<span class="fc" id="L289">        return lc;</span>
+    }
+
+    /**
+     * Parses the column or rows constraints. They normally looks something like
+     * &lt;code&gt;&quot;[min:pref]rel[10px][]&quot;&lt;/code&gt;.
+     *
+     * @param s The string to parse. Not &lt;code&gt;null&lt;/code&gt;.
+     * @return An array of {@link DimConstraint}s that is as many are there
+     * exist &quot;[...]&quot; sections in the string that is parsed.
+     * @throws RuntimeException if the constraint was not valid.
+     */
+    public static AC parseRowConstraints(String s) {
+<span class="fc" id="L302">        return parseAxisConstraint(s, false);</span>
+    }
+
+    /**
+     * Parses the column or rows constraints. They normally looks something like
+     * &lt;code&gt;&quot;[min:pref]rel[10px][]&quot;&lt;/code&gt;.
+     *
+     * @param s The string to parse. Not &lt;code&gt;null&lt;/code&gt;.
+     * @return An array of {@link DimConstraint}s that is as many are there
+     * exist &quot;[...]&quot; sections in the string that is parsed.
+     * @throws RuntimeException if the constraint was not valid.
+     */
+    public static AC parseColumnConstraints(String s) {
+<span class="fc" id="L315">        return parseAxisConstraint(s, true);</span>
+    }
+
+    /**
+     * Parses the column or rows constraints. They normally looks something like
+     * &lt;code&gt;&quot;[min:pref]rel[10px][]&quot;&lt;/code&gt;.
+     *
+     * @param s      The string to parse. Not &lt;code&gt;null&lt;/code&gt;.
+     * @param isCols If this for columns rather than rows.
+     * @return An array of {@link DimConstraint}s that is as many are there
+     * exist &quot;[...]&quot; sections in the string that is parsed.
+     * @throws RuntimeException if the constraint was not valid.
+     */
+    private static AC parseAxisConstraint(String s, boolean isCols) {
+<span class="fc" id="L329">        s = s.trim();</span>
+
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">        if (s.length() == 0) {</span>
+<span class="nc" id="L332">            return new AC();    // Short circuit for performance.</span>
+        }
+<span class="fc" id="L334">        s = s.toLowerCase();</span>
+
+<span class="fc" id="L336">        ArrayList&lt;String&gt; parts = getRowColAndGapsTrimmed(s);</span>
+
+<span class="fc" id="L338">        BoundSize[] gaps = new BoundSize[(parts.size() &gt;&gt; 1) + 1];</span>
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        for (int i = 0, iSz = parts.size(), gIx = 0; i &lt; iSz; i += 2, gIx++) {</span>
+<span class="fc" id="L340">            gaps[gIx] = parseBoundSize(parts.get(i), true, isCols);</span>
+        }
+
+<span class="fc" id="L343">        DimConstraint[] colSpecs = new DimConstraint[parts.size() &gt;&gt; 1];</span>
+<span class="fc bfc" id="L344" title="All 2 branches covered.">        for (int i = 0, gIx = 0; i &lt; colSpecs.length; i++, gIx++) {</span>
+<span class="pc bpc" id="L345" title="1 of 2 branches missed.">            if (gIx &gt;= gaps.length - 1) {</span>
+<span class="nc" id="L346">                gIx = gaps.length - 2;</span>
+            }
+
+<span class="fc" id="L349">            colSpecs[i] = parseDimConstraint(parts.get((i &lt;&lt; 1) + 1), gaps[gIx], gaps[gIx + 1], isCols);</span>
+        }
+
+<span class="fc" id="L352">        AC ac = new AC();</span>
+<span class="fc" id="L353">        ac.setConstaints(colSpecs);</span>
+
+//		ac = (AC) serializeTest(ac);
+<span class="fc" id="L356">        return ac;</span>
+    }
+
+    /**
+     * Parses a single column or row constraint.
+     *
+     * @param s         The single constraint to parse. May look something like
+     *                  &lt;code&gt;&quot;min:pref,fill,grow&quot;&lt;/code&gt;. Should not be &lt;code&gt;null&lt;/code&gt; and
+     *                  &lt;b&gt;must be lower case and trimmed&lt;/b&gt;.
+     * @param gapBefore The default gap &quot;before&quot; the column/row constraint. Can
+     *                  be overridden with a &lt;code&gt;&quot;gap&quot;&lt;/code&gt; section within &lt;code&gt;s&lt;/code&gt;.
+     * @param gapAfter  The default gap &quot;after&quot; the column/row constraint. Can be
+     *                  overridden with a &lt;code&gt;&quot;gap&quot;&lt;/code&gt; section within &lt;code&gt;s&lt;/code&gt;.
+     * @param isCols    If the constraints are column constraints rather than row
+     *                  constraints.
+     * @return A single constraint. Never &lt;code&gt;null&lt;/code&gt;.
+     * @throws RuntimeException if the constraint was not valid.
+     */
+    private static DimConstraint parseDimConstraint(String s, BoundSize gapBefore, BoundSize gapAfter, boolean isCols) {
+<span class="fc" id="L375">        DimConstraint dimConstraint = new DimConstraint();</span>
+
+        // Default values.
+<span class="fc" id="L378">        dimConstraint.setGapBefore(gapBefore);</span>
+<span class="fc" id="L379">        dimConstraint.setGapAfter(gapAfter);</span>
+
+<span class="fc" id="L381">        String[] parts = toTrimmedTokens(s, ',');</span>
+<span class="fc bfc" id="L382" title="All 2 branches covered.">        for (int i = 0; i &lt; parts.length; i++) {</span>
+<span class="fc" id="L383">            String part = parts[i];</span>
+            try {
+<span class="fc bfc" id="L385" title="All 2 branches covered.">                if (part.length() == 0) {</span>
+<span class="fc" id="L386">                    continue;</span>
+                }
+
+<span class="pc bpc" id="L389" title="1 of 2 branches missed.">                if (part.equals(&quot;fill&quot;)) {</span>
+<span class="nc" id="L390">                    dimConstraint.setFill(true);</span>
+//					 dimConstraint.setAlign(null);   // Can not have both fill and alignment (changed for 3.5 since it can have &quot;growy 0&quot;)
+<span class="nc" id="L392">                    continue;</span>
+                }
+
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">                if (part.equals(&quot;nogrid&quot;)) {</span>
+<span class="nc" id="L396">                    dimConstraint.setNoGrid(true);</span>
+<span class="nc" id="L397">                    continue;</span>
+                }
+
+<span class="fc" id="L400">                int ix = -1;</span>
+<span class="fc" id="L401">                char c = part.charAt(0);</span>
+
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">                if (c == 's') {</span>
+<span class="nc" id="L404">                    ix = startsWithLenient(part, new String[]{&quot;sizegroup&quot;, &quot;sg&quot;}, new int[]{5, 2}, true);</span>
+<span class="nc bnc" id="L405" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L406">                        dimConstraint.setSizeGroup(part.substring(ix).trim());</span>
+<span class="nc" id="L407">                        continue;</span>
+                    }
+
+<span class="nc" id="L410">                    ix = startsWithLenient(part, new String[]{&quot;shrinkprio&quot;, &quot;shp&quot;}, new int[]{10, 3}, true);</span>
+<span class="nc bnc" id="L411" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L412">                        dimConstraint.setShrinkPriority(Integer.parseInt(part.substring(ix).trim()));</span>
+<span class="nc" id="L413">                        continue;</span>
+                    }
+
+<span class="nc" id="L416">                    ix = startsWithLenient(part, &quot;shrink&quot;, 6, true);</span>
+<span class="nc bnc" id="L417" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L418">                        dimConstraint.setShrink(parseFloat(part.substring(ix).trim(), ResizeConstraint.WEIGHT_100));</span>
+<span class="nc" id="L419">                        continue;</span>
+                    }
+                }
+
+<span class="fc bfc" id="L423" title="All 2 branches covered.">                if (c == 'g') {</span>
+<span class="fc" id="L424">                    ix = startsWithLenient(part, new String[]{&quot;growpriority&quot;, &quot;gp&quot;}, new int[]{5, 2}, true);</span>
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L426">                        dimConstraint.setGrowPriority(Integer.parseInt(part.substring(ix).trim()));</span>
+<span class="nc" id="L427">                        continue;</span>
+                    }
+
+<span class="fc" id="L430">                    ix = startsWithLenient(part, &quot;grow&quot;, 4, true);</span>
+<span class="pc bpc" id="L431" title="1 of 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="fc" id="L432">                        dimConstraint.setGrow(parseFloat(part.substring(ix).trim(), ResizeConstraint.WEIGHT_100));</span>
+<span class="fc" id="L433">                        continue;</span>
+                    }
+                }
+
+<span class="pc bpc" id="L437" title="1 of 2 branches missed.">                if (c == 'a') {</span>
+<span class="nc" id="L438">                    ix = startsWithLenient(part, &quot;align&quot;, 2, true);</span>
+<span class="nc bnc" id="L439" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+//						if (dimConstraint.isFill() == false)    // Swallow, but ignore if fill is set. (changed for 3.5 since it can have &quot;growy 0&quot;)
+<span class="nc" id="L441">                        dimConstraint.setAlign(parseUnitValueOrAlign(part.substring(ix).trim(), isCols, null));</span>
+<span class="nc" id="L442">                        continue;</span>
+                    }
+                }
+
+<span class="fc" id="L446">                UnitValue align = parseAlignKeywords(part, isCols);</span>
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">                if (align != null) {</span>
+//					if (dimConstraint.isFill() == false)    // Swallow, but ignore if fill is set. (changed for 3.5 since it can have &quot;growy 0&quot;)
+<span class="nc" id="L449">                    dimConstraint.setAlign(align);</span>
+<span class="nc" id="L450">                    continue;</span>
+                }
+
+                // Only min:pref:max still left that is ok
+<span class="fc" id="L454">                dimConstraint.setSize(parseBoundSize(part, false, isCols));</span>
+
+<span class="nc" id="L456">            } catch (Exception ex) {</span>
+<span class="nc" id="L457">                throw new IllegalArgumentException(&quot;Illegal constraint: '&quot; + part + &quot;'\n&quot; + ex.getMessage());</span>
+<span class="fc" id="L458">            }</span>
+        }
+<span class="fc" id="L460">        return dimConstraint;</span>
+    }
+
+    /**
+     * Parses all component constraints and stores the parsed values in the
+     * transient (cache) member variables.
+     *
+     * @param constrMap The constraints as &lt;code&gt;String&lt;/code&gt;s. Strings &lt;b&gt;must
+     *                  be lower case and trimmed&lt;/b&gt;
+     * @return The parsed constraints. Never &lt;code&gt;null&lt;/code&gt;.
+     */
+    public static Map&lt;ComponentWrapper, CC&gt; parseComponentConstraints(Map&lt;ComponentWrapper, String&gt; constrMap) {
+<span class="nc" id="L472">        HashMap&lt;ComponentWrapper, CC&gt; flowConstrMap = new HashMap&lt;ComponentWrapper, CC&gt;();</span>
+
+<span class="nc bnc" id="L474" title="All 2 branches missed.">        for (Map.Entry&lt;ComponentWrapper, String&gt; entry : constrMap.entrySet()) {</span>
+<span class="nc" id="L475">            flowConstrMap.put(entry.getKey(), parseComponentConstraint(entry.getValue()));</span>
+<span class="nc" id="L476">        }</span>
+
+<span class="nc" id="L478">        return flowConstrMap;</span>
+    }
+
+    /**
+     * Parses one component constraint and returns the parsed value.
+     *
+     * @param s The string to parse. Should not be &lt;code&gt;null&lt;/code&gt; and &lt;b&gt;must
+     *          be lower case and trimmed&lt;/b&gt;.
+     * @return The parsed constraint. Never &lt;code&gt;null&lt;/code&gt;.
+     * @throws RuntimeException if the constraint was not valid.
+     */
+    public static CC parseComponentConstraint(String s) {
+<span class="fc" id="L490">        CC cc = new CC();</span>
+
+<span class="fc bfc" id="L492" title="All 2 branches covered.">        if (s.length() == 0) {</span>
+<span class="fc" id="L493">            return cc;</span>
+        }
+
+<span class="fc" id="L496">        String[] parts = toTrimmedTokens(s, ',');</span>
+
+<span class="fc bfc" id="L498" title="All 2 branches covered.">        for (String part : parts) {</span>
+            try {
+<span class="pc bpc" id="L500" title="1 of 2 branches missed.">                if (part.length() == 0) {</span>
+<span class="nc" id="L501">                    continue;</span>
+                }
+
+<span class="fc" id="L504">                int ix = -1;</span>
+<span class="fc" id="L505">                char c = part.charAt(0);</span>
+
+<span class="pc bpc" id="L507" title="1 of 2 branches missed.">                if (c == 'n') {</span>
+<span class="nc bnc" id="L508" title="All 2 branches missed.">                    if (part.equals(&quot;north&quot;)) {</span>
+<span class="nc" id="L509">                        cc.setDockSide(0);</span>
+<span class="nc" id="L510">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L513" title="All 2 branches missed.">                    if (part.equals(&quot;newline&quot;)) {</span>
+<span class="nc" id="L514">                        cc.setNewline(true);</span>
+<span class="nc" id="L515">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L518" title="All 2 branches missed.">                    if (part.startsWith(&quot;newline &quot;)) {</span>
+<span class="nc" id="L519">                        String gapSz = part.substring(7).trim();</span>
+<span class="nc" id="L520">                        cc.setNewlineGapSize(parseBoundSize(gapSz, true, true));</span>
+<span class="nc" id="L521">                        continue;</span>
+                    }
+                }
+
+<span class="pc bpc" id="L525" title="5 of 6 branches missed.">                if (c == 'f' &amp;&amp; (part.equals(&quot;flowy&quot;) || part.equals(&quot;flowx&quot;))) {</span>
+<span class="nc bnc" id="L526" title="All 2 branches missed.">                    cc.setFlowX(part.charAt(4) == 'x' ? Boolean.TRUE : Boolean.FALSE);</span>
+<span class="nc" id="L527">                    continue;</span>
+                }
+
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">                if (c == 's') {</span>
+<span class="nc" id="L531">                    ix = startsWithLenient(part, &quot;skip&quot;, 4, true);</span>
+<span class="nc bnc" id="L532" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L533">                        String num = part.substring(ix).trim();</span>
+<span class="nc bnc" id="L534" title="All 2 branches missed.">                        cc.setSkip(num.length() != 0 ? Integer.parseInt(num) : 1);</span>
+<span class="nc" id="L535">                        continue;</span>
+                    }
+
+<span class="nc" id="L538">                    ix = startsWithLenient(part, &quot;split&quot;, 5, true);</span>
+<span class="nc bnc" id="L539" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L540">                        String split = part.substring(ix).trim();</span>
+<span class="nc bnc" id="L541" title="All 2 branches missed.">                        cc.setSplit(split.length() &gt; 0 ? Integer.parseInt(split) : LayoutUtil.INF);</span>
+<span class="nc" id="L542">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L545" title="All 2 branches missed.">                    if (part.equals(&quot;south&quot;)) {</span>
+<span class="nc" id="L546">                        cc.setDockSide(2);</span>
+<span class="nc" id="L547">                        continue;</span>
+                    }
+
+<span class="nc" id="L550">                    ix = startsWithLenient(part, new String[]{&quot;spany&quot;, &quot;sy&quot;}, new int[]{5, 2}, true);</span>
+<span class="nc bnc" id="L551" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L552">                        cc.setSpanY(parseSpan(part.substring(ix).trim()));</span>
+<span class="nc" id="L553">                        continue;</span>
+                    }
+
+<span class="nc" id="L556">                    ix = startsWithLenient(part, new String[]{&quot;spanx&quot;, &quot;sx&quot;}, new int[]{5, 2}, true);</span>
+<span class="nc bnc" id="L557" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L558">                        cc.setSpanX(parseSpan(part.substring(ix).trim()));</span>
+<span class="nc" id="L559">                        continue;</span>
+                    }
+
+<span class="nc" id="L562">                    ix = startsWithLenient(part, &quot;span&quot;, 4, true);</span>
+<span class="nc bnc" id="L563" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L564">                        String[] spans = toTrimmedTokens(part.substring(ix).trim(), ' ');</span>
+<span class="nc bnc" id="L565" title="All 2 branches missed.">                        cc.setSpanX(spans[0].length() &gt; 0 ? Integer.parseInt(spans[0]) : LayoutUtil.INF);</span>
+<span class="nc bnc" id="L566" title="All 2 branches missed.">                        cc.setSpanY(spans.length &gt; 1 ? Integer.parseInt(spans[1]) : 1);</span>
+<span class="nc" id="L567">                        continue;</span>
+                    }
+
+<span class="nc" id="L570">                    ix = startsWithLenient(part, &quot;shrinkx&quot;, 7, true);</span>
+<span class="nc bnc" id="L571" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L572">                        cc.getHorizontal().setShrink(parseFloat(part.substring(ix).trim(), ResizeConstraint.WEIGHT_100));</span>
+<span class="nc" id="L573">                        continue;</span>
+                    }
+
+<span class="nc" id="L576">                    ix = startsWithLenient(part, &quot;shrinky&quot;, 7, true);</span>
+<span class="nc bnc" id="L577" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L578">                        cc.getVertical().setShrink(parseFloat(part.substring(ix).trim(), ResizeConstraint.WEIGHT_100));</span>
+<span class="nc" id="L579">                        continue;</span>
+                    }
+
+<span class="nc" id="L582">                    ix = startsWithLenient(part, &quot;shrink&quot;, 6, false);</span>
+<span class="nc bnc" id="L583" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L584">                        String[] shrinks = toTrimmedTokens(part.substring(ix).trim(), ' ');</span>
+<span class="nc" id="L585">                        cc.getHorizontal().setShrink(parseFloat(part.substring(ix).trim(), ResizeConstraint.WEIGHT_100));</span>
+<span class="nc bnc" id="L586" title="All 2 branches missed.">                        if (shrinks.length &gt; 1) {</span>
+<span class="nc" id="L587">                            cc.getVertical().setShrink(parseFloat(part.substring(ix).trim(), ResizeConstraint.WEIGHT_100));</span>
+                        }
+<span class="nc" id="L589">                        continue;</span>
+                    }
+
+<span class="nc" id="L592">                    ix = startsWithLenient(part, new String[]{&quot;shrinkprio&quot;, &quot;shp&quot;}, new int[]{10, 3}, true);</span>
+<span class="nc bnc" id="L593" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L594">                        String sp = part.substring(ix).trim();</span>
+<span class="nc bnc" id="L595" title="All 4 branches missed.">                        if (sp.startsWith(&quot;x&quot;) || sp.startsWith(&quot;y&quot;)) { // To gandle &quot;gpx&quot;, &quot;gpy&quot;, &quot;shrinkpriorityx&quot;, shrinkpriorityy&quot;</span>
+<span class="nc bnc" id="L596" title="All 2 branches missed.">                            (sp.startsWith(&quot;x&quot;) ? cc.getHorizontal() : cc.getVertical()).setShrinkPriority(Integer.parseInt(sp.substring(2)));</span>
+                        } else {
+<span class="nc" id="L598">                            String[] shrinks = toTrimmedTokens(sp, ' ');</span>
+<span class="nc" id="L599">                            cc.getHorizontal().setShrinkPriority(Integer.parseInt(shrinks[0]));</span>
+<span class="nc bnc" id="L600" title="All 2 branches missed.">                            if (shrinks.length &gt; 1) {</span>
+<span class="nc" id="L601">                                cc.getVertical().setShrinkPriority(Integer.parseInt(shrinks[1]));</span>
+                            }
+                        }
+<span class="nc" id="L604">                        continue;</span>
+                    }
+
+<span class="nc" id="L607">                    ix = startsWithLenient(part, new String[]{&quot;sizegroupx&quot;, &quot;sizegroupy&quot;, &quot;sgx&quot;, &quot;sgy&quot;}, new int[]{9, 9, 2, 2}, true);</span>
+<span class="nc bnc" id="L608" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L609">                        String sg = part.substring(ix).trim();</span>
+<span class="nc" id="L610">                        char lc = part.charAt(ix - 1);</span>
+<span class="nc bnc" id="L611" title="All 2 branches missed.">                        if (lc != 'y') {</span>
+<span class="nc" id="L612">                            cc.getHorizontal().setSizeGroup(sg);</span>
+                        }
+<span class="nc bnc" id="L614" title="All 2 branches missed.">                        if (lc != 'x') {</span>
+<span class="nc" id="L615">                            cc.getVertical().setSizeGroup(sg);</span>
+                        }
+<span class="nc" id="L617">                        continue;</span>
+                    }
+                }
+
+<span class="pc bpc" id="L621" title="1 of 2 branches missed.">                if (c == 'g') {</span>
+<span class="fc" id="L622">                    ix = startsWithLenient(part, &quot;growx&quot;, 5, true);</span>
+<span class="pc bpc" id="L623" title="1 of 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L624">                        cc.getHorizontal().setGrow(parseFloat(part.substring(ix).trim(), ResizeConstraint.WEIGHT_100));</span>
+<span class="nc" id="L625">                        continue;</span>
+                    }
+
+<span class="fc" id="L628">                    ix = startsWithLenient(part, &quot;growy&quot;, 5, true);</span>
+<span class="pc bpc" id="L629" title="1 of 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L630">                        cc.getVertical().setGrow(parseFloat(part.substring(ix).trim(), ResizeConstraint.WEIGHT_100));</span>
+<span class="nc" id="L631">                        continue;</span>
+                    }
+
+<span class="fc" id="L634">                    ix = startsWithLenient(part, &quot;grow&quot;, 4, false);</span>
+<span class="pc bpc" id="L635" title="1 of 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="fc" id="L636">                        String[] grows = toTrimmedTokens(part.substring(ix).trim(), ' ');</span>
+<span class="fc" id="L637">                        cc.getHorizontal().setGrow(parseFloat(grows[0], ResizeConstraint.WEIGHT_100));</span>
+<span class="pc bpc" id="L638" title="1 of 2 branches missed.">                        cc.getVertical().setGrow(parseFloat(grows.length &gt; 1 ? grows[1] : &quot;&quot;, ResizeConstraint.WEIGHT_100));</span>
+<span class="fc" id="L639">                        continue;</span>
+                    }
+
+<span class="nc" id="L642">                    ix = startsWithLenient(part, new String[]{&quot;growprio&quot;, &quot;gp&quot;}, new int[]{8, 2}, true);</span>
+<span class="nc bnc" id="L643" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L644">                        String gp = part.substring(ix).trim();</span>
+<span class="nc bnc" id="L645" title="All 2 branches missed.">                        char c0 = gp.length() &gt; 0 ? gp.charAt(0) : ' ';</span>
+<span class="nc bnc" id="L646" title="All 4 branches missed.">                        if (c0 == 'x' || c0 == 'y') { // To gandle &quot;gpx&quot;, &quot;gpy&quot;, &quot;growpriorityx&quot;, growpriorityy&quot;</span>
+<span class="nc bnc" id="L647" title="All 2 branches missed.">                            (c0 == 'x' ? cc.getHorizontal() : cc.getVertical()).setGrowPriority(Integer.parseInt(gp.substring(2)));</span>
+                        } else {
+<span class="nc" id="L649">                            String[] grows = toTrimmedTokens(gp, ' ');</span>
+<span class="nc" id="L650">                            cc.getHorizontal().setGrowPriority(Integer.parseInt(grows[0]));</span>
+<span class="nc bnc" id="L651" title="All 2 branches missed.">                            if (grows.length &gt; 1) {</span>
+<span class="nc" id="L652">                                cc.getVertical().setGrowPriority(Integer.parseInt(grows[1]));</span>
+                            }
+                        }
+<span class="nc" id="L655">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L658" title="All 2 branches missed.">                    if (part.startsWith(&quot;gap&quot;)) {</span>
+<span class="nc" id="L659">                        BoundSize[] gaps = parseGaps(part); // Changes order!!</span>
+<span class="nc bnc" id="L660" title="All 2 branches missed.">                        if (gaps[0] != null) {</span>
+<span class="nc" id="L661">                            cc.getVertical().setGapBefore(gaps[0]);</span>
+                        }
+<span class="nc bnc" id="L663" title="All 2 branches missed.">                        if (gaps[1] != null) {</span>
+<span class="nc" id="L664">                            cc.getHorizontal().setGapBefore(gaps[1]);</span>
+                        }
+<span class="nc bnc" id="L666" title="All 2 branches missed.">                        if (gaps[2] != null) {</span>
+<span class="nc" id="L667">                            cc.getVertical().setGapAfter(gaps[2]);</span>
+                        }
+<span class="nc bnc" id="L669" title="All 2 branches missed.">                        if (gaps[3] != null) {</span>
+<span class="nc" id="L670">                            cc.getHorizontal().setGapAfter(gaps[3]);</span>
+                        }
+<span class="nc" id="L672">                        continue;</span>
+                    }
+                }
+
+<span class="nc bnc" id="L676" title="All 2 branches missed.">                if (c == 'a') {</span>
+<span class="nc" id="L677">                    ix = startsWithLenient(part, new String[]{&quot;aligny&quot;, &quot;ay&quot;}, new int[]{6, 2}, true);</span>
+<span class="nc bnc" id="L678" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L679">                        cc.getVertical().setAlign(parseUnitValueOrAlign(part.substring(ix).trim(), false, null));</span>
+<span class="nc" id="L680">                        continue;</span>
+                    }
+
+<span class="nc" id="L683">                    ix = startsWithLenient(part, new String[]{&quot;alignx&quot;, &quot;ax&quot;}, new int[]{6, 2}, true);</span>
+<span class="nc bnc" id="L684" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L685">                        cc.getHorizontal().setAlign(parseUnitValueOrAlign(part.substring(ix).trim(), true, null));</span>
+<span class="nc" id="L686">                        continue;</span>
+                    }
+
+<span class="nc" id="L689">                    ix = startsWithLenient(part, &quot;align&quot;, 2, true);</span>
+<span class="nc bnc" id="L690" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L691">                        String[] gaps = toTrimmedTokens(part.substring(ix).trim(), ' ');</span>
+<span class="nc" id="L692">                        cc.getHorizontal().setAlign(parseUnitValueOrAlign(gaps[0], true, null));</span>
+<span class="nc bnc" id="L693" title="All 2 branches missed.">                        if (gaps.length &gt; 1) {</span>
+<span class="nc" id="L694">                            cc.getVertical().setAlign(parseUnitValueOrAlign(gaps[1], false, null));</span>
+                        }
+<span class="nc" id="L696">                        continue;</span>
+                    }
+                }
+
+<span class="nc bnc" id="L700" title="All 6 branches missed.">                if ((c == 'x' || c == 'y') &amp;&amp; part.length() &gt; 2) {</span>
+<span class="nc" id="L701">                    char c2 = part.charAt(1);</span>
+<span class="nc bnc" id="L702" title="All 6 branches missed.">                    if (c2 == ' ' || (c2 == '2' &amp;&amp; part.charAt(2) == ' ')) {</span>
+<span class="nc bnc" id="L703" title="All 2 branches missed.">                        if (cc.getPos() == null) {</span>
+<span class="nc" id="L704">                            cc.setPos(new UnitValue[4]);</span>
+<span class="nc bnc" id="L705" title="All 2 branches missed.">                        } else if (!cc.isBoundsInGrid()) {</span>
+<span class="nc" id="L706">                            throw new IllegalArgumentException(&quot;Cannot combine 'position' with 'x/y/x2/y2' keywords.&quot;);</span>
+                        }
+
+<span class="nc bnc" id="L709" title="All 4 branches missed.">                        int edge = (c == 'x' ? 0 : 1) + (c2 == '2' ? 2 : 0);</span>
+<span class="nc" id="L710">                        UnitValue[] pos = cc.getPos();</span>
+<span class="nc bnc" id="L711" title="All 2 branches missed.">                        pos[edge] = parseUnitValue(part.substring(2).trim(), null, c == 'x');</span>
+<span class="nc" id="L712">                        cc.setPos(pos);</span>
+<span class="nc" id="L713">                        cc.setBoundsInGrid(true);</span>
+<span class="nc" id="L714">                        continue;</span>
+                    }
+                }
+
+<span class="nc bnc" id="L718" title="All 2 branches missed.">                if (c == 'c') {</span>
+<span class="nc" id="L719">                    ix = startsWithLenient(part, &quot;cell&quot;, 4, true);</span>
+<span class="nc bnc" id="L720" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L721">                        String[] grs = toTrimmedTokens(part.substring(ix).trim(), ' ');</span>
+<span class="nc bnc" id="L722" title="All 2 branches missed.">                        if (grs.length &lt; 2) {</span>
+<span class="nc" id="L723">                            throw new IllegalArgumentException(&quot;At least two integers must follow &quot; + part);</span>
+                        }
+<span class="nc" id="L725">                        cc.setCellX(Integer.parseInt(grs[0]));</span>
+<span class="nc" id="L726">                        cc.setCellY(Integer.parseInt(grs[1]));</span>
+<span class="nc bnc" id="L727" title="All 2 branches missed.">                        if (grs.length &gt; 2) {</span>
+<span class="nc" id="L728">                            cc.setSpanX(Integer.parseInt(grs[2]));</span>
+                        }
+<span class="nc bnc" id="L730" title="All 2 branches missed.">                        if (grs.length &gt; 3) {</span>
+<span class="nc" id="L731">                            cc.setSpanY(Integer.parseInt(grs[3]));</span>
+                        }
+<span class="nc" id="L733">                        continue;</span>
+                    }
+                }
+
+<span class="nc bnc" id="L737" title="All 2 branches missed.">                if (c == 'p') {</span>
+<span class="nc" id="L738">                    ix = startsWithLenient(part, &quot;pos&quot;, 3, true);</span>
+<span class="nc bnc" id="L739" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc bnc" id="L740" title="All 4 branches missed.">                        if (cc.getPos() != null &amp;&amp; cc.isBoundsInGrid()) {</span>
+<span class="nc" id="L741">                            throw new IllegalArgumentException(&quot;Can not combine 'pos' with 'x/y/x2/y2' keywords.&quot;);</span>
+                        }
+
+<span class="nc" id="L744">                        String[] pos = toTrimmedTokens(part.substring(ix).trim(), ' ');</span>
+<span class="nc" id="L745">                        UnitValue[] bounds = new UnitValue[4];</span>
+<span class="nc bnc" id="L746" title="All 2 branches missed.">                        for (int j = 0; j &lt; pos.length; j++) {</span>
+<span class="nc bnc" id="L747" title="All 2 branches missed.">                            bounds[j] = parseUnitValue(pos[j], null, j % 2 == 0);</span>
+                        }
+
+<span class="nc bnc" id="L750" title="All 8 branches missed.">                        if (bounds[0] == null &amp;&amp; bounds[2] == null || bounds[1] == null &amp;&amp; bounds[3] == null) {</span>
+<span class="nc" id="L751">                            throw new IllegalArgumentException(&quot;Both x and x2 or y and y2 can not be null!&quot;);</span>
+                        }
+
+<span class="nc" id="L754">                        cc.setPos(bounds);</span>
+<span class="nc" id="L755">                        cc.setBoundsInGrid(false);</span>
+<span class="nc" id="L756">                        continue;</span>
+                    }
+
+<span class="nc" id="L759">                    ix = startsWithLenient(part, &quot;pad&quot;, 3, true);</span>
+<span class="nc bnc" id="L760" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L761">                        UnitValue[] p = parseInsets(part.substring(ix).trim(), false);</span>
+<span class="nc bnc" id="L762" title="All 6 branches missed.">                        cc.setPadding(new UnitValue[]{</span>
+                                p[0],
+                                p.length &gt; 1 ? p[1] : null,
+                                p.length &gt; 2 ? p[2] : null,
+                                p.length &gt; 3 ? p[3] : null});
+<span class="nc" id="L767">                        continue;</span>
+                    }
+
+<span class="nc" id="L770">                    ix = startsWithLenient(part, &quot;pushx&quot;, 5, true);</span>
+<span class="nc bnc" id="L771" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L772">                        cc.setPushX(parseFloat(part.substring(ix).trim(), ResizeConstraint.WEIGHT_100));</span>
+<span class="nc" id="L773">                        continue;</span>
+                    }
+
+<span class="nc" id="L776">                    ix = startsWithLenient(part, &quot;pushy&quot;, 5, true);</span>
+<span class="nc bnc" id="L777" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L778">                        cc.setPushY(parseFloat(part.substring(ix).trim(), ResizeConstraint.WEIGHT_100));</span>
+<span class="nc" id="L779">                        continue;</span>
+                    }
+
+<span class="nc" id="L782">                    ix = startsWithLenient(part, &quot;push&quot;, 4, false);</span>
+<span class="nc bnc" id="L783" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L784">                        String[] pushs = toTrimmedTokens(part.substring(ix).trim(), ' ');</span>
+<span class="nc" id="L785">                        cc.setPushX(parseFloat(pushs[0], ResizeConstraint.WEIGHT_100));</span>
+<span class="nc bnc" id="L786" title="All 2 branches missed.">                        cc.setPushY(parseFloat(pushs.length &gt; 1 ? pushs[1] : &quot;&quot;, ResizeConstraint.WEIGHT_100));</span>
+<span class="nc" id="L787">                        continue;</span>
+                    }
+                }
+
+<span class="nc bnc" id="L791" title="All 2 branches missed.">                if (c == 't') {</span>
+<span class="nc" id="L792">                    ix = startsWithLenient(part, &quot;tag&quot;, 3, true);</span>
+<span class="nc bnc" id="L793" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L794">                        cc.setTag(part.substring(ix).trim());</span>
+<span class="nc" id="L795">                        continue;</span>
+                    }
+                }
+
+<span class="nc bnc" id="L799" title="All 4 branches missed.">                if (c == 'w' || c == 'h') {</span>
+<span class="nc bnc" id="L800" title="All 2 branches missed.">                    if (part.equals(&quot;wrap&quot;)) {</span>
+<span class="nc" id="L801">                        cc.setWrap(true);</span>
+<span class="nc" id="L802">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L805" title="All 2 branches missed.">                    if (part.startsWith(&quot;wrap &quot;)) {</span>
+<span class="nc" id="L806">                        String gapSz = part.substring(5).trim();</span>
+<span class="nc" id="L807">                        cc.setWrapGapSize(parseBoundSize(gapSz, true, true));</span>
+<span class="nc" id="L808">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L811" title="All 2 branches missed.">                    boolean isHor = c == 'w';</span>
+<span class="nc bnc" id="L812" title="All 6 branches missed.">                    if (isHor &amp;&amp; (part.startsWith(&quot;w &quot;) || part.startsWith(&quot;width &quot;))) {</span>
+<span class="nc bnc" id="L813" title="All 2 branches missed.">                        String uvStr = part.substring(part.charAt(1) == ' ' ? 2 : 6).trim();</span>
+<span class="nc" id="L814">                        cc.getHorizontal().setSize(parseBoundSize(uvStr, false, true));</span>
+<span class="nc" id="L815">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L818" title="All 6 branches missed.">                    if (!isHor &amp;&amp; (part.startsWith(&quot;h &quot;) || part.startsWith(&quot;height &quot;))) {</span>
+<span class="nc bnc" id="L819" title="All 2 branches missed.">                        String uvStr = part.substring(part.charAt(1) == ' ' ? 2 : 7).trim();</span>
+<span class="nc" id="L820">                        cc.getVertical().setSize(parseBoundSize(uvStr, false, false));</span>
+<span class="nc" id="L821">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L824" title="All 8 branches missed.">                    if (part.startsWith(&quot;wmin &quot;) || part.startsWith(&quot;wmax &quot;) || part.startsWith(&quot;hmin &quot;) || part.startsWith(&quot;hmax &quot;)) {</span>
+<span class="nc" id="L825">                        String uvStr = part.substring(5).trim();</span>
+<span class="nc bnc" id="L826" title="All 2 branches missed.">                        if (uvStr.length() &gt; 0) {</span>
+<span class="nc" id="L827">                            UnitValue uv = parseUnitValue(uvStr, null, isHor);</span>
+<span class="nc bnc" id="L828" title="All 2 branches missed.">                            boolean isMin = part.charAt(3) == 'n';</span>
+<span class="nc bnc" id="L829" title="All 2 branches missed.">                            DimConstraint dc = isHor ? cc.getHorizontal() : cc.getVertical();</span>
+<span class="nc bnc" id="L830" title="All 2 branches missed.">                            dc.setSize(new BoundSize(</span>
+<span class="nc" id="L831">                                    isMin ? uv : dc.getSize().getMin(),</span>
+<span class="nc bnc" id="L832" title="All 2 branches missed.">                                    dc.getSize().getPreferred(),</span>
+<span class="nc" id="L833">                                    isMin ? (dc.getSize().getMax()) : uv,</span>
+                                    uvStr
+                            ));
+<span class="nc" id="L836">                            continue;</span>
+                        }
+                    }
+
+<span class="nc bnc" id="L840" title="All 2 branches missed.">                    if (part.equals(&quot;west&quot;)) {</span>
+<span class="nc" id="L841">                        cc.setDockSide(1);</span>
+<span class="nc" id="L842">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L845" title="All 2 branches missed.">                    if (part.startsWith(&quot;hidemode &quot;)) {</span>
+<span class="nc" id="L846">                        cc.setHideMode(Integer.parseInt(part.substring(9)));</span>
+<span class="nc" id="L847">                        continue;</span>
+                    }
+                }
+
+<span class="nc bnc" id="L851" title="All 4 branches missed.">                if (c == 'i' &amp;&amp; part.startsWith(&quot;id &quot;)) {</span>
+<span class="nc" id="L852">                    cc.setId(part.substring(3).trim());</span>
+<span class="nc" id="L853">                    int dIx = cc.getId().indexOf('.');</span>
+<span class="nc bnc" id="L854" title="All 4 branches missed.">                    if (dIx == 0 || dIx == cc.getId().length() - 1) {</span>
+<span class="nc" id="L855">                        throw new IllegalArgumentException(&quot;Dot must not be first or last!&quot;);</span>
+                    }
+
+<span class="nc" id="L858">                    continue;</span>
+                }
+
+<span class="nc bnc" id="L861" title="All 2 branches missed.">                if (c == 'e') {</span>
+<span class="nc bnc" id="L862" title="All 2 branches missed.">                    if (part.equals(&quot;east&quot;)) {</span>
+<span class="nc" id="L863">                        cc.setDockSide(3);</span>
+<span class="nc" id="L864">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L867" title="All 2 branches missed.">                    if (part.equals(&quot;external&quot;)) {</span>
+<span class="nc" id="L868">                        cc.setExternal(true);</span>
+<span class="nc" id="L869">                        continue;</span>
+                    }
+
+<span class="nc" id="L872">                    ix = startsWithLenient(part, new String[]{&quot;endgroupx&quot;, &quot;endgroupy&quot;, &quot;egx&quot;, &quot;egy&quot;}, new int[]{-1, -1, -1, -1}, true);</span>
+<span class="nc bnc" id="L873" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L874">                        String sg = part.substring(ix).trim();</span>
+<span class="nc" id="L875">                        char lc = part.charAt(ix - 1);</span>
+<span class="nc bnc" id="L876" title="All 2 branches missed.">                        DimConstraint dc = (lc == 'x' ? cc.getHorizontal() : cc.getVertical());</span>
+<span class="nc" id="L877">                        dc.setEndGroup(sg);</span>
+<span class="nc" id="L878">                        continue;</span>
+                    }
+                }
+
+<span class="nc bnc" id="L882" title="All 2 branches missed.">                if (c == 'd') {</span>
+<span class="nc bnc" id="L883" title="All 2 branches missed.">                    if (part.equals(&quot;dock north&quot;)) {</span>
+<span class="nc" id="L884">                        cc.setDockSide(0);</span>
+<span class="nc" id="L885">                        continue;</span>
+                    }
+<span class="nc bnc" id="L887" title="All 2 branches missed.">                    if (part.equals(&quot;dock west&quot;)) {</span>
+<span class="nc" id="L888">                        cc.setDockSide(1);</span>
+<span class="nc" id="L889">                        continue;</span>
+                    }
+<span class="nc bnc" id="L891" title="All 2 branches missed.">                    if (part.equals(&quot;dock south&quot;)) {</span>
+<span class="nc" id="L892">                        cc.setDockSide(2);</span>
+<span class="nc" id="L893">                        continue;</span>
+                    }
+<span class="nc bnc" id="L895" title="All 2 branches missed.">                    if (part.equals(&quot;dock east&quot;)) {</span>
+<span class="nc" id="L896">                        cc.setDockSide(3);</span>
+<span class="nc" id="L897">                        continue;</span>
+                    }
+
+<span class="nc bnc" id="L900" title="All 2 branches missed.">                    if (part.equals(&quot;dock center&quot;)) {</span>
+<span class="nc" id="L901">                        cc.getHorizontal().setGrow(new Float(100f));</span>
+<span class="nc" id="L902">                        cc.getVertical().setGrow(new Float(100f));</span>
+<span class="nc" id="L903">                        cc.setPushX(new Float(100f));</span>
+<span class="nc" id="L904">                        cc.setPushY(new Float(100f));</span>
+<span class="nc" id="L905">                        continue;</span>
+                    }
+                }
+
+<span class="nc bnc" id="L909" title="All 2 branches missed.">                if (c == 'v') {</span>
+<span class="nc" id="L910">                    ix = startsWithLenient(part, new String[]{&quot;visualpadding&quot;, &quot;vp&quot;}, new int[]{3, 2}, true);</span>
+<span class="nc bnc" id="L911" title="All 2 branches missed.">                    if (ix &gt; -1) {</span>
+<span class="nc" id="L912">                        UnitValue[] p = parseInsets(part.substring(ix).trim(), false);</span>
+<span class="nc bnc" id="L913" title="All 6 branches missed.">                        cc.setVisualPadding(new UnitValue[]{</span>
+                                p[0],
+                                p.length &gt; 1 ? p[1] : null,
+                                p.length &gt; 2 ? p[2] : null,
+                                p.length &gt; 3 ? p[3] : null});
+<span class="nc" id="L918">                        continue;</span>
+                    }
+                }
+
+<span class="nc" id="L922">                UnitValue horAlign = parseAlignKeywords(part, true);</span>
+<span class="nc bnc" id="L923" title="All 2 branches missed.">                if (horAlign != null) {</span>
+<span class="nc" id="L924">                    cc.getHorizontal().setAlign(horAlign);</span>
+<span class="nc" id="L925">                    continue;</span>
+                }
+
+<span class="nc" id="L928">                UnitValue verAlign = parseAlignKeywords(part, false);</span>
+<span class="nc bnc" id="L929" title="All 2 branches missed.">                if (verAlign != null) {</span>
+<span class="nc" id="L930">                    cc.getVertical().setAlign(verAlign);</span>
+<span class="nc" id="L931">                    continue;</span>
+                }
+
+<span class="nc" id="L934">                throw new IllegalArgumentException(&quot;Unknown keyword.&quot;);</span>
+
+<span class="nc" id="L936">            } catch (Exception ex) {</span>
+<span class="nc" id="L937">                Log.e(ex);</span>
+<span class="nc" id="L938">                throw new IllegalArgumentException(&quot;Error parsing Constraint: '&quot; + part + &quot;'&quot;);</span>
+            }
+        }
+
+//		cc = (CC) serializeTest(cc);
+<span class="fc" id="L943">        return cc;</span>
+    }
+
+    /**
+     * Parses insets which consists of 1-4 &lt;code&gt;UnitValue&lt;/code&gt;s.
+     *
+     * @param s           The string to parse. E.g. &quot;10 10 10 10&quot; or &quot;20&quot;. If less than 4
+     *                    groups the last will be used for the missing.
+     * @param acceptPanel If &quot;panel&quot; and &quot;dialog&quot; should be accepted. They are
+     *                    used to access platform defaults.
+     * @return An array of length 4 with the parsed insets.
+     * @throws IllegalArgumentException if the parsing could not be done.
+     */
+    public static UnitValue[] parseInsets(String s, boolean acceptPanel) {
+<span class="nc bnc" id="L957" title="All 6 branches missed.">        if (s.length() == 0 || s.equals(&quot;dialog&quot;) || s.equals(&quot;panel&quot;)) {</span>
+<span class="nc bnc" id="L958" title="All 2 branches missed.">            if (!acceptPanel) {</span>
+<span class="nc" id="L959">                throw new IllegalArgumentException(&quot;Insets now allowed: &quot; + s + &quot;\n&quot;);</span>
+            }
+
+<span class="nc" id="L962">            boolean isPanel = s.startsWith(&quot;p&quot;);</span>
+<span class="nc" id="L963">            UnitValue[] ins = new UnitValue[4];</span>
+<span class="nc bnc" id="L964" title="All 2 branches missed.">            for (int j = 0; j &lt; 4; j++) {</span>
+<span class="nc bnc" id="L965" title="All 2 branches missed.">                ins[j] = isPanel ? PlatformDefaults.getPanelInsets(j) : PlatformDefaults.getDialogInsets(j);</span>
+            }
+
+<span class="nc" id="L968">            return ins;</span>
+        } else {
+<span class="nc" id="L970">            String[] insS = toTrimmedTokens(s, ' ');</span>
+<span class="nc" id="L971">            UnitValue[] ins = new UnitValue[4];</span>
+<span class="nc bnc" id="L972" title="All 2 branches missed.">            for (int j = 0; j &lt; 4; j++) {</span>
+<span class="nc bnc" id="L973" title="All 4 branches missed.">                UnitValue insSz = parseUnitValue(insS[j &lt; insS.length ? j : insS.length - 1], UnitValue.ZERO, j % 2 == 1);</span>
+<span class="nc bnc" id="L974" title="All 2 branches missed.">                ins[j] = insSz != null ? insSz : PlatformDefaults.getPanelInsets(j);</span>
+            }
+<span class="nc" id="L976">            return ins;</span>
+        }
+    }
+
+    /**
+     * Parses gaps.
+     *
+     * @param s The string that contains gap information. Should start with
+     *          &quot;gap&quot;.
+     * @return The gaps as specified in &lt;code&gt;s&lt;/code&gt;. Indexed:
+     * &lt;code&gt;[top,left,bottom,right][min,pref,max]&lt;/code&gt; or
+     * [before,after][min,pref,max] if &lt;code&gt;oneDim&lt;/code&gt; is true.
+     */
+    private static BoundSize[] parseGaps(String s) {
+<span class="nc" id="L990">        BoundSize[] ret = new BoundSize[4];</span>
+
+<span class="nc" id="L992">        int ix = startsWithLenient(s, &quot;gaptop&quot;, -1, true);</span>
+<span class="nc bnc" id="L993" title="All 2 branches missed.">        if (ix &gt; -1) {</span>
+<span class="nc" id="L994">            s = s.substring(ix).trim();</span>
+<span class="nc" id="L995">            ret[0] = parseBoundSize(s, true, false);</span>
+<span class="nc" id="L996">            return ret;</span>
+        }
+
+<span class="nc" id="L999">        ix = startsWithLenient(s, &quot;gapleft&quot;, -1, true);</span>
+<span class="nc bnc" id="L1000" title="All 2 branches missed.">        if (ix &gt; -1) {</span>
+<span class="nc" id="L1001">            s = s.substring(ix).trim();</span>
+<span class="nc" id="L1002">            ret[1] = parseBoundSize(s, true, true);</span>
+<span class="nc" id="L1003">            return ret;</span>
+        }
+
+<span class="nc" id="L1006">        ix = startsWithLenient(s, &quot;gapbottom&quot;, -1, true);</span>
+<span class="nc bnc" id="L1007" title="All 2 branches missed.">        if (ix &gt; -1) {</span>
+<span class="nc" id="L1008">            s = s.substring(ix).trim();</span>
+<span class="nc" id="L1009">            ret[2] = parseBoundSize(s, true, false);</span>
+<span class="nc" id="L1010">            return ret;</span>
+        }
+
+<span class="nc" id="L1013">        ix = startsWithLenient(s, &quot;gapright&quot;, -1, true);</span>
+<span class="nc bnc" id="L1014" title="All 2 branches missed.">        if (ix &gt; -1) {</span>
+<span class="nc" id="L1015">            s = s.substring(ix).trim();</span>
+<span class="nc" id="L1016">            ret[3] = parseBoundSize(s, true, true);</span>
+<span class="nc" id="L1017">            return ret;</span>
+        }
+
+<span class="nc" id="L1020">        ix = startsWithLenient(s, &quot;gapbefore&quot;, -1, true);</span>
+<span class="nc bnc" id="L1021" title="All 2 branches missed.">        if (ix &gt; -1) {</span>
+<span class="nc" id="L1022">            s = s.substring(ix).trim();</span>
+<span class="nc" id="L1023">            ret[1] = parseBoundSize(s, true, true);</span>
+<span class="nc" id="L1024">            return ret;</span>
+        }
+
+<span class="nc" id="L1027">        ix = startsWithLenient(s, &quot;gapafter&quot;, -1, true);</span>
+<span class="nc bnc" id="L1028" title="All 2 branches missed.">        if (ix &gt; -1) {</span>
+<span class="nc" id="L1029">            s = s.substring(ix).trim();</span>
+<span class="nc" id="L1030">            ret[3] = parseBoundSize(s, true, true);</span>
+<span class="nc" id="L1031">            return ret;</span>
+        }
+
+<span class="nc" id="L1034">        ix = startsWithLenient(s, new String[]{&quot;gapx&quot;, &quot;gapy&quot;}, null, true);</span>
+<span class="nc bnc" id="L1035" title="All 2 branches missed.">        if (ix &gt; -1) {</span>
+<span class="nc bnc" id="L1036" title="All 2 branches missed.">            boolean x = s.charAt(3) == 'x';</span>
+<span class="nc" id="L1037">            String[] gaps = toTrimmedTokens(s.substring(ix).trim(), ' ');</span>
+<span class="nc bnc" id="L1038" title="All 2 branches missed.">            ret[x ? 1 : 0] = parseBoundSize(gaps[0], true, x);</span>
+<span class="nc bnc" id="L1039" title="All 2 branches missed.">            if (gaps.length &gt; 1) {</span>
+<span class="nc bnc" id="L1040" title="All 4 branches missed.">                ret[x ? 3 : 2] = parseBoundSize(gaps[1], true, !x);</span>
+            }
+<span class="nc" id="L1042">            return ret;</span>
+        }
+
+<span class="nc" id="L1045">        ix = startsWithLenient(s, &quot;gap &quot;, 1, true);</span>
+<span class="nc bnc" id="L1046" title="All 2 branches missed.">        if (ix &gt; -1) {</span>
+<span class="nc" id="L1047">            String[] gaps = toTrimmedTokens(s.substring(ix).trim(), ' ');</span>
+
+<span class="nc" id="L1049">            ret[1] = parseBoundSize(gaps[0], true, true);   // left</span>
+<span class="nc bnc" id="L1050" title="All 2 branches missed.">            if (gaps.length &gt; 1) {</span>
+<span class="nc" id="L1051">                ret[3] = parseBoundSize(gaps[1], true, false);   // right</span>
+<span class="nc bnc" id="L1052" title="All 2 branches missed.">                if (gaps.length &gt; 2) {</span>
+<span class="nc" id="L1053">                    ret[0] = parseBoundSize(gaps[2], true, true);   // top</span>
+<span class="nc bnc" id="L1054" title="All 2 branches missed.">                    if (gaps.length &gt; 3) {</span>
+<span class="nc" id="L1055">                        ret[2] = parseBoundSize(gaps[3], true, false);   // bottom</span>
+                    }
+                }
+            }
+<span class="nc" id="L1059">            return ret;</span>
+        }
+
+<span class="nc" id="L1062">        throw new IllegalArgumentException(&quot;Unknown Gap part: '&quot; + s + &quot;'&quot;);</span>
+    }
+
+    private static int parseSpan(String s) {
+<span class="nc bnc" id="L1066" title="All 2 branches missed.">        return s.length() &gt; 0 ? Integer.parseInt(s) : LayoutUtil.INF;</span>
+    }
+
+    private static Float parseFloat(String s, Float nullVal) {
+<span class="pc bpc" id="L1070" title="1 of 2 branches missed.">        return s.length() &gt; 0 ? new Float(Float.parseFloat(s)) : nullVal;</span>
+    }
+
+    /**
+     * Parses a single &quot;min:pref:max&quot; value. May look something like
+     * &lt;code&gt;&quot;10px:20lp:30%&quot;&lt;/code&gt; or &lt;code&gt;&quot;pref!&quot;&lt;/code&gt;.
+     *
+     * @param s     The string to parse. Not &lt;code&gt;null&lt;/code&gt;.
+     * @param isGap If this bound size is a gap (different empty string
+     *              handling).
+     * @param isHor If the size is for the horizontal dimension.
+     * @return A bound size that may be &lt;code&gt;null&lt;/code&gt; if the string was
+     * &quot;null&quot;, &quot;n&quot; or &lt;code&gt;null&lt;/code&gt;.
+     */
+    public static BoundSize parseBoundSize(String s, boolean isGap, boolean isHor) {
+<span class="pc bpc" id="L1085" title="2 of 6 branches missed.">        if (s.length() == 0 || s.equals(&quot;null&quot;) || s.equals(&quot;n&quot;)) {</span>
+<span class="fc" id="L1086">            return null;</span>
+        }
+
+<span class="fc" id="L1089">        String cs = s;</span>
+<span class="fc" id="L1090">        boolean push = false;</span>
+<span class="pc bpc" id="L1091" title="1 of 2 branches missed.">        if (s.endsWith(&quot;push&quot;)) {</span>
+<span class="nc" id="L1092">            push = true;</span>
+<span class="nc" id="L1093">            int l = s.length();</span>
+<span class="nc bnc" id="L1094" title="All 2 branches missed.">            s = s.substring(0, l - (s.endsWith(&quot;:push&quot;) ? 5 : 4));</span>
+<span class="nc bnc" id="L1095" title="All 2 branches missed.">            if (s.length() == 0) {</span>
+<span class="nc" id="L1096">                return new BoundSize(null, null, null, true, cs);</span>
+            }
+        }
+
+<span class="fc" id="L1100">        String[] sizes = toTrimmedTokens(s, ':');</span>
+<span class="fc" id="L1101">        String s0 = sizes[0];</span>
+
+<span class="pc bpc" id="L1103" title="1 of 2 branches missed.">        if (sizes.length == 1) {</span>
+<span class="fc" id="L1104">            boolean hasEM = s0.endsWith(&quot;!&quot;);</span>
+<span class="pc bpc" id="L1105" title="1 of 2 branches missed.">            if (hasEM) {</span>
+<span class="nc" id="L1106">                s0 = s0.substring(0, s0.length() - 1);</span>
+            }
+<span class="fc" id="L1108">            UnitValue uv = parseUnitValue(s0, null, isHor);</span>
+<span class="pc bpc" id="L1109" title="3 of 6 branches missed.">            return new BoundSize(((isGap || hasEM) ? uv : null), uv, (hasEM ? uv : null), push, cs);</span>
+
+<span class="nc bnc" id="L1111" title="All 2 branches missed.">        } else if (sizes.length == 2) {</span>
+<span class="nc" id="L1112">            return new BoundSize(parseUnitValue(s0, null, isHor), parseUnitValue(sizes[1], null, isHor), null, push, cs);</span>
+<span class="nc bnc" id="L1113" title="All 2 branches missed.">        } else if (sizes.length == 3) {</span>
+<span class="nc" id="L1114">            return new BoundSize(parseUnitValue(s0, null, isHor), parseUnitValue(sizes[1], null, isHor), parseUnitValue(sizes[2], null, isHor), push, cs);</span>
+        } else {
+<span class="nc" id="L1116">            throw new IllegalArgumentException(&quot;Min:Preferred:Max size section must contain 0, 1 or 2 colons. '&quot; + cs + &quot;'&quot;);</span>
+        }
+    }
+
+    /**
+     * Parses a single unit value that may also be an alignment as parsed by
+     * {@link #parseAlignKeywords(String, boolean)}.
+     *
+     * @param s                The string to parse. Not &lt;code&gt;null&lt;/code&gt;. May look something
+     *                         like &lt;code&gt;&quot;10px&quot;&lt;/code&gt; or &lt;code&gt;&quot;5dlu&quot;&lt;/code&gt;.
+     * @param isHor            If the value is for the horizontal dimension.
+     * @param emptyReplacement A replacement if &lt;code&gt;s&lt;/code&gt; is empty. May be
+     *                         &lt;code&gt;null&lt;/code&gt;.
+     * @return The parsed unit value. May be &lt;code&gt;null&lt;/code&gt;.
+     */
+    public static UnitValue parseUnitValueOrAlign(String s, boolean isHor, UnitValue emptyReplacement) {
+<span class="nc bnc" id="L1132" title="All 2 branches missed.">        if (s.length() == 0) {</span>
+<span class="nc" id="L1133">            return emptyReplacement;</span>
+        }
+
+<span class="nc" id="L1136">        UnitValue align = parseAlignKeywords(s, isHor);</span>
+<span class="nc bnc" id="L1137" title="All 2 branches missed.">        if (align != null) {</span>
+<span class="nc" id="L1138">            return align;</span>
+        }
+
+<span class="nc" id="L1141">        return parseUnitValue(s, emptyReplacement, isHor);</span>
+    }
+
+    /**
+     * Parses a single unit value. E.g. &quot;10px&quot; or &quot;5in&quot;
+     *
+     * @param s     The string to parse. Not &lt;code&gt;null&lt;/code&gt;. May look something
+     *              like &lt;code&gt;&quot;10px&quot;&lt;/code&gt; or &lt;code&gt;&quot;5dlu&quot;&lt;/code&gt;.
+     * @param isHor If the value is for the horizontal dimension.
+     * @return The parsed unit value. &lt;code&gt;null&lt;/code&gt; is empty string,
+     */
+    public static UnitValue parseUnitValue(String s, boolean isHor) {
+<span class="nc" id="L1153">        return parseUnitValue(s, null, isHor);</span>
+    }
+
+    /**
+     * Parses a single unit value.
+     *
+     * @param s                The string to parse. May be &lt;code&gt;null&lt;/code&gt;. May look
+     *                         something like &lt;code&gt;&quot;10px&quot;&lt;/code&gt; or &lt;code&gt;&quot;5dlu&quot;&lt;/code&gt;.
+     * @param emptyReplacement A replacement &lt;code&gt;s&lt;/code&gt; is empty or
+     *                         &lt;code&gt;null&lt;/code&gt;. May be &lt;code&gt;null&lt;/code&gt;.
+     * @param isHor            If the value is for the horizontal dimension.
+     * @return The parsed unit value. May be &lt;code&gt;null&lt;/code&gt;.
+     */
+    private static UnitValue parseUnitValue(String s, UnitValue emptyReplacement, boolean isHor) {
+<span class="pc bpc" id="L1167" title="2 of 4 branches missed.">        if (s == null || s.length() == 0) {</span>
+<span class="nc" id="L1168">            return emptyReplacement;</span>
+        }
+
+<span class="fc" id="L1171">        String cs = s; // Save creation string.</span>
+<span class="fc" id="L1172">        char c0 = s.charAt(0);</span>
+
+        // Remove start and end parentheses, if there.
+<span class="pc bpc" id="L1175" title="3 of 4 branches missed.">        if (c0 == '(' &amp;&amp; s.charAt(s.length() - 1) == ')') {</span>
+<span class="nc" id="L1176">            s = s.substring(1, s.length() - 1);</span>
+        }
+
+<span class="pc bpc" id="L1179" title="5 of 6 branches missed.">        if (c0 == 'n' &amp;&amp; (s.equals(&quot;null&quot;) || s.equals(&quot;n&quot;))) {</span>
+<span class="nc" id="L1180">            return null;</span>
+        }
+
+<span class="pc bpc" id="L1183" title="3 of 4 branches missed.">        if (c0 == 'i' &amp;&amp; s.equals(&quot;inf&quot;)) {</span>
+<span class="nc" id="L1184">            return UnitValue.INF;</span>
+        }
+
+<span class="fc" id="L1187">        int oper = getOper(s);</span>
+<span class="pc bpc" id="L1188" title="4 of 8 branches missed.">        boolean inline = oper == UnitValue.ADD || oper == UnitValue.SUB || oper == UnitValue.MUL || oper == UnitValue.DIV;</span>
+
+<span class="pc bpc" id="L1190" title="1 of 2 branches missed.">        if (oper != UnitValue.STATIC) {  // It is a multi-value</span>
+
+            String[] uvs;
+<span class="nc bnc" id="L1193" title="All 2 branches missed.">            if (!inline) {   // If the format is of type &quot;opr(xxx,yyy)&quot; (compared to in-line &quot;10%+15px&quot;)</span>
+<span class="nc" id="L1194">                String sub = s.substring(4, s.length() - 1).trim();</span>
+<span class="nc" id="L1195">                uvs = toTrimmedTokens(sub, ',');</span>
+<span class="nc bnc" id="L1196" title="All 2 branches missed.">                if (uvs.length == 1) {</span>
+<span class="nc" id="L1197">                    return parseUnitValue(sub, null, isHor);</span>
+                }
+<span class="nc" id="L1199">            } else {</span>
+                char delim;
+<span class="nc bnc" id="L1201" title="All 2 branches missed.">                if (oper == UnitValue.ADD) {</span>
+<span class="nc" id="L1202">                    delim = '+';</span>
+<span class="nc bnc" id="L1203" title="All 2 branches missed.">                } else if (oper == UnitValue.SUB) {</span>
+<span class="nc" id="L1204">                    delim = '-';</span>
+<span class="nc bnc" id="L1205" title="All 2 branches missed.">                } else if (oper == UnitValue.MUL) {</span>
+<span class="nc" id="L1206">                    delim = '*';</span>
+                } else {    // div left
+<span class="nc" id="L1208">                    delim = '/';</span>
+                }
+<span class="nc" id="L1210">                uvs = toTrimmedTokens(s, delim);</span>
+<span class="nc bnc" id="L1211" title="All 2 branches missed.">                if (uvs.length &gt; 2) {   // More than one +-*/.</span>
+<span class="nc" id="L1212">                    String last = uvs[uvs.length - 1];</span>
+<span class="nc" id="L1213">                    String first = s.substring(0, s.length() - last.length() - 1);</span>
+<span class="nc" id="L1214">                    uvs = new String[]{first, last};</span>
+                }
+            }
+
+<span class="nc bnc" id="L1218" title="All 2 branches missed.">            if (uvs.length != 2) {</span>
+<span class="nc" id="L1219">                throw new IllegalArgumentException(&quot;Malformed UnitValue: '&quot; + s + &quot;'&quot;);</span>
+            }
+
+<span class="nc" id="L1222">            UnitValue sub1 = parseUnitValue(uvs[0], null, isHor);</span>
+<span class="nc" id="L1223">            UnitValue sub2 = parseUnitValue(uvs[1], null, isHor);</span>
+
+<span class="nc bnc" id="L1225" title="All 4 branches missed.">            if (sub1 == null || sub2 == null) {</span>
+<span class="nc" id="L1226">                throw new IllegalArgumentException(&quot;Malformed UnitValue. Must be two sub-values: '&quot; + s + &quot;'&quot;);</span>
+            }
+
+<span class="nc" id="L1229">            return new UnitValue(isHor, oper, sub1, sub2, cs);</span>
+        } else {
+            try {
+<span class="fc" id="L1232">                String[] numParts = getNumTextParts(s);</span>
+<span class="pc bpc" id="L1233" title="1 of 2 branches missed.">                float value = numParts[0].length() &gt; 0 ? Float.parseFloat(numParts[0]) : 1;     // e.g. &quot;related&quot; has no number part..</span>
+
+<span class="fc" id="L1235">                return new UnitValue(value, numParts[1], isHor, oper, cs);</span>
+
+<span class="nc" id="L1237">            } catch (Exception e) {</span>
+<span class="nc" id="L1238">                Log.e(e);</span>
+<span class="nc" id="L1239">                throw new IllegalArgumentException(&quot;Malformed UnitValue: '&quot; + s + &quot;'&quot;);</span>
+            }
+        }
+    }
+
+    /**
+     * Parses alignment keywords and returns the appropriate
+     * &lt;code&gt;UnitValue&lt;/code&gt;.
+     *
+     * @param s     The string to parse. Not &lt;code&gt;null&lt;/code&gt;.
+     * @param isHor If alignments for horizontal is checked. &lt;code&gt;false&lt;/code&gt;
+     *              means vertical.
+     * @return The unit value or &lt;code&gt;null&lt;/code&gt; if not recognized (no
+     * exception).
+     */
+    static UnitValue parseAlignKeywords(String s, boolean isHor) {
+<span class="pc bpc" id="L1255" title="1 of 2 branches missed.">        if (startsWithLenient(s, &quot;center&quot;, 1, false) != -1) {</span>
+<span class="nc" id="L1256">            return UnitValue.CENTER;</span>
+        }
+
+<span class="pc bpc" id="L1259" title="1 of 2 branches missed.">        if (isHor) {</span>
+<span class="pc bpc" id="L1260" title="1 of 2 branches missed.">            if (startsWithLenient(s, &quot;left&quot;, 1, false) != -1) {</span>
+<span class="nc" id="L1261">                return UnitValue.LEFT;</span>
+            }
+
+<span class="pc bpc" id="L1264" title="1 of 2 branches missed.">            if (startsWithLenient(s, &quot;right&quot;, 1, false) != -1) {</span>
+<span class="nc" id="L1265">                return UnitValue.RIGHT;</span>
+            }
+
+<span class="pc bpc" id="L1268" title="1 of 2 branches missed.">            if (startsWithLenient(s, &quot;leading&quot;, 4, false) != -1) {</span>
+<span class="nc" id="L1269">                return UnitValue.LEADING;</span>
+            }
+
+<span class="pc bpc" id="L1272" title="1 of 2 branches missed.">            if (startsWithLenient(s, &quot;trailing&quot;, 5, false) != -1) {</span>
+<span class="nc" id="L1273">                return UnitValue.TRAILING;</span>
+            }
+
+<span class="pc bpc" id="L1276" title="1 of 2 branches missed.">            if (startsWithLenient(s, &quot;label&quot;, 5, false) != -1) {</span>
+<span class="nc" id="L1277">                return UnitValue.LABEL;</span>
+            }
+
+        } else {
+
+<span class="nc bnc" id="L1282" title="All 2 branches missed.">            if (startsWithLenient(s, &quot;baseline&quot;, 4, false) != -1) {</span>
+<span class="nc" id="L1283">                return UnitValue.BASELINE_IDENTITY;</span>
+            }
+
+<span class="nc bnc" id="L1286" title="All 2 branches missed.">            if (startsWithLenient(s, &quot;top&quot;, 1, false) != -1) {</span>
+<span class="nc" id="L1287">                return UnitValue.TOP;</span>
+            }
+
+<span class="nc bnc" id="L1290" title="All 2 branches missed.">            if (startsWithLenient(s, &quot;bottom&quot;, 1, false) != -1) {</span>
+<span class="nc" id="L1291">                return UnitValue.BOTTOM;</span>
+            }
+        }
+
+<span class="fc" id="L1295">        return null;</span>
+    }
+
+    /**
+     * Splits a text-number combination such as &quot;hello 10.0&quot; into
+     * &lt;code&gt;{&quot;hello&quot;, &quot;10.0&quot;}&lt;/code&gt;.
+     *
+     * @param s The string to split. Not &lt;code&gt;null&lt;/code&gt;. Needs be be
+     *          reasonably formatted since the method only finds the first 0-9 or . and
+     *          cuts the string in half there.
+     * @return Always length 2 and no &lt;code&gt;null&lt;/code&gt; elements. Elements are
+     * &quot;&quot; if no part found.
+     */
+    private static String[] getNumTextParts(String s) {
+<span class="fc bfc" id="L1309" title="All 2 branches covered.">        for (int i = 0, iSz = s.length(); i &lt; iSz; i++) {</span>
+<span class="fc" id="L1310">            char c = s.charAt(i);</span>
+<span class="pc bpc" id="L1311" title="1 of 2 branches missed.">            if (c == ' ') {</span>
+<span class="nc" id="L1312">                throw new IllegalArgumentException(&quot;Space in UnitValue: '&quot; + s + &quot;'&quot;);</span>
+            }
+
+<span class="pc bpc" id="L1315" title="6 of 8 branches missed.">            if ((c &lt; '0' || c &gt; '9') &amp;&amp; c != '.' &amp;&amp; c != '-') {</span>
+<span class="nc" id="L1316">                return new String[]{s.substring(0, i).trim(), s.substring(i).trim()};</span>
+            }
+        }
+<span class="fc" id="L1319">        return new String[]{s, &quot;&quot;};</span>
+    }
+
+    /**
+     * Returns the operation depending on the start character.
+     *
+     * @param s The string to check. Not &lt;code&gt;null&lt;/code&gt;.
+     * @return E.g. UnitValue.ADD, UnitValue.SUB or UnitValue.STATIC. Returns
+     * negative value for in-line operations.
+     */
+    private static int getOper(String s) {
+<span class="fc" id="L1330">        int len = s.length();</span>
+<span class="pc bpc" id="L1331" title="1 of 2 branches missed.">        if (len &lt; 3) {</span>
+<span class="nc" id="L1332">            return UnitValue.STATIC;</span>
+        }
+
+<span class="pc bpc" id="L1335" title="5 of 6 branches missed.">        if (len &gt; 5 &amp;&amp; s.charAt(3) == '(' &amp;&amp; s.charAt(len - 1) == ')') {</span>
+<span class="nc bnc" id="L1336" title="All 2 branches missed.">            if (s.startsWith(&quot;min(&quot;)) {</span>
+<span class="nc" id="L1337">                return UnitValue.MIN;</span>
+            }
+
+<span class="nc bnc" id="L1340" title="All 2 branches missed.">            if (s.startsWith(&quot;max(&quot;)) {</span>
+<span class="nc" id="L1341">                return UnitValue.MAX;</span>
+            }
+
+<span class="nc bnc" id="L1344" title="All 2 branches missed.">            if (s.startsWith(&quot;mid(&quot;)) {</span>
+<span class="nc" id="L1345">                return UnitValue.MID;</span>
+            }
+        }
+
+        // Try in-line add/sub. E.g. &quot;pref+10px&quot;.
+<span class="fc bfc" id="L1350" title="All 2 branches covered.">        for (int j = 0; j &lt; 2; j++) {   // First +-   then */   (precedence)</span>
+<span class="fc bfc" id="L1351" title="All 2 branches covered.">            for (int i = len - 1, p = 0; i &gt; 0; i--) {</span>
+<span class="fc" id="L1352">                char c = s.charAt(i);</span>
+<span class="pc bpc" id="L1353" title="1 of 2 branches missed.">                if (c == ')') {</span>
+<span class="nc" id="L1354">                    p++;</span>
+<span class="pc bpc" id="L1355" title="1 of 2 branches missed.">                } else if (c == '(') {</span>
+<span class="nc" id="L1356">                    p--;</span>
+<span class="pc bpc" id="L1357" title="1 of 2 branches missed.">                } else if (p == 0) {</span>
+<span class="fc bfc" id="L1358" title="All 2 branches covered.">                    if (j == 0) {</span>
+<span class="pc bpc" id="L1359" title="1 of 2 branches missed.">                        if (c == '+') {</span>
+<span class="nc" id="L1360">                            return UnitValue.ADD;</span>
+                        }
+<span class="pc bpc" id="L1362" title="1 of 2 branches missed.">                        if (c == '-') {</span>
+<span class="nc" id="L1363">                            return UnitValue.SUB;</span>
+                        }
+                    } else {
+<span class="pc bpc" id="L1366" title="1 of 2 branches missed.">                        if (c == '*') {</span>
+<span class="nc" id="L1367">                            return UnitValue.MUL;</span>
+                        }
+<span class="pc bpc" id="L1369" title="1 of 2 branches missed.">                        if (c == '/') {</span>
+<span class="nc" id="L1370">                            return UnitValue.DIV;</span>
+                        }
+                    }
+                }
+            }
+        }
+<span class="fc" id="L1376">        return UnitValue.STATIC;</span>
+    }
+
+    /**
+     * Returns if a string shares at least a specified numbers starting
+     * characters with a number of matches.
+     * &lt;p&gt;
+     * This method just exercise
+     * {@link #startsWithLenient(String, String, int, boolean)} with every one
+     * of &lt;code&gt;matches&lt;/code&gt; and &lt;code&gt;minChars&lt;/code&gt;.
+     *
+     * @param s              The string to check. Not &lt;code&gt;null&lt;/code&gt;.
+     * @param matches        A number of possible starts for &lt;code&gt;s&lt;/code&gt;.
+     * @param minChars       The minimum number of characters to match for every
+     *                       element in &lt;code&gt;matches&lt;/code&gt;. Needs to be of same length as
+     *                       &lt;code&gt;matches&lt;/code&gt;. Can be &lt;code&gt;null&lt;/code&gt;.
+     * @param acceptTrailing If after the required number of characters are
+     *                       matched on recognized characters that are not in one of the the
+     *                       &lt;code&gt;matches&lt;/code&gt; string should be accepted. For instance if &quot;abczz&quot;
+     *                       should be matched with &quot;abcdef&quot; and min chars 3.
+     * @return The index of the first unmatched character if
+     * &lt;code&gt;minChars&lt;/code&gt; was reached or &lt;code&gt;-1&lt;/code&gt; if a match was not
+     * found.
+     */
+    private static int startsWithLenient(String s, String[] matches, int[] minChars, boolean acceptTrailing) {
+<span class="fc bfc" id="L1401" title="All 2 branches covered.">        for (int i = 0; i &lt; matches.length; i++) {</span>
+<span class="pc bpc" id="L1402" title="1 of 2 branches missed.">            int minChar = minChars != null ? minChars[i] : -1;</span>
+<span class="fc" id="L1403">            int ix = startsWithLenient(s, matches[i], minChar, acceptTrailing);</span>
+<span class="pc bpc" id="L1404" title="1 of 2 branches missed.">            if (ix &gt; -1) {</span>
+<span class="nc" id="L1405">                return ix;</span>
+            }
+        }
+<span class="fc" id="L1408">        return -1;</span>
+    }
+
+    /**
+     * Returns if a string shares at least a specified numbers starting
+     * characters with a match.
+     *
+     * @param s              The string to check. Not &lt;code&gt;null&lt;/code&gt; and must be trimmed.
+     * @param match          The possible start for &lt;code&gt;s&lt;/code&gt;. Not &lt;code&gt;null&lt;/code&gt;
+     *                       and must be trimmed.
+     * @param minChars       The mimimum number of characters to match to
+     *                       &lt;code&gt;s&lt;/code&gt; for it this to be considered a match. -1 means the full
+     *                       length of &lt;code&gt;match&lt;/code&gt;.
+     * @param acceptTrailing If after the required number of charecters are
+     *                       matched unrecognized characters that are not in one of the the
+     *                       &lt;code&gt;matches&lt;/code&gt; string should be accepted. For instance if &quot;abczz&quot;
+     *                       should be matched with &quot;abcdef&quot; and min chars 3.
+     * @return The index of the first unmatched character if
+     * &lt;code&gt;minChars&lt;/code&gt; was reached or &lt;code&gt;-1&lt;/code&gt; if a match was not
+     * found.
+     */
+    private static int startsWithLenient(String s, String match, int minChars, boolean acceptTrailing) {
+<span class="fc bfc" id="L1430" title="All 2 branches covered.">        if (s.charAt(0) != match.charAt(0)) // Fast sanity check.</span>
+        {
+<span class="fc" id="L1432">            return -1;</span>
+        }
+
+<span class="fc bfc" id="L1435" title="All 2 branches covered.">        if (minChars == -1) {</span>
+<span class="fc" id="L1436">            minChars = match.length();</span>
+        }
+
+<span class="fc" id="L1439">        int sSz = s.length();</span>
+<span class="fc bfc" id="L1440" title="All 2 branches covered.">        if (sSz &lt; minChars) {</span>
+<span class="fc" id="L1441">            return -1;</span>
+        }
+
+<span class="fc" id="L1444">        int mSz = match.length();</span>
+<span class="fc" id="L1445">        int sIx = 0;</span>
+<span class="fc bfc" id="L1446" title="All 2 branches covered.">        for (int mIx = 0; mIx &lt; mSz; sIx++, mIx++) {</span>
+<span class="pc bpc" id="L1447" title="3 of 6 branches missed.">            while (sIx &lt; sSz &amp;&amp; (s.charAt(sIx) == ' ' || s.charAt(sIx) == '_')) // Disregard spaces and _</span>
+            {
+<span class="nc" id="L1449">                sIx++;</span>
+            }
+
+<span class="pc bpc" id="L1452" title="1 of 4 branches missed.">            if (sIx &gt;= sSz || s.charAt(sIx) != match.charAt(mIx)) {</span>
+<span class="pc bpc" id="L1453" title="9 of 10 branches missed.">                return mIx &gt;= minChars &amp;&amp; (acceptTrailing || sIx &gt;= sSz) &amp;&amp; (sIx &gt;= sSz || s.charAt(sIx - 1) == ' ') ? sIx : -1;</span>
+            }
+        }
+<span class="pc bpc" id="L1456" title="3 of 6 branches missed.">        return sIx &gt;= sSz || acceptTrailing || s.charAt(sIx) == ' ' ? sIx : -1;</span>
+    }
+
+    /**
+     * Parses a string and returns it in those parts of the string that are
+     * separated with a &lt;code&gt;sep&lt;/code&gt; character.
+     * &lt;p&gt;
+     * separator characters within parentheses will not be counted or handled in
+     * any way, whatever the depth.
+     * &lt;p&gt;
+     * A space separator will be a hit to one or more spaces and thus not return
+     * empty strings.
+     *
+     * @param s   The string to parse. If it starts and/or ends with a
+     *            &lt;code&gt;sep&lt;/code&gt; the first and/or last element returned will be &quot;&quot;. If
+     *            two &lt;code&gt;sep&lt;/code&gt; are next to each other and empty element will be
+     *            &quot;between&quot; the periods. The &lt;code&gt;sep&lt;/code&gt; themselves will never be
+     *            returned.
+     * @param sep The separator char.
+     * @return Those parts of the string that are separated with
+     * &lt;code&gt;sep&lt;/code&gt;. Never null and at least of size 1
+     * @since 6.7.2 Changed so more than one space in a row works as one space.
+     */
+    private static String[] toTrimmedTokens(String s, char sep) {
+<span class="fc" id="L1480">        int toks = 0, sSize = s.length();</span>
+<span class="fc bfc" id="L1481" title="All 2 branches covered.">        boolean disregardDoubles = sep == ' ';</span>
+
+        // Count the sep:s
+<span class="fc" id="L1484">        int p = 0;</span>
+<span class="fc bfc" id="L1485" title="All 2 branches covered.">        for (int i = 0; i &lt; sSize; i++) {</span>
+<span class="fc" id="L1486">            char c = s.charAt(i);</span>
+<span class="pc bpc" id="L1487" title="1 of 2 branches missed.">            if (c == '(') {</span>
+<span class="nc" id="L1488">                p++;</span>
+<span class="pc bpc" id="L1489" title="1 of 2 branches missed.">            } else if (c == ')') {</span>
+<span class="nc" id="L1490">                p--;</span>
+<span class="pc bpc" id="L1491" title="2 of 4 branches missed.">            } else if (p == 0 &amp;&amp; c == sep) {</span>
+<span class="nc" id="L1492">                toks++;</span>
+<span class="nc bnc" id="L1493" title="All 6 branches missed.">                while (disregardDoubles &amp;&amp; i &lt; sSize - 1 &amp;&amp; s.charAt(i + 1) == ' ') {</span>
+<span class="nc" id="L1494">                    i++;</span>
+                }
+            }
+<span class="pc bpc" id="L1497" title="1 of 2 branches missed.">            if (p &lt; 0) {</span>
+<span class="nc" id="L1498">                throw new IllegalArgumentException(&quot;Unbalanced parentheses: '&quot; + s + &quot;'&quot;);</span>
+            }
+        }
+<span class="pc bpc" id="L1501" title="1 of 2 branches missed.">        if (p != 0) {</span>
+<span class="nc" id="L1502">            throw new IllegalArgumentException(&quot;Unbalanced parentheses: '&quot; + s + &quot;'&quot;);</span>
+        }
+
+<span class="pc bpc" id="L1505" title="1 of 2 branches missed.">        if (toks == 0) {</span>
+<span class="fc" id="L1506">            return new String[]{s.trim()};</span>
+        }
+
+<span class="nc" id="L1509">        String[] retArr = new String[toks + 1];</span>
+
+<span class="nc" id="L1511">        int st = 0, pNr = 0;</span>
+<span class="nc" id="L1512">        p = 0;</span>
+<span class="nc bnc" id="L1513" title="All 2 branches missed.">        for (int i = 0; i &lt; sSize; i++) {</span>
+
+<span class="nc" id="L1515">            char c = s.charAt(i);</span>
+<span class="nc bnc" id="L1516" title="All 2 branches missed.">            if (c == '(') {</span>
+<span class="nc" id="L1517">                p++;</span>
+<span class="nc bnc" id="L1518" title="All 2 branches missed.">            } else if (c == ')') {</span>
+<span class="nc" id="L1519">                p--;</span>
+<span class="nc bnc" id="L1520" title="All 4 branches missed.">            } else if (p == 0 &amp;&amp; c == sep) {</span>
+<span class="nc" id="L1521">                retArr[pNr++] = s.substring(st, i).trim();</span>
+<span class="nc" id="L1522">                st = i + 1;</span>
+<span class="nc bnc" id="L1523" title="All 6 branches missed.">                while (disregardDoubles &amp;&amp; i &lt; sSize - 1 &amp;&amp; s.charAt(i + 1) == ' ') {</span>
+<span class="nc" id="L1524">                    i++;</span>
+                }
+            }
+        }
+
+<span class="nc" id="L1529">        retArr[pNr++] = s.substring(st, sSize).trim();</span>
+<span class="nc" id="L1530">        return retArr;</span>
+    }
+
+    /**
+     * Parses &quot;AAA[BBB]CCC[DDD]EEE&quot; into {&quot;AAA&quot;, &quot;BBB&quot;, &quot;CCC&quot;, &quot;DDD&quot;, &quot;EEE&quot;,
+     * &quot;FFF&quot;}. Handles empty parts. Will always start and end outside a [] block
+     * so that the number of returned elemets will always be uneven and at least
+     * of length 3.
+     * &lt;p&gt;
+     * &quot;|&quot; is interpreted as &quot;][&quot;.
+     *
+     * @param s The string. Might be &quot;&quot; but not null. Should be trimmed.
+     * @return The string divided into elements. Never &lt;code&gt;null&lt;/code&gt; and at
+     * least of length 3.
+     * @throws IllegalArgumentException If a [] mismatch of some kind. (If not
+     *                                  same [ as ] count or if the interleave.)
+     */
+    private static ArrayList&lt;String&gt; getRowColAndGapsTrimmed(String s) {
+<span class="pc bpc" id="L1548" title="1 of 2 branches missed.">        if (s.indexOf('|') != -1) {</span>
+<span class="nc" id="L1549">            s = StringUtil.replaceAll(s, &quot;\\|&quot;, &quot;][&quot;);</span>
+        }
+
+<span class="fc" id="L1552">        ArrayList&lt;String&gt; retList = new ArrayList&lt;String&gt;(Math.max(s.length() &gt;&gt; 2 + 1, 3)); // Approx return length.</span>
+<span class="fc" id="L1553">        int s0 = 0, s1 = 0; // '[' and ']' count.</span>
+<span class="fc" id="L1554">        int st = 0; // Start of &quot;next token to add&quot;.</span>
+<span class="fc bfc" id="L1555" title="All 2 branches covered.">        for (int i = 0, iSz = s.length(); i &lt; iSz; i++) {</span>
+<span class="fc" id="L1556">            char c = s.charAt(i);</span>
+<span class="fc bfc" id="L1557" title="All 2 branches covered.">            if (c == '[') {</span>
+<span class="fc" id="L1558">                s0++;</span>
+<span class="fc bfc" id="L1559" title="All 2 branches covered.">            } else if (c == ']') {</span>
+<span class="fc" id="L1560">                s1++;</span>
+            } else {
+                continue;
+            }
+
+<span class="pc bpc" id="L1565" title="1 of 4 branches missed.">            if (s0 != s1 &amp;&amp; (s0 - 1) != s1) {</span>
+<span class="nc" id="L1566">                break;  // Wrong [ or ] found. Break for throw.</span>
+            }
+<span class="fc" id="L1568">            retList.add(s.substring(st, i).trim());</span>
+<span class="fc" id="L1569">            st = i + 1;</span>
+        }
+<span class="pc bpc" id="L1571" title="1 of 2 branches missed.">        if (s0 != s1) {</span>
+<span class="nc" id="L1572">            throw new IllegalArgumentException(&quot;'[' and ']' mismatch in row/column format string: &quot; + s);</span>
+        }
+
+<span class="pc bpc" id="L1575" title="1 of 2 branches missed.">        if (s0 == 0) {</span>
+<span class="nc" id="L1576">            retList.add(&quot;&quot;);</span>
+<span class="nc" id="L1577">            retList.add(s);</span>
+<span class="nc" id="L1578">            retList.add(&quot;&quot;);</span>
+<span class="pc bpc" id="L1579" title="1 of 2 branches missed.">        } else if (retList.size() % 2 == 0) {</span>
+<span class="fc" id="L1580">            retList.add(s.substring(st));</span>
+        }
+
+<span class="fc" id="L1583">        return retList;</span>
+    }
+
+    /**
+     * Makes &lt;code&gt;null&lt;/code&gt; &quot;&quot;, trims and converts to lower case.
+     *
+     * @param s The string
+     * @return Not null.
+     */
+    public static String prepare(String s) {
+<span class="fc bfc" id="L1593" title="All 2 branches covered.">        return s != null ? s.trim().toLowerCase() : &quot;&quot;;</span>
+    }
+
+//	/** Tests to serialize and deserialize the object with both XMLEncoder/Decoder and through Serializable
+//	 * @param o The object to serialize
+//	 * @return The same object after a tri through the process.
+//	 */
+//	public static final Object serializeTest(Object o)
+//	{
+//		try {
+//			ByteArrayOutputStream barr = new ByteArrayOutputStream();
+//			XMLEncoder enc = new XMLEncoder(barr);
+//			enc.writeObject(o);
+//			enc.close();
+//
+//			XMLDecoder dec = new XMLDecoder(new ByteArrayInputStream(barr.toByteArray()));
+//			o = dec.readObject();
+//			dec.close();
+//		} catch (Exception e) {
+//			e.printStackTrace();
+//		}
+//
+//		try {
+//			ByteArrayOutputStream barr = new ByteArrayOutputStream();
+//			ObjectOutputStream oos = new ObjectOutputStream(barr);
+//			oos.writeObject(o);
+//			oos.close();
+//
+//			ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(barr.toByteArray()));
+//			o = ois.readObject();
+//			ois.close();
+//		} catch (Exception e) {
+//			e.printStackTrace();
+//		}
+//
+//		return o;
+//	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

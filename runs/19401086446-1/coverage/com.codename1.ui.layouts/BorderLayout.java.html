@@ -1,0 +1,941 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BorderLayout.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts</a> &gt; <span class="el_source">BorderLayout.java</span></div><h1>BorderLayout.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.layouts;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.Style;
+
+import java.util.HashMap;
+
+/**
+ * &lt;p&gt;A border layout lays out a container, arranging and resizing its
+ * components to fit in five regions: north, south, east, west, and center.
+ * Each region may contain no more than one component, and is identified by a
+ * corresponding constant: NORTH, SOUTH, EAST, WEST, and CENTER.
+ * When adding a component to a container with a border layout, use one of
+ * these five constants.&lt;/p&gt;
+ * &lt;p&gt;
+ * The border layout scales all of the components within it to match the available
+ * constraints. The NORTH &amp;amp; SOUTH components use their preferred height but
+ * are stretched to take up the full width available. The EAST &amp;amp; WEST do the same
+ * for the reverse axis however they leave room for the NORTH/SOUTH entries if they
+ * are defined.&lt;br&gt;
+ * The CENTER constraint will take up the rest of the available space regardless of its preferred
+ * size. This is normally very useful, however in some cases we would prefer that the center
+ * component will actually position itself in the middle of the available space. For this we have
+ * the &lt;code&gt;setCenterBehavior&lt;/code&gt; method.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * Because of its scaling behavior scrolling a border layout makes no sense. However it is a
+ * common mistake to apply a border layout to a scrollable container or trying to make a border
+ * layout scrollable. That is why the {@link com.codename1.ui.Container} class explicitly blocks
+ * scrolling on a BorderLayout.&lt;br&gt;
+ * Typical usage of this class:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/23e642b1a749e2f37e68.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/border-layout.png&quot; alt=&quot;Border Layout&quot; /&gt;
+ *
+ * &lt;p&gt;
+ * When defining the center behavior we can get very different results:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/108aa105386ed7c340ad.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/border-layout-center.png&quot; alt=&quot;Border Layout Center&quot; /&gt;
+ *
+ * &lt;p&gt;Notice that in the case of RTL (right to left language also known as bidi) the
+ * EAST and WEST values are implicitly reversed as shown in this image:
+ * &lt;/p&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/border-layout-RTL.png&quot; alt=&quot;Border Layout bidi/RTL&quot; /&gt;
+ *
+ * &lt;p&gt;
+ * You can read further in the &lt;a href=&quot;https://www.codenameone.com/manual/basics.html#_border_layout&quot;&gt;BorderLayout section in the developer guide&lt;/a&gt;.
+ * &lt;/p&gt;
+ *
+ * @author Nir Shabi, Shai Almog
+ */
+public class BorderLayout extends Layout {
+    /**
+     * Defines the behavior of the component placed in the center position of the layout, by default it is scaled to the available space
+     */
+    public static final int CENTER_BEHAVIOR_SCALE = 0;
+    /**
+     * Defines the behavior of the component placed in the center position of the layout, places the component in the center of
+     * the space available to the center component.
+     */
+    public static final int CENTER_BEHAVIOR_CENTER = 1;
+    /**
+     * Defines the behavior of the component placed in the center position of the layout, places the component in the center of
+     * the surrounding container
+     */
+    public static final int CENTER_BEHAVIOR_CENTER_ABSOLUTE = 2;
+    /**
+     * Deprecated due to spelling mistake, use CENTER_BEHAVIOR_TOTAL_BELOW
+     * The center component takes up the entire screens and the sides are automatically placed on top of it thus creating
+     * a layered effect
+     *
+     * @deprecated Deprecated due to spelling mistake, use CENTER_BEHAVIOR_TOTAL_BELOW
+     */
+    public static final int CENTER_BEHAVIOR_TOTAL_BELLOW = 3;
+    /**
+     * The center component takes up the entire screens and the sides are
+     * automatically placed on top (or below based on z-order) thus creating
+     * a layered effect
+     */
+    public static final int CENTER_BEHAVIOR_TOTAL_BELOW = 3;
+    /**
+     * The north layout constraint (top of container).
+     */
+    public static final String NORTH = &quot;North&quot;;
+    /**
+     * The south layout constraint (bottom of container).
+     */
+    public static final String SOUTH = &quot;South&quot;;
+    /**
+     * The center layout constraint (middle of container)
+     */
+    public static final String CENTER = &quot;Center&quot;;
+    /**
+     * The west layout constraint (left of container).
+     */
+    public static final String WEST = &quot;West&quot;;
+    /**
+     * The east layout constraint (right of container).
+     */
+    public static final String EAST = &quot;East&quot;;
+    /**
+     * Overlay on top of the other layout components
+     */
+    public static final String OVERLAY = &quot;Overlay&quot;;
+<span class="fc" id="L132">    private boolean scaleEdges = true;</span>
+    private Component portraitNorth;
+    private Component portraitSouth;
+    private Component portraitCenter;
+    private Component portraitWest;
+    private Component portraitEast;
+    private Component overlay;
+    private HashMap&lt;String, String&gt; landscapeSwap;
+    /**
+     * Defines the behavior of the center component to one of the constants defined in this class
+     */
+    private int centerBehavior;
+<span class="fc" id="L144">    private final Dimension dim = new Dimension(0, 0);</span>
+
+    /**
+     * Creates a new instance of BorderLayout
+     */
+<span class="fc" id="L149">    public BorderLayout() {</span>
+<span class="fc" id="L150">    }</span>
+
+    /**
+     * Creates a new instance of BorderLayout  with absolute behavior
+     *
+     * @param behavior identical value as the setCenterBehavior method
+     */
+<span class="fc" id="L157">    public BorderLayout(int behavior) {</span>
+<span class="fc" id="L158">        setCenterBehavior(behavior);</span>
+<span class="fc" id="L159">    }</span>
+
+    /**
+     * Shorthand for {@code new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER)}
+     *
+     * @return a new {@code BorderLayout} with {@link  #CENTER_BEHAVIOR_CENTER} constraint applied
+     */
+    public static BorderLayout center() {
+<span class="fc" id="L167">        return new BorderLayout(CENTER_BEHAVIOR_CENTER);</span>
+    }
+
+    /**
+     * Shorthand for {@code new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE)}
+     *
+     * @return a new {@code BorderLayout} with {@link  #CENTER_BEHAVIOR_CENTER_ABSOLUTE} constraint applied
+     */
+    public static BorderLayout absolute() {
+<span class="fc" id="L176">        return new BorderLayout(CENTER_BEHAVIOR_CENTER_ABSOLUTE);</span>
+    }
+
+    /**
+     * Shorthand for {@code new BorderLayout(BorderLayout.CENTER_BEHAVIOR_TOTAL_BELOW)}
+     *
+     * @return a new {@code BorderLayout} with {@link  #CENTER_BEHAVIOR_TOTAL_BELOW} constraint applied
+     */
+    public static BorderLayout totalBelow() {
+<span class="fc" id="L185">        return new BorderLayout(CENTER_BEHAVIOR_TOTAL_BELOW);</span>
+    }
+
+    /**
+     * Convenience method that creates a border layout container and places the given component in the center
+     *
+     * @param center the center component
+     * @return the created component
+     */
+    public static Container center(Component center) {
+<span class="fc" id="L195">        return Container.encloseIn(new BorderLayout(), center, BorderLayout.CENTER);</span>
+    }
+
+    /**
+     * Convenience method that creates a border layout container and places the given component in the center
+     * east and west respectively
+     *
+     * @param center the center component
+     * @param east   component or null to ignore
+     * @param west   component or null to ignore
+     * @return the created component
+     */
+    public static Container centerEastWest(Component center, Component east, Component west) {
+        Container c;
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        if (center != null) {</span>
+<span class="fc" id="L210">            c = center(center);</span>
+        } else {
+<span class="fc" id="L212">            c = new Container(new BorderLayout());</span>
+        }
+<span class="fc bfc" id="L214" title="All 2 branches covered.">        if (east != null) {</span>
+<span class="fc" id="L215">            c.add(BorderLayout.EAST, east);</span>
+        }
+<span class="fc bfc" id="L217" title="All 2 branches covered.">        if (west != null) {</span>
+<span class="fc" id="L218">            c.add(BorderLayout.WEST, west);</span>
+        }
+<span class="fc" id="L220">        return c;</span>
+    }
+
+    /**
+     * Convenience method that creates a border layout absolute center container and places the given component in the center
+     * east and west respectively
+     *
+     * @param center the center component
+     * @param east   component or null to ignore
+     * @param west   component or null to ignore
+     * @return the created component
+     */
+    public static Container centerAbsoluteEastWest(Component center, Component east, Component west) {
+        Container c;
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">        if (center != null) {</span>
+<span class="fc" id="L235">            c = centerAbsolute(center);</span>
+        } else {
+<span class="nc" id="L237">            c = new Container(new BorderLayout(CENTER_BEHAVIOR_CENTER_ABSOLUTE));</span>
+        }
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        if (east != null) {</span>
+<span class="fc" id="L240">            c.add(BorderLayout.EAST, east);</span>
+        }
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">        if (west != null) {</span>
+<span class="nc" id="L243">            c.add(BorderLayout.WEST, west);</span>
+        }
+<span class="fc" id="L245">        return c;</span>
+    }
+
+    /**
+     * Convenience method that creates a border layout center container and places the given component in the center
+     * east and west respectively with the {@link  #CENTER_BEHAVIOR_CENTER} constraint applied
+     *
+     * @param center the center component
+     * @param east   component or null to ignore
+     * @param west   component or null to ignore
+     * @return the created component
+     */
+    public static Container centerCenterEastWest(Component center, Component east, Component west) {
+        Container c;
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">        if (center != null) {</span>
+<span class="fc" id="L260">            c = centerCenter(center);</span>
+        } else {
+<span class="nc" id="L262">            c = new Container(new BorderLayout(CENTER_BEHAVIOR_CENTER));</span>
+        }
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">        if (east != null) {</span>
+<span class="nc" id="L265">            c.add(BorderLayout.EAST, east);</span>
+        }
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">        if (west != null) {</span>
+<span class="nc" id="L268">            c.add(BorderLayout.WEST, west);</span>
+        }
+<span class="fc" id="L270">        return c;</span>
+    }
+
+    /**
+     * Convenience method that creates a border layout center container and places the given component in the center
+     * east and west respectively with the {@link  #CENTER_BEHAVIOR_TOTAL_BELOW} constraint applied
+     *
+     * @param center the center component
+     * @param east   component or null to ignore
+     * @param west   component or null to ignore
+     * @return the created component
+     */
+    public static Container centerTotalBelowEastWest(Component center, Component east, Component west) {
+        Container c;
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">        if (center != null) {</span>
+<span class="fc" id="L285">            c = centerTotalBelow(center);</span>
+        } else {
+<span class="nc" id="L287">            c = new Container(new BorderLayout(CENTER_BEHAVIOR_TOTAL_BELOW));</span>
+        }
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">        if (east != null) {</span>
+<span class="nc" id="L290">            c.add(BorderLayout.EAST, east);</span>
+        }
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">        if (west != null) {</span>
+<span class="nc" id="L293">            c.add(BorderLayout.WEST, west);</span>
+        }
+<span class="fc" id="L295">        return c;</span>
+    }
+
+    /**
+     * Convenience method that creates a border layout container and places the given component in the center
+     * with the {@link  #CENTER_BEHAVIOR_CENTER} constraint applied
+     *
+     * @param center the center component
+     * @return the created component
+     */
+    public static Container centerCenter(Component center) {
+<span class="fc" id="L306">        return Container.encloseIn(new BorderLayout(CENTER_BEHAVIOR_CENTER), center, BorderLayout.CENTER);</span>
+    }
+
+    /**
+     * Convenience method that creates a border layout container and places the given component in the center
+     * with the {@link  #CENTER_BEHAVIOR_CENTER_ABSOLUTE} constraint applied
+     *
+     * @param center the center component
+     * @return the created component
+     */
+    public static Container centerAbsolute(Component center) {
+<span class="fc" id="L317">        return Container.encloseIn(new BorderLayout(CENTER_BEHAVIOR_CENTER_ABSOLUTE), center, BorderLayout.CENTER);</span>
+    }
+
+    /**
+     * Convenience method that creates a border layout container and places the given component in the center
+     * with the {@link  #CENTER_BEHAVIOR_TOTAL_BELOW} constraint applied
+     *
+     * @param center the center component
+     * @return the created component
+     */
+    public static Container centerTotalBelow(Component center) {
+<span class="fc" id="L328">        return Container.encloseIn(new BorderLayout(CENTER_BEHAVIOR_TOTAL_BELOW), center, BorderLayout.CENTER);</span>
+    }
+
+    /**
+     * Convenience method that creates a border layout container and places the given component in the north
+     *
+     * @param north the north component
+     * @return the created component
+     */
+    public static Container north(Component north) {
+<span class="fc" id="L338">        return Container.encloseIn(new BorderLayout(), north, BorderLayout.NORTH);</span>
+    }
+
+    /**
+     * Convenience method that creates a border layout container and places the given component in the south
+     *
+     * @param south the south component
+     * @return the created component
+     */
+    public static Container south(Component south) {
+<span class="fc" id="L348">        return Container.encloseIn(new BorderLayout(), south, BorderLayout.SOUTH);</span>
+    }
+
+    /**
+     * Convenience method that creates a border layout container and places the given component in the east
+     *
+     * @param east the east component
+     * @return the created component
+     */
+    public static Container east(Component east) {
+<span class="fc" id="L358">        return Container.encloseIn(new BorderLayout(), east, BorderLayout.EAST);</span>
+    }
+
+    /**
+     * Convenience method that creates a border layout container and places the given component in the west
+     *
+     * @param west the west component
+     * @return the created component
+     */
+    public static Container west(Component west) {
+<span class="fc" id="L368">        return Container.encloseIn(new BorderLayout(), west, BorderLayout.WEST);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addLayoutComponent(Object name, Component comp, Container c) {
+        // helper check for a common mistake...
+<span class="fc bfc" id="L376" title="All 2 branches covered.">        if (name == null) {</span>
+<span class="fc" id="L377">            throw new IllegalArgumentException(&quot;Cannot add component to BorderLayout Container without constraint parameter&quot;);</span>
+        }
+
+        // allows us to work with Component constraints too which makes some code simpler
+<span class="fc bfc" id="L381" title="All 2 branches covered.">        if (name instanceof Integer) {</span>
+<span class="pc bpc" id="L382" title="1 of 6 branches missed.">            switch (((Integer) name).intValue()) {</span>
+                case Component.TOP:
+<span class="fc" id="L384">                    name = NORTH;</span>
+<span class="fc" id="L385">                    break;</span>
+                case Component.BOTTOM:
+<span class="fc" id="L387">                    name = SOUTH;</span>
+<span class="fc" id="L388">                    break;</span>
+                case Component.LEFT:
+<span class="fc" id="L390">                    name = WEST;</span>
+<span class="fc" id="L391">                    break;</span>
+                case Component.RIGHT:
+<span class="fc" id="L393">                    name = EAST;</span>
+<span class="fc" id="L394">                    break;</span>
+                case Component.CENTER:
+<span class="fc" id="L396">                    name = CENTER;</span>
+<span class="fc" id="L397">                    break;</span>
+                default:
+<span class="nc" id="L399">                    throw new IllegalArgumentException(&quot;BorderLayout Container expects one of the constraints BorderLayout.NORTH/SOUTH/EAST/WEST/CENTER&quot;);</span>
+            }
+        }
+
+<span class="fc" id="L403">        Component previous = null;</span>
+
+        /* Assign the component to one of the known regions of the layout.
+         */
+<span class="fc bfc" id="L407" title="All 2 branches covered.">        if (CENTER.equals(name)) {</span>
+<span class="fc" id="L408">            previous = portraitCenter;</span>
+<span class="fc" id="L409">            portraitCenter = comp;</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">        } else if (NORTH.equals(name)) {</span>
+<span class="fc" id="L411">            previous = portraitNorth;</span>
+<span class="fc" id="L412">            portraitNorth = comp;</span>
+<span class="fc bfc" id="L413" title="All 2 branches covered.">        } else if (SOUTH.equals(name)) {</span>
+<span class="fc" id="L414">            previous = portraitSouth;</span>
+<span class="fc" id="L415">            portraitSouth = comp;</span>
+<span class="fc bfc" id="L416" title="All 2 branches covered.">        } else if (EAST.equals(name)) {</span>
+<span class="fc" id="L417">            previous = portraitEast;</span>
+<span class="fc" id="L418">            portraitEast = comp;</span>
+<span class="fc bfc" id="L419" title="All 2 branches covered.">        } else if (WEST.equals(name)) {</span>
+<span class="fc" id="L420">            previous = portraitWest;</span>
+<span class="fc" id="L421">            portraitWest = comp;</span>
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">        } else if (OVERLAY.equals(name)) {</span>
+<span class="fc" id="L423">            previous = overlay;</span>
+<span class="fc" id="L424">            overlay = comp;</span>
+        } else {
+<span class="nc" id="L426">            throw new IllegalArgumentException(&quot;cannot add to layout: unknown constraint: &quot; + name);</span>
+        }
+<span class="pc bpc" id="L428" title="1 of 4 branches missed.">        if (previous != null &amp;&amp; previous != comp) {</span>
+<span class="fc" id="L429">            c.removeComponent(previous);</span>
+        }
+<span class="fc" id="L431">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void removeLayoutComponent(Component comp) {
+<span class="fc bfc" id="L437" title="All 2 branches covered.">        if (comp == portraitCenter) {</span>
+<span class="fc" id="L438">            portraitCenter = null;</span>
+<span class="fc bfc" id="L439" title="All 2 branches covered.">        } else if (comp == portraitNorth) {</span>
+<span class="fc" id="L440">            portraitNorth = null;</span>
+<span class="fc bfc" id="L441" title="All 2 branches covered.">        } else if (comp == portraitSouth) {</span>
+<span class="fc" id="L442">            portraitSouth = null;</span>
+<span class="fc bfc" id="L443" title="All 2 branches covered.">        } else if (comp == portraitEast) {</span>
+<span class="fc" id="L444">            portraitEast = null;</span>
+<span class="fc bfc" id="L445" title="All 2 branches covered.">        } else if (comp == portraitWest) {</span>
+<span class="fc" id="L446">            portraitWest = null;</span>
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">        } else if (comp == overlay) {</span>
+<span class="nc" id="L448">            overlay = null;</span>
+        }
+<span class="fc" id="L450">    }</span>
+
+    /**
+     * Returns the component constraint
+     *
+     * @param comp the component whose constraint is queried
+     * @return one of the constraints defined in this class
+     */
+    public Object getComponentConstraint(Component comp) {
+<span class="fc bfc" id="L459" title="All 2 branches covered.">        if (comp == portraitCenter) {</span>
+<span class="fc" id="L460">            return CENTER;</span>
+<span class="fc bfc" id="L461" title="All 2 branches covered.">        } else if (comp == portraitNorth) {</span>
+<span class="fc" id="L462">            return NORTH;</span>
+<span class="fc bfc" id="L463" title="All 2 branches covered.">        } else if (comp == portraitSouth) {</span>
+<span class="fc" id="L464">            return SOUTH;</span>
+<span class="fc bfc" id="L465" title="All 2 branches covered.">        } else if (comp == portraitEast) {</span>
+<span class="fc" id="L466">            return EAST;</span>
+<span class="fc bfc" id="L467" title="All 2 branches covered.">        } else if (comp == overlay) {</span>
+<span class="fc" id="L468">            return OVERLAY;</span>
+        } else {
+<span class="fc bfc" id="L470" title="All 2 branches covered.">            if (comp == portraitWest) {</span>
+<span class="fc" id="L471">                return WEST;</span>
+            }
+        }
+<span class="fc" id="L474">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void layoutContainer(Container target) {
+<span class="fc" id="L481">        Style s = target.getStyle();</span>
+<span class="fc" id="L482">        int top = s.getPaddingTop();</span>
+<span class="fc" id="L483">        int bottom = target.getLayoutHeight() - target.getBottomGap() - s.getPaddingBottom();</span>
+<span class="fc" id="L484">        int left = s.getPaddingLeft(target.isRTL());</span>
+<span class="fc" id="L485">        int right = target.getLayoutWidth() - target.getSideGap() - s.getPaddingRight(target.isRTL());</span>
+<span class="fc" id="L486">        int targetWidth = target.getWidth();</span>
+<span class="fc" id="L487">        int targetHeight = target.getHeight();</span>
+
+<span class="fc" id="L489">        boolean rtl = target.isRTL();</span>
+<span class="pc bpc" id="L490" title="1 of 2 branches missed.">        if (rtl) {</span>
+<span class="nc" id="L491">            left += target.getSideGap();</span>
+        }
+
+<span class="fc" id="L494">        Component east = getEast();</span>
+<span class="fc" id="L495">        Component west = getWest();</span>
+<span class="fc" id="L496">        Component south = getSouth();</span>
+<span class="fc" id="L497">        Component north = getNorth();</span>
+<span class="fc" id="L498">        Component center = getCenter();</span>
+<span class="fc bfc" id="L499" title="All 2 branches covered.">        if (north != null) {</span>
+<span class="fc" id="L500">            Component c = north;</span>
+<span class="fc" id="L501">            positionTopBottom(target, c, right, left, targetHeight);</span>
+<span class="fc" id="L502">            c.setY(top + c.getStyle().getMarginTop());</span>
+<span class="fc" id="L503">            top += (c.getHeight() + c.getStyle().getMarginTop() + c.getStyle().getMarginBottom());</span>
+        }
+<span class="fc bfc" id="L505" title="All 2 branches covered.">        if (south != null) {</span>
+<span class="fc" id="L506">            Component c = south;</span>
+<span class="fc" id="L507">            positionTopBottom(target, c, right, left, targetHeight);</span>
+<span class="fc" id="L508">            c.setY(bottom - c.getHeight() - c.getStyle().getMarginBottom());</span>
+<span class="fc" id="L509">            bottom -= (c.getHeight() + c.getStyle().getMarginTop() + c.getStyle().getMarginBottom());</span>
+        }
+
+<span class="fc" id="L512">        Component realEast = east;</span>
+<span class="fc" id="L513">        Component realWest = west;</span>
+
+<span class="pc bpc" id="L515" title="1 of 2 branches missed.">        if (rtl) {</span>
+<span class="nc" id="L516">            realEast = west;</span>
+<span class="nc" id="L517">            realWest = east;</span>
+        }
+
+<span class="fc bfc" id="L520" title="All 2 branches covered.">        if (realEast != null) {</span>
+<span class="fc" id="L521">            Component c = realEast;</span>
+<span class="fc" id="L522">            positionLeftRight(realEast, targetWidth, bottom, top);</span>
+<span class="fc" id="L523">            c.setX(right - c.getWidth() - c.getStyle().getMarginRight(rtl));</span>
+<span class="fc" id="L524">            right -= (c.getWidth() + c.getStyle().getHorizontalMargins());</span>
+        }
+<span class="fc bfc" id="L526" title="All 2 branches covered.">        if (realWest != null) {</span>
+<span class="fc" id="L527">            Component c = realWest;</span>
+<span class="fc" id="L528">            positionLeftRight(realWest, targetWidth, bottom, top);</span>
+<span class="fc" id="L529">            c.setX(left + c.getStyle().getMarginLeft(rtl));</span>
+<span class="fc" id="L530">            left += (c.getWidth() + c.getStyle().getMarginLeftNoRTL() + c.getStyle().getMarginRightNoRTL());</span>
+        }
+<span class="fc bfc" id="L532" title="All 2 branches covered.">        if (center != null) {</span>
+<span class="fc" id="L533">            Component c = center;</span>
+<span class="fc" id="L534">            int w = right - left - c.getStyle().getMarginLeftNoRTL() - c.getStyle().getMarginRightNoRTL();</span>
+<span class="fc" id="L535">            int h = bottom - top - c.getStyle().getMarginTop() - c.getStyle().getMarginBottom();</span>
+<span class="fc" id="L536">            int x = left + c.getStyle().getMarginLeft(rtl);</span>
+<span class="fc" id="L537">            int y = top + c.getStyle().getMarginTop();</span>
+<span class="pc bpc" id="L538" title="1 of 4 branches missed.">            switch (centerBehavior) {</span>
+                case CENTER_BEHAVIOR_CENTER_ABSOLUTE: {
+<span class="fc" id="L540">                    Dimension d = c.getPreferredSize();</span>
+<span class="fc" id="L541">                    int passNum = 0;</span>
+<span class="fc bfc" id="L542" title="All 2 branches covered.">                    while (passNum &lt; 2) {</span>
+<span class="fc bfc" id="L543" title="All 2 branches covered.">                        if (d.getWidth() &lt; w) {</span>
+<span class="fc" id="L544">                            int newX = (s.getPaddingLeft(rtl) - s.getPaddingRight(rtl)) + targetWidth / 2 - d.getWidth() / 2;</span>
+<span class="pc bpc" id="L545" title="1 of 2 branches missed.">                            if (newX &gt; x) {</span>
+<span class="fc" id="L546">                                x = newX;</span>
+                            }
+<span class="fc" id="L548">                            w = d.getWidth();</span>
+                        }
+<span class="fc bfc" id="L550" title="All 2 branches covered.">                        if (passNum == 0) {</span>
+                            // Some components, like SpanLabel and SpanButton have preferred heights
+                            // that depend on their width.  So we need to set the width,
+                            // and then recalc preferred size
+<span class="fc" id="L554">                            c.setWidth(w);</span>
+<span class="fc" id="L555">                            d = c.getPreferredSize();</span>
+                        }
+<span class="fc" id="L557">                        passNum++;</span>
+                    }
+
+<span class="fc" id="L560">                    int append = 0;</span>
+<span class="fc" id="L561">                    int th = targetHeight;</span>
+<span class="pc bpc" id="L562" title="1 of 2 branches missed.">                    if (north != null) {</span>
+<span class="nc" id="L563">                        append = north.getHeight();</span>
+<span class="nc" id="L564">                        th -= append;</span>
+                    }
+<span class="pc bpc" id="L566" title="1 of 2 branches missed.">                    if (south != null) {</span>
+<span class="nc" id="L567">                        th -= south.getHeight();</span>
+                    }
+<span class="fc bfc" id="L569" title="All 2 branches covered.">                    if (d.getHeight() &lt; h) {</span>
+<span class="fc" id="L570">                        int newY = (s.getPaddingTop() + th) / 2 - d.getHeight() / 2 + append;</span>
+<span class="pc bpc" id="L571" title="1 of 2 branches missed.">                        if (newY &gt; y) {</span>
+<span class="fc" id="L572">                            y = newY;</span>
+                        }
+<span class="fc" id="L574">                        h = d.getHeight();</span>
+<span class="fc" id="L575">                    }</span>
+                    break;
+                }
+                case CENTER_BEHAVIOR_CENTER: {
+<span class="fc" id="L579">                    Dimension d = c.getPreferredSize();</span>
+<span class="fc" id="L580">                    int passNum = 0;</span>
+<span class="fc bfc" id="L581" title="All 2 branches covered.">                    while (passNum &lt; 2) {</span>
+<span class="fc bfc" id="L582" title="All 2 branches covered.">                        if (d.getWidth() &lt; w) {</span>
+<span class="fc" id="L583">                            x += w / 2 - d.getWidth() / 2;</span>
+<span class="fc" id="L584">                            w = d.getWidth();</span>
+                        }
+<span class="fc bfc" id="L586" title="All 2 branches covered.">                        if (passNum == 0) {</span>
+                            // Some components, like SpanLabel and SpanButton have preferred heights
+                            // that depend on their width.  So we need to set the width,
+                            // and then recalc preferred size
+<span class="fc" id="L590">                            c.setWidth(w);</span>
+<span class="fc" id="L591">                            d = c.getPreferredSize();</span>
+                        }
+<span class="fc" id="L593">                        passNum++;</span>
+
+                    }
+<span class="pc bpc" id="L596" title="1 of 2 branches missed.">                    if (d.getHeight() &lt; h) {</span>
+<span class="fc" id="L597">                        y += h / 2 - d.getHeight() / 2;</span>
+<span class="fc" id="L598">                        h = d.getHeight();</span>
+                    }
+                    break;
+                }
+                case CENTER_BEHAVIOR_TOTAL_BELOW: {
+<span class="nc" id="L603">                    w = targetWidth;</span>
+<span class="nc" id="L604">                    h = targetHeight;</span>
+<span class="nc" id="L605">                    x = s.getPaddingLeft(rtl);</span>
+<span class="nc" id="L606">                    y = s.getPaddingTop();</span>
+                }
+            }
+<span class="fc" id="L609">            c.setWidth(w);</span>
+<span class="fc" id="L610">            c.setHeight(h);</span>
+<span class="fc" id="L611">            c.setX(x);</span>
+<span class="fc" id="L612">            c.setY(y);</span>
+        }
+<span class="fc bfc" id="L614" title="All 2 branches covered.">        if (overlay != null) {</span>
+<span class="fc" id="L615">            Component c = overlay;</span>
+<span class="fc" id="L616">            c.setWidth(targetWidth);</span>
+<span class="fc" id="L617">            c.setHeight(targetHeight);</span>
+<span class="fc" id="L618">            c.setX(0);</span>
+<span class="fc" id="L619">            c.setY(0);</span>
+        }
+<span class="fc" id="L621">    }</span>
+
+    /**
+     * Position the east/west component variables
+     */
+    private void positionLeftRight(Component c, int targetWidth, int bottom, int top) {
+<span class="fc" id="L627">        int y = top + c.getStyle().getMarginTop();</span>
+<span class="fc" id="L628">        int h = bottom - top - c.getStyle().getMarginTop() - c.getStyle().getMarginBottom();</span>
+<span class="pc bpc" id="L629" title="1 of 2 branches missed.">        if (scaleEdges) {</span>
+<span class="fc" id="L630">            c.setY(y);</span>
+<span class="fc" id="L631">            c.setHeight(h);</span>
+        } else {
+<span class="nc" id="L633">            int ph = c.getPreferredH();</span>
+<span class="nc bnc" id="L634" title="All 2 branches missed.">            if (ph &lt; h) {</span>
+<span class="nc" id="L635">                c.setHeight(ph);</span>
+<span class="nc" id="L636">                c.setY(y + (h - ph) / 2);</span>
+            } else {
+<span class="nc" id="L638">                c.setY(y);</span>
+<span class="nc" id="L639">                c.setHeight(h);</span>
+            }
+        }
+<span class="fc" id="L642">        c.setWidth(Math.min(targetWidth, c.getPreferredW()));</span>
+<span class="fc" id="L643">    }</span>
+
+    private void positionTopBottom(Component target, Component c, int right, int left, int targetHeight) {
+<span class="fc" id="L646">        int w = right - left - c.getStyle().getMarginLeftNoRTL() - c.getStyle().getMarginRightNoRTL();</span>
+<span class="fc" id="L647">        int x = left + c.getStyle().getMarginLeft(target.isRTL());</span>
+<span class="pc bpc" id="L648" title="1 of 2 branches missed.">        if (scaleEdges) {</span>
+<span class="fc" id="L649">            c.setWidth(w);</span>
+<span class="fc" id="L650">            c.setX(x);</span>
+        } else {
+<span class="nc" id="L652">            int pw = c.getPreferredW();</span>
+<span class="nc bnc" id="L653" title="All 2 branches missed.">            if (pw &lt; w) {</span>
+<span class="nc" id="L654">                c.setWidth(pw);</span>
+<span class="nc" id="L655">                c.setX(x + (w - pw) / 2);</span>
+            } else {
+<span class="nc" id="L657">                c.setWidth(w);</span>
+<span class="nc" id="L658">                c.setX(x);</span>
+            }
+        }
+<span class="fc" id="L661">        c.setHeight(Math.min(targetHeight, c.getPreferredH())); //verify I want to use tge prefered size</span>
+<span class="fc" id="L662">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Dimension getPreferredSize(Container parent) {
+<span class="fc" id="L668">        dim.setWidth(0);</span>
+<span class="fc" id="L669">        dim.setHeight(0);</span>
+<span class="fc" id="L670">        Component east = getEast();</span>
+<span class="fc" id="L671">        Component west = getWest();</span>
+<span class="fc" id="L672">        Component south = getSouth();</span>
+<span class="fc" id="L673">        Component north = getNorth();</span>
+<span class="fc" id="L674">        Component center = getCenter();</span>
+
+<span class="fc bfc" id="L676" title="All 2 branches covered.">        if (east != null) {</span>
+<span class="fc" id="L677">            dim.setWidth(east.getPreferredW() + east.getStyle().getMarginLeftNoRTL() + east.getStyle().getMarginRightNoRTL());</span>
+<span class="fc" id="L678">            dim.setHeight(Math.max(east.getPreferredH() + east.getStyle().getMarginTop() + east.getStyle().getMarginBottom(), dim.getHeight()));</span>
+        }
+<span class="fc bfc" id="L680" title="All 2 branches covered.">        if (west != null) {</span>
+<span class="fc" id="L681">            dim.setWidth(dim.getWidth() + west.getPreferredW() + west.getStyle().getMarginLeftNoRTL() + west.getStyle().getMarginRightNoRTL());</span>
+<span class="fc" id="L682">            dim.setHeight(Math.max(west.getPreferredH() + west.getStyle().getMarginTop() + west.getStyle().getMarginBottom(), dim.getHeight()));</span>
+        }
+<span class="fc bfc" id="L684" title="All 2 branches covered.">        if (center != null) {</span>
+<span class="fc" id="L685">            dim.setWidth(dim.getWidth() + center.getPreferredW() + center.getStyle().getMarginLeftNoRTL() + center.getStyle().getMarginRightNoRTL());</span>
+<span class="fc" id="L686">            dim.setHeight(Math.max(center.getPreferredH() + center.getStyle().getMarginTop() + center.getStyle().getMarginBottom(), dim.getHeight()));</span>
+        }
+<span class="fc bfc" id="L688" title="All 2 branches covered.">        if (north != null) {</span>
+<span class="fc" id="L689">            dim.setWidth(Math.max(north.getPreferredW() + north.getStyle().getMarginLeftNoRTL() + north.getStyle().getMarginRightNoRTL(), dim.getWidth()));</span>
+<span class="fc" id="L690">            dim.setHeight(dim.getHeight() + north.getPreferredH() + north.getStyle().getMarginTop() + north.getStyle().getMarginBottom());</span>
+        }
+
+<span class="fc bfc" id="L693" title="All 2 branches covered.">        if (south != null) {</span>
+<span class="fc" id="L694">            dim.setWidth(Math.max(south.getPreferredW() + south.getStyle().getMarginLeftNoRTL() + south.getStyle().getMarginRightNoRTL(), dim.getWidth()));</span>
+<span class="fc" id="L695">            dim.setHeight(dim.getHeight() + south.getPreferredH() + south.getStyle().getMarginTop() + south.getStyle().getMarginBottom());</span>
+        }
+
+<span class="fc" id="L698">        dim.setWidth(dim.getWidth() + parent.getStyle().getHorizontalPadding());</span>
+<span class="fc" id="L699">        dim.setHeight(dim.getHeight() + parent.getStyle().getVerticalPadding());</span>
+<span class="fc" id="L700">        return dim;</span>
+    }
+
+    private boolean isLandscape() {
+<span class="nc" id="L704">        Display d = Display.getInstance();</span>
+<span class="nc bnc" id="L705" title="All 2 branches missed.">        return !d.isPortrait();</span>
+    }
+
+    /**
+     * Returns the component at the given constraint
+     */
+    private Component getComponentAtIgnoreLandscape(String constraint) {
+<span class="nc bnc" id="L712" title="All 2 branches missed.">        if (constraint != null) {</span>
+<span class="nc bnc" id="L713" title="All 2 branches missed.">            if (constraint.equals(NORTH)) {</span>
+<span class="nc" id="L714">                return portraitNorth;</span>
+            }
+<span class="nc bnc" id="L716" title="All 2 branches missed.">            if (constraint.equals(SOUTH)) {</span>
+<span class="nc" id="L717">                return portraitSouth;</span>
+            }
+<span class="nc bnc" id="L719" title="All 2 branches missed.">            if (constraint.equals(EAST)) {</span>
+<span class="nc" id="L720">                return portraitEast;</span>
+            }
+<span class="nc bnc" id="L722" title="All 2 branches missed.">            if (constraint.equals(WEST)) {</span>
+<span class="nc" id="L723">                return portraitWest;</span>
+            }
+<span class="nc bnc" id="L725" title="All 2 branches missed.">            if (constraint.equals(CENTER)) {</span>
+<span class="nc" id="L726">                return portraitCenter;</span>
+            }
+        }
+<span class="nc" id="L729">        return null;</span>
+    }
+
+    private Component getComponentImpl(Component noLandscape, String orientation) {
+<span class="pc bpc" id="L733" title="3 of 4 branches missed.">        if (landscapeSwap != null &amp;&amp; isLandscape()) {</span>
+<span class="nc" id="L734">            String s = landscapeSwap.get(orientation);</span>
+<span class="nc bnc" id="L735" title="All 2 branches missed.">            if (s != null) {</span>
+<span class="nc" id="L736">                return getComponentAtIgnoreLandscape(s);</span>
+            }
+        }
+<span class="fc" id="L739">        return noLandscape;</span>
+    }
+
+    /**
+     * Returns the component in the south location
+     *
+     * @return the component in the constraint
+     */
+    public Component getSouth() {
+<span class="fc" id="L748">        return getComponentImpl(portraitSouth, SOUTH);</span>
+    }
+
+    /**
+     * Returns the component in the center location
+     *
+     * @return the component in the constraint
+     */
+    public Component getCenter() {
+<span class="fc" id="L757">        return getComponentImpl(portraitCenter, CENTER);</span>
+    }
+
+    /**
+     * Returns the component in the north location
+     *
+     * @return the component in the constraint
+     */
+    public Component getNorth() {
+<span class="fc" id="L766">        return getComponentImpl(portraitNorth, NORTH);</span>
+    }
+
+    /**
+     * Returns the component in the east location
+     *
+     * @return the component in the constraint
+     */
+    public Component getEast() {
+<span class="fc" id="L775">        return getComponentImpl(portraitEast, EAST);</span>
+    }
+
+    /**
+     * Returns the component in the west location
+     *
+     * @return the component in the constraint
+     */
+    public Component getWest() {
+<span class="fc" id="L784">        return getComponentImpl(portraitWest, WEST);</span>
+    }
+
+    /**
+     * Returns overlay component.
+     *
+     * @return The overlay component.
+     */
+    public Component getOverlay() {
+<span class="fc" id="L793">        return overlay;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String toString() {
+<span class="fc" id="L800">        return &quot;BorderLayout&quot;;</span>
+    }
+
+    /**
+     * This method allows swapping positions within the border layout when the layout
+     * orientation changes to landscape or if the layout starts off as landscape.
+     *
+     * @param portraitPosition  the position for the component when in portrait (this position
+     *                          should always be used when adding a component to the layout). One of NORTH/SOUTH/EAST/WEST/CENTER.
+     * @param landscapePosition the destination position to use in landscape
+     */
+    public void defineLandscapeSwap(String portraitPosition, String landscapePosition) {
+<span class="pc bpc" id="L812" title="1 of 2 branches missed.">        if (landscapeSwap == null) {</span>
+<span class="fc" id="L813">            landscapeSwap = new HashMap&lt;String, String&gt;();</span>
+        }
+<span class="fc" id="L815">        landscapeSwap.put(portraitPosition, landscapePosition);</span>
+<span class="fc" id="L816">        landscapeSwap.put(landscapePosition, portraitPosition);</span>
+<span class="fc" id="L817">    }</span>
+
+    /**
+     * Returns the landscape swap destination for the given border layout element if such
+     * a destination is defined.
+     *
+     * @param portraitPosition the constraint used when placing the component
+     * @return the constraint to use when in landscape or null if undefined
+     */
+    public String getLandscapeSwap(String portraitPosition) {
+<span class="fc bfc" id="L827" title="All 2 branches covered.">        if (landscapeSwap == null) {</span>
+<span class="fc" id="L828">            return null;</span>
+        }
+<span class="fc" id="L830">        return landscapeSwap.get(portraitPosition);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L837" title="1 of 4 branches missed.">        if (super.equals(o) &amp;&amp; centerBehavior == ((BorderLayout) o).centerBehavior) {</span>
+<span class="fc bfc" id="L838" title="All 2 branches covered.">            if (landscapeSwap == ((BorderLayout) o).landscapeSwap) {</span>
+<span class="fc" id="L839">                return true;</span>
+            }
+<span class="pc bpc" id="L841" title="1 of 2 branches missed.">            if (landscapeSwap != null) {</span>
+<span class="fc" id="L842">                return landscapeSwap.equals(((BorderLayout) o).landscapeSwap);</span>
+            }
+        }
+<span class="fc" id="L845">        return false;</span>
+    }
+
+    /**
+     * Indicates that the center shouldn't grow and should be placed exactly in the center of the layout
+     *
+     * @return the absoluteCenter
+     * @deprecated use center behavior instead
+     */
+    public boolean isAbsoluteCenter() {
+<span class="fc bfc" id="L855" title="All 2 branches covered.">        return centerBehavior == CENTER_BEHAVIOR_CENTER;</span>
+    }
+
+    /**
+     * Indicates that the center shouldn't grow and should be placed exactly in the center of the layout
+     *
+     * @param absoluteCenter the absoluteCenter to set
+     * @deprecated use center behavior instead
+     */
+    public void setAbsoluteCenter(boolean absoluteCenter) {
+<span class="fc bfc" id="L865" title="All 2 branches covered.">        if (absoluteCenter) {</span>
+<span class="fc" id="L866">            setCenterBehavior(CENTER_BEHAVIOR_CENTER);</span>
+        } else {
+<span class="fc" id="L868">            setCenterBehavior(CENTER_BEHAVIOR_SCALE);</span>
+        }
+<span class="fc" id="L870">    }</span>
+
+    /**
+     * Defines the behavior of the center component to one of the constants defined in this class
+     *
+     * @return the centerBehavior
+     */
+    public int getCenterBehavior() {
+<span class="fc" id="L878">        return centerBehavior;</span>
+    }
+
+    /**
+     * Defines the behavior of the center component to one of the constants defined in this class
+     *
+     * @param centerBehavior the centerBehavior to set
+     */
+    public void setCenterBehavior(int centerBehavior) {
+<span class="fc" id="L887">        this.centerBehavior = centerBehavior;</span>
+<span class="fc" id="L888">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean isOverlapSupported() {
+<span class="fc bfc" id="L895" title="All 4 branches covered.">        return centerBehavior == CENTER_BEHAVIOR_TOTAL_BELOW || overlay != null;</span>
+    }
+
+    /**
+     * Stretches the edge components (NORTH/EAST/WEST/SOUTH)
+     *
+     * @return the scaleEdges
+     */
+    public boolean isScaleEdges() {
+<span class="fc" id="L904">        return scaleEdges;</span>
+    }
+
+    /**
+     * Stretches the edge components (NORTH/EAST/WEST/SOUTH)
+     *
+     * @param scaleEdges the scaleEdges to set
+     */
+    public void setScaleEdges(boolean scaleEdges) {
+<span class="fc" id="L913">        this.scaleEdges = scaleEdges;</span>
+<span class="fc" id="L914">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean isConstraintTracking() {
+<span class="fc" id="L920">        return true;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean obscuresPotential(Container parent) {
+<span class="fc bfc" id="L927" title="All 2 branches covered.">        return getCenter() != null;</span>
+    }
+
+    @Override
+    public boolean overridesTabIndices(Container parent) {
+<span class="fc" id="L932">        return true;</span>
+    }
+
+    @Override
+    protected Component[] getChildrenInTraversalOrder(Container parent) {
+<span class="nc" id="L937">        return new Component[]{portraitNorth, portraitWest, portraitCenter, portraitEast, portraitSouth};</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

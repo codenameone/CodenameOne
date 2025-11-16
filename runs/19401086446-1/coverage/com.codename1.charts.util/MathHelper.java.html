@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MathHelper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.util</a> &gt; <span class="el_source">MathHelper.java</span></div><h1>MathHelper.java</h1><pre class="source lang-java linenums">/**
+ * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.codename1.charts.util;
+
+import com.codename1.io.Log;
+import com.codename1.l10n.ParseException;
+import com.codename1.util.MathUtil;
+
+import java.util.ArrayList;
+import java.util.List;
+
+
+/**
+ * Utility class for math operations.
+ */
+public class MathHelper {
+    /** A value that is used a null value. */
+    public static final double NULL_VALUE = -Double.MAX_VALUE + 1;
+    /**
+     * A number formatter to be used to make sure we have a maximum number of
+     * fraction digits in the labels.
+     */
+<span class="fc" id="L36">    private static final NumberFormat FORMAT = NumberFormat.getNumberInstance();</span>
+
+    private MathHelper() {
+        // empty constructor
+    }
+
+    /**
+     * Calculate the minimum and maximum values out of a list of doubles.
+     *
+     * @param values the input values
+     * @return an array with the minimum and maximum values
+     */
+    public static double[] minmax(List&lt;Double&gt; values) {
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        if (values.size() == 0) {</span>
+<span class="nc" id="L50">            return new double[2];</span>
+        }
+<span class="nc" id="L52">        double min = values.get(0);</span>
+<span class="nc" id="L53">        double max = min;</span>
+<span class="nc" id="L54">        int length = values.size();</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        for (int i = 1; i &lt; length; i++) {</span>
+<span class="nc" id="L56">            double value = values.get(i);</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">            min = min == NULL_VALUE ? value : Math.min(min, value);</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">            max = max == NULL_VALUE ? value : Math.max(max, value);</span>
+        }
+<span class="nc" id="L60">        return new double[]{min, max};</span>
+    }
+
+    /**
+     * Computes a reasonable set of labels for a data interval and number of
+     * labels.
+     *
+     * @param start start value
+     * @param end final value
+     * @param approxNumLabels desired number of labels
+     * @return collection containing the label values
+     */
+    public static List&lt;Double&gt; getLabels(final double start, final double end,
+                                         final int approxNumLabels) {
+<span class="fc" id="L74">        List&lt;Double&gt; labels = new ArrayList&lt;Double&gt;();</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (approxNumLabels &lt;= 0) {</span>
+<span class="nc" id="L76">            return labels;</span>
+        }
+<span class="fc" id="L78">        FORMAT.setMaximumFractionDigits(5);</span>
+<span class="fc" id="L79">        double[] labelParams = computeLabels(start, end, approxNumLabels);</span>
+        // when the start &gt; end the inc will be negative so it will still work
+<span class="fc" id="L81">        int numLabels = 1 + (int) ((labelParams[1] - labelParams[0]) / labelParams[2]);</span>
+        // we want the range to be inclusive but we don't want to blow up when
+        // looping for the case where the min and max are the same. So we loop
+        // on
+        // numLabels not on the values.
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        for (int i = 0; i &lt; numLabels; i++) {</span>
+<span class="fc" id="L87">            double z = labelParams[0] + i * labelParams[2];</span>
+            try {
+                // this way, we avoid a label value like 0.4000000000000000001 instead
+                // of 0.4
+<span class="fc" id="L91">                z = FORMAT.parseDouble(FORMAT.format(z));</span>
+<span class="nc" id="L92">            } catch (ParseException e) { // PMD Fix: EmptyCatchBlock log exception</span>
+<span class="nc" id="L93">                Log.e(e);</span>
+<span class="fc" id="L94">            }</span>
+<span class="fc" id="L95">            labels.add(z);</span>
+        }
+<span class="fc" id="L97">        return labels;</span>
+    }
+
+    /**
+     * Computes a reasonable number of labels for a data range.
+     *
+     * @param start start value
+     * @param end final value
+     * @param approxNumLabels desired number of labels
+     * @return double[] array containing {start value, end value, increment}
+     */
+    private static double[] computeLabels(final double start, final double end,
+                                          final int approxNumLabels) {
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (Math.abs(start - end) &lt; 0.0000001f) {</span>
+<span class="nc" id="L111">            return new double[]{start, start, 0};</span>
+        }
+<span class="fc" id="L113">        double s = start;</span>
+<span class="fc" id="L114">        double e = end;</span>
+<span class="fc" id="L115">        boolean switched = false;</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (s &gt; e) {</span>
+<span class="nc" id="L117">            switched = true;</span>
+<span class="nc" id="L118">            double tmp = s;</span>
+<span class="nc" id="L119">            s = e;</span>
+<span class="nc" id="L120">            e = tmp;</span>
+        }
+<span class="fc" id="L122">        double xStep = roundUp(Math.abs(s - e) / approxNumLabels);</span>
+        // Compute x starting point so it is a multiple of xStep.
+<span class="fc" id="L124">        double xStart = xStep * Math.ceil(s / xStep);</span>
+<span class="fc" id="L125">        double xEnd = xStep * Math.floor(e / xStep);</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (switched) {</span>
+<span class="nc" id="L127">            return new double[]{xEnd, xStart, -1.0 * xStep};</span>
+        }
+<span class="fc" id="L129">        return new double[]{xStart, xEnd, xStep};</span>
+    }
+
+    /**
+     * Given a number, round up to the nearest power of ten times 1, 2, or 5.
+     *
+     * @param val the number, it must be strictly positive
+     */
+    private static double roundUp(final double val) {
+<span class="fc" id="L138">        int exponent = (int) Math.floor(MathUtil.log10(val));</span>
+<span class="fc" id="L139">        double rval = val * MathUtil.pow(10, -exponent);</span>
+<span class="fc bfc" id="L140" title="All 2 branches covered.">        if (rval &gt; 5.0) {</span>
+<span class="fc" id="L141">            rval = 10.0;</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">        } else if (rval &gt; 2.0) {</span>
+<span class="fc" id="L143">            rval = 5.0;</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        } else if (rval &gt; 1.0) {</span>
+<span class="fc" id="L145">            rval = 2.0;</span>
+        }
+<span class="fc" id="L147">        rval *= MathUtil.pow(10, exponent);</span>
+<span class="fc" id="L148">        return rval;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>UITimer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.util</a> &gt; <span class="el_source">UITimer.java</span></div><h1>UITimer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.util;
+
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.animations.Animation;
+
+/**
+ * Simple timer callback that is invoked on the CodenameOne EDT thread rather
+ * than on a separate thread. Notice that the accuracy of this timer is very low!
+ * A timer must be linked to a specific form
+ *
+ * @author Shai Almog
+ */
+public class UITimer {
+    private Runnable internalRunnable;
+    private Form bound;
+    private long lastEllapse;
+    private int ms;
+    private boolean repeat;
+<span class="pc" id="L43">    private final Internal i = new Internal();</span>
+
+    /**
+     * This constructor is useful when deriving this class to implement a timer.
+     */
+<span class="nc" id="L48">    protected UITimer() {</span>
+<span class="nc" id="L49">    }</span>
+
+    /**
+     * Constructor that accepts a runnable to invoke on timer elapse
+     *
+     * @param r runnable instance
+     */
+<span class="fc" id="L56">    public UITimer(Runnable r) {</span>
+<span class="fc" id="L57">        internalRunnable = r;</span>
+<span class="fc" id="L58">    }</span>
+
+    /**
+     * Convenience method to schedule a UITimer more easily
+     *
+     * @param timeMillis the time from now in milliseconds
+     * @param repeat     whether the timer repeats
+     * @param parent     the form to which the timer is bound
+     * @param r          callback when the timer elapses
+     * @return the timer instance
+     */
+    public static UITimer timer(int timeMillis, boolean repeat, Form parent, Runnable r) {
+<span class="nc" id="L70">        UITimer uit = new UITimer(r);</span>
+<span class="nc" id="L71">        uit.schedule(timeMillis, repeat, parent);</span>
+<span class="nc" id="L72">        return uit;</span>
+    }
+
+    /**
+     * Convenience method to schedule a UITimer more easily on the current form
+     *
+     * @param timeMillis the time from now in milliseconds
+     * @param repeat     whether the timer repeats
+     * @param r          callback when the timer elapses
+     * @return the timer instance
+     */
+    public static UITimer timer(int timeMillis, boolean repeat, Runnable r) {
+<span class="nc" id="L84">        UITimer uit = new UITimer(r);</span>
+<span class="nc" id="L85">        uit.schedule(timeMillis, repeat, Display.getInstance().getCurrent());</span>
+<span class="nc" id="L86">        return uit;</span>
+    }
+
+    /**
+     * Binds the timer to start at the given schedule
+     *
+     * @param timeMillis the time from now in milliseconds
+     * @param repeat     whether the timer repeats
+     * @param bound      the form to which the timer is bound
+     */
+    public void schedule(int timeMillis, boolean repeat, Form bound) {
+<span class="fc" id="L97">        lastEllapse = System.currentTimeMillis();</span>
+<span class="fc" id="L98">        ms = timeMillis;</span>
+<span class="fc" id="L99">        this.repeat = repeat;</span>
+<span class="fc" id="L100">        this.bound = bound;</span>
+<span class="fc" id="L101">        bound.registerAnimated(i);</span>
+<span class="fc" id="L102">    }</span>
+
+    /**
+     * Stops executing the timer
+     */
+    public void cancel() {
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">        if (bound != null) {</span>
+<span class="fc" id="L109">            bound.deregisterAnimated(i);</span>
+        }
+<span class="fc" id="L111">    }</span>
+
+
+    void testEllapse() {
+<span class="fc" id="L115">        long t = System.currentTimeMillis();</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (t - lastEllapse &gt;= ms) {</span>
+<span class="fc bfc" id="L117" title="All 2 branches covered.">            if (!repeat) {</span>
+<span class="fc" id="L118">                Display.getInstance().getCurrent().deregisterAnimated(i);</span>
+            }
+<span class="fc" id="L120">            lastEllapse = t;</span>
+<span class="fc" id="L121">            i.run();</span>
+        }
+<span class="fc" id="L123">    }</span>
+
+
+<span class="fc" id="L126">    class Internal implements Runnable, Animation {</span>
+        /**
+         * {@inheritDoc}
+         */
+        public boolean animate() {
+<span class="nc" id="L131">            testEllapse();</span>
+<span class="nc" id="L132">            return false;</span>
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        public void paint(Graphics g) {
+<span class="nc" id="L139">        }</span>
+
+        /**
+         * Invoked when the timer elapses
+         */
+        public void run() {
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">            if (internalRunnable != null) {</span>
+<span class="fc" id="L146">                internalRunnable.run();</span>
+            }
+<span class="fc" id="L148">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

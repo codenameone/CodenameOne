@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FacebookShare.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.share</a> &gt; <span class="el_source">FacebookShare.java</span></div><h1>FacebookShare.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.share;
+
+import com.codename1.components.InfiniteProgress;
+import com.codename1.facebook.FaceBookAccess;
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
+import com.codename1.io.MultipartRequest;
+import com.codename1.io.NetworkEvent;
+import com.codename1.io.NetworkManager;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Image;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.util.Resources;
+
+import java.io.IOException;
+import java.io.InputStream;
+
+/**
+ * Facebook sharing service
+ *
+ * @author Chen
+ */
+public class FacebookShare extends ShareService {
+
+    private String token;
+
+    /**
+     * Default Constructor
+     */
+    public FacebookShare() {
+<span class="fc" id="L54">        super(&quot;Facebook&quot;, null);</span>
+<span class="fc" id="L55">    }</span>
+
+    @Override
+    public Image getIcon() {
+<span class="nc" id="L59">        Image i = super.getIcon();</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">        if (i == null) {</span>
+<span class="nc" id="L61">            i = Resources.getSystemResource().getImage(&quot;facebook.png&quot;);</span>
+<span class="nc" id="L62">            setIcon(i);</span>
+        }
+<span class="nc" id="L64">        return i;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        if (!FaceBookAccess.getInstance().isAuthenticated()) {</span>
+<span class="nc" id="L72">            FaceBookAccess.getInstance().showAuthentication(this);</span>
+<span class="nc" id="L73">            return;</span>
+        }
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        if (evt.getSource() instanceof Exception) {</span>
+<span class="nc" id="L76">            return;</span>
+        }
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (evt.getSource() instanceof String) {</span>
+<span class="nc" id="L79">            token = (String) evt.getSource();</span>
+        }
+
+<span class="nc" id="L82">        super.actionPerformed(evt);</span>
+<span class="nc" id="L83">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void share(String text, final String image, final String mime) {
+<span class="nc" id="L89">        final ShareForm[] f = new ShareForm[1];</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        if (image == null) {</span>
+<span class="nc" id="L91">            f[0] = new ShareForm(getOriginal(), &quot;Post on My Wall&quot;, null, text,</span>
+<span class="nc" id="L92">                    new ActionListener() {</span>
+
+                        public void actionPerformed(ActionEvent evt) {
+                            try {
+<span class="nc" id="L96">                                InfiniteProgress inf = new InfiniteProgress();</span>
+<span class="nc" id="L97">                                final Dialog progress = inf.showInifiniteBlocking();</span>
+<span class="nc" id="L98">                                FaceBookAccess.getInstance().addResponseCodeListener(new ActionListener() {</span>
+
+                                    public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L101">                                        NetworkEvent ne = (NetworkEvent) evt;</span>
+<span class="nc" id="L102">                                        FaceBookAccess.getInstance().removeResponseCodeListener(this);</span>
+<span class="nc" id="L103">                                        progress.dispose();</span>
+<span class="nc" id="L104">                                        Dialog.show(&quot;Failed to Share&quot;, &quot;for some reason sharing has failed, try again later.&quot;, &quot;Ok&quot;, null);</span>
+<span class="nc" id="L105">                                        finish();</span>
+<span class="nc" id="L106">                                    }</span>
+                                });
+<span class="nc" id="L108">                                FaceBookAccess.getInstance().postOnWall(&quot;me&quot;, f[0].getMessage(), new ActionListener() {</span>
+
+                                    public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L111">                                        progress.dispose();</span>
+<span class="nc" id="L112">                                        finish();</span>
+<span class="nc" id="L113">                                    }</span>
+                                });
+
+<span class="nc" id="L116">                            } catch (IOException ex) {</span>
+<span class="nc" id="L117">                                Log.e(ex);</span>
+<span class="nc" id="L118">                                System.out.println(&quot;failed to share &quot; + ex.getMessage());</span>
+<span class="nc" id="L119">                            }</span>
+<span class="nc" id="L120">                        }</span>
+                    });
+<span class="nc" id="L122">            f[0].show();</span>
+        } else {
+<span class="nc" id="L124">            f[0] = new ShareForm(getOriginal(), &quot;Post on My Wall&quot;, null, text, image,</span>
+<span class="nc" id="L125">                    new ActionListener() {</span>
+
+                        public void actionPerformed(ActionEvent evt) {
+
+<span class="nc" id="L129">                            InfiniteProgress inf = new InfiniteProgress();</span>
+<span class="nc" id="L130">                            final Dialog progress = inf.showInifiniteBlocking();</span>
+<span class="nc" id="L131">                            FaceBookAccess.getInstance().addResponseCodeListener(new ActionListener() {</span>
+
+                                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L134">                                    NetworkEvent ne = (NetworkEvent) evt;</span>
+<span class="nc" id="L135">                                      FaceBookAccess.getInstance().removeResponseCodeListener(this);</span>
+<span class="nc" id="L136">                                    progress.dispose();</span>
+<span class="nc" id="L137">                                    Dialog.show(&quot;Failed to Share&quot;, &quot;for some reason sharing has failed, try again later.&quot;, &quot;Ok&quot;, null);</span>
+<span class="nc" id="L138">                                    finish();</span>
+<span class="nc" id="L139">                                }</span>
+                            });
+
+<span class="nc" id="L142">                            MultipartRequest req = new MultipartRequest();</span>
+<span class="nc" id="L143">                            req.addResponseListener(new ActionListener() {</span>
+                                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L145">                                    progress.dispose();</span>
+<span class="nc" id="L146">                                    finish();</span>
+<span class="nc" id="L147">                                }</span>
+                            });
+<span class="nc" id="L149">                            final String endpoint = &quot;https://graph.facebook.com/me/photos?access_token=&quot; + token;</span>
+<span class="nc" id="L150">                            req.setUrl(endpoint);</span>
+<span class="nc" id="L151">                            req.addArgumentNoEncoding(&quot;message&quot;, f[0].getMessage());</span>
+<span class="nc" id="L152">                            InputStream is = null;</span>
+                            try {
+<span class="nc" id="L154">                                is = FileSystemStorage.getInstance().openInputStream(image);</span>
+<span class="nc" id="L155">                                req.addData(&quot;source&quot;, is, FileSystemStorage.getInstance().getLength(image), mime);</span>
+<span class="nc" id="L156">                                NetworkManager.getInstance().addToQueue(req);</span>
+<span class="nc" id="L157">                            } catch (IOException ioe) {</span>
+<span class="nc" id="L158">                                Log.e(ioe);</span>
+<span class="nc" id="L159">                            }</span>
+<span class="nc" id="L160">                        }</span>
+                    });
+<span class="nc" id="L162">            f[0].show();</span>
+
+        }
+
+<span class="nc" id="L166">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void share(String toShare) {
+<span class="nc" id="L172">        share(toShare, null, null);</span>
+<span class="nc" id="L173">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean canShareImage() {
+<span class="nc" id="L179">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

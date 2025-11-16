@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PushContent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.push</a> &gt; <span class="el_source">PushContent.java</span></div><h1>PushContent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.push;
+
+import com.codename1.ui.Display;
+
+/**
+ * Encapsulates the content of a Push message.  Use this class inside the {@link PushCallback#push(java.lang.String) }
+ * method to retrieve details of the push, including title, body, image URL, category, type, and metadata if available.
+ *
+ * @author Steve Hannah
+ */
+public class PushContent {
+    private static final String PROP_PREFIX = &quot;com.codename1.push.prop.&quot;;
+
+    private final String title;
+    private final String body;
+    private final String imageUrl;
+    private final String category;
+    private final String metaData;
+    private final String actionId;
+    private final String textResponse;
+    private int type;
+
+<span class="nc" id="L45">    private PushContent() {</span>
+<span class="nc" id="L46">        title = p(&quot;title&quot;, null);</span>
+<span class="nc" id="L47">        body = p(&quot;body&quot;, null);</span>
+<span class="nc" id="L48">        imageUrl = p(&quot;imageUrl&quot;, null);</span>
+<span class="nc" id="L49">        category = p(&quot;category&quot;, null);</span>
+<span class="nc" id="L50">        metaData = p(&quot;metaData&quot;, null);</span>
+<span class="nc" id="L51">        actionId = p(&quot;actionId&quot;, null);</span>
+<span class="nc" id="L52">        textResponse = p(&quot;textResponse&quot;, null);</span>
+<span class="nc" id="L53">        String typeVal = p(&quot;type&quot;, null);</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (typeVal != null) {</span>
+            try {
+<span class="nc" id="L56">                type = Integer.parseInt(typeVal);</span>
+<span class="nc" id="L57">            } catch (NumberFormatException err) {</span>
+<span class="nc" id="L58">                type = 0;</span>
+<span class="nc" id="L59">            }</span>
+        }
+<span class="nc" id="L61">    }</span>
+
+    private static String[] keys() {
+<span class="nc" id="L64">        return new String[]{&quot;title&quot;, &quot;body&quot;, &quot;imageUrl&quot;, &quot;category&quot;, &quot;metaData&quot;, &quot;actionId&quot;, &quot;textResponse&quot;};</span>
+    }
+
+    /**
+     * Checks if there is pending push content to retrieve.
+     *
+     * @return True if there is pending push content to retrieve.
+     */
+    public static boolean exists() {
+<span class="nc" id="L73">        return anyProperties(keys());</span>
+    }
+
+    /**
+     * Gets the most recent push notification content if it exists.  This functions like Stack.pop()
+     * for a single-element stack.  I.e. In addition to returning the PushContent, that push content
+     * is removed from the queue.
+     * &lt;p&gt;
+     * {@code
+     * if (PushContent.exists()) {
+     * PushContent content = PushContent.get();
+     * // content should be non-null
+     * PushContent content2 = PushContent.get();
+     * // content2 should be null
+     * PushContent.exists(); // false
+     * }
+     * }
+     * &lt;/p&gt;
+     *
+     * @return Pending push content if it exists.
+     */
+    public static PushContent get() {
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (exists()) {</span>
+<span class="nc" id="L96">            PushContent next = new PushContent();</span>
+<span class="nc" id="L97">            clearAll(keys());</span>
+<span class="nc" id="L98">            return next;</span>
+        }
+<span class="nc" id="L100">        return null;</span>
+    }
+
+
+    private static String p(String propName, String defaultVal) {
+<span class="nc" id="L105">        return Display.getInstance().getProperty(PROP_PREFIX + propName, defaultVal);</span>
+    }
+
+    private static void setProperty(String propName, String value) {
+<span class="nc" id="L109">        Display.getInstance().setProperty(PROP_PREFIX + propName, value);</span>
+<span class="nc" id="L110">    }</span>
+
+    private static void clearAll(String... propNames) {
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        for (String propName : propNames) {</span>
+<span class="nc" id="L114">            setProperty(propName, null);</span>
+        }
+<span class="nc" id="L116">    }</span>
+
+    /**
+     * Resets the push content.  After calling this, {@link PushContent#exists()} will return {@literal false}.
+     */
+    public static void reset() {
+<span class="nc" id="L122">        clearAll(keys());</span>
+<span class="nc" id="L123">    }</span>
+
+    private static boolean anyProperties(String... propNames) {
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        for (String propName : propNames) {</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">            if (p(propName, null) != null) return true;</span>
+        }
+<span class="nc" id="L129">        return false;</span>
+    }
+
+    /**
+     * Gets the title of the Push content.
+     *
+     * @return the title
+     */
+    public String getTitle() {
+<span class="nc" id="L138">        return title;</span>
+    }
+
+    /**
+     * Sets the title of the pending push content.
+     *
+     * @param title the title to set
+     * @deprecated For internal use only.
+     */
+    public static void setTitle(String title) {
+<span class="nc" id="L148">        setProperty(&quot;title&quot;, title);</span>
+<span class="nc" id="L149">    }</span>
+
+    /**
+     * Gets the body of the push content.
+     *
+     * @return the body
+     */
+    public String getBody() {
+<span class="nc" id="L157">        return body;</span>
+    }
+
+    /**
+     * Sets the body of pending push content.
+     *
+     * @param body the body to set
+     * @deprecated For internal use only
+     */
+    public static void setBody(String body) {
+<span class="nc" id="L167">        setProperty(&quot;body&quot;, body);</span>
+<span class="nc" id="L168">    }</span>
+
+    /**
+     * Gets the image URL of the push content.
+     *
+     * @return the imageUrl
+     */
+    public String getImageUrl() {
+<span class="nc" id="L176">        return imageUrl;</span>
+    }
+
+    /**
+     * Sets the image URL of pending push content.
+     *
+     * @param imageUrl the imageUrl to set
+     * @deprecated For internal use only.
+     */
+    public static void setImageUrl(String imageUrl) {
+
+<span class="nc" id="L187">        setProperty(&quot;imageUrl&quot;, imageUrl);</span>
+<span class="nc" id="L188">    }</span>
+
+    /**
+     * Gets category of the push content.
+     *
+     * @return the category
+     */
+    public String getCategory() {
+<span class="nc" id="L196">        return category;</span>
+    }
+
+    /**
+     * Sets the category of the pending push content.
+     *
+     * @param category the category to set
+     * @deprecated For internal use only.
+     */
+    public static void setCategory(String category) {
+<span class="nc" id="L206">        setProperty(&quot;category&quot;, category);</span>
+<span class="nc" id="L207">    }</span>
+
+    /**
+     * Gets the metadata associated with push.  This is hidden content not shown to the user.
+     *
+     * @return the metaData
+     */
+    public String getMetaData() {
+<span class="nc" id="L215">        return metaData;</span>
+    }
+
+    /**
+     * Sets the metadata of pending push content.
+     *
+     * @param metaData the metaData to set
+     * @deprecated For internal use only.
+     */
+    public static void setMetaData(String metaData) {
+<span class="nc" id="L225">        setProperty(&quot;metaData&quot;, metaData);</span>
+<span class="nc" id="L226">    }</span>
+
+    /**
+     * Gets the type of the push content.
+     *
+     * @return the type of the push content.
+     */
+    public int getType() {
+<span class="nc" id="L234">        return type;</span>
+    }
+
+    /**
+     * Sets the type of the push content.
+     *
+     * @param type the type to set
+     * @deprecated For internal use only.
+     */
+    public static void setType(int type) {
+<span class="nc" id="L244">        setProperty(&quot;type&quot;, &quot;&quot; + type);</span>
+<span class="nc" id="L245">    }</span>
+
+    /**
+     * If the user selected an action on the push notification, then the ID of the selected action will be stored in the PushContent's
+     * actionId.  If the user did not tap an action, then this will be null.
+     *
+     * @return The action ID that was selected by the user.
+     * @see PushActionsProvider
+     * @see PushActionCategory
+     * @see PushAction
+     */
+    public String getActionId() {
+<span class="nc" id="L257">        return actionId;</span>
+    }
+
+    /**
+     * Sets the action ID of the push content.  The action ID is only set if the user tapped on one of the actions
+     * in the push notification; and, if set, it will be set to the ID of the action that was selected.
+     *
+     * @param actionId The ID of the action that was selected by the user.
+     * @see PushActionsProvider
+     * @see PushActionCategory
+     * @see PushAction
+     * @deprecated For internal use only.
+     */
+    public static void setActionId(String actionId) {
+<span class="nc" id="L271">        setProperty(&quot;actionId&quot;, actionId);</span>
+<span class="nc" id="L272">    }</span>
+
+    /**
+     * If the push notification action included a text field for the user to enter a response, then that response
+     * will be returned here.  For notifications that don't include a response, this will return {@literal null}.
+     *
+     * @return The action ID that was selected by the user.
+     * @see PushActionsProvider
+     * @see PushActionCategory
+     * @see PushAction
+     * @see PushAction#getTextInputButtonText()
+     * @see PushAction#getTextInputPlaceholder()
+     */
+    public String getTextResponse() {
+<span class="nc" id="L286">        return textResponse;</span>
+    }
+
+    /**
+     * Sets the text response for the notification.  Only applies to notifications where the user has entered
+     * a text response.
+     *
+     * @see PushActionsProvider
+     * @see PushActionCategory
+     * @see PushAction
+     * @see PushAction#getTextInputButtonText()
+     * @see PushAction#getTextInputPlaceholder()
+     * @deprecated For internal use only.
+     */
+    public static void setTextResponse(String textResponse) {
+<span class="nc" id="L301">        setProperty(&quot;textResponse&quot;, textResponse);</span>
+<span class="nc" id="L302">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

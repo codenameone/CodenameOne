@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NativeLookup.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.system</a> &gt; <span class="el_source">NativeLookup.java</span></div><h1>NativeLookup.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.system;
+
+import com.codename1.io.Log;
+
+import java.util.HashMap;
+
+/**
+ * Creates an instance of the native interface which will call the underlying
+ * platform using the convention documented in the package docs.
+ * To understand more
+ * about native interfaces you can check out this
+ * &lt;a href=&quot;https://www.codenameone.com/how-do-i---access-native-device-functionality-invoke-native-interfaces.html&quot;&gt;
+ * quick &quot;How Do I?&quot; tutorial&lt;/a&gt;.&lt;br&gt;
+ * Alternatively you can dig deeper into &lt;a href=&quot;https://www.codenameone.com/blog/integrating-3rd-party-native-sdks-part-1.html&quot;&gt;
+ * this tutorial for integrating 3rd party native libraries&lt;/a&gt;.
+ *
+ * @author Shai Almog
+ */
+public class NativeLookup {
+    /**
+     * Indicates whether stack traces should be printed when lookup fails
+     */
+<span class="fc" id="L45">    private static boolean verbose = true;</span>
+    private static HashMap&lt;Class, Class&gt; interfaceToClassLookup;
+
+    private NativeLookup() {
+    }
+
+    /**
+     * Indicates whether stack traces should be printed when lookup fails
+     *
+     * @return the verbose
+     */
+    public static boolean isVerbose() {
+<span class="nc" id="L57">        return verbose;</span>
+    }
+
+    /**
+     * Indicates whether stack traces should be printed when lookup fails
+     *
+     * @param aVerbose the verbose to set
+     */
+    public static void setVerbose(boolean aVerbose) {
+<span class="fc" id="L66">        verbose = aVerbose;</span>
+<span class="fc" id="L67">    }</span>
+
+    /**
+     * Creates an instance of the given native interface and returns it for
+     * user callbacks.
+     *
+     * @param c the class of the NativeInterface sub interface
+     * @return an instance of that interface that can be invoked or null if the native interface isn't
+     * present on the underlying platform (e.g. simulator platform).
+     */
+    public static &lt;T extends NativeInterface&gt; T create(Class&lt;T&gt; c) {
+        try {
+<span class="pc bpc" id="L79" title="1 of 2 branches missed.">            if (interfaceToClassLookup != null) {</span>
+<span class="fc" id="L80">                Class cls = interfaceToClassLookup.get(c);</span>
+<span class="fc bfc" id="L81" title="All 2 branches covered.">                if (cls == null) {</span>
+<span class="fc" id="L82">                    return null;</span>
+                }
+<span class="fc" id="L84">                return (T) cls.newInstance();</span>
+            }
+            // special case for JavaSE native interfaces
+<span class="nc" id="L87">            return (T) Class.forName(c.getName() + &quot;Impl&quot;).newInstance();</span>
+<span class="nc" id="L88">        } catch (Throwable ex) {</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">            if (verbose) {</span>
+<span class="nc" id="L90">                Log.e(ex);</span>
+            }
+        }
+<span class="nc" id="L93">        return null;</span>
+    }
+
+    /**
+     * Do NOT invoke this method. This method is invoked internally by the stub to register the implementation class
+     * that matches a specific interface type.
+     *
+     * @param ni  the native interface
+     * @param cls the stub class matching said interface
+     */
+    public static void register(Class ni, Class cls) {
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (interfaceToClassLookup == null) {</span>
+<span class="fc" id="L105">            interfaceToClassLookup = new HashMap&lt;Class, Class&gt;();</span>
+        }
+<span class="fc" id="L107">        interfaceToClassLookup.put(ni, cls);</span>
+<span class="fc" id="L108">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

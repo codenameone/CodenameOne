@@ -1,0 +1,550 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XYSeries.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.models</a> &gt; <span class="el_source">XYSeries.java</span></div><h1>XYSeries.java</h1><pre class="source lang-java linenums">/**
+ * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.codename1.charts.models;
+
+import com.codename1.charts.util.MathHelper;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.SortedMap;
+import java.util.TreeMap;
+
+
+/**
+ * An XY series encapsulates values for XY charts like line, time, area,
+ * scatter... charts.
+ */
+public class XYSeries {
+    /** A map to contain values for X and Y axes and index for each bundle */
+<span class="fc" id="L35">    private final IndexXYMap&lt;Double, Double&gt; mXY = new IndexXYMap&lt;Double, Double&gt;();</span>
+    /** The scale number for this series. */
+    private final int mScaleNumber;
+    /** A map contain a (x,y) value for each String annotation. */
+<span class="fc" id="L39">    private final IndexXYMap&lt;Double, Double&gt; mStringXY = new IndexXYMap&lt;Double, Double&gt;();</span>
+    /** The series title. */
+    private String mTitle;
+    /** The minimum value for the X axis. */
+<span class="fc" id="L43">    private double mMinX = MathHelper.NULL_VALUE;</span>
+    /** The maximum value for the X axis. */
+<span class="fc" id="L45">    private double mMaxX = MathHelper.NULL_VALUE;</span>
+    /** The minimum value for the Y axis. */
+<span class="fc" id="L47">    private double mMinY = MathHelper.NULL_VALUE;</span>
+    /** The maximum value for the Y axis. */
+<span class="fc" id="L49">    private double mMaxY = MathHelper.NULL_VALUE;</span>
+    /** Contains the annotations. */
+<span class="fc" id="L51">    private final List&lt;String&gt; mAnnotations = new ArrayList&lt;String&gt;();</span>
+
+    /**
+     * Builds a new XY series.
+     *
+     * @param title the series title.
+     */
+    public XYSeries(String title) {
+<span class="fc" id="L59">        this(title, 0);</span>
+<span class="fc" id="L60">    }</span>
+
+    /**
+     * Builds a new XY series.
+     *
+     * @param title the series title.
+     * @param scaleNumber the series scale number
+     */
+<span class="fc" id="L68">    public XYSeries(String title, int scaleNumber) {</span>
+<span class="fc" id="L69">        mTitle = title;</span>
+<span class="fc" id="L70">        mScaleNumber = scaleNumber;</span>
+<span class="fc" id="L71">        initRange();</span>
+<span class="fc" id="L72">    }</span>
+
+    private static double ulp(double value) {
+<span class="fc" id="L75">        long bits = Double.doubleToLongBits(value);</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if ((bits &amp; 0x7FF0000000000000L) == 0x7FF0000000000000L) { // if x is not finite</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">            if ((bits &amp; 0x000FFFFFFFFFFFFFL) != 0x0) { // if x is a NaN</span>
+<span class="nc" id="L78">                return value;  // I did not force the sign bit here with NaNs.</span>
+            }
+<span class="nc" id="L80">            return Double.longBitsToDouble(0x7FF0000000000000L); // Positive Infinity;</span>
+        }
+<span class="fc" id="L82">        bits &amp;= 0x7FFFFFFFFFFFFFFFL; // make positive</span>
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (bits == 0x7FEFFFFFFFFFFFFL) { // if x == max_double (notice the _E_)</span>
+<span class="nc" id="L84">            return Double.longBitsToDouble(bits) - Double.longBitsToDouble(bits - 1);</span>
+        }
+<span class="fc" id="L86">        double nextValue = Double.longBitsToDouble(bits + 1);</span>
+<span class="fc" id="L87">        double result = nextValue - value;</span>
+<span class="fc" id="L88">        return result;</span>
+    }
+
+    public int getScaleNumber() {
+<span class="fc" id="L92">        return mScaleNumber;</span>
+    }
+
+    /**
+     * Initializes the range for both axes.
+     */
+    private void initRange() {
+<span class="fc" id="L99">        mMinX = MathHelper.NULL_VALUE;</span>
+<span class="fc" id="L100">        mMaxX = MathHelper.NULL_VALUE;</span>
+<span class="fc" id="L101">        mMinY = MathHelper.NULL_VALUE;</span>
+<span class="fc" id="L102">        mMaxY = MathHelper.NULL_VALUE;</span>
+<span class="fc" id="L103">        int length = getItemCount(); // PMD Fix: UnusedLocalVariable removed redundant loop index</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        for (int k = 0; k &lt; length; k++) {</span>
+<span class="fc" id="L105">            double x = getX(k);</span>
+<span class="fc" id="L106">            double y = getY(k);</span>
+<span class="fc" id="L107">            updateRange(x, y);</span>
+        }
+
+<span class="fc" id="L110">    }</span>
+
+    /**
+     * Updates the range on both axes.
+     *
+     * @param x the new x value
+     * @param y the new y value
+     */
+    private void updateRange(double x, double y) {
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        mMinX = mMinX == MathHelper.NULL_VALUE ? x : Math.min(mMinX, x);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        mMaxX = mMaxX == MathHelper.NULL_VALUE ? x : Math.max(mMaxX, x);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        mMinY = mMinY == MathHelper.NULL_VALUE ? y : Math.min(mMinY, y);</span>
+<span class="fc bfc" id="L122" title="All 2 branches covered.">        mMaxY = mMaxY == MathHelper.NULL_VALUE ? y : Math.max(mMaxY, y);</span>
+
+
+<span class="fc" id="L125">    }</span>
+
+    /**
+     * Returns the series title.
+     *
+     * @return the series title
+     */
+    public String getTitle() {
+<span class="fc" id="L133">        return mTitle;</span>
+    }
+
+    /**
+     * Sets the series title.
+     *
+     * @param title the series title
+     */
+    public void setTitle(String title) {
+<span class="nc" id="L142">        mTitle = title;</span>
+<span class="nc" id="L143">    }</span>
+
+    /**
+     * Adds a new value to the series.
+     *
+     * @param x the value for the X axis
+     * @param y the value for the Y axis
+     */
+    public synchronized void add(double x, double y) {
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        while (mXY.get(x) != null) {</span>
+            // add a very small value to x such as data points sharing the same x will
+            // still be added
+<span class="fc" id="L155">            x += getPadding(x);</span>
+        }
+<span class="fc" id="L157">        mXY.put(x, y);</span>
+<span class="fc" id="L158">        updateRange(x, y);</span>
+<span class="fc" id="L159">    }</span>
+
+    /**
+     * Adds a new value to the series at the specified index.
+     *
+     * @param index the index to be added the data to
+     * @param x the value for the X axis
+     * @param y the value for the Y axis
+     */
+    public synchronized void add(int index, double x, double y) {
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        while (mXY.get(x) != null) {</span>
+            // add a very small value to x such as data points sharing the same x will
+            // still be added
+<span class="nc" id="L172">            x += getPadding(x);</span>
+        }
+<span class="nc" id="L174">        mXY.put(index, x, y);</span>
+<span class="nc" id="L175">        updateRange(x, y);</span>
+<span class="nc" id="L176">    }</span>
+
+    protected double getPadding(double x) {
+<span class="fc" id="L179">        return ulp(x);</span>
+    }
+
+    /**
+     * Removes an existing value from the series.
+     *
+     * @param index the index in the series of the value to remove
+     */
+    public synchronized void remove(int index) {
+<span class="fc" id="L188">        XYEntry&lt;Double, Double&gt; removedEntry = mXY.removeByIndex(index);</span>
+<span class="fc" id="L189">        double removedX = removedEntry.getKey();</span>
+<span class="fc" id="L190">        double removedY = removedEntry.getValue();</span>
+<span class="pc bpc" id="L191" title="2 of 8 branches missed.">        if (removedX == mMinX || removedX == mMaxX || removedY == mMinY || removedY == mMaxY) {</span>
+<span class="fc" id="L192">            initRange();</span>
+        }
+<span class="fc" id="L194">    }</span>
+
+    /**
+     * Removes all the existing values and annotations from the series.
+     */
+    public synchronized void clear() {
+<span class="fc" id="L200">        clearAnnotations();</span>
+<span class="fc" id="L201">        clearSeriesValues();</span>
+<span class="fc" id="L202">    }</span>
+
+    /**
+     * Removes all the existing values from the series but annotations.
+     */
+    public synchronized void clearSeriesValues() {
+<span class="fc" id="L208">        mXY.clear();</span>
+<span class="fc" id="L209">        initRange();</span>
+<span class="fc" id="L210">    }</span>
+
+    /**
+     * Removes all the existing annotations from the series.
+     */
+    public synchronized void clearAnnotations() {
+<span class="fc" id="L216">        mStringXY.clear();</span>
+<span class="fc" id="L217">        mAnnotations.clear();</span>
+<span class="fc" id="L218">    }</span>
+
+    /**
+     * Returns the current values that are used for drawing the series.
+     *
+     * @return the XY map
+     */
+    public synchronized IndexXYMap&lt;Double, Double&gt; getXYMap() {
+<span class="nc" id="L226">        return mXY;</span>
+    }
+
+    /**
+     * Returns the X axis value at the specified index.
+     *
+     * @param index the index
+     * @return the X value
+     */
+    public synchronized double getX(int index) {
+<span class="fc" id="L236">        return mXY.getXByIndex(index);</span>
+    }
+
+    /**
+     * Returns the Y axis value at the specified index.
+     *
+     * @param index the index
+     * @return the Y value
+     */
+    public synchronized double getY(int index) {
+<span class="fc" id="L246">        return mXY.getYByIndex(index);</span>
+    }
+
+    /**
+     * Add a String at (x,y) coordinates
+     *
+     * @param annotation String text
+     * @param x
+     * @param y
+     */
+    public void addAnnotation(String annotation, double x, double y) {
+<span class="fc" id="L257">        mAnnotations.add(annotation);</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">        while (mStringXY.get(x) != null) {</span>
+<span class="nc" id="L259">            x += getPadding(x);</span>
+        }
+<span class="fc" id="L261">        mStringXY.put(x, y);</span>
+<span class="fc" id="L262">    }</span>
+
+    /**
+     * Add a String at (x,y) coordinates
+     *
+     * @param annotation String text
+     * @param index the index to add the annotation to
+     * @param x
+     * @param y
+     */
+    public void addAnnotation(String annotation, int index, double x, double y) {
+<span class="fc" id="L273">        mAnnotations.add(index, annotation);</span>
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">        while (mStringXY.get(x) != null) {</span>
+<span class="nc" id="L275">            x += getPadding(x);</span>
+        }
+<span class="fc" id="L277">        mStringXY.put(x, y);</span>
+<span class="fc" id="L278">    }</span>
+
+    /**
+     * Remove a String at index
+     *
+     * @param index
+     */
+    public void removeAnnotation(int index) {
+<span class="fc" id="L286">        mAnnotations.remove(index);</span>
+<span class="fc" id="L287">        mStringXY.removeByIndex(index);</span>
+<span class="fc" id="L288">    }</span>
+
+    /**
+     * Get X coordinate of the annotation at index
+     *
+     * @param index the index in the annotations list
+     * @return the corresponding annotation X value
+     */
+    public double getAnnotationX(int index) {
+<span class="fc" id="L297">        return mStringXY.getXByIndex(index);</span>
+    }
+
+    /**
+     * Get Y coordinate of the annotation at index
+     *
+     * @param index the index in the annotations list
+     * @return the corresponding annotation Y value
+     */
+    public double getAnnotationY(int index) {
+<span class="fc" id="L307">        return mStringXY.getYByIndex(index);</span>
+    }
+
+    /**
+     * Get the annotations count
+     *
+     * @return the annotations count
+     */
+    public int getAnnotationCount() {
+<span class="fc" id="L316">        return mAnnotations.size();</span>
+    }
+
+    /**
+     * Get the String at index
+     *
+     * @param index
+     * @return String
+     */
+    public String getAnnotationAt(int index) {
+<span class="fc" id="L326">        return mAnnotations.get(index);</span>
+    }
+
+    /**
+     * Returns submap of x and y values according to the given start and end
+     *
+     * @param start start x value
+     * @param stop stop x value
+     * @param beforeAfterPoints if the points before and after the first and last
+     *          visible ones must be displayed
+     * @return a submap of x and y values
+     */
+    public synchronized SortedMap&lt;Double, Double&gt; getRange(double start, double stop,
+                                                           boolean beforeAfterPoints) {
+<span class="fc bfc" id="L340" title="All 2 branches covered.">        if (beforeAfterPoints) {</span>
+            // we need to add one point before the start and one point after the end
+            // (if there are any)
+            // to ensure that line doesn't end before the end of the screen
+
+            // this would be simply: start = mXY.lowerKey(start) but NavigableMap is
+            // available since API 9
+<span class="fc" id="L347">            SortedMap&lt;Double, Double&gt; headMap = mXY.headMap(start);</span>
+<span class="fc bfc" id="L348" title="All 2 branches covered.">            if (!headMap.isEmpty()) {</span>
+<span class="fc" id="L349">                start = headMap.lastKey();</span>
+            }
+
+            // this would be simply: end = mXY.higherKey(end) but NavigableMap is
+            // available since API 9
+            // so we have to do this hack in order to support older versions
+<span class="fc" id="L355">            SortedMap&lt;Double, Double&gt; tailMap = mXY.tailMap(stop);</span>
+<span class="pc bpc" id="L356" title="1 of 2 branches missed.">            if (!tailMap.isEmpty()) {</span>
+<span class="fc" id="L357">                Iterator&lt;Double&gt; tailIterator = tailMap.keySet().iterator();</span>
+<span class="fc" id="L358">                Double next = tailIterator.next();</span>
+<span class="fc bfc" id="L359" title="All 2 branches covered.">                if (tailIterator.hasNext()) {</span>
+<span class="fc" id="L360">                    stop = tailIterator.next();</span>
+                } else {
+<span class="fc" id="L362">                    stop += next;</span>
+                }
+            }
+        }
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">        if (start &lt;= stop) {</span>
+<span class="fc" id="L367">            return mXY.subMap(start, stop);</span>
+        } else {
+<span class="nc" id="L369">            return new TreeMap&lt;Double, Double&gt;();</span>
+        }
+    }
+
+    public int getIndexForKey(double key) {
+<span class="fc" id="L374">        return mXY.getIndexForKey(key);</span>
+    }
+
+    /**
+     * Returns the series item count.
+     *
+     * @return the series item count
+     */
+    public synchronized int getItemCount() {
+<span class="fc" id="L383">        return mXY.size();</span>
+    }
+
+    /**
+     * Returns the minimum value on the X axis.
+     *
+     * @return the X axis minimum value
+     */
+    public double getMinX() {
+<span class="fc" id="L392">        return mMinX;</span>
+    }
+
+    /**
+     * Returns the minimum value on the Y axis.
+     *
+     * @return the Y axis minimum value
+     */
+    public double getMinY() {
+<span class="fc" id="L401">        return mMinY;</span>
+    }
+
+    /**
+     * Returns the maximum value on the X axis.
+     *
+     * @return the X axis maximum value
+     */
+    public double getMaxX() {
+<span class="fc" id="L410">        return mMaxX;</span>
+    }
+
+    /**
+     * Returns the maximum value on the Y axis.
+     *
+     * @return the Y axis maximum value
+     */
+    public double getMaxY() {
+<span class="fc" id="L419">        return mMaxY;</span>
+    }
+
+    /**
+     * This class requires sorted x values
+     */
+    private static class IndexXYMap&lt;K, V&gt; extends TreeMap&lt;K, V&gt; {
+<span class="fc" id="L426">        private final List&lt;K&gt; indexList = new ArrayList&lt;K&gt;();</span>
+
+<span class="fc" id="L428">        private double maxXDifference = 0;</span>
+<span class="fc" id="L429">        private boolean sorted = false;</span>
+
+        public IndexXYMap() {
+<span class="fc" id="L432">            super();</span>
+<span class="fc" id="L433">        }</span>
+
+        public V put(K key, V value) {
+<span class="fc" id="L436">            indexList.add(key);</span>
+<span class="fc" id="L437">            sorted = false;</span>
+<span class="fc" id="L438">            updateMaxXDifference();</span>
+<span class="fc" id="L439">            return super.put(key, value);</span>
+        }
+
+        public V put(int index, K key, V value) {
+<span class="nc" id="L443">            indexList.add(index, key);</span>
+<span class="nc" id="L444">            sorted = false;</span>
+<span class="nc" id="L445">            updateMaxXDifference();</span>
+<span class="nc" id="L446">            return super.put(key, value);</span>
+        }
+
+        private void updateMaxXDifference() {
+<span class="fc bfc" id="L450" title="All 2 branches covered.">            if (indexList.size() &lt; 2) {</span>
+<span class="fc" id="L451">                maxXDifference = 0;</span>
+<span class="fc" id="L452">                return;</span>
+            }
+
+<span class="fc bfc" id="L455" title="All 2 branches covered.">            if (Math.abs((Double) indexList.get(indexList.size() - 1)</span>
+<span class="fc" id="L456">                    - (Double) indexList.get(indexList.size() - 2)) &gt; maxXDifference)</span>
+<span class="fc" id="L457">                maxXDifference = Math.abs((Double) indexList.get(indexList.size() - 1)</span>
+<span class="fc" id="L458">                        - (Double) indexList.get(indexList.size() - 2));</span>
+<span class="fc" id="L459">        }</span>
+
+        public double getMaxXDifference() {
+<span class="nc" id="L462">            return maxXDifference;</span>
+        }
+
+        public void clear() {
+<span class="fc" id="L466">            updateMaxXDifference();</span>
+<span class="fc" id="L467">            super.clear();</span>
+<span class="fc" id="L468">            indexList.clear();</span>
+<span class="fc" id="L469">        }</span>
+
+        /**
+         * Returns X-value according to the given index
+         *
+         * @param index
+         * @return the X value
+         */
+        public K getXByIndex(int index) {
+<span class="fc" id="L478">            return indexList.get(index);</span>
+        }
+
+        /**
+         * Returns Y-value according to the given index
+         *
+         * @param index
+         * @return the Y value
+         */
+        public V getYByIndex(int index) {
+<span class="fc" id="L488">            K key = indexList.get(index);</span>
+<span class="fc" id="L489">            return this.get(key);</span>
+        }
+
+        /**
+         * Returns XY-entry according to the given index
+         *
+         * @param index
+         * @return the X and Y values
+         */
+        public XYEntry&lt;K, V&gt; getByIndex(int index) {
+<span class="nc" id="L499">            K key = indexList.get(index);</span>
+<span class="nc" id="L500">            return new XYEntry&lt;K, V&gt;(key, this.get(key));</span>
+        }
+
+        /**
+         * Removes entry from map by index
+         *
+         * @param index
+         */
+        public XYEntry&lt;K, V&gt; removeByIndex(int index) {
+<span class="fc" id="L509">            K key = indexList.remove(index);</span>
+<span class="fc" id="L510">            return new XYEntry&lt;K, V&gt;(key, this.remove(key));</span>
+        }
+
+        public int getIndexForKey(K key) {
+<span class="fc bfc" id="L514" title="All 2 branches covered.">            if (!sorted) {</span>
+<span class="fc" id="L515">                Collections.sort(indexList, null);</span>
+<span class="fc" id="L516">                sorted = true;</span>
+            }
+<span class="fc" id="L518">            int out = Collections.binarySearch(indexList, key, null);</span>
+<span class="fc" id="L519">            return out;</span>
+        }
+    }
+}
+
+/**
+ * A map entry value encapsulating an XY point.
+ */
+class XYEntry&lt;K, V&gt; implements Map.Entry&lt;K, V&gt; {
+    private final K key;
+
+    private V value;
+
+<span class="fc" id="L532">    public XYEntry(K key, V value) {</span>
+<span class="fc" id="L533">        this.key = key;</span>
+<span class="fc" id="L534">        this.value = value;</span>
+<span class="fc" id="L535">    }</span>
+
+    public K getKey() {
+<span class="fc" id="L538">        return key;</span>
+    }
+
+    public V getValue() {
+<span class="fc" id="L542">        return value;</span>
+    }
+
+    public V setValue(V object) {
+<span class="nc" id="L546">        this.value = object;</span>
+<span class="nc" id="L547">        return this.value;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

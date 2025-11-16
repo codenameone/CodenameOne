@@ -1,0 +1,536 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Promise.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util.promise</a> &gt; <span class="el_source">Promise.java</span></div><h1>Promise.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.util.promise;
+
+
+import com.codename1.annotations.Async;
+import com.codename1.io.Util;
+import com.codename1.ui.CN;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.AsyncResult;
+import com.codename1.util.SuccessCallback;
+
+import java.util.LinkedList;
+
+import static com.codename1.ui.CN.invokeAndBlock;
+
+/**
+ * An implementation of &lt;a href=&quot;https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise&quot;&gt;Promise&lt;/a&gt; for
+ * use with Codename One applications.  Due to java reserved words, there are a few differences in this implementation:
+ *
+ * &lt;ol&gt;
+ * &lt;li&gt;Instead of {@literal catch()}, we use {@literal except()}&lt;/li&gt;
+ * &lt;li&gt;Instead of {@literal finally()}, we use {@literal always()}&lt;/li&gt;
+ * &lt;/ol&gt;
+ *
+ * &lt;p&gt;Since {@link #then(Functor, Functor) }, {@link #except(Functor) },
+ * and {@link #always(Functor) } take Functors as parameters, which must have a return value, this implementation
+ * provides convenience wrappers {@link #onSuccess(SuccessCallback) }, {@link #onFail(SuccessCallback) },
+ * and {@link #onComplete(SuccessCallback) } which take {@link SuccessCallback} objects instead.  For simple cases,
+ * these wrappers will be easier to use because you don't need to return a dummy {@literal null} at the end of the callback.&lt;/p&gt;
+ *
+ * &lt;p&gt;For more complex cases, where the return value of one Functor is meant to be piped into the subsequent Functor, then the Functor
+ * variants should be used.&lt;/p&gt;
+ *
+ * @author shannah
+ * @see &lt;a href=&quot;https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise&quot;&gt;MDN documentation for Promise&lt;/a&gt;
+ * @since 8.0
+ */
+public class Promise&lt;T&gt; {
+
+<span class="fc" id="L61">    private final LinkedList&lt;PromiseHandler&gt; then = new LinkedList&lt;PromiseHandler&gt;();</span>
+
+    private final Functor&lt;T, ?&gt; resolve;
+    private final Functor&lt;Throwable, ?&gt; reject;
+
+<span class="fc" id="L66">    private State state = State.Pending;</span>
+    private Throwable error;
+    private T value;
+
+
+    /**
+     * Creates a new promise with the given executor function.  Works the same as Javascript equivalent.
+     *
+     * @param executor The executor function.  This is executed immediately, and should call either the passed {@literal resolve}
+     *                 or {@literal reject} functor to mark success or failure.
+     * @see &lt;a href=&quot;https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/Promise&quot;&gt;MDN documentation for Promise&lt;/a&gt;
+     */
+    @Async.Schedule
+<span class="fc" id="L79">    public Promise(ExecutorFunction executor) {</span>
+<span class="fc" id="L80">        resolve = new Functor&lt;T, Object&gt;() {</span>
+            public Object call(final T o) {
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">                if (!CN.isEdt()) {</span>
+<span class="nc" id="L83">                    CN.callSerially(new Runnable() {</span>
+                        public void run() {
+<span class="nc" id="L85">                            resolve.call(o);</span>
+<span class="nc" id="L86">                        }</span>
+                    });
+<span class="nc" id="L88">                    return null;</span>
+                }
+<span class="fc" id="L90">                state = State.Fulfilled;</span>
+<span class="fc" id="L91">                value = o;</span>
+<span class="fc" id="L92">                Promise.this.processThens(o, true);</span>
+<span class="fc" id="L93">                return value;</span>
+
+            }
+        };
+<span class="fc" id="L97">        reject = new Functor&lt;Throwable, Object&gt;() {</span>
+            public Object call(final Throwable o) {
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">                if (!CN.isEdt()) {</span>
+<span class="nc" id="L100">                    CN.callSerially(new Runnable() {</span>
+                        public void run() {
+<span class="nc" id="L102">                            reject.call(o);</span>
+<span class="nc" id="L103">                        }</span>
+                    });
+<span class="nc" id="L105">                    return null;</span>
+                }
+<span class="fc" id="L107">                state = State.Rejected;</span>
+<span class="fc" id="L108">                error = o;</span>
+<span class="fc" id="L109">                Promise.this.processThens(o, false);</span>
+<span class="fc" id="L110">                return error;</span>
+            }
+        };
+<span class="fc bfc" id="L113" title="All 2 branches covered.">        if (executor != null) {</span>
+<span class="fc" id="L114">            executor.call(resolve, reject);</span>
+        }
+
+
+<span class="fc" id="L118">    }</span>
+
+    /**
+     * The Promise.all() method takes an iterable of promises as an input, and returns a single Promise that resolves to an array of the results of the input promises. This returned promise will resolve when all of the input's promises have resolved, or if the input iterable contains no promises. It rejects immediately upon any of the input promises rejecting or non-promises throwing an error, and will reject with this first rejection message / error.
+     *
+     * @param promises
+     * @return
+     * @see &lt;a href=&quot;https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all&quot;&gt;See MDN documentation for all()&lt;/a&gt;
+     */
+    public static Promise all(final Promise... promises) {
+
+<span class="fc" id="L129">        return new Promise(new ExecutorFunction() {</span>
+            public void call(final Functor resolve, final Functor reject) {
+<span class="fc" id="L131">                final int[] complete = new int[1];</span>
+<span class="fc" id="L132">                final int len = promises.length;</span>
+<span class="fc" id="L133">                final Object[] results = new Object[len];</span>
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">                if (len &gt; 0) {</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">                    for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L136">                        final int index = i;</span>
+<span class="fc" id="L137">                        final Promise p = promises[i];</span>
+<span class="fc" id="L138">                        p.then(new Functor() {</span>
+                            public Object call(Object res) {
+
+<span class="fc" id="L141">                                results[index] = res;</span>
+<span class="fc" id="L142">                                complete[0]++;</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">                                if (complete[0] == len) {</span>
+<span class="fc" id="L144">                                    resolve.call(results);</span>
+                                }
+<span class="fc" id="L146">                                return null;</span>
+                            }
+<span class="fc" id="L148">                        }).except(new Functor() {</span>
+                            public Object call(Object error) {
+<span class="nc" id="L150">                                reject.call(error);</span>
+<span class="nc" id="L151">                                return null;</span>
+                            }
+                        });
+                    }
+                } else {
+<span class="nc" id="L156">                    resolve.call(results);</span>
+                }
+
+<span class="fc" id="L159">            }</span>
+        });
+    }
+
+    /**
+     * &lt;p&gt;
+     * The Promise.allSettled() method returns a promise that resolves after all
+     * of the given promises have either fulfilled or rejected, with an array of
+     * objects that each describes the outcome of each promise.&lt;/p&gt;
+     *
+     * &lt;p&gt;
+     * It is typically used when you have multiple asynchronous tasks that are
+     * not dependent on one another to complete successfully, or you'd always
+     * like to know the result of each promise.&lt;/p&gt;
+     *
+     * &lt;p&gt;
+     * In comparison, the Promise returned by Promise.all() may be more
+     * appropriate if the tasks are dependent on each other / if you'd like to
+     * immediately reject upon any of them rejecting.&lt;/p&gt;
+     *
+     * @param promises
+     * @return
+     * @see &lt;a href=&quot;https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled&quot;&gt;See MDN documentation for allSettled()&lt;/a&gt;
+     */
+    public static Promise allSettled(final Promise... promises) {
+<span class="nc" id="L184">        return new Promise(new ExecutorFunction() {</span>
+            public void call(final Functor resolve, Functor reject) {
+<span class="nc" id="L186">                final int[] complete = new int[1];</span>
+<span class="nc" id="L187">                final int len = promises.length;</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">                if (len &gt; 0) {</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">                    for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L190">                        Promise p = promises[i];</span>
+<span class="nc" id="L191">                        p.always(new Functor() {</span>
+                            public Object call(Object res) {
+<span class="nc" id="L193">                                complete[0]++;</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">                                if (complete[0] == len) {</span>
+<span class="nc" id="L195">                                    resolve.call(promises);</span>
+                                }
+
+<span class="nc" id="L198">                                return null;</span>
+                            }
+                        });
+                    }
+                } else {
+<span class="nc" id="L203">                    resolve.call(promises);</span>
+                }
+<span class="nc" id="L205">            }</span>
+        });
+    }
+
+    public static &lt;V&gt; Promise&lt;V&gt; resolve(final V value) {
+<span class="nc" id="L210">        return new Promise&lt;V&gt;(new ExecutorFunction() {</span>
+            public void call(Functor resolutionFunc, Functor rejectionFunc) {
+<span class="nc" id="L212">                resolutionFunc.call(value);</span>
+<span class="nc" id="L213">            }</span>
+        });
+    }
+
+    public static Promise reject(final Throwable err) {
+<span class="nc" id="L218">        return new Promise(new ExecutorFunction() {</span>
+            public void call(Functor resolve, Functor reject) {
+<span class="nc" id="L220">                reject(err);</span>
+<span class="nc" id="L221">            }</span>
+        });
+    }
+
+    public static &lt;V&gt; Promise&lt;V&gt; promisify(final AsyncResource&lt;V&gt; res) {
+<span class="nc" id="L226">        return new Promise&lt;V&gt;(new ExecutorFunction() {</span>
+            public void call(final Functor resolutionFunc, final Functor rejectionFunc) {
+<span class="nc" id="L228">                res.onResult(new AsyncResult&lt;V&gt;() {</span>
+                    public void onReady(V r, Throwable err) {
+<span class="nc bnc" id="L230" title="All 2 branches missed.">                        if (err != null) {</span>
+<span class="nc" id="L231">                            rejectionFunc.call(err);</span>
+                        } else {
+<span class="nc" id="L233">                            resolutionFunc.call(r);</span>
+                        }
+<span class="nc" id="L235">                    }</span>
+                });
+<span class="nc" id="L237">            }</span>
+        });
+    }
+
+    /**
+     * Called when the promise is rejected or resolved to process all handler functions
+     * that were registered via {@link #then(Functor, Functor) },
+     * {@link #except(Functor) }, or {@link #always(Functor) }
+     *
+     * @param o        The value to pipe into the handler functors as an argument.
+     * @param resolved Whether the promise was resolved.  If {@literal true}, it will call the resolve
+     *                 handler.  If {@literal false}, it will call the reject handler.
+     */
+    @Async.Execute
+    private void processThens(final Object o, final boolean resolved) {
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">        if (!CN.isEdt()) {</span>
+<span class="nc" id="L253">            CN.callSerially(new Runnable() {</span>
+                public void run() {
+<span class="nc" id="L255">                    Promise.this.processThens(o, resolved);</span>
+<span class="nc" id="L256">                }</span>
+            });
+<span class="nc" id="L258">            return;</span>
+        }
+<span class="fc bfc" id="L260" title="All 2 branches covered.">        while (!then.isEmpty()) {</span>
+<span class="fc" id="L261">            PromiseHandler p = then.remove(0);</span>
+            try {
+<span class="fc bfc" id="L263" title="All 2 branches covered.">                Object result = resolved ? p.resolve.call(o) : p.reject.call(o);</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">                if (result instanceof Promise) {</span>
+<span class="nc" id="L265">                    Promise promiseResult = (Promise) result;</span>
+<span class="nc bnc" id="L266" title="All 4 branches missed.">                    switch (promiseResult.state) {</span>
+                        case Fulfilled:
+
+
+<span class="nc" id="L270">                            p.promise.resolve.call(promiseResult.value);</span>
+<span class="nc" id="L271">                            break;</span>
+                        case Rejected:
+<span class="nc" id="L273">                            p.promise.reject.call(promiseResult.error);</span>
+<span class="nc" id="L274">                            break;</span>
+                        case Pending:
+<span class="nc" id="L276">                            promiseResult.then(p.promise.resolve, p.promise.reject);</span>
+                            break;
+                    }
+<span class="nc" id="L279">                } else {</span>
+<span class="fc" id="L280">                    p.promise.resolve.call(result);</span>
+                }
+
+<span class="nc" id="L283">            } catch (Throwable ex) {</span>
+<span class="nc" id="L284">                p.promise.reject.call(ex);</span>
+<span class="fc" id="L285">            }</span>
+<span class="fc" id="L286">        }</span>
+<span class="fc" id="L287">    }</span>
+
+    /**
+     * A wrapper for {@link #then(Functor, Functor) } that uses {@link SuccessCallback}
+     * instead of {@link Functor}.
+     *
+     * @param resolutionFunc Callback to run on resolution of promise.
+     * @param rejectionFunc  Callback to run on rejection of promise.
+     * @return
+     */
+    public Promise ready(final SuccessCallback&lt;T&gt; resolutionFunc, final SuccessCallback&lt;Throwable&gt; rejectionFunc) {
+<span class="pc bpc" id="L298" title="2 of 4 branches missed.">        return then(resolutionFunc == null ? null : new Functor&lt;T, Object&gt;() {</span>
+            public Object call(T o) {
+<span class="fc" id="L300">                resolutionFunc.onSucess(o);</span>
+<span class="fc" id="L301">                return null;</span>
+            }
+<span class="nc" id="L303">        }, rejectionFunc == null ? null : new Functor&lt;Throwable, Object&gt;() {</span>
+            public Object call(Throwable o) {
+<span class="nc" id="L305">                rejectionFunc.onSucess(o);</span>
+<span class="nc" id="L306">                return null;</span>
+            }
+        });
+    }
+
+    /**
+     * A wrapper for {@link #then(Functor) } that uses {@link SuccessCallback} instead
+     * of {@link Functor}.
+     *
+     * @param resolutionFunc Callback called when project is fulfilled.
+     * @return
+     */
+    public Promise onSuccess(SuccessCallback&lt;T&gt; resolutionFunc) {
+<span class="fc" id="L319">        return ready(resolutionFunc, null);</span>
+    }
+
+    /**
+     * A wrapper for {@link #except(Functor) } that uses {@link SuccessCallback} instead
+     * of {@link Functor}.
+     *
+     * @param rejectionFunc
+     * @return
+     */
+    public Promise onFail(SuccessCallback&lt;Throwable&gt; rejectionFunc) {
+<span class="nc" id="L330">        return ready(null, rejectionFunc);</span>
+    }
+
+    /**
+     * A wrapper for {@link #always(Functor) } that uses {@link SuccessCallback} instead
+     * of {@link Functor}.
+     *
+     * @param handlerFunc
+     * @return
+     */
+    public Promise onComplete(SuccessCallback handlerFunc) {
+<span class="nc" id="L341">        return ready(handlerFunc, handlerFunc);</span>
+    }
+
+    /**
+     * @param resolutionFunc
+     * @return
+     */
+    public Promise then(Functor&lt;T, ?&gt; resolutionFunc) {
+<span class="fc" id="L349">        return then(resolutionFunc, null);</span>
+    }
+
+    /**
+     * The then() method returns a Promise. It takes up to two arguments: callback functions for the success and failure cases of the Promise.
+     *
+     * @param resolutionFunc A Function called if the Promise is fulfilled. This function has one argument, the fulfillment value. If it is null, it is internally replaced with an &quot;Identity&quot; function (it returns the received argument).
+     * @param rejectionFunc  A Function called if the Promise is rejected. This function has one argument, the rejection reason. If it is null, it is internally replaced with a &quot;Thrower&quot; function (it throws an error it received as argument).
+     * @return &lt;p&gt;Once a Promise is fulfilled or rejected, the respective handler function (resolutionFunc or rejectionFunc) will be called asynchronously (scheduled on the EDT). The behavior of the handler function follows a specific set of rules. If a handler function:&lt;/p&gt;
+     * &lt;dl&gt;
+     * &lt;dt&gt;returns a value,&lt;/dt&gt;&lt;dd&gt; the promise returned by then gets resolved
+     * with the returned value as its value.&lt;/dd&gt;
+     * &lt;dt&gt;doesn't return anything,&lt;/dt&gt; &lt;dd&gt;the promise returned by then gets
+     * resolved with an undefined value.&lt;/dd&gt;
+     * &lt;dt&gt;throws an error,&lt;/dt&gt;&lt;dd&gt; the promise returned by then gets rejected
+     * with the thrown error as its value.&lt;/dd&gt;
+     * &lt;dt&gt;returns an already fulfilled promise&lt;/dt&gt;, &lt;dd&gt;the promise returned
+     * by then gets fulfilled with that promise's value as its value.&lt;/dd&gt;
+     * &lt;dt&gt;returns an already rejected promise,&lt;/dt&gt; &lt;dd&gt;the promise returned by
+     * then gets rejected with that promise's value as its value.&lt;/dd&gt;
+     * &lt;dt&gt;returns another pending promise object,&lt;/dt&gt;&lt;dd&gt; the
+     * resolution/rejection of the promise returned by then will be subsequent
+     * to the resolution/rejection of the promise returned by the handler. Also,
+     * the resolved value of the promise returned by then will be the same as
+     * the resolved value of the promise returned by the handler.&lt;/dd&gt;
+     * &lt;/dl&gt;
+     * @see &lt;a href=&quot;https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/then&quot;&gt;See MDN documentation for then()&lt;/a&gt;
+     */
+    public Promise then(Functor&lt;T, ?&gt; resolutionFunc, Functor&lt;Throwable, ?&gt; rejectionFunc) {
+<span class="fc bfc" id="L378" title="All 2 branches covered.">        if (resolutionFunc == null) {</span>
+<span class="fc" id="L379">            resolutionFunc = new Functor&lt;T, Object&gt;() {</span>
+                public Object call(T o) {
+<span class="fc" id="L381">                    return o;</span>
+                }
+            };
+        }
+<span class="fc bfc" id="L385" title="All 2 branches covered.">        if (rejectionFunc == null) {</span>
+<span class="fc" id="L386">            rejectionFunc = new Functor&lt;Throwable, Object&gt;() {</span>
+                public Object call(Throwable o) {
+<span class="nc" id="L388">                    throw (RuntimeException) o;</span>
+                }
+            };
+        }
+
+<span class="fc" id="L393">        PromiseHandler handler = new PromiseHandler();</span>
+<span class="fc" id="L394">        handler.promise = new Promise(null);</span>
+<span class="fc" id="L395">        handler.resolve = resolutionFunc;</span>
+<span class="fc" id="L396">        handler.reject = rejectionFunc;</span>
+<span class="fc" id="L397">        then.add(handler);</span>
+<span class="pc bpc" id="L398" title="1 of 3 branches missed.">        switch (state) {</span>
+            case Fulfilled:
+<span class="fc" id="L400">                processThens(value, true);</span>
+<span class="fc" id="L401">                break;</span>
+            case Rejected:
+<span class="fc" id="L403">                processThens(error, false);</span>
+                break;
+        }
+<span class="fc" id="L406">        return handler.promise;</span>
+    }
+
+    /**
+     * Implementation of Promise.catch(). Named &quot;except&quot; because of Java reserved word..
+     *
+     * @param rejectionFunc Function called if promise is rejected.
+     * @return
+     * @see &lt;a href=&quot;https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/catch&quot;&gt;See MDN documentation for catch()&lt;/a&gt;
+     */
+    public Promise except(Functor&lt;Throwable, ?&gt; rejectionFunc) {
+<span class="fc" id="L417">        return then(null, rejectionFunc);</span>
+    }
+
+    /**
+     * Implementation of Promise.finally().  Named &quot;always&quot; because of Java reserved word.
+     *
+     * @param handlerFunc
+     * @return
+     * @see &lt;a href=&quot;https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/finally&quot;&gt;See MDN documentation for finally()&lt;/a&gt;
+     */
+    public Promise always(Functor handlerFunc) {
+<span class="fc" id="L428">        return then(handlerFunc, handlerFunc);</span>
+    }
+
+    /**
+     * Gets the return value once the promise is fulfilled.  If the promise isnt resolved, this just returns null.
+     *
+     * @return
+     */
+    public T getValue() {
+<span class="fc" id="L437">        return value;</span>
+    }
+
+    /**
+     * Returns the current state of the promise.
+     *
+     * @return
+     */
+    public State getState() {
+<span class="nc" id="L446">        return state;</span>
+    }
+
+    /**
+     * Uses invokeAndBlock to wait for this promise to be either resolved or rejected.
+     * This will throw an exception of type {@link AsyncResource.AsyncExecutionException} if the
+     * promise failed.  Otherwise it will return the resolved value.
+     *
+     * @return
+     */
+    public T await() {
+<span class="nc" id="L457">        final boolean[] complete = new boolean[1];</span>
+<span class="nc" id="L458">        final Object[] out = new Object[1];</span>
+<span class="nc" id="L459">        final Throwable[] ex = new Throwable[1];</span>
+<span class="nc" id="L460">        this.onSuccess(new SuccessCallback&lt;T&gt;() {</span>
+            public void onSucess(T res) {
+<span class="nc" id="L462">                synchronized (complete) {</span>
+<span class="nc" id="L463">                    out[0] = res;</span>
+<span class="nc" id="L464">                    complete[0] = true;</span>
+<span class="nc" id="L465">                    complete.notifyAll();</span>
+<span class="nc" id="L466">                }</span>
+<span class="nc" id="L467">            }</span>
+<span class="nc" id="L468">        }).onFail(new SuccessCallback() {</span>
+            public void onSucess(Object res) {
+<span class="nc" id="L470">                synchronized (complete) {</span>
+<span class="nc" id="L471">                    ex[0] = (Throwable) res;</span>
+<span class="nc" id="L472">                    complete[0] = true;</span>
+<span class="nc" id="L473">                    complete.notifyAll();</span>
+
+<span class="nc" id="L475">                }</span>
+<span class="nc" id="L476">            }</span>
+        });
+
+<span class="nc bnc" id="L479" title="All 2 branches missed.">        while (!complete[0]) {</span>
+<span class="nc" id="L480">            invokeAndBlock(new Runnable() {</span>
+                public void run() {
+<span class="nc" id="L482">                    synchronized (complete) {</span>
+<span class="nc" id="L483">                        Util.wait(complete, 500);</span>
+<span class="nc" id="L484">                    }</span>
+<span class="nc" id="L485">                }</span>
+            });
+        }
+<span class="nc bnc" id="L488" title="All 2 branches missed.">        if (ex[0] != null) {</span>
+<span class="nc" id="L489">            throw new AsyncResource.AsyncExecutionException(ex[0]);</span>
+        }
+<span class="nc" id="L491">        return (T) out[0];</span>
+    }
+
+    public AsyncResource&lt;T&gt; asAsyncResource() {
+<span class="nc" id="L495">        final AsyncResource&lt;T&gt; out = new AsyncResource&lt;T&gt;();</span>
+<span class="nc" id="L496">        this.onSuccess(new SuccessCallback&lt;T&gt;() {</span>
+            public void onSucess(T res) {
+<span class="nc" id="L498">                out.complete(res);</span>
+<span class="nc" id="L499">            }</span>
+        });
+<span class="nc" id="L501">        this.onFail(new SuccessCallback&lt;Throwable&gt;() {</span>
+            public void onSucess(Throwable err) {
+<span class="nc" id="L503">                out.error(err);</span>
+<span class="nc" id="L504">            }</span>
+        });
+<span class="nc" id="L506">        return out;</span>
+    }
+
+    /**
+     * Encapsulates the state of a Promise.
+     */
+<span class="fc" id="L512">    public enum State {</span>
+        /**
+         * initial state, neither fulfilled nor rejected.
+         */
+<span class="fc" id="L516">        Pending,</span>
+
+        /**
+         * the operation completed successfully.
+         */
+<span class="fc" id="L521">        Fulfilled,</span>
+
+        /**
+         * the operation failed.
+         */
+<span class="fc" id="L526">        Rejected</span>
+    }
+
+    private static class PromiseHandler {
+        private Promise promise;
+        private Functor resolve;
+        private Functor reject;
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

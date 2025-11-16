@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LinearGradientPaint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">LinearGradientPaint.java</span></div><h1>LinearGradientPaint.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.geom.Rectangle2D;
+import com.codename1.ui.geom.Shape;
+import com.codename1.util.MathUtil;
+
+import static com.codename1.ui.MultipleGradientPaint.CycleMethod.REFLECT;
+
+/**
+ * LinearGradientPaint provides a way to fill a {@link Shape} with a linear gradient.
+ *
+ * @author shannah
+ * @see Graphics#setColor(com.codename1.ui.Paint)
+ * @since 7.0
+ */
+public class LinearGradientPaint extends MultipleGradientPaint {
+    private final double startX;
+    private final double startY;
+    private final double endX;
+    private final double endY;
+<span class="pc" id="L43">    private final Transform t = Transform.makeIdentity();</span>
+<span class="pc" id="L44">    private final Transform t2 = Transform.makeIdentity();</span>
+
+    /**
+     * Creates a LinearGradientPaint with the specified settings.
+     *
+     * @param startX            The startX coordinate of the gradient in user space.
+     * @param startY            The startY coordinate of the gradient in user space.
+     * @param endX              The endX coordinate of the gradient in user space.
+     * @param endY              THe endY coordinate of the gradient in user space.
+     * @param fractions         Fractional positions of where gradient colors begin.  Each value should be between 0 and 1.
+     * @param colors            The colors to use in the gradient.  There should be the same number of colors as there are fractions.
+     * @param cycleMethod       The cycle method to use.
+     * @param colorSpace        The color space to use.
+     * @param gradientTransform Transform to use for the gradient.  Not used right now.
+     */
+    public LinearGradientPaint(float startX, float startY, float endX, float endY, float[] fractions, int[] colors, MultipleGradientPaint.CycleMethod cycleMethod, MultipleGradientPaint.ColorSpaceType colorSpace, Transform gradientTransform) {
+<span class="fc" id="L60">        super(fractions, colors, cycleMethod, colorSpace, gradientTransform);</span>
+<span class="fc" id="L61">        this.startX = startX;</span>
+<span class="fc" id="L62">        this.startY = startY;</span>
+<span class="fc" id="L63">        this.endX = endX;</span>
+<span class="fc" id="L64">        this.endY = endY;</span>
+<span class="fc" id="L65">    }</span>
+
+    /**
+     * Creates a LinearGradientPaint with the specified settings.
+     *
+     * @param startX            The startX coordinate of the gradient in user space.
+     * @param startY            The startY coordinate of the gradient in user space.
+     * @param endX              The endX coordinate of the gradient in user space.
+     * @param endY              THe endY coordinate of the gradient in user space.
+     * @param fractions         Fractional positions of where gradient colors begin.  Each value should be between 0 and 1.
+     * @param colors            The colors to use in the gradient.  There should be the same number of colors as there are fractions.
+     * @param cycleMethod       The cycle method to use.
+     * @param colorSpace        The color space to use.
+     * @param gradientTransform Transform to use for the gradient.  Not used right now.
+     */
+    public LinearGradientPaint(double startX, double startY, double endX, double endY, float[] fractions, int[] colors, MultipleGradientPaint.CycleMethod cycleMethod, MultipleGradientPaint.ColorSpaceType colorSpace, Transform gradientTransform) {
+<span class="nc" id="L81">        super(fractions, colors, cycleMethod, colorSpace, gradientTransform);</span>
+<span class="nc" id="L82">        this.startX = startX;</span>
+<span class="nc" id="L83">        this.startY = startY;</span>
+<span class="nc" id="L84">        this.endX = endX;</span>
+<span class="nc" id="L85">        this.endY = endY;</span>
+<span class="nc" id="L86">    }</span>
+
+    private static double findAngle(double x1, double y1, double x2, double y2) {
+<span class="nc" id="L89">        return MathUtil.atan((y2 - y1) / (x2 - x1));</span>
+    }
+
+    private static double scaleX(double theta, double x) {
+<span class="nc" id="L93">        return x / Math.cos(theta);</span>
+    }
+
+    private static double scaleY(double theta, double y) {
+<span class="nc" id="L97">        return y / Math.sin(theta);</span>
+    }
+
+    /**
+     * Paints linear gradient in the given bounds.
+     *
+     * @param g
+     * @param bounds
+     */
+    @Override
+    public final void paint(Graphics g, Rectangle2D bounds) {
+<span class="fc" id="L108">        paint(g, bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());</span>
+<span class="fc" id="L109">    }</span>
+
+    private double insetStartLength(double x, double y, double w, double h) {
+
+
+<span class="fc" id="L114">        return Math.max(w, h);</span>
+    }
+
+    private double insetEndLength(double x, double y, double w, double h) {
+<span class="fc" id="L118">        return Math.max(w, h);</span>
+    }
+
+    private double length() {
+<span class="fc" id="L122">        double x = endX - startX;</span>
+<span class="fc" id="L123">        double y = endY - startY;</span>
+<span class="fc" id="L124">        return Math.sqrt(x * x + y * y);</span>
+    }
+
+    private double theta() {
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (length() == 0) {</span>
+<span class="nc" id="L129">            return 0;</span>
+        }
+<span class="fc" id="L131">        return thetaDirection() * MathUtil.acos((endX - startX) / length());</span>
+    }
+
+    private int thetaDirection() {
+<span class="pc bpc" id="L135" title="1 of 2 branches missed.">        if (endY &gt;= startY) {</span>
+<span class="fc" id="L136">            return 1;</span>
+        } else {
+<span class="nc" id="L138">            return -1;</span>
+        }
+    }
+
+    private int[] reverseColors() {
+<span class="fc" id="L143">        int[] colors = getColors();</span>
+<span class="fc" id="L144">        int len = colors.length;</span>
+<span class="fc" id="L145">        int[] out = new int[len];</span>
+<span class="fc bfc" id="L146" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L147">            out[i] = colors[len - i - 1];</span>
+        }
+<span class="fc" id="L149">        return out;</span>
+    }
+
+    private float[] reverseFractions() {
+<span class="fc" id="L153">        float[] fractions = getFractions();</span>
+<span class="fc" id="L154">        int len = fractions.length;</span>
+<span class="fc" id="L155">        float[] out = new float[len];</span>
+<span class="fc bfc" id="L156" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc" id="L157">            out[i] = 1f - fractions[len - i - 1];</span>
+        }
+<span class="fc" id="L159">        return out;</span>
+    }
+
+    /**
+     * Painds the linear gradient in the given bounds.
+     *
+     * @param g
+     * @param x
+     * @param y
+     * @param w
+     * @param h
+     */
+    @Override
+    public void paint(Graphics g, double x, double y, double w, double h) {
+<span class="fc" id="L173">        paint(g, x, y, w, h, true);</span>
+<span class="fc" id="L174">    }</span>
+
+    private void paint(Graphics g, double x, double y, double w, double h, boolean processCycles) {
+<span class="fc" id="L177">        Paint p = g.getPaint();</span>
+<span class="fc" id="L178">        int[] colors = getColors();</span>
+<span class="fc" id="L179">        float[] fractions = getFractions();</span>
+
+<span class="fc" id="L181">        double theta = theta();</span>
+<span class="fc" id="L182">        double px = 0;</span>
+<span class="fc" id="L183">        double py = 0;</span>
+<span class="fc" id="L184">        double pw = length();</span>
+<span class="fc" id="L185">        double ph = Math.max(w, h) * 2;</span>
+
+
+        //System.out.println(&quot;px=&quot;+px+&quot;, &quot;+py+&quot;, &quot;+pw+&quot;, &quot;+ph+&quot; theta=&quot;+theta);
+
+<span class="fc" id="L190">        g.getTransform(t);</span>
+<span class="fc" id="L191">        t2.setTransform(t);</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        if (getTransform() != null) {</span>
+<span class="nc" id="L193">            t2.concatenate(getTransform());</span>
+        }
+<span class="fc" id="L195">        int tx = g.getTranslateX();</span>
+<span class="fc" id="L196">        int ty = g.getTranslateY();</span>
+<span class="fc" id="L197">        g.translate(-tx, -ty);</span>
+
+<span class="fc" id="L199">        t2.translate((float) (startX + tx), (float) (startY + ty));</span>
+<span class="fc" id="L200">        t2.rotate((float) theta, 0, 0);</span>
+<span class="fc" id="L201">        t2.translate(0, -(float) ph / 2);</span>
+
+<span class="fc" id="L203">        g.setTransform(t2);</span>
+<span class="fc" id="L204">        int len = Math.min(colors.length, fractions.length);</span>
+<span class="fc" id="L205">        int alpha = g.getAlpha();</span>
+<span class="fc" id="L206">        int gradientTrans = getTransparency();</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        if (getTransparency() &lt; 0xff) {</span>
+<span class="fc" id="L208">            g.setAlpha((int) (alpha * gradientTrans / 255.0));</span>
+        }
+        /*
+        if (pStartX &gt; 0) {
+            g.setColor(colors[0]);
+            g.fillRect(0, 0, (int)Math.round(pStartX), (int)Math.round(ph));
+        }
+        */
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        if (processCycles) {</span>
+<span class="pc bpc" id="L217" title="2 of 3 branches missed.">            switch (getCycleMethod()) {</span>
+                case NO_CYCLE: {
+
+<span class="nc" id="L220">                    g.setColor(colors[0]);</span>
+<span class="nc" id="L221">                    g.fillRect((int) Math.floor(-insetStartLength(x, y, w, h)), 0, (int) Math.ceil(insetStartLength(x, y, w, h)) + 1, (int) Math.round(ph));</span>
+<span class="nc" id="L222">                    break;</span>
+                }
+                case REPEAT:
+                case REFLECT: {
+<span class="fc" id="L226">                    int currPos = 0;</span>
+<span class="fc" id="L227">                    int endPos = (int) Math.floor(-insetStartLength(x, y, w, h));</span>
+<span class="fc" id="L228">                    int iter = 0;</span>
+
+<span class="fc bfc" id="L230" title="All 2 branches covered.">                    while (currPos &gt; endPos) {</span>
+<span class="fc" id="L231">                        float sx = (float) startX;</span>
+<span class="fc" id="L232">                        float sy = (float) startY;</span>
+<span class="fc" id="L233">                        float ex = (float) endX;</span>
+<span class="fc" id="L234">                        float ey = (float) endY;</span>
+<span class="fc" id="L235">                        int[] cols = getColors();</span>
+<span class="fc" id="L236">                        float[] fracs = getFractions();</span>
+<span class="pc bpc" id="L237" title="1 of 4 branches missed.">                        if (iter % 2 == 0 &amp;&amp; getCycleMethod() == REFLECT) {</span>
+<span class="fc" id="L238">                            sx = (float) endX;</span>
+<span class="fc" id="L239">                            sy = (float) endY;</span>
+<span class="fc" id="L240">                            ex = (float) startX;</span>
+<span class="fc" id="L241">                            ey = (float) startY;</span>
+<span class="fc" id="L242">                            cols = reverseColors();</span>
+<span class="fc" id="L243">                            fracs = reverseFractions();</span>
+                        }
+<span class="fc bfc" id="L245" title="All 2 branches covered.">                        for (int i = 0; i &lt; len - 1; i++) {</span>
+<span class="fc" id="L246">                            int x1 = (int) Math.round(currPos - fracs[i] * pw);</span>
+<span class="fc" id="L247">                            int x2 = (int) Math.round(currPos - fracs[i + 1] * pw);</span>
+<span class="fc" id="L248">                            g.fillLinearGradient(cols[i], cols[i + 1], x1, 0, Math.abs(x2 - x1), (int) Math.round(ph), true);</span>
+                        }
+<span class="fc" id="L250">                        currPos -= pw;</span>
+<span class="fc" id="L251">                        iter++;</span>
+<span class="fc" id="L252">                    }</span>
+                }
+
+            }
+        }
+<span class="fc bfc" id="L257" title="All 2 branches covered.">        for (int i = 0; i &lt; len - 1; i++) {</span>
+<span class="fc" id="L258">            int x1 = (int) Math.round(fractions[i] * pw);</span>
+<span class="fc" id="L259">            int x2 = (int) Math.round(fractions[i + 1] * pw);</span>
+<span class="fc" id="L260">            g.fillLinearGradient(colors[i], colors[i + 1], x1, 0, x2 - x1, (int) Math.round(ph), true);</span>
+        }
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        if (processCycles) {</span>
+<span class="pc bpc" id="L263" title="2 of 3 branches missed.">            switch (getCycleMethod()) {</span>
+                case NO_CYCLE: {
+
+<span class="nc" id="L266">                    g.setColor(colors[len - 1]);</span>
+<span class="nc" id="L267">                    g.fillRect((int) Math.floor(pw) - 1, 0, (int) Math.ceil(insetEndLength(x, y, w, h)), (int) Math.round(ph));</span>
+<span class="nc" id="L268">                    break;</span>
+                }
+                case REPEAT:
+                case REFLECT: {
+<span class="fc" id="L272">                    int currPos = 0;</span>
+<span class="fc" id="L273">                    int endPos = (int) Math.ceil(insetEndLength(x, y, w, h));</span>
+<span class="fc" id="L274">                    int iter = 0;</span>
+
+<span class="fc bfc" id="L276" title="All 2 branches covered.">                    while (currPos &lt; endPos) {</span>
+<span class="fc" id="L277">                        float sx = (float) startX;</span>
+<span class="fc" id="L278">                        float sy = (float) startY;</span>
+<span class="fc" id="L279">                        float ex = (float) endX;</span>
+<span class="fc" id="L280">                        float ey = (float) endY;</span>
+<span class="fc" id="L281">                        int[] cols = getColors();</span>
+<span class="fc" id="L282">                        float[] fracs = getFractions();</span>
+<span class="pc bpc" id="L283" title="1 of 4 branches missed.">                        if (iter % 2 == 0 &amp;&amp; getCycleMethod() == REFLECT) {</span>
+<span class="fc" id="L284">                            sx = (float) endX;</span>
+<span class="fc" id="L285">                            sy = (float) endY;</span>
+<span class="fc" id="L286">                            ex = (float) startX;</span>
+<span class="fc" id="L287">                            ey = (float) startY;</span>
+<span class="fc" id="L288">                            cols = reverseColors();</span>
+<span class="fc" id="L289">                            fracs = reverseFractions();</span>
+                        }
+<span class="fc bfc" id="L291" title="All 2 branches covered.">                        for (int i = 0; i &lt; len - 1; i++) {</span>
+<span class="fc" id="L292">                            int x1 = (int) Math.round(currPos + fracs[i] * pw);</span>
+<span class="fc" id="L293">                            int x2 = (int) Math.round(currPos + fracs[i + 1] * pw);</span>
+<span class="fc" id="L294">                            g.fillLinearGradient(cols[i], cols[i + 1], x1, 0, Math.abs(x2 - x1), (int) Math.round(ph), true);</span>
+                        }
+<span class="fc" id="L296">                        currPos += pw;</span>
+<span class="fc" id="L297">                        iter++;</span>
+<span class="fc" id="L298">                    }</span>
+                }
+
+            }
+        }
+        /*
+        if (pEndX &lt; pw) {
+            g.setColor(colors[len-1]);
+            g.fillRect((int)Math.round(pEndX), 0, (int)Math.round(pw-pEndX), (int)Math.round(ph));
+        }*/
+<span class="fc" id="L308">        g.setAlpha(alpha);</span>
+<span class="fc" id="L309">        g.setTransform(t);</span>
+<span class="fc" id="L310">        g.translate(tx, ty);</span>
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">        if (p != null) {</span>
+<span class="fc" id="L312">            g.setColor(p);</span>
+        }
+
+
+<span class="fc" id="L316">    }</span>
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

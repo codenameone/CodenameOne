@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ResultTokenizer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.processing</a> &gt; <span class="el_source">ResultTokenizer.java</span></div><h1>ResultTokenizer.java</h1><pre class="source lang-java linenums">/*
+Copyright (c) 2007, Sun Microsystems, Inc.
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in
+      the documentation and/or other materials provided with the
+      distribution.
+    * Neither the name of Sun Microsystems, Inc. nor the names of its
+      contributors may be used to endorse or promote products derived
+      from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+&quot;AS IS&quot; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Derivative Revision History:
+
+2012-03 - derivative work from original Sun source, added
+	support for nested expressions to support new features added
+	to Result class.
+*/
+
+package com.codename1.processing;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Vector;
+
+/**
+ * Internal class, do not use.
+ * &lt;p&gt;
+ * Used internally by Result class apply() methods, this converts a path expression into a List of string tokens.
+ *
+ * @author Eric Coolman (2012-03 - derivative work from original Sun source).
+ */
+class ResultTokenizer {
+
+    private final String expression;
+    private final int length;
+    boolean predicate;
+    private int pos;
+
+<span class="fc" id="L59">    ResultTokenizer(final String expr) {</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (expr == null) {</span>
+<span class="nc" id="L61">            throw new IllegalArgumentException(&quot;path cannot be null&quot;);</span>
+        }
+
+<span class="fc" id="L64">        expression = expr;</span>
+<span class="fc" id="L65">        length = expression.length();</span>
+<span class="fc" id="L66">        pos = 0;</span>
+<span class="fc" id="L67">        predicate = false;</span>
+<span class="fc" id="L68">    }</span>
+
+    static boolean isSubscript(final char ch) {
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        switch (ch) {</span>
+            case Result.ARRAY_START:
+            case Result.ARRAY_END:
+<span class="fc" id="L74">                return true;</span>
+        }
+<span class="fc" id="L76">        return false;</span>
+    }
+
+    static boolean isSeparator(final char ch) {
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        return (ch == Result.SEPARATOR);</span>
+    }
+
+    static boolean isDelimiter(final char ch) {
+<span class="fc bfc" id="L84" title="All 4 branches covered.">        return isSubscript(ch) || isSeparator(ch);</span>
+    }
+
+    List tokenize(Map namespaceAliases) {
+<span class="fc" id="L88">        final List tokens = new Vector();</span>
+        String tok;
+        int i;
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        for (pos = 0, tok = next(); !&quot;&quot;.equals(tok); tok = next()) {</span>
+<span class="fc bfc" id="L92" title="All 4 branches covered.">            if (namespaceAliases != null &amp;&amp; ((i = tok.indexOf(':')) != -1)) {</span>
+<span class="fc" id="L93">                String mapto = (String) namespaceAliases.get(tok.substring(0, i));</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">                if (mapto != null) {</span>
+<span class="fc" id="L95">                    tok = mapto + tok.substring(i);</span>
+                }
+            }
+<span class="fc" id="L98">            tokens.add(tok);</span>
+        }
+<span class="fc" id="L100">        return tokens;</span>
+    }
+
+    /**
+     * Handle the predicate expression within outermost brackets.
+     * This allows us to nest predicate expressions.  For example:
+     *
+     * &lt;code&gt;
+     * /result/address_component[/type[position() &lt; 5]='locality']/long_name
+     * &lt;/code&gt;
+     * The nested predicate in the above statement is
+     *
+     * &lt;code&gt;
+     * /type[position() &lt; 5]='locality'
+     * &lt;/code&gt;
+     * &lt;p&gt;
+     * which is applied against the address_component node.
+     *
+     * @param sbuf
+     * @return full predicate expression
+     */
+    private String getPredicate(StringBuffer sbuf) {
+<span class="fc" id="L122">        int stack = 1;</span>
+
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        for (int i = pos; i &lt; length; i++) {</span>
+<span class="fc" id="L125">            final char ch = expression.charAt(i);</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">            if (isSubscript(ch)) {</span>
+<span class="fc bfc" id="L127" title="All 2 branches covered.">                if (ch == Result.ARRAY_START) {</span>
+<span class="fc" id="L128">                    stack++;</span>
+                } else {
+<span class="fc" id="L130">                    stack--;</span>
+                }
+            }
+<span class="fc bfc" id="L133" title="All 2 branches covered.">            if (stack == 0) {</span>
+<span class="fc" id="L134">                pos = i;</span>
+<span class="fc" id="L135">                predicate = false;</span>
+<span class="fc" id="L136">                break;</span>
+            } else {
+<span class="fc" id="L138">                sbuf.append(ch);</span>
+            }
+        }
+<span class="fc" id="L141">        return sbuf.toString();</span>
+    }
+
+    private String next() {
+<span class="fc" id="L145">        final StringBuffer sbuf = new StringBuffer();</span>
+
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        if (pos &gt;= length) {</span>
+<span class="fc" id="L148">            return sbuf.toString();</span>
+        }
+<span class="fc bfc" id="L150" title="All 2 branches covered.">        if (predicate) {</span>
+<span class="fc" id="L151">            return getPredicate(sbuf);</span>
+        }
+<span class="fc" id="L153">        final char del = expression.charAt(pos);</span>
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (isDelimiter(del)) {</span>
+            // next token will be handled by
+            // getPredicate() instead of next().
+<span class="fc bfc" id="L157" title="All 2 branches covered.">            if (del == Result.ARRAY_START) {</span>
+<span class="fc" id="L158">                predicate = true;</span>
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            } else if (isSeparator(del)) {</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">                while (isSeparator(expression.charAt(pos + 1))) {</span>
+                    // handle 'decendants' token
+<span class="fc" id="L162">                    sbuf.append(del);</span>
+<span class="fc" id="L163">                    pos++;</span>
+                }
+            }
+<span class="fc" id="L166">            pos++;</span>
+<span class="fc" id="L167">            sbuf.append(del);</span>
+<span class="fc" id="L168">            return sbuf.toString();</span>
+        }
+
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        for (int i = pos; i &lt; length; i++) {</span>
+<span class="fc" id="L172">            final char ch = expression.charAt(i);</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">            if (isDelimiter(ch)) {</span>
+<span class="fc" id="L174">                pos = i;</span>
+<span class="fc" id="L175">                return sbuf.toString();</span>
+            } else {
+<span class="fc" id="L177">                sbuf.append(ch);</span>
+            }
+        }
+
+<span class="fc" id="L181">        pos = length;</span>
+<span class="fc" id="L182">        return sbuf.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

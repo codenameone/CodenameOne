@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XYValueSeriesTransition.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.transitions</a> &gt; <span class="el_source">XYValueSeriesTransition.java</span></div><h1>XYValueSeriesTransition.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.charts.transitions;
+
+import com.codename1.charts.ChartComponent;
+import com.codename1.charts.models.XYValueSeries;
+
+/**
+ * A transition for enabling animations between different values in an XYSeries.
+ *
+ * @author shannah
+ */
+public class XYValueSeriesTransition extends SeriesTransition {
+
+
+    /**
+     * The subject series.
+     */
+    private final XYValueSeries series;
+
+    /**
+     * The buffer series where values are set before they are finally applied
+     * to the series during the animation.
+     */
+    private XYValueSeries cachedSeries;
+
+    /**
+     * Start values for the series in the transition.
+     */
+    private XYValueSeries startVals;
+
+    /**
+     * End values for the series in the transition.
+     */
+    private XYValueSeries endVals;
+
+
+    /**
+     * Creates a new transition on the given chart and associated series.  The
+     * series should be one of the series rendered by the given chart.
+     *
+     * @param chart  The ChartComponent that is being used to render the series.
+     * @param series The series whose data you wish to animate.
+     */
+    public XYValueSeriesTransition(ChartComponent chart, XYValueSeries series) {
+<span class="nc" id="L68">        super(chart);</span>
+<span class="nc" id="L69">        this.series = series;</span>
+<span class="nc" id="L70">    }</span>
+
+    /**
+     * Initializes the transition.  This can be overridden by subclasses to
+     * provide their own functionality to be executed just before the transition
+     * occurs.
+     */
+    @Override
+    public void initTransition() {
+<span class="nc" id="L79">        super.initTransition();</span>
+
+
+        // Now make sure that there are the same number of values in source and
+        // target
+<span class="nc" id="L84">        startVals = new XYValueSeries(&quot;Start&quot;);</span>
+<span class="nc" id="L85">        copyValues(series, startVals);</span>
+
+<span class="nc" id="L87">        endVals = new XYValueSeries(&quot;End&quot;);</span>
+<span class="nc" id="L88">        copyValues(cachedSeries, endVals);</span>
+
+
+<span class="nc" id="L91">    }</span>
+
+    private void copyValues(XYValueSeries source, XYValueSeries target) {
+<span class="nc" id="L94">        int len = source.getItemCount();</span>
+
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L97">            int index = target.getIndexForKey(source.getX(i));</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            if (index &gt; -1) {</span>
+<span class="nc" id="L99">                target.remove(index);</span>
+            }
+<span class="nc" id="L101">            target.add(source.getX(i), source.getY(i), source.getValue(i));</span>
+        }
+<span class="nc" id="L103">    }</span>
+
+    /**
+     * Cleans up after the transition is complete.
+     */
+    @Override
+    protected void cleanup() {
+<span class="nc" id="L110">        super.cleanup();</span>
+<span class="nc" id="L111">        this.cachedSeries.clear();</span>
+<span class="nc" id="L112">    }</span>
+
+
+    /**
+     * Updates the series and renderer at the given progress position (0 to 100).
+     *
+     * @param progress The progress position in the motion. (0-100).
+     */
+    protected void update(int progress) {
+<span class="nc" id="L121">        double dProgress = progress;</span>
+<span class="nc" id="L122">        int len = endVals.getItemCount(); // PMD Fix: UnusedLocalVariable removed unused endindex</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L124">            double x = endVals.getX(i);</span>
+<span class="nc" id="L125">            double y = endVals.getY(i);</span>
+<span class="nc" id="L126">            double val = endVals.getValue(i);</span>
+<span class="nc" id="L127">            int startIndex = startVals.getIndexForKey(x);</span>
+
+<span class="nc bnc" id="L129" title="All 2 branches missed.">            double startY = startIndex == -1 ? 0.0 : startVals.getY(startIndex);</span>
+<span class="nc" id="L130">            double endY = y;</span>
+<span class="nc" id="L131">            double tweenY = startY + (endY - startY) * dProgress / 100.0;</span>
+
+<span class="nc bnc" id="L133" title="All 2 branches missed.">            double startVal = startIndex == -1 ? 0.0 : startVals.getValue(startIndex);</span>
+<span class="nc" id="L134">            double endVal = val;</span>
+<span class="nc" id="L135">            double tweenVal = startVal + (endVal - startVal) * dProgress / 100.0;</span>
+
+
+<span class="nc" id="L138">            int seriesIndex = series.getIndexForKey(x);</span>
+
+<span class="nc bnc" id="L140" title="All 2 branches missed.">            if (seriesIndex &gt; -1) {</span>
+<span class="nc" id="L141">                series.remove(seriesIndex);</span>
+            }
+<span class="nc" id="L143">            series.add(x, tweenY, tweenVal);</span>
+
+
+        }
+
+
+<span class="nc" id="L149">    }</span>
+
+    /**
+     * Gets the &quot;buffer&quot; series where values can be set.  Any values set on the
+     * buffer will be applied to the target series during the course of the
+     * transition.
+     *
+     * @return
+     */
+    public XYValueSeries getBuffer() {
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (cachedSeries == null) {</span>
+<span class="nc" id="L160">            cachedSeries = new XYValueSeries(series.getTitle());</span>
+        }
+<span class="nc" id="L162">        return cachedSeries;</span>
+    }
+
+    /**
+     * Sets the buffer/cache series to be used.
+     *
+     * @param buffer
+     */
+    void setBuffer(XYValueSeries buffer) {
+<span class="nc" id="L171">        this.cachedSeries = buffer;</span>
+<span class="nc" id="L172">    }</span>
+
+    /**
+     * Gets the series whose values are to be animated by this transition.
+     *
+     * @return
+     */
+    public XYValueSeries getSeries() {
+<span class="nc" id="L180">        return series;</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ScaleImageLabel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">ScaleImageLabel.java</span></div><h1>ScaleImageLabel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.components;
+
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.Style;
+
+/**
+ * &lt;p&gt;Label that simplifies the usage of scale to fill/fit. This is effectively equivalent to just setting the style image
+ * on a label but more convenient for some special circumstances. One major difference is that preferred size
+ * equals the image in this case.&lt;br&gt;
+ * The default UIID for this component is &quot;{@code Label}&quot;.
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/7289bbe5dad9e279eabb.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-scaleimage.png&quot; alt=&quot;ScaleImageButton and ScaleImageLabel samples&quot; /&gt;
+ *
+ * @author Shai Almog
+ */
+public class ScaleImageLabel extends Label {
+
+<span class="fc" id="L46">    private int preferredH = -1;</span>
+<span class="fc" id="L47">    private int preferredW = -1;</span>
+
+    /**
+     * Default constructor
+     */
+<span class="fc" id="L52">    public ScaleImageLabel() {</span>
+<span class="fc" id="L53">        setUIID(&quot;Label&quot;);</span>
+<span class="fc" id="L54">        setShowEvenIfBlank(true);</span>
+<span class="fc" id="L55">        getAllStyles().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FIT);</span>
+<span class="fc" id="L56">    }</span>
+
+    /**
+     * Create a version with the given image
+     *
+     * @param i image
+     */
+<span class="fc" id="L63">    public ScaleImageLabel(Image i) {</span>
+<span class="fc" id="L64">        setUIID(&quot;Label&quot;);</span>
+<span class="fc" id="L65">        setShowEvenIfBlank(true);</span>
+<span class="fc" id="L66">        getAllStyles().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FIT);</span>
+<span class="fc" id="L67">        setIcon(i);</span>
+<span class="fc" id="L68">    }</span>
+
+    /**
+     * Returns the background type for the component
+     *
+     * @return One of Style.BACKGROUND_IMAGE_SCALED_FIT,
+     * Style.BACKGROUND_IMAGE_SCALED_FILL or Style.BACKGROUND_IMAGE_SCALE
+     */
+    public byte getBackgroundType() {
+<span class="fc" id="L77">        return getUnselectedStyle().getBackgroundType();</span>
+    }
+
+    /**
+     * Sets the behavior of the background to one of Style.BACKGROUND_IMAGE_SCALED_FIT,
+     * Style.BACKGROUND_IMAGE_SCALED_FILL, Style.BACKGROUND_IMAGE_SCALE
+     *
+     * @param behavior the background behavior
+     */
+    public void setBackgroundType(byte behavior) {
+<span class="fc" id="L87">        getAllStyles().setBackgroundType(behavior);</span>
+<span class="fc" id="L88">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L95">        Image i = getIcon();</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (i == null) {</span>
+<span class="fc" id="L97">            return new Dimension();</span>
+        }
+<span class="fc" id="L99">        int dw = Display.getInstance().getDisplayWidth();</span>
+<span class="fc" id="L100">        int iw = i.getWidth();</span>
+<span class="fc" id="L101">        int ih = i.getHeight();</span>
+
+        // a huge preferred width might be requested that is bigger than screen size. Normally this isn't a problem but in
+        // a scrollable container the vertical height might be granted providing so much space as to make this unrealistic...
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (iw &gt; dw) {</span>
+<span class="nc" id="L106">            float ratio = ((float) iw) / ((float) dw);</span>
+<span class="nc" id="L107">            iw = (int) (((float) iw) / ratio);</span>
+<span class="nc" id="L108">            ih = (int) (((float) ih) / ratio);</span>
+        }
+<span class="fc" id="L110">        Style s = getStyle();</span>
+<span class="fc" id="L111">        return new Dimension(iw + s.getPaddingLeftNoRTL() + s.getPaddingRightNoRTL(), ih +</span>
+<span class="fc" id="L112">                s.getPaddingTop() + s.getPaddingBottom());</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     * &lt;p&gt;
+     * Overriden to support animations
+     */
+    @Override
+    protected void initComponent() {
+<span class="nc" id="L122">        super.initComponent();</span>
+<span class="nc" id="L123">        checkAnimation(getIcon());</span>
+<span class="nc" id="L124">    }</span>
+
+    void checkAnimation(Image icon) {
+<span class="nc bnc" id="L127" title="All 4 branches missed.">        if (icon != null &amp;&amp; icon.isAnimation()) {</span>
+<span class="nc" id="L128">            Form parent = getComponentForm();</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">            if (parent != null) {</span>
+                // animations are always running so the internal animation isn't
+                // good enough. We never want to stop this sort of animation
+<span class="nc" id="L132">                parent.registerAnimated(this);</span>
+            }
+        }
+<span class="nc" id="L135">    }</span>
+
+    /**
+     * Returns the background image
+     *
+     * @return the bg image
+     */
+    public Image getIcon() {
+<span class="fc" id="L143">        return getUnselectedStyle().getBgImage();</span>
+    }
+
+    /**
+     * Instead of setting the icon sets the background image
+     *
+     * @param i the image
+     */
+    public void setIcon(Image i) {
+<span class="fc" id="L152">        setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L153">        getAllStyles().setBgImage(i);</span>
+<span class="pc bpc" id="L154" title="1 of 4 branches missed.">        if (i != null &amp;&amp; i.isAnimation()) {</span>
+<span class="nc" id="L155">            checkAnimation(i);</span>
+        }
+<span class="fc" id="L157">        repaint();</span>
+<span class="fc" id="L158">    }</span>
+
+    /**
+     * Scale image label doesn't support text this method is overriden to do nothing
+     */
+    @Override
+    public void setText(String text) {
+<span class="nc" id="L165">    }</span>
+
+    /**
+     * {@inheritDoc}
+     * Overriden to prevent the setUIID from replacing the code
+     */
+    @Override
+    public void setUIID(String id) {
+<span class="fc" id="L173">        byte type = getBackgroundType();</span>
+<span class="fc" id="L174">        Image icon = getIcon();</span>
+<span class="fc" id="L175">        super.setUIID(id);</span>
+<span class="fc" id="L176">        setIcon(icon);</span>
+<span class="fc" id="L177">        getAllStyles().setBackgroundType(type);</span>
+<span class="fc" id="L178">    }</span>
+
+    @Override
+    protected void refreshTheme(String id, boolean merge) {
+<span class="nc" id="L182">        byte type = getBackgroundType();</span>
+<span class="nc" id="L183">        Image icon = getIcon();</span>
+<span class="nc" id="L184">        super.refreshTheme(id, merge);</span>
+<span class="nc" id="L185">        setIcon(icon);</span>
+<span class="nc" id="L186">        getAllStyles().setBackgroundType(type);</span>
+<span class="nc" id="L187">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+<span class="nc" id="L193">        return new String[]{&quot;backgroundType&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L200">        return new Class[]{Byte.class};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyTypeNames() {
+<span class="nc" id="L207">        return new String[]{&quot;Byte&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (name.equals(&quot;backgroundType&quot;)) {</span>
+<span class="nc" id="L215">            return getBackgroundType();</span>
+        }
+<span class="nc" id="L217">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        if (name.equals(&quot;backgroundType&quot;)) {</span>
+<span class="nc" id="L225">            setBackgroundType(((Byte) value).byteValue());</span>
+<span class="nc" id="L226">            return null;</span>
+        }
+<span class="nc" id="L228">        return super.setPropertyValue(name, value);</span>
+    }
+
+    @Override
+    public int getPreferredH() {
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">        if (preferredH &gt; 0) {</span>
+<span class="fc" id="L234">            return preferredH;</span>
+        }
+<span class="nc bnc" id="L236" title="All 2 branches missed.">        if (preferredW &gt; 0) {</span>
+<span class="nc" id="L237">            Image i = getIcon();</span>
+            // PMD Fix (CollapsibleIfStatements): Combine the nested icon and width checks into a single conditional.
+<span class="nc bnc" id="L239" title="All 4 branches missed.">            if (i != null &amp;&amp; preferredW &lt; i.getWidth()) {</span>
+<span class="nc" id="L240">                return (int) (i.getHeight() * preferredW / (double) i.getWidth());</span>
+            }
+        }
+<span class="nc" id="L243">        return super.getPreferredH();</span>
+    }
+
+    @Override
+    public void setPreferredH(int preferredH) {
+<span class="fc" id="L248">        this.preferredH = preferredH;</span>
+<span class="fc" id="L249">    }</span>
+
+    @Override
+    public int getPreferredW() {
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">        if (preferredW &gt; 0) {</span>
+<span class="fc" id="L254">            return preferredW;</span>
+        }
+<span class="nc bnc" id="L256" title="All 2 branches missed.">        if (preferredH &gt; 0) {</span>
+<span class="nc" id="L257">            Image i = getIcon();</span>
+            // PMD Fix (CollapsibleIfStatements): Merge the icon nullity and height comparison into one condition.
+<span class="nc bnc" id="L259" title="All 4 branches missed.">            if (i != null &amp;&amp; preferredH &lt; i.getHeight()) {</span>
+<span class="nc" id="L260">                return (int) (i.getWidth() * preferredH / (double) i.getHeight());</span>
+            }
+        }
+<span class="nc" id="L263">        return super.getPreferredW();</span>
+    }
+
+    @Override
+    public void setPreferredW(int preferredW) {
+<span class="fc" id="L268">        this.preferredW = preferredW;</span>
+<span class="fc" id="L269">    }</span>
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

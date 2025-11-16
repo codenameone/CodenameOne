@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Capture.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.capture</a> &gt; <span class="el_source">Capture.java</span></div><h1>Capture.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.capture;
+
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
+import com.codename1.io.Util;
+import com.codename1.media.MediaRecorderBuilder;
+import com.codename1.ui.Display;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.util.ImageIO;
+
+import java.io.IOException;
+import java.io.OutputStream;
+
+/**
+ * &lt;p&gt;{@code Capture} can &quot;capture&quot; media files from the device e.g. record audio, video and snap photos.
+ * Notice that files returned by this class are potentially temporary files and might be
+ * deleted by the OS in the future.&lt;br&gt;
+ * The code below demonstrates the capturing of a photo thru this API:&lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/b18c37dfcc7de752e0e6.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/graphics-image-masking.png&quot; alt=&quot;Picture after the capture was complete and the resulted image was rounded. The background was set to red so the rounding effect will be more noticeable&quot; /&gt;
+ * &lt;p&gt;
+ * The code below demonstrates capturing and playing back audio files using this API:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/a347dc9dcadaa759d0cb.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/capture-audio.png&quot; alt=&quot;Captured recordings in the demo&quot; /&gt;
+ *
+ * @author Chen
+ */
+<span class="nc" id="L52">public class Capture {</span>
+
+    /**
+     * Returns true if the device has camera false otherwise.
+     *
+     * @return true if the device has a camera
+     */
+    public static boolean hasCamera() {
+<span class="nc" id="L60">        return Display.getInstance().hasCamera();</span>
+    }
+
+    /**
+     * This method tries to invoke the device native camera to capture images.
+     * The method returns immediately and the response will be sent asynchronously
+     * to the given ActionListener Object
+     * The image is saved as a jpeg to a file on the device.
+     * &lt;p&gt;
+     * use this in the actionPerformed to retrieve the file path
+     * String path = (String) evt.getSource();
+     * &lt;p&gt;
+     * if evt returns null the image capture was canceled by the user.
+     *
+     * @param response a callback Object to retrieve the file path
+     * @throws RuntimeException if this feature failed or unsupported on the platform
+     */
+    public static void capturePhoto(ActionListener response) {
+<span class="fc" id="L78">        Display.getInstance().capturePhoto(response);</span>
+<span class="fc" id="L79">    }</span>
+
+    /**
+     * Invokes the camera and takes a photo synchronously while blocking the EDT
+     *
+     * @return the photo file location or null if the user canceled
+     */
+    public static String capturePhoto() {
+<span class="fc" id="L87">        return capturePhoto(-1, -1);</span>
+    }
+
+    /**
+     * Capture the audio, blocking version that holds the EDT; alternatively you can use the Media API.
+     *
+     * @return the audio file location or null if the user canceled
+     */
+    public static String captureAudio() {
+<span class="fc" id="L96">        CallBack c = new CallBack();</span>
+<span class="fc" id="L97">        captureAudio(c);</span>
+<span class="fc" id="L98">        Display.getInstance().invokeAndBlock(c);</span>
+<span class="fc" id="L99">        return c.url;</span>
+    }
+
+    /**
+     * Capture the audio, blocking version that holds the EDT; alternatively you can use the Media API.
+     *
+     * @return the audio file location or null if the user canceled
+     * @since 7.0
+     */
+    public static String captureAudio(MediaRecorderBuilder recordingOptions) {
+<span class="fc" id="L109">        CallBack c = new CallBack();</span>
+<span class="fc" id="L110">        captureAudio(recordingOptions, c);</span>
+<span class="fc" id="L111">        Display.getInstance().invokeAndBlock(c);</span>
+<span class="fc" id="L112">        return c.url;</span>
+    }
+
+
+    /**
+     * Same as captureVideo only a blocking version that holds the EDT
+     *
+     * @return the photo file location or null if the user canceled
+     */
+    public static String captureVideo() {
+<span class="fc" id="L122">        CallBack c = new CallBack();</span>
+<span class="fc" id="L123">        captureVideo(c);</span>
+<span class="fc" id="L124">        Display.getInstance().invokeAndBlock(c);</span>
+<span class="fc" id="L125">        return c.url;</span>
+    }
+
+    /**
+     * Same as {@link #captureVideo(com.codename1.capture.VideoCaptureConstraints, com.codename1.ui.events.ActionListener) } only a
+     * blocking version that holds the EDT.
+     *
+     * @param constraints
+     * @return A video file location or null if the user canceled.
+     * @since 7.0
+     */
+    public static String captureVideo(VideoCaptureConstraints constraints) {
+<span class="fc" id="L137">        CallBack c = new CallBack();</span>
+<span class="fc" id="L138">        captureVideo(constraints, c);</span>
+<span class="fc" id="L139">        Display.getInstance().invokeAndBlock(c);</span>
+<span class="fc" id="L140">        return c.url;</span>
+    }
+
+    /**
+     * &lt;p&gt;Invokes the camera and takes a photo synchronously while blocking the EDT, the sample below
+     * demonstrates a simple usage and applying a mask to the result&lt;/p&gt;
+     * &lt;script src=&quot;https://gist.github.com/codenameone/b18c37dfcc7de752e0e6.js&quot;&gt;&lt;/script&gt;
+     * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/graphics-image-masking.png&quot; alt=&quot;Picture after the capture was complete and the resulted image was rounded. The background was set to red so the rounding effect will be more noticeable&quot; /&gt;
+     *
+     * @param width  the target width for the image if possible, some platforms don't support scaling. To maintain aspect ratio set to -1
+     * @param height the target height for the image if possible, some platforms don't support scaling. To maintain aspect ratio set to -1
+     * @return the photo file location or null if the user canceled
+     */
+    public static String capturePhoto(int width, int height) {
+<span class="fc" id="L154">        CallBack c = new CallBack();</span>
+<span class="pc bpc" id="L155" title="5 of 6 branches missed.">        if (&quot;ios&quot;.equals(Display.getInstance().getPlatformName()) &amp;&amp; (width != -1 || height != -1)) {</span>
+            // workaround for threading issues in iOS https://github.com/codenameone/CodenameOne/issues/2246
+<span class="nc" id="L157">            capturePhoto(c);</span>
+<span class="nc" id="L158">            Display.getInstance().invokeAndBlock(c);</span>
+<span class="nc bnc" id="L159" title="All 2 branches missed.">            if (c.url == null) {</span>
+<span class="nc" id="L160">                return null;</span>
+            }
+<span class="nc" id="L162">            ImageIO scale = Display.getInstance().getImageIO();</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">            if (scale != null) {</span>
+                try {
+<span class="nc" id="L165">                    String path = c.url.substring(0, c.url.indexOf(&quot;.&quot;)) + &quot;s&quot; + c.url.substring(c.url.indexOf(&quot;.&quot;));</span>
+<span class="nc" id="L166">                    OutputStream os = FileSystemStorage.getInstance().openOutputStream(path);</span>
+<span class="nc" id="L167">                    scale.save(c.url, os, ImageIO.FORMAT_JPEG, width, height, 1);</span>
+<span class="nc" id="L168">                    Util.cleanup(os);</span>
+<span class="nc" id="L169">                    FileSystemStorage.getInstance().delete(c.url);</span>
+<span class="nc" id="L170">                    return path;</span>
+<span class="nc" id="L171">                } catch (IOException ex) {</span>
+<span class="nc" id="L172">                    Log.e(ex);</span>
+                }
+            }
+<span class="nc" id="L175">        } else {</span>
+<span class="fc" id="L176">            c.targetWidth = width;</span>
+<span class="fc" id="L177">            c.targetHeight = height;</span>
+<span class="fc" id="L178">            capturePhoto(c);</span>
+<span class="fc" id="L179">            Display.getInstance().invokeAndBlock(c);</span>
+        }
+<span class="fc" id="L181">        return c.url;</span>
+    }
+
+    /**
+     * This method tries to invoke the device native hardware to capture audio.
+     * The method returns immediately and the response will be sent asynchronously
+     * to the given ActionListener Object
+     * The audio is saved to a file on the device.
+     * &lt;p&gt;
+     * use this in the actionPerformed to retrieve the file path
+     * String path = (String) evt.getSource();
+     *
+     * @param response a callback Object to retrieve the file path
+     * @throws RuntimeException if this feature failed or unsupported on the platform
+     */
+    public static void captureAudio(ActionListener response) {
+<span class="fc" id="L197">        Display.getInstance().captureAudio(response);</span>
+<span class="fc" id="L198">    }</span>
+
+    /**
+     * This method tries to invoke the device native hardware to capture audio.
+     * The method returns immediately and the response will be sent asynchronously
+     * to the given ActionListener Object
+     * The audio record settings are specified in the recorderOptions parameter.
+     *
+     * &lt;p&gt;use this in the actionPerformed to retrieve the file path.
+     * String path = (String) evt.getSource();&lt;/p&gt;
+     *
+     * @param response a callback Object to retrieve the file path
+     * @throws RuntimeException if this feature failed or unsupported on the platform
+     * @since 7.0
+     */
+    public static void captureAudio(MediaRecorderBuilder recorderOptions, ActionListener response) {
+<span class="fc" id="L214">        Display.getInstance().captureAudio(recorderOptions, response);</span>
+<span class="fc" id="L215">    }</span>
+
+    /**
+     * Captures video with some constraints, like width, height, and max length.  Video constraints
+     * may not be supported on all platforms.  Use {@link VideoCaptureConstraints#isSupported() } and {@link VideoCaptureConstraints#isSizeSupported() }
+     * to check whether constraints are supported on the current platform.  If constraints are not supported, then, in the worst case, this will fall
+     * back to just use {@link #captureVideo(com.codename1.ui.events.ActionListener) }, i.e. capture with no constraints.
+     *
+     * @param constraints The constraints to use for the video capture.
+     * @param response    a callback Object to retrieve the file path
+     * @since 7.0
+     */
+    public static void captureVideo(VideoCaptureConstraints constraints, ActionListener response) {
+<span class="fc" id="L228">        Display.getInstance().captureVideo(constraints, response);</span>
+<span class="fc" id="L229">    }</span>
+
+    /**
+     * This method tries to invoke the device native camera to capture video.
+     * The method returns immediately and the response will be sent asynchronously
+     * to the given ActionListener Object
+     * The video is saved to a file on the device.
+     * &lt;p&gt;
+     * use this in the actionPerformed to retrieve the file path
+     * String path = (String) evt.getSource();
+     *
+     * @param response a callback Object to retrieve the file path
+     * @throws RuntimeException if this feature failed or unsupported on the platform
+     * @see #captureVideo(com.codename1.capture.VideoCaptureConstraints, com.codename1.ui.events.ActionListener)
+     */
+    public static void captureVideo(ActionListener response) {
+<span class="fc" id="L245">        Display.getInstance().captureVideo(response);</span>
+<span class="fc" id="L246">    }</span>
+
+<span class="fc" id="L248">    static class CallBack implements ActionListener, Runnable {</span>
+        String url;
+        private boolean completed;
+<span class="fc" id="L251">        private int targetWidth = -1;</span>
+<span class="fc" id="L252">        private int targetHeight = -1;</span>
+
+        public void actionPerformed(ActionEvent evt) {
+<span class="fc bfc" id="L255" title="All 2 branches covered.">            if (evt == null) {</span>
+<span class="fc" id="L256">                url = null;</span>
+            } else {
+<span class="fc" id="L258">                url = (String) evt.getSource();</span>
+            }
+<span class="fc" id="L260">            completed = true;</span>
+<span class="fc" id="L261">            synchronized (this) {</span>
+<span class="fc" id="L262">                this.notify();</span>
+<span class="fc" id="L263">            }</span>
+<span class="fc" id="L264">        }</span>
+
+        public void run() {
+<span class="pc bpc" id="L267" title="1 of 2 branches missed.">            while (!completed) {</span>
+<span class="nc" id="L268">                synchronized (this) {</span>
+                    try {
+<span class="nc" id="L270">                        this.wait();</span>
+<span class="nc" id="L271">                    } catch (InterruptedException ex) {</span>
+<span class="nc" id="L272">                    }</span>
+<span class="nc" id="L273">                }</span>
+            }
+<span class="fc bfc" id="L275" title="All 2 branches covered.">            if (url == null) {</span>
+<span class="fc" id="L276">                return;</span>
+            }
+<span class="pc bpc" id="L278" title="2 of 4 branches missed.">            if (targetWidth &gt; 0 || targetHeight &gt; 0) {</span>
+<span class="nc" id="L279">                ImageIO scale = Display.getInstance().getImageIO();</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">                if (scale != null) {</span>
+                    try {
+
+<span class="nc" id="L283">                        String path = url.substring(0, url.lastIndexOf(&quot;.&quot;)) + &quot;s&quot; + url.substring(url.lastIndexOf(&quot;.&quot;));</span>
+<span class="nc" id="L284">                        OutputStream os = FileSystemStorage.getInstance().openOutputStream(path);</span>
+<span class="nc" id="L285">                        scale.save(url, os, ImageIO.FORMAT_JPEG, targetWidth, targetHeight, 1);</span>
+<span class="nc" id="L286">                        Util.cleanup(os);</span>
+<span class="nc" id="L287">                        FileSystemStorage.getInstance().delete(url);</span>
+<span class="nc" id="L288">                        url = path;</span>
+<span class="nc" id="L289">                    } catch (IOException ex) {</span>
+<span class="nc" id="L290">                        Log.e(ex);</span>
+<span class="nc" id="L291">                    }</span>
+                }
+            }
+<span class="fc" id="L294">        }</span>
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

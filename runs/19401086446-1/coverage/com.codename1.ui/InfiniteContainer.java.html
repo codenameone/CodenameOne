@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InfiniteContainer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">InfiniteContainer.java</span></div><h1>InfiniteContainer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.components.InfiniteProgress;
+import com.codename1.components.InfiniteScrollAdapter;
+import com.codename1.ui.layouts.BoxLayout;
+
+/**
+ * &lt;p&gt;This abstract Container can scroll indefinitely (or at least until
+ * we run out of data).
+ * This class uses the {@link com.codename1.components.InfiniteScrollAdapter} to bring more data and the pull to
+ * refresh feature to refresh current displayed data.&lt;/p&gt;
+ * &lt;p&gt;
+ * The sample code shows the usage of the nestoria API to fill out an infinitely scrolling list.
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/9e2f7984beb22d9e372c.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-infinitescrolladapter.png&quot; alt=&quot;Sample usage of infinite scroll adapter&quot; /&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/22efe9e04e2b8986dfc3.js&quot;&gt;&lt;/script&gt;
+ *
+ * @author Chen
+ */
+public abstract class InfiniteContainer extends Container {
+
+<span class="fc" id="L45">    private int amount = 10;</span>
+    private boolean amountSet;
+
+    private boolean requestingResults;
+
+    private InfiniteScrollAdapter adapter;
+    private boolean initialized;
+
+    /**
+     * Creates the InfiniteContainer.
+     * The InfiniteContainer is created with BoxLayout Y layout.
+     */
+<span class="fc" id="L57">    public InfiniteContainer() {</span>
+<span class="fc" id="L58">        setLayout(new BoxLayout(BoxLayout.Y_AXIS));</span>
+<span class="fc" id="L59">        setScrollableY(true);</span>
+<span class="fc" id="L60">    }</span>
+
+    /**
+     * Creates the InfiniteContainer.
+     * The InfiniteContainer is created with BoxLayout Y layout.
+     *
+     * @param amount the number of items to fetch in each call to fetchComponents
+     */
+    public InfiniteContainer(int amount) {
+<span class="fc" id="L69">        this();</span>
+<span class="fc" id="L70">        this.amount = amount;</span>
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        if (amount &lt;= 0) {</span>
+<span class="fc" id="L72">            throw new IllegalArgumentException(&quot;amount must be greater then zero&quot;);</span>
+        }
+<span class="fc" id="L74">        amountSet = true;</span>
+<span class="fc" id="L75">    }</span>
+
+    @Override
+    void resetScroll() {
+<span class="fc" id="L79">    }</span>
+
+    boolean shouldContinue(Component[] cmps) {
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (amountSet) {</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">            return cmps.length == amount;</span>
+        } else {
+<span class="pc bpc" id="L85" title="1 of 4 branches missed.">            return cmps != null &amp;&amp; cmps.length &gt; 0;</span>
+        }
+    }
+
+    @Override
+    protected void initComponent() {
+<span class="fc" id="L91">        super.initComponent();</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (initialized) {</span>
+<span class="nc" id="L93">            return;</span>
+        }
+<span class="fc" id="L95">        initialized = true;</span>
+<span class="fc" id="L96">        createInfiniteScroll();</span>
+<span class="fc" id="L97">        addPullToRefresh(new Runnable() {</span>
+
+            public void run() {
+<span class="nc" id="L100">                refresh();</span>
+<span class="nc" id="L101">            }</span>
+        });
+<span class="fc" id="L103">    }</span>
+
+    /**
+     * This refreshes the UI in a similar way to the &quot;pull to refresh&quot; functionality
+     */
+    public void refresh() {
+        // prevent exception when refresh() is invoked too soon
+<span class="fc bfc" id="L110" title="All 2 branches covered.">        if (!isInitialized()) {</span>
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">            if (getClientProperty(&quot;cn1$infinite&quot;) == null) {</span>
+<span class="fc" id="L112">                return;</span>
+            }
+        }
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">        if (isAsync()) {</span>
+<span class="nc" id="L116">            Display.getInstance().invokeAndBlock(new Runnable() {</span>
+                public void run() {
+<span class="nc" id="L118">                    refreshImpl();</span>
+<span class="nc" id="L119">                }</span>
+            });
+<span class="nc" id="L121">            return;</span>
+        }
+<span class="fc" id="L123">        refreshImpl();</span>
+<span class="fc" id="L124">    }</span>
+
+    void refreshImpl() {
+<span class="fc" id="L127">        requestingResults = true;</span>
+<span class="fc" id="L128">        Component[] components = fetchComponents(0, amount);</span>
+<span class="fc bfc" id="L129" title="All 2 branches covered.">        if (components == null) {</span>
+<span class="fc" id="L130">            components = new Component[0];</span>
+        }
+<span class="fc" id="L132">        final Component[] cmps = components;</span>
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (!Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L134">            Display.getInstance().callSerially(new Runnable() {</span>
+
+                public void run() {
+<span class="nc" id="L137">                    removeAll();</span>
+<span class="nc" id="L138">                    InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, shouldContinue(cmps));</span>
+<span class="nc" id="L139">                    requestingResults = false;</span>
+<span class="nc" id="L140">                }</span>
+            });
+        } else {
+<span class="fc" id="L143">            removeAll();</span>
+<span class="fc" id="L144">            InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, shouldContinue(cmps));</span>
+<span class="fc" id="L145">            requestingResults = false;</span>
+        }
+<span class="fc" id="L147">    }</span>
+
+    /**
+     * If we previously added returned null when fetching components this
+     * method can continue the process of fetching. This is useful in case of
+     * a networking error. You can end fetching and then restart it based on
+     * user interaction see https://github.com/codenameone/CodenameOne/issues/2721
+     */
+    public void continueFetching() {
+<span class="fc" id="L156">        InfiniteScrollAdapter.continueFetching(this);</span>
+<span class="fc" id="L157">    }</span>
+
+    void fetchMore() {
+<span class="pc bpc" id="L160" title="1 of 2 branches missed.">        if (requestingResults) {</span>
+<span class="nc" id="L161">            return;</span>
+        }
+<span class="fc" id="L163">        requestingResults = true;</span>
+<span class="fc" id="L164">        Component[] components = fetchComponents(getComponentCount() - 1, amount);</span>
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (components == null) {</span>
+<span class="fc" id="L166">            components = new Component[0];</span>
+        }
+<span class="fc" id="L168">        final Component[] cmps = components;</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        if (!Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L170">            Display.getInstance().callSerially(new Runnable() {</span>
+                public void run() {
+<span class="nc" id="L172">                    InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, shouldContinue(cmps));</span>
+<span class="nc" id="L173">                    requestingResults = false;</span>
+<span class="nc" id="L174">                }</span>
+            });
+        } else {
+<span class="fc" id="L177">            InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, shouldContinue(cmps));</span>
+<span class="fc" id="L178">            requestingResults = false;</span>
+        }
+<span class="fc" id="L180">    }</span>
+
+    private void createInfiniteScroll() {
+<span class="fc" id="L183">        adapter = InfiniteScrollAdapter.createInfiniteScroll(this, new Runnable() {</span>
+
+            public void run() {
+<span class="pc bpc" id="L186" title="1 of 2 branches missed.">                if (isAsync()) {</span>
+<span class="nc" id="L187">                    Display.getInstance().scheduleBackgroundTask(new Runnable() {</span>
+                        public void run() {
+<span class="nc" id="L189">                            fetchMore();</span>
+<span class="nc" id="L190">                        }</span>
+                    });
+                } else {
+<span class="fc" id="L193">                    fetchMore();</span>
+                }
+<span class="fc" id="L195">            }</span>
+        });
+
+<span class="fc" id="L198">    }</span>
+
+    /**
+     * Indicates whether {@link #fetchComponents(int, int)} should be invoked asynchronously off the EDT
+     *
+     * @return this is set to true for compatibility with older versions of the infinite container
+     */
+    protected boolean isAsync() {
+<span class="fc" id="L206">        return false;</span>
+    }
+
+    /**
+     * &lt;p&gt;This is an abstract method that should be implemented by the sub classes
+     * to fetch the data.&lt;/p&gt;
+     * &lt;p&gt;&lt;b&gt;When {@link #isAsync()} is overriden to return true this method is invoked on a background thread&lt;/b&gt;.
+     * Notice that in this case the method might cause EDT violations warnings, since the
+     * subclasses will need to create the Components off the EDT. While these are EDT violations they
+     * probably won't cause problems for more code.&lt;/p&gt;
+     * &lt;p&gt;Sub classes should preform their networking/data fetching here.&lt;/p&gt;
+     *
+     * @param index  the index from which to bring data
+     * @param amount the size of components to bring
+     * @return Components array of the returned data, size of the array can be the
+     * size of the amount or smaller, if there is no more data to fetch the method should return null.
+     */
+    public abstract Component[] fetchComponents(int index, int amount);
+
+
+    /**
+     * Lets us manipulate the infinite progress object e.g. set the animation image etc.
+     *
+     * @return the infinite progress component underlying this container
+     */
+    public InfiniteProgress getInfiniteProgress() {
+<span class="fc" id="L232">        return adapter.getInfiniteProgress();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

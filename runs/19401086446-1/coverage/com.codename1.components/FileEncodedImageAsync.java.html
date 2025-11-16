@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileEncodedImageAsync.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">FileEncodedImageAsync.java</span></div><h1>FileEncodedImageAsync.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.components;
+
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Log;
+import com.codename1.io.Util;
+import com.codename1.ui.Display;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Image;
+
+import java.io.InputStream;
+
+/**
+ * This class is identical to FileEncodedImage with the difference of using
+ * asynchronous loading for files (and the animation framework) which will
+ * not work for all cases (e.g. renderers) but could improve some performance/RAM
+ * aspects.
+ *
+ * @author Shai Almog
+ */
+public class FileEncodedImageAsync extends EncodedImage {
+<span class="fc" id="L45">    private static final Object LOCK = new Object();</span>
+    private final String fileName;
+    private boolean changePending;
+    private boolean imageCreated;
+    private byte[] imageData;
+    private byte[] placeholder;
+    private Image placeholderImage;
+    private boolean queued;
+
+    private FileEncodedImageAsync(String fileName, byte[] placeholder, int w, int h) {
+<span class="fc" id="L55">        super(w, h);</span>
+<span class="fc" id="L56">        this.fileName = fileName;</span>
+<span class="fc" id="L57">        this.placeholder = placeholder;</span>
+<span class="fc" id="L58">    }</span>
+
+    private FileEncodedImageAsync(String fileName, Image placeholderImage) {
+<span class="fc" id="L61">        super(placeholderImage.getWidth(), placeholderImage.getHeight());</span>
+<span class="fc" id="L62">        this.fileName = fileName;</span>
+<span class="fc" id="L63">        this.placeholderImage = placeholderImage;</span>
+<span class="fc" id="L64">    }</span>
+
+    /**
+     * Creates an encoded image that maps to a local file thus allowing to
+     * seamlessly fetch files as needed. This only works reasonably well for very small
+     * files.
+     *
+     * @param fileName    the name of the file
+     * @param placeholder a placeholder image until the actual image loads
+     * @param width       the width of the file or -1 if unknown (notice that this will improve performance)
+     * @param height      the height of the file or -1 if unknown (notice that this will improve performance)
+     * @return image that will load the file seamlessly
+     * @deprecated use the version that accepts a name and a placeholderImage
+     */
+    public static FileEncodedImageAsync create(String fileName, byte[] placeholder, int width, int height) {
+<span class="fc" id="L79">        return new FileEncodedImageAsync(fileName, placeholder, width, height);</span>
+    }
+
+    /**
+     * Creates an encoded image that maps to a local file thus allowing to
+     * seamlessly fetch files as needed. This only works reasonably well for very small
+     * files.
+     *
+     * @param fileName    the name of the file
+     * @param placeholder an image that will occupy the space
+     * @return image that will load the file seamlessly
+     */
+    public static FileEncodedImageAsync create(String fileName, Image placeholder) {
+<span class="fc" id="L92">        return new FileEncodedImageAsync(fileName, placeholder);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void resetCache() {
+<span class="nc" id="L99">        super.resetCache();</span>
+<span class="nc" id="L100">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected Image getInternal() {
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (imageData == null) {</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            if (!queued) {</span>
+<span class="nc" id="L108">                getImageData();</span>
+            }
+<span class="nc" id="L110">            return placeholderImage;</span>
+        }
+<span class="nc" id="L112">        imageCreated = true;</span>
+<span class="nc" id="L113">        return super.getInternal();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public byte[] getImageData() {
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (imageData != null) {</span>
+<span class="nc" id="L121">            return imageData;</span>
+        }
+<span class="fc" id="L123">        synchronized (LOCK) {</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">            if (queued) {</span>
+<span class="nc" id="L125">                return placeholder;</span>
+            }
+<span class="fc" id="L127">            queued = true;</span>
+<span class="fc" id="L128">            Display.getInstance().scheduleBackgroundTask(new Runnable() {</span>
+                public void run() {
+<span class="fc" id="L130">                    InputStream i = null;</span>
+                    try {
+<span class="pc bpc" id="L132" title="1 of 2 branches missed.">                        if (!FileSystemStorage.getInstance().exists(fileName)) {</span>
+<span class="fc" id="L133">                            Log.p(fileName + &quot; doesn't exist&quot;);</span>
+<span class="fc" id="L134">                            return;</span>
+                        }
+<span class="nc" id="L136">                        final byte[] imageDataLocal = new byte[(int) FileSystemStorage.getInstance().getLength(fileName)];</span>
+<span class="nc" id="L137">                        i = FileSystemStorage.getInstance().openInputStream(fileName);</span>
+<span class="nc" id="L138">                        Util.readFully(i, imageDataLocal);</span>
+<span class="nc" id="L139">                        i.close();</span>
+
+                        // we need to change the image on the EDT to avoid potential race conditions
+<span class="nc" id="L142">                        Display.getInstance().callSerially(new Runnable() {</span>
+                            public void run() {
+<span class="nc" id="L144">                                imageData = imageDataLocal;</span>
+<span class="nc" id="L145">                                resetCache();</span>
+<span class="nc" id="L146">                                changePending = true;</span>
+<span class="nc" id="L147">                                imageCreated = false;</span>
+<span class="nc" id="L148">                            }</span>
+                        });
+<span class="nc" id="L150">                    } catch (Throwable ex) {</span>
+<span class="nc" id="L151">                        Log.e(ex);</span>
+                    } finally {
+<span class="fc" id="L153">                        queued = false;</span>
+<span class="fc" id="L154">                        Util.cleanup(i);</span>
+                    }
+<span class="nc" id="L156">                }</span>
+            });
+<span class="fc" id="L158">        }</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        if (placeholderImage != null) {</span>
+<span class="nc" id="L160">            return null;</span>
+        }
+<span class="fc" id="L162">        return placeholder;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean animate() {
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        if (changePending) {</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">            if (imageCreated) {</span>
+<span class="nc" id="L171">                changePending = false;</span>
+            }
+<span class="nc" id="L173">            return true;</span>
+        }
+<span class="fc" id="L175">        return false;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean isAnimation() {
+<span class="fc" id="L182">        return true;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

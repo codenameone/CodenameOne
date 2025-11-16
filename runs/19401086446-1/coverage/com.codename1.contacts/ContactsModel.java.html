@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ContactsModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.contacts</a> &gt; <span class="el_source">ContactsModel.java</span></div><h1>ContactsModel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.contacts;
+
+import com.codename1.ui.Display;
+import com.codename1.ui.Image;
+import com.codename1.ui.list.DefaultListModel;
+
+import java.util.Hashtable;
+
+/**
+ * This Contacts model is responsible for querying Contacts from the device
+ * and to cache the data for faster usage
+ *
+ * @author Chen
+ */
+public class ContactsModel extends DefaultListModel {
+
+<span class="nc" id="L39">    private final Hashtable contactsCache = new Hashtable();</span>
+
+    private Image placeHolder;
+
+    /**
+     * Constructor with contacts ids
+     *
+     * @param ids the contact ids we would like this model to handle
+     */
+    public ContactsModel(String... ids) {
+<span class="nc" id="L49">        super((Object[]) ids);</span>
+<span class="nc" id="L50">    }</span>
+
+    /**
+     * Sets the Contacts place holder image.
+     *
+     * @param placeHolder image place holder for the contacts
+     */
+    public void setPlaceHolderImage(Image placeHolder) {
+<span class="nc" id="L58">        this.placeHolder = placeHolder;</span>
+<span class="nc" id="L59">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getItemAt(final int index) {
+<span class="nc" id="L65">        final String id = (String) super.getItemAt(index);</span>
+<span class="nc" id="L66">        Hashtable contact = (Hashtable) contactsCache.get(id);</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (contact == null) {</span>
+<span class="nc" id="L68">            Hashtable cnt = getContactAsHashtable(null);</span>
+<span class="nc" id="L69">            contactsCache.put(id, cnt);</span>
+<span class="nc" id="L70">            Display.getInstance().scheduleBackgroundTask(new Runnable() {</span>
+                public void run() {
+<span class="nc" id="L72">                    Contact c = ContactsManager.getContactById(id);</span>
+<span class="nc" id="L73">                    Hashtable contact = getContactAsHashtable(c);</span>
+<span class="nc" id="L74">                    contactsCache.put(id, contact);</span>
+<span class="nc" id="L75">                    Display.getInstance().callSerially(new Runnable() {</span>
+                        public void run() {
+<span class="nc" id="L77">                            setItem(index, id);</span>
+<span class="nc" id="L78">                        }</span>
+                    });
+<span class="nc" id="L80">                }</span>
+            });
+<span class="nc" id="L82">            return cnt;</span>
+        }
+<span class="nc" id="L84">        return contact;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addItem(Object item) {
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        if (item instanceof String) {</span>
+<span class="nc" id="L92">            super.addItem(item);</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        } else if (item instanceof Contact) {</span>
+<span class="nc" id="L94">            super.addItem(((Contact) item).getId());</span>
+<span class="nc" id="L95">            contactsCache.put(((Contact) item).getId(), getContactAsHashtable((Contact) item));</span>
+
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        } else if (item instanceof Hashtable) {</span>
+<span class="nc" id="L98">            super.addItem(((Hashtable) item).get(&quot;id&quot;));</span>
+<span class="nc" id="L99">            contactsCache.put(((Hashtable) item).get(&quot;id&quot;), item);</span>
+
+        }
+<span class="nc" id="L102">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void removeItem(int index) {
+<span class="nc" id="L108">        String id = (String) super.getItemAt(index);</span>
+<span class="nc" id="L109">        super.removeItem(index);</span>
+<span class="nc" id="L110">        contactsCache.remove(id);</span>
+<span class="nc" id="L111">    }</span>
+
+    private Hashtable getContactAsHashtable(Contact c) {
+<span class="nc" id="L114">        Hashtable table = new Hashtable();</span>
+<span class="nc" id="L115">        String id = null;</span>
+        String fname;
+        String lname;
+        String displayName;
+        Image image;
+        String phone;
+        String email;
+
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        if (c == null) {</span>
+<span class="nc" id="L124">            fname = &quot;Loading...&quot;;</span>
+<span class="nc" id="L125">            lname = &quot;Loading...&quot;;</span>
+<span class="nc" id="L126">            displayName = &quot;Loading...&quot;;</span>
+<span class="nc" id="L127">            image = placeHolder;</span>
+<span class="nc" id="L128">            phone = &quot;Loading...&quot;;</span>
+<span class="nc" id="L129">            email = &quot;Loading...&quot;;</span>
+        } else {
+<span class="nc" id="L131">            id = c.getId();</span>
+<span class="nc" id="L132">            fname = c.getFirstName();</span>
+<span class="nc" id="L133">            lname = c.getFamilyName();</span>
+<span class="nc" id="L134">            displayName = c.getDisplayName();</span>
+<span class="nc" id="L135">            image = c.getPhoto();</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">            if (image == null) {</span>
+<span class="nc" id="L137">                image = placeHolder;</span>
+            }
+<span class="nc" id="L139">            phone = getContactPhoneNumber(c);</span>
+<span class="nc" id="L140">            email = getContactEmail(c);</span>
+        }
+<span class="nc" id="L142">        addAttribute(table, &quot;id&quot;, id);</span>
+<span class="nc" id="L143">        addAttribute(table, &quot;fname&quot;, fname);</span>
+<span class="nc" id="L144">        addAttribute(table, &quot;lname&quot;, lname);</span>
+<span class="nc" id="L145">        addAttribute(table, &quot;displayName&quot;, displayName);</span>
+<span class="nc" id="L146">        addAttribute(table, &quot;icon&quot;, image);</span>
+<span class="nc" id="L147">        addAttribute(table, &quot;phone&quot;, phone);</span>
+<span class="nc" id="L148">        addAttribute(table, &quot;email&quot;, email);</span>
+
+        //the keys in the Hashtable should be enough for most use-cases, in case
+        //something is missing there is the ability to get the Contact.
+<span class="nc bnc" id="L152" title="All 2 branches missed.">        if (c != null) {</span>
+<span class="nc" id="L153">            table.put(&quot;contact&quot;, c);</span>
+        }
+<span class="nc" id="L155">        return table;</span>
+    }
+
+    private void addAttribute(Hashtable table, String key, Object value) {
+<span class="nc bnc" id="L159" title="All 4 branches missed.">        if (value == null || key == null) {</span>
+<span class="nc" id="L160">            return;</span>
+        }
+<span class="nc" id="L162">        table.put(key, value);</span>
+<span class="nc" id="L163">    }</span>
+
+
+    private String getContactPhoneNumber(Contact contact) {
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        if (contact.getPrimaryPhoneNumber() != null) {</span>
+<span class="nc" id="L168">            return contact.getPrimaryPhoneNumber();</span>
+        }
+<span class="nc" id="L170">        Hashtable phones = contact.getPhoneNumbers();</span>
+<span class="nc bnc" id="L171" title="All 4 branches missed.">        if (phones != null &amp;&amp; phones.size() &gt; 0) {</span>
+<span class="nc" id="L172">            String first = (String) phones.keys().nextElement();</span>
+<span class="nc" id="L173">            return (String) phones.get(first);</span>
+
+        }
+<span class="nc" id="L176">        return null;</span>
+    }
+
+    private String getContactEmail(Contact contact) {
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        if (contact.getPrimaryEmail() != null) {</span>
+<span class="nc" id="L181">            return contact.getPrimaryEmail();</span>
+        }
+<span class="nc" id="L183">        Hashtable emails = contact.getEmails();</span>
+<span class="nc bnc" id="L184" title="All 4 branches missed.">        if (emails != null &amp;&amp; emails.size() &gt; 0) {</span>
+<span class="nc" id="L185">            String first = (String) emails.keys().nextElement();</span>
+<span class="nc" id="L186">            return (String) emails.get(first);</span>
+        }
+<span class="nc" id="L188">        return null;</span>
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

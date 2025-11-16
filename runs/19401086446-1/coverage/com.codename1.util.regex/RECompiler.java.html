@@ -1,0 +1,1314 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RECompiler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util.regex</a> &gt; <span class="el_source">RECompiler.java</span></div><h1>RECompiler.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.codename1.util.regex;
+
+import java.util.HashMap;
+
+/**
+ * A regular expression compiler class.  This class compiles a pattern string into a
+ * regular expression program interpretable by the RE evaluator class.  The 'recompile'
+ * command line tool uses this compiler to pre-compile regular expressions for use
+ * with RE.  For a description of the syntax accepted by RECompiler and what you can
+ * do with regular expressions, see the documentation for the RE matcher class.
+ *
+ * @author &lt;a href=&quot;mailto:jonl@muppetlabs.com&quot;&gt;Jonathan Locke&lt;/a&gt;
+ * @author &lt;a href=&quot;mailto:gholam@xtra.co.nz&quot;&gt;Michael McCallum&lt;/a&gt;
+ * @version $Id: RECompiler.java 518156 2007-03-14 14:31:26Z vgritsenko $
+ * @see RE
+ */
+public class RECompiler {
+    // Node flags
+    static final int NODE_NORMAL = 0;                 // No flags (nothing special)
+    static final int NODE_NULLABLE = 1;                 // True if node is potentially null
+    static final int NODE_TOPLEVEL = 2;                 // True if top level expr
+    // Special types of 'escapes'
+    static final int ESC_MASK = 0xffff0;           // Escape complexity mask
+    static final int ESC_BACKREF = 0xfffff;           // Escape is really a backreference
+    static final int ESC_COMPLEX = 0xffffe;           // Escape isn't really a true character
+    static final int ESC_CLASS = 0xffffd;           // Escape represents a whole class of characters
+    // {m,n} stacks
+    static final int bracketUnbounded = -1;             // Unbounded value
+    // Lookup table for POSIX character class names
+<span class="fc" id="L47">    static final HashMap hashPOSIX = new HashMap();</span>
+
+    static {
+<span class="fc" id="L50">        hashPOSIX.put(&quot;alnum&quot;, new Character(RE.POSIX_CLASS_ALNUM));</span>
+<span class="fc" id="L51">        hashPOSIX.put(&quot;alpha&quot;, new Character(RE.POSIX_CLASS_ALPHA));</span>
+<span class="fc" id="L52">        hashPOSIX.put(&quot;blank&quot;, new Character(RE.POSIX_CLASS_BLANK));</span>
+<span class="fc" id="L53">        hashPOSIX.put(&quot;cntrl&quot;, new Character(RE.POSIX_CLASS_CNTRL));</span>
+<span class="fc" id="L54">        hashPOSIX.put(&quot;digit&quot;, new Character(RE.POSIX_CLASS_DIGIT));</span>
+<span class="fc" id="L55">        hashPOSIX.put(&quot;graph&quot;, new Character(RE.POSIX_CLASS_GRAPH));</span>
+<span class="fc" id="L56">        hashPOSIX.put(&quot;lower&quot;, new Character(RE.POSIX_CLASS_LOWER));</span>
+<span class="fc" id="L57">        hashPOSIX.put(&quot;print&quot;, new Character(RE.POSIX_CLASS_PRINT));</span>
+<span class="fc" id="L58">        hashPOSIX.put(&quot;punct&quot;, new Character(RE.POSIX_CLASS_PUNCT));</span>
+<span class="fc" id="L59">        hashPOSIX.put(&quot;space&quot;, new Character(RE.POSIX_CLASS_SPACE));</span>
+<span class="fc" id="L60">        hashPOSIX.put(&quot;upper&quot;, new Character(RE.POSIX_CLASS_UPPER));</span>
+<span class="fc" id="L61">        hashPOSIX.put(&quot;xdigit&quot;, new Character(RE.POSIX_CLASS_XDIGIT));</span>
+<span class="fc" id="L62">        hashPOSIX.put(&quot;javastart&quot;, new Character(RE.POSIX_CLASS_JSTART));</span>
+<span class="fc" id="L63">        hashPOSIX.put(&quot;javapart&quot;, new Character(RE.POSIX_CLASS_JPART));</span>
+<span class="fc" id="L64">    }</span>
+
+    // The compiled program
+    char[] instruction;                                 // The compiled RE 'program' instruction buffer
+    int lenInstruction;                                 // The amount of the program buffer currently in use
+    // Input state for compiling regular expression
+    String pattern;                                     // Input string
+    int len;                                            // Length of the pattern string
+    int idx;                                            // Current input index into ac
+    int parens;                                         // Total number of paren pairs
+    int bracketMin;                                     // Minimum number of matches
+    int bracketOpt;                                     // Additional optional matches
+
+    /**
+     * Constructor.  Creates (initially empty) storage for a regular expression program.
+     */
+<span class="fc" id="L80">    public RECompiler() {</span>
+        // Start off with a generous, yet reasonable, initial size
+<span class="fc" id="L82">        instruction = new char[128];</span>
+<span class="fc" id="L83">        lenInstruction = 0;</span>
+<span class="fc" id="L84">    }</span>
+
+    /**
+     * Ensures that n more characters can fit in the program buffer.
+     * If n more can't fit, then the size is doubled until it can.
+     *
+     * @param n Number of additional characters to ensure will fit.
+     */
+    void ensure(int n) {
+        // Get current program length
+<span class="fc" id="L94">        int curlen = instruction.length;</span>
+
+        // If the current length + n more is too much
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (lenInstruction + n &gt;= curlen) {</span>
+            // Double the size of the program array until n more will fit
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            while (lenInstruction + n &gt;= curlen) {</span>
+<span class="nc" id="L100">                curlen *= 2;</span>
+            }
+
+            // Allocate new program array and move data into it
+<span class="nc" id="L104">            char[] newInstruction = new char[curlen];</span>
+<span class="nc" id="L105">            System.arraycopy(instruction, 0, newInstruction, 0, lenInstruction);</span>
+<span class="nc" id="L106">            instruction = newInstruction;</span>
+        }
+<span class="fc" id="L108">    }</span>
+
+    /**
+     * Emit a single character into the program stream.
+     *
+     * @param c Character to add
+     */
+    void emit(char c) {
+        // Make room for character
+<span class="fc" id="L117">        ensure(1);</span>
+
+        // Add character
+<span class="fc" id="L120">        instruction[lenInstruction++] = c;</span>
+<span class="fc" id="L121">    }</span>
+
+    /**
+     * Inserts a node with a given opcode and opdata at insertAt.  The node relative next
+     * pointer is initialized to 0.
+     *
+     * @param opcode   Opcode for new node
+     * @param opdata   Opdata for new node (only the low 16 bits are currently used)
+     * @param insertAt Index at which to insert the new node in the program
+     */
+    void nodeInsert(char opcode, int opdata, int insertAt) {
+        // Make room for a new node
+<span class="fc" id="L133">        ensure(RE.nodeSize);</span>
+
+        // Move everything from insertAt to the end down nodeSize elements
+<span class="fc" id="L136">        System.arraycopy(instruction, insertAt, instruction, insertAt + RE.nodeSize, lenInstruction - insertAt);</span>
+<span class="fc" id="L137">        instruction[insertAt /* + RE.offsetOpcode */] = opcode;</span>
+<span class="fc" id="L138">        instruction[insertAt + RE.offsetOpdata] = (char) opdata;</span>
+<span class="fc" id="L139">        instruction[insertAt + RE.offsetNext] = 0;</span>
+<span class="fc" id="L140">        lenInstruction += RE.nodeSize;</span>
+<span class="fc" id="L141">    }</span>
+
+    /**
+     * Appends a node to the end of a node chain
+     *
+     * @param node    Start of node chain to traverse
+     * @param pointTo Node to have the tail of the chain point to
+     */
+    void setNextOfEnd(int node, int pointTo) {
+        // Traverse the chain until the next offset is 0
+<span class="fc" id="L151">        int next = instruction[node + RE.offsetNext];</span>
+        // while the 'node' is not the last in the chain
+        // and the 'node' is not the last in the program.
+<span class="pc bpc" id="L154" title="1 of 4 branches missed.">        while (next != 0 &amp;&amp; node &lt; lenInstruction) {</span>
+            // if the node we are supposed to point to is in the chain then
+            // point to the end of the program instead.
+            // Michael McCallum &lt;gholam@xtra.co.nz&gt;
+            // FIXME: This is a _hack_ to stop infinite programs.
+            // I believe that the implementation of the reluctant matches is wrong but
+            // have not worked out a better way yet.
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">            if (node == pointTo) {</span>
+<span class="nc" id="L162">                pointTo = lenInstruction;</span>
+            }
+<span class="fc" id="L164">            node += next;</span>
+<span class="fc" id="L165">            next = instruction[node + RE.offsetNext];</span>
+        }
+
+        // if we have reached the end of the program then dont set the pointTo.
+        // im not sure if this will break any thing but passes all the tests.
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (node &lt; lenInstruction) {</span>
+            // Some patterns result in very large programs which exceed
+            // capacity of the short used for specifying signed offset of the
+            // next instruction. Example: a{1638}
+<span class="fc" id="L174">            int offset = pointTo - node;</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">            if (offset != (short) offset) {</span>
+<span class="nc" id="L176">                throw new RESyntaxException(&quot;Exceeded short jump range.&quot;);</span>
+            }
+
+            // Point the last node in the chain to pointTo.
+<span class="fc" id="L180">            instruction[node + RE.offsetNext] = (char) (short) offset;</span>
+        }
+<span class="fc" id="L182">    }</span>
+
+    /**
+     * Adds a new node
+     *
+     * @param opcode Opcode for node
+     * @param opdata Opdata for node (only the low 16 bits are currently used)
+     * @return Index of new node in program
+     */
+    int node(char opcode, int opdata) {
+        // Make room for a new node
+<span class="fc" id="L193">        ensure(RE.nodeSize);</span>
+
+        // Add new node at end
+<span class="fc" id="L196">        instruction[lenInstruction /* + RE.offsetOpcode */] = opcode;</span>
+<span class="fc" id="L197">        instruction[lenInstruction + RE.offsetOpdata] = (char) opdata;</span>
+<span class="fc" id="L198">        instruction[lenInstruction + RE.offsetNext] = 0;</span>
+<span class="fc" id="L199">        lenInstruction += RE.nodeSize;</span>
+
+        // Return index of new node
+<span class="fc" id="L202">        return lenInstruction - RE.nodeSize;</span>
+    }
+
+
+    /**
+     * Throws a new internal error exception
+     *
+     * @throws Error Thrown in the event of an internal error.
+     */
+    void internalError() throws Error {
+<span class="nc" id="L212">        throw new Error(&quot;Internal error!&quot;);</span>
+    }
+
+    /**
+     * Throws a new syntax error exception
+     *
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
+     */
+    void syntaxError(String s) throws RESyntaxException {
+<span class="nc" id="L221">        throw new RESyntaxException(s);</span>
+    }
+
+    /**
+     * Match bracket {m,n} expression put results in bracket member variables
+     *
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
+     */
+    void bracket() throws RESyntaxException {
+        // Current character must be a '{'
+<span class="nc bnc" id="L231" title="All 4 branches missed.">        if (idx &gt;= len || pattern.charAt(idx++) != '{') {</span>
+<span class="nc" id="L232">            internalError();</span>
+        }
+
+        // Next char must be a digit
+<span class="nc bnc" id="L236" title="All 4 branches missed.">        if (idx &gt;= len || !Character.isDigit(pattern.charAt(idx))) {</span>
+<span class="nc" id="L237">            syntaxError(&quot;Expected digit&quot;);</span>
+        }
+
+        // Get min ('m' of {m,n}) number
+<span class="nc" id="L241">        StringBuffer number = new StringBuffer();</span>
+<span class="nc bnc" id="L242" title="All 4 branches missed.">        while (idx &lt; len &amp;&amp; Character.isDigit(pattern.charAt(idx))) {</span>
+<span class="nc" id="L243">            number.append(pattern.charAt(idx++));</span>
+        }
+        try {
+<span class="nc" id="L246">            bracketMin = Integer.parseInt(number.toString());</span>
+<span class="nc" id="L247">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L248">            syntaxError(&quot;Expected valid number&quot;);</span>
+<span class="nc" id="L249">        }</span>
+
+        // If out of input, fail
+<span class="nc bnc" id="L252" title="All 2 branches missed.">        if (idx &gt;= len) {</span>
+<span class="nc" id="L253">            syntaxError(&quot;Expected comma or right bracket&quot;);</span>
+        }
+
+        // If end of expr, optional limit is 0
+<span class="nc bnc" id="L257" title="All 2 branches missed.">        if (pattern.charAt(idx) == '}') {</span>
+<span class="nc" id="L258">            idx++;</span>
+<span class="nc" id="L259">            bracketOpt = 0;</span>
+<span class="nc" id="L260">            return;</span>
+        }
+
+        // Must have at least {m,} and maybe {m,n}.
+<span class="nc bnc" id="L264" title="All 4 branches missed.">        if (idx &gt;= len || pattern.charAt(idx++) != ',') {</span>
+<span class="nc" id="L265">            syntaxError(&quot;Expected comma&quot;);</span>
+        }
+
+        // If out of input, fail
+<span class="nc bnc" id="L269" title="All 2 branches missed.">        if (idx &gt;= len) {</span>
+<span class="nc" id="L270">            syntaxError(&quot;Expected comma or right bracket&quot;);</span>
+        }
+
+        // If {m,} max is unlimited
+<span class="nc bnc" id="L274" title="All 2 branches missed.">        if (pattern.charAt(idx) == '}') {</span>
+<span class="nc" id="L275">            idx++;</span>
+<span class="nc" id="L276">            bracketOpt = bracketUnbounded;</span>
+<span class="nc" id="L277">            return;</span>
+        }
+
+        // Next char must be a digit
+<span class="nc bnc" id="L281" title="All 4 branches missed.">        if (idx &gt;= len || !Character.isDigit(pattern.charAt(idx))) {</span>
+<span class="nc" id="L282">            syntaxError(&quot;Expected digit&quot;);</span>
+        }
+
+        // Get max number
+<span class="nc" id="L286">        number.setLength(0);</span>
+<span class="nc bnc" id="L287" title="All 4 branches missed.">        while (idx &lt; len &amp;&amp; Character.isDigit(pattern.charAt(idx))) {</span>
+<span class="nc" id="L288">            number.append(pattern.charAt(idx++));</span>
+        }
+        try {
+<span class="nc" id="L291">            bracketOpt = Integer.parseInt(number.toString()) - bracketMin;</span>
+<span class="nc" id="L292">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L293">            syntaxError(&quot;Expected valid number&quot;);</span>
+<span class="nc" id="L294">        }</span>
+
+        // Optional repetitions must be &gt;= 0
+<span class="nc bnc" id="L297" title="All 2 branches missed.">        if (bracketOpt &lt; 0) {</span>
+<span class="nc" id="L298">            syntaxError(&quot;Bad range&quot;);</span>
+        }
+
+        // Must have close brace
+<span class="nc bnc" id="L302" title="All 4 branches missed.">        if (idx &gt;= len || pattern.charAt(idx++) != '}') {</span>
+<span class="nc" id="L303">            syntaxError(&quot;Missing close brace&quot;);</span>
+        }
+<span class="nc" id="L305">    }</span>
+
+    /**
+     * Match an escape sequence.  Handles quoted chars and octal escapes as well
+     * as normal escape characters.  Always advances the input stream by the
+     * right amount. This code &quot;understands&quot; the subtle difference between an
+     * octal escape and a backref.  You can access the type of ESC_CLASS or
+     * ESC_COMPLEX or ESC_BACKREF by looking at pattern[idx - 1].
+     *
+     * @return ESC_* code or character if simple escape
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
+     */
+    int escape() throws RESyntaxException {
+        // &quot;Shouldn't&quot; happen
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">        if (pattern.charAt(idx) != '\\') {</span>
+<span class="nc" id="L320">            internalError();</span>
+        }
+
+        // Escape shouldn't occur as last character in string!
+<span class="pc bpc" id="L324" title="1 of 2 branches missed.">        if (idx + 1 == len) {</span>
+<span class="nc" id="L325">            syntaxError(&quot;Escape terminates string&quot;);</span>
+        }
+
+        // Switch on character after backslash
+<span class="fc" id="L329">        idx += 2;</span>
+<span class="fc" id="L330">        char escapeChar = pattern.charAt(idx - 1);</span>
+<span class="pc bpc" id="L331" title="8 of 9 branches missed.">        switch (escapeChar) {</span>
+            case RE.E_BOUND:
+            case RE.E_NBOUND:
+<span class="nc" id="L334">                return ESC_COMPLEX;</span>
+
+            case RE.E_ALNUM:
+            case RE.E_NALNUM:
+            case RE.E_SPACE:
+            case RE.E_NSPACE:
+            case RE.E_DIGIT:
+            case RE.E_NDIGIT:
+<span class="fc" id="L342">                return ESC_CLASS;</span>
+
+            case 'u':
+            case 'x': {
+                // Exact required hex digits for escape type
+<span class="nc bnc" id="L347" title="All 2 branches missed.">                int hexDigits = (escapeChar == 'u' ? 4 : 2);</span>
+
+                // Parse up to hexDigits characters from input
+<span class="nc" id="L350">                int val = 0;</span>
+<span class="nc bnc" id="L351" title="All 4 branches missed.">                for (; idx &lt; len &amp;&amp; hexDigits-- &gt; 0; idx++) {</span>
+                    // Get char
+<span class="nc" id="L353">                    char c = pattern.charAt(idx);</span>
+
+                    // If it's a hexadecimal digit (0-9)
+<span class="nc bnc" id="L356" title="All 4 branches missed.">                    if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+                        // Compute new value
+<span class="nc" id="L358">                        val = (val &lt;&lt; 4) + c - '0';</span>
+                    } else {
+                        // If it's a hexadecimal letter (a-f)
+<span class="nc" id="L361">                        c = Character.toLowerCase(c);</span>
+<span class="nc bnc" id="L362" title="All 4 branches missed.">                        if (c &gt;= 'a' &amp;&amp; c &lt;= 'f') {</span>
+                            // Compute new value
+<span class="nc" id="L364">                            val = (val &lt;&lt; 4) + (c - 'a') + 10;</span>
+                        } else {
+                            // If it's not a valid digit or hex letter, the escape must be invalid
+                            // because hexDigits of input have not been absorbed yet.
+<span class="nc" id="L368">                            syntaxError(&quot;Expected &quot; + hexDigits + &quot; hexadecimal digits after \\&quot; + escapeChar);</span>
+                        }
+                    }
+                }
+<span class="nc" id="L372">                return val;</span>
+            }
+
+            case 't':
+<span class="nc" id="L376">                return '\t';</span>
+
+            case 'n':
+<span class="nc" id="L379">                return '\n';</span>
+
+            case 'r':
+<span class="nc" id="L382">                return '\r';</span>
+
+            case 'f':
+<span class="nc" id="L385">                return '\f';</span>
+
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+
+                // An octal escape starts with a 0 or has two digits in a row
+<span class="nc bnc" id="L399" title="All 6 branches missed.">                if ((idx &lt; len &amp;&amp; Character.isDigit(pattern.charAt(idx))) || escapeChar == '0') {</span>
+                    // Handle \nnn octal escapes
+<span class="nc" id="L401">                    int val = escapeChar - '0';</span>
+<span class="nc bnc" id="L402" title="All 4 branches missed.">                    if (idx &lt; len &amp;&amp; Character.isDigit(pattern.charAt(idx))) {</span>
+<span class="nc" id="L403">                        val = ((val &lt;&lt; 3) + (pattern.charAt(idx++) - '0'));</span>
+<span class="nc bnc" id="L404" title="All 4 branches missed.">                        if (idx &lt; len &amp;&amp; Character.isDigit(pattern.charAt(idx))) {</span>
+<span class="nc" id="L405">                            val = ((val &lt;&lt; 3) + (pattern.charAt(idx++) - '0'));</span>
+                        }
+                    }
+<span class="nc" id="L408">                    return val;</span>
+                }
+
+                // It's actually a backreference (\[1-9]), not an escape
+<span class="nc" id="L412">                return ESC_BACKREF;</span>
+
+            default:
+
+                // Simple quoting of a character
+<span class="nc" id="L417">                return escapeChar;</span>
+        }
+    }
+
+    /**
+     * Compile a character class
+     *
+     * @return Index of class node
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
+     */
+    int characterClass() throws RESyntaxException {
+        // Check for bad calling or empty class
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">        if (pattern.charAt(idx) != '[') {</span>
+<span class="nc" id="L430">            internalError();</span>
+        }
+
+        // Check for unterminated or empty class
+<span class="pc bpc" id="L434" title="2 of 4 branches missed.">        if ((idx + 1) &gt;= len || pattern.charAt(++idx) == ']') {</span>
+<span class="nc" id="L435">            syntaxError(&quot;Empty or unterminated class&quot;);</span>
+        }
+
+        // Check for POSIX character class
+<span class="pc bpc" id="L439" title="2 of 4 branches missed.">        if (idx &lt; len &amp;&amp; pattern.charAt(idx) == ':') {</span>
+            // Skip colon
+<span class="nc" id="L441">            idx++;</span>
+
+            // POSIX character classes are denoted with lowercase ASCII strings
+<span class="nc" id="L444">            int idxStart = idx;</span>
+<span class="nc bnc" id="L445" title="All 6 branches missed.">            while (idx &lt; len &amp;&amp; pattern.charAt(idx) &gt;= 'a' &amp;&amp; pattern.charAt(idx) &lt;= 'z') {</span>
+<span class="nc" id="L446">                idx++;</span>
+            }
+
+            // Should be a &quot;:]&quot; to terminate the POSIX character class
+<span class="nc bnc" id="L450" title="All 6 branches missed.">            if ((idx + 1) &lt; len &amp;&amp; pattern.charAt(idx) == ':' &amp;&amp; pattern.charAt(idx + 1) == ']') {</span>
+                // Get character class
+<span class="nc" id="L452">                String charClass = pattern.substring(idxStart, idx);</span>
+
+                // Select the POSIX class id
+<span class="nc" id="L455">                Character i = (Character) hashPOSIX.get(charClass);</span>
+<span class="nc bnc" id="L456" title="All 2 branches missed.">                if (i != null) {</span>
+                    // Move past colon and right bracket
+<span class="nc" id="L458">                    idx += 2;</span>
+
+                    // Return new POSIX character class node
+<span class="nc" id="L461">                    return node(RE.OP_POSIXCLASS, i.charValue());</span>
+                }
+<span class="nc" id="L463">                syntaxError(&quot;Invalid POSIX character class '&quot; + charClass + &quot;'&quot;);</span>
+            }
+<span class="nc" id="L465">            syntaxError(&quot;Invalid POSIX character class syntax&quot;);</span>
+        }
+
+        // Try to build a class.  Create OP_ANYOF node
+<span class="fc" id="L469">        int ret = node(RE.OP_ANYOF, 0);</span>
+
+        // Parse class declaration
+<span class="fc" id="L472">        char CHAR_INVALID = Character.MAX_VALUE;</span>
+<span class="fc" id="L473">        char last = CHAR_INVALID;</span>
+        char simpleChar;
+<span class="fc" id="L475">        boolean include = true;</span>
+<span class="fc" id="L476">        boolean definingRange = false;</span>
+<span class="fc" id="L477">        int idxFirst = idx;</span>
+<span class="fc" id="L478">        char rangeStart = Character.MIN_VALUE;</span>
+        char rangeEnd;
+<span class="fc" id="L480">        RERange range = new RERange();</span>
+<span class="pc bpc" id="L481" title="1 of 4 branches missed.">        while (idx &lt; len &amp;&amp; pattern.charAt(idx) != ']') {</span>
+
+            switchOnCharacter:
+
+            // Switch on character
+<span class="pc bpc" id="L486" title="2 of 4 branches missed.">            switch (pattern.charAt(idx)) {</span>
+                case '^':
+<span class="nc bnc" id="L488" title="All 2 branches missed.">                    include = !include;</span>
+<span class="nc bnc" id="L489" title="All 2 branches missed.">                    if (idx == idxFirst) {</span>
+<span class="nc" id="L490">                        range.include(Character.MIN_VALUE, Character.MAX_VALUE, true);</span>
+                    }
+<span class="nc" id="L492">                    idx++;</span>
+<span class="nc" id="L493">                    continue;</span>
+
+                case '\\': {
+                    // Escape always advances the stream
+                    int c;
+<span class="nc bnc" id="L498" title="All 3 branches missed.">                    switch (c = escape()) {</span>
+                        case ESC_COMPLEX:
+                        case ESC_BACKREF:
+
+                            // Word boundaries and backrefs not allowed in a character class!
+<span class="nc" id="L503">                            syntaxError(&quot;Bad character class&quot;);</span>
+
+                        case ESC_CLASS:
+
+                            // Classes can't be an endpoint of a range
+<span class="nc bnc" id="L508" title="All 2 branches missed.">                            if (definingRange) {</span>
+<span class="nc" id="L509">                                syntaxError(&quot;Bad character class&quot;);</span>
+                            }
+
+                            // Handle specific type of class (some are ok)
+<span class="nc bnc" id="L513" title="All 7 branches missed.">                            switch (pattern.charAt(idx - 1)) {</span>
+                                case RE.E_NSPACE:
+<span class="nc" id="L515">                                    range.include(Character.MIN_VALUE, 7, include);   // [Min - \b )</span>
+<span class="nc" id="L516">                                    range.include((char) 11, include);                // ( \n - \f )</span>
+<span class="nc" id="L517">                                    range.include(14, 31, include);                   // ( \r - ' ')</span>
+<span class="nc" id="L518">                                    range.include(33, Character.MAX_VALUE, include);  // (' ' - Max]</span>
+<span class="nc" id="L519">                                    break;</span>
+
+                                case RE.E_NALNUM:
+<span class="nc" id="L522">                                    range.include(Character.MIN_VALUE, '/', include); // [Min - '0')</span>
+<span class="nc" id="L523">                                    range.include(':', '@', include);                 // ('9' - 'A')</span>
+<span class="nc" id="L524">                                    range.include('[', '^', include);                 // ('Z' - '_')</span>
+<span class="nc" id="L525">                                    range.include('`', include);                      // ('_' - 'a')</span>
+<span class="nc" id="L526">                                    range.include('{', Character.MAX_VALUE, include); // ('z' - Max]</span>
+<span class="nc" id="L527">                                    break;</span>
+
+                                case RE.E_NDIGIT:
+<span class="nc" id="L530">                                    range.include(Character.MIN_VALUE, '/', include); // [Min - '0')</span>
+<span class="nc" id="L531">                                    range.include(':', Character.MAX_VALUE, include); // ('9' - Max]</span>
+<span class="nc" id="L532">                                    break;</span>
+
+                                case RE.E_SPACE:
+<span class="nc" id="L535">                                    range.include('\t', include);</span>
+<span class="nc" id="L536">                                    range.include('\r', include);</span>
+<span class="nc" id="L537">                                    range.include('\f', include);</span>
+<span class="nc" id="L538">                                    range.include('\n', include);</span>
+<span class="nc" id="L539">                                    range.include('\b', include);</span>
+<span class="nc" id="L540">                                    range.include(' ', include);</span>
+<span class="nc" id="L541">                                    break;</span>
+
+                                case RE.E_ALNUM:
+<span class="nc" id="L544">                                    range.include('a', 'z', include);</span>
+<span class="nc" id="L545">                                    range.include('A', 'Z', include);</span>
+<span class="nc" id="L546">                                    range.include('_', include);</span>
+
+                                    // Fall through!
+
+                                case RE.E_DIGIT:
+<span class="nc" id="L551">                                    range.include('0', '9', include);</span>
+                                    break;
+                            }
+
+                            // Make last char invalid (can't be a range start)
+<span class="nc" id="L556">                            last = CHAR_INVALID;</span>
+<span class="nc" id="L557">                            break;</span>
+
+                        default:
+
+                            // Escape is simple so treat as a simple char
+<span class="nc" id="L562">                            simpleChar = (char) c;</span>
+<span class="nc" id="L563">                            break switchOnCharacter;</span>
+                    }
+                }
+<span class="nc" id="L566">                continue;</span>
+
+                case '-':
+
+                    // Start a range if one isn't already started
+<span class="pc bpc" id="L571" title="1 of 2 branches missed.">                    if (definingRange) {</span>
+<span class="nc" id="L572">                        syntaxError(&quot;Bad class range&quot;);</span>
+                    }
+<span class="fc" id="L574">                    definingRange = true;</span>
+
+                    // If no last character, start of range is 0
+<span class="pc bpc" id="L577" title="1 of 2 branches missed.">                    rangeStart = (last == CHAR_INVALID ? 0 : last);</span>
+
+                    // Premature end of range. define up to Character.MAX_VALUE
+<span class="pc bpc" id="L580" title="2 of 4 branches missed.">                    if ((idx + 1) &lt; len &amp;&amp; pattern.charAt(++idx) == ']') {</span>
+<span class="nc" id="L581">                        simpleChar = Character.MAX_VALUE;</span>
+<span class="nc" id="L582">                        break;</span>
+                    }
+                    continue;
+
+                default:
+<span class="fc" id="L587">                    simpleChar = pattern.charAt(idx++);</span>
+                    break;
+            }
+
+            // Handle simple character simpleChar
+<span class="fc bfc" id="L592" title="All 2 branches covered.">            if (definingRange) {</span>
+                // if we are defining a range make it now
+<span class="fc" id="L594">                rangeEnd = simpleChar;</span>
+
+                // Actually create a range if the range is ok
+<span class="pc bpc" id="L597" title="1 of 2 branches missed.">                if (rangeStart &gt;= rangeEnd) {</span>
+<span class="nc" id="L598">                    syntaxError(&quot;Bad character class&quot;);</span>
+                }
+<span class="fc" id="L600">                range.include(rangeStart, rangeEnd, include);</span>
+
+                // We are done defining the range
+<span class="fc" id="L603">                last = CHAR_INVALID;</span>
+<span class="fc" id="L604">                definingRange = false;</span>
+            } else {
+                // If simple character and not start of range, include it
+<span class="pc bpc" id="L607" title="2 of 4 branches missed.">                if (idx &gt;= len || pattern.charAt(idx) != '-') {</span>
+<span class="nc" id="L608">                    range.include(simpleChar, include);</span>
+                }
+<span class="fc" id="L610">                last = simpleChar;</span>
+            }
+        }
+
+        // Shouldn't be out of input
+<span class="pc bpc" id="L615" title="1 of 2 branches missed.">        if (idx == len) {</span>
+<span class="nc" id="L616">            syntaxError(&quot;Unterminated character class&quot;);</span>
+        }
+
+        // Absorb the ']' end of class marker
+<span class="fc" id="L620">        idx++;</span>
+
+        // Emit character class definition
+<span class="fc" id="L623">        instruction[ret + RE.offsetOpdata] = (char) range.num;</span>
+<span class="fc bfc" id="L624" title="All 2 branches covered.">        for (int i = 0; i &lt; range.num; i++) {</span>
+<span class="fc" id="L625">            emit((char) range.minRange[i]);</span>
+<span class="fc" id="L626">            emit((char) range.maxRange[i]);</span>
+        }
+<span class="fc" id="L628">        return ret;</span>
+    }
+
+    /**
+     * Absorb an atomic character string.  This method is a little tricky because
+     * it can un-include the last character of string if a closure operator follows.
+     * This is correct because *+? have higher precedence than concatentation (thus
+     * ABC* means AB(C*) and NOT (ABC)*).
+     *
+     * @return Index of new atom node
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
+     */
+    int atom() throws RESyntaxException {
+        // Create a string node
+<span class="fc" id="L642">        int ret = node(RE.OP_ATOM, 0);</span>
+
+        // Length of atom
+<span class="fc" id="L645">        int lenAtom = 0;</span>
+
+        // Loop while we've got input
+
+        atomLoop:
+
+<span class="pc bpc" id="L651" title="1 of 2 branches missed.">        while (idx &lt; len) {</span>
+            // Is there a next char?
+<span class="pc bpc" id="L653" title="1 of 2 branches missed.">            if ((idx + 1) &lt; len) {</span>
+<span class="fc" id="L654">                char c = pattern.charAt(idx + 1);</span>
+
+                // If the next 'char' is an escape, look past the whole escape
+<span class="pc bpc" id="L657" title="1 of 2 branches missed.">                if (pattern.charAt(idx) == '\\') {</span>
+<span class="nc" id="L658">                    int idxEscape = idx;</span>
+<span class="nc" id="L659">                    escape();</span>
+<span class="nc bnc" id="L660" title="All 2 branches missed.">                    if (idx &lt; len) {</span>
+<span class="nc" id="L661">                        c = pattern.charAt(idx);</span>
+                    }
+<span class="nc" id="L663">                    idx = idxEscape;</span>
+                }
+
+                // Switch on next char
+<span class="pc bpc" id="L667" title="1 of 2 branches missed.">                switch (c) {</span>
+                    case '{':
+                    case '?':
+                    case '*':
+                    case '+':
+
+                        // If the next character is a closure operator and our atom is non-empty, the
+                        // current character should bind to the closure operator rather than the atom
+<span class="nc bnc" id="L675" title="All 2 branches missed.">                        if (lenAtom != 0) {</span>
+<span class="nc" id="L676">                            break atomLoop;</span>
+                        }
+                }
+            }
+
+            // Switch on current char
+<span class="pc bpc" id="L682" title="2 of 4 branches missed.">            switch (pattern.charAt(idx)) {</span>
+                case ']':
+                case '^':
+                case '$':
+                case '.':
+                case '[':
+                case '(':
+                case ')':
+                case '|':
+<span class="fc" id="L691">                    break atomLoop;</span>
+
+                case '{':
+                case '?':
+                case '*':
+                case '+':
+
+                    // We should have an atom by now
+<span class="nc bnc" id="L699" title="All 2 branches missed.">                    if (lenAtom == 0) {</span>
+                        // No atom before closure
+<span class="nc" id="L701">                        syntaxError(&quot;Missing operand to closure&quot;);</span>
+                    }
+                    break atomLoop;
+
+                case '\\': {
+                    // Get the escaped character (advances input automatically)
+<span class="nc" id="L707">                    int idxBeforeEscape = idx;</span>
+<span class="nc" id="L708">                    int c = escape();</span>
+
+                    // Check if it's a simple escape (as opposed to, say, a backreference)
+<span class="nc bnc" id="L711" title="All 2 branches missed.">                    if ((c &amp; ESC_MASK) == ESC_MASK) {</span>
+                        // Not a simple escape, so backup to where we were before the escape.
+<span class="nc" id="L713">                        idx = idxBeforeEscape;</span>
+<span class="nc" id="L714">                        break atomLoop;</span>
+                    }
+
+                    // Add escaped char to atom
+<span class="nc" id="L718">                    emit((char) c);</span>
+<span class="nc" id="L719">                    lenAtom++;</span>
+                }
+<span class="nc" id="L721">                break;</span>
+
+                default:
+
+                    // Add normal character to atom
+<span class="fc" id="L726">                    emit(pattern.charAt(idx++));</span>
+<span class="fc" id="L727">                    lenAtom++;</span>
+<span class="fc" id="L728">                    break;</span>
+            }
+        }
+
+        // This &quot;shouldn't&quot; happen
+<span class="pc bpc" id="L733" title="1 of 2 branches missed.">        if (lenAtom == 0) {</span>
+<span class="nc" id="L734">            internalError();</span>
+        }
+
+        // Emit the atom length into the program
+<span class="fc" id="L738">        instruction[ret + RE.offsetOpdata] = (char) lenAtom;</span>
+<span class="fc" id="L739">        return ret;</span>
+    }
+
+    /**
+     * Match a terminal node.
+     *
+     * @param flags Flags
+     * @return Index of terminal node (closeable)
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
+     */
+    int terminal(int[] flags) throws RESyntaxException {
+<span class="pc bpc" id="L750" title="5 of 10 branches missed.">        switch (pattern.charAt(idx)) {</span>
+            case RE.OP_EOL:
+            case RE.OP_BOL:
+            case RE.OP_ANY:
+<span class="fc" id="L754">                return node(pattern.charAt(idx++), 0);</span>
+
+            case '[':
+<span class="fc" id="L757">                return characterClass();</span>
+
+            case '(':
+<span class="fc" id="L760">                return expr(flags);</span>
+
+            case ')':
+<span class="nc" id="L763">                syntaxError(&quot;Unexpected close paren&quot;);</span>
+
+            case '|':
+<span class="nc" id="L766">                internalError();</span>
+
+            case ']':
+<span class="nc" id="L769">                syntaxError(&quot;Mismatched class&quot;);</span>
+
+            case 0:
+<span class="nc" id="L772">                syntaxError(&quot;Unexpected end of input&quot;);</span>
+
+            case '?':
+            case '+':
+            case '{':
+            case '*':
+<span class="nc" id="L778">                syntaxError(&quot;Missing operand to closure&quot;);</span>
+
+            case '\\': {
+                // Don't forget, escape() advances the input stream!
+<span class="fc" id="L782">                int idxBeforeEscape = idx;</span>
+
+                // Switch on escaped character
+<span class="pc bpc" id="L785" title="2 of 3 branches missed.">                switch (escape()) {</span>
+                    case ESC_CLASS:
+                    case ESC_COMPLEX:
+<span class="fc" id="L788">                        flags[0] &amp;= ~NODE_NULLABLE;</span>
+<span class="fc" id="L789">                        return node(RE.OP_ESCAPE, pattern.charAt(idx - 1));</span>
+
+                    case ESC_BACKREF: {
+<span class="nc" id="L792">                        char backreference = (char) (pattern.charAt(idx - 1) - '0');</span>
+<span class="nc bnc" id="L793" title="All 2 branches missed.">                        if (parens &lt;= backreference) {</span>
+<span class="nc" id="L794">                            syntaxError(&quot;Bad backreference&quot;);</span>
+                        }
+<span class="nc" id="L796">                        flags[0] |= NODE_NULLABLE;</span>
+<span class="nc" id="L797">                        return node(RE.OP_BACKREF, backreference);</span>
+                    }
+
+                    default:
+
+                        // We had a simple escape and we want to have it end up in
+                        // an atom, so we back up and fall though to the default handling
+<span class="nc" id="L804">                        idx = idxBeforeEscape;</span>
+<span class="nc" id="L805">                        flags[0] &amp;= ~NODE_NULLABLE;</span>
+                        break;
+                }
+            }
+        }
+
+        // Everything above either fails or returns.
+        // If it wasn't one of the above, it must be the start of an atom.
+<span class="fc" id="L813">        flags[0] &amp;= ~NODE_NULLABLE;</span>
+<span class="fc" id="L814">        return atom();</span>
+    }
+
+    /**
+     * Compile a possibly closured terminal
+     *
+     * @param flags Flags passed by reference
+     * @return Index of closured node
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
+     */
+    int closure(int[] flags) throws RESyntaxException {
+        // Before terminal
+<span class="fc" id="L826">        int idxBeforeTerminal = idx;</span>
+
+        // Values to pass by reference to terminal()
+<span class="fc" id="L829">        int[] terminalFlags = {NODE_NORMAL};</span>
+
+        // Get terminal symbol
+<span class="fc" id="L832">        int ret = terminal(terminalFlags);</span>
+
+        // Or in flags from terminal symbol
+<span class="fc" id="L835">        flags[0] |= terminalFlags[0];</span>
+
+        // Advance input, set NODE_NULLABLE flag and do sanity checks
+<span class="fc bfc" id="L838" title="All 2 branches covered.">        if (idx &gt;= len) {</span>
+<span class="fc" id="L839">            return ret;</span>
+        }
+
+<span class="fc" id="L842">        boolean greedy = true;</span>
+<span class="fc" id="L843">        char closureType = pattern.charAt(idx);</span>
+<span class="pc bpc" id="L844" title="2 of 4 branches missed.">        switch (closureType) {</span>
+            case '?':
+            case '*':
+
+                // The current node can be null
+<span class="nc" id="L849">                flags[0] |= NODE_NULLABLE;</span>
+
+                // Drop through
+
+            case '+':
+
+                // Eat closure character
+<span class="fc" id="L856">                idx++;</span>
+
+                // Drop through
+
+            case '{':
+
+                // Don't allow blantant stupidity
+<span class="fc" id="L863">                int opcode = instruction[ret /* + RE.offsetOpcode */];</span>
+<span class="pc bpc" id="L864" title="2 of 4 branches missed.">                if (opcode == RE.OP_BOL || opcode == RE.OP_EOL) {</span>
+<span class="nc" id="L865">                    syntaxError(&quot;Bad closure operand&quot;);</span>
+                }
+<span class="pc bpc" id="L867" title="1 of 2 branches missed.">                if ((terminalFlags[0] &amp; NODE_NULLABLE) != 0) {</span>
+<span class="nc" id="L868">                    syntaxError(&quot;Closure operand can't be nullable&quot;);</span>
+                }
+        }
+
+        // If the next character is a '?', make the closure non-greedy (reluctant)
+<span class="pc bpc" id="L873" title="2 of 4 branches missed.">        if (idx &lt; len &amp;&amp; pattern.charAt(idx) == '?') {</span>
+<span class="nc" id="L874">            idx++;</span>
+<span class="nc" id="L875">            greedy = false;</span>
+        }
+
+<span class="pc bpc" id="L878" title="1 of 2 branches missed.">        if (greedy) {</span>
+            // Actually do the closure now
+<span class="pc bpc" id="L880" title="3 of 5 branches missed.">            switch (closureType) {</span>
+                case '{': {
+<span class="nc" id="L882">                    bracket();</span>
+<span class="nc" id="L883">                    int bracketEnd = idx;</span>
+<span class="nc" id="L884">                    int bracketMin = this.bracketMin;</span>
+<span class="nc" id="L885">                    int bracketOpt = this.bracketOpt;</span>
+
+                    // Pointer to the last terminal
+<span class="nc" id="L888">                    int pos = ret;</span>
+
+                    // Process min first
+<span class="nc bnc" id="L891" title="All 2 branches missed.">                    for (int c = 0; c &lt; bracketMin; c++) {</span>
+                        // Rewind stream and run it through again - more matchers coming
+<span class="nc" id="L893">                        idx = idxBeforeTerminal;</span>
+<span class="nc" id="L894">                        setNextOfEnd(pos, pos = terminal(terminalFlags));</span>
+                    }
+
+                    // Do the right thing for maximum ({m,})
+<span class="nc bnc" id="L898" title="All 2 branches missed.">                    if (bracketOpt == bracketUnbounded) {</span>
+                        // Drop through now and closure expression.
+                        // We are done with the {m,} expr, so skip rest
+<span class="nc" id="L901">                        idx = bracketEnd;</span>
+<span class="nc" id="L902">                        nodeInsert(RE.OP_STAR, 0, pos);</span>
+<span class="nc" id="L903">                        setNextOfEnd(pos + RE.nodeSize, pos);</span>
+<span class="nc" id="L904">                        break;</span>
+<span class="nc bnc" id="L905" title="All 2 branches missed.">                    } else if (bracketOpt &gt; 0) {</span>
+<span class="nc" id="L906">                        int[] opt = new int[bracketOpt + 1];</span>
+                        // Surround first optional terminal with MAYBE
+<span class="nc" id="L908">                        nodeInsert(RE.OP_MAYBE, 0, pos);</span>
+<span class="nc" id="L909">                        opt[0] = pos;</span>
+
+                        // Add all the rest optional terminals with preceeding MAYBEs
+<span class="nc bnc" id="L912" title="All 2 branches missed.">                        for (int c = 1; c &lt; bracketOpt; c++) {</span>
+<span class="nc" id="L913">                            opt[c] = node(RE.OP_MAYBE, 0);</span>
+                            // Rewind stream and run it through again - more matchers coming
+<span class="nc" id="L915">                            idx = idxBeforeTerminal;</span>
+<span class="nc" id="L916">                            terminal(terminalFlags);</span>
+                        }
+
+                        // Tie ends together
+<span class="nc" id="L920">                        int end = opt[bracketOpt] = node(RE.OP_NOTHING, 0);</span>
+<span class="nc bnc" id="L921" title="All 2 branches missed.">                        for (int c = 0; c &lt; bracketOpt; c++) {</span>
+<span class="nc" id="L922">                            setNextOfEnd(opt[c], end);</span>
+<span class="nc" id="L923">                            setNextOfEnd(opt[c] + RE.nodeSize, opt[c + 1]);</span>
+                        }
+<span class="nc" id="L925">                    } else {</span>
+                        // Rollback terminal - no opt matchers present
+<span class="nc" id="L927">                        lenInstruction = pos;</span>
+<span class="nc" id="L928">                        node(RE.OP_NOTHING, 0);</span>
+                    }
+
+                    // We are done. skip the reminder of {m,n} expr
+<span class="nc" id="L932">                    idx = bracketEnd;</span>
+<span class="nc" id="L933">                    break;</span>
+                }
+
+                case '?': {
+<span class="nc" id="L937">                    nodeInsert(RE.OP_MAYBE, 0, ret);</span>
+<span class="nc" id="L938">                    int n = node(RE.OP_NOTHING, 0);</span>
+<span class="nc" id="L939">                    setNextOfEnd(ret, n);</span>
+<span class="nc" id="L940">                    setNextOfEnd(ret + RE.nodeSize, n);</span>
+<span class="nc" id="L941">                    break;</span>
+                }
+
+                case '*': {
+<span class="nc" id="L945">                    nodeInsert(RE.OP_STAR, 0, ret);</span>
+<span class="nc" id="L946">                    setNextOfEnd(ret + RE.nodeSize, ret);</span>
+<span class="nc" id="L947">                    break;</span>
+                }
+
+                case '+': {
+<span class="fc" id="L951">                    nodeInsert(RE.OP_CONTINUE, 0, ret);</span>
+<span class="fc" id="L952">                    int n = node(RE.OP_PLUS, 0);</span>
+<span class="fc" id="L953">                    setNextOfEnd(ret + RE.nodeSize, n);</span>
+<span class="fc" id="L954">                    setNextOfEnd(n, ret);</span>
+<span class="fc" id="L955">                    break;</span>
+                }
+            }
+        } else {
+            // Actually do the closure now
+<span class="nc bnc" id="L960" title="All 4 branches missed.">            switch (closureType) {</span>
+                case '?': {
+<span class="nc" id="L962">                    nodeInsert(RE.OP_RELUCTANTMAYBE, 0, ret);</span>
+<span class="nc" id="L963">                    int n = node(RE.OP_NOTHING, 0);</span>
+<span class="nc" id="L964">                    setNextOfEnd(ret, n);</span>
+<span class="nc" id="L965">                    setNextOfEnd(ret + RE.nodeSize, n);</span>
+<span class="nc" id="L966">                    break;</span>
+                }
+
+                case '*': {
+<span class="nc" id="L970">                    nodeInsert(RE.OP_RELUCTANTSTAR, 0, ret);</span>
+<span class="nc" id="L971">                    setNextOfEnd(ret + RE.nodeSize, ret);</span>
+<span class="nc" id="L972">                    break;</span>
+                }
+
+                case '+': {
+<span class="nc" id="L976">                    nodeInsert(RE.OP_CONTINUE, 0, ret);</span>
+<span class="nc" id="L977">                    int n = node(RE.OP_RELUCTANTPLUS, 0);</span>
+<span class="nc" id="L978">                    setNextOfEnd(n, ret);</span>
+<span class="nc" id="L979">                    setNextOfEnd(ret + RE.nodeSize, n);</span>
+<span class="nc" id="L980">                    break;</span>
+                }
+            }
+        }
+
+<span class="fc" id="L985">        return ret;</span>
+    }
+
+    /**
+     * Compile body of one branch of an or operator (implements concatenation)
+     *
+     * @param flags Flags passed by reference
+     * @return Pointer to first node in the branch
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
+     */
+    int branch(int[] flags) throws RESyntaxException {
+        // Get each possibly closured piece and concat
+        int node;
+<span class="fc" id="L998">        int ret = -1;</span>
+<span class="fc" id="L999">        int chain = -1;</span>
+<span class="fc" id="L1000">        int[] closureFlags = new int[1];</span>
+<span class="fc" id="L1001">        boolean nullable = true;</span>
+<span class="pc bpc" id="L1002" title="1 of 6 branches missed.">        while (idx &lt; len &amp;&amp; pattern.charAt(idx) != '|' &amp;&amp; pattern.charAt(idx) != ')') {</span>
+            // Get new node
+<span class="fc" id="L1004">            closureFlags[0] = NODE_NORMAL;</span>
+<span class="fc" id="L1005">            node = closure(closureFlags);</span>
+<span class="pc bpc" id="L1006" title="1 of 2 branches missed.">            if (closureFlags[0] == NODE_NORMAL) {</span>
+<span class="fc" id="L1007">                nullable = false;</span>
+            }
+
+            // If there's a chain, append to the end
+<span class="fc bfc" id="L1011" title="All 2 branches covered.">            if (chain != -1) {</span>
+<span class="fc" id="L1012">                setNextOfEnd(chain, node);</span>
+            }
+
+            // Chain starts at current
+<span class="fc" id="L1016">            chain = node;</span>
+<span class="fc bfc" id="L1017" title="All 2 branches covered.">            if (ret == -1) {</span>
+<span class="fc" id="L1018">                ret = node;</span>
+            }
+        }
+
+        // If we don't run loop, make a nothing node
+<span class="pc bpc" id="L1023" title="1 of 2 branches missed.">        if (ret == -1) {</span>
+<span class="nc" id="L1024">            ret = node(RE.OP_NOTHING, 0);</span>
+        }
+
+        // Set nullable flag for this branch
+<span class="pc bpc" id="L1028" title="1 of 2 branches missed.">        if (nullable) {</span>
+<span class="nc" id="L1029">            flags[0] |= NODE_NULLABLE;</span>
+        }
+
+<span class="fc" id="L1032">        return ret;</span>
+    }
+
+    /**
+     * Compile an expression with possible parens around it.  Paren matching
+     * is done at this level so we can tie the branch tails together.
+     *
+     * @param flags Flag value passed by reference
+     * @return Node index of expression in instruction array
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
+     */
+    int expr(int[] flags) throws RESyntaxException {
+        // Create open paren node unless we were called from the top level (which has no parens)
+<span class="fc" id="L1045">        int paren = -1;</span>
+<span class="fc" id="L1046">        int ret = -1;</span>
+<span class="fc" id="L1047">        int closeParens = parens;</span>
+<span class="pc bpc" id="L1048" title="1 of 4 branches missed.">        if ((flags[0] &amp; NODE_TOPLEVEL) == 0 &amp;&amp; pattern.charAt(idx) == '(') {</span>
+            // if its a cluster ( rather than a proper subexpression ie with backrefs )
+<span class="pc bpc" id="L1050" title="4 of 6 branches missed.">            if (idx + 2 &lt; len &amp;&amp; pattern.charAt(idx + 1) == '?' &amp;&amp; pattern.charAt(idx + 2) == ':') {</span>
+<span class="nc" id="L1051">                paren = 2;</span>
+<span class="nc" id="L1052">                idx += 3;</span>
+<span class="nc" id="L1053">                ret = node(RE.OP_OPEN_CLUSTER, 0);</span>
+            } else {
+<span class="fc" id="L1055">                paren = 1;</span>
+<span class="fc" id="L1056">                idx++;</span>
+<span class="fc" id="L1057">                ret = node(RE.OP_OPEN, parens++);</span>
+            }
+        }
+<span class="fc" id="L1060">        flags[0] &amp;= ~NODE_TOPLEVEL;</span>
+
+        // Process contents of first branch node
+<span class="fc" id="L1063">        boolean open = false;</span>
+<span class="fc" id="L1064">        int branch = branch(flags);</span>
+<span class="fc bfc" id="L1065" title="All 2 branches covered.">        if (ret == -1) {</span>
+<span class="fc" id="L1066">            ret = branch;</span>
+        } else {
+<span class="fc" id="L1068">            setNextOfEnd(ret, branch);</span>
+        }
+
+        // Loop through branches
+<span class="pc bpc" id="L1072" title="1 of 4 branches missed.">        while (idx &lt; len &amp;&amp; pattern.charAt(idx) == '|') {</span>
+            // Now open the first branch since there are more than one
+<span class="nc bnc" id="L1074" title="All 2 branches missed.">            if (!open) {</span>
+<span class="nc" id="L1075">                nodeInsert(RE.OP_BRANCH, 0, branch);</span>
+<span class="nc" id="L1076">                open = true;</span>
+            }
+
+<span class="nc" id="L1079">            idx++;</span>
+<span class="nc" id="L1080">            setNextOfEnd(branch, branch = node(RE.OP_BRANCH, 0));</span>
+<span class="nc" id="L1081">            branch(flags);</span>
+        }
+
+        // Create an ending node (either a close paren or an OP_END)
+        int end;
+<span class="fc bfc" id="L1086" title="All 2 branches covered.">        if (paren &gt; 0) {</span>
+<span class="pc bpc" id="L1087" title="2 of 4 branches missed.">            if (idx &lt; len &amp;&amp; pattern.charAt(idx) == ')') {</span>
+<span class="fc" id="L1088">                idx++;</span>
+            } else {
+<span class="nc" id="L1090">                syntaxError(&quot;Missing close paren&quot;);</span>
+            }
+<span class="pc bpc" id="L1092" title="1 of 2 branches missed.">            if (paren == 1) {</span>
+<span class="fc" id="L1093">                end = node(RE.OP_CLOSE, closeParens);</span>
+            } else {
+<span class="nc" id="L1095">                end = node(RE.OP_CLOSE_CLUSTER, 0);</span>
+            }
+        } else {
+<span class="fc" id="L1098">            end = node(RE.OP_END, 0);</span>
+        }
+
+        // Append the ending node to the ret nodelist
+<span class="fc" id="L1102">        setNextOfEnd(ret, end);</span>
+
+        // Hook the ends of each branch to the end node
+<span class="fc" id="L1105">        int currentNode = ret;</span>
+<span class="fc" id="L1106">        int nextNodeOffset = instruction[currentNode + RE.offsetNext];</span>
+        // while the next node o
+<span class="pc bpc" id="L1108" title="1 of 4 branches missed.">        while (nextNodeOffset != 0 &amp;&amp; currentNode &lt; lenInstruction) {</span>
+            // If branch, make the end of the branch's operand chain point to the end node.
+<span class="pc bpc" id="L1110" title="1 of 2 branches missed.">            if (instruction[currentNode /* + RE.offsetOpcode */] == RE.OP_BRANCH) {</span>
+<span class="nc" id="L1111">                setNextOfEnd(currentNode + RE.nodeSize, end);</span>
+            }
+<span class="fc" id="L1113">            nextNodeOffset = instruction[currentNode + RE.offsetNext];</span>
+<span class="fc" id="L1114">            currentNode += nextNodeOffset;</span>
+        }
+
+        // Return the node list
+<span class="fc" id="L1118">        return ret;</span>
+    }
+
+    /**
+     * Compiles a regular expression pattern into a program runnable by the pattern
+     * matcher class 'RE'.
+     *
+     * @param pattern Regular expression pattern to compile (see RECompiler class
+     *                for details).
+     * @return A compiled regular expression program.
+     * @throws RESyntaxException Thrown if the regular expression has invalid syntax.
+     * @see RECompiler
+     * @see RE
+     */
+    public REProgram compile(String pattern) throws RESyntaxException {
+        // Initialize variables for compilation
+<span class="fc" id="L1134">        this.pattern = pattern;                         // Save pattern in instance variable</span>
+<span class="fc" id="L1135">        len = pattern.length();                         // Precompute pattern length for speed</span>
+<span class="fc" id="L1136">        idx = 0;                                        // Set parsing index to the first character</span>
+<span class="fc" id="L1137">        lenInstruction = 0;                             // Set emitted instruction count to zero</span>
+<span class="fc" id="L1138">        parens = 1;                                     // Set paren level to 1 (the implicit outer parens)</span>
+
+        // Initialize pass by reference flags value
+<span class="fc" id="L1141">        int[] flags = {NODE_TOPLEVEL};</span>
+
+        // Parse expression
+<span class="fc" id="L1144">        expr(flags);</span>
+
+        // Should be at end of input
+<span class="pc bpc" id="L1147" title="1 of 2 branches missed.">        if (idx != len) {</span>
+<span class="nc bnc" id="L1148" title="All 2 branches missed.">            if (pattern.charAt(idx) == ')') {</span>
+<span class="nc" id="L1149">                syntaxError(&quot;Unmatched close paren&quot;);</span>
+            }
+<span class="nc" id="L1151">            syntaxError(&quot;Unexpected input remains&quot;);</span>
+        }
+
+        // Return the result
+<span class="fc" id="L1155">        char[] ins = new char[lenInstruction];</span>
+<span class="fc" id="L1156">        System.arraycopy(instruction, 0, ins, 0, lenInstruction);</span>
+<span class="fc" id="L1157">        return new REProgram(parens, ins);</span>
+    }
+
+    /**
+     * Local, nested class for maintaining character ranges for character classes.
+     */
+<span class="fc" id="L1163">    class RERange {</span>
+<span class="fc" id="L1164">        int size = 16;                      // Capacity of current range arrays</span>
+<span class="fc" id="L1165">        int[] minRange = new int[size];     // Range minima</span>
+<span class="fc" id="L1166">        int[] maxRange = new int[size];     // Range maxima</span>
+<span class="fc" id="L1167">        int num = 0;                        // Number of range array elements in use</span>
+
+        /**
+         * Deletes the range at a given index from the range lists
+         *
+         * @param index Index of range to delete from minRange and maxRange arrays.
+         */
+        void delete(int index) {
+            // Return if no elements left or index is out of range
+<span class="nc bnc" id="L1176" title="All 4 branches missed.">            if (num == 0 || index &gt;= num) {</span>
+<span class="nc" id="L1177">                return;</span>
+            }
+
+            // Move elements down
+<span class="nc bnc" id="L1181" title="All 2 branches missed.">            while (++index &lt; num) {</span>
+<span class="nc bnc" id="L1182" title="All 2 branches missed.">                if (index - 1 &gt;= 0) {</span>
+<span class="nc" id="L1183">                    minRange[index - 1] = minRange[index];</span>
+<span class="nc" id="L1184">                    maxRange[index - 1] = maxRange[index];</span>
+                }
+            }
+
+            // One less element now
+<span class="nc" id="L1189">            num--;</span>
+<span class="nc" id="L1190">        }</span>
+
+        /**
+         * Merges a range into the range list, coalescing ranges if possible.
+         *
+         * @param min Minimum end of range
+         * @param max Maximum end of range
+         */
+        void merge(int min, int max) {
+            // Loop through ranges
+<span class="fc bfc" id="L1200" title="All 2 branches covered.">            for (int i = 0; i &lt; num; i++) {</span>
+                // Min-max is subsumed by minRange[i]-maxRange[i]
+<span class="pc bpc" id="L1202" title="2 of 4 branches missed.">                if (min &gt;= minRange[i] &amp;&amp; max &lt;= maxRange[i]) {</span>
+<span class="nc" id="L1203">                    return;</span>
+                }
+
+                // Min-max subsumes minRange[i]-maxRange[i]
+<span class="pc bpc" id="L1207" title="3 of 4 branches missed.">                else if (min &lt;= minRange[i] &amp;&amp; max &gt;= maxRange[i]) {</span>
+<span class="nc" id="L1208">                    delete(i);</span>
+<span class="nc" id="L1209">                    merge(min, max);</span>
+<span class="nc" id="L1210">                    return;</span>
+                }
+
+                // Min is in the range, but max is outside
+<span class="pc bpc" id="L1214" title="2 of 4 branches missed.">                else if (min &gt;= minRange[i] &amp;&amp; min &lt;= maxRange[i]) {</span>
+<span class="nc" id="L1215">                    min = minRange[i];</span>
+<span class="nc" id="L1216">                    delete(i);</span>
+<span class="nc" id="L1217">                    merge(min, max);</span>
+<span class="nc" id="L1218">                    return;</span>
+                }
+
+                // Max is in the range, but min is outside
+<span class="pc bpc" id="L1222" title="2 of 4 branches missed.">                else if (max &gt;= minRange[i] &amp;&amp; max &lt;= maxRange[i]) {</span>
+<span class="nc" id="L1223">                    max = maxRange[i];</span>
+<span class="nc" id="L1224">                    delete(i);</span>
+<span class="nc" id="L1225">                    merge(min, max);</span>
+<span class="nc" id="L1226">                    return;</span>
+                }
+            }
+
+            // Must not overlap any other ranges
+<span class="pc bpc" id="L1231" title="1 of 2 branches missed.">            if (num &gt;= size) {</span>
+<span class="nc" id="L1232">                size *= 2;</span>
+<span class="nc" id="L1233">                int[] newMin = new int[size];</span>
+<span class="nc" id="L1234">                int[] newMax = new int[size];</span>
+<span class="nc" id="L1235">                System.arraycopy(minRange, 0, newMin, 0, num);</span>
+<span class="nc" id="L1236">                System.arraycopy(maxRange, 0, newMax, 0, num);</span>
+<span class="nc" id="L1237">                minRange = newMin;</span>
+<span class="nc" id="L1238">                maxRange = newMax;</span>
+            }
+<span class="fc" id="L1240">            minRange[num] = min;</span>
+<span class="fc" id="L1241">            maxRange[num] = max;</span>
+<span class="fc" id="L1242">            num++;</span>
+<span class="fc" id="L1243">        }</span>
+
+        /**
+         * Removes a range by deleting or shrinking all other ranges
+         *
+         * @param min Minimum end of range
+         * @param max Maximum end of range
+         */
+        void remove(int min, int max) {
+            // Loop through ranges
+<span class="nc bnc" id="L1253" title="All 2 branches missed.">            for (int i = 0; i &lt; num; i++) {</span>
+                // minRange[i]-maxRange[i] is subsumed by min-max
+<span class="nc bnc" id="L1255" title="All 4 branches missed.">                if (minRange[i] &gt;= min &amp;&amp; maxRange[i] &lt;= max) {</span>
+<span class="nc" id="L1256">                    delete(i);</span>
+<span class="nc" id="L1257">                    return;</span>
+                }
+
+                // min-max is subsumed by minRange[i]-maxRange[i]
+<span class="nc bnc" id="L1261" title="All 4 branches missed.">                else if (min &gt;= minRange[i] &amp;&amp; max &lt;= maxRange[i]) {</span>
+<span class="nc" id="L1262">                    int minr = minRange[i];</span>
+<span class="nc" id="L1263">                    int maxr = maxRange[i];</span>
+<span class="nc" id="L1264">                    delete(i);</span>
+<span class="nc bnc" id="L1265" title="All 2 branches missed.">                    if (minr &lt; min) {</span>
+<span class="nc" id="L1266">                        merge(minr, min - 1);</span>
+                    }
+<span class="nc bnc" id="L1268" title="All 2 branches missed.">                    if (max &lt; maxr) {</span>
+<span class="nc" id="L1269">                        merge(max + 1, maxr);</span>
+                    }
+<span class="nc" id="L1271">                    return;</span>
+                }
+
+                // minRange is in the range, but maxRange is outside
+<span class="nc bnc" id="L1275" title="All 4 branches missed.">                else if (minRange[i] &gt;= min &amp;&amp; minRange[i] &lt;= max) {</span>
+<span class="nc" id="L1276">                    minRange[i] = max + 1;</span>
+<span class="nc" id="L1277">                    return;</span>
+                }
+
+                // maxRange is in the range, but minRange is outside
+<span class="nc bnc" id="L1281" title="All 4 branches missed.">                else if (maxRange[i] &gt;= min &amp;&amp; maxRange[i] &lt;= max) {</span>
+<span class="nc" id="L1282">                    maxRange[i] = min - 1;</span>
+<span class="nc" id="L1283">                    return;</span>
+                }
+            }
+<span class="nc" id="L1286">        }</span>
+
+        /**
+         * Includes (or excludes) the range from min to max, inclusive.
+         *
+         * @param min     Minimum end of range
+         * @param max     Maximum end of range
+         * @param include True if range should be included.  False otherwise.
+         */
+        void include(int min, int max, boolean include) {
+<span class="pc bpc" id="L1296" title="1 of 2 branches missed.">            if (include) {</span>
+<span class="fc" id="L1297">                merge(min, max);</span>
+            } else {
+<span class="nc" id="L1299">                remove(min, max);</span>
+            }
+<span class="fc" id="L1301">        }</span>
+
+        /**
+         * Includes a range with the same min and max
+         *
+         * @param minmax  Minimum and maximum end of range (inclusive)
+         * @param include True if range should be included.  False otherwise.
+         */
+        void include(char minmax, boolean include) {
+<span class="nc" id="L1310">            include(minmax, minmax, include);</span>
+<span class="nc" id="L1311">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

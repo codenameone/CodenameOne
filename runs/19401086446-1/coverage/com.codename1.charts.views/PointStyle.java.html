@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PointStyle.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.views</a> &gt; <span class="el_source">PointStyle.java</span></div><h1>PointStyle.java</h1><pre class="source lang-java linenums">/**
+ * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.codename1.charts.views;
+
+/**
+ * The chart point style enumerator.
+ */
+<span class="fc" id="L21">public enum PointStyle {</span>
+<span class="fc" id="L22">    X(&quot;x&quot;), CIRCLE(&quot;circle&quot;), TRIANGLE(&quot;triangle&quot;), SQUARE(&quot;square&quot;), DIAMOND(&quot;diamond&quot;), POINT(</span>
+            &quot;point&quot;);
+
+    /** The point shape name. */
+    private final String mName;
+
+    /**
+     * The point style enum constructor.
+     *
+     * @param name the name
+     */
+<span class="fc" id="L33">    PointStyle(String name) { // PMD Fix: UnnecessaryModifier removed implicit private</span>
+<span class="fc" id="L34">        mName = name;</span>
+<span class="fc" id="L35">    }</span>
+
+    /**
+     * Return the point shape that has the provided symbol.
+     *
+     * @param name the point style name
+     * @return the point shape
+     */
+    public static PointStyle getPointStyleForName(String name) {
+<span class="nc" id="L44">        PointStyle pointStyle = null;</span>
+<span class="nc" id="L45">        PointStyle[] styles = values();</span>
+<span class="nc" id="L46">        int length = styles.length;</span>
+<span class="nc bnc" id="L47" title="All 4 branches missed.">        for (int i = 0; i &lt; length &amp;&amp; pointStyle == null; i++) {</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">            if (styles[i].mName.equals(name)) {</span>
+<span class="nc" id="L49">                pointStyle = styles[i];</span>
+            }
+        }
+<span class="nc" id="L52">        return pointStyle;</span>
+    }
+
+    /**
+     * Returns the point shape index based on the given name.
+     *
+     * @return the point shape index
+     */
+    public static int getIndexForName(String name) {
+<span class="nc" id="L61">        int index = -1;</span>
+<span class="nc" id="L62">        PointStyle[] styles = values();</span>
+<span class="nc" id="L63">        int length = styles.length;</span>
+<span class="nc bnc" id="L64" title="All 4 branches missed.">        for (int i = 0; i &lt; length &amp;&amp; index &lt; 0; i++) {</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">            if (styles[i].mName.equals(name)) {</span>
+<span class="nc" id="L66">                index = i;</span>
+            }
+        }
+<span class="nc" id="L69">        return Math.max(0, index);</span>
+    }
+
+    /**
+     * Returns the point shape name.
+     *
+     * @return the point shape name
+     */
+    public String getName() {
+<span class="nc" id="L78">        return mName;</span>
+    }
+
+    /**
+     * Returns the point shape name.
+     *
+     * @return the point shape name
+     */
+    public String toString() {
+<span class="nc" id="L87">        return getName();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

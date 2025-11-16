@@ -1,0 +1,925 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultRenderer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.renderers</a> &gt; <span class="el_source">DefaultRenderer.java</span></div><h1>DefaultRenderer.java</h1><pre class="source lang-java linenums">/**
+ * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.codename1.charts.renderers;
+
+import com.codename1.ui.Font;
+
+import java.util.ArrayList;
+import java.util.List;
+
+
+/**
+ * An abstract renderer to be extended by the multiple series classes.
+ */
+<span class="fc" id="L27">public class DefaultRenderer { // PMD Fix: UnusedPrivateField removed unused text font constant</span>
+    /** A no color constant. */
+    public static final int NO_COLOR = 0;
+    /** The default background color. */
+    public static final int BACKGROUND_COLOR = 0x0;
+    /** The default color for text. */
+    public static final int TEXT_COLOR = 0xEAEAEA;
+    /** The chart title. */
+<span class="fc" id="L35">    private String mChartTitle = &quot;&quot;;</span>
+    /** The chart title text size. */
+<span class="fc" id="L37">    private float mChartTitleTextSize = 15;</span>
+    /** The typeface name for the texts. */
+<span class="fc" id="L39">    private int mTextTypefaceName = Font.FACE_SYSTEM;</span>
+    /** The typeface style for the texts. */
+<span class="fc" id="L41">    private int mTextTypefaceStyle = Font.STYLE_PLAIN;</span>
+    /** The typeface for the texts */
+    private Font mTextTypeface;
+    /** The chart background color. */
+    private int mBackgroundColor;
+    /** If the background color is applied. */
+    private boolean mApplyBackgroundColor;
+    /** If the axes are visible. */
+<span class="fc" id="L49">    private boolean mShowAxes = true;</span>
+    /** The Y axis color. */
+<span class="fc" id="L51">    private int mYAxisColor = TEXT_COLOR;</span>
+    /** The X axis color. */
+<span class="fc" id="L53">    private int mXAxisColor = TEXT_COLOR;</span>
+    /** If the labels are visible. */
+<span class="fc" id="L55">    private boolean mShowLabels = true;</span>
+    /** If the tick marks are visible. */
+<span class="fc" id="L57">    private boolean mShowTickMarks = true;</span>
+    /** The labels color. */
+<span class="fc" id="L59">    private int mLabelsColor = TEXT_COLOR;</span>
+    /** The labels text size. */
+<span class="fc" id="L61">    private float mLabelsTextSize = 10;</span>
+    /** If the legend is visible. */
+<span class="fc" id="L63">    private boolean mShowLegend = true;</span>
+    /** The legend text size. */
+<span class="fc" id="L65">    private float mLegendTextSize = 12;</span>
+    /** If the legend should size to fit. */
+<span class="fc" id="L67">    private boolean mFitLegend = false;</span>
+    /** If the X axis grid should be displayed. */
+<span class="fc" id="L69">    private boolean mShowGridX = false;</span>
+    /** If the Y axis grid should be displayed. */
+<span class="fc" id="L71">    private boolean mShowGridY = false;</span>
+    /** If the custom text grid should be displayed on the X axis. */
+<span class="fc" id="L73">    private boolean mShowCustomTextGridX = false;</span>
+    /** If the custom text grid should be displayed on the Y axis. */
+<span class="fc" id="L75">    private boolean mShowCustomTextGridY = false;</span>
+    /** The simple renderers that are included in this multiple series renderer. */
+<span class="fc" id="L77">    private final List&lt;SimpleSeriesRenderer&gt; mRenderers = new ArrayList&lt;SimpleSeriesRenderer&gt;();</span>
+    /** The antialiasing flag. */
+<span class="fc" id="L79">    private boolean mAntialiasing = true;</span>
+    /** The legend height. */
+<span class="fc" id="L81">    private int mLegendHeight = 0;</span>
+    /** The margins size. */
+<span class="fc" id="L83">    private int[] mMargins = new int[]{20, 30, 10, 20};</span>
+    /** A value to be used for scaling the chart. */
+<span class="fc" id="L85">    private float mScale = 1;</span>
+    /** A flag for enabling the pan. */
+<span class="fc" id="L87">    private boolean mPanEnabled = true;</span>
+    /** A flag for enabling the zoom. */
+<span class="fc" id="L89">    private boolean mZoomEnabled = true;</span>
+    /** A flag for enabling the visibility of the zoom buttons. */
+<span class="fc" id="L91">    private boolean mZoomButtonsVisible = false;</span>
+    /** The zoom rate. */
+<span class="fc" id="L93">    private float mZoomRate = 1.5f;</span>
+    /** A flag for enabling the external zoom. */
+<span class="fc" id="L95">    private boolean mExternalZoomEnabled = false;</span>
+    /** The original chart scale. */
+<span class="fc" id="L97">    private final float mOriginalScale = mScale;</span>
+    /** A flag for enabling the click on elements. */
+<span class="fc" id="L99">    private boolean mClickEnabled = false;</span>
+    /** The selectable radius around a clickable point. */
+<span class="fc" id="L101">    private int selectableBuffer = 15;</span>
+    /** If the chart should display the values (available for pie chart). */
+    private boolean mDisplayValues;
+
+    /**
+     * A flag to be set if the chart is inside a scroll and doesn't need to shrink
+     * when not enough space.
+     */
+    private boolean mInScroll;
+    /** The start angle for circular charts such as pie, doughnut, etc. */
+<span class="fc" id="L111">    private float mStartAngle = 0;</span>
+
+    /**
+     * Returns the chart title.
+     *
+     * @return the chart title
+     */
+    public String getChartTitle() {
+<span class="fc" id="L119">        return mChartTitle;</span>
+    }
+
+    /**
+     * Sets the chart title.
+     *
+     * @param title the chart title
+     */
+    public void setChartTitle(String title) {
+<span class="fc" id="L128">        mChartTitle = title;</span>
+<span class="fc" id="L129">    }</span>
+
+    /**
+     * Returns the chart title text size.
+     *
+     * @return the chart title text size
+     */
+    public float getChartTitleTextSize() {
+<span class="fc" id="L137">        return mChartTitleTextSize;</span>
+    }
+
+
+    /**
+     * Sets the chart title text size in pixels.  Consider using {@link #setChartTitleTextFont(com.codename1.ui.Font) }
+     * instead of this method to allow the text to be sized appropriately for the
+     * device resolution.
+     *
+     *
+     * @param textSize the chart title text size
+     */
+    public void setChartTitleTextSize(float textSize) {
+<span class="nc" id="L150">        mChartTitleTextSize = textSize;</span>
+<span class="nc" id="L151">    }</span>
+
+    /**
+     * Sets the chart title font size using a Font object instead of a point size.
+     * This method is the preferred way to set font size because it allows you to
+     * more easily have fonts appear in an appropriate size for the target device.
+     *
+     * Alternatively check out {@link #setChartTitleTextSize(float) } to set the text
+     * size in pixels.
+     * @param font
+     */
+    public void setChartTitleTextFont(Font font) {
+<span class="nc" id="L163">        setChartTitleTextSize(font.getHeight());</span>
+
+<span class="nc" id="L165">    }</span>
+
+    /**
+     * Adds a simple renderer to the multiple renderer.
+     *
+     * @param renderer the renderer to be added
+     */
+    public void addSeriesRenderer(SimpleSeriesRenderer renderer) {
+<span class="fc" id="L173">        mRenderers.add(renderer);</span>
+<span class="fc" id="L174">    }</span>
+
+    /**
+     * Adds a simple renderer to the multiple renderer.
+     *
+     * @param index the index in the renderers list
+     * @param renderer the renderer to be added
+     */
+    public void addSeriesRenderer(int index, SimpleSeriesRenderer renderer) {
+<span class="nc" id="L183">        mRenderers.add(index, renderer);</span>
+<span class="nc" id="L184">    }</span>
+
+    /**
+     * Removes a simple renderer from the multiple renderer.
+     *
+     * @param renderer the renderer to be removed
+     */
+    public void removeSeriesRenderer(SimpleSeriesRenderer renderer) {
+<span class="nc" id="L192">        mRenderers.remove(renderer);</span>
+<span class="nc" id="L193">    }</span>
+
+    /**
+     * Removes all renderers from the multiple renderer.
+     */
+    public void removeAllRenderers() {
+<span class="nc" id="L199">        mRenderers.clear();</span>
+<span class="nc" id="L200">    }</span>
+
+    /**
+     * Returns the simple renderer from the multiple renderer list.
+     *
+     * @param index the index in the simple renderers list
+     * @return the simple renderer at the specified index
+     */
+    public SimpleSeriesRenderer getSeriesRendererAt(int index) {
+<span class="fc" id="L209">        return mRenderers.get(index);</span>
+    }
+
+    /**
+     * Returns the simple renderers count in the multiple renderer list.
+     *
+     * @return the simple renderers count
+     */
+    public int getSeriesRendererCount() {
+<span class="fc" id="L218">        return mRenderers.size();</span>
+    }
+
+    /**
+     * Returns an array of the simple renderers in the multiple renderer list.
+     *
+     * @return the simple renderers array
+     */
+    public SimpleSeriesRenderer[] getSeriesRenderers() {
+<span class="nc" id="L227">        SimpleSeriesRenderer[] out = new SimpleSeriesRenderer[mRenderers.size()];</span>
+<span class="nc" id="L228">        return mRenderers.toArray(out);</span>
+    }
+
+    /**
+     * Returns the background color.
+     *
+     * @return the background color
+     */
+    public int getBackgroundColor() {
+<span class="nc" id="L237">        return mBackgroundColor;</span>
+    }
+
+    /**
+     * Sets the background color.
+     *
+     * @param color the background color
+     */
+    public void setBackgroundColor(int color) {
+<span class="fc" id="L246">        mBackgroundColor = color;</span>
+<span class="fc" id="L247">    }</span>
+
+    /**
+     * Returns if the background color should be applied.
+     *
+     * @return the apply flag for the background color.
+     */
+    public boolean isApplyBackgroundColor() {
+<span class="fc" id="L255">        return mApplyBackgroundColor;</span>
+    }
+
+    /**
+     * Sets if the background color should be applied.
+     *
+     * @param apply the apply flag for the background color
+     */
+    public void setApplyBackgroundColor(boolean apply) {
+<span class="fc" id="L264">        mApplyBackgroundColor = apply;</span>
+<span class="fc" id="L265">    }</span>
+
+    /**
+     * Returns the axes color.
+     *
+     * @return the axes color
+     */
+    public int getAxesColor() {
+<span class="nc bnc" id="L273" title="All 2 branches missed.">        if (mXAxisColor != TEXT_COLOR) {</span>
+<span class="nc" id="L274">            return mXAxisColor;</span>
+        } else {
+<span class="nc" id="L276">            return mYAxisColor;</span>
+        }
+    }
+
+    /**
+     * Sets the axes color.
+     *
+     * @param color the axes color
+     */
+    public void setAxesColor(int color) {
+<span class="nc" id="L286">        this.setXAxisColor(color);</span>
+<span class="nc" id="L287">        this.setYAxisColor(color);</span>
+<span class="nc" id="L288">    }</span>
+
+    /**
+     * Returns the color of the Y axis
+     *
+     * @return the Y axis color
+     */
+    public int getYAxisColor() {
+<span class="fc" id="L296">        return mYAxisColor;</span>
+    }
+
+    /**
+     * Sets the Y axis color.
+     *
+     * @param color the Y axis color
+     */
+    public void setYAxisColor(int color) {
+<span class="nc" id="L305">        mYAxisColor = color;</span>
+<span class="nc" id="L306">    }</span>
+
+    /**
+     * Returns the color of the X axis
+     *
+     * @return the X axis color
+     */
+    public int getXAxisColor() {
+<span class="fc" id="L314">        return mXAxisColor;</span>
+    }
+
+    /**
+     * Sets the X axis color.
+     *
+     * @param color the X axis color
+     */
+    public void setXAxisColor(int color) {
+<span class="nc" id="L323">        mXAxisColor = color;</span>
+<span class="nc" id="L324">    }</span>
+
+    /**
+     * Returns the labels color.
+     *
+     * @return the labels color
+     */
+    public int getLabelsColor() {
+<span class="fc" id="L332">        return mLabelsColor;</span>
+    }
+
+    /**
+     * Sets the labels color.
+     *
+     * @param color the labels color
+     */
+    public void setLabelsColor(int color) {
+<span class="nc" id="L341">        mLabelsColor = color;</span>
+<span class="nc" id="L342">    }</span>
+
+    /**
+     * Returns the labels text size.
+     *
+     * @return the labels text size
+     */
+    public float getLabelsTextSize() {
+<span class="fc" id="L350">        return mLabelsTextSize;</span>
+    }
+
+    /**
+     * Sets the labels text size.  Consider using  {@link #setLabelsTextFont(com.codename1.ui.Font) }
+     * instead to allow the font size to to be adjusted appropriately for the display
+     * resolution.
+     *
+     *
+     * @param textSize the labels text size
+     */
+    public void setLabelsTextSize(float textSize) {
+<span class="fc" id="L362">        mLabelsTextSize = textSize;</span>
+<span class="fc" id="L363">    }</span>
+
+    /**
+     * Sets the label title font size using a Font object instead of a point size.
+     * This method is the preferred way to set font size because it allows you to
+     * more easily have fonts appear in an appropriate size for the target device.
+     *
+     * Alternatively check out {@link #setLabelsTextSize(float) } to set the text
+     * size in pixels.
+     * @param font
+     */
+    public void setLabelsTextFont(Font font) {
+<span class="nc" id="L375">        setLabelsTextSize(font.getHeight());</span>
+<span class="nc" id="L376">    }</span>
+
+    /**
+     * Returns if the axes should be visible.
+     *
+     * @return the visibility flag for the axes
+     */
+    public boolean isShowAxes() {
+<span class="fc" id="L384">        return mShowAxes;</span>
+    }
+
+    /**
+     * Sets if the axes should be visible.
+     *
+     * @param showAxes the visibility flag for the axes
+     */
+    public void setShowAxes(boolean showAxes) {
+<span class="nc" id="L393">        mShowAxes = showAxes;</span>
+<span class="nc" id="L394">    }</span>
+
+    /**
+     * Returns if the labels should be visible.
+     *
+     * @return the visibility flag for the labels
+     */
+    public boolean isShowLabels() {
+<span class="fc" id="L402">        return mShowLabels;</span>
+    }
+
+    /**
+     * Sets if the labels should be visible.
+     *
+     * @param showLabels the visibility flag for the labels
+     */
+    public void setShowLabels(boolean showLabels) {
+<span class="nc" id="L411">        mShowLabels = showLabels;</span>
+<span class="nc" id="L412">    }</span>
+
+    /**
+     * Returns if the tick marks should be visible.
+     *
+     * @return
+     */
+    public boolean isShowTickMarks() {
+<span class="fc" id="L420">        return mShowTickMarks;</span>
+    }
+
+    /**
+     * Sets if the tick marks should be visible.
+     *
+     * @param showTickMarks the visibility flag for the tick marks
+     */
+    public void setShowTickMarks(boolean mShowTickMarks) {
+<span class="nc" id="L429">        this.mShowTickMarks = mShowTickMarks;</span>
+<span class="nc" id="L430">    }</span>
+
+    /**
+     * Returns if the X axis grid should be visible.
+     *
+     * @return the visibility flag for the X axis grid
+     */
+    public boolean isShowGridX() {
+<span class="fc" id="L438">        return mShowGridX;</span>
+    }
+
+    /**
+     * Sets if the X axis grid should be visible.
+     *
+     * @param showGrid the visibility flag for the X axis grid
+     */
+    public void setShowGridX(boolean showGrid) {
+<span class="nc" id="L447">        mShowGridX = showGrid;</span>
+<span class="nc" id="L448">    }</span>
+
+    /**
+     * Returns if the Y axis grid should be visible.
+     *
+     * @return the visibility flag for the Y axis grid
+     */
+    public boolean isShowGridY() {
+<span class="fc" id="L456">        return mShowGridY;</span>
+    }
+
+    /**
+     * Sets if the Y axis grid should be visible.
+     *
+     * @param showGrid the visibility flag for the Y axis grid
+     */
+    public void setShowGridY(boolean showGrid) {
+<span class="nc" id="L465">        mShowGridY = showGrid;</span>
+<span class="nc" id="L466">    }</span>
+
+    /**
+     * Sets if the grid should be visible.
+     *
+     * @param showGrid the visibility flag for the grid
+     */
+    public void setShowGrid(boolean showGrid) {
+<span class="nc" id="L474">        setShowGridX(showGrid);</span>
+<span class="nc" id="L475">        setShowGridY(showGrid);</span>
+<span class="nc" id="L476">    }</span>
+
+    /**
+     * Returns if the X axis custom text grid should be visible.
+     *
+     * @return the visibility flag for the X axis custom text grid
+     */
+    public boolean isShowCustomTextGridX() {
+<span class="fc" id="L484">        return mShowCustomTextGridX;</span>
+    }
+
+    /**
+     * Sets if the X axis custom text grid should be visible.
+     *
+     * @param showGrid the visibility flag for the X axis custom text grid
+     */
+    public void setShowCustomTextGridX(boolean showGrid) {
+<span class="nc" id="L493">        mShowCustomTextGridX = showGrid;</span>
+<span class="nc" id="L494">    }</span>
+
+    /**
+     * Returns if the Y axis custom text grid should be visible.
+     *
+     * @return the visibility flag for the custom text Y axis grid
+     */
+    public boolean isShowCustomTextGridY() {
+<span class="fc" id="L502">        return mShowCustomTextGridY;</span>
+    }
+
+    /**
+     * Sets if the Y axis custom text grid should be visible.
+     *
+     * @param showGrid the visibility flag for the Y axis custom text grid
+     */
+    public void setShowCustomTextGridY(boolean showGrid) {
+<span class="nc" id="L511">        mShowCustomTextGridY = showGrid;</span>
+<span class="nc" id="L512">    }</span>
+
+    /**
+     * Sets if the grid for custom X or Y labels should be visible.
+     *
+     * @param showGrid the visibility flag for the custom text grid
+     */
+    public void setShowCustomTextGrid(boolean showGrid) {
+<span class="nc" id="L520">        setShowCustomTextGridX(showGrid);</span>
+<span class="nc" id="L521">        setShowCustomTextGridY(showGrid);</span>
+<span class="nc" id="L522">    }</span>
+
+    /**
+     * Returns if the legend should be visible.
+     *
+     * @return the visibility flag for the legend
+     */
+    public boolean isShowLegend() {
+<span class="fc" id="L530">        return mShowLegend;</span>
+    }
+
+    /**
+     * Sets if the legend should be visible.
+     *
+     * @param showLegend the visibility flag for the legend
+     */
+    public void setShowLegend(boolean showLegend) {
+<span class="nc" id="L539">        mShowLegend = showLegend;</span>
+<span class="nc" id="L540">    }</span>
+
+    /**
+     * Returns if the legend should size to fit.
+     *
+     * @return the fit behavior
+     */
+    public boolean isFitLegend() {
+<span class="fc" id="L548">        return mFitLegend;</span>
+    }
+
+    /**
+     * Sets if the legend should size to fit.
+     *
+     * @param fit the fit behavior
+     */
+    public void setFitLegend(boolean fit) {
+<span class="fc" id="L557">        mFitLegend = fit;</span>
+<span class="fc" id="L558">    }</span>
+
+    /**
+     * Returns the text typeface name.
+     *
+     * @return the text typeface name
+     */
+    public int getTextTypefaceName() {
+<span class="fc" id="L566">        return mTextTypefaceName;</span>
+    }
+
+    /**
+     * Returns the text typeface style.
+     *
+     * @return the text typeface style
+     */
+    public int getTextTypefaceStyle() {
+<span class="fc" id="L575">        return mTextTypefaceStyle;</span>
+    }
+
+    /**
+     * Returns the text typeface.
+     *
+     * @return the text typeface
+     */
+    public Font getTextTypeface() {
+<span class="fc" id="L584">        return mTextTypeface;</span>
+    }
+
+    /**
+     * Sets the text typeface.
+     *
+     * @param typeface the typeface
+     */
+    public void setTextTypeface(Font typeface) {
+<span class="nc" id="L593">        mTextTypeface = typeface;</span>
+<span class="nc" id="L594">    }</span>
+
+    /**
+     * Returns the legend text size.
+     *
+     * @return the legend text size
+     */
+    public float getLegendTextSize() {
+<span class="fc" id="L602">        return mLegendTextSize;</span>
+    }
+
+    /**
+     * Sets the legend text size. Consider using  {@link #setLegendTextFont(com.codename1.ui.Font) }
+     * instead to allow the font size to to be adjusted appropriately for the display
+     * resolution.
+     *
+     * @param textSize the legend text size
+     */
+    public void setLegendTextSize(float textSize) {
+<span class="fc" id="L613">        mLegendTextSize = textSize;</span>
+<span class="fc" id="L614">    }</span>
+
+    /**
+     * Sets the legend text font size using a Font object instead of a point size.
+     * This method is the preferred way to set font size because it allows you to
+     * more easily have fonts appear in an appropriate size for the target device.
+     *
+     * Alternatively check out {@link #setLegendTextSize(float) } to set the text
+     * size in pixels.
+     * @param font
+     */
+    public void setLegendTextFont(Font font) {
+<span class="nc" id="L626">        setLegendTextSize(font.getHeight());</span>
+<span class="nc" id="L627">    }</span>
+
+    /**
+     * Sets the text typeface name and style.
+     *
+     * @param typefaceName the text typeface name
+     * @param style the text typeface style
+     */
+    public void setTextTypeface(int typefaceName, int style) {
+<span class="nc" id="L636">        mTextTypefaceName = typefaceName;</span>
+<span class="nc" id="L637">        mTextTypefaceStyle = style;</span>
+<span class="nc" id="L638">    }</span>
+
+    /**
+     * Returns the antialiasing flag value.
+     *
+     * @return the antialiasing value
+     */
+    public boolean isAntialiasing() {
+<span class="fc" id="L646">        return mAntialiasing;</span>
+    }
+
+    /**
+     * Sets the antialiasing value.
+     *
+     * @param antialiasing the antialiasing
+     */
+    public void setAntialiasing(boolean antialiasing) {
+<span class="nc" id="L655">        mAntialiasing = antialiasing;</span>
+<span class="nc" id="L656">    }</span>
+
+    /**
+     * Returns the value to be used for scaling the chart.
+     *
+     * @return the scale value
+     */
+    public float getScale() {
+<span class="nc" id="L664">        return mScale;</span>
+    }
+
+    /**
+     * Sets the value to be used for scaling the chart. It works on some charts
+     * like pie, doughnut, dial.
+     *
+     * @param scale the scale value
+     */
+    public void setScale(float scale) {
+<span class="fc" id="L674">        mScale = scale;</span>
+<span class="fc" id="L675">    }</span>
+
+    /**
+     * Returns the original value to be used for scaling the chart.
+     *
+     * @return the original scale value
+     */
+    public float getOriginalScale() {
+<span class="nc" id="L683">        return mOriginalScale;</span>
+    }
+
+    /**
+     * Returns the enabled state of the zoom.
+     *
+     * @return if zoom is enabled
+     * @deprecated
+     */
+    public boolean isZoomEnabled() {
+<span class="nc" id="L693">        return mZoomEnabled;</span>
+    }
+
+    /**
+     * Sets the enabled state of the zoom.
+     *
+     * @param enabled zoom enabled
+     * @deprecated
+     */
+    public void setZoomEnabled(boolean enabled) {
+<span class="nc" id="L703">        mZoomEnabled = enabled;</span>
+<span class="nc" id="L704">    }</span>
+
+    /**
+     * Returns the visible state of the zoom buttons.
+     *
+     * @return if zoom buttons are visible
+     * @deprecated
+     */
+    public boolean isZoomButtonsVisible() {
+<span class="nc" id="L713">        return mZoomButtonsVisible;</span>
+    }
+
+    /**
+     * Sets the visible state of the zoom buttons.
+     *
+     * @param visible if the zoom buttons are visible
+     * @deprecated
+     */
+    public void setZoomButtonsVisible(boolean visible) {
+<span class="nc" id="L723">        mZoomButtonsVisible = visible;</span>
+<span class="nc" id="L724">    }</span>
+
+    /**
+     * Returns the enabled state of the external (application implemented) zoom.
+     *
+     * @return if external zoom is enabled
+     * @deprecated
+     */
+    public boolean isExternalZoomEnabled() {
+<span class="nc" id="L733">        return mExternalZoomEnabled;</span>
+    }
+
+    /**
+     * Sets the enabled state of the external (application implemented) zoom.
+     *
+     * @param enabled external zoom enabled
+     * @deprecated
+     */
+    public void setExternalZoomEnabled(boolean enabled) {
+<span class="nc" id="L743">        mExternalZoomEnabled = enabled;</span>
+<span class="nc" id="L744">    }</span>
+
+    /**
+     * Returns the zoom rate.
+     *
+     * @return the zoom rate
+     * @deprecated
+     */
+    public float getZoomRate() {
+<span class="nc" id="L753">        return mZoomRate;</span>
+    }
+
+    /**
+     * Sets the zoom rate.
+     *
+     * @param rate the zoom rate
+     * @deprecated
+     */
+    public void setZoomRate(float rate) {
+<span class="nc" id="L763">        mZoomRate = rate;</span>
+<span class="nc" id="L764">    }</span>
+
+    /**
+     * Returns the enabled state of the pan.
+     *
+     * @return if pan is enabled
+     * @deprecated
+     */
+    public boolean isPanEnabled() {
+<span class="nc" id="L773">        return mPanEnabled;</span>
+    }
+
+    /**
+     * Sets the enabled state of the pan.
+     *
+     * @param enabled pan enabled
+     * @deprecated
+     */
+    public void setPanEnabled(boolean enabled) {
+<span class="nc" id="L783">        mPanEnabled = enabled;</span>
+<span class="nc" id="L784">    }</span>
+
+    /**
+     * Returns the enabled state of the click.
+     *
+     * @return if click is enabled
+     * @deprecated
+     */
+    public boolean isClickEnabled() {
+<span class="nc" id="L793">        return mClickEnabled;</span>
+    }
+
+    /**
+     * Sets the enabled state of the click.
+     *
+     * @param enabled click enabled
+     * @deprecated
+     */
+    public void setClickEnabled(boolean enabled) {
+<span class="nc" id="L803">        mClickEnabled = enabled;</span>
+<span class="nc" id="L804">    }</span>
+
+    /**
+     * Returns the selectable radius value around clickable points.
+     *
+     * @return the selectable radius
+     */
+    public int getSelectableBuffer() {
+<span class="fc" id="L812">        return selectableBuffer;</span>
+    }
+
+    /**
+     * Sets the selectable radius value around clickable points.
+     *
+     * @param buffer the selectable radius
+     */
+    public void setSelectableBuffer(int buffer) {
+<span class="nc" id="L821">        selectableBuffer = buffer;</span>
+<span class="nc" id="L822">    }</span>
+
+    /**
+     * Returns the legend height.
+     *
+     * @return the legend height
+     */
+    public int getLegendHeight() {
+<span class="fc" id="L830">        return mLegendHeight;</span>
+    }
+
+    /**
+     * Sets the legend height, in pixels.
+     *
+     * @param height the legend height
+     */
+    public void setLegendHeight(int height) {
+<span class="nc" id="L839">        mLegendHeight = height;</span>
+<span class="nc" id="L840">    }</span>
+
+    /**
+     * Returns the margin sizes. An array containing the margins in this order:
+     * top, left, bottom, right
+     *
+     * @return the margin sizes
+     */
+    public int[] getMargins() {
+<span class="fc" id="L849">        return mMargins;</span>
+    }
+
+    /**
+     * Sets the margins, in pixels.
+     *
+     * @param margins an array containing the margin size values, in this order:
+     *          top, left, bottom, right
+     */
+    public void setMargins(int[] margins) {
+<span class="nc" id="L859">        mMargins = margins;</span>
+<span class="nc" id="L860">    }</span>
+
+    /**
+     * Returns if the chart is inside a scroll view and doesn't need to shrink.
+     *
+     * @return if it is inside a scroll view
+     */
+    public boolean isInScroll() {
+<span class="nc" id="L868">        return mInScroll;</span>
+    }
+
+    /**
+     * To be set if the chart is inside a scroll view and doesn't need to shrink
+     * when not enough space.
+     *
+     * @param inScroll if it is inside a scroll view
+     */
+    public void setInScroll(boolean inScroll) {
+<span class="nc" id="L878">        mInScroll = inScroll;</span>
+<span class="nc" id="L879">    }</span>
+
+    /**
+     * Returns the start angle for circular charts such as pie, doughnut. An angle
+     * of 0 degrees correspond to the geometric angle of 0 degrees (3 o'clock on a
+     * watch.)
+     *
+     * @return the start angle in degrees
+     */
+    public float getStartAngle() {
+<span class="nc" id="L889">        return mStartAngle;</span>
+    }
+
+    /**
+     * Sets the start angle for circular charts such as pie, doughnut, etc. An
+     * angle of 0 degrees correspond to the geometric angle of 0 degrees (3
+     * o'clock on a watch.)
+     *
+     * @param startAngle the start angle in degrees
+     */
+    public void setStartAngle(float startAngle) {
+<span class="pc bpc" id="L900" title="1 of 2 branches missed.">        while (startAngle &lt; 0) {</span>
+<span class="nc" id="L901">            startAngle += 360;</span>
+        }
+<span class="fc" id="L903">        mStartAngle = startAngle;</span>
+<span class="fc" id="L904">    }</span>
+
+    /**
+     * Returns if the values should be displayed as text.
+     *
+     * @return if the values should be displayed as text
+     */
+    public boolean isDisplayValues() {
+<span class="nc" id="L912">        return mDisplayValues;</span>
+    }
+
+    /**
+     * Sets if the values should be displayed as text (supported by pie chart).
+     *
+     * @param display if the values should be displayed as text
+     */
+    public void setDisplayValues(boolean display) {
+<span class="nc" id="L921">        mDisplayValues = display;</span>
+<span class="nc" id="L922">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

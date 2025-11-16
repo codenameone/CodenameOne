@@ -1,0 +1,473 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DimConstraint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts.mig</a> &gt; <span class="el_source">DimConstraint.java</span></div><h1>DimConstraint.java</h1><pre class="source lang-java linenums">package com.codename1.ui.layouts.mig;
+
+/*
+ * License (BSD):
+ * ==============
+ *
+ * Copyright (c) 2004, Mikael Grev, MiG InfoCom AB. (miglayout (at) miginfocom (dot) com)
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * Neither the name of the MiG InfoCom AB nor the names of its contributors may be
+ * used to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ *
+ * @version 1.0
+ * @author Mikael Grev, MiG InfoCom AB
+ *         Date: 2006-sep-08
+ */
+
+/**
+ * A simple value holder for a constraint for one dimension.
+ */
+public final class DimConstraint {
+    /**
+     * How this entity can be resized in the dimension that this constraint represents.
+     */
+<span class="fc" id="L44">    final ResizeConstraint resize = new ResizeConstraint();</span>
+
+    // Look at the properties' getter/setter methods for explanation
+
+<span class="fc" id="L48">    private String sizeGroup = null;            // A &quot;context&quot; compared with equals.</span>
+
+<span class="fc" id="L50">    private BoundSize size = BoundSize.NULL_SIZE;     // Min, pref, max. Never null, but sizes can be null.</span>
+
+<span class="fc" id="L52">    private BoundSize gapBefore = null, gapAfter = null;</span>
+
+<span class="fc" id="L54">    private UnitValue align = null;</span>
+
+
+    // **************  Only applicable on components! *******************
+
+<span class="fc" id="L59">    private String endGroup = null;            // A &quot;context&quot; compared with equals.</span>
+
+
+    // **************  Only applicable on rows/columns! *******************
+
+<span class="fc" id="L64">    private boolean fill = false;</span>
+
+<span class="fc" id="L66">    private boolean noGrid = false;</span>
+
+    /**
+     * Empty constructor.
+     */
+<span class="fc" id="L71">    public DimConstraint() {</span>
+<span class="fc" id="L72">    }</span>
+
+    /**
+     * Returns the grow priority. Relative priority is used for determining which entities gets the extra space first.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The grow priority.
+     */
+    public int getGrowPriority() {
+<span class="nc" id="L82">        return resize.growPrio;</span>
+    }
+
+    /**
+     * Sets the grow priority. Relative priority is used for determining which entities gets the extra space first.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param p The new grow priority.
+     */
+    public void setGrowPriority(int p) {
+<span class="fc" id="L93">        resize.growPrio = p;</span>
+<span class="fc" id="L94">    }</span>
+
+    /**
+     * Returns the grow weight.&lt;p&gt;
+     * Grow weight is how flexible the entity should be, relative to other entities, when it comes to growing. &lt;code&gt;null&lt;/code&gt; or
+     * zero mean it will never grow. An entity that has twice the grow weight compared to another entity will get twice
+     * as much of available space.
+     * &lt;p&gt;
+     * GrowWeight are only compared within the same GrowPrio.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current grow weight.
+     */
+    public Float getGrow() {
+<span class="fc" id="L109">        return resize.grow;</span>
+    }
+
+    /**
+     * Sets the grow weight.&lt;p&gt;
+     * Grow weight is how flexible the entity should be, relative to other entities, when it comes to growing. &lt;code&gt;null&lt;/code&gt; or
+     * zero mean it will never grow. An entity that has twice the grow weight compared to another entity will get twice
+     * as much of available space.
+     * &lt;p&gt;
+     * GrowWeight are only compared within the same GrowPrio.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param weight The new grow weight.
+     */
+    public void setGrow(Float weight) {
+<span class="fc" id="L125">        resize.grow = weight;</span>
+<span class="fc" id="L126">    }</span>
+
+    /**
+     * Returns the shrink priority. Relative priority is used for determining which entities gets smaller first when space is scarce.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The shrink priority.
+     */
+    public int getShrinkPriority() {
+<span class="nc" id="L136">        return resize.shrinkPrio;</span>
+    }
+
+    /**
+     * Sets the shrink priority. Relative priority is used for determining which entities gets smaller first when space is scarce.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param p The new shrink priority.
+     */
+    public void setShrinkPriority(int p) {
+<span class="nc" id="L147">        resize.shrinkPrio = p;</span>
+<span class="nc" id="L148">    }</span>
+
+    /**
+     * Returns the shrink priority. Relative priority is used for determining which entities gets smaller first when space is scarce.
+     * Shrink weight is how flexible the entity should be, relative to other entities, when it comes to shrinking. &lt;code&gt;null&lt;/code&gt; or
+     * zero mean it will never shrink (default). An entity that has twice the shrink weight compared to another entity will get twice
+     * as much of available space.
+     * &lt;p&gt;
+     * Shrink(Weight) are only compared within the same ShrinkPrio.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current shrink weight.
+     */
+    public Float getShrink() {
+<span class="nc" id="L163">        return resize.shrink;</span>
+    }
+
+    /**
+     * Sets the shrink priority. Relative priority is used for determining which entities gets smaller first when space is scarce.
+     * Shrink weight is how flexible the entity should be, relative to other entities, when it comes to shrinking. &lt;code&gt;null&lt;/code&gt; or
+     * zero mean it will never shrink (default). An entity that has twice the shrink weight compared to another entity will get twice
+     * as much of available space.
+     * &lt;p&gt;
+     * Shrink(Weight) are only compared within the same ShrinkPrio.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param weight The new shrink weight.
+     */
+    public void setShrink(Float weight) {
+<span class="nc" id="L179">        resize.shrink = weight;</span>
+<span class="nc" id="L180">    }</span>
+
+    public UnitValue getAlignOrDefault(boolean isCols) {
+<span class="pc bpc" id="L183" title="1 of 2 branches missed.">        if (align != null)</span>
+<span class="nc" id="L184">            return align;</span>
+
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        if (isCols)</span>
+<span class="fc" id="L187">            return UnitValue.LEADING;</span>
+
+<span class="pc bpc" id="L189" title="2 of 4 branches missed.">        return fill || !PlatformDefaults.getDefaultRowAlignmentBaseline() ? UnitValue.CENTER : UnitValue.BASELINE_IDENTITY;</span>
+    }
+
+    /**
+     * Returns the alignment used either as a default value for sub-entities or for this entity.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The alignment.
+     */
+    public UnitValue getAlign() {
+<span class="fc" id="L200">        return align;</span>
+    }
+
+    /**
+     * Sets the alignment used wither as a default value for sub-entities or for this entity.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param uv The new shrink priority. E.g. {@link UnitValue#CENTER} or {@link net.miginfocom.layout.UnitValue#LEADING}.
+     */
+    public void setAlign(UnitValue uv) {
+<span class="nc" id="L211">        this.align = uv;</span>
+<span class="nc" id="L212">    }</span>
+
+    /**
+     * Returns the gap after this entity. The gap is an empty space and can have a min/preferred/maximum size so that it can shrink and
+     * grow depending on available space. Gaps are against other entities' edges and not against other entities' gaps.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The gap after this entity
+     */
+    public BoundSize getGapAfter() {
+<span class="fc" id="L223">        return gapAfter;</span>
+    }
+
+    /**
+     * Sets the gap after this entity. The gap is an empty space and can have a min/preferred/maximum size so that it can shrink and
+     * grow depending on available space. Gaps are against other entities' edges and not against other entities' gaps.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param size The new gap.
+     * @see net.miginfocom.layout.ConstraintParser#parseBoundSize(String, boolean, boolean)
+     */
+    public void setGapAfter(BoundSize size) {
+<span class="fc" id="L236">        this.gapAfter = size;</span>
+<span class="fc" id="L237">    }</span>
+
+    boolean hasGapAfter() {
+<span class="nc bnc" id="L240" title="All 4 branches missed.">        return gapAfter != null &amp;&amp; !gapAfter.isUnset();</span>
+    }
+
+    boolean isGapAfterPush() {
+<span class="pc bpc" id="L244" title="3 of 4 branches missed.">        return gapAfter != null &amp;&amp; gapAfter.getGapPush();</span>
+    }
+
+    /**
+     * Returns the gap before this entity. The gap is an empty space and can have a min/preferred/maximum size so that it can shrink and
+     * grow depending on available space. Gaps are against other entities' edges and not against other entities' gaps.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The gap before this entity
+     */
+    public BoundSize getGapBefore() {
+<span class="fc" id="L256">        return gapBefore;</span>
+    }
+
+    /**
+     * Sets the gap before this entity. The gap is an empty space and can have a min/preferred/maximum size so that it can shrink and
+     * grow depending on available space. Gaps are against other entities' edges and not against other entities' gaps.
+     * &lt;p&gt;
+     * See also {@link net.miginfocom.layout.ConstraintParser#parseBoundSize(String, boolean, boolean)}.
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param size The new gap.
+     */
+    public void setGapBefore(BoundSize size) {
+<span class="fc" id="L269">        this.gapBefore = size;</span>
+<span class="fc" id="L270">    }</span>
+
+    boolean hasGapBefore() {
+<span class="nc bnc" id="L273" title="All 4 branches missed.">        return gapBefore != null &amp;&amp; !gapBefore.isUnset();</span>
+    }
+
+    boolean isGapBeforePush() {
+<span class="pc bpc" id="L277" title="3 of 4 branches missed.">        return gapBefore != null &amp;&amp; gapBefore.getGapPush();</span>
+    }
+
+    /**
+     * Returns the min/preferred/max size for the entity in the dimension that this object describes.
+     * &lt;p&gt;
+     * See also {@link net.miginfocom.layout.ConstraintParser#parseBoundSize(String, boolean, boolean)}.
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current size. Never &lt;code&gt;null&lt;/code&gt; since v3.5.
+     */
+    public BoundSize getSize() {
+<span class="fc" id="L289">        return size;</span>
+    }
+
+    /**
+     * Sets the min/preferred/max size for the entity in the dimension that this object describes.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param size The new size. May be &lt;code&gt;null&lt;/code&gt;.
+     */
+    public void setSize(BoundSize size) {
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        if (size != null)</span>
+<span class="fc" id="L301">            size.checkNotLinked();</span>
+<span class="fc" id="L302">        this.size = size;</span>
+<span class="fc" id="L303">    }</span>
+
+    /**
+     * Returns the size group that this entity should be in for the dimension that this object is describing.
+     * If this constraint is in a size group that is specified here. &lt;code&gt;null&lt;/code&gt; means no size group
+     * and all other values are legal. Comparison with .equals(). Components/columnss/rows in the same size group
+     * will have the same min/preferred/max size; that of the largest in the group for the first two and the
+     * smallest for max.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current size group. May be &lt;code&gt;null&lt;/code&gt;.
+     */
+    public String getSizeGroup() {
+<span class="fc" id="L317">        return sizeGroup;</span>
+    }
+
+    /**
+     * Sets the size group that this entity should be in for the dimension that this object is describing.
+     * If this constraint is in a size group that is specified here. &lt;code&gt;null&lt;/code&gt; means no size group
+     * and all other values are legal. Comparison with .equals(). Components/columnss/rows in the same size group
+     * will have the same min/preferred/max size; that of the largest in the group for the first two and the
+     * smallest for max.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param s The new size group. &lt;code&gt;null&lt;/code&gt; disables size grouping.
+     */
+    public void setSizeGroup(String s) {
+<span class="nc" id="L332">        sizeGroup = s;</span>
+<span class="nc" id="L333">    }</span>
+
+    // **************  Only applicable on components ! *******************
+
+    /**
+     * Returns the end group that this entity should be in for the demension that this object is describing.
+     * If this constraint is in an end group that is specified here. &lt;code&gt;null&lt;/code&gt; means no end group
+     * and all other values are legal. Comparison with .equals(). Components in the same end group
+     * will have the same end coordinate.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current end group. &lt;code&gt;null&lt;/code&gt; may be returned.
+     */
+    public String getEndGroup() {
+<span class="fc" id="L348">        return endGroup;</span>
+    }
+
+    /**
+     * Sets the end group that this entity should be in for the demension that this object is describing.
+     * If this constraint is in an end group that is specified here. &lt;code&gt;null&lt;/code&gt; means no end group
+     * and all other values are legal. Comparison with .equals(). Components in the same end group
+     * will have the same end coordinate.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param s The new end group. &lt;code&gt;null&lt;/code&gt; disables end grouping.
+     */
+    public void setEndGroup(String s) {
+<span class="nc" id="L362">        endGroup = s;</span>
+<span class="nc" id="L363">    }</span>
+
+    // **************  Not applicable on components below ! *******************
+
+    /**
+     * Returns if the component in the row/column that this constraint should default be grown in the same dimension that
+     * this constraint represents (width for column and height for a row).
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;true&lt;/code&gt; means that components should grow.
+     */
+    public boolean isFill() {
+<span class="fc" id="L376">        return fill;</span>
+    }
+
+    /**
+     * Sets if the component in the row/column that this constraint should default be grown in the same dimension that
+     * this constraint represents (width for column and height for a row).
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param b &lt;code&gt;true&lt;/code&gt; means that components should grow.
+     */
+    public void setFill(boolean b) {
+<span class="nc" id="L388">        fill = b;</span>
+<span class="nc" id="L389">    }</span>
+
+    /**
+     * Returns if the row/column should default to flow and not to grid behaviour. This means that the whole row/column
+     * will be one cell and all components will end up in that cell.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;true&lt;/code&gt; means that the whole row/column should be one cell.
+     */
+    public boolean isNoGrid() {
+<span class="fc" id="L400">        return noGrid;</span>
+    }
+
+    /**
+     * Sets if the row/column should default to flow and not to grid behaviour. This means that the whole row/column
+     * will be one cell and all components will end up in that cell.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param b &lt;code&gt;true&lt;/code&gt; means that the whole row/column should be one cell.
+     */
+    public void setNoGrid(boolean b) {
+<span class="nc" id="L412">        this.noGrid = b;</span>
+<span class="nc" id="L413">    }</span>
+
+    /**
+     * Returns the gaps as pixel values.
+     *
+     * @param parent  The parent. Used to get the pixel values.
+     * @param defGap  The default gap to use if there is no gap set on this object (i.e. it is null).
+     * @param refSize The reference size used to get the pixel sizes.
+     * @param before  IF it is the gap before rather than the gap after to return.
+     * @return The [min,preferred,max] sizes for the specified gap. Uses {@link net.miginfocom.layout.LayoutUtil#NOT_SET}
+     * for gap sizes that are &lt;code&gt;null&lt;/code&gt;. Returns &lt;code&gt;null&lt;/code&gt; if there was no gap specified. A new and free to use array.
+     */
+    int[] getRowGaps(ContainerWrapper parent, BoundSize defGap, int refSize, boolean before) {
+<span class="fc bfc" id="L426" title="All 2 branches covered.">        BoundSize gap = before ? gapBefore : gapAfter;</span>
+<span class="pc bpc" id="L427" title="3 of 4 branches missed.">        if (gap == null || gap.isUnset())</span>
+<span class="fc" id="L428">            gap = defGap;</span>
+
+<span class="pc bpc" id="L430" title="3 of 4 branches missed.">        if (gap == null || gap.isUnset())</span>
+<span class="fc" id="L431">            return null;</span>
+
+<span class="nc" id="L433">        int[] ret = new int[3];</span>
+<span class="nc bnc" id="L434" title="All 2 branches missed.">        for (int i = LayoutUtil.MIN; i &lt;= LayoutUtil.MAX; i++) {</span>
+<span class="nc" id="L435">            UnitValue uv = gap.getSize(i);</span>
+<span class="nc bnc" id="L436" title="All 2 branches missed.">            ret[i] = uv != null ? uv.getPixels(refSize, parent, null) : LayoutUtil.NOT_SET;</span>
+        }
+<span class="nc" id="L438">        return ret;</span>
+    }
+
+    /**
+     * Returns the gaps as pixel values.
+     *
+     * @param parent       The parent. Used to get the pixel values.
+     * @param comp         The component that the gap is for. If not for a component it is &lt;code&gt;null&lt;/code&gt;.
+     * @param adjGap       The gap that the adjacent component, if any, has towards &lt;code&gt;comp&lt;/code&gt;.
+     * @param adjacentComp The adjacent component if any. May be &lt;code&gt;null&lt;/code&gt;.
+     * @param refSize      The reference size used to get the pixel sizes.
+     * @param adjacentSide What side the &lt;code&gt;adjacentComp&lt;/code&gt; is on. 0 = top, 1 = left, 2 = bottom, 3 = right.
+     * @param tag          The tag string that the component might be tagged with in the component constraints. May be &lt;code&gt;null&lt;/code&gt;.
+     * @param isLTR        If it is left-to-right.
+     * @return The [min,preferred,max] sizes for the specified gap. Uses {@link net.miginfocom.layout.LayoutUtil#NOT_SET}
+     * for gap sizes that are &lt;code&gt;null&lt;/code&gt;. Returns &lt;code&gt;null&lt;/code&gt; if there was no gap specified. A new and free to use array.
+     */
+    int[] getComponentGaps(ContainerWrapper parent, ComponentWrapper comp, BoundSize adjGap, ComponentWrapper adjacentComp, String tag, int refSize, int adjacentSide, boolean isLTR) {
+<span class="fc bfc" id="L456" title="All 2 branches covered.">        BoundSize gap = adjacentSide &lt; 2 ? gapBefore : gapAfter;</span>
+
+<span class="pc bpc" id="L458" title="3 of 4 branches missed.">        boolean hasGap = gap != null &amp;&amp; gap.getGapPush();</span>
+<span class="pc bpc" id="L459" title="7 of 10 branches missed.">        if ((gap == null || gap.isUnset()) &amp;&amp; (adjGap == null || adjGap.isUnset()) &amp;&amp; comp != null)</span>
+<span class="fc" id="L460">            gap = PlatformDefaults.getDefaultComponentGap(comp, adjacentComp, adjacentSide + 1, tag, isLTR);</span>
+
+<span class="pc bpc" id="L462" title="1 of 2 branches missed.">        if (gap == null)</span>
+<span class="pc bpc" id="L463" title="1 of 2 branches missed.">            return hasGap ? new int[]{0, 0, LayoutUtil.NOT_SET} : null;</span>
+
+<span class="nc" id="L465">        int[] ret = new int[3];</span>
+<span class="nc bnc" id="L466" title="All 2 branches missed.">        for (int i = LayoutUtil.MIN; i &lt;= LayoutUtil.MAX; i++) {</span>
+<span class="nc" id="L467">            UnitValue uv = gap.getSize(i);</span>
+<span class="nc bnc" id="L468" title="All 2 branches missed.">            ret[i] = uv != null ? uv.getPixels(refSize, parent, null) : LayoutUtil.NOT_SET;</span>
+        }
+<span class="nc" id="L470">        return ret;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
