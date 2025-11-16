@@ -4,124 +4,102 @@ import com.codename1.charts.compat.Canvas;
 import com.codename1.charts.compat.Paint;
 import com.codename1.charts.models.Point;
 import com.codename1.charts.models.SeriesSelection;
-import com.codename1.charts.models.XYMultipleSeriesDataset;
-import com.codename1.charts.models.XYSeries;
 import com.codename1.charts.renderers.SimpleSeriesRenderer;
-import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
-import com.codename1.charts.renderers.XYSeriesRenderer;
 import com.codename1.charts.views.AbstractChart;
-import com.codename1.charts.views.LineChart;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Form;
-import com.codename1.ui.Graphics;
-import com.codename1.ui.Image;
-import com.codename1.ui.Transform;
 import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.BorderLayout;
+
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class ChartComponentInteractionTest extends UITestBase {
 
     @FormTest
-    void panAndZoomFlagsPropagateToRenderer() {
-        XYMultipleSeriesDataset dataset = new XYMultipleSeriesDataset();
-        XYSeries series = new XYSeries("Series");
-        series.add(0, 1);
-        series.add(1, 2);
-        dataset.addSeries(series);
+    void chartComponentForwardsPointerEventsToSeries() {
+        TrackingChart chart = new TrackingChart();
+        ChartComponent component = new ChartComponent(chart) {
+            protected void seriesPressed(SeriesSelection sel) {
+                chart.markPressed(sel);
+            }
 
-        XYMultipleSeriesRenderer renderer = new XYMultipleSeriesRenderer();
-        renderer.addSeriesRenderer(new XYSeriesRenderer());
-        ChartComponent component = new ChartComponent(new LineChart(dataset, renderer));
+            protected void seriesReleased(SeriesSelection sel) {
+                chart.markReleased(sel);
+            }
+        };
+        component.setName("chart");
+        component.setPreferredW(120);
+        component.setPreferredH(120);
 
-        Form form = new Form();
-        form.add(component);
+        Form form = new Form(new BorderLayout());
+        form.add(BorderLayout.CENTER, component);
         form.show();
 
-        assertEquals(renderer.isZoomEnabled(), component.isZoomEnabled());
-        assertEquals(renderer.isPanEnabled(), component.isPanEnabled());
+        component.pointerPressed(5, 5);
+        component.pointerReleased(5, 5);
 
-        component.setZoomEnabled(false);
-        assertFalse(component.isZoomEnabled());
-        assertFalse(renderer.isZoomEnabled());
-
-        component.setZoomEnabled(true);
-        assertTrue(component.isZoomEnabled());
-        assertTrue(renderer.isZoomEnabled());
-
-        component.setZoomEnabled(false, true);
-        assertTrue(component.isZoomEnabled());
-        assertFalse(renderer.isZoomXEnabled());
-        assertTrue(renderer.isZoomYEnabled());
-
-        component.setPanEnabled(false);
-        assertFalse(renderer.isPanEnabled());
-        component.setPanEnabled(false, true);
-        assertTrue(renderer.isPanYEnabled());
-        assertFalse(renderer.isPanXEnabled());
+        assertTrue(chart.pressed.get());
+        assertTrue(chart.released.get());
+        assertEquals("Counting", chart.getChartType());
     }
 
     @FormTest
-    void chartUtilDelegatesToChartDraw() {
-        RecordingChart chart = new RecordingChart();
-        ChartUtil util = new ChartUtil();
-        Image buffer = Image.createImage(40, 30);
-        Graphics graphics = buffer.getGraphics();
-        Rectangle bounds = new Rectangle(5, 6, 20, 10);
-
-        util.paintChart(graphics, chart, bounds, 7, 9);
-
-        assertSame(graphics, chart.lastGraphics);
-        assertEquals(bounds, chart.lastBounds);
-        assertEquals(7, chart.lastAbsX);
-        assertEquals(9, chart.lastAbsY);
-    }
-
-    @FormTest
-    void transformSetterAndGetterPersistState() {
-        XYMultipleSeriesDataset dataset = new XYMultipleSeriesDataset();
-        dataset.addSeries(new XYSeries("Series"));
-        XYMultipleSeriesRenderer renderer = new XYMultipleSeriesRenderer();
-        renderer.addSeriesRenderer(new XYSeriesRenderer());
-        ChartComponent component = new ChartComponent(new LineChart(dataset, renderer));
-        Form form = new Form();
-        form.add(component);
+    void chartComponentZoomTransitionsAndCoordinateTransforms() {
+        TrackingChart chart = new TrackingChart();
+        ChartComponent component = new ChartComponent(chart);
+        component.setPreferredW(100);
+        component.setPreferredH(80);
+        Form form = new Form(new BorderLayout());
+        form.add(BorderLayout.CENTER, component);
         form.show();
 
-        Transform transform = Transform.makeIdentity();
-        transform.translate(5, 7);
-        component.setTransform(transform);
-        assertSame(transform, component.getTransform());
+        component.zoomToShapeInChartCoords(new Rectangle(0, 0, 10, 10), 50);
+        component.zoomTo(0, 5, 0, 5, 50);
+        Point screen = component.chartToScreenCoord(5, 5);
+        Point chartCoord = component.screenToChartCoord(screen.getX(), screen.getY());
+        assertEquals(5, chartCoord.getX());
+        assertEquals(5, chartCoord.getY());
+
+        // paint invokes AbstractChart.draw through ChartUtil
+        component.paint(component.getGraphics());
+        assertEquals(1, chart.drawCount.get());
     }
 
-    private static class RecordingChart extends AbstractChart {
-        private Graphics lastGraphics;
-        private Rectangle lastBounds;
-        private int lastAbsX;
-        private int lastAbsY;
+    private static class TrackingChart extends AbstractChart {
+        private final AtomicInteger drawCount = new AtomicInteger();
+        private final AtomicBoolean pressed = new AtomicBoolean();
+        private final AtomicBoolean released = new AtomicBoolean();
 
-        @Override
-        public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
-            lastGraphics = canvas.g;
-            lastBounds = canvas.bounds;
-            lastAbsX = canvas.absoluteX;
-            lastAbsY = canvas.absoluteY;
+        void markPressed(SeriesSelection sel) {
+            pressed.set(sel != null);
         }
 
-        @Override
-        public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y, int seriesIndex, Paint paint) {
+        void markReleased(SeriesSelection sel) {
+            released.set(sel != null);
         }
 
-        @Override
-        public int getLegendShapeWidth(int seriesIndex) {
-            return 0;
-        }
-
-        @Override
         public SeriesSelection getSeriesAndPointForScreenCoordinate(Point point) {
-            return null;
+            return new SeriesSelection(0, 0, point.getX(), point.getY());
         }
 
+        public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
+            drawCount.incrementAndGet();
+        }
+
+        public int getLegendShapeWidth(int seriesIndex) {
+            return 1;
+        }
+
+        public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y, Paint paint) {
+            paint.setColor(0xffffff);
+        }
+
+        public String getChartType() {
+            return "Counting";
+        }
     }
 }
