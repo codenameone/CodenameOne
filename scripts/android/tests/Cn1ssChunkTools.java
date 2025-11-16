@@ -100,16 +100,30 @@ public class Cn1ssChunkTools {
         if (path == null) {
             throw new IllegalArgumentException("Path is required for extract");
         }
+        if (path == null) {
+            throw new IllegalArgumentException("Path is required for extract");
+        }
         String targetTest = test != null ? test : DEFAULT_TEST_NAME;
-        List<Chunk> chunks = new ArrayList<>();
-        for (Chunk chunk : iterateChunks(path, Optional.ofNullable(targetTest), Optional.ofNullable(channel))) {
-            chunks.add(chunk);
+
+// Collect chunks by index so that if the same test/channel was emitted multiple
+// times (e.g. test re-runs), only the last payload for a given index is kept.
+        java.util.Map<Integer, String> byIndex = new java.util.HashMap<>();
+        for (Chunk chunk : iterateChunks(path,
+                Optional.ofNullable(targetTest),
+                Optional.ofNullable(channel))) {
+            // For duplicate indices, later entries overwrite earlier ones.
+            byIndex.put(chunk.index, chunk.payload);
         }
-        Collections.sort(chunks);
+
+        // Rebuild the base64 payload in ascending index order
+        List<Integer> indices = new ArrayList<>(byIndex.keySet());
+        Collections.sort(indices);
+
         StringBuilder payload = new StringBuilder();
-        for (Chunk chunk : chunks) {
-            payload.append(chunk.payload);
+        for (int idx : indices) {
+            payload.append(byIndex.get(idx));
         }
+
         if (decode) {
             byte[] data;
             try {

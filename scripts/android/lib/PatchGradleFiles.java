@@ -106,6 +106,10 @@ public class PatchGradleFiles {
         content = r.content();
         changed |= r.changed();
 
+        r = ensureCoverageEnabled(content);
+        content = r.content();
+        changed |= r.changed();
+
         if (changed) {
             Files.writeString(path, ensureTrailingNewline(content), StandardCharsets.UTF_8);
         }
@@ -245,6 +249,24 @@ public class PatchGradleFiles {
             content += "\n";
         }
         return new Result(content + block, true);
+    }
+
+    private static Result ensureCoverageEnabled(String content) {
+        if (content.contains("testCoverageEnabled")) {
+            return new Result(content, false);
+        }
+        StringBuilder builder = new StringBuilder(content);
+        if (!content.endsWith("\n")) {
+            builder.append('\n');
+        }
+        builder.append("android {\n")
+                .append("    buildTypes {\n")
+                .append("        debug {\n")
+                .append("            testCoverageEnabled true\n")
+                .append("        }\n")
+                .append("    }\n")
+                .append("}\n");
+        return new Result(builder.toString(), true);
     }
 
     private static String ensureTrailingNewline(String content) {
