@@ -283,20 +283,20 @@ tasks.register("jacocoAndroidReport", JacocoReport) {
     }
 
     def excludes = [
-            "**/R.class",
-            "**/R$*.class",
-            "**/BuildConfig.*",
-            "**/Manifest*.*",
-            "**/*Test*.*",
-            "**/androidx/**/*",
-            "**/com/google/**/*"
+            '**/R.class',
+            '**/R$*.class',
+            '**/BuildConfig.*',
+            '**/Manifest*.*',
+            '**/*Test*.*',
+            '**/androidx/**/*',
+            '**/com/google/**/*'
     ]
 
     def javaClasses = fileTree(dir: "$buildDir/intermediates/javac/debug/classes", exclude: excludes)
     def kotlinClasses = fileTree(dir: "$buildDir/tmp/kotlin-classes/debug", exclude: excludes)
 
     classDirectories.setFrom(files(javaClasses, kotlinClasses).asFileTree.matching {
-        include "com/codename1/impl/android/**"
+        include 'com/codename1/impl/android/**'
     })
 
     sourceDirectories.setFrom(files("src/main/java"))
