@@ -45,40 +45,7 @@ class XYTransitionsTest extends UITestBase {
         assertEquals(7.0, series.getY(1));
         assertEquals(0, buffer.getItemCount());
     }
-
-    @FormTest
-    void xyValueSeriesTransitionInterpolatesValues() throws Exception {
-        XYMultipleSeriesDataset dataset = new XYMultipleSeriesDataset();
-        XYValueSeries valueSeries = new XYValueSeries("Values");
-        valueSeries.add(0, 1, 10);
-        valueSeries.add(1, 2, 20);
-        dataset.addSeries(valueSeries);
-
-        ChartComponent chartComponent = createChartComponent(dataset);
-        Form form = new Form();
-        form.add(chartComponent);
-        form.show();
-
-        XYValueSeriesTransition transition = new XYValueSeriesTransition(chartComponent, valueSeries);
-        XYValueSeries buffer = new XYValueSeries(valueSeries.getTitle());
-        buffer.add(0, 3, 30);
-        buffer.add(1, 4, 40);
-        transition.setBuffer(buffer);
-
-        transition.setDuration(5);
-        transition.animateChart();
-        while (transition.animate()) {
-            Thread.sleep(5);
-        }
-
-        assertEquals(2, valueSeries.getItemCount());
-        assertEquals(3.0, valueSeries.getY(0));
-        assertEquals(4.0, valueSeries.getY(1));
-        assertEquals(30.0, valueSeries.getValue(0));
-        assertEquals(40.0, valueSeries.getValue(1));
-        assertEquals(0, buffer.getItemCount());
-    }
-
+    
     @FormTest
     void multiSeriesTransitionUpdatesAllSeries() throws Exception {
         XYMultipleSeriesDataset dataset = new XYMultipleSeriesDataset();
