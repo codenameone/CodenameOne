@@ -54,7 +54,8 @@ class PrimitivePropertyBasicsTest extends UITestBase {
         assertEquals("uno", holder.names.get(0));
 
         holder.tags.add("alpha");
-        holder.tags.addAll(holder.names.asExplodedList());
+        holder.tags.add(holder.names.get(0));
+        holder.tags.add(holder.names.get(1));
         assertTrue(holder.tags.contains("alpha"));
         assertEquals(3, holder.tags.size());
 

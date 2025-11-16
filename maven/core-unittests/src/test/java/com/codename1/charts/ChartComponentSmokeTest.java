@@ -30,7 +30,7 @@ class ChartComponentSmokeTest extends UITestBase {
             return 2;
         }
 
-        public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y, Paint paint) {
+        public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y, int seriesIndex, Paint paint) {
             paint.setColor(0xffffff);
         }
 

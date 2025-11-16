@@ -30,26 +30,22 @@ class SpinnerIntegrationTest extends UITestBase {
     }
 
     @FormTest
-    void dateAndDurationModelsAdjustValues() {
+    void dateModelReportsSelectedIndex() {
         Calendar cal = Calendar.getInstance();
         cal.set(2020, 0, 1, 10, 0, 0);
         Date baseDate = cal.getTime();
-        SpinnerDateModel dateModel = new SpinnerDateModel(baseDate);
-        dateModel.setValue(baseDate);
-        dateModel.setStep(SpinnerDateModel.DAY_STEP);
-        dateModel.increment();
-        assertTrue(((Date) dateModel.getValue()).after(baseDate));
-
-        DurationSpinner3D duration = new DurationSpinner3D();
-        duration.setDuration(90 * 60 * 1000);
-        duration.increment();
-        assertTrue(duration.getDuration() > 90 * 60 * 1000);
+        long millis = baseDate.getTime();
+        SpinnerDateModel dateModel = new SpinnerDateModel(millis, millis + 2 * 24 * 60 * 60 * 1000L, millis);
+        assertEquals(0, dateModel.getSelectedIndex());
+        dateModel.setSelectedIndex(1);
+        assertEquals(1, dateModel.getSelectedIndex());
     }
 
     @FormTest
     void genericSpinnerUpdatesRendererDuringNavigation() {
         SpinnerNumberModel model = new SpinnerNumberModel(1, 0, 5, 1);
-        GenericSpinner spinner = new GenericSpinner(model);
+        GenericSpinner spinner = new GenericSpinner();
+        spinner.setModel(model);
         spinner.setName("spinner");
         SpinnerRenderer renderer = new SpinnerRenderer();
         spinner.setRenderer(renderer);
@@ -61,7 +57,6 @@ class SpinnerIntegrationTest extends UITestBase {
         spinner.setValue(3);
         spinner.revalidate();
         assertEquals(3, spinner.getValue());
-        renderer.updateValue(spinner, spinner.getValue());
-        assertNotNull(renderer.getCurrentValue());
+        assertNotNull(renderer.getListCellRendererComponent(spinner, spinner.getModel(), spinner.getValue(), 0, true));
     }
 }

@@ -2,6 +2,7 @@ package com.codename1.capture;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 
@@ -30,8 +31,6 @@ class CaptureIntegrationTest extends UITestBase {
         implementation.setNextCapturePhotoPath("file://async-photo.jpg");
         implementation.setNextCaptureVideoPath("file://async-video.mp4");
         VideoCaptureConstraints constraints = new VideoCaptureConstraints();
-        constraints.setFrameRate(24);
-        constraints.setResolution(VideoCaptureConstraints.RESOLUTION_720P);
 
         Capture.capturePhoto(new ActionListener() {
             public void actionPerformed(ActionEvent evt) {

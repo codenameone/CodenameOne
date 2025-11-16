@@ -17,7 +17,9 @@ class ShareServiceIntegrationTest extends UITestBase {
     void shareServiceActionUsesStoredMessageAndImage() {
         Image icon = Image.createImage(3, 3);
         RecordingShareService service = new RecordingShareService("Recorder", icon);
-        service.setOriginalForm(new Form(new Label("Origin")));
+        Form origin = new Form("Origin");
+        origin.add(new Label("Origin"));
+        service.setOriginalForm(origin);
         service.setMessage("hello world");
         service.setImage("file://icon.png", "image/png");
 
@@ -30,10 +32,12 @@ class ShareServiceIntegrationTest extends UITestBase {
 
     @FormTest
     void finishReturnsToOriginalForm() {
-        Form original = new Form(new Label("Original"));
+        Form original = new Form("Original");
+        original.add(new Label("Original"));
         RecordingShareService service = new RecordingShareService("Recorder", null);
         service.setOriginalForm(original);
-        Form next = new Form(new Label("Second"));
+        Form next = new Form("Second");
+        next.add(new Label("Second"));
         next.show();
         service.finish();
         assertSame(original, com.codename1.ui.Display.getInstance().getCurrent());
