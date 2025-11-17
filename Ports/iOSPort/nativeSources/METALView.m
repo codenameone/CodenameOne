@@ -26,6 +26,7 @@
 #import "METALView.h"
 #import "ExecutableOp.h"
 #import "CodenameOne_GLViewController.h"
+#import "CN1METALTransform.h"
 #include "com_codename1_impl_ios_IOSImplementation.h"
 #include "xmlvm.h"
 #include "com_codename1_impl_ios_TextEditUtil.h"
@@ -50,8 +51,12 @@ extern void repaintUI();
 @synthesize renderPassDescriptor;
 @synthesize drawable;
 @synthesize peerComponentsLayer;
-@synthesize scissorRect;
-@synthesize scissorEnabled;
+@synthesize currentEncoder;
+
+- (CGSize)drawableSize {
+    CAMetalLayer *layer = (CAMetalLayer *)self.layer;
+    return layer.drawableSize;
+}
 
 // You must implement this method
 + (Class)layerClass
@@ -167,14 +172,23 @@ extern BOOL isRetinaBug();
     colorAttachment.clearColor = MTLClearColorMake(1.0, 1.0, 1.0, 1.0);
     colorAttachment.storeAction = MTLStoreActionStore;
 
-    // Enable blending for transparency
-    colorAttachment.blendingEnabled = YES;
-    colorAttachment.sourceRGBBlendFactor = MTLBlendFactorOne;
-    colorAttachment.destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-    colorAttachment.rgbBlendOperation = MTLBlendOperationAdd;
-    colorAttachment.sourceAlphaBlendFactor = MTLBlendFactorOne;
-    colorAttachment.destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
-    colorAttachment.alphaBlendOperation = MTLBlendOperationAdd;
+    // Note: Blending is configured on MTLRenderPipelineDescriptor, not here
+    // Each ExecutableOp configures blending on its pipeline state
+}
+
+- (void)beginFrame
+{
+    [self setFramebuffer];
+
+    // Create render command encoder for this frame
+    if (self.renderPassDescriptor != nil && self.commandBuffer != nil) {
+        self.currentEncoder = [self.commandBuffer renderCommandEncoderWithDescriptor:self.renderPassDescriptor];
+
+        // Apply scissor rectangle if enabled
+        if (self.scissorEnabled && self.currentEncoder != nil) {
+            [self.currentEncoder setScissorRect:self.scissorRect];
+        }
+    }
 }
 
 - (void)setFramebuffer
@@ -191,11 +205,20 @@ extern BOOL isRetinaBug();
     framebufferWidth = (int)layer.drawableSize.width;
     framebufferHeight = (int)layer.drawableSize.height;
 
-    // Matrix initialization will be done by CN1METALTransform
+    // Initialize matrices for Metal rendering (only if size is valid)
+    if (framebufferWidth > 0 && framebufferHeight > 0) {
+        CN1_Metal_InitMatrices(framebufferWidth, framebufferHeight);
+    }
 }
 
 - (BOOL)presentFramebuffer
 {
+    // End encoding before presenting
+    if (self.currentEncoder) {
+        [self.currentEncoder endEncoding];
+        self.currentEncoder = nil;
+    }
+
     if (self.commandBuffer && self.drawable) {
         [self.commandBuffer presentDrawable:self.drawable];
         [self.commandBuffer commit];
@@ -340,11 +363,9 @@ extern int currentlyEditingMaxLength;
  }*/
 
 -(id<MTLRenderCommandEncoder>)makeRenderCommandEncoder {
-    if (self.renderPassDescriptor == nil) {
-        NSLog(@"METALView: Cannot create encoder, render pass descriptor is nil");
-        return nil;
-    }
-    return [self.commandBuffer renderCommandEncoderWithDescriptor:self.renderPassDescriptor];
+    // Return the current encoder created in beginFrame
+    // This allows all ExecutableOps in a frame to use the same encoder
+    return self.currentEncoder;
 }
 
 @end

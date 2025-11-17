@@ -129,6 +129,22 @@ static GLuint getOGLProgram(){
         pipelineDescriptor.fragmentFunction = [library newFunctionWithName:@"textured_fragment"];
         pipelineDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
 
+        // Configure vertex descriptor for textured shader
+        MTLVertexDescriptor *vertexDescriptor = [[MTLVertexDescriptor alloc] init];
+        // Position attribute (float2) at attribute 0
+        vertexDescriptor.attributes[0].format = MTLVertexFormatFloat2;
+        vertexDescriptor.attributes[0].offset = 0;
+        vertexDescriptor.attributes[0].bufferIndex = 0;
+        // TexCoord attribute (float2) at attribute 1
+        vertexDescriptor.attributes[1].format = MTLVertexFormatFloat2;
+        vertexDescriptor.attributes[1].offset = sizeof(float) * 2;
+        vertexDescriptor.attributes[1].bufferIndex = 0;
+        // Layout for buffer 0 (interleaved position + texCoord)
+        vertexDescriptor.layouts[0].stride = sizeof(float) * 4;
+        vertexDescriptor.layouts[0].stepRate = 1;
+        vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
+        pipelineDescriptor.vertexDescriptor = vertexDescriptor;
+
         // Enable blending for alpha
         pipelineDescriptor.colorAttachments[0].blendingEnabled = YES;
         pipelineDescriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;

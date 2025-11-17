@@ -117,6 +117,7 @@ static GLuint getOGLProgram(){
     // Metal rendering path
     id<MTLRenderCommandEncoder> encoder = [self makeRenderCommandEncoder];
     if (!encoder) {
+        NSLog(@"FillRect: No encoder available!");
         return;
     }
 
@@ -131,6 +132,18 @@ static GLuint getOGLProgram(){
         pipelineDescriptor.vertexFunction = [library newFunctionWithName:@"solidColor_vertex"];
         pipelineDescriptor.fragmentFunction = [library newFunctionWithName:@"solidColor_fragment"];
         pipelineDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+
+        // Configure vertex descriptor
+        MTLVertexDescriptor *vertexDescriptor = [[MTLVertexDescriptor alloc] init];
+        // Position attribute (float2)
+        vertexDescriptor.attributes[0].format = MTLVertexFormatFloat2;
+        vertexDescriptor.attributes[0].offset = 0;
+        vertexDescriptor.attributes[0].bufferIndex = 0;
+        // Layout for buffer 0
+        vertexDescriptor.layouts[0].stride = sizeof(float) * 2;
+        vertexDescriptor.layouts[0].stepRate = 1;
+        vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
+        pipelineDescriptor.vertexDescriptor = vertexDescriptor;
 
         // Enable blending for alpha
         pipelineDescriptor.colorAttachments[0].blendingEnabled = YES;
@@ -178,6 +191,7 @@ static GLuint getOGLProgram(){
 
     // Draw rectangle as triangle strip
     [encoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
+    // NSLog(@"FillRect draw command issued");
 }
 
 #elif USE_ES2

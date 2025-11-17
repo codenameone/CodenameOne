@@ -138,6 +138,7 @@ static GLuint getOGLProgram(){
     // Metal rendering path
     id<MTLRenderCommandEncoder> encoder = [self makeRenderCommandEncoder];
     if (!encoder) {
+        NSLog(@"DrawString: No encoder available!");
         return;
     }
 
@@ -187,6 +188,11 @@ static GLuint getOGLProgram(){
         [pipelineDescriptor release];
 #endif
     });
+
+    if (!pipelineState) {
+        NSLog(@"DrawString: Pipeline state is nil!");
+        return;
+    }
 
     [encoder setRenderPipelineState:pipelineState];
 
@@ -286,6 +292,7 @@ static GLuint getOGLProgram(){
 
     // Draw rectangle as triangle strip
     [encoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
+    // NSLog(@"DrawString draw command issued for '%@'", str);
 }
 
 #elif USE_ES2

@@ -76,6 +76,8 @@ extern int nextPowerOf2(int val);
         textureHeight = h;
 
         // Create image data
+        // Flip the context to match OpenGL's bottom-left origin convention
+        // This allows us to use the same texture coordinates as OpenGL
         CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
         void* imageData = malloc(p2h * p2w * 4);
         CGContextRef context = CGBitmapContextCreate(imageData, p2w, p2h, 8, 4 * p2w, colorSpace, kCGImageAlphaPremultipliedLast);

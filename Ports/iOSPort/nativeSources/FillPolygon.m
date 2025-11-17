@@ -122,6 +122,11 @@ static GLuint getOGLProgram(){
 }
 -(void)execute
 {
+#ifdef CN1_USE_METAL
+    // TODO: Implement Metal polygon rendering
+    // For now, just skip rendering to allow build to succeed
+    NSLog(@"FillPolygon: Metal implementation not yet available");
+#else
     glUseProgram(getOGLProgram());
     
     float alph = ((float)alpha)/255.0;
@@ -183,13 +188,14 @@ static GLuint getOGLProgram(){
     
     glDisableVertexAttribArray(vertexCoordAtt);
     GLErrorLog;
-    
+
     //glUseProgram(CN1activeProgram);
     //GLErrorLog;
-    
-    
+
+
     // ---------- end
-    
+#endif // CN1_USE_METAL
+
 
 }
 

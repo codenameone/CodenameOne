@@ -103,6 +103,7 @@ static GLuint getOGLProgram(){
     height = h;
     return self;
 }
+
 #ifdef CN1_USE_METAL
 -(void)execute {
     // Metal rendering path - draws rectangle outline

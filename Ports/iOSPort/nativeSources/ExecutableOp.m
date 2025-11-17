@@ -27,6 +27,7 @@
 #import <mach/mach_host.h>
 
 
+#ifndef CN1_USE_METAL
 extern void logGlErrorAt(const char *f, int l) {
     GLenum err = glGetError();
     if(err != GL_NO_ERROR) {
@@ -46,6 +47,11 @@ extern void logGlErrorAt(const char *f, int l) {
         }
     }
 }
+#else
+extern void logGlErrorAt(const char *f, int l) {
+    // No-op for Metal builds - use Metal validation layers instead
+}
+#endif
 
 @implementation ExecutableOp
 static BOOL blockDrawing = NO;
@@ -142,7 +148,8 @@ static BOOL blockDrawing = NO;
 }
 
 -(simd_float4x4)getMVPMatrix {
-    return CN1_Metal_GetMVPMatrix();
+    simd_float4x4 mvp = CN1_Metal_GetMVPMatrix();
+    return mvp;
 }
 
 -(simd_float4)colorToFloat4:(int)color alpha:(int)alpha {
