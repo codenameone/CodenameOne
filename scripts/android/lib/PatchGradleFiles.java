@@ -274,7 +274,6 @@ jacoco {
     tasks.register("jacocoAndroidReport", JacocoReport) {
         group = "verification"
         description = "Generates Jacoco coverage report for the debug variant"
-        dependsOn("connectedDebugAndroidTest")
         outputs.upToDateWhen { false }
 
         reports {
@@ -322,10 +321,6 @@ jacoco {
         }
         logger.lifecycle("Jacoco coverage inputs: ${existing}")
     }
-}
-
-tasks.matching { it.name == "connectedDebugAndroidTest" }.configureEach {
-    outputs.upToDateWhen { false }
 }
 """.stripTrailing();
 

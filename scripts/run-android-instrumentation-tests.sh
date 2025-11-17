@@ -70,17 +70,6 @@ cn1ss_setup "$JAVA17_BIN" "$CN1SS_HELPER_SOURCE_DIR"
 [ -x "$GRADLE_PROJECT_DIR/gradlew" ] || chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 
 # ---- Prepare app + emulator state -----------------------------------------
-
-APK_PATH="${2:-}"
-if [ -z "$APK_PATH" ]; then
-  APK_PATH="$(find "$GRADLE_PROJECT_DIR" -type f -path '*/outputs/apk/debug/*.apk' | head -n 1 || true)"
-fi
-if [ -z "$APK_PATH" ] || [ ! -f "$APK_PATH" ]; then
-  ra_log "FATAL: Unable to locate debug APK under $GRADLE_PROJECT_DIR" >&2
-  exit 10
-fi
-ra_log "Using APK: $APK_PATH"
-
 MANIFEST="$GRADLE_PROJECT_DIR/app/src/main/AndroidManifest.xml"
 if [ ! -f "$MANIFEST" ]; then
   ra_log "FATAL: AndroidManifest.xml not found at $MANIFEST" >&2
@@ -104,18 +93,6 @@ ADB_BIN="$(command -v adb)"
 ra_log "ADB connected devices:"
 "$ADB_BIN" devices -l | sed 's/^/[run-android-instrumentation-tests]   /'
 
-ra_log "Installing APK onto device"
-"$ADB_BIN" shell am force-stop "$PACKAGE_NAME" >/dev/null 2>&1 || true
-"$ADB_BIN" uninstall "$PACKAGE_NAME" >/dev/null 2>&1 || true
-if ! "$ADB_BIN" install -r "$APK_PATH"; then
-  ra_log "adb install failed; retrying after explicit uninstall"
-  "$ADB_BIN" uninstall "$PACKAGE_NAME" >/dev/null 2>&1 || true
-  if ! "$ADB_BIN" install "$APK_PATH"; then
-    ra_log "FATAL: adb install failed after retry"
-    exit 10
-  fi
-fi
-
 ra_log "Clearing logcat buffer"
 "$ADB_BIN" logcat -c || true
 
@@ -134,24 +111,21 @@ ra_log "Capturing device logcat to $TEST_LOG"
 LOGCAT_PID=$!
 sleep 2
 
-ra_log "Launching Codename One DeviceRunner"
-"$ADB_BIN" shell pm clear "$PACKAGE_NAME" >/dev/null 2>&1 || true
-if ! "$ADB_BIN" shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; then
-  ra_log "monkey launch failed; attempting am start fallback"
-  MAIN_ACTIVITY="$("$ADB_BIN" shell cmd package resolve-activity --brief "$PACKAGE_NAME" 2>/dev/null | head -n 1 | tr -d '\r' | sed 's/ .*//')"
-  if [[ "$MAIN_ACTIVITY" == */* ]]; then
-    if ! "$ADB_BIN" shell am start -n "$MAIN_ACTIVITY" >/dev/null 2>&1; then
-      ra_log "FATAL: Failed to start application via am start"
-      exit 10
-    fi
-  else
-    ra_log "FATAL: Unable to determine launchable activity"
-    exit 10
-  fi
+GRADLEW="$GRADLE_PROJECT_DIR/gradlew"
+[ -x "$GRADLEW" ] || chmod +x "$GRADLEW"
+GRADLE_CMD=("$GRADLEW" --no-daemon connectedDebugAndroidTest)
+
+ra_log "Executing connectedDebugAndroidTest via Gradle"
+if ! (
+  cd "$GRADLE_PROJECT_DIR"
+  JAVA_HOME="$JAVA17_HOME" "${GRADLE_CMD[@]}"
+); then
+  ra_log "FATAL: connectedDebugAndroidTest failed"
+  exit 10
 fi
 
 END_MARKER="CN1SS:SUITE:FINISHED"
-TIMEOUT_SECONDS=300
+TIMEOUT_SECONDS=60
 START_TIME="$(date +%s)"
 ra_log "Waiting for DeviceRunner completion marker ($END_MARKER)"
 while true; do
