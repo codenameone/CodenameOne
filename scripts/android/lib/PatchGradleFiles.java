@@ -314,12 +314,18 @@ jacoco {
 
     executionData.setFrom(coverageFiles)
 
-    doFirst {
-        def existing = coverageFiles.files.findAll { it.exists() }
-        if (existing.isEmpty()) {
-            throw new GradleException("No Jacoco coverage data found. Ensure connectedDebugAndroidTest runs with coverage enabled.")
+        doFirst {
+            def existing = coverageFiles.files.findAll { it.exists() }
+            if (existing.isEmpty()) {
+                throw new GradleException("No Jacoco coverage data found. Ensure connectedDebugAndroidTest runs with coverage enabled.")
+            }
+            logger.lifecycle("Jacoco coverage inputs: ${existing}")
         }
-        logger.lifecycle("Jacoco coverage inputs: ${existing}")
+}
+
+afterEvaluate {
+    tasks.matching { it.name == "connectedDebugAndroidTest" }.configureEach {
+        finalizedBy(tasks.named("jacocoAndroidReport"))
     }
 }
 """.stripTrailing();

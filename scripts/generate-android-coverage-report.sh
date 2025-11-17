@@ -33,11 +33,6 @@ else
   exit 1
 fi
 
-if [ -z "${JAVA17_HOME:-}" ] || [ ! -x "$JAVA17_HOME/bin/java" ]; then
-  cov_log "JAVA17_HOME validation failed. Current value: ${JAVA17_HOME:-<unset>}" >&2
-  exit 1
-fi
-
 if [ ! -d "$GRADLE_PROJECT_DIR" ]; then
   cov_log "Gradle project directory not found: $GRADLE_PROJECT_DIR" >&2
   exit 3
@@ -47,17 +42,6 @@ if [ ! -x "$GRADLE_PROJECT_DIR/gradlew" ]; then
   cov_log "Gradle wrapper missing at $GRADLE_PROJECT_DIR/gradlew" >&2
   exit 3
 fi
-
-ORIGINAL_JAVA_HOME="${JAVA_HOME:-}";
-export JAVA_HOME="$JAVA17_HOME"
-
-cov_log "Running jacocoAndroidReport in $GRADLE_PROJECT_DIR"
-(
-  cd "$GRADLE_PROJECT_DIR"
-  ./gradlew --no-daemon jacocoAndroidReport
-)
-
-export JAVA_HOME="$ORIGINAL_JAVA_HOME"
 
 COVERAGE_SCAN=$(find "$GRADLE_PROJECT_DIR/app/build" -type f \( -name "*.ec" -o -name "*.exec" \) 2>/dev/null | sed 's/^/[generate-android-coverage] coverage-file: /')
 if [ -n "$COVERAGE_SCAN" ]; then
