@@ -19,6 +19,7 @@ import com.codename1.ui.util.Resources;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.util.LazyValue;
+import org.junit.jupiter.api.Timeout;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -29,6 +30,7 @@ import java.util.Vector;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@Timeout(value = 5)
 class UtilCoverageTest extends UITestBase {
 
     @FormTest
