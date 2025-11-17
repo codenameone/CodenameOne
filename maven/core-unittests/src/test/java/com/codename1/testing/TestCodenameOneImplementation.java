@@ -21,6 +21,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.Image;
 import com.codename1.ui.PeerComponent;
 import com.codename1.ui.Stroke;
 import com.codename1.ui.TextArea;
@@ -105,6 +106,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private LocationManager locationManager;
     private L10NManager localizationManager;
     private ImageIO imageIO;
+    private boolean gaussianBlurSupported;
+    private int gaussianBlurInvocations;
     private MediaRecorderBuilderHandler mediaRecorderBuilderHandler;
     private MediaRecorderHandler mediaRecorderHandler;
     private boolean animation;
@@ -2040,6 +2043,29 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public ImageIO getImageIO() {
         return imageIO;
+    }
+
+    public void setImageIO(ImageIO imageIO) {
+        this.imageIO = imageIO;
+    }
+
+    public void setGaussianBlurSupported(boolean gaussianBlurSupported) {
+        this.gaussianBlurSupported = gaussianBlurSupported;
+    }
+
+    public int getGaussianBlurInvocations() {
+        return gaussianBlurInvocations;
+    }
+
+    @Override
+    public Image gaussianBlurImage(Image image, float radius) {
+        gaussianBlurInvocations++;
+        return Image.createImage(image); // clone to show usage without altering source
+    }
+
+    @Override
+    public boolean isGaussianBlurSupported() {
+        return gaussianBlurSupported;
     }
 
     public void setMediaRecorder(Media mediaRecorder) {
