@@ -302,8 +302,11 @@ jacoco {
 
     def javaClasses = fileTree(dir: "$buildDir/intermediates/javac/debug/classes", exclude: excludes)
     def kotlinClasses = fileTree(dir: "$buildDir/tmp/kotlin-classes/debug", exclude: excludes)
+    def aarMainJar = file("$buildDir/intermediates/aar_main_jar/debug/classes.jar")
+    def aarTrees = aarMainJar.exists() ? [zipTree(aarMainJar)] : []
+    def runtimeJars = configurations.debugRuntimeClasspath.filter { it.name.endsWith('.jar') }.collect { zipTree(it) }
 
-    classDirectories.setFrom(files(javaClasses, kotlinClasses).asFileTree.matching {
+    classDirectories.setFrom(files(javaClasses, kotlinClasses, aarTrees, runtimeJars).asFileTree.matching {
         include 'com/codename1/impl/android/**'
     })
 
