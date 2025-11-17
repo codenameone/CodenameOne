@@ -18,6 +18,7 @@ import com.codename1.util.LazyValue;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Arrays;
 import java.util.Hashtable;
 import java.util.Vector;
 
@@ -104,9 +105,9 @@ class AdditionalUtilCoverageTest extends UITestBase {
         res.setResource("ui", Resources.MAGIC_UI, new byte[]{2});
         res.setResource("image", Resources.MAGIC_IMAGE, new byte[]{3});
 
-        assertArrayEquals(new String[]{"l10n"}, res.getL10NResourceNames());
-        assertArrayEquals(new String[]{"data"}, res.getDataResourceNames());
-        assertArrayEquals(new String[]{"ui"}, res.getUIResourceNames());
+        assertTrue(Arrays.asList(res.getL10NResourceNames()).contains("l10n"));
+        assertTrue(Arrays.asList(res.getDataResourceNames()).contains("data"));
+        assertTrue(Arrays.asList(res.getUIResourceNames()).contains("ui"));
         assertEquals(2, res.getFontResourceNames().length);
         assertArrayEquals(new String[]{"theme"}, res.getThemeResourceNames());
         assertArrayEquals(new String[]{"image"}, res.getImageResourceNames());

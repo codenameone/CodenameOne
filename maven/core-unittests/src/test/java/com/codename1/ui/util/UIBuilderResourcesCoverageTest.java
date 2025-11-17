@@ -60,13 +60,17 @@ class UIBuilderResourcesCoverageTest extends UITestBase {
                 buffer.append("local");
             }
         });
+        com.codename1.ui.Form f = new com.codename1.ui.Form("test");
+        f.show();
         Command cmd = builder.createCommand("Hello", null, 0, null);
-        com.codename1.ui.events.ActionEvent event = new com.codename1.ui.events.ActionEvent(cmd, com.codename1.ui.events.ActionEvent.Type.Command, null, 0, 0);
-        builder.processCommand(event, cmd);
-        builder.processCommand(event, new Command("Other"));
+        com.codename1.ui.events.ActionEvent event = new com.codename1.ui.events.ActionEvent(cmd, com.codename1.ui.events.ActionEvent.Type.Command, f, 0, 0);
+        UIBuilder.FormListener listener = builder.new FormListener();
+        listener.actionPerformed(event);
+        listener.actionPerformed(new com.codename1.ui.events.ActionEvent(new Command("Other"), com.codename1.ui.events.ActionEvent.Type.Command, f, 0, 0));
         builder.removeCommandListener("test", null);
         builder.removeCommandListener(null);
-        assertTrue(buffer.length() > 0);
+        assertTrue(buffer.indexOf("global") >= 0);
+        assertTrue(buffer.indexOf("local") >= 0);
     }
 
     @FormTest
