@@ -61,6 +61,7 @@ class UIBuilderResourcesCoverageTest extends UITestBase {
             }
         });
         com.codename1.ui.Form f = new com.codename1.ui.Form("test");
+        f.setName("test");
         f.show();
         Command cmd = builder.createCommand("Hello", null, 0, null);
         com.codename1.ui.events.ActionEvent event = new com.codename1.ui.events.ActionEvent(cmd, com.codename1.ui.events.ActionEvent.Type.Command, f, 0, 0);

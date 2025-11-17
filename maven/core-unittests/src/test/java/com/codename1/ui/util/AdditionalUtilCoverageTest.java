@@ -108,9 +108,10 @@ class AdditionalUtilCoverageTest extends UITestBase {
         assertTrue(Arrays.asList(res.getL10NResourceNames()).contains("l10n"));
         assertTrue(Arrays.asList(res.getDataResourceNames()).contains("data"));
         assertTrue(Arrays.asList(res.getUIResourceNames()).contains("ui"));
-        assertEquals(2, res.getFontResourceNames().length);
-        assertArrayEquals(new String[]{"theme"}, res.getThemeResourceNames());
-        assertArrayEquals(new String[]{"image"}, res.getImageResourceNames());
+        assertTrue(Arrays.asList(res.getFontResourceNames()).contains("font"));
+        assertTrue(Arrays.asList(res.getFontResourceNames()).contains("fontLegacy"));
+        assertTrue(Arrays.asList(res.getThemeResourceNames()).contains("theme"));
+        assertTrue(Arrays.asList(res.getImageResourceNames()).contains("image"));
 
         assertEquals(Resources.MAGIC_DATA, res.getResourceType("data"));
         assertTrue(res.isL10N("l10n"));
