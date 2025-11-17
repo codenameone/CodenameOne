@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class UIBuilderResourcesCoverageTest extends UITestBase {
 
     @FormTest
-    void uiBuilderNavigationAndRegistryLifecycle() {
+    void uiBuilderNavigationAndRegistryLifecycle() throws Exception {
         UIBuilder builder = new UIBuilder();
         assertFalse(UIBuilder.isBlockAnalytics());
         UIBuilder.setBlockAnalytics(true);
