@@ -248,21 +248,6 @@ fi
 cp "$TEST_SOURCE_DIR"/*.java "$TEST_JAVA_DIR"/
 ba_log "Installed DeviceRunner UI tests in $TEST_JAVA_DIR"
 
-# --- Install Android instrumentation harness for coverage ---
-ANDROID_TEST_SOURCE_DIR="$SCRIPT_DIR/device-runner-app/androidTest"
-ANDROID_TEST_JAVA_DIR="$APP_DIR/app/src/androidTest/java/${PACKAGE_PATH}"
-if [ -d "$APP_DIR/app/src/androidTest" ]; then
-  ba_log "Removing template Android instrumentation tests from $APP_DIR/app/src/androidTest"
-  rm -rf "$APP_DIR/app/src/androidTest"
-fi
-mkdir -p "$ANDROID_TEST_JAVA_DIR"
-if [ ! -d "$ANDROID_TEST_SOURCE_DIR" ]; then
-  ba_log "Android instrumentation test sources not found: $ANDROID_TEST_SOURCE_DIR" >&2
-  exit 1
-fi
-cp "$ANDROID_TEST_SOURCE_DIR"/*.java "$ANDROID_TEST_JAVA_DIR"/
-ba_log "Installed Android instrumentation tests in $ANDROID_TEST_JAVA_DIR"
-
 # --- Normalize Codename One versions (use Maven Versions Plugin) ---
 ba_log "Normalizing Codename One Maven coordinates to $CN1_VERSION"
 
@@ -284,6 +269,22 @@ if [ -z "$GRADLE_PROJECT_DIR" ]; then
 fi
 
 ba_log "Normalizing Android Gradle project in $GRADLE_PROJECT_DIR"
+
+# --- Install Android instrumentation harness for coverage ---
+ANDROID_TEST_SOURCE_DIR="$SCRIPT_DIR/device-runner-app/androidTest"
+ANDROID_TEST_ROOT="$GRADLE_PROJECT_DIR/app/src/androidTest"
+ANDROID_TEST_JAVA_DIR="$ANDROID_TEST_ROOT/java/${PACKAGE_PATH}"
+if [ -d "$ANDROID_TEST_ROOT" ]; then
+  ba_log "Removing template Android instrumentation tests from $ANDROID_TEST_ROOT"
+  rm -rf "$ANDROID_TEST_ROOT"
+fi
+mkdir -p "$ANDROID_TEST_JAVA_DIR"
+if [ ! -d "$ANDROID_TEST_SOURCE_DIR" ]; then
+  ba_log "Android instrumentation test sources not found: $ANDROID_TEST_SOURCE_DIR" >&2
+  exit 1
+fi
+cp "$ANDROID_TEST_SOURCE_DIR"/*.java "$ANDROID_TEST_JAVA_DIR"/
+ba_log "Installed Android instrumentation tests in $ANDROID_TEST_JAVA_DIR"
 
 # Ensure AndroidX flags in gradle.properties
 # --- BEGIN: robust Gradle patch for AndroidX tests ---
