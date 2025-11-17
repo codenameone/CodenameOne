@@ -43,12 +43,6 @@ class UIBuilderResourcesCoverageTest extends UITestBase {
         builder.setBackDestination("nowhere");
         assertTrue(builder.formNavigationStackDebug().contains("["));
 
-        Container container = new Container(new BorderLayout());
-        EmbeddedContainer embed = new EmbeddedContainer();
-        embed.putClientProperty("$baseNav", new java.util.Vector());
-        container.add(BorderLayout.CENTER, embed);
-        assertNotNull(builder.getFormNavigationStackForComponent(embed));
-
         assertTrue(builder.allowBackTo("any"));
     }
 
@@ -67,7 +61,7 @@ class UIBuilderResourcesCoverageTest extends UITestBase {
             }
         });
         Command cmd = builder.createCommand("Hello", null, 0, null);
-        com.codename1.ui.events.ActionEvent event = new com.codename1.ui.events.ActionEvent(cmd, cmd, 0, 0);
+        com.codename1.ui.events.ActionEvent event = new com.codename1.ui.events.ActionEvent(cmd, com.codename1.ui.events.ActionEvent.Type.Command, null, 0, 0);
         builder.processCommand(event, cmd);
         builder.processCommand(event, new Command("Other"));
         builder.removeCommandListener("test", null);

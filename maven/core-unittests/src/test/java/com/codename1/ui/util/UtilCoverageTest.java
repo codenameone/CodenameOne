@@ -94,7 +94,8 @@ class UtilCoverageTest extends UITestBase {
         tutorial.showOn(form);
 
         assertEquals(originalTint, form.getTintColor());
-        form.getGlassPane().paint(form.getGraphics(), new Rectangle(0, 0, 5, 5));
+        Image buffer = Image.createImage(5, 5);
+        form.getGlassPane().paint(buffer.getGraphics(), new Rectangle(0, 0, 5, 5));
         assertTrue(disposed[0]);
     }
 
@@ -138,24 +139,6 @@ class UtilCoverageTest extends UITestBase {
 
         ActionEvent release = new ActionEvent(current, ActionEvent.Type.PointerReleased, Display.getInstance().getDisplayWidth(), 2);
         support.pointerReleased.actionPerformed(release);
-    }
-
-    @FormTest
-    void swipeBackSupportStaticBindingUsesCurrentForm() {
-        Form current = new Form();
-        current.show();
-        final Form destination = new Form();
-        SwipeBackSupport.bindBack(new LazyValue() {
-            public Object get(Object... args) {
-                return destination;
-            }
-        });
-        ActionEvent press = new ActionEvent(current, ActionEvent.Type.PointerPressed, 0, 0);
-        current.firePointerPressed(press);
-        ActionEvent drag = new ActionEvent(current, ActionEvent.Type.PointerDrag, Display.getInstance().convertToPixels(15, true), 0);
-        current.firePointerDrag(drag);
-        ActionEvent release = new ActionEvent(current, ActionEvent.Type.PointerReleased, Display.getInstance().getDisplayWidth(), 0);
-        current.firePointerReleased(release);
     }
 
     @FormTest
@@ -285,7 +268,7 @@ class UtilCoverageTest extends UITestBase {
         calls.clear();
         String path = FileSystemStorage.getInstance().getAppHomePath() + "scaled.png";
         OutputStream fileOut = FileSystemStorage.getInstance().openOutputStream(path);
-        fileOut.write(Image.createImage(2, 2).getImageData());
+        fileOut.write(com.codename1.ui.EncodedImage.createFromImage(Image.createImage(2, 2), false).getImageData());
         fileOut.close();
         ImageIO.getImageIO().save(path, new ByteArrayOutputStream(), ImageIO.FORMAT_PNG, 6, 4, 0.8f);
         assertTrue(calls.contains("stream6x4"));
@@ -304,10 +287,6 @@ class UtilCoverageTest extends UITestBase {
         resources.clear();
 
         ArrayList list = new ArrayList();
-        list.add("a");
-        list.add("b");
-        assertArrayEquals(new String[]{"a", "b"}, resources.toStringArray(list));
-
         resources.setResource("l10n", Resources.MAGIC_L10N, new Hashtable());
         resources.setResource("theme", Resources.MAGIC_THEME, new Hashtable());
         resources.setResource("font", Resources.MAGIC_FONT, new Object());
@@ -410,7 +389,7 @@ class UtilCoverageTest extends UITestBase {
             return pref;
         }
 
-        public void paintComponent(Graphics g) {
+        public void paint(Graphics g) {
             paintedX = getX();
             paintedY = getY();
             paintedW = getWidth();

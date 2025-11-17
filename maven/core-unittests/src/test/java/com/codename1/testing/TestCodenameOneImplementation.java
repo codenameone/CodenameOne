@@ -2045,10 +2045,6 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return imageIO;
     }
 
-    public void setImageIO(ImageIO imageIO) {
-        this.imageIO = imageIO;
-    }
-
     public void setGaussianBlurSupported(boolean gaussianBlurSupported) {
         this.gaussianBlurSupported = gaussianBlurSupported;
     }

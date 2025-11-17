@@ -29,7 +29,7 @@ class AdditionalUtilCoverageTest extends UITestBase {
     void swipeBackManualMotionReflectsCurrentX() {
         Form current = new Form();
         current.show();
-        SwipeBackSupport support = new SwipeBackSupport();
+        final SwipeBackSupport support = new SwipeBackSupport();
         support.bind(current, new LazyValue() {
             public Object get(Object... args) {
                 Form dest = new Form();
@@ -39,9 +39,9 @@ class AdditionalUtilCoverageTest extends UITestBase {
             }
         });
         ActionEvent press = new ActionEvent(current, ActionEvent.Type.PointerPressed, 0, 0);
-        current.firePointerPressed(press);
+        support.pointerPressed.actionPerformed(press);
         ActionEvent drag = new ActionEvent(current, ActionEvent.Type.PointerDrag, Display.getInstance().convertToPixels(12, true), 0);
-        current.firePointerDrag(drag);
+        support.pointerDragged.actionPerformed(drag);
         support.currentX = Display.getInstance().getDisplayWidth();
         SwipeBackSupport.ManualMotion motion = support.new ManualMotion(0, Display.getInstance().getDisplayWidth(), 50);
         assertEquals(Display.getInstance().getDisplayWidth(), motion.getValue());
@@ -86,7 +86,7 @@ class AdditionalUtilCoverageTest extends UITestBase {
 
         String path = FileSystemStorage.getInstance().getAppHomePath() + "shortCircuit.png";
         OutputStream fileOut = FileSystemStorage.getInstance().openOutputStream(path);
-        fileOut.write(base.getImageData());
+        fileOut.write(com.codename1.ui.EncodedImage.createFromImage(base, false).getImageData());
         fileOut.close();
         String returned = ImageIO.getImageIO().saveAndKeepAspect(path, path, ImageIO.FORMAT_PNG, 4, 4, 0.9f, true, true);
         assertEquals(path, returned);
@@ -125,8 +125,8 @@ class AdditionalUtilCoverageTest extends UITestBase {
     @FormTest
     void uiBuilderCreatesComponentsAndTracksState() throws Exception {
         UIBuilder builder = new UIBuilder();
-        UIBuilder.setKeepResourcesInRam(true);
-        assertTrue(UIBuilder.isKeepResourcesInRam());
+        builder.setKeepResourcesInRam(true);
+        assertTrue(builder.isKeepResourcesInRam());
         builder.setBackCommandEnabled(true);
         builder.setHomeForm("Home");
         assertEquals("Home", builder.getHomeForm());
