@@ -271,16 +271,24 @@ jacoco {
     toolVersion = "0.8.11"
 }
 
-tasks.register("jacocoAndroidReport", JacocoReport) {
-    group = "verification"
-    description = "Generates Jacoco coverage report for the debug variant"
-    dependsOn("connectedDebugAndroidTest")
+    tasks.register("jacocoAndroidReport", JacocoReport) {
+        group = "verification"
+        description = "Generates Jacoco coverage report for the debug variant"
+        dependsOn("connectedDebugAndroidTest")
 
-    reports {
-        xml.required = true
-        html.required = true
-        html.outputLocation = layout.buildDirectory.dir("reports/jacoco/jacocoAndroidReport/html")
-    }
+        reports {
+            xml.required = true
+            html.required = true
+            html.outputLocation = layout.buildDirectory.dir("reports/jacoco/jacocoAndroidReport/html")
+        }
+
+    def coverageFiles = fileTree(dir: "$buildDir", includes: [
+            "outputs/code_coverage/**/*coverage.ec",
+            "jacoco/*.exec",
+            "outputs/unit_test_code_coverage/**/*coverage.ec",
+            "**/*.ec",
+            "**/*.exec"
+    ])
 
     def excludes = [
             '**/R.class',
@@ -301,12 +309,15 @@ tasks.register("jacocoAndroidReport", JacocoReport) {
 
     sourceDirectories.setFrom(files("src/main/java"))
 
-    executionData.setFrom(fileTree(dir: "$buildDir", includes: [
-            "outputs/code_coverage/debugAndroidTest/connected/*coverage.ec",
-            "outputs/code_coverage/connected/*coverage.ec",
-            "jacoco/testDebugUnitTest.exec",
-            "outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec"
-    ]))
+    executionData.setFrom(coverageFiles)
+
+    doFirst {
+        def existing = coverageFiles.files.findAll { it.exists() }
+        if (existing.isEmpty()) {
+            throw new GradleException("No Jacoco coverage data found. Ensure connectedDebugAndroidTest runs with coverage enabled.")
+        }
+        logger.lifecycle("Jacoco coverage inputs: ${existing}")
+    }
 }
 """.stripTrailing();
 

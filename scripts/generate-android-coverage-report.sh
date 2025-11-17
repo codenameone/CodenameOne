@@ -59,6 +59,13 @@ cov_log "Running jacocoAndroidReport in $GRADLE_PROJECT_DIR"
 
 export JAVA_HOME="$ORIGINAL_JAVA_HOME"
 
+COVERAGE_SCAN=$(find "$GRADLE_PROJECT_DIR/app/build" -type f \( -name "*.ec" -o -name "*.exec" \) 2>/dev/null | sed 's/^/[generate-android-coverage] coverage-file: /')
+if [ -n "$COVERAGE_SCAN" ]; then
+  echo "$COVERAGE_SCAN"
+else
+  cov_log "No coverage data files detected under $GRADLE_PROJECT_DIR/app/build"
+fi
+
 REPORT_SOURCE_DIR="$GRADLE_PROJECT_DIR/app/build/reports/jacoco/jacocoAndroidReport"
 if [ ! -d "$REPORT_SOURCE_DIR" ]; then
   cov_log "Coverage report directory not found: $REPORT_SOURCE_DIR" >&2
