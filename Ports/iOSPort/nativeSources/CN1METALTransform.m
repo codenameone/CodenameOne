@@ -40,6 +40,8 @@ static simd_float4x4 matrixStack[MAX_MATRIX_STACK_DEPTH];
 static int matrixStackTop = -1;
 
 void CN1_Metal_InitMatrices(int framebufferWidth, int framebufferHeight) {
+    // NSLog(@"CN1_Metal_InitMatrices called with width=%d, height=%d", framebufferWidth, framebufferHeight);
+
     // Create orthographic projection for 2D UI rendering
     // Origin at top-left (0,0), Y increases downward (UIKit convention)
     CN1_Metal_ProjectionMatrix = CN1_Metal_MakeOrtho(
@@ -48,6 +50,12 @@ void CN1_Metal_InitMatrices(int framebufferWidth, int framebufferHeight) {
         -1, 1
     );
     CN1_Metal_ProjectionMatrixVersion++;
+
+    // NSLog(@"Projection matrix after init: [%.6f %.6f %.6f %.6f] [%.6f %.6f %.6f %.6f] [%.6f %.6f %.6f %.6f] [%.6f %.6f %.6f %.6f]",
+    //       CN1_Metal_ProjectionMatrix.columns[0][0], CN1_Metal_ProjectionMatrix.columns[0][1], CN1_Metal_ProjectionMatrix.columns[0][2], CN1_Metal_ProjectionMatrix.columns[0][3],
+    //       CN1_Metal_ProjectionMatrix.columns[1][0], CN1_Metal_ProjectionMatrix.columns[1][1], CN1_Metal_ProjectionMatrix.columns[1][2], CN1_Metal_ProjectionMatrix.columns[1][3],
+    //       CN1_Metal_ProjectionMatrix.columns[2][0], CN1_Metal_ProjectionMatrix.columns[2][1], CN1_Metal_ProjectionMatrix.columns[2][2], CN1_Metal_ProjectionMatrix.columns[2][3],
+    //       CN1_Metal_ProjectionMatrix.columns[3][0], CN1_Metal_ProjectionMatrix.columns[3][1], CN1_Metal_ProjectionMatrix.columns[3][2], CN1_Metal_ProjectionMatrix.columns[3][3]);
 
     // Initialize model-view and transform to identity
     CN1_Metal_ModelViewMatrix = matrix_identity_float4x4;

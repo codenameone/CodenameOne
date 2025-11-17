@@ -5309,12 +5309,20 @@ static BOOL cn1_renderViewIntoContext(UIView *renderView, UIView *rootView, CGCo
 
 static void cn1_renderPeerComponents(UIView *rootView, CGContextRef ctx) {
     CodenameOne_GLViewController *controller = [CodenameOne_GLViewController instance];
-    EAGLView *glView = [controller eaglView];
+#ifdef CN1_USE_METAL
+    UIView *glView = [controller metalView];
+#else
+    UIView *glView = [controller eaglView];
+#endif
     if (glView == nil || rootView == nil || ctx == NULL) {
         return;
     }
 
-    UIView *peerLayer = glView.peerComponentsLayer;
+#ifdef CN1_USE_METAL
+    UIView *peerLayer = nil; // TODO: Add peerComponentsLayer support to METALView
+#else
+    UIView *peerLayer = ((EAGLView*)glView).peerComponentsLayer;
+#endif
     NSArray<UIView *> *peerCandidates = nil;
     if (peerLayer != nil) {
         [peerLayer layoutIfNeeded];
@@ -5423,7 +5431,11 @@ static UIImage* cn1_captureView(UIView *view) {
     cn1_renderViewIntoContext(view, rootView, ctx);
 
     CodenameOne_GLViewController *controller = [CodenameOne_GLViewController instance];
-    EAGLView *glView = [controller eaglView];
+#ifdef CN1_USE_METAL
+    UIView *glView = [controller metalView];
+#else
+    UIView *glView = [controller eaglView];
+#endif
     if (glView != nil && glView != view) {
         cn1_renderViewIntoContext(glView, rootView, ctx);
     }
@@ -8432,6 +8444,7 @@ JAVA_OBJECT m, JAVA_INT pointSize, JAVA_OBJECT in, JAVA_INT srcPos, JAVA_OBJECT 
     JAVA_ARRAY_FLOAT* inData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)in)->data;
     JAVA_ARRAY_FLOAT* outData = (JAVA_ARRAY_FLOAT*) ((JAVA_ARRAY)out)->data;
 #endif
+#ifndef CN1_USE_METAL
     GLKMatrix4 mMat = GLKMatrix4MakeWithArray(mData);
     JAVA_INT len = numPoints * pointSize;
     for (JAVA_INT i=0; i<len; i+=pointSize) {
@@ -8441,14 +8454,18 @@ JAVA_OBJECT m, JAVA_INT pointSize, JAVA_OBJECT in, JAVA_INT srcPos, JAVA_OBJECT 
             inputVector.v[2]= inData[s0+2];
         }
         GLKVector4 outputVector = GLKMatrix4MultiplyVector4(mMat, inputVector);
-        
+
         int d0 = destPos + i;
         outData[d0++] = outputVector.v[0] / outputVector.v[3];
         outData[d0++] = outputVector.v[1] / outputVector.v[3];
         if (pointSize==3) {
             outData[d0] = outputVector.v[2] / outputVector.v[3];
-        }     
+        }
     }
+#else
+    // TODO: Implement Metal version of transformPoints using simd
+    NSLog(@"transformPoints: Metal implementation not yet available");
+#endif
     
 }
 

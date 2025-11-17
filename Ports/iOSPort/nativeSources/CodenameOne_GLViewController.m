@@ -2006,7 +2006,9 @@ bool lockDrawing;
     // Metal updates drawable size automatically via CAMetalLayer
     int framebufferWidth = (int)([[self metalView] drawableSize].width);
     int framebufferHeight = (int)([[self metalView] drawableSize].height);
-    CN1_Metal_InitMatrices(framebufferWidth, framebufferHeight);
+    if (framebufferWidth > 0 && framebufferHeight > 0) {
+        CN1_Metal_InitMatrices(framebufferWidth, framebufferHeight);
+    }
 #else
     [[self eaglView] updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
 #endif
@@ -2177,9 +2179,17 @@ METALView* lastFoundMetalView;
     view.scissorRect = rect;
     view.scissorEnabled = enabled;
 
-    // Apply scissor to the current encoder if it exists
-    // Note: The iOSPort version doesn't use currentEncoder, so we'll store the state
-    // and it will be applied when the next encoder is created
+    // If there's a current encoder, apply scissor immediately
+    if (view.currentEncoder != nil) {
+        if (enabled) {
+            [view.currentEncoder setScissorRect:rect];
+        } else {
+            // Disable scissor by setting it to full drawable size
+            CGSize drawableSize = [view drawableSize];
+            MTLScissorRect fullRect = {0, 0, (NSUInteger)drawableSize.width, (NSUInteger)drawableSize.height};
+            [view.currentEncoder setScissorRect:fullRect];
+        }
+    }
 }
 #else
 EAGLView* lastFoundEaglView;
@@ -2236,9 +2246,12 @@ EAGLView* lastFoundEaglView;
 
     // Initialize Metal matrices
     METALView *metalView = [self metalView];
-    int framebufferWidth = (int)metalView.drawableSize.width;
-    int framebufferHeight = (int)metalView.drawableSize.height;
-    CN1_Metal_InitMatrices(framebufferWidth, framebufferHeight);
+    CAMetalLayer *layer = (CAMetalLayer *)metalView.layer;
+    int framebufferWidth = (int)layer.drawableSize.width;
+    int framebufferHeight = (int)layer.drawableSize.height;
+    if (framebufferWidth > 0 && framebufferHeight > 0) {
+        CN1_Metal_InitMatrices(framebufferWidth, framebufferHeight);
+    }
 #else
 #ifdef USE_ES2
     if (!cn1CompareMatrices(GLKMatrix4Identity, CN1transformMatrix)) {
@@ -2818,7 +2831,9 @@ BOOL prefersStatusBarHidden = NO;
     // Metal updates drawable size automatically
     int framebufferWidth = (int)([[self metalView] drawableSize].width);
     int framebufferHeight = (int)([[self metalView] drawableSize].height);
-    CN1_Metal_InitMatrices(framebufferWidth, framebufferHeight);
+    if (framebufferWidth > 0 && framebufferHeight > 0) {
+        CN1_Metal_InitMatrices(framebufferWidth, framebufferHeight);
+    }
 #else
     [[self eaglView] updateFrameBufferSize:(int)size.width h:(int)size.height];
     [[self eaglView] deleteFramebuffer];
@@ -2865,7 +2880,9 @@ BOOL prefersStatusBarHidden = NO;
     // Metal updates drawable size automatically
     int framebufferWidth = (int)([[self metalView] drawableSize].width);
     int framebufferHeight = (int)([[self metalView] drawableSize].height);
-    CN1_Metal_InitMatrices(framebufferWidth, framebufferHeight);
+    if (framebufferWidth > 0 && framebufferHeight > 0) {
+        CN1_Metal_InitMatrices(framebufferWidth, framebufferHeight);
+    }
 #else
     [[self eaglView] updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
     [[self eaglView] deleteFramebuffer];
@@ -3031,7 +3048,6 @@ BOOL prefersStatusBarHidden = NO;
         }
     }
 #ifdef CN1_USE_METAL
-    METALView *metalView = [self metalView];
     [metalView presentFramebuffer];
 #else
     GLErrorLog;
@@ -3135,6 +3151,7 @@ BOOL prefersStatusBarHidden = NO;
     return TRUE;
 }
 
+#ifndef CN1_USE_METAL
 - (BOOL)loadShaders
 {
     GLuint vertShader, fragShader;
@@ -3202,9 +3219,10 @@ BOOL prefersStatusBarHidden = NO;
         glDeleteShader(vertShader);
     if (fragShader)
         glDeleteShader(fragShader);
-    
+
     return TRUE;
 }
+#endif // CN1_USE_METAL
 
 
 -(BOOL)isPaintFinished {

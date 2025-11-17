@@ -287,6 +287,7 @@ static CGRect drawingRect;
 
 
 +(void)updateClipToScale {
+#ifndef CN1_USE_METAL
     if ( clipIsTexture ){
         return;
     }
@@ -296,7 +297,7 @@ static CGRect drawingRect;
         //CN1Log(@"Updating clip to scale");
         glScissor(clipX, displayHeight - clipY - clipH, clipW, clipH);
     }
-
+#endif
 }
 
 #ifndef CN1_USE_ARC

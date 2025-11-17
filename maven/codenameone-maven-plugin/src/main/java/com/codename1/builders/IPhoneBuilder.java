@@ -660,8 +660,6 @@ public class IPhoneBuilder extends Executor {
 
         if (useMetal) {
             try {
-                File CN1ES2compat = new File(buildinRes, "CN1ES2compat.h");
-                replaceInFile(CN1ES2compat, "//#define CN1_USE_METAL", "#define CN1_USE_METAL");
                 copy(new File(buildinRes, "MainWindowMETAL.xib"), new File(buildinRes, "MainWindow.xib"));
                 copy(new File(buildinRes, "CodenameOne_METALViewController.xib"), new File(buildinRes, "CodenameOne_GLViewController.xib"));
             } catch (Exception ex) {
@@ -1624,6 +1622,7 @@ public class IPhoneBuilder extends Executor {
                 if (useMetal) {
                     File pbx = new File(tmpFile, "dist/" + request.getMainClass() + ".xcodeproj/project.pbxproj");
                     replaceInFile(pbx, "CLANG_ENABLE_MODULES = NO;", "CLANG_ENABLE_MODULES = YES;");
+                    replaceInFile(pbx, "GCC_PREPROCESSOR_DEFINITIONS = (", "GCC_PREPROCESSOR_DEFINITIONS = (\n\t\t\t\t\"CN1_USE_METAL=1\",");
                 }
             } catch (Exception ex) {
                 throw new BuildException("Failed to update infoplist file", ex);
@@ -1887,6 +1886,7 @@ public class IPhoneBuilder extends Executor {
 
                     if (useMetal) {
                         buildSettings += "      config.build_settings['CLANG_ENABLE_MODULES'] = \"YES\"\n";
+                        buildSettings += "      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = \"$(inherited) CN1_USE_METAL=1\"\n";
                     }
 
 
