@@ -5,6 +5,7 @@ import com.codename1.junit.UITestBase;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
@@ -19,7 +20,9 @@ import com.codename1.ui.util.Resources;
 import com.codename1.ui.animations.CommonTransitions;
 import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.CN;
 import com.codename1.util.LazyValue;
+import com.codename1.testing.TestUtils;
 import org.junit.jupiter.api.Timeout;
 
 import java.io.ByteArrayOutputStream;
@@ -85,21 +88,46 @@ class UtilCoverageTest extends UITestBase {
     @FormTest
     void glassTutorialShowOnRestoresGlassPaneAndTint() {
         Form form = new Form();
-        final boolean[] disposed = new boolean[1];
-        form.setGlassPane(new Painter() {
+        final boolean[] painted = new boolean[1];
+        Painter original = new Painter() {
             public void paint(Graphics g, Rectangle rect) {
-                disposed[0] = true;
+                painted[0] = true;
             }
-        });
+        };
+        form.setGlassPane(original);
         int originalTint = form.getTintColor();
 
         GlassTutorial tutorial = new GlassTutorial();
-        tutorial.showOn(form);
+        final boolean[] finished = new boolean[1];
+        CN.callSerially(new Runnable() {
+            public void run() {
+                tutorial.showOn(form);
+                finished[0] = true;
+            }
+        });
 
+        TestUtils.waitFor(50);
+        CN.callSerially(new Runnable() {
+            public void run() {
+                Form current = Display.getInstance().getCurrent();
+                if (current instanceof Dialog) {
+                    ((Dialog) current).dispose();
+                }
+            }
+        });
+
+        int attempts = 0;
+        while (!finished[0] && attempts < 40) {
+            TestUtils.waitFor(50);
+            attempts++;
+        }
+
+        assertTrue(finished[0]);
         assertEquals(originalTint, form.getTintColor());
+        assertSame(original, form.getGlassPane());
         Image buffer = Image.createImage(5, 5);
         form.getGlassPane().paint(buffer.getGraphics(), new Rectangle(0, 0, 5, 5));
-        assertTrue(disposed[0]);
+        assertTrue(painted[0]);
     }
 
     @FormTest
