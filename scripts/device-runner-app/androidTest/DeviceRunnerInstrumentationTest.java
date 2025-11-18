@@ -1,15 +1,19 @@
 package com.codenameone.examples.hellocodenameone;
 
+import android.app.UiAutomation;
 import android.content.Context;
 import android.content.Intent;
+import android.os.ParcelFileDescriptor;
 
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.io.BufferedReader;
+import java.io.FileInputStream;
 import java.io.InputStreamReader;
 
 import static org.junit.Assert.assertNotNull;
@@ -33,12 +37,11 @@ public class DeviceRunnerInstrumentationTest {
         final long timeoutMs = 300_000L;
         final String endMarker = "CN1SS:SUITE:FINISHED";
 
-        Process logcat = new ProcessBuilder("logcat", "-v", "brief")
-                .redirectErrorStream(true)
-                .start();
-
         long deadline = System.currentTimeMillis() + timeoutMs;
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(logcat.getInputStream()))) {
+        UiAutomation automation = InstrumentationRegistry.getInstrumentation().getUiAutomation();
+        ParcelFileDescriptor pfd = automation.executeShellCommand("logcat -v brief");
+        try (FileInputStream fis = new FileInputStream(pfd.getFileDescriptor());
+             BufferedReader reader = new BufferedReader(new InputStreamReader(fis))) {
             String line;
             while (System.currentTimeMillis() < deadline) {
                 if (reader.ready() && (line = reader.readLine()) != null) {
@@ -50,7 +53,10 @@ public class DeviceRunnerInstrumentationTest {
                 }
             }
         } finally {
-            logcat.destroyForcibly();
+            try {
+                pfd.close();
+            } catch (Exception ignored) {
+            }
         }
         return false;
     }
