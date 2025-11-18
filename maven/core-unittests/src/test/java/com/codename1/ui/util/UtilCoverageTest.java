@@ -17,6 +17,7 @@ import com.codename1.ui.Painter;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
 import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.util.LazyValue;
 import org.junit.jupiter.api.Timeout;
@@ -113,7 +114,14 @@ class UtilCoverageTest extends UITestBase {
         current.show();
 
         final Form destination = new Form();
-        destination.setTransitionOutAnimator(CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, true, 50));
+        destination.setTransitionOutAnimator(new Transition() {
+            public boolean animate() {
+                return false;
+            }
+
+            public void paint(Graphics g) {
+            }
+        });
         destination.setTransitionInAnimator(CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, false, 50));
 
         final SwipeBackSupport support = new SwipeBackSupport();
