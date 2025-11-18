@@ -5,6 +5,7 @@ import com.codename1.contacts.Contact;
 import com.codename1.db.Cursor;
 import com.codename1.db.Database;
 import com.codename1.db.Row;
+import com.codename1.db.RowExt;
 import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
@@ -2443,6 +2444,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         private Object[][] rows = new Object[0][];
         private final List<String> executedStatements = new ArrayList<String>();
         private final List<String[]> executedParameters = new ArrayList<String[]>();
+        private final List<String> executedQueries = new ArrayList<String>();
+        private final List<String[]> executedQueryParameters = new ArrayList<String[]>();
+        private boolean rowExtSupported;
 
         TestDatabase(String name) {
             this.name = name;
@@ -2485,6 +2489,18 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
         public List<String[]> getExecutedParameters() {
             return new ArrayList<String[]>(executedParameters);
+        }
+
+        public List<String> getExecutedQueries() {
+            return new ArrayList<String>(executedQueries);
+        }
+
+        public List<String[]> getExecutedQueryParameters() {
+            return new ArrayList<String[]>(executedQueryParameters);
+        }
+
+        public void setRowExtSupported(boolean rowExtSupported) {
+            this.rowExtSupported = rowExtSupported;
         }
 
         public boolean isInTransaction() {
@@ -2534,22 +2550,33 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
         @Override
         public Cursor executeQuery(String sql, String[] params) throws IOException {
-            return executeQuery(sql);
+            executedQueries.add(sql);
+            if (params == null) {
+                executedQueryParameters.add(null);
+            } else {
+                String[] copy = new String[params.length];
+                System.arraycopy(params, 0, copy, 0, params.length);
+                executedQueryParameters.add(copy);
+            }
+            return new TestCursor(columns, rows, rowExtSupported);
         }
 
         @Override
         public Cursor executeQuery(String sql) throws IOException {
-            return new TestCursor(columns, rows);
+            executedQueries.add(sql);
+            executedQueryParameters.add(null);
+            return new TestCursor(columns, rows, rowExtSupported);
         }
     }
 
     private static final class TestCursor implements Cursor {
         private final String[] columns;
         private final Object[][] rows;
+        private final boolean rowExtSupported;
         private int index = -1;
         private boolean closed;
 
-        TestCursor(String[] columns, Object[][] rows) {
+        TestCursor(String[] columns, Object[][] rows, boolean rowExtSupported) {
             if (columns == null) {
                 this.columns = new String[0];
             } else {
@@ -2570,6 +2597,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
                     }
                 }
             }
+            this.rowExtSupported = rowExtSupported;
         }
 
         public boolean first() throws IOException {
@@ -2650,13 +2678,20 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             }
             Object[] data = rows[index];
             if (data == null) {
-                return new TestRow(new Object[0]);
+                return createRow(new Object[0]);
+            }
+            return createRow(data);
+        }
+
+        private Row createRow(Object[] data) {
+            if (rowExtSupported) {
+                return new WasNullRow(data);
             }
             return new TestRow(data);
         }
     }
 
-    private static final class TestRow implements Row {
+    private static class TestRow implements Row {
         private final Object[] values;
 
         TestRow(Object[] values) {
@@ -2742,11 +2777,30 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             return value.toString();
         }
 
-        private Object getValue(int index) {
+        protected Object getValue(int index) {
             if (index < 0 || index >= values.length) {
                 return null;
             }
             return values[index];
+        }
+    }
+
+    private static final class WasNullRow extends TestRow implements RowExt {
+        private boolean lastWasNull;
+
+        WasNullRow(Object[] values) {
+            super(values);
+        }
+
+        @Override
+        protected Object getValue(int index) {
+            Object value = super.getValue(index);
+            lastWasNull = value == null;
+            return value;
+        }
+
+        public boolean wasNull() throws IOException {
+            return lastWasNull;
         }
     }
 
