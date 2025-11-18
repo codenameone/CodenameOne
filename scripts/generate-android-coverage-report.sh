@@ -4,6 +4,67 @@ set -euo pipefail
 
 cov_log() { echo "[generate-android-coverage] $1"; }
 
+publish_coverage_preview() {
+  local source_dir="$1" html_index="$2"
+  local server_url="${GITHUB_SERVER_URL:-}" repository="${GITHUB_REPOSITORY:-}" token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+  local run_id="${GITHUB_RUN_ID:-local}" run_attempt="${GITHUB_RUN_ATTEMPT:-1}" actor="${GITHUB_ACTOR:-github-actions[bot]}"
+
+  if [ "$server_url" != "https://github.com" ]; then
+    cov_log "Skipping coverage preview publish (unsupported server: ${server_url:-<unset>})"
+    return 1
+  fi
+  if [ -z "$repository" ] || [ -z "$token" ]; then
+    cov_log "Skipping coverage preview publish (missing repository or token)"
+    return 1
+  fi
+  if [ ! -d "$source_dir" ]; then
+    cov_log "Skipping coverage preview publish (source directory missing: $source_dir)"
+    return 1
+  fi
+  if [ -z "$html_index" ] || [ ! -f "$source_dir/$html_index" ]; then
+    cov_log "Skipping coverage preview publish (HTML index not found: $source_dir/$html_index)"
+    return 1
+  fi
+
+  local tmp_dir run_dir dest_dir remote_url commit_sha raw_base preview_base
+  tmp_dir="$(mktemp -d)"
+  run_dir="runs/${run_id}-${run_attempt}/android-coverage"
+  dest_dir="${tmp_dir}/${run_dir}"
+  mkdir -p "$dest_dir"
+
+  cp -R "$source_dir"/. "$dest_dir"/
+
+  if ! git -C "$tmp_dir" init -b previews >/dev/null 2>&1; then
+    cov_log "Failed to initialize preview git repository"
+    rm -rf "$tmp_dir"
+    return 1
+  fi
+  git -C "$tmp_dir" config user.name "$actor" >/dev/null
+  git -C "$tmp_dir" config user.email "github-actions@users.noreply.github.com" >/dev/null
+  git -C "$tmp_dir" add . >/dev/null
+  if ! git -C "$tmp_dir" commit -m "Publish Android coverage preview for run ${run_id} (attempt ${run_attempt})" >/dev/null 2>&1; then
+    cov_log "No changes to commit for coverage preview"
+    rm -rf "$tmp_dir"
+    return 1
+  fi
+
+  remote_url="${server_url}/${repository}.git"
+  remote_url="${remote_url/https:\/\//https://x-access-token:${token}@}"
+  if ! git -C "$tmp_dir" push --force "$remote_url" previews:quality-report-previews >/dev/null 2>&1; then
+    cov_log "Failed to push coverage preview to quality-report-previews"
+    rm -rf "$tmp_dir"
+    return 1
+  fi
+
+  commit_sha="$(git -C "$tmp_dir" rev-parse HEAD)"
+  raw_base="https://raw.githubusercontent.com/${repository}/${commit_sha}/${run_dir}"
+  preview_base="https://htmlpreview.github.io/?${raw_base}"
+  echo "${preview_base}/${html_index}"
+
+  rm -rf "$tmp_dir"
+  return 0
+}
+
 if [ $# -lt 1 ]; then
   cov_log "Usage: $0 <gradle_project_dir>" >&2
   exit 2
@@ -71,6 +132,11 @@ if [ ! -f "$REPORT_XML_PATH" ]; then
     cov_log "Using fallback coverage XML: $alt_xml"
     REPORT_XML_PATH="$alt_xml"
   fi
+fi
+
+if preview_url=$(publish_coverage_preview "$REPORT_DEST_DIR" "$HTML_INDEX"); then
+  export ANDROID_COVERAGE_HTML_URL="$preview_url"
+  cov_log "Published coverage HTML preview: $ANDROID_COVERAGE_HTML_URL"
 fi
 
 python3 - "$REPORT_XML_PATH" "$SUMMARY_OUT" "$ARTIFACT_NAME" "$HTML_INDEX" <<'PY'
