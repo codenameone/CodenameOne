@@ -9,8 +9,10 @@ name: Test Android build scripts
       - 'scripts/build-android-port.sh'
       - 'scripts/build-android-app.sh'
       - 'scripts/run-android-instrumentation-tests.sh'
+      - 'scripts/generate-android-coverage-report.sh'
       - 'scripts/android/lib/**/*.java'
       - 'scripts/android/tests/**/*.java'
+      - 'scripts/device-runner-app/**/*.java'
       - 'scripts/android/screenshots/**'
       - '!scripts/android/screenshots/**/*.md'
       - 'scripts/templates/**'
@@ -33,8 +35,10 @@ name: Test Android build scripts
       - 'scripts/build-android-port.sh'
       - 'scripts/build-android-app.sh'
       - 'scripts/run-android-instrumentation-tests.sh'
+      - 'scripts/generate-android-coverage-report.sh'
       - 'scripts/android/lib/**/*.java'
       - 'scripts/android/tests/**/*.java'
+      - 'scripts/device-runner-app/**/*.java'
       - 'scripts/android/screenshots/**'
       - '!scripts/android/screenshots/**/*.md'
       - 'scripts/templates/**'
@@ -96,12 +100,22 @@ jobs:
           target: google_apis
           script: |
             ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
+            ./scripts/generate-android-coverage-report.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
       - name: Upload emulator screenshot
         if: always()   # still collect it if tests fail
         uses: actions/upload-artifact@v4
         with:
           name: emulator-screenshot
           path: artifacts/*.png
+          if-no-files-found: warn
+          retention-days: 14
+          compression-level: 6
+      - name: Upload Android Jacoco coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-jacoco-coverage
+          path: artifacts/android-coverage-report
           if-no-files-found: warn
           retention-days: 14
           compression-level: 6
