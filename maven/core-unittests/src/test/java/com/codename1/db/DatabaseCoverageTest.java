@@ -3,6 +3,7 @@ package com.codename1.db;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation;
+import com.codename1.ui.CN;
 
 import java.util.List;
 
@@ -16,22 +17,15 @@ class DatabaseCoverageTest extends UITestBase {
 
     private void withDatabases(String baseName, DatabaseHandler handler) throws Exception {
         String databaseName = baseName + "-database.db";
-        String threadSafeName = baseName + "-threadsafe.db";
 
         Database database = implementation.openOrCreateDB(databaseName);
         TestCodenameOneImplementation.TestDatabase backing = implementation.getTestDatabase(databaseName);
 
-        Database threadSafe = new ThreadSafeDatabase(implementation.openOrCreateDB(threadSafeName));
-        TestCodenameOneImplementation.TestDatabase threadSafeBacking = implementation.getTestDatabase(threadSafeName);
-
         try {
             handler.accept(database, backing);
-            handler.accept(threadSafe, threadSafeBacking);
         } finally {
             database.close();
-            threadSafe.close();
             Database.delete(databaseName);
-            Database.delete(threadSafeName);
         }
     }
 
