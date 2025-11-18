@@ -67,6 +67,7 @@ HTML_INDEX="jacocoAndroidReport/html/index.html"
 python3 - "$REPORT_DEST_DIR/jacocoAndroidReport.xml" "$SUMMARY_OUT" "$ARTIFACT_NAME" "$HTML_INDEX" <<'PY'
 import json
 import sys
+import os
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -79,11 +80,59 @@ data = {
     "artifact": artifact_name,
     "html_index": html_index,
     "counters": {},
+    "top_classes": [],
 }
 
 if not xml_path.is_file():
     json.dump(data, summary_path.open("w", encoding="utf-8"), indent=2)
     sys.exit(0)
+
+def safe_int(value, default=0):
+    try:
+        return int(value)
+    except Exception:
+        return default
+
+
+def format_class_name(package, class_name):
+    pkg = package.replace("/", ".").strip(".")
+    cls = class_name.replace("/", ".")
+    if pkg:
+        return f"{pkg}.{cls}"
+    return cls
+
+
+def parse_class_coverage(root):
+    classes = []
+    for package in root.findall("package"):
+        pkg_name = package.get("name", "")
+        for cls in package.findall("class"):
+            class_name = cls.get("name", "")
+            line_counter = None
+            for counter in cls.findall("counter"):
+                if counter.get("type") == "LINE":
+                    line_counter = counter
+                    break
+            if line_counter is None:
+                continue
+            missed = safe_int(line_counter.get("missed", 0))
+            covered = safe_int(line_counter.get("covered", 0))
+            total = missed + covered
+            if total <= 0:
+                continue
+            pct = covered / total * 100.0
+            classes.append(
+                {
+                    "name": format_class_name(pkg_name, class_name),
+                    "missed": missed,
+                    "covered": covered,
+                    "total": total,
+                    "coverage": pct,
+                }
+            )
+    classes.sort(key=lambda c: (c["coverage"], -c["total"]))
+    return classes[:10]
+
 
 try:
     tree = ET.parse(xml_path)
@@ -92,13 +141,10 @@ except ET.ParseError:
     sys.exit(0)
 
 root = tree.getroot()
-for counter in root.iter("counter"):
+for counter in root.findall("counter"):
     ctype = counter.get("type")
-    try:
-        missed = int(counter.get("missed", 0))
-        covered = int(counter.get("covered", 0))
-    except ValueError:
-        continue
+    missed = safe_int(counter.get("missed", 0))
+    covered = safe_int(counter.get("covered", 0))
     total = missed + covered
     pct = (covered / total * 100.0) if total else 0.0
     data["counters"][ctype] = {
@@ -107,6 +153,12 @@ for counter in root.iter("counter"):
         "total": total,
         "coverage": pct,
     }
+
+data["top_classes"] = parse_class_coverage(root)
+
+html_url_env = os.environ.get("ANDROID_COVERAGE_HTML_URL") or os.environ.get("COVERAGE_HTML_URL")
+if html_url_env:
+    data["html_url"] = html_url_env
 
 json.dump(data, summary_path.open("w", encoding="utf-8"), indent=2)
 PY
