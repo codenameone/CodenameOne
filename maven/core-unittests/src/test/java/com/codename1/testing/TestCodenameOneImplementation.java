@@ -2056,7 +2056,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public Image gaussianBlurImage(Image image, float radius) {
         gaussianBlurInvocations++;
-        return Image.createImage(image); // clone to show usage without altering source
+
+        // clone to show usage without altering source
+        return Image.createImage(image.getImage());
     }
 
     @Override

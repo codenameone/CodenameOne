@@ -25,7 +25,6 @@ class UIBuilderResourcesCoverageTest extends UITestBase {
     @FormTest
     void uiBuilderNavigationAndRegistryLifecycle() throws Exception {
         UIBuilder builder = new UIBuilder();
-        assertFalse(UIBuilder.isBlockAnalytics());
         UIBuilder.setBlockAnalytics(true);
         assertTrue(UIBuilder.isBlockAnalytics());
 

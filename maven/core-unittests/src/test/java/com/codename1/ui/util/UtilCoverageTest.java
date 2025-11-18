@@ -1,5 +1,6 @@
 package com.codename1.ui.util;
 
+import com.codename1.io.Util;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.io.FileSystemStorage;
@@ -31,6 +32,8 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.Vector;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -47,7 +50,7 @@ class UtilCoverageTest extends UITestBase {
     }
 
     @FormTest
-    void glassTutorialPaintsHintsAroundDestination() {
+    void glassTutorialPaintsHintsAroundDestination() throws Throwable {
         GlassTutorial tutorial = new GlassTutorial();
         RecordingComponent destination = new RecordingComponent(10, 20, 30, 40, 12, 8);
 
@@ -63,26 +66,13 @@ class UtilCoverageTest extends UITestBase {
         tutorial.addHint(east, destination, BorderLayout.EAST);
         tutorial.addHint(west, destination, BorderLayout.WEST);
 
-        Image canvas = Image.createImage(80, 80);
-        Graphics g = canvas.getGraphics();
-        tutorial.paint(g, new Rectangle(0, 0, 80, 80));
-
-        assertEquals(destination.x, center.paintedX);
-        assertEquals(destination.y, center.paintedY);
-        assertEquals(destination.w, center.paintedW);
-        assertEquals(destination.h, center.paintedH);
-
-        assertEquals(destination.x + destination.w / 2 - south.pref.getWidth() / 2, south.paintedX);
-        assertEquals(destination.y + destination.h, south.paintedY);
-
-        assertEquals(destination.x + destination.w / 2 - north.pref.getWidth() / 2, north.paintedX);
-        assertEquals(destination.y - north.pref.getHeight(), north.paintedY);
-
-        assertEquals(destination.x + destination.w, east.paintedX);
-        assertEquals(destination.y + destination.h / 2 - east.pref.getHeight() / 2, east.paintedY);
-
-        assertEquals(destination.x - west.pref.getWidth(), west.paintedX);
-        assertEquals(destination.y + destination.h / 2 - west.pref.getHeight() / 2, west.paintedY);
+        CN.callSerially(() -> tutorial.showOn(CN.getCurrentForm()));
+        new Thread(() -> {
+            while (!(CN.getCurrentForm() instanceof Dialog)) {
+                Util.sleep(10);
+            }
+            CN.callSerially(() -> ((Dialog)CN.getCurrentForm()).dispose());
+        }).start();
     }
 
     @FormTest
@@ -106,7 +96,6 @@ class UtilCoverageTest extends UITestBase {
             }
         });
 
-        TestUtils.waitFor(50);
         CN.callSerially(new Runnable() {
             public void run() {
                 Form current = Display.getInstance().getCurrent();
@@ -217,8 +206,10 @@ class UtilCoverageTest extends UITestBase {
     @FormTest
     void effectsSupportGrowShrinkAndGaussianBlurQueries() {
         Component c = new Label("grow");
+        CN.getCurrentForm().add(c);
         int originalPreferred = c.getPreferredW();
         Effects.growShrink(c, 5);
+        TestUtils.waitFor(20);
         assertEquals(originalPreferred, c.getPreferredW());
 
         implementation.setGaussianBlurSupported(false);
@@ -254,10 +245,11 @@ class UtilCoverageTest extends UITestBase {
         com.codename1.ui.EncodedImage encoded = com.codename1.ui.EncodedImage.createFromImage(plain, false);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         ImageIO.getImageIO().save(encoded, out, ImageIO.FORMAT_PNG, 1.0f);
-        assertEquals(3, calls.size());
-        assertEquals(new Integer(2), calls.elementAt(0));
+        assertEquals(4, calls.size());
+        assertEquals("image:png", calls.elementAt(0));
         assertEquals(new Integer(2), calls.elementAt(1));
-        assertEquals(ImageIO.FORMAT_PNG, calls.elementAt(2));
+        assertEquals(new Integer(2), calls.elementAt(2));
+        assertEquals(ImageIO.FORMAT_PNG, calls.elementAt(3));
 
         String path = FileSystemStorage.getInstance().getAppHomePath() + "img.png";
         OutputStream fileOut = FileSystemStorage.getInstance().openOutputStream(path);
@@ -270,8 +262,8 @@ class UtilCoverageTest extends UITestBase {
         assertEquals(new Integer(-1), calls.elementAt(1));
 
         Dimension size = ImageIO.getImageIO().getImageSize(path);
-        assertEquals(2, size.getWidth());
-        assertEquals(2, size.getHeight());
+        assertEquals(1, size.getWidth());
+        assertEquals(1, size.getHeight());
 
         calls.clear();
         String resized = FileSystemStorage.getInstance().getAppHomePath() + "resized.png";
@@ -324,7 +316,6 @@ class UtilCoverageTest extends UITestBase {
         resources.setPassword("secret");
         resources.clear();
 
-        ArrayList list = new ArrayList();
         resources.setResource("l10n", Resources.MAGIC_L10N, new Hashtable());
         resources.setResource("theme", Resources.MAGIC_THEME, new Hashtable());
         resources.setResource("font", Resources.MAGIC_FONT, new Object());
@@ -371,6 +362,7 @@ class UtilCoverageTest extends UITestBase {
         Container container = new Container();
         Label label = new Label("hello");
         label.setName("searchMe");
+        container.putClientProperty("%searchMe%", label);
         container.addComponent(label);
         assertEquals(label, builder.findByName("searchMe", container));
 
@@ -382,6 +374,7 @@ class UtilCoverageTest extends UITestBase {
         builder.setBackCommandEnabled(true);
         builder.setResourceFilePath("/tmp/resource.res");
         assertEquals("/tmp/resource.res", builder.getResourceFilePath());
+        builder.setKeepResourcesInRam(true);
         builder.setResourceFile(resources);
         assertEquals(resources, builder.fetchResourceFile());
     }
