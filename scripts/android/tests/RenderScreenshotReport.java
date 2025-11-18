@@ -231,35 +231,47 @@ public class RenderScreenshotReport {
         }
         commentLines.add("### Native Android coverage");
         commentLines.add("");
+
         CoverageCounter lineCounter = coverage.counters().get("LINE");
         if (lineCounter != null) {
-            commentLines.add(String.format("- **Line coverage**: %.2f%% (%d/%d lines covered)",
+            commentLines.add(String.format("- **Overall line coverage**: %.2f%% (%d/%d lines covered)",
                     lineCounter.coverage(), lineCounter.covered(), lineCounter.total()));
         }
+
         if (!coverage.counters().isEmpty()) {
+            List<String> counterSummaries = new ArrayList<>();
             for (Map.Entry<String, CoverageCounter> entry : coverage.counters().entrySet()) {
                 if ("LINE".equals(entry.getKey())) {
                     continue;
                 }
                 CoverageCounter counter = entry.getValue();
-                commentLines.add(String.format("- **%s**: %.2f%% (%d/%d covered)",
+                counterSummaries.add(String.format("%s %.2f%% (%d/%d)",
                         entry.getKey().toLowerCase(), counter.coverage(), counter.covered(), counter.total()));
             }
+            if (!counterSummaries.isEmpty()) {
+                commentLines.add("- Other counters: " + String.join(", ", counterSummaries));
+            }
         }
+
         if (!coverage.topClasses().isEmpty()) {
             commentLines.add("");
             commentLines.add("Lowest-covered classes (by line coverage):");
             int rank = 1;
             for (CoverageClass cls : coverage.topClasses()) {
+                if (rank > 10) {
+                    break;
+                }
                 commentLines.add(String.format("  %d. `%s` — %.2f%% (%d/%d lines covered)",
                         rank++, cls.name(), cls.coverage(), cls.covered(), cls.total()));
             }
         }
+
         if (coverage.htmlUrl() != null && !coverage.htmlUrl().isEmpty()) {
-            commentLines.add(String.format("- [HTML report](%s)", coverage.htmlUrl()));
+            commentLines.add(String.format("- [Live HTML report](%s)", coverage.htmlUrl()));
         } else if (coverage.artifact() != null && coverage.htmlIndex() != null) {
             commentLines.add(String.format("- HTML report saved in artifact `%s` at `%s`", coverage.artifact(), coverage.htmlIndex()));
         }
+
         commentLines.add("");
     }
 
