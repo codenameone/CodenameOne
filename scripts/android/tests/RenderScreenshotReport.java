@@ -233,9 +233,12 @@ public class RenderScreenshotReport {
         commentLines.add("");
 
         CoverageCounter lineCounter = coverage.counters().get("LINE");
+        String linkText = formatCoverageLinks(coverage);
         if (lineCounter != null) {
-            commentLines.add(String.format("- **Overall line coverage**: %.2f%% (%d/%d lines covered)",
-                    lineCounter.coverage(), lineCounter.covered(), lineCounter.total()));
+            commentLines.add(String.format("- 📊 **Line coverage:** %.2f%% (%d/%d lines covered)%s",
+                    lineCounter.coverage(), lineCounter.covered(), lineCounter.total(), linkText));
+        } else if (!linkText.isEmpty()) {
+            commentLines.add("- 📊 Coverage report:" + linkText);
         }
 
         if (!coverage.counters().isEmpty()) {
@@ -249,30 +252,43 @@ public class RenderScreenshotReport {
                         entry.getKey().toLowerCase(), counter.coverage(), counter.covered(), counter.total()));
             }
             if (!counterSummaries.isEmpty()) {
-                commentLines.add("- Other counters: " + String.join(", ", counterSummaries));
+                commentLines.add("  - Other counters: " + String.join(", ", counterSummaries));
             }
         }
 
         if (!coverage.topClasses().isEmpty()) {
-            commentLines.add("");
-            commentLines.add("Lowest-covered classes (by line coverage):");
+            commentLines.add("  - **Lowest covered classes**");
             int rank = 1;
             for (CoverageClass cls : coverage.topClasses()) {
                 if (rank > 10) {
                     break;
                 }
-                commentLines.add(String.format("  %d. `%s` — %.2f%% (%d/%d lines covered)",
-                        rank++, cls.name(), cls.coverage(), cls.covered(), cls.total()));
+                commentLines.add(String.format("    - `%s` – %.2f%% (%d/%d lines covered)",
+                        cls.name(), cls.coverage(), cls.covered(), cls.total()));
+                rank++;
             }
         }
 
-        if (coverage.htmlUrl() != null && !coverage.htmlUrl().isEmpty()) {
-            commentLines.add(String.format("- [Live HTML report](%s)", coverage.htmlUrl()));
-        } else if (coverage.artifact() != null && coverage.htmlIndex() != null) {
-            commentLines.add(String.format("- HTML report saved in artifact `%s` at `%s`", coverage.artifact(), coverage.htmlIndex()));
+        if (lineCounter == null && coverage.topClasses().isEmpty() && linkText.isEmpty()) {
+            commentLines.add("- Coverage summary not available.");
         }
 
         commentLines.add("");
+    }
+
+    private static String formatCoverageLinks(CoverageSummary coverage) {
+        List<String> links = new ArrayList<>();
+        if (coverage.htmlUrl() != null && !coverage.htmlUrl().isEmpty()) {
+            links.add(String.format(" [[HTML preview]](%s)", coverage.htmlUrl()));
+        }
+        if (coverage.artifact() != null) {
+            if (coverage.htmlIndex() != null && !coverage.htmlIndex().isEmpty()) {
+                links.add(String.format(" (artifact `%s`, %s)", coverage.artifact(), coverage.htmlIndex()));
+            } else {
+                links.add(String.format(" (artifact `%s`)", coverage.artifact()));
+            }
+        }
+        return String.join("", links);
     }
 
     private static Map<String, Object> commentEntry(

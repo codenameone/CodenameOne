@@ -63,8 +63,17 @@ cp -R "$REPORT_SOURCE_DIR"/ "${REPORT_DEST_DIR}"/
 SUMMARY_OUT="$REPORT_DEST_DIR/coverage-summary.json"
 ARTIFACT_NAME="android-coverage-report"
 HTML_INDEX="jacocoAndroidReport/html/index.html"
+REPORT_XML_PATH="$REPORT_DEST_DIR/jacocoAndroidReport.xml"
 
-python3 - "$REPORT_DEST_DIR/jacocoAndroidReport.xml" "$SUMMARY_OUT" "$ARTIFACT_NAME" "$HTML_INDEX" <<'PY'
+if [ ! -f "$REPORT_XML_PATH" ]; then
+  alt_xml="$(find "$REPORT_DEST_DIR" -maxdepth 3 -type f -name '*.xml' | head -n1)"
+  if [ -n "$alt_xml" ]; then
+    cov_log "Using fallback coverage XML: $alt_xml"
+    REPORT_XML_PATH="$alt_xml"
+  fi
+fi
+
+python3 - "$REPORT_XML_PATH" "$SUMMARY_OUT" "$ARTIFACT_NAME" "$HTML_INDEX" <<'PY'
 import json
 import sys
 import os
