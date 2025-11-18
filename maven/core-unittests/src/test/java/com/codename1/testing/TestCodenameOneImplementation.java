@@ -2691,7 +2691,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
     }
 
-    private static final class TestRow implements Row {
+    private static class TestRow implements Row {
         private final Object[] values;
 
         TestRow(Object[] values) {
