@@ -30,7 +30,9 @@ public class RenderScreenshotReport {
         String title = arguments.title != null ? arguments.title : DEFAULT_TITLE;
         String successMessage = arguments.successMessage != null ? arguments.successMessage : DEFAULT_SUCCESS_MESSAGE;
 
-        SummaryAndComment output = buildSummaryAndComment(data, title, marker, successMessage);
+        CoverageSummary coverage = loadCoverage(arguments.coverageSummary, arguments.coverageHtmlUrl);
+
+        SummaryAndComment output = buildSummaryAndComment(data, title, marker, successMessage, coverage);
         writeLines(arguments.summaryOut, output.summaryLines);
         writeLines(arguments.commentOut, output.commentLines);
     }
@@ -49,12 +51,14 @@ public class RenderScreenshotReport {
         Files.writeString(path, sb.toString(), StandardCharsets.UTF_8);
     }
 
-    private static SummaryAndComment buildSummaryAndComment(Map<String, Object> data, String title, String marker, String successMessage) {
+    private static SummaryAndComment buildSummaryAndComment(Map<String, Object> data, String title, String marker, String successMessage, CoverageSummary coverage) {
         List<String> summaryLines = new ArrayList<>();
         List<String> commentLines = new ArrayList<>();
         Object resultsObj = data.get("results");
         List<Object> results = resultsObj instanceof List<?> list ? (List<Object>) list : List.of();
         List<Map<String, Object>> commentEntries = new ArrayList<>();
+        ComparisonSummary comparisonSummary = new ComparisonSummary();
+        boolean comparisonOverviewAdded = false;
         for (Object item : results) {
             Map<String, Object> result = JsonUtil.asObject(item);
             String test = stringValue(result.get("test"), "unknown");
@@ -117,13 +121,17 @@ public class RenderScreenshotReport {
             }
             String noteColumn = previewNote != null ? previewNote : base64Note != null ? base64Note : "";
             summaryLines.add(String.join("|", List.of(status, test, message, copyFlag, actualPath, noteColumn)));
+            comparisonSummary = comparisonSummary.record(status);
         }
+
+        appendCoverageSummary(summaryLines, coverage);
 
         if (!commentEntries.isEmpty()) {
             if (title != null && !title.isEmpty()) {
                 commentLines.add("### " + title);
                 commentLines.add("");
             }
+            comparisonOverviewAdded = appendComparisonOverview(commentLines, comparisonSummary);
             for (Map<String, Object> entry : commentEntries) {
                 String test = stringValue(entry.get("test"), "");
                 String status = stringValue(entry.get("status"), "");
@@ -132,16 +140,155 @@ public class RenderScreenshotReport {
                 addPreviewSection(commentLines, entry);
                 commentLines.add("");
             }
-            if (!commentLines.isEmpty() && !commentLines.get(commentLines.size() - 1).isEmpty()) {
-                commentLines.add("");
-            }
-            commentLines.add(marker);
-        } else {
+        }
+
+        if (!comparisonOverviewAdded) {
+            comparisonOverviewAdded = appendComparisonOverview(commentLines, comparisonSummary);
+        }
+
+        appendCoverageComment(commentLines, coverage);
+
+        if (commentLines.isEmpty()) {
             commentLines.add(successMessage != null ? successMessage : DEFAULT_SUCCESS_MESSAGE);
             commentLines.add("");
+            comparisonOverviewAdded = appendComparisonOverview(commentLines, comparisonSummary);
+            appendCoverageComment(commentLines, coverage);
+        } else if (commentLines.size() == 1 && commentLines.get(0).isEmpty()) {
+            commentLines.add(successMessage != null ? successMessage : DEFAULT_SUCCESS_MESSAGE);
+            commentLines.add("");
+            comparisonOverviewAdded = appendComparisonOverview(commentLines, comparisonSummary);
+            appendCoverageComment(commentLines, coverage);
+        }
+
+        if (commentLines.isEmpty()) {
+            commentLines.add(successMessage != null ? successMessage : DEFAULT_SUCCESS_MESSAGE);
+            commentLines.add("");
+            appendComparisonOverview(commentLines, comparisonSummary);
+        }
+
+        if (marker != null && !marker.isEmpty()) {
             commentLines.add(marker);
         }
         return new SummaryAndComment(summaryLines, commentLines);
+    }
+
+    private static boolean appendComparisonOverview(List<String> commentLines, ComparisonSummary summary) {
+        if (summary.total == 0) {
+            return false;
+        }
+        if (!commentLines.isEmpty() && !commentLines.get(commentLines.size() - 1).isEmpty()) {
+            commentLines.add("");
+        }
+        List<String> parts = new ArrayList<>();
+        parts.add(summary.total + (summary.total == 1 ? " screenshot" : " screenshots"));
+        List<String> statusParts = new ArrayList<>();
+        statusParts.add(summary.equal + (summary.equal == 1 ? " matched" : " matched"));
+        if (summary.different > 0) {
+            statusParts.add(summary.different + (summary.different == 1 ? " updated" : " updated"));
+        }
+        if (summary.missingExpected > 0) {
+            statusParts.add(summary.missingExpected + (summary.missingExpected == 1 ? " missing reference" : " missing references"));
+        }
+        if (summary.missingActual > 0) {
+            statusParts.add(summary.missingActual + (summary.missingActual == 1 ? " missing actual" : " missing actuals"));
+        }
+        if (summary.errors > 0) {
+            statusParts.add(summary.errors + (summary.errors == 1 ? " error" : " errors"));
+        }
+        if (summary.other > 0) {
+            statusParts.add(summary.other + (summary.other == 1 ? " other" : " other"));
+        }
+        commentLines.add("Compared " + String.join("; ", parts) + ": " + String.join(", ", statusParts) + ".");
+        return true;
+    }
+
+    private static void appendCoverageSummary(List<String> summaryLines, CoverageSummary coverage) {
+        if (coverage == null || coverage.counters().isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, CoverageCounter> entry : coverage.counters().entrySet()) {
+            CoverageCounter counter = entry.getValue();
+            summaryLines.add(String.join("|", List.of(
+                    "coverage",
+                    entry.getKey().toLowerCase(),
+                    String.format("%s/%s (%.2f%%)", counter.covered(), counter.total(), counter.coverage()),
+                    "0",
+                    coverage.htmlIndex() != null ? coverage.htmlIndex() : "",
+                    coverage.artifact() != null ? coverage.artifact() : ""
+            )));
+        }
+    }
+
+    private static void appendCoverageComment(List<String> commentLines, CoverageSummary coverage) {
+        if (coverage == null) {
+            return;
+        }
+        if (coverage.counters().isEmpty() && (coverage.htmlIndex() == null || coverage.artifact() == null)) {
+            return;
+        }
+        if (!commentLines.isEmpty() && !commentLines.get(commentLines.size() - 1).isEmpty()) {
+            commentLines.add("");
+        }
+        commentLines.add("### Native Android coverage");
+        commentLines.add("");
+
+        CoverageCounter lineCounter = coverage.counters().get("LINE");
+        String linkText = formatCoverageLinks(coverage);
+        if (lineCounter != null) {
+            commentLines.add(String.format("- 📊 **Line coverage:** %.2f%% (%d/%d lines covered)%s",
+                    lineCounter.coverage(), lineCounter.covered(), lineCounter.total(), linkText));
+        } else if (!linkText.isEmpty()) {
+            commentLines.add("- 📊 Coverage report:" + linkText);
+        }
+
+        if (!coverage.counters().isEmpty()) {
+            List<String> counterSummaries = new ArrayList<>();
+            for (Map.Entry<String, CoverageCounter> entry : coverage.counters().entrySet()) {
+                if ("LINE".equals(entry.getKey())) {
+                    continue;
+                }
+                CoverageCounter counter = entry.getValue();
+                counterSummaries.add(String.format("%s %.2f%% (%d/%d)",
+                        entry.getKey().toLowerCase(), counter.coverage(), counter.covered(), counter.total()));
+            }
+            if (!counterSummaries.isEmpty()) {
+                commentLines.add("  - Other counters: " + String.join(", ", counterSummaries));
+            }
+        }
+
+        if (!coverage.topClasses().isEmpty()) {
+            commentLines.add("  - **Lowest covered classes**");
+            int rank = 1;
+            for (CoverageClass cls : coverage.topClasses()) {
+                if (rank > 10) {
+                    break;
+                }
+                commentLines.add(String.format("    - `%s` – %.2f%% (%d/%d lines covered)",
+                        cls.name(), cls.coverage(), cls.covered(), cls.total()));
+                rank++;
+            }
+        }
+
+        if (lineCounter == null && coverage.topClasses().isEmpty() && linkText.isEmpty()) {
+            commentLines.add("- Coverage summary not available.");
+        }
+
+        commentLines.add("");
+    }
+
+    private static String formatCoverageLinks(CoverageSummary coverage) {
+        List<String> links = new ArrayList<>();
+        if (coverage.htmlUrl() != null && !coverage.htmlUrl().isEmpty()) {
+            links.add(String.format(" [[HTML preview]](%s)", coverage.htmlUrl()));
+        }
+        if (coverage.artifact() != null) {
+            if (coverage.htmlIndex() != null && !coverage.htmlIndex().isEmpty()) {
+                links.add(String.format(" (artifact `%s`, %s)", coverage.artifact(), coverage.htmlIndex()));
+            } else {
+                links.add(String.format(" (artifact `%s`)", coverage.artifact()));
+            }
+        }
+        return String.join("", links);
     }
 
     private static Map<String, Object> commentEntry(
@@ -269,14 +416,18 @@ public class RenderScreenshotReport {
         final String marker;
         final String title;
         final String successMessage;
+        final Path coverageSummary;
+        final String coverageHtmlUrl;
 
-        private Arguments(Path compareJson, Path commentOut, Path summaryOut, String marker, String title, String successMessage) {
+        private Arguments(Path compareJson, Path commentOut, Path summaryOut, String marker, String title, String successMessage, Path coverageSummary, String coverageHtmlUrl) {
             this.compareJson = compareJson;
             this.commentOut = commentOut;
             this.summaryOut = summaryOut;
             this.marker = marker;
             this.title = title;
             this.successMessage = successMessage;
+            this.coverageSummary = coverageSummary;
+            this.coverageHtmlUrl = coverageHtmlUrl;
         }
 
         static Arguments parse(String[] args) {
@@ -286,6 +437,8 @@ public class RenderScreenshotReport {
             String marker = null;
             String title = null;
             String successMessage = null;
+            Path coverageSummary = null;
+            String coverageHtmlUrl = null;
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
                 switch (arg) {
@@ -331,6 +484,20 @@ public class RenderScreenshotReport {
                         }
                         successMessage = args[i];
                     }
+                    case "--coverage-summary" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --coverage-summary");
+                            return null;
+                        }
+                        coverageSummary = Path.of(args[i]);
+                    }
+                    case "--coverage-html-url" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --coverage-html-url");
+                            return null;
+                        }
+                        coverageHtmlUrl = args[i];
+                    }
                     default -> {
                         System.err.println("Unknown argument: " + arg);
                         return null;
@@ -341,7 +508,105 @@ public class RenderScreenshotReport {
                 System.err.println("--compare-json, --comment-out, and --summary-out are required");
                 return null;
             }
-            return new Arguments(compare, comment, summary, marker, title, successMessage);
+            return new Arguments(compare, comment, summary, marker, title, successMessage, coverageSummary, coverageHtmlUrl);
+        }
+    }
+
+    private static CoverageSummary loadCoverage(Path summaryPath, String htmlUrlOverride) {
+        if (summaryPath == null) {
+            return null;
+        }
+        if (!Files.isRegularFile(summaryPath)) {
+            return null;
+        }
+        try {
+            String text = Files.readString(summaryPath, StandardCharsets.UTF_8);
+            Object parsed = JsonUtil.parse(text);
+            Map<String, Object> obj = JsonUtil.asObject(parsed);
+            String artifact = stringValue(obj.get("artifact"), null);
+            String htmlIndex = stringValue(obj.get("html_index"), null);
+            String htmlUrl = htmlUrlOverride != null ? htmlUrlOverride : stringValue(obj.get("html_url"), null);
+            Map<String, CoverageCounter> counters = new LinkedHashMap<>();
+            Map<String, Object> counterMap = JsonUtil.asObject(obj.get("counters"));
+            for (Map.Entry<String, Object> entry : counterMap.entrySet()) {
+                Map<String, Object> counterObj = JsonUtil.asObject(entry.getValue());
+                Integer covered = toInteger(counterObj.get("covered"));
+                Integer total = toInteger(counterObj.get("total"));
+                Integer missed = toInteger(counterObj.get("missed"));
+                Double coverage = null;
+                if (counterObj.get("coverage") instanceof Number number) {
+                    coverage = number.doubleValue();
+                }
+                if (covered != null && total != null && coverage != null && missed != null) {
+                    counters.put(entry.getKey(), new CoverageCounter(covered, total, coverage, missed));
+                }
+            }
+            List<CoverageClass> lowestCoverage = new ArrayList<>();
+            for (Object item : JsonUtil.asArray(obj.get("top_classes"))) {
+                Map<String, Object> classObj = JsonUtil.asObject(item);
+                String name = stringValue(classObj.get("name"), null);
+                Integer covered = toInteger(classObj.get("covered"));
+                Integer total = toInteger(classObj.get("total"));
+                Double coverage = classObj.get("coverage") instanceof Number number ? number.doubleValue() : null;
+                if (name != null && covered != null && total != null && coverage != null) {
+                    lowestCoverage.add(new CoverageClass(name, covered, total, coverage));
+                }
+            }
+            return new CoverageSummary(counters, artifact, htmlIndex, htmlUrl, lowestCoverage);
+        } catch (IOException ignored) {
+            return null;
+        }
+    }
+
+    private record CoverageSummary(Map<String, CoverageCounter> counters, String artifact, String htmlIndex, String htmlUrl, List<CoverageClass> topClasses) {
+    }
+
+    private record CoverageCounter(int covered, int total, double coverage, int missed) {
+    }
+
+    private record CoverageClass(String name, int covered, int total, double coverage) {
+    }
+
+    private static class ComparisonSummary {
+        final int total;
+        final int equal;
+        final int different;
+        final int missingExpected;
+        final int missingActual;
+        final int errors;
+        final int other;
+
+        ComparisonSummary() {
+            this(0, 0, 0, 0, 0, 0, 0);
+        }
+
+        ComparisonSummary(int total, int equal, int different, int missingExpected, int missingActual, int errors, int other) {
+            this.total = total;
+            this.equal = equal;
+            this.different = different;
+            this.missingExpected = missingExpected;
+            this.missingActual = missingActual;
+            this.errors = errors;
+            this.other = other;
+        }
+
+        ComparisonSummary record(String status) {
+            int t = total + 1;
+            int eq = equal;
+            int diff = different;
+            int mex = missingExpected;
+            int mac = missingActual;
+            int err = errors;
+            int oth = other;
+            switch (status) {
+                case "equal" -> eq++;
+                case "different" -> diff++;
+                case "missing_expected" -> mex++;
+                case "missing_actual" -> mac++;
+                case "error" -> err++;
+                default -> oth++;
+            }
+            return new ComparisonSummary(t, eq, diff, mex, mac, err, oth);
         }
     }
 }

@@ -47,6 +47,7 @@ SCREENSHOT_REF_DIR="$SCRIPT_DIR/android/screenshots"
 SCREENSHOT_TMP_DIR="$(mktemp -d "${TMPDIR}/cn1ss-XXXXXX" 2>/dev/null || echo "${TMPDIR}/cn1ss-tmp")"
 ensure_dir "$SCREENSHOT_TMP_DIR"
 SCREENSHOT_PREVIEW_DIR="$SCREENSHOT_TMP_DIR/previews"
+COVERAGE_SUMMARY="$ARTIFACTS_DIR/android-coverage-report/coverage-summary.json"
 
 ra_log "Loading workspace environment from $ENV_FILE"
 [ -f "$ENV_FILE" ] || { ra_log "Missing env file: $ENV_FILE"; exit 3; }
@@ -143,6 +144,17 @@ done
 
 sleep 3
 
+ra_log "STAGE:COVERAGE -> Collecting Jacoco coverage report"
+if ARTIFACTS_DIR="$ARTIFACTS_DIR" "$SCRIPT_DIR/generate-android-coverage-report.sh" "$GRADLE_PROJECT_DIR"; then
+  if [ -f "$COVERAGE_SUMMARY" ]; then
+    ra_log "  -> Coverage summary detected at $COVERAGE_SUMMARY"
+  else
+    ra_log "  -> Coverage summary not found after report generation"
+  fi
+else
+  ra_log "WARNING: Coverage report generation failed; continuing without coverage details"
+fi
+
 declare -a CN1SS_SOURCES=("LOGCAT:$TEST_LOG")
 
 
@@ -231,10 +243,16 @@ SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"
 COMMENT_FILE="$SCREENSHOT_TMP_DIR/screenshot-comment.md"
 
 ra_log "STAGE:COMMENT_BUILD -> Rendering summary and PR comment markdown"
-if ! cn1ss_java_run "$RENDER_SCREENSHOT_REPORT_CLASS" \
-  --compare-json "$COMPARE_JSON" \
-  --comment-out "$COMMENT_FILE" \
-  --summary-out "$SUMMARY_FILE"; then
+render_args=(
+  --compare-json "$COMPARE_JSON"
+  --comment-out "$COMMENT_FILE"
+  --summary-out "$SUMMARY_FILE"
+  --coverage-summary "$COVERAGE_SUMMARY"
+)
+if [ -n "${ANDROID_COVERAGE_HTML_URL:-}" ]; then
+  render_args+=(--coverage-html-url "${ANDROID_COVERAGE_HTML_URL}")
+fi
+if ! cn1ss_java_run "$RENDER_SCREENSHOT_REPORT_CLASS" "${render_args[@]}"; then
   ra_log "FATAL: Failed to render screenshot summary/comment"
   exit 14
 fi
