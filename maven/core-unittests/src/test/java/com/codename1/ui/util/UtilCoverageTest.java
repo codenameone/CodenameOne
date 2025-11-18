@@ -101,18 +101,21 @@ class UtilCoverageTest extends UITestBase {
         final boolean[] finished = new boolean[1];
         CN.callSerially(new Runnable() {
             public void run() {
+                new Thread(new Runnable() {
+                    public void run() {
+                        TestUtils.waitFor(100);
+                        CN.callSerially(new Runnable() {
+                            public void run() {
+                                Form current = Display.getInstance().getCurrent();
+                                if (current instanceof Dialog) {
+                                    ((Dialog) current).dispose();
+                                }
+                            }
+                        });
+                    }
+                }).start();
                 tutorial.showOn(form);
                 finished[0] = true;
-            }
-        });
-
-        TestUtils.waitFor(50);
-        CN.callSerially(new Runnable() {
-            public void run() {
-                Form current = Display.getInstance().getCurrent();
-                if (current instanceof Dialog) {
-                    ((Dialog) current).dispose();
-                }
             }
         });
 
