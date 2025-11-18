@@ -60,4 +60,58 @@ rm -rf "$REPORT_DEST_DIR"
 mkdir -p "$REPORT_DEST_DIR"
 cp -R "$REPORT_SOURCE_DIR"/ "${REPORT_DEST_DIR}"/
 
+SUMMARY_OUT="$REPORT_DEST_DIR/coverage-summary.json"
+ARTIFACT_NAME="android-coverage-report"
+HTML_INDEX="jacocoAndroidReport/html/index.html"
+
+python3 - "$REPORT_DEST_DIR/jacocoAndroidReport.xml" "$SUMMARY_OUT" "$ARTIFACT_NAME" "$HTML_INDEX" <<'PY'
+import json
+import sys
+from pathlib import Path
+from xml.etree import ElementTree as ET
+
+xml_path = Path(sys.argv[1])
+summary_path = Path(sys.argv[2])
+artifact_name = sys.argv[3]
+html_index = sys.argv[4]
+
+data = {
+    "artifact": artifact_name,
+    "html_index": html_index,
+    "counters": {},
+}
+
+if not xml_path.is_file():
+    json.dump(data, summary_path.open("w", encoding="utf-8"), indent=2)
+    sys.exit(0)
+
+try:
+    tree = ET.parse(xml_path)
+except ET.ParseError:
+    json.dump(data, summary_path.open("w", encoding="utf-8"), indent=2)
+    sys.exit(0)
+
+root = tree.getroot()
+for counter in root.iter("counter"):
+    ctype = counter.get("type")
+    try:
+        missed = int(counter.get("missed", 0))
+        covered = int(counter.get("covered", 0))
+    except ValueError:
+        continue
+    total = missed + covered
+    pct = (covered / total * 100.0) if total else 0.0
+    data["counters"][ctype] = {
+        "missed": missed,
+        "covered": covered,
+        "total": total,
+        "coverage": pct,
+    }
+
+json.dump(data, summary_path.open("w", encoding="utf-8"), indent=2)
+PY
+
 cov_log "Copied Jacoco coverage report to $REPORT_DEST_DIR"
+if [ -f "$SUMMARY_OUT" ]; then
+  cov_log "Wrote coverage summary to $SUMMARY_OUT"
+fi
