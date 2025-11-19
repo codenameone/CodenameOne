@@ -66,6 +66,11 @@ fi
 
 CN1SS_JAVAC_BIN="$JAVAC_BIN"
 
+if ! command -v python3 >/dev/null 2>&1; then
+  jd_log "python3 binary not found" >&2
+  exit 2
+fi
+
 cn1ss_setup "$JAVA_BIN" "$CN1SS_HELPER_SOURCE_DIR"
 
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts/desktop-device-runner}"
@@ -101,14 +106,65 @@ rsync -a "$TEST_SRC/" "$BUILD_DIR/src/"
 jd_log "Compiling device-runner application sources"
 find "$BUILD_DIR/src" -name '*.java' -print0 | xargs -0 "$JAVAC_BIN" -cp "$CN1_CLASSPATH" -d "$BUILD_DIR/classes"
 
-JAVA_CMD=(timeout --foreground --kill-after=30s 7m xvfb-run -a "$JAVA_BIN" \
+SIM_TIMEOUT_SECONDS=${SIM_TIMEOUT_SECONDS:-420}
+SIM_KILL_GRACE_SECONDS=${SIM_KILL_GRACE_SECONDS:-30}
+JAVA_CMD=(xvfb-run -a "$JAVA_BIN" \
   -cp "$CN1_CLASSPATH:$BUILD_DIR/classes" \
   com.codename1.impl.javase.Simulator com.codenameone.examples.hellocodenameone.HelloCodenameOne)
 
+run_with_timeout() {
+  python3 - "$@" <<'PY'
+import os
+import signal
+import subprocess
+import sys
+
+def kill_process_group(proc, sig):
+    try:
+        os.killpg(proc.pid, sig)
+    except ProcessLookupError:
+        pass
+
+def main():
+    if len(sys.argv) < 4:
+        raise SystemExit(2)
+    timeout_seconds = int(sys.argv[1])
+    kill_grace = int(sys.argv[2])
+    log_path = sys.argv[3]
+    cmd = sys.argv[4:]
+    with open(log_path, 'ab', buffering=0) as log_file:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            preexec_fn=os.setsid,
+        )
+        try:
+            proc.wait(timeout=timeout_seconds)
+            sys.exit(proc.returncode)
+        except subprocess.TimeoutExpired:
+            kill_process_group(proc, signal.SIGTERM)
+            try:
+                proc.wait(timeout=kill_grace)
+            except subprocess.TimeoutExpired:
+                kill_process_group(proc, signal.SIGKILL)
+                proc.wait()
+            sys.exit(124)
+
+if __name__ == '__main__':
+    main()
+PY
+}
+
 jd_log "Launching Java SE simulator for device-runner app"
+: >"$LOG_FILE"
 set +e
-"${JAVA_CMD[@]}" >"$LOG_FILE" 2>&1
+tail -n0 -F "$LOG_FILE" &
+TAIL_PID=$!
+run_with_timeout "$SIM_TIMEOUT_SECONDS" "$SIM_KILL_GRACE_SECONDS" "$LOG_FILE" "${JAVA_CMD[@]}"
 rc=$?
+kill "$TAIL_PID" 2>/dev/null || true
+wait "$TAIL_PID" 2>/dev/null || true
 set -e
 
 if [ $rc -ne 0 ]; then
