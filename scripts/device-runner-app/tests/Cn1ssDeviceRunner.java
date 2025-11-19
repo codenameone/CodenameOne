@@ -9,7 +9,12 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     private static final String[] TEST_CLASSES = new String[] {
             MainScreenScreenshotTest.class.getName(),
             BrowserComponentScreenshotTest.class.getName(),
-            MediaPlaybackScreenshotTest.class.getName()
+            MediaPlaybackScreenshotTest.class.getName(),
+            GraphicsPipelineScreenshotTest.class.getName(),
+            GraphicsShapesAndGradientsScreenshotTest.class.getName(),
+            GraphicsStateAndTextScreenshotTest.class.getName(),
+            GraphicsTransformationsScreenshotTest.class.getName(),
+            GraphicsMethodsScreenshotTest.class.getName()
     };
 
     public void runSuite() {
