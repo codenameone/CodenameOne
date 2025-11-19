@@ -101,7 +101,8 @@ rsync -a "$TEST_SRC/" "$BUILD_DIR/src/"
 jd_log "Compiling device-runner application sources"
 find "$BUILD_DIR/src" -name '*.java' -print0 | xargs -0 "$JAVAC_BIN" -cp "$CN1_CLASSPATH" -d "$BUILD_DIR/classes"
 
-JAVA_CMD=(xvfb-run -a timeout 7m "$JAVA_BIN" -cp "$CN1_CLASSPATH:$BUILD_DIR/classes" \
+JAVA_CMD=(timeout --foreground --kill-after=30s 7m xvfb-run -a "$JAVA_BIN" \
+  -cp "$CN1_CLASSPATH:$BUILD_DIR/classes" \
   com.codename1.impl.javase.Simulator com.codenameone.examples.hellocodenameone.HelloCodenameOne)
 
 jd_log "Launching Java SE simulator for device-runner app"
