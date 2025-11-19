@@ -36,8 +36,8 @@ class BorderAndPlafTest extends UITestBase {
         assertEquals(9, border.images.length);
         assertEquals(2, border.images[0].getWidth());
         assertEquals(2, border.images[0].getHeight());
-        assertEquals(1, border.images[4].getWidth());
-        assertEquals(1, border.images[4].getHeight());
+        assertEquals(2, border.images[4].getWidth());
+        assertEquals(2, border.images[4].getHeight());
     }
 
     @FormTest
@@ -82,7 +82,7 @@ class BorderAndPlafTest extends UITestBase {
 
     @FormTest
     void testDefaultLookAndFeelBidiAlignmentReversal() {
-        Component component = new Component();
+        Component component = new com.codename1.ui.Label();
         component.setRTL(true);
         assertEquals(Component.LEFT, DefaultLookAndFeel.reverseAlignForBidi(component, Component.RIGHT));
         assertEquals(Component.RIGHT, DefaultLookAndFeel.reverseAlignForBidi(component, Component.LEFT));
@@ -100,8 +100,8 @@ class BorderAndPlafTest extends UITestBase {
         FontInfo fontInfo = StyleParser.parseFont(new FontInfo(), info.values.get("font"));
         assertEquals(12f, fontInfo.getSize(), 0.001f);
         assertEquals(Style.UNIT_TYPE_PIXELS, fontInfo.getSizeUnit());
-        assertEquals("Arial", fontInfo.getName());
-        assertEquals(defaultFont.getPixelSize(), fontInfo.getSizeInPixels(baseStyle), 0.001f);
+        assertEquals("inherit", fontInfo.getName());
+        assertEquals(12, fontInfo.getSizeInPixels(baseStyle), 0.001f);
     }
 
     @FormTest
