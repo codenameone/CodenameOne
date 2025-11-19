@@ -5,6 +5,8 @@ on:
     branches:
       - master
     paths-ignore:
+      - '.github/workflows/scripts-android.yml'
+      - '.github/workflows/scripts-ios.yml'
       - 'scripts/**'
       - 'docs/**'
       - '**/*.md'
@@ -14,6 +16,8 @@ on:
     branches:
       - master
     paths-ignore:
+      - '.github/workflows/scripts-android.yml'
+      - '.github/workflows/scripts-ios.yml'
       - 'scripts/**'
       - 'docs/**'
       - '**/*.md'

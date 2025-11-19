@@ -10,11 +10,9 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 public class GraphicsMethodsScreenshotTest extends AbstractTest {
     @Override
@@ -33,7 +31,7 @@ public class GraphicsMethodsScreenshotTest extends AbstractTest {
         // Allow layout to settle before we start iterating through methods.
         Cn1ssDeviceRunnerHelper.waitForMillis(500);
 
-        AtomicBoolean success = new AtomicBoolean(true);
+        final boolean[] success = new boolean[] {true};
         int index = 1;
         for (String descriptor : methods) {
             final String label = descriptor + " (" + index + "/" + methods.size() + ")";
@@ -52,23 +50,43 @@ public class GraphicsMethodsScreenshotTest extends AbstractTest {
             final String screenshotName = "Graphics." + Cn1ssDeviceRunnerHelper.sanitizeTestName(descriptor);
             Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> shotOk[0] = Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(screenshotName));
             if (!shotOk[0]) {
-                success.set(false);
+                success[0] = false;
             }
             index++;
         }
 
-        return success.get();
+        return success[0];
     }
 
     private static List<String> collectGraphicsMethods() {
-        return Arrays.stream(Graphics.class.getDeclaredMethods())
-                .filter(m -> java.lang.reflect.Modifier.isPublic(m.getModifiers()))
-                .filter(m -> !m.isSynthetic())
-                .sorted(Comparator.comparing(java.lang.reflect.Method::getName)
-                        .thenComparing(m -> m.getParameterTypes().length)
-                        .thenComparing(GraphicsMethodsScreenshotTest::parameterDescriptor))
-                .map(GraphicsMethodsScreenshotTest::describeMethod)
-                .collect(Collectors.toCollection(ArrayList::new));
+        java.lang.reflect.Method[] methods = Graphics.class.getDeclaredMethods();
+        List<java.lang.reflect.Method> filtered = new ArrayList<java.lang.reflect.Method>();
+        for (int i = 0; i < methods.length; i++) {
+            java.lang.reflect.Method m = methods[i];
+            if (java.lang.reflect.Modifier.isPublic(m.getModifiers()) && !m.isSynthetic()) {
+                filtered.add(m);
+            }
+        }
+
+        Collections.sort(filtered, new Comparator<java.lang.reflect.Method>() {
+            public int compare(java.lang.reflect.Method a, java.lang.reflect.Method b) {
+                int cmp = a.getName().compareTo(b.getName());
+                if (cmp != 0) {
+                    return cmp;
+                }
+                int lenCmp = a.getParameterTypes().length - b.getParameterTypes().length;
+                if (lenCmp != 0) {
+                    return lenCmp;
+                }
+                return parameterDescriptor(a).compareTo(parameterDescriptor(b));
+            }
+        });
+
+        List<String> descriptors = new ArrayList<String>();
+        for (java.lang.reflect.Method method : filtered) {
+            descriptors.add(describeMethod(method));
+        }
+        return descriptors;
     }
 
     private static String describeMethod(java.lang.reflect.Method method) {
