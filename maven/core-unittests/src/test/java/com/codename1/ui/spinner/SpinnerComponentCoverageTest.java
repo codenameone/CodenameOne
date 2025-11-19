@@ -5,6 +5,7 @@ import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.ui.Label;
 import com.codename1.ui.List;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.layouts.BorderLayout;
@@ -42,11 +43,13 @@ class SpinnerComponentCoverageTest extends UITestBase {
         Date renderedDate = calendar.getTime();
         List list = new List(new DefaultListModel(renderedDate));
 
-        assertEquals("Sat-Mar-04-2023", dateRenderer.getListCellRendererComponent(list, renderedDate, 0, true).getText());
+        Component dateComponent = dateRenderer.getListCellRendererComponent(list, renderedDate, 0, true);
+        assertEquals("Sat-Mar-04-2023", ((Label) dateComponent).getText());
 
         DateTimeRenderer timeRenderer = DateTimeRenderer.createTimeRenderer(true, true);
         List timeList = new List(new DefaultListModel(Integer.valueOf(60 * 60 + 5)));
-        assertEquals("01:00:05", timeRenderer.getListCellRendererComponent(timeList, Integer.valueOf(60 * 60 + 5), 0, true).getText());
+        Component timeComponent = timeRenderer.getListCellRendererComponent(timeList, Integer.valueOf(60 * 60 + 5), 0, true);
+        assertEquals("01:00:05", ((Label) timeComponent).getText());
         assertTrue(timeRenderer.isShowSeconds());
     }
 
@@ -59,10 +62,10 @@ class SpinnerComponentCoverageTest extends UITestBase {
         list.setFixedSelection(List.FIXED_CENTER);
         list.setSelectedIndex(1);
 
-        renderer.getCellRendererComponent(list, "A", 0, false);
+        renderer.getCellRendererComponent(list, model, "A", 0, false);
         assertEquals(1, renderer.perspective);
 
-        renderer.getCellRendererComponent(list, "C", 2, false);
+        renderer.getCellRendererComponent(list, model, "C", 2, false);
         assertEquals(6, renderer.perspective);
     }
 
