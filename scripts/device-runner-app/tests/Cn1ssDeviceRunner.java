@@ -13,7 +13,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             GraphicsPipelineScreenshotTest.class.getName(),
             GraphicsShapesAndGradientsScreenshotTest.class.getName(),
             GraphicsStateAndTextScreenshotTest.class.getName(),
-            GraphicsTransformationsScreenshotTest.class.getName()
+            GraphicsTransformationsScreenshotTest.class.getName(),
+            GraphicsMethodsScreenshotTest.class.getName()
     };
 
     public void runSuite() {
