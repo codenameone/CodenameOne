@@ -9,15 +9,10 @@ import com.codename1.ui.Image;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-
 public class GraphicsMethodsScreenshotTest extends AbstractTest {
     @Override
     public boolean runTest() throws Exception {
-        List<String> methods = collectGraphicsMethods();
+        String[] methods = GRAPHICS_METHODS;
         final MethodCoverageCanvas canvas = new MethodCoverageCanvas();
         final Form[] formHolder = new Form[1];
 
@@ -33,8 +28,10 @@ public class GraphicsMethodsScreenshotTest extends AbstractTest {
 
         final boolean[] success = new boolean[] {true};
         int index = 1;
-        for (String descriptor : methods) {
-            final String label = descriptor + " (" + index + "/" + methods.size() + ")";
+        int total = methods.length;
+        for (int i = 0; i < total; i++) {
+            String descriptor = methods[i];
+            final String label = descriptor + " (" + index + "/" + total + ")";
             Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {
                 canvas.setHighlightedMethod(label);
                 if (formHolder[0] != null) {
@@ -58,60 +55,93 @@ public class GraphicsMethodsScreenshotTest extends AbstractTest {
         return success[0];
     }
 
-    private static List<String> collectGraphicsMethods() {
-        java.lang.reflect.Method[] methods = Graphics.class.getDeclaredMethods();
-        List<java.lang.reflect.Method> filtered = new ArrayList<java.lang.reflect.Method>();
-        for (int i = 0; i < methods.length; i++) {
-            java.lang.reflect.Method m = methods[i];
-            if (java.lang.reflect.Modifier.isPublic(m.getModifiers()) && !m.isSynthetic()) {
-                filtered.add(m);
-            }
-        }
-
-        Collections.sort(filtered, new Comparator<java.lang.reflect.Method>() {
-            public int compare(java.lang.reflect.Method a, java.lang.reflect.Method b) {
-                int cmp = a.getName().compareTo(b.getName());
-                if (cmp != 0) {
-                    return cmp;
-                }
-                int lenCmp = a.getParameterTypes().length - b.getParameterTypes().length;
-                if (lenCmp != 0) {
-                    return lenCmp;
-                }
-                return parameterDescriptor(a).compareTo(parameterDescriptor(b));
-            }
-        });
-
-        List<String> descriptors = new ArrayList<String>();
-        for (java.lang.reflect.Method method : filtered) {
-            descriptors.add(describeMethod(method));
-        }
-        return descriptors;
-    }
-
-    private static String describeMethod(java.lang.reflect.Method method) {
-        StringBuilder descriptor = new StringBuilder();
-        descriptor.append(method.getName());
-        descriptor.append('(');
-        Class<?>[] params = method.getParameterTypes();
-        for (int i = 0; i < params.length; i++) {
-            descriptor.append(params[i].getSimpleName());
-            if (i < params.length - 1) {
-                descriptor.append(',');
-            }
-        }
-        descriptor.append(')');
-        return descriptor.toString();
-    }
-
-    private static String parameterDescriptor(java.lang.reflect.Method method) {
-        StringBuilder descriptor = new StringBuilder();
-        Class<?>[] params = method.getParameterTypes();
-        for (Class<?> param : params) {
-            descriptor.append(param.getSimpleName()).append('-');
-        }
-        return descriptor.toString();
-    }
+    private static final String[] GRAPHICS_METHODS = new String[] {
+            "translate(int,int)",
+            "getTranslateX()",
+            "getTranslateY()",
+            "getColor()",
+            "setColor(int)",
+            "setColor(Paint)",
+            "getPaint()",
+            "setAndGetColor(int)",
+            "getFont()",
+            "setFont(Font)",
+            "getClipX()",
+            "getClip()",
+            "setClip(int[])",
+            "setClip(Shape)",
+            "getClipY()",
+            "getClipWidth()",
+            "getClipHeight()",
+            "clipRect(int,int,int,int)",
+            "setClip(int,int,int,int)",
+            "pushClip()",
+            "popClip()",
+            "drawLine(int,int,int,int)",
+            "fillRect(int,int,int,int)",
+            "drawShadow(Image,int,int,int,int,int,int,int,float)",
+            "clearRect(int,int,int,int)",
+            "drawRect(int,int,int,int)",
+            "drawRect(int,int,int,int,int)",
+            "drawRoundRect(int,int,int,int,int,int)",
+            "lighterColor(int)",
+            "darkerColor(int)",
+            "fillRoundRect(int,int,int,int,int,int)",
+            "fillArc(int,int,int,int,int,int)",
+            "drawArc(int,int,int,int,int,int)",
+            "drawString(String,int,int,int)",
+            "drawStringBaseline(String,int,int)",
+            "drawStringBaseline(String,int,int,int)",
+            "drawString(String,int,int)",
+            "drawChar(char,int,int)",
+            "drawChars(char[],int,int,int,int)",
+            "drawImage(Image,int,int)",
+            "drawImage(Image,int,int,int,int)",
+            "drawShape(Shape,Stroke)",
+            "fillShape(Shape)",
+            "isTransformSupported()",
+            "isPerspectiveTransformSupported()",
+            "isShapeSupported()",
+            "isShapeClipSupported()",
+            "transform(Transform)",
+            "getTransform()",
+            "setTransform(Transform)",
+            "getTransform(Transform)",
+            "fillTriangle(int,int,int,int,int,int)",
+            "fillRadialGradient(int,int,int,int,int,int)",
+            "fillRadialGradient(int,int,int,int,int,int,int,int)",
+            "fillRectRadialGradient(int,int,int,int,int,int,float,float,float)",
+            "fillLinearGradient(int,int,int,int,int,int,boolean)",
+            "fillRect(int,int,int,int,byte)",
+            "fillPolygon(int[],int[],int)",
+            "drawPolygon(int[],int[],int)",
+            "isAlphaSupported()",
+            "setAndGetAlpha(int)",
+            "concatenateAlpha(int)",
+            "getAlpha()",
+            "setAlpha(int)",
+            "isAntiAliasingSupported()",
+            "isAntiAliasedTextSupported()",
+            "isAntiAliased()",
+            "setAntiAliased(boolean)",
+            "isAntiAliasedText()",
+            "setAntiAliasedText(boolean)",
+            "isAffineSupported()",
+            "resetAffine()",
+            "scale(float,float)",
+            "rotate(float)",
+            "rotateRadians(float)",
+            "rotate(float,int,int)",
+            "rotateRadians(float,int,int)",
+            "shear(float,float)",
+            "beginNativeGraphicsAccess()",
+            "endNativeGraphicsAccess()",
+            "tileImage(Image,int,int,int,int)",
+            "getScaleX()",
+            "getScaleY()",
+            "getRenderingHints()",
+            "setRenderingHints(int)"
+    };
 
     private static final class MethodCoverageCanvas extends Component {
         private String highlightedMethod = "";
