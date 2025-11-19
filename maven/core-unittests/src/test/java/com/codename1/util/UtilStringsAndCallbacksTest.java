@@ -32,7 +32,7 @@ class UtilStringsAndCallbacksTest extends UITestBase {
         List<String> csv = StringUtil.tokenize("one,two,three", ',');
         assertEquals(3, csv.size());
 
-        StringBuilder builder = new CStringBuilder().append(true).append(',').append(5).append(',').append(4L).append(',').append('Z').insert(0, "[");
+        CStringBuilder builder = new CStringBuilder().append(true).append(',').append(5).append(',').append(4L).append(',').append('Z').insert(0, "[");
         builder.append(']');
         assertTrue(builder.toString().startsWith("[true,5,4,Z]"));
         assertEquals('t', builder.charAt(1));
