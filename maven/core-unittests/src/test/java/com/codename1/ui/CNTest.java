@@ -40,17 +40,19 @@ class CNTest extends UITestBase {
         flushSerialCalls();
         assertEquals(1, invoked.get(), "callSerially should enqueue runnable on EDT");
 
-        RuntimeException thrown = assertThrows(RuntimeException.class, new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                CN.callSeriallyAndWait(new Runnable() {
-                    @Override
-                    public void run() {
-                        invoked.incrementAndGet();
-                    }
-                });
-            }
-        }, "callSeriallyAndWait should not be allowed on the EDT");
+        RuntimeException thrown = null;
+        try {
+            CN.callSeriallyAndWait(new Runnable() {
+                @Override
+                public void run() {
+                    invoked.incrementAndGet();
+                }
+            });
+            fail("callSeriallyAndWait should not be allowed on the EDT");
+        } catch (RuntimeException ex) {
+            thrown = ex;
+        }
+        assertNotNull(thrown, "Exception should be thrown when callSeriallyAndWait runs on the EDT");
         assertTrue(thrown.getMessage().contains("MUST NOT"), "Exception message should indicate EDT restriction");
         assertEquals(0, invoked.get(), "Runnable must not execute when callSeriallyAndWait is invoked on EDT");
     }
