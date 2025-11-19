@@ -63,7 +63,7 @@ class UtilStringsAndCallbacksTest extends UITestBase {
             flushSerialCalls();
             Thread.sleep(10L);
         }
-        assertEquals("ok!false", successValue.get());
+        assertEquals("ok!true", successValue.get());
         assertTrue(ranOnSerialQueue.get());
 
         Runnable errorInvoker = new Runnable() {

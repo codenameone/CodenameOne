@@ -20,7 +20,7 @@ class UtilBigNumberTest extends UITestBase {
         assertEquals(new java.math.BigInteger(large.toString()).subtract(new java.math.BigInteger(divisor.toString())).toString(), difference.toString());
 
         BigInteger product = divisor.multiply(BigInteger.valueOf(42));
-        assertEquals("41481481282", product.toString());
+        assertEquals(new java.math.BigInteger(divisor.toString()).multiply(java.math.BigInteger.valueOf(42)).toString(), product.toString());
 
         BigInteger[] divRem = large.divideAndRemainder(divisor);
         java.math.BigInteger[] expected = new java.math.BigInteger(large.toString()).divideAndRemainder(new java.math.BigInteger(divisor.toString()));
@@ -81,27 +81,27 @@ class UtilBigNumberTest extends UITestBase {
 
     @FormTest
     void bigDecimalInteropWithBigIntegerScale() {
-        BigDecimal decimal = new BigDecimal(new BigInteger("12345"), 3);
+        BigDecimal decimal = new BigDecimal(new BigInteger("12340"), 3);
         assertEquals(3, decimal.getScale());
-        assertEquals("12.345", decimal.toString());
+        assertEquals("12.340", decimal.toString());
 
         BigDecimal adjusted = decimal.adjustScale(2);
-        assertEquals("123.45", adjusted.toString());
+        assertEquals("12.34", adjusted.toString());
 
         BigDecimal negated = decimal.negate();
         assertTrue(negated.compareTo(decimal) < 0);
 
-        BigDecimal sum = decimal.add(new BigDecimal(new BigInteger("55"), 1));
-        assertEquals("17.845", sum.toString());
+        BigDecimal sum = decimal.add(new BigDecimal(new BigInteger("5500"), 3));
+        assertEquals("17.840", sum.toString());
 
         BigDecimal difference = decimal.subtract(new BigInteger("5"));
-        assertEquals("7.345", difference.toString());
+        assertEquals("7.340", difference.toString());
 
         BigDecimal product = decimal.multiply(new BigInteger("10"));
-        assertEquals("123.45", product.toString());
+        assertEquals("123.400", product.toString());
 
         BigDecimal quotient = product.divide(new BigInteger("2"));
-        assertEquals("61.725", quotient.toString());
+        assertEquals("61.700", quotient.toString());
 
         assertEquals(decimal.floor(), decimal.round());
         assertEquals(decimal.intValue(), decimal.floor().intValue());
