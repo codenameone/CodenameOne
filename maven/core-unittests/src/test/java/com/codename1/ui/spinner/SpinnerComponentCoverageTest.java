@@ -82,6 +82,7 @@ class SpinnerComponentCoverageTest extends UITestBase {
 
         spinner.setValue(0, "Two");
         spinner.setValue(1, "Second");
+        spinner.initSpinner();
         assertEquals("Two", spinner.getValue(0));
         assertEquals("Second", spinner.getValue(1));
 
@@ -152,7 +153,7 @@ class SpinnerComponentCoverageTest extends UITestBase {
         TimeSpinner3D time = new TimeSpinner3D();
         DateSpinner3D date = new DateSpinner3D();
 
-        dateTime.setPropertyValue("currentDate", Long.valueOf(1700000000000L));
+        dateTime.setPropertyValue("currentDate", new Date(1700000000000L));
         assertNotNull(dateTime.getPropertyValue("currentDate"));
 
         time.setPropertyValue("currentHour", Integer.valueOf(10));
