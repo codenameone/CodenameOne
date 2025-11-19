@@ -74,7 +74,11 @@ public class GraphicsTransformationsScreenshotTest extends AbstractGraphicsScree
 
             g.setColor(0xe2e8f0);
             g.drawString("transform ok=" + transformSupported + " persp=" + perspectiveSupported, x + 10, y + h - 24);
-            g.drawString("legacy m00=" + legacy.getMatrix()[0], x + 10, y + h - 44);
+            g.drawString(
+                    "legacy tx=" + legacy.getTranslateX() + " ty=" + legacy.getTranslateY() + " sx=" + legacy.getScaleX()
+                            + " sy=" + legacy.getScaleY(),
+                    x + 10,
+                    y + h - 44);
         }
 
         private void paintAffineOperations(Graphics g, int x, int y, int w, int h) {

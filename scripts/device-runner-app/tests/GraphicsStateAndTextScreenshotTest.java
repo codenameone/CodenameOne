@@ -9,7 +9,7 @@ import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.Style;
-import com.codename1.ui.paint.LinearGradientPaint;
+import com.codename1.ui.LinearGradientPaint;
 
 public class GraphicsStateAndTextScreenshotTest extends AbstractGraphicsScreenshotTest {
     @Override
