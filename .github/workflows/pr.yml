@@ -302,7 +302,7 @@ jobs:
 
     - name: Run Java SE device-runner tests
       env:
-        ARTIFACTS_DIR: ${{ github.workspace }}/artifacts
+        ARTIFACTS_DIR: ${{ github.workspace }}/artifacts/desktop-device-runner
       run: ./scripts/run-javase-device-tests.sh
 
     - name: Upload Java SE device-runner artifacts

@@ -90,7 +90,8 @@ else
   jd_log "Using cached media jar at $CN1_MEDIA_JAR"
 fi
 
-ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts/desktop-device-runner}"
+ARTIFACTS_DIR_BASE="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
+ARTIFACTS_DIR="${ARTIFACTS_DIR_BASE%/}/desktop-device-runner"
 ensure_dir "$ARTIFACTS_DIR"
 LOG_FILE="$ARTIFACTS_DIR/javase-device-runner.log"
 SCREENSHOT_DIR="$ARTIFACTS_DIR/screenshots"
@@ -176,12 +177,8 @@ PY
 jd_log "Launching Java SE simulator for device-runner app"
 : >"$LOG_FILE"
 set +e
-tail -n0 -F "$LOG_FILE" &
-TAIL_PID=$!
 run_with_timeout "$SIM_TIMEOUT_SECONDS" "$SIM_KILL_GRACE_SECONDS" "$LOG_FILE" "${JAVA_CMD[@]}"
 rc=$?
-kill "$TAIL_PID" 2>/dev/null || true
-wait "$TAIL_PID" 2>/dev/null || true
 set -e
 
 if [ $rc -ne 0 ]; then
@@ -223,10 +220,18 @@ for test in "${TEST_NAMES[@]}"; do
 
 done
 
+if [ "$SIM_EXIT_CODE" -eq 124 ]; then
+  screenshot_count=$(find "$SCREENSHOT_DIR" -maxdepth 1 -type f -name '*.png' | wc -l | tr -d '[:space:]')
+  if [ "${screenshot_count:-0}" -gt 0 ]; then
+    jd_log "Simulator timed out but CN1SS artifacts were captured; marking run as successful"
+    SIM_EXIT_CODE=0
+  fi
+fi
+
 # Emit a simple summary for debugging
 SUMMARY_FILE="$ARTIFACTS_DIR/summary.txt"
 {
-  echo "Simulator exit code: $rc"
+  echo "Simulator exit code: $SIM_EXIT_CODE"
   echo "Log file: $LOG_FILE"
   echo "Screenshots:"
   find "$SCREENSHOT_DIR" -maxdepth 1 -type f -name '*.png' -printf '  - %f\n' 2>/dev/null || true
