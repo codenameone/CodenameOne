@@ -210,4 +210,48 @@ class ComponentSelectorTest extends UITestBase {
         ComponentSelector selector = ComponentSelector.$("CurrentFormLabel");
         assertEquals(1, selector.size());
     }
+
+    @FormTest
+    void testStyleModeSelection() {
+        Form form = Display.getInstance().getCurrent();
+        form.removeAll();
+        form.setLayout(BoxLayout.y());
+
+        Button button = new Button("Stylable");
+        button.setUIID("Stylable");
+        form.add(button);
+        form.revalidate();
+
+        ComponentSelector selector = ComponentSelector.$("Stylable", form);
+        selector.selectPressedStyle().setFgColor(0xff0000);
+        selector.selectUnselectedStyle().setBgColor(0x00ff00);
+        selector.selectRollOverStyle().setBgTransparency(200);
+
+        assertEquals(0xff0000, button.getPressedStyle().getFgColor());
+        assertEquals(0x00ff00, button.getUnselectedStyle().getBgColor());
+        assertEquals(200, button.getRollOverStyle().getBgTransparency());
+    }
+
+    @FormTest
+    void testMultipleSelectorsWithTags() {
+        Form form = Display.getInstance().getCurrent();
+        form.removeAll();
+        form.setLayout(BoxLayout.y());
+
+        Button tagged = new Button("Tagged");
+        tagged.setUIID("Tagged");
+        ComponentSelector.$(tagged).addTags("primary", "action");
+
+        Label untagged = new Label("Plain");
+        untagged.setUIID("Plain");
+        form.addAll(tagged, untagged);
+        form.revalidate();
+
+        ComponentSelector taggedSelector = ComponentSelector.$(".primary", form);
+        assertEquals(1, taggedSelector.size());
+        taggedSelector.setText("Updated");
+
+        assertEquals("Updated", tagged.getText());
+        assertEquals("Plain", untagged.getText());
+    }
 }
