@@ -300,6 +300,20 @@ jobs:
     - name: Build Android Port
       run: ant -noinput -buildfile Ports/Android/build.xml jar
 
+    - name: Run Java SE device-runner tests
+      env:
+        ARTIFACTS_DIR: ${{ github.workspace }}/artifacts
+      run: ./scripts/run-javase-device-tests.sh
+
+    - name: Upload Java SE device-runner artifacts
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: javase-device-runner
+        path: artifacts/desktop-device-runner
+        if-no-files-found: warn
+        retention-days: 14
+
     - name: Packaging Everything
       run: zip -j result.zip CodenameOne/javadocs.zip CodenameOne/dist/CodenameOne.jar CodenameOne/updatedLibs.zip Ports/JavaSE/dist/JavaSE.jar build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip
 
