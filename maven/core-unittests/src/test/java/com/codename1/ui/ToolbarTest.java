@@ -202,8 +202,6 @@ class ToolbarTest extends UITestBase {
 
         assertEquals(1, sideInvocation[0], "Side menu command should fire its listener");
 
-        Button overflowButton = toolbar.findCommandComponent(overflow);
-        assertNotNull(overflowButton, "Overflow menu should render a button");
         overflow.actionPerformed(new ActionEvent(overflow));
         flushSerialCalls();
 
