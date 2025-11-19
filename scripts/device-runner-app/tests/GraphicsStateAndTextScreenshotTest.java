@@ -10,6 +10,7 @@ import com.codename1.ui.geom.GeneralPath;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.LinearGradientPaint;
+import com.codename1.ui.MultipleGradientPaint;
 
 public class GraphicsStateAndTextScreenshotTest extends AbstractGraphicsScreenshotTest {
     @Override
@@ -58,7 +59,16 @@ public class GraphicsStateAndTextScreenshotTest extends AbstractGraphicsScreensh
             g.darkerColor(80);
             g.fillRect(x + 8, y + 40, w / 3, 24);
 
-            LinearGradientPaint paint = new LinearGradientPaint(0, 0, w, 0, new float[] {0f, 1f}, new int[] {0xff22d3ee, 0xff6366f1});
+            LinearGradientPaint paint = new LinearGradientPaint(
+                    0f,
+                    0f,
+                    (float) w,
+                    0f,
+                    new float[] {0f, 1f},
+                    new int[] {0xff22d3ee, 0xff6366f1},
+                    MultipleGradientPaint.CycleMethod.NO_CYCLE,
+                    MultipleGradientPaint.ColorSpaceType.SRGB,
+                    null);
             g.setColor(paint);
             GeneralPath shape = new GeneralPath();
             shape.moveTo(x + w - 12, y + 12);
