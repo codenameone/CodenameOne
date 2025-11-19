@@ -4,6 +4,10 @@ set -euo pipefail
 
 jd_log() { echo "[run-javase-device-tests] $1"; }
 ensure_dir() { mkdir -p "$1" 2>/dev/null || true; }
+download_file() {
+  local url="$1" dest="$2"
+  curl -fL --retry 3 --retry-delay 2 --connect-timeout 10 -o "$dest" "$url"
+}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -72,6 +76,19 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 cn1ss_setup "$JAVA_BIN" "$CN1SS_HELPER_SOURCE_DIR"
+
+CN1_HOME_DIR="${HOME}/.codenameone"
+CN1_MEDIA_JAR="$CN1_HOME_DIR/jmf-2.1.1e.jar"
+CN1_MEDIA_JAR_URL="https://github.com/codenameone/cn1-binaries/raw/refs/heads/master/javase/jmf-2.1.1e.jar"
+
+jd_log "Ensuring Java SE media libraries are available"
+ensure_dir "$CN1_HOME_DIR"
+if [ ! -f "$CN1_MEDIA_JAR" ]; then
+  jd_log "Downloading JMF media support to $CN1_MEDIA_JAR"
+  download_file "$CN1_MEDIA_JAR_URL" "$CN1_MEDIA_JAR"
+else
+  jd_log "Using cached media jar at $CN1_MEDIA_JAR"
+fi
 
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts/desktop-device-runner}"
 ensure_dir "$ARTIFACTS_DIR"
