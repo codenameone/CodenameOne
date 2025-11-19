@@ -10,7 +10,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             MainScreenScreenshotTest.class.getName(),
             BrowserComponentScreenshotTest.class.getName(),
             MediaPlaybackScreenshotTest.class.getName(),
-            GraphicsPipelineScreenshotTest.class.getName()
+            GraphicsPipelineScreenshotTest.class.getName(),
+            GraphicsShapesAndGradientsScreenshotTest.class.getName(),
+            GraphicsStateAndTextScreenshotTest.class.getName(),
+            GraphicsTransformationsScreenshotTest.class.getName()
     };
 
     public void runSuite() {
