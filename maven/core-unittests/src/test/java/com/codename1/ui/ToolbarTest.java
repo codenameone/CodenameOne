@@ -134,4 +134,77 @@ class ToolbarTest extends UITestBase {
         toolbar.removeCommand(right);
         assertNull(toolbar.findCommandComponent(right), "Removed command should no longer have a button");
     }
+
+    @FormTest
+    void rightSideMenuCommandsDispatch() {
+        implementation.setBuiltinSoundsEnabled(false);
+        Toolbar.setOnTopSideMenu(true);
+
+        Form form = new Form(new BorderLayout());
+        Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
+        form.show();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+
+        final int[] invocation = {0};
+        Command rightSide = toolbar.addCommandToRightSideMenu("RightMenu", null, evt -> invocation[0]++);
+
+        toolbar.openRightSideMenu();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+        awaitAnimations(form);
+
+        Button rightButton = toolbar.findCommandComponent(rightSide);
+        assertNotNull(rightButton, "Right side menu button should be created");
+
+        int px = rightButton.getAbsoluteX() + rightButton.getWidth() / 2;
+        int py = rightButton.getAbsoluteY() + rightButton.getHeight() / 2;
+        rightButton.pointerPressed(px, py);
+        rightButton.pointerReleased(px, py);
+        flushSerialCalls();
+
+        assertEquals(1, invocation[0], "Pointer events should fire right side menu command");
+
+        toolbar.closeRightSideMenu();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+        awaitAnimations(form);
+    }
+
+    @FormTest
+    void sideMenuAndOverflowCommands() {
+        implementation.setBuiltinSoundsEnabled(false);
+        Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
+        Toolbar.setOnTopSideMenu(true);
+
+        Form form = new Form(new BorderLayout());
+        Toolbar toolbar = new Toolbar();
+        form.setToolbar(toolbar);
+        form.show();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+
+        final int[] sideInvocation = {0};
+        final int[] overflowInvocation = {0};
+        Command side = toolbar.addCommandToSideMenu("Side", null, evt -> sideInvocation[0]++);
+        Command overflow = toolbar.addCommandToOverflowMenu("Overflow", null, evt -> overflowInvocation[0]++);
+
+        toolbar.openSideMenu();
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+        awaitAnimations(form);
+
+        Button sideButton = toolbar.findCommandComponent(side);
+        assertNotNull(sideButton, "Side menu should create a button for the command");
+        side.actionPerformed(new ActionEvent(side));
+        flushSerialCalls();
+
+        assertEquals(1, sideInvocation[0], "Side menu command should fire its listener");
+
+        overflow.actionPerformed(new ActionEvent(overflow));
+        flushSerialCalls();
+
+        assertEquals(1, overflowInvocation[0], "Overflow command should be invoked");
+    }
 }

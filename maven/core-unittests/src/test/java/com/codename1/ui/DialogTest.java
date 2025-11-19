@@ -87,6 +87,69 @@ class DialogTest extends UITestBase {
         assertTrue(dialog.isDisposed(), "Dialog should be disposed after timeout");
     }
 
+    @FormTest
+    void staticConfigurationCarriesToNewDialogs() {
+        boolean originalAutoAdjust = Dialog.isAutoAdjustDialogSize();
+        String originalPosition = Dialog.getDefaultDialogPosition();
+        boolean originalScrolling = Dialog.isDisableStaticDialogScrolling();
+        boolean originalCommandsAsButtons = Dialog.isCommandsAsButtons();
+        boolean originalDispose = Dialog.isDefaultDisposeWhenPointerOutOfBounds();
+        float originalBlurRadius = Dialog.getDefaultBlurBackgroundRadius();
+
+        try {
+            Dialog.setAutoAdjustDialogSize(false);
+            Dialog.setDefaultDialogPosition(BorderLayout.SOUTH);
+            Dialog.setDisableStaticDialogScrolling(true);
+            Dialog.setCommandsAsButtons(false);
+            Dialog.setDefaultDisposeWhenPointerOutOfBounds(true);
+            Dialog.setDefaultBlurBackgroundRadius(4.5f);
+
+            Dialog dialog = new Dialog("Configured", new BorderLayout());
+            dialog.getContentPane().addComponent(BorderLayout.CENTER, new Label("Body"));
+
+            assertFalse(Dialog.isAutoAdjustDialogSize());
+            assertTrue(Dialog.isDisableStaticDialogScrolling());
+            assertFalse(Dialog.isCommandsAsButtons());
+            assertTrue(Dialog.isDefaultDisposeWhenPointerOutOfBounds());
+            assertEquals(BorderLayout.SOUTH, dialog.getDialogPosition());
+            assertTrue(dialog.isDisposeWhenPointerOutOfBounds());
+            assertEquals(4.5f, dialog.getBlurBackgroundRadius(), 0.01f);
+        } finally {
+            Dialog.setAutoAdjustDialogSize(originalAutoAdjust);
+            Dialog.setDefaultDialogPosition(originalPosition);
+            Dialog.setDisableStaticDialogScrolling(originalScrolling);
+            Dialog.setCommandsAsButtons(originalCommandsAsButtons);
+            Dialog.setDefaultDisposeWhenPointerOutOfBounds(originalDispose);
+            Dialog.setDefaultBlurBackgroundRadius(originalBlurRadius);
+        }
+    }
+
+    @FormTest
+    void popupDialogCanBeDisposedFromBackground() throws Exception {
+        implementation.setBuiltinSoundsEnabled(false);
+        Dialog dialog = new Dialog("Popup", new BorderLayout());
+        Label body = new Label("Popup Body");
+        dialog.getContentPane().addComponent(BorderLayout.CENTER, body);
+        dialog.setDisposeWhenPointerOutOfBounds(true);
+
+        Thread disposer = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Thread.sleep(50L);
+                } catch (InterruptedException ignored) {
+                }
+                dialog.dispose();
+            }
+        });
+        disposer.start();
+
+        dialog.showPopupDialog(body);
+        disposer.join(1000L);
+
+        assertTrue(dialog.isDisposed(), "Popup dialog should dispose when closed from another thread");
+    }
+
     private Button findButton(Container root, Command target) {
         for (int i = 0; i < root.getComponentCount(); i++) {
             Component cmp = root.getComponentAt(i);
