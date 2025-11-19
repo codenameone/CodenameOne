@@ -2,7 +2,9 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.plaf.Style;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -22,7 +24,7 @@ class CNTest extends UITestBase {
         assertEquals(display.getDisplayHeight(), CN.getDisplayHeight());
         assertEquals("proxyValue", display.getProperty("proxyKey", null));
         assertEquals(display.convertToPixels(3, true), CN.convertToPixels(3, true));
-        assertEquals(display.convertToPixels(2.5f, Display.UNIT_TYPE_DIPS, true), CN.convertToPixels(2.5f, Display.UNIT_TYPE_DIPS, true));
+        assertEquals(display.convertToPixels(2.5f, Style.UNIT_TYPE_DIPS, true), CN.convertToPixels(2.5f, Style.UNIT_TYPE_DIPS, true));
         assertEquals(display.getDeviceDensity(), CN.getDeviceDensity());
         assertEquals(display.isPortrait(), CN.isPortrait());
     }
@@ -40,13 +42,31 @@ class CNTest extends UITestBase {
         assertEquals(1, invoked.get(), "callSerially should enqueue runnable on EDT");
 
         invoked.set(0);
-        CN.callSeriallyAndWait(new Runnable() {
+        final CountDownLatch latch = new CountDownLatch(1);
+        Thread background = new Thread(new Runnable() {
             @Override
             public void run() {
-                invoked.incrementAndGet();
+                try {
+                    CN.callSeriallyAndWait(new Runnable() {
+                        @Override
+                        public void run() {
+                            invoked.incrementAndGet();
+                        }
+                    });
+                } finally {
+                    latch.countDown();
+                }
             }
         });
-        assertEquals(1, invoked.get(), "callSeriallyAndWait should run runnable");
+        background.start();
+        try {
+            latch.await();
+        } catch (InterruptedException err) {
+            Thread.currentThread().interrupt();
+            fail("Interrupted while waiting for callSeriallyAndWait to complete", err);
+        }
+
+        assertEquals(1, invoked.get(), "callSeriallyAndWait should run runnable from non-EDT thread");
     }
 
     @FormTest

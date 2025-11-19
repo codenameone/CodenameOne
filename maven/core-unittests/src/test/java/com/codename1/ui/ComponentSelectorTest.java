@@ -225,11 +225,11 @@ class ComponentSelectorTest extends UITestBase {
         ComponentSelector selector = ComponentSelector.$("Stylable", form);
         selector.selectPressedStyle().setFgColor(0xff0000);
         selector.selectUnselectedStyle().setBgColor(0x00ff00);
-        selector.selectRollOverStyle().setBgTransparency(200);
+        selector.selectDisabledStyle().setBgTransparency(200);
 
         assertEquals(0xff0000, button.getPressedStyle().getFgColor());
         assertEquals(0x00ff00, button.getUnselectedStyle().getBgColor());
-        assertEquals(200, button.getRollOverStyle().getBgTransparency());
+        assertEquals(200, button.getDisabledStyle().getBgTransparency());
     }
 
     @FormTest
