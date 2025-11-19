@@ -64,16 +64,16 @@ class UtilBigNumberTest extends UITestBase {
         assertEquals(TRoundingMode.HALF_EVEN, TRoundingMode.valueOf("HALF_EVEN"));
 
         // Ensure arithmetic methods with MathContext engage rounding helpers
-        TBigDecimal augend = new TBigDecimal(new TBigInteger("5"), 1, context);
+        TBigDecimal augend = new TBigDecimal(new TBigInteger("5"), 0, context);
         TBigDecimal multiplicand = new TBigDecimal("3.33", context);
-        assertEquals("8.83", augend.add(multiplicand, context).toString());
+        assertEquals("8.33", augend.add(multiplicand, context).toString());
         assertEquals("1.67", multiplicand.subtract(augend, context).abs().toString());
 
         TBigDecimal product = multiplicand.multiply(augend, context);
-        assertTrue(product.toString().startsWith("1.6"));
+        assertTrue(product.toString().startsWith("16.65"));
 
         TBigDecimal quotient = product.divide(augend, context);
-        assertFalse(quotient.toString().isEmpty());
+        assertEquals(multiplicand.round(context).toString(), quotient.toString());
 
         TBigDecimal[] divRem = product.divideAndRemainder(augend, context);
         assertEquals(product.toString(), divRem[0].multiply(augend, context).add(divRem[1], context).round(context).toString());

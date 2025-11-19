@@ -39,7 +39,7 @@ class UtilStringsAndCallbacksTest extends UITestBase {
     }
 
     @FormTest
-    void callbackDispatcherUsesSerialQueue() {
+    void callbackDispatcherUsesSerialQueue() throws InterruptedException {
         final AtomicReference<String> successValue = new AtomicReference<String>(null);
         final AtomicReference<Throwable> errorValue = new AtomicReference<Throwable>(null);
         final AtomicBoolean ranOnSerialQueue = new AtomicBoolean(false);
@@ -54,9 +54,15 @@ class UtilStringsAndCallbacksTest extends UITestBase {
                 }, "ok");
             }
         };
-        new Thread(successInvoker).start();
+        Thread successThread = new Thread(successInvoker);
+        successThread.start();
+        successThread.join(200);
 
-        flushSerialCalls();
+        int attempts = 0;
+        while (successValue.get() == null && attempts++ < 5) {
+            flushSerialCalls();
+            Thread.sleep(10L);
+        }
         assertEquals("ok!false", successValue.get());
         assertTrue(ranOnSerialQueue.get());
 
@@ -69,8 +75,14 @@ class UtilStringsAndCallbacksTest extends UITestBase {
                 }, new IllegalStateException("boom"));
             }
         };
-        new Thread(errorInvoker).start();
-        flushSerialCalls();
+        Thread errorThread = new Thread(errorInvoker);
+        errorThread.start();
+        errorThread.join(200);
+        attempts = 0;
+        while (errorValue.get() == null && attempts++ < 5) {
+            flushSerialCalls();
+            Thread.sleep(10L);
+        }
         assertEquals("boom", errorValue.get().getMessage());
     }
 
