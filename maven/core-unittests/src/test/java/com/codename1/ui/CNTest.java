@@ -4,7 +4,6 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.plaf.Style;
 
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -41,32 +40,19 @@ class CNTest extends UITestBase {
         flushSerialCalls();
         assertEquals(1, invoked.get(), "callSerially should enqueue runnable on EDT");
 
-        invoked.set(0);
-        final CountDownLatch latch = new CountDownLatch(1);
-        Thread background = new Thread(new Runnable() {
+        RuntimeException thrown = assertThrows(RuntimeException.class, new Executable() {
             @Override
-            public void run() {
-                try {
-                    CN.callSeriallyAndWait(new Runnable() {
-                        @Override
-                        public void run() {
-                            invoked.incrementAndGet();
-                        }
-                    });
-                } finally {
-                    latch.countDown();
-                }
+            public void execute() throws Throwable {
+                CN.callSeriallyAndWait(new Runnable() {
+                    @Override
+                    public void run() {
+                        invoked.incrementAndGet();
+                    }
+                });
             }
-        });
-        background.start();
-        try {
-            latch.await();
-        } catch (InterruptedException err) {
-            Thread.currentThread().interrupt();
-            fail("Interrupted while waiting for callSeriallyAndWait to complete", err);
-        }
-
-        assertEquals(1, invoked.get(), "callSeriallyAndWait should run runnable from non-EDT thread");
+        }, "callSeriallyAndWait should not be allowed on the EDT");
+        assertTrue(thrown.getMessage().contains("MUST NOT"), "Exception message should indicate EDT restriction");
+        assertEquals(0, invoked.get(), "Runnable must not execute when callSeriallyAndWait is invoked on EDT");
     }
 
     @FormTest
