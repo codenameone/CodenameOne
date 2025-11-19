@@ -18,11 +18,53 @@ fi
 source "$SCRIPT_DIR/lib/cn1ss.sh"
 cn1ss_log() { jd_log "$1"; }
 
-JAVA_BIN="${JAVA_BIN:-$(command -v java || true)}"
+if [ -z "${JAVA_BIN:-}" ]; then
+  if [ -n "${JAVA_HOME_17_X64:-}" ] && [ -x "$JAVA_HOME_17_X64/bin/java" ]; then
+    JAVA_BIN="$JAVA_HOME_17_X64/bin/java"
+  elif [ -n "${JAVA_HOME_17:-}" ] && [ -x "$JAVA_HOME_17/bin/java" ]; then
+    JAVA_BIN="$JAVA_HOME_17/bin/java"
+  else
+    JAVA_BIN="$(command -v java || true)"
+  fi
+fi
+
 if [ -z "$JAVA_BIN" ]; then
   jd_log "java binary not found on PATH" >&2
   exit 2
 fi
+
+JAVA_VERSION_RAW="$($JAVA_BIN -version 2>&1 | head -n1 | sed -E 's/.*version \"([^\"]+)\".*/\1/' || true)"
+JAVA_VERSION_MAJOR="${JAVA_VERSION_RAW%%.*}"
+if [ "$JAVA_VERSION_MAJOR" = "1" ]; then
+  JAVA_VERSION_MAJOR="$(echo "$JAVA_VERSION_RAW" | cut -d. -f2)"
+fi
+
+if [ -z "$JAVA_VERSION_MAJOR" ] || [ "$JAVA_VERSION_MAJOR" -lt 17 ]; then
+  jd_log "Java 17 or newer is required for CN1SS helpers (detected: ${JAVA_VERSION_RAW:-unknown})" >&2
+  exit 2
+fi
+
+JAVAC_BIN="${JAVAC_BIN:-${JAVA_BIN%/*}/javac}"
+if [ -z "$JAVAC_BIN" ] || [ ! -x "$JAVAC_BIN" ]; then
+  JAVAC_BIN="$(command -v javac || true)"
+fi
+if [ -z "$JAVAC_BIN" ] || [ ! -x "$JAVAC_BIN" ]; then
+  jd_log "javac binary not found" >&2
+  exit 2
+fi
+
+JAVAC_VERSION_RAW="$($JAVAC_BIN -version 2>&1 | head -n1 | sed -E 's/.* ([0-9]+(\.[0-9]+)*).*/\1/' || true)"
+JAVAC_VERSION_MAJOR="${JAVAC_VERSION_RAW%%.*}"
+if [ "$JAVAC_VERSION_MAJOR" = "1" ]; then
+  JAVAC_VERSION_MAJOR="$(echo "$JAVAC_VERSION_RAW" | cut -d. -f2)"
+fi
+
+if [ -z "$JAVAC_VERSION_MAJOR" ] || [ "$JAVAC_VERSION_MAJOR" -lt 17 ]; then
+  jd_log "Java 17 or newer is required for compilation (javac detected: ${JAVAC_VERSION_RAW:-unknown})" >&2
+  exit 2
+fi
+
+CN1SS_JAVAC_BIN="$JAVAC_BIN"
 
 cn1ss_setup "$JAVA_BIN" "$CN1SS_HELPER_SOURCE_DIR"
 
@@ -57,7 +99,7 @@ rsync -a "$MAIN_SRC/" "$BUILD_DIR/src/"
 rsync -a "$TEST_SRC/" "$BUILD_DIR/src/"
 
 jd_log "Compiling device-runner application sources"
-find "$BUILD_DIR/src" -name '*.java' -print0 | xargs -0 javac -cp "$CN1_CLASSPATH" -d "$BUILD_DIR/classes"
+find "$BUILD_DIR/src" -name '*.java' -print0 | xargs -0 "$JAVAC_BIN" -cp "$CN1_CLASSPATH" -d "$BUILD_DIR/classes"
 
 JAVA_CMD=(xvfb-run -a timeout 7m "$JAVA_BIN" -cp "$CN1_CLASSPATH:$BUILD_DIR/classes" \
   com.codename1.impl.javase.Simulator com.codenameone.examples.hellocodenameone.HelloCodenameOne)
@@ -71,6 +113,8 @@ set -e
 if [ $rc -ne 0 ]; then
   jd_log "Simulator exited with status $rc (see log at $LOG_FILE)"
 fi
+
+SIM_EXIT_CODE=$rc
 
 TEST_NAMES_RAW="$(cn1ss_list_tests "$LOG_FILE" 2>/dev/null | awk 'NF' | sort -u || true)"
 declare -a TEST_NAMES=()
@@ -116,4 +160,4 @@ SUMMARY_FILE="$ARTIFACTS_DIR/summary.txt"
 
 jd_log "Desktop device-runner artifacts stored in $ARTIFACTS_DIR"
 
-exit 0
+exit $SIM_EXIT_CODE
