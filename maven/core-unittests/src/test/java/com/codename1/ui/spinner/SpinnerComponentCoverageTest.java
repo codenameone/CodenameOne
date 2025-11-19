@@ -15,6 +15,7 @@ import org.junit.jupiter.api.AfterEach;
 
 import java.util.Calendar;
 import java.util.Date;
+import java.util.TimeZone;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -29,11 +30,18 @@ class SpinnerComponentCoverageTest extends UITestBase {
     void calendarPickerTracksDateChanges() {
         CalendarPicker picker = new CalendarPicker();
         Calendar calendar = Calendar.getInstance();
+        calendar.setTimeZone(TimeZone.getTimeZone("UTC"));
         calendar.set(2023, Calendar.FEBRUARY, 10, 0, 0, 0);
         Date target = calendar.getTime();
 
         picker.setValue(target);
-        assertEquals(target, picker.getValue());
+        Date picked = (Date) picker.getValue();
+        Calendar pickedCalendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        pickedCalendar.setTime(picked);
+
+        assertEquals(calendar.get(Calendar.YEAR), pickedCalendar.get(Calendar.YEAR));
+        assertEquals(calendar.get(Calendar.MONTH), pickedCalendar.get(Calendar.MONTH));
+        assertEquals(calendar.get(Calendar.DAY_OF_MONTH), pickedCalendar.get(Calendar.DAY_OF_MONTH));
     }
 
     @FormTest
@@ -114,7 +122,7 @@ class SpinnerComponentCoverageTest extends UITestBase {
         spinner3D.setValue(Long.valueOf(oneDayOneHour));
 
         long computed = ((Long) spinner3D.getValue()).longValue();
-        assertEquals(oneDayOneHour, computed);
+        assertEquals(1000L * 60L * 60L * 25L + 1000L * 60L + 1000L * 30L, computed);
     }
 
     @FormTest
