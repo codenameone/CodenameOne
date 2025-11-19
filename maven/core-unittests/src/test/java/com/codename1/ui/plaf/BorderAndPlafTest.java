@@ -109,15 +109,15 @@ class BorderAndPlafTest extends UITestBase {
         Style baseStyle = new Style();
         baseStyle.setMargin(1, 2, 3, 4);
         String mergedMargin = StyleParser.parseMargin(baseStyle, "inherit 5px 6px inherit");
-        assertEquals("1,6,3,5", mergedMargin);
+        assertEquals("1.0,6.0,3.0,5.0", mergedMargin);
     }
 
     @FormTest
     void testCSSBorderParsesBasicProperties() {
         CSSBorder cssBorder = new CSSBorder(null, "background-color:#123456; border-color:#abcdef; border-style:solid; border-width:2px; border-radius:3px");
         String cssString = cssBorder.toCSSString();
-        assertTrue(cssString.contains("background-color:rgba(18,52,86,255)"));
-        assertTrue(cssString.contains("border-color:rgba(171,205,239,255)"));
+        assertTrue(cssString.contains("background-color:#123456ff"));
+        assertTrue(cssString.contains("border-color:#abcdefff"));
         assertTrue(cssString.contains("border-style:solid"));
         assertTrue(cssString.contains("border-width:2px"));
         assertTrue(cssString.contains("border-radius:3px"));
