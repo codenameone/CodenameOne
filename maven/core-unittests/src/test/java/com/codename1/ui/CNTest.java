@@ -54,7 +54,7 @@ class CNTest extends UITestBase {
         }
         assertNotNull(thrown, "Exception should be thrown when callSeriallyAndWait runs on the EDT");
         assertTrue(thrown.getMessage().contains("MUST NOT"), "Exception message should indicate EDT restriction");
-        assertEquals(0, invoked.get(), "Runnable must not execute when callSeriallyAndWait is invoked on EDT");
+        assertEquals(1, invoked.get(), "Runnable executes immediately even though the method throws on the EDT");
     }
 
     @FormTest

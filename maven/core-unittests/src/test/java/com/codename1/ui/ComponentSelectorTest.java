@@ -229,7 +229,7 @@ class ComponentSelectorTest extends UITestBase {
 
         assertEquals(0xff0000, button.getPressedStyle().getFgColor());
         assertEquals(0x00ff00, button.getUnselectedStyle().getBgColor());
-        assertEquals(200, button.getDisabledStyle().getBgTransparency());
+        assertEquals(200, button.getDisabledStyle().getBgTransparency() & 0xff);
     }
 
     @FormTest

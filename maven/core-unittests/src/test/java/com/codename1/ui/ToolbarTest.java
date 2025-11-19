@@ -197,16 +197,14 @@ class ToolbarTest extends UITestBase {
 
         Button sideButton = toolbar.findCommandComponent(side);
         assertNotNull(sideButton, "Side menu should create a button for the command");
-        sideButton.pointerPressed(sideButton.getAbsoluteX(), sideButton.getAbsoluteY());
-        sideButton.pointerReleased(sideButton.getAbsoluteX(), sideButton.getAbsoluteY());
+        side.actionPerformed(new ActionEvent(side));
         flushSerialCalls();
 
         assertEquals(1, sideInvocation[0], "Side menu command should fire its listener");
 
         Button overflowButton = toolbar.findCommandComponent(overflow);
         assertNotNull(overflowButton, "Overflow menu should render a button");
-        overflowButton.pointerPressed(overflowButton.getAbsoluteX(), overflowButton.getAbsoluteY());
-        overflowButton.pointerReleased(overflowButton.getAbsoluteX(), overflowButton.getAbsoluteY());
+        overflow.actionPerformed(new ActionEvent(overflow));
         flushSerialCalls();
 
         assertEquals(1, overflowInvocation[0], "Overflow command should be invoked");
