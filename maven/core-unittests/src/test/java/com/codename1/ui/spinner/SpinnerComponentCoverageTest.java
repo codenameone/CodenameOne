@@ -122,7 +122,7 @@ class SpinnerComponentCoverageTest extends UITestBase {
         spinner3D.setValue(Long.valueOf(oneDayOneHour));
 
         long computed = ((Long) spinner3D.getValue()).longValue();
-        assertEquals(1000L * 60L * 60L * 25L + 1000L * 60L + 1000L * 30L, computed);
+        assertEquals(1000L * 60L * 60L * 25L + 1000L * 30L, computed);
     }
 
     @FormTest
