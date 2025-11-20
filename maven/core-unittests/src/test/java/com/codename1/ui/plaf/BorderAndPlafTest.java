@@ -177,7 +177,9 @@ class BorderAndPlafTest extends UITestBase {
 
         BorderInfo borderInfo = StyleParser.parseBorder(new BorderInfo(), "1px solid ff00ff");
         assertEquals("1px solid ff00ff", borderInfo.toString());
-        assertEquals(1, borderInfo.getValue(Component.TOP).getValue(), 0.01);
+        assertEquals(1f, borderInfo.getWidth(), 0.01f);
+        assertEquals(Style.UNIT_TYPE_PIXELS, borderInfo.getWidthUnit());
+        assertEquals("line", borderInfo.getType());
     }
 
     @FormTest
