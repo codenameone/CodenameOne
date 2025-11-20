@@ -114,16 +114,29 @@ sleep 2
 
 GRADLEW="$GRADLE_PROJECT_DIR/gradlew"
 [ -x "$GRADLEW" ] || chmod +x "$GRADLEW"
-GRADLE_CMD=("$GRADLEW" --no-daemon connectedDebugAndroidTest)
 
-ra_log "Executing connectedDebugAndroidTest via Gradle"
-if ! (
+# 1) Make sure the app is installed on the emulator
+ra_log "Installing debug APK via Gradle installDebug"
+(
   cd "$GRADLE_PROJECT_DIR"
-  JAVA_HOME="$JAVA17_HOME" "${GRADLE_CMD[@]}"
-); then
-  ra_log "FATAL: connectedDebugAndroidTest failed"
-  exit 10
+  JAVA_HOME="$JAVA17_HOME" "$GRADLEW" --no-daemon installDebug
+)
+
+# 2) Launch the app
+ra_log "Launching app main activity on device"
+
+# Easiest way that doesn’t care about the exact Activity name:
+if ! "$ADB_BIN" shell monkey -p "$PACKAGE_NAME" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1; then
+  ra_log "monkey launch failed; falling back to am start"
+  # If you know the main activity, you can be more explicit here:
+  "$ADB_BIN" shell am start -a android.intent.action.MAIN \
+      -c android.intent.category.LAUNCHER "$PACKAGE_NAME" >/dev/null 2>&1 || true
 fi
+
+# 3) Give the app a little head-start before we start enforcing timeouts
+STARTUP_SLEEP=10
+ra_log "Sleeping ${STARTUP_SLEEP}s to let app start"
+sleep "$STARTUP_SLEEP"
 
 END_MARKER="CN1SS:SUITE:FINISHED"
 TIMEOUT_SECONDS=60
