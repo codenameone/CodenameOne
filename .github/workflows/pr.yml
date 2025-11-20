@@ -172,7 +172,7 @@ jobs:
         java -jar "$JACOCO_CLI_JAR" merge "$UNIT_EXEC" "$DEVICE_EXEC" --destfile "$MERGED_EXEC"
         mv "$MERGED_EXEC" "$UNIT_EXEC"
 
-        mvn -pl core-unittests -am -DskipTests -Djacoco.skip=true jacoco:report
+        mvn -f maven/pom.xml -pl core-unittests -am -DskipTests jacoco:report
 
     - name: Generate static analysis HTML summaries
       if: ${{ always() }}
