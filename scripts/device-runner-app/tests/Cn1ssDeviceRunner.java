@@ -19,11 +19,24 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
 
     public void runSuite() {
         for (String testClass : TEST_CLASSES) {
-            runTest(testClass);
+            log("CN1SS:INFO:suite starting test=" + testClass);
+            try {
+                runTest(testClass);
+                log("CN1SS:INFO:suite finished test=" + testClass);
+            } catch (Throwable t) {
+                log("CN1SS:ERR:suite test=" + testClass + " failed=" + t);
+                t.printStackTrace();
+                // continue with next test instead of aborting
+            }
         }
+        log("CN1SS:SUITE:FINISHED");
         TestReporting.getInstance().testExecutionFinished(getClass().getName());
     }
 
+    private static void log(String msg) {
+        System.out.println(msg);
+    }
+    
     @Override
     protected void startApplicationInstance() {
         Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {

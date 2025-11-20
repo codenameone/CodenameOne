@@ -105,7 +105,7 @@ public class PatchGradleFiles {
         r = ensureTestDependencies(content);
         content = r.content();
         changed |= r.changed();
-        
+
         if (changed) {
             Files.writeString(path, ensureTrailingNewline(content), StandardCharsets.UTF_8);
         }
