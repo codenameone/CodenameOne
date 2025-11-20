@@ -7,7 +7,14 @@ import com.codename1.ui.Font;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.Stroke;
+import com.codename1.ui.plaf.StyleParser.BorderInfo;
 import com.codename1.ui.plaf.StyleParser.FontInfo;
+import com.codename1.ui.plaf.StyleParser.ImageInfo;
+import com.codename1.ui.plaf.StyleParser.MarginInfo;
+import com.codename1.ui.plaf.StyleParser.PaddingInfo;
+import com.codename1.ui.plaf.StyleParser.ScalarValue;
+import com.codename1.ui.plaf.StyleParser.StyleInfo;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -121,5 +128,88 @@ class BorderAndPlafTest extends UITestBase {
         assertTrue(cssString.contains("border-style:solid"));
         assertTrue(cssString.contains("border-width:2px"));
         assertTrue(cssString.contains("border-radius:3px"));
+    }
+
+    @FormTest
+    void testStyleParserScalarValuesAndBackgroundTypes() {
+        assertTrue(StyleParser.validateScalarValue("2px"));
+        assertFalse(StyleParser.validateScalarValue("two"));
+        ScalarValue percent = StyleParser.parseScalarValue("33%");
+        assertEquals(33, percent.getValue(), 0.0001);
+        assertEquals(Style.UNIT_TYPE_SCREEN_PERCENTAGE, percent.getUnit());
+        percent.setUnit(Style.UNIT_TYPE_PIXELS);
+        percent.setValue(4.7);
+        assertEquals("5px", percent.toString());
+        assertEquals("4.7%", new ScalarValue(4.7, Style.UNIT_TYPE_SCREEN_PERCENTAGE).toString(1));
+
+        List<String> sortedTypes = StyleParser.getBackgroundTypes();
+        List<String> unsortedTypes = StyleParser.getSupportedBackgroundTypes();
+        assertTrue(sortedTypes.contains("none"));
+        assertEquals(sortedTypes.size(), unsortedTypes.size());
+    }
+
+    @FormTest
+    void testStyleInfoConstructionAndMutation() {
+        StyleInfo composed = new StyleInfo("padding:1px 2px 3px 4px; margin: 6px; font: 10px native:Main; bgColor:ffffff; fgColor:000000");
+        PaddingInfo paddingInfo = composed.getPadding();
+        MarginInfo marginInfo = composed.getMargin();
+        FontInfo fontInfo = composed.getFont();
+        assertEquals(1, paddingInfo.getTop().getValue(), 0.01);
+        assertEquals(6, marginInfo.getTop().getValue(), 0.01);
+        assertEquals(10f, fontInfo.getSize(), 0.01f);
+
+        StyleInfo copied = new StyleInfo(composed);
+        copied.setFontSize("inherit").setFontName("native:Other").setBorder("1px solid ff0000").setBgColor(null).setMargin("2px 3px");
+        assertEquals("inherit", StyleParser.parseFont(new FontInfo(), copied.values.get("font")).toString());
+        assertEquals("native:Other", StyleParser.parseFont(new FontInfo(), copied.values.get("font")).getName());
+        assertEquals(2, copied.getMargin().getTop().getValue(), 0.01);
+        assertEquals("1px solid ff0000", copied.getBorder().toString());
+
+        StyleInfo empty = new StyleInfo((String[]) null);
+        assertNull(empty.getFont());
+    }
+
+    @FormTest
+    void testStyleParserImageAndBorderParsing() {
+        ImageInfo info = new ImageInfo("/img.png");
+        assertEquals("/img.png", info.toString());
+        assertNull(info.getImage(null));
+
+        BorderInfo borderInfo = StyleParser.parseBorder(new BorderInfo(), "1px solid ff00ff");
+        assertEquals("1px solid ff00ff", borderInfo.toString());
+        assertEquals(1, borderInfo.getTop().getValue(), 0.01);
+    }
+
+    @FormTest
+    void testRoundBorderShadowSpreadAndPaintingCaches() {
+        RoundBorder border = RoundBorder.create().shadowSpread(3).shadowBlur(4f).shadowOpacity(128).uiid(false);
+        com.codename1.ui.Label label = new com.codename1.ui.Label();
+        label.setWidth(20);
+        label.setHeight(20);
+        label.setX(0);
+        label.setY(0);
+        border.paintBorderBackground(graphics, label);
+        RoundBorder.CacheValue cacheValue = null;
+        for (int i = 0; i < 10; i++) {
+            Object cached = label.getClientProperty("cn1$$-rbcache" + (i + 1));
+            if (cached instanceof RoundBorder.CacheValue) {
+                cacheValue = (RoundBorder.CacheValue) cached;
+                break;
+            }
+        }
+        assertNotNull(cacheValue);
+        assertEquals(label.getWidth(), cacheValue.img.getWidth());
+        assertTrue(border.getMinimumHeight() > 0);
+        assertTrue(border.getMinimumWidth() > 0);
+    }
+
+    @FormTest
+    void testCSSBorderStrokeAndRadiusRoundTrip() {
+        CSSBorder cssBorder = new CSSBorder(null, "border-stroke:2px dotted; border-radius:4px 5px 6px 7px; background-repeat:repeat-x; background-position:10% 20%");
+        String css = cssBorder.toCSSString();
+        assertTrue(css.contains("border-stroke:2px dotted"));
+        assertTrue(css.contains("border-radius:4px 5px 6px 7px"));
+        assertTrue(css.contains("background-repeat:repeat-x"));
+        assertTrue(css.contains("background-position:10% 20%"));
     }
 }
