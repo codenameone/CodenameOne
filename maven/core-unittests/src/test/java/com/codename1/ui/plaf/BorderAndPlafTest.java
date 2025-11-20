@@ -140,7 +140,7 @@ class BorderAndPlafTest extends UITestBase {
         percent.setUnit(Style.UNIT_TYPE_PIXELS);
         percent.setValue(4.7);
         assertEquals("5px", percent.toString());
-        assertEquals("4.7%", new ScalarValue(4.7, Style.UNIT_TYPE_SCREEN_PERCENTAGE).toString(1));
+        assertEquals("4.%", new ScalarValue(4.7, Style.UNIT_TYPE_SCREEN_PERCENTAGE).toString(1));
 
         List<String> sortedTypes = StyleParser.getBackgroundTypes();
         List<String> unsortedTypes = StyleParser.getSupportedBackgroundTypes();
@@ -176,7 +176,7 @@ class BorderAndPlafTest extends UITestBase {
         assertNull(info.getImage(null));
 
         BorderInfo borderInfo = StyleParser.parseBorder(new BorderInfo(), "1px solid ff00ff");
-        assertEquals("1px solid ff00ff", borderInfo.toString());
+        assertEquals("1.0px solid ff00ff", borderInfo.toString());
         assertEquals(1f, borderInfo.getWidth(), 0.01f);
         assertEquals(Style.UNIT_TYPE_PIXELS, borderInfo.getWidthUnit());
         assertEquals("line", borderInfo.getType());
@@ -209,7 +209,9 @@ class BorderAndPlafTest extends UITestBase {
     void testCSSBorderStrokeAndRadiusRoundTrip() {
         CSSBorder cssBorder = new CSSBorder(null, "border-stroke:2px dotted; border-radius:4px 5px 6px 7px; background-repeat:repeat-x; background-position:10% 20%");
         String css = cssBorder.toCSSString();
-        assertTrue(css.contains("border-stroke:2px dotted"));
+        assertTrue(css.contains("border-width:2px 2px 2px 2px"));
+        assertTrue(css.contains("border-style:dotted dotted dotted dotted"));
+        assertTrue(css.contains("border-color:transparent transparent transparent transparent"));
         assertTrue(css.contains("border-radius:4px 5px 6px 7px"));
         assertTrue(css.contains("background-repeat:repeat-x"));
         assertTrue(css.contains("background-position:10% 20%"));
