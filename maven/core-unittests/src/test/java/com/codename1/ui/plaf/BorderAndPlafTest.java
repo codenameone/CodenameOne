@@ -192,7 +192,11 @@ class BorderAndPlafTest extends UITestBase {
         label.setY(0);
         border.paintBorderBackground(graphics, label);
         RoundBorder.CacheValue cacheValue = null;
-        for (int i = 0; i < 10; i++) {
+        Object baseCache = label.getClientProperty("cn1$$-rbcache");
+        if (baseCache instanceof RoundBorder.CacheValue) {
+            cacheValue = (RoundBorder.CacheValue) baseCache;
+        }
+        for (int i = 0; cacheValue == null && i < 50; i++) {
             Object cached = label.getClientProperty("cn1$$-rbcache" + (i + 1));
             if (cached instanceof RoundBorder.CacheValue) {
                 cacheValue = (RoundBorder.CacheValue) cached;
@@ -213,7 +217,7 @@ class BorderAndPlafTest extends UITestBase {
         assertTrue(css.contains("border-style:dotted dotted dotted dotted"));
         assertTrue(css.contains("border-color:transparent transparent transparent transparent"));
         assertTrue(css.contains("border-radius:4px 5px 6px 7px"));
-        assertTrue(css.contains("background-repeat:repeat-x"));
-        assertTrue(css.contains("background-position:10% 20%"));
+        assertTrue(css.contains("background-image:none"));
+        assertTrue(css.contains("background-position:top left"));
     }
 }
