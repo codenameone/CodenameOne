@@ -19,6 +19,31 @@ if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/Cn1ssChunkTools.java" ]; then
   exit 2
 fi
 
+JACOCO_VERSION="${JACOCO_VERSION:-0.8.7}"
+JACOCO_AGENT_JAR="${JACOCO_AGENT_JAR:-$HOME/.m2/repository/org/jacoco/org.jacoco.agent/${JACOCO_VERSION}/org.jacoco.agent-${JACOCO_VERSION}-runtime.jar}"
+JACOCO_DESTFILE="${JACOCO_DESTFILE:-${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}/jacoco-device.exec}"
+JACOCO_AGENT_ENABLED="${JACOCO_AGENT_ENABLED:-1}"
+
+ensure_jacoco_agent() {
+  if [ "$JACOCO_AGENT_ENABLED" = "0" ]; then
+    JACOCO_AGENT_OPTS=()
+    return
+  fi
+
+  ensure_dir "$(dirname "$JACOCO_AGENT_JAR")"
+  ensure_dir "$(dirname "$JACOCO_DESTFILE")"
+
+  if [ ! -f "$JACOCO_AGENT_JAR" ]; then
+    jd_log "Downloading JaCoCo agent ${JACOCO_VERSION} to $JACOCO_AGENT_JAR"
+    download_file "https://repo1.maven.org/maven2/org/jacoco/org.jacoco.agent/${JACOCO_VERSION}/org.jacoco.agent-${JACOCO_VERSION}-runtime.jar" "$JACOCO_AGENT_JAR"
+  else
+    jd_log "Using cached JaCoCo agent at $JACOCO_AGENT_JAR"
+  fi
+
+  JACOCO_AGENT_OPTS=(-javaagent:"$JACOCO_AGENT_JAR=destfile=$JACOCO_DESTFILE,append=true,output=file")
+  jd_log "JaCoCo coverage will be written to $JACOCO_DESTFILE"
+}
+
 source "$SCRIPT_DIR/lib/cn1ss.sh"
 cn1ss_log() { jd_log "$1"; }
 
@@ -124,9 +149,12 @@ rsync -a "$TEST_SRC/" "$BUILD_DIR/src/"
 jd_log "Compiling device-runner application sources"
 find "$BUILD_DIR/src" -name '*.java' -print0 | xargs -0 "$JAVAC_BIN" -cp "$CN1_CLASSPATH" -d "$BUILD_DIR/classes"
 
+ensure_jacoco_agent
+
 SIM_TIMEOUT_SECONDS=${SIM_TIMEOUT_SECONDS:-420}
 SIM_KILL_GRACE_SECONDS=${SIM_KILL_GRACE_SECONDS:-30}
 JAVA_CMD=(xvfb-run -a "$JAVA_BIN" \
+  "${JACOCO_AGENT_OPTS[@]}" \
   -cp "$CN1_CLASSPATH:$BUILD_DIR/classes" \
   com.codename1.impl.javase.Simulator com.codenameone.examples.hellocodenameone.HelloCodenameOne)
 

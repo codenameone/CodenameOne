@@ -68,177 +68,6 @@ jobs:
           -Dcodename1.platform=javase \
           -Dcn1.binaries="${CN1_BINARIES}" \
           -pl codenameone-maven-plugin -am -Plocal-dev-javase test
-    - name: Generate static analysis HTML summaries
-      if: ${{ always() }}
-      env:
-        QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target
-        QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
-        QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
-        QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
-        QUALITY_REPORT_GENERATE_HTML_ONLY: "1"
-      run: python3 .github/scripts/generate-quality-report.py
-    - name: Collect quality artifacts
-      if: ${{ always() }}
-      run: |
-        set -euo pipefail
-        mkdir -p quality-artifacts/static-analysis
-        mkdir -p quality-artifacts/coverage
-        shopt -s nullglob
-        for path in maven/core-unittests/target/spotbugsXml.xml maven/core-unittests/target/spotbugs.xml; do
-          if [ -f "$path" ]; then
-            cp "$path" quality-artifacts/static-analysis/
-          fi
-        done
-        if [ -f maven/core-unittests/target/pmd.xml ]; then
-          cp maven/core-unittests/target/pmd.xml quality-artifacts/static-analysis/
-        fi
-        if [ -f maven/core-unittests/target/checkstyle-result.xml ]; then
-          cp maven/core-unittests/target/checkstyle-result.xml quality-artifacts/static-analysis/
-        fi
-        if [ -d target/quality-report ]; then
-          mkdir -p quality-artifacts/static-analysis/html
-          cp -R target/quality-report/. quality-artifacts/static-analysis/html/
-        fi
-        if [ -d maven/core-unittests/target/site/jacoco ]; then
-          cp -R maven/core-unittests/target/site/jacoco quality-artifacts/coverage/
-        fi
-        if [ "$(find quality-artifacts -type f | wc -l)" -eq 0 ]; then
-          echo "No quality artifacts were generated." > quality-artifacts/README.txt
-        fi
-    - name: Upload quality artifacts
-      if: ${{ always() }}
-      id: upload-quality-artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: quality-artifacts
-        path: quality-artifacts
-    - name: Publish quality report previews
-      if: ${{ always() && github.server_url == 'https://github.com' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-      id: publish-quality-previews
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-        SERVER_URL: ${{ github.server_url }}
-        REPOSITORY: ${{ github.repository }}
-        RUN_ID: ${{ github.run_id }}
-        RUN_ATTEMPT: ${{ github.run_attempt }}
-      run: |
-        set -euo pipefail
-        if [ "${SERVER_URL}" != "https://github.com" ]; then
-          echo "HTML previews are only published for github.com instances."
-          exit 0
-        fi
-        run_dir="runs/${RUN_ID}-${RUN_ATTEMPT}"
-        tmp_dir=$(mktemp -d)
-        dest_dir="${tmp_dir}/${run_dir}"
-        mkdir -p "${dest_dir}"
-        has_content=0
-        if compgen -G "target/quality-report/*.html" > /dev/null; then
-          mkdir -p "${dest_dir}/static-analysis"
-          cp target/quality-report/*.html "${dest_dir}/static-analysis/"
-          has_content=1
-        fi
-        if [ -d maven/core-unittests/target/site/jacoco ] && [ -f maven/core-unittests/target/site/jacoco/index.html ]; then
-          mkdir -p "${dest_dir}/coverage"
-          cp -R maven/core-unittests/target/site/jacoco/. "${dest_dir}/coverage/"
-          has_content=1
-        fi
-        if [ "${has_content}" -eq 0 ]; then
-          echo "No HTML outputs detected; skipping preview publishing."
-          exit 0
-        fi
-        printf '%s\n%s\n%s\n' \
-          '# Quality report previews' \
-          '' \
-          'This branch is automatically managed by the PR CI workflow and may be force-pushed.' \
-          > "${tmp_dir}/README.md"
-        git -C "${tmp_dir}" init -b previews >/dev/null
-        git -C "${tmp_dir}" config user.name "github-actions[bot]"
-        git -C "${tmp_dir}" config user.email "github-actions[bot]@users.noreply.github.com"
-        git -C "${tmp_dir}" add .
-        git -C "${tmp_dir}" commit -m "Publish quality report previews for run ${RUN_ID} (attempt ${RUN_ATTEMPT})" >/dev/null
-        remote_url="${SERVER_URL}/${REPOSITORY}.git"
-        token_remote_url="${remote_url/https:\/\//https://x-access-token:${GITHUB_TOKEN}@}"
-        git -C "${tmp_dir}" push --force "${token_remote_url}" previews:quality-report-previews >/dev/null
-        commit_sha=$(git -C "${tmp_dir}" rev-parse HEAD)
-        raw_base="https://raw.githubusercontent.com/${REPOSITORY}/${commit_sha}/${run_dir}"
-        preview_base="https://htmlpreview.github.io/?${raw_base}"
-        {
-          echo "commit=${commit_sha}"
-          echo "run_path=${run_dir}"
-        } >> "$GITHUB_OUTPUT"
-        if [ -f "${dest_dir}/static-analysis/spotbugs.html" ]; then
-          echo "spotbugs_url=${preview_base}/static-analysis/spotbugs.html" >> "$GITHUB_OUTPUT"
-        fi
-        if [ -f "${dest_dir}/static-analysis/pmd.html" ]; then
-          echo "pmd_url=${preview_base}/static-analysis/pmd.html" >> "$GITHUB_OUTPUT"
-        fi
-        if [ -f "${dest_dir}/static-analysis/checkstyle.html" ]; then
-          echo "checkstyle_url=${preview_base}/static-analysis/checkstyle.html" >> "$GITHUB_OUTPUT"
-        fi
-        if [ -f "${dest_dir}/coverage/index.html" ]; then
-          echo "jacoco_url=${preview_base}/coverage/index.html" >> "$GITHUB_OUTPUT"
-        fi
-    - name: Generate quality report summary
-      if: ${{ always() }}
-      env:
-        QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target
-        QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
-        QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
-        QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
-        SPOTBUGS_REPORT_URL: ${{ steps.upload-quality-artifacts.outputs.artifact-url }}
-        PMD_REPORT_URL: ${{ steps.upload-quality-artifacts.outputs.artifact-url }}
-        CHECKSTYLE_REPORT_URL: ${{ steps.upload-quality-artifacts.outputs.artifact-url }}
-        JACOCO_REPORT_URL: ${{ steps.upload-quality-artifacts.outputs.artifact-url }}
-        SPOTBUGS_HTML_URL: ${{ steps.publish-quality-previews.outputs.spotbugs_url }}
-        PMD_HTML_URL: ${{ steps.publish-quality-previews.outputs.pmd_url }}
-        CHECKSTYLE_HTML_URL: ${{ steps.publish-quality-previews.outputs.checkstyle_url }}
-        JACOCO_HTML_URL: ${{ steps.publish-quality-previews.outputs.jacoco_url }}
-      run: python3 .github/scripts/generate-quality-report.py
-    - name: Upload quality report summary
-      if: ${{ always() }}
-      uses: actions/upload-artifact@v4
-      with:
-        name: quality-report
-        path: quality-report.md
-    - name: Publish quality report comment
-      if: ${{ github.event_name == 'pull_request' }}
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
-          const marker = '<!-- quality-report -->';
-          const reportPath = 'quality-report.md';
-          if (!fs.existsSync(reportPath)) {
-            core.warning('quality-report.md was not generated.');
-            return;
-          }
-          const body = `${marker}\n${fs.readFileSync(reportPath, 'utf8')}`;
-          const { owner, repo } = context.repo;
-          const issue_number = context.issue.number;
-          const { data: comments } = await github.rest.issues.listComments({
-            owner,
-            repo,
-            issue_number,
-            per_page: 100,
-          });
-          const existing = comments.find(
-            (comment) => comment.user?.type === 'Bot' && comment.body?.includes(marker),
-          );
-          if (existing) {
-            await github.rest.issues.updateComment({
-              owner,
-              repo,
-              comment_id: existing.id,
-              body,
-            });
-          } else {
-            await github.rest.issues.createComment({
-              owner,
-              repo,
-              issue_number,
-              body,
-            });
-          }
     - name: Install dependencies
       run: |
         sudo apt-get update && sudo apt-get install xvfb
@@ -313,6 +142,215 @@ jobs:
         path: artifacts/desktop-device-runner
         if-no-files-found: warn
         retention-days: 14
+
+    - name: Merge JaCoCo coverage data and regenerate report
+      if: ${{ always() }}
+      env:
+        JACOCO_VERSION: 0.8.7
+      run: |
+        set -euo pipefail
+
+        UNIT_EXEC="maven/core-unittests/target/jacoco.exec"
+        DEVICE_EXEC="artifacts/desktop-device-runner/jacoco-device.exec"
+        MERGED_EXEC="maven/core-unittests/target/jacoco-merged.exec"
+
+        if [ ! -f "$UNIT_EXEC" ]; then
+          echo "Unit test JaCoCo exec file not found at $UNIT_EXEC" >&2
+          exit 1
+        fi
+
+        if [ ! -f "$DEVICE_EXEC" ]; then
+          echo "Device-runner JaCoCo exec file not found at $DEVICE_EXEC" >&2
+          exit 1
+        fi
+
+        JACOCO_CLI_JAR="$HOME/.m2/repository/org/jacoco/org.jacoco.cli/${JACOCO_VERSION}/org.jacoco.cli-${JACOCO_VERSION}-nodeps.jar"
+        if [ ! -f "$JACOCO_CLI_JAR" ]; then
+          mvn -q -DskipTests -pl core-unittests -am dependency:get -Dartifact=org.jacoco:org.jacoco.cli:${JACOCO_VERSION}:jar:nodeps
+        fi
+
+        java -jar "$JACOCO_CLI_JAR" merge "$UNIT_EXEC" "$DEVICE_EXEC" --destfile "$MERGED_EXEC"
+        mv "$MERGED_EXEC" "$UNIT_EXEC"
+
+        mvn -pl core-unittests -am -DskipTests -Djacoco.skip=true jacoco:report
+
+    - name: Generate static analysis HTML summaries
+      if: ${{ always() }}
+      env:
+        QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target
+        QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
+        QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
+        QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+        QUALITY_REPORT_GENERATE_HTML_ONLY: "1"
+      run: python3 .github/scripts/generate-quality-report.py
+
+    - name: Collect quality artifacts
+      if: ${{ always() }}
+      run: |
+        set -euo pipefail
+        mkdir -p quality-artifacts/static-analysis
+        mkdir -p quality-artifacts/coverage
+        shopt -s nullglob
+        for path in maven/core-unittests/target/spotbugsXml.xml maven/core-unittests/target/spotbugs.xml; do
+          if [ -f "$path" ]; then
+            cp "$path" quality-artifacts/static-analysis/
+          fi
+        done
+        if [ -f maven/core-unittests/target/pmd.xml ]; then
+          cp maven/core-unittests/target/pmd.xml quality-artifacts/static-analysis/
+        fi
+        if [ -f maven/core-unittests/target/checkstyle-result.xml ]; then
+          cp maven/core-unittests/target/checkstyle-result.xml quality-artifacts/static-analysis/
+        fi
+        if [ -d target/quality-report ]; then
+          mkdir -p quality-artifacts/static-analysis/html
+          cp -R target/quality-report/. quality-artifacts/static-analysis/html/
+        fi
+        if [ -d maven/core-unittests/target/site/jacoco ]; then
+          cp -R maven/core-unittests/target/site/jacoco quality-artifacts/coverage/
+        fi
+        if [ "$(find quality-artifacts -type f | wc -l)" -eq 0 ]; then
+          echo "No quality artifacts were generated." > quality-artifacts/README.txt
+        fi
+
+    - name: Upload quality artifacts
+      if: ${{ always() }}
+      id: upload-quality-artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: quality-artifacts
+        path: quality-artifacts
+
+    - name: Publish quality report previews
+      if: ${{ always() && github.server_url == 'https://github.com' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+      id: publish-quality-previews
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        SERVER_URL: ${{ github.server_url }}
+        REPOSITORY: ${{ github.repository }}
+        RUN_ID: ${{ github.run_id }}
+        RUN_ATTEMPT: ${{ github.run_attempt }}
+      run: |
+        set -euo pipefail
+        if [ "${SERVER_URL}" != "https://github.com" ]; then
+          echo "HTML previews are only published for github.com instances."
+          exit 0
+        fi
+        run_dir="runs/${RUN_ID}-${RUN_ATTEMPT}"
+        tmp_dir=$(mktemp -d)
+        dest_dir="${tmp_dir}/${run_dir}"
+        mkdir -p "${dest_dir}"
+        has_content=0
+        if compgen -G "target/quality-report/*.html" > /dev/null; then
+          mkdir -p "${dest_dir}/static-analysis"
+          cp target/quality-report/*.html "${dest_dir}/static-analysis/"
+          has_content=1
+        fi
+        if [ -d maven/core-unittests/target/site/jacoco ] && [ -f maven/core-unittests/target/site/jacoco/index.html ]; then
+          mkdir -p "${dest_dir}/coverage"
+          cp -R maven/core-unittests/target/site/jacoco/. "${dest_dir}/coverage/"
+          has_content=1
+        fi
+        if [ "${has_content}" -eq 0 ]; then
+          echo "No HTML outputs detected; skipping preview publishing."
+          exit 0
+        fi
+        printf '%s\n%s\n%s\n' \
+          '# Quality report previews' \
+          '' \
+          'This branch is automatically managed by the PR CI workflow and may be force-pushed.' \
+          > "${tmp_dir}/README.md"
+        git -C "${tmp_dir}" init -b previews >/dev/null
+        git -C "${tmp_dir}" config user.name "github-actions[bot]"
+        git -C "${tmp_dir}" config user.email "github-actions[bot]@users.noreply.github.com"
+        git -C "${tmp_dir}" add .
+        git -C "${tmp_dir}" commit -m "Publish quality report previews for run ${RUN_ID} (attempt ${RUN_ATTEMPT})" >/dev/null
+        remote_url="${SERVER_URL}/${REPOSITORY}.git"
+        token_remote_url="${remote_url/https:\/\//https://x-access-token:${GITHUB_TOKEN}@}"
+        git -C "${tmp_dir}" push --force "${token_remote_url}" previews:quality-report-previews >/dev/null
+        commit_sha=$(git -C "${tmp_dir}" rev-parse HEAD)
+        raw_base="https://raw.githubusercontent.com/${REPOSITORY}/${commit_sha}/${run_dir}"
+        preview_base="https://htmlpreview.github.io/?${raw_base}"
+        {
+          echo "commit=${commit_sha}"
+          echo "run_path=${run_dir}"
+        } >> "$GITHUB_OUTPUT"
+        if [ -f "${dest_dir}/static-analysis/spotbugs.html" ]; then
+          echo "spotbugs_url=${preview_base}/static-analysis/spotbugs.html" >> "$GITHUB_OUTPUT"
+        fi
+        if [ -f "${dest_dir}/static-analysis/pmd.html" ]; then
+          echo "pmd_url=${preview_base}/static-analysis/pmd.html" >> "$GITHUB_OUTPUT"
+        fi
+        if [ -f "${dest_dir}/static-analysis/checkstyle.html" ]; then
+          echo "checkstyle_url=${preview_base}/static-analysis/checkstyle.html" >> "$GITHUB_OUTPUT"
+        fi
+        if [ -f "${dest_dir}/coverage/index.html" ]; then
+          echo "jacoco_url=${preview_base}/coverage/index.html" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Generate quality report summary
+      if: ${{ always() }}
+      env:
+        QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target
+        QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
+        QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
+        QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+        SPOTBUGS_REPORT_URL: ${{ steps.upload-quality-artifacts.outputs.artifact-url }}
+        PMD_REPORT_URL: ${{ steps.upload-quality-artifacts.outputs.artifact-url }}
+        CHECKSTYLE_REPORT_URL: ${{ steps.upload-quality-artifacts.outputs.artifact-url }}
+        JACOCO_REPORT_URL: ${{ steps.upload-quality-artifacts.outputs.artifact-url }}
+        SPOTBUGS_HTML_URL: ${{ steps.publish-quality-previews.outputs.spotbugs_url }}
+        PMD_HTML_URL: ${{ steps.publish-quality-previews.outputs.pmd_url }}
+        CHECKSTYLE_HTML_URL: ${{ steps.publish-quality-previews.outputs.checkstyle_url }}
+        JACOCO_HTML_URL: ${{ steps.publish-quality-previews.outputs.jacoco_url }}
+      run: python3 .github/scripts/generate-quality-report.py
+
+    - name: Upload quality report summary
+      if: ${{ always() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: quality-report
+        path: quality-report.md
+
+    - name: Publish quality report comment
+      if: ${{ github.event_name == 'pull_request' }}
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const marker = '<!-- quality-report -->';
+          const reportPath = 'quality-report.md';
+          if (!fs.existsSync(reportPath)) {
+            core.warning('quality-report.md was not generated.');
+            return;
+          }
+          const body = `${marker}\n${fs.readFileSync(reportPath, 'utf8')}`;
+          const { owner, repo } = context.repo;
+          const issue_number = context.issue.number;
+          const { data: comments } = await github.rest.issues.listComments({
+            owner,
+            repo,
+            issue_number,
+            per_page: 100,
+          });
+          const existing = comments.find(
+            (comment) => comment.user?.type === 'Bot' && comment.body?.includes(marker),
+          );
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner,
+              repo,
+              comment_id: existing.id,
+              body,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number,
+              body,
+            });
+          }
 
     - name: Packaging Everything
       run: zip -j result.zip CodenameOne/javadocs.zip CodenameOne/dist/CodenameOne.jar CodenameOne/updatedLibs.zip Ports/JavaSE/dist/JavaSE.jar build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip
