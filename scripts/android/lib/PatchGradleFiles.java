@@ -105,11 +105,7 @@ public class PatchGradleFiles {
         r = ensureTestDependencies(content);
         content = r.content();
         changed |= r.changed();
-
-        r = ensureJacocoConfiguration(content);
-        content = r.content();
-        changed |= r.changed();
-
+        
         if (changed) {
             Files.writeString(path, ensureTrailingNewline(content), StandardCharsets.UTF_8);
         }
@@ -249,88 +245,6 @@ public class PatchGradleFiles {
             content += "\n";
         }
         return new Result(content + block, true);
-    }
-
-    private static Result ensureJacocoConfiguration(String content) {
-        if (content.contains("jacocoAndroidReport")) {
-            return new Result(content, false);
-        }
-
-        String jacocoBlock = """
-apply plugin: 'jacoco'
-
-android {
-    buildTypes {
-        debug {
-            testCoverageEnabled true
-        }
-    }
-}
-
-jacoco {
-    toolVersion = "0.8.11"
-}
-
-    tasks.register("jacocoAndroidReport", JacocoReport) {
-        group = "verification"
-        description = "Generates Jacoco coverage report for the debug variant"
-        outputs.upToDateWhen { false }
-
-        reports {
-            xml.required = true
-            html.required = true
-            html.outputLocation = layout.buildDirectory.dir("reports/jacoco/jacocoAndroidReport/html")
-        }
-
-    def coverageFiles = fileTree(dir: "$buildDir", includes: [
-            "outputs/code_coverage/**/*coverage.ec",
-            "jacoco/*.exec",
-            "outputs/unit_test_code_coverage/**/*coverage.ec",
-            "**/*.ec",
-            "**/*.exec"
-    ])
-
-    def excludes = [
-            '**/R.class',
-            '**/R$*.class',
-            '**/BuildConfig.*',
-            '**/Manifest*.*',
-            '**/*Test*.*',
-            '**/androidx/**/*',
-            '**/com/google/**/*'
-    ]
-
-    def javaClasses = fileTree(dir: "$buildDir/intermediates/javac/debug/classes", exclude: excludes)
-    def kotlinClasses = fileTree(dir: "$buildDir/tmp/kotlin-classes/debug", exclude: excludes)
-    def aarMainJar = file("$buildDir/intermediates/aar_main_jar/debug/classes.jar")
-    def aarTrees = aarMainJar.exists() ? [zipTree(aarMainJar)] : []
-    def runtimeJars = configurations.debugRuntimeClasspath.filter { it.name.endsWith('.jar') }.collect { zipTree(it) }
-
-    classDirectories.setFrom(files(javaClasses, kotlinClasses, aarTrees, runtimeJars).asFileTree.matching {
-        include 'com/codename1/impl/android/**'
-    })
-
-    sourceDirectories.setFrom(files("src/main/java"))
-
-    executionData.setFrom(coverageFiles)
-
-        doFirst {
-            def existing = coverageFiles.files.findAll { it.exists() }
-            if (existing.isEmpty()) {
-                throw new GradleException("No Jacoco coverage data found. Ensure connectedDebugAndroidTest runs with coverage enabled.")
-            }
-            logger.lifecycle("Jacoco coverage inputs: ${existing}")
-        }
-}
-
-afterEvaluate {
-    tasks.matching { it.name == "connectedDebugAndroidTest" }.configureEach {
-        finalizedBy(tasks.named("jacocoAndroidReport"))
-    }
-}
-""".stripTrailing();
-
-        return new Result(ensureTrailingNewline(content) + "\n" + jacocoBlock + "\n", true);
     }
 
     private static String ensureTrailingNewline(String content) {
