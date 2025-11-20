@@ -8,13 +8,13 @@ import com.codename1.ui.Form;
 public final class Cn1ssDeviceRunner extends DeviceRunner {
     private static final String[] TEST_CLASSES = new String[] {
             MainScreenScreenshotTest.class.getName(),
-            BrowserComponentScreenshotTest.class.getName(),
-            MediaPlaybackScreenshotTest.class.getName(),
             GraphicsPipelineScreenshotTest.class.getName(),
             GraphicsShapesAndGradientsScreenshotTest.class.getName(),
             GraphicsStateAndTextScreenshotTest.class.getName(),
             GraphicsTransformationsScreenshotTest.class.getName(),
-            GraphicsMethodsScreenshotTest.class.getName()
+            GraphicsMethodsScreenshotTest.class.getName(),
+            BrowserComponentScreenshotTest.class.getName(),
+            MediaPlaybackScreenshotTest.class.getName()
     };
 
     public void runSuite() {
@@ -36,7 +36,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     private static void log(String msg) {
         System.out.println(msg);
     }
-    
+
     @Override
     protected void startApplicationInstance() {
         Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {
