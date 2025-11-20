@@ -154,15 +154,15 @@ class BorderAndPlafTest extends UITestBase {
         PaddingInfo paddingInfo = composed.getPadding();
         MarginInfo marginInfo = composed.getMargin();
         FontInfo fontInfo = composed.getFont();
-        assertEquals(1, paddingInfo.getTop().getValue(), 0.01);
-        assertEquals(6, marginInfo.getTop().getValue(), 0.01);
+        assertEquals(1, paddingInfo.getValue(Component.TOP).getValue(), 0.01);
+        assertEquals(6, marginInfo.getValue(Component.TOP).getValue(), 0.01);
         assertEquals(10f, fontInfo.getSize(), 0.01f);
 
         StyleInfo copied = new StyleInfo(composed);
         copied.setFontSize("inherit").setFontName("native:Other").setBorder("1px solid ff0000").setBgColor(null).setMargin("2px 3px");
         assertEquals("inherit", StyleParser.parseFont(new FontInfo(), copied.values.get("font")).toString());
         assertEquals("native:Other", StyleParser.parseFont(new FontInfo(), copied.values.get("font")).getName());
-        assertEquals(2, copied.getMargin().getTop().getValue(), 0.01);
+        assertEquals(2, copied.getMargin().getValue(Component.TOP).getValue(), 0.01);
         assertEquals("1px solid ff0000", copied.getBorder().toString());
 
         StyleInfo empty = new StyleInfo((String[]) null);
@@ -177,7 +177,7 @@ class BorderAndPlafTest extends UITestBase {
 
         BorderInfo borderInfo = StyleParser.parseBorder(new BorderInfo(), "1px solid ff00ff");
         assertEquals("1px solid ff00ff", borderInfo.toString());
-        assertEquals(1, borderInfo.getTop().getValue(), 0.01);
+        assertEquals(1, borderInfo.getValue(Component.TOP).getValue(), 0.01);
     }
 
     @FormTest
