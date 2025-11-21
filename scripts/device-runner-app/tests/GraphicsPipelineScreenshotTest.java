@@ -11,25 +11,15 @@ import com.codename1.ui.layouts.BorderLayout;
 public class GraphicsPipelineScreenshotTest extends AbstractTest {
     @Override
     public boolean runTest() throws Exception {
-        final Form[] formHolder = new Form[1];
-        Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {
-            Form form = new Form("Graphics Pipeline", new BorderLayout());
-            form.add(BorderLayout.CENTER, new GraphicsShowcase());
-            formHolder[0] = form;
-            form.show();
-        });
-
-        Cn1ssDeviceRunnerHelper.waitForMillis(1200);
-
-        final boolean[] result = new boolean[1];
-        Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {
-            if (formHolder[0] != null) {
-                formHolder[0].revalidate();
-                formHolder[0].repaint();
+        Form form = new Form("Graphics Pipeline", new BorderLayout()) {
+            @Override
+            protected void onShowCompleted() {
+                Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("GraphicsPipeline");
             }
-            result[0] = Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("GraphicsPipeline");
-        });
-        return result[0];
+        };
+        form.add(BorderLayout.CENTER, new GraphicsShowcase());
+        form.show();
+        return true;
     }
 
     private static final class GraphicsShowcase extends Component {

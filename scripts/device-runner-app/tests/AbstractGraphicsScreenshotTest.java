@@ -12,24 +12,14 @@ abstract class AbstractGraphicsScreenshotTest extends AbstractTest {
 
     @Override
     public boolean runTest() throws Exception {
-        final Form[] holder = new Form[1];
-        Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {
-            Form form = new Form("Graphics", new BorderLayout());
-            form.add(BorderLayout.CENTER, createContent());
-            holder[0] = form;
-            form.show();
-        });
-
-        Cn1ssDeviceRunnerHelper.waitForMillis(1200);
-
-        final boolean[] result = new boolean[1];
-        Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {
-            if (holder[0] != null) {
-                holder[0].revalidate();
-                holder[0].repaint();
+        Form form = new Form("Graphics", new BorderLayout()) {
+            @Override
+            protected void onShowCompleted() {
+                Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(screenshotName());
             }
-            result[0] = Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(screenshotName());
-        });
-        return result[0];
+        }
+        form.add(BorderLayout.CENTER, createContent());
+        form.show();
+        return true;
     }
 }
