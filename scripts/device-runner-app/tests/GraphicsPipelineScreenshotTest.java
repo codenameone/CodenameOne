@@ -8,18 +8,13 @@ import com.codename1.ui.Graphics;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 
-public class GraphicsPipelineScreenshotTest extends AbstractTest {
+public class GraphicsPipelineScreenshotTest extends BaseTest {
     @Override
     public boolean runTest() throws Exception {
-        Form form = new Form("Graphics Pipeline", new BorderLayout()) {
-            @Override
-            protected void onShowCompleted() {
-                Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("GraphicsPipeline");
-            }
-        };
+        Form form = createForm("Graphics Pipeline", new BorderLayout(), "GraphicsPipeline");
         form.add(BorderLayout.CENTER, new GraphicsShowcase());
         form.show();
-        return true;
+        return waitForDone();
     }
 
     private static final class GraphicsShowcase extends Component {

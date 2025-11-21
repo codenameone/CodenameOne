@@ -7,16 +7,10 @@ import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 
-public class MainScreenScreenshotTest extends AbstractTest {
+public class MainScreenScreenshotTest extends BaseTest {
     @Override
     public boolean runTest() throws Exception {
-        Form form = new Form("Main Screen", new BorderLayout()) {
-            @Override
-            protected void onShowCompleted() {
-                Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("MainActivity");
-            }
-        };
-
+        Form form = createForm("Main Screen", new BorderLayout(), "MainActivity");
         Container content = new Container(BoxLayout.y());
         content.getAllStyles().setBgColor(0x1f2937);
         content.getAllStyles().setBgTransparency(255);
@@ -36,6 +30,6 @@ public class MainScreenScreenshotTest extends AbstractTest {
         form.add(BorderLayout.CENTER, content);
         form.show();
 
-        return true;
+        return waitForDone();
     }
 }

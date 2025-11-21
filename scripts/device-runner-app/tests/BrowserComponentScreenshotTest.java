@@ -6,25 +6,18 @@ import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
 
-public class BrowserComponentScreenshotTest extends AbstractTest {
+public class BrowserComponentScreenshotTest extends BaseTest {
     @Override
     public boolean runTest() throws Exception {
         if (!BrowserComponent.isNativeBrowserSupported()) {
             return true;
         }
-        Form form = new Form("Browser Test", new BorderLayout()) {
-            @Override
-            protected void onShowCompleted() {
-                TestUtils.waitFor(100);
-                Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("BrowserComponent");
-            }
-        };
+        Form form = createForm("Browser Test", new BorderLayout(), "BrowserComponent");
         BrowserComponent browser = new BrowserComponent();
         browser.setPage(buildHtml(), null);
         form.add(BorderLayout.CENTER, browser);
         form.show();
-        TestUtils.waitFor(250);
-        return true;
+        return waitForDone();
     }
 
     private static String buildHtml() {

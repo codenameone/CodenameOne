@@ -15,14 +15,14 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
-public class MediaPlaybackScreenshotTest extends AbstractTest {
+public class MediaPlaybackScreenshotTest extends BaseTest {
     private static final int SAMPLE_RATE = 44100;
     private static final double TONE_FREQUENCY = 440.0;
     private static final double TONE_DURATION_SECONDS = 1.2;
 
     @Override
     public boolean runTest() throws Exception {
-        Form form = new Form("Media Playback", new BorderLayout());
+        Form form = createForm("Media Playback", new BorderLayout(), "MediaPlayback");
         String tonePath = writeToneWav();
         final Label statusLabel = new Label("Preparing media sample…");
         if (tonePath == null) {
@@ -46,8 +46,7 @@ public class MediaPlaybackScreenshotTest extends AbstractTest {
         form.show();
 
         Cn1ssDeviceRunnerHelper.waitForMillis(800);
-        boolean screenshotSuccess = Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("MediaPlayback");
-        return screenshotSuccess;
+        return waitForDone();
     }
 
     private static void updateStatus(Label label, Form form, String message) {
