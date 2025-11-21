@@ -10,7 +10,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
-static import com.codename1.ui.CN.*;
+import com.codename1.ui.CN;
 
 import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunner;
 import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunnerReporter;
@@ -31,7 +31,7 @@ public class HelloCodenameOne {
         }
         if (!deviceRunnerExecuted) {
             deviceRunnerExecuted = true;
-            callSerially(() -> new Cn1ssDeviceRunner().runSuite());
+            CN.callSerially(() -> new Cn1ssDeviceRunner().runSuite());
         }
         new Form("Fallback").show();
         //showMainForm();
