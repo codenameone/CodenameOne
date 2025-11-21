@@ -12,6 +12,7 @@ import com.codename1.ui.TextComponent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.table.TableLayout;
 import com.codename1.ui.plaf.UIManager;
+import java.util.Hashtable;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -27,33 +28,33 @@ class LayoutsCoverageTest extends UITestBase {
         content.setLayout(layout);
 
         Label first = new Label("First");
-        first.getStyle().setPreferredSize(new Dimension(20, 10));
+        first.setPreferredSize(new Dimension(20, 10));
         Button second = new Button("Second");
-        second.getStyle().setPreferredSize(new Dimension(60, 10));
+        second.setPreferredSize(new Dimension(60, 10));
         Label third = new Label("Third");
-        third.getStyle().setPreferredSize(new Dimension(25, 10));
+        third.setPreferredSize(new Dimension(25, 10));
 
         layout.setHorizontalGroup(
                 layout.createSequentialGroup()
-                        .addComponent(first)
-                        .addComponent(second)
+                        .add(first)
+                        .add(second)
                         .add(layout.createParallelGroup(GroupLayout.LEADING)
-                                .addComponent(third))
+                                .add(third))
         );
 
         layout.setVerticalGroup(
                 layout.createParallelGroup(GroupLayout.BASELINE)
-                        .addComponent(first)
-                        .addComponent(second)
-                        .addComponent(third)
+                        .add(first)
+                        .add(second)
+                        .add(third)
         );
 
         layout.linkSize(new Component[]{first, second}, GroupLayout.HORIZONTAL);
         form.show();
         TestCodenameOneImplementation.getInstance().dispatchPointerPressAndRelease(1, 1);
 
-        assertTrue(layout.isAutocreateContainerGaps());
-        assertTrue(layout.isAutocreateGaps());
+        assertTrue(layout.getAutocreateContainerGaps());
+        assertTrue(layout.getAutocreateGaps());
         assertEquals(first.getWidth(), second.getWidth());
         assertEquals(third.getHeight(), second.getHeight());
         assertEquals(layout.getComponentConstraint(first), layout.getComponentConstraint(first));
@@ -127,7 +128,9 @@ class LayoutsCoverageTest extends UITestBase {
 
     @FormTest
     void textModeLayoutGroupsInputsAndClonesConstraints() {
-        UIManager.getInstance().getThemeProps().put("textComponentOnTopBool", Boolean.FALSE);
+        Hashtable theme = new Hashtable();
+        theme.put("textComponentOnTopBool", Boolean.FALSE);
+        UIManager.getInstance().setThemeProps(theme);
         TextModeLayout textLayout = new TextModeLayout(2, 1);
         Container container = new Container(textLayout);
 
@@ -137,15 +140,19 @@ class LayoutsCoverageTest extends UITestBase {
         second.onTopMode(false);
 
         container.add(textLayout.createConstraint(), first);
-        TableLayout.Constraint constraint = textLayout.createConstraint().spanRows(1);
+        TableLayout.Constraint constraint = textLayout.createConstraint();
+        constraint.setVerticalSpan(2);
         container.add(constraint, second);
 
-        Form form = new Form(container);
+        Form form = new Form(new BorderLayout());
+        form.add(BorderLayout.CENTER, container);
         form.show();
         TestCodenameOneImplementation.getInstance().dispatchPointerPressAndRelease(5, 5);
 
-        assertEquals(((TableLayout.Constraint) textLayout.cloneConstraint(constraint)).rowSpan, constraint.rowSpan);
-        assertEquals(first.getLabel().getPreferredW(), second.getLabel().getPreferredW());
+        TableLayout.Constraint cloned = (TableLayout.Constraint) textLayout.cloneConstraint(constraint);
+        assertEquals(constraint.getVerticalSpan(), cloned.getVerticalSpan());
+        assertEquals(2, ((TableLayout.Constraint) textLayout.table.getComponentConstraint(second)).getVerticalSpan());
+        assertNotSame(constraint, cloned);
     }
 
     @FormTest
@@ -163,15 +170,16 @@ class LayoutsCoverageTest extends UITestBase {
         layeredLayout.setReferenceComponentLeft(overlay, base, 1f);
         layeredLayout.setReferenceComponentTop(overlay, base, 0f);
 
-        Form form = new Form(container);
+        Form form = new Form(new BorderLayout());
+        form.add(BorderLayout.CENTER, container);
         form.show();
         TestCodenameOneImplementation.getInstance().dispatchPointerPressAndRelease(10, 10);
 
-        LayeredLayout.LayeredLayoutConstraint baseConstraint = layeredLayout.getConstraint(base);
-        assertEquals(LayeredLayout.UNIT_PIXELS, baseConstraint.top().unit());
-        assertEquals(2, baseConstraint.right().value());
+        LayeredLayout.LayeredLayoutConstraint baseConstraint = layeredLayout.getLayeredLayoutConstraint(base);
+        assertEquals(LayeredLayout.UNIT_PIXELS, baseConstraint.top().getUnit());
+        assertEquals("2px", baseConstraint.right().getValueAsString());
 
-        LayeredLayout.LayeredLayoutConstraint overlayConstraint = layeredLayout.getConstraint(overlay);
+        LayeredLayout.LayeredLayoutConstraint overlayConstraint = layeredLayout.getLayeredLayoutConstraint(overlay);
         assertSame(base, overlayConstraint.left().referenceComponent());
         assertEquals(1f, overlayConstraint.left().referencePosition());
         assertEquals(0f, overlayConstraint.top().referencePosition());
