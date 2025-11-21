@@ -166,13 +166,13 @@ jobs:
 
         JACOCO_CLI_JAR="$HOME/.m2/repository/org/jacoco/org.jacoco.cli/${JACOCO_VERSION}/org.jacoco.cli-${JACOCO_VERSION}-nodeps.jar"
         if [ ! -f "$JACOCO_CLI_JAR" ]; then
-          mvn -q -DskipTests -pl core-unittests -am dependency:get -Dartifact=org.jacoco:org.jacoco.cli:${JACOCO_VERSION}:jar:nodeps
+          mvn -q -DskipTests -f maven/pom.xml dependency:get -Dartifact=org.jacoco:org.jacoco.cli:${JACOCO_VERSION}:jar:nodeps
         fi
 
         java -jar "$JACOCO_CLI_JAR" merge "$UNIT_EXEC" "$DEVICE_EXEC" --destfile "$MERGED_EXEC"
         mv "$MERGED_EXEC" "$UNIT_EXEC"
 
-        mvn -f maven/pom.xml -pl core-unittests -am -DskipTests jacoco:report
+        mvn -f maven/pom.xml -P unittests -DunitTests=true -pl core-unittests -am -DskipTests jacoco:report
 
     - name: Generate static analysis HTML summaries
       if: ${{ always() }}
