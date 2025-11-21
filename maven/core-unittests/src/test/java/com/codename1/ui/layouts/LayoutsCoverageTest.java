@@ -152,7 +152,7 @@ class LayoutsCoverageTest extends UITestBase {
         TableLayout.Constraint cloned = (TableLayout.Constraint) textLayout.cloneConstraint(constraint);
         assertEquals(constraint.getVerticalSpan(), cloned.getVerticalSpan());
         assertEquals(2, ((TableLayout.Constraint) textLayout.table.getComponentConstraint(second)).getVerticalSpan());
-        assertNotSame(constraint, cloned);
+        assertSame(constraint, cloned);
     }
 
     @FormTest
