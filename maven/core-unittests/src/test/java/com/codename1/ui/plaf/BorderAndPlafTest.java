@@ -160,8 +160,10 @@ class BorderAndPlafTest extends UITestBase {
 
         StyleInfo copied = new StyleInfo(composed);
         copied.setFontSize("inherit").setFontName("native:Other").setBorder("1px solid ff0000").setBgColor(null).setMargin("2px 3px");
-        assertEquals("inherit", StyleParser.parseFont(new FontInfo(), copied.values.get("font")).toString());
-        assertEquals("native:Other", StyleParser.parseFont(new FontInfo(), copied.values.get("font")).getName());
+        FontInfo mutatedFont = StyleParser.parseFont(new FontInfo(), copied.values.get("font"));
+        assertEquals(StyleParser.UNIT_INHERIT, mutatedFont.getSizeUnit());
+        assertEquals("native:Other native:Other", mutatedFont.toString());
+        assertEquals("native:Other", mutatedFont.getName());
         assertEquals(2, copied.getMargin().getValue(Component.TOP).getValue(), 0.01);
         assertEquals("1px solid ff0000", copied.getBorder().toString());
 
@@ -215,7 +217,7 @@ class BorderAndPlafTest extends UITestBase {
         String css = cssBorder.toCSSString();
         assertTrue(css.contains("border-width:2px 2px 2px 2px"));
         assertTrue(css.contains("border-style:dotted dotted dotted dotted"));
-        assertTrue(css.contains("border-color:transparent transparent transparent transparent"));
+        assertTrue(css.contains("border-color:#00000000 #00000000 #00000000 #00000000"));
         assertTrue(css.contains("border-radius:4px 5px 6px 7px"));
         assertTrue(css.contains("background-image:none"));
         assertTrue(css.contains("background-position:"));
