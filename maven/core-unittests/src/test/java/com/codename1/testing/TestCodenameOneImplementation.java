@@ -173,6 +173,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private String nextCaptureAudioPath = "file://test-audio.wav";
     private MediaRecorderBuilder lastMediaRecorderBuilder;
     private VideoCaptureConstraints lastVideoConstraints;
+    private boolean minimizeInvoked;
+    private boolean exitInvoked;
+    private String lastExecuteUrl;
 
 
     public TestCodenameOneImplementation() {
@@ -1113,6 +1116,40 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         int[] ys = new int[]{y};
         display.pointerPressed(xs, ys);
         display.pointerReleased(xs, ys);
+    }
+
+    @Override
+    public boolean minimizeApplication() {
+        minimizeInvoked = true;
+        return true;
+    }
+
+    @Override
+    public void exitApplication() {
+        exitInvoked = true;
+    }
+
+    @Override
+    public void execute(String url) {
+        lastExecuteUrl = url;
+    }
+
+    public boolean isMinimizeInvoked() {
+        return minimizeInvoked;
+    }
+
+    public boolean isExitInvoked() {
+        return exitInvoked;
+    }
+
+    public String getLastExecuteUrl() {
+        return lastExecuteUrl;
+    }
+
+    public void resetInvocationTracking() {
+        minimizeInvoked = false;
+        exitInvoked = false;
+        lastExecuteUrl = null;
     }
 
     private boolean beginAllowingEditDuringKey(int keyCode) {
