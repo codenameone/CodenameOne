@@ -33,7 +33,7 @@ public class HelloCodenameOne {
             deviceRunnerExecuted = true;
             CN.callSerially(() -> new Cn1ssDeviceRunner().runSuite());
         }
-        new Form("Fallback").show();
+        mainForm.show();
     }
 
     public void stop() {

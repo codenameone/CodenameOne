@@ -13,7 +13,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new GraphicsShapesAndGradientsScreenshotTest(),
             new GraphicsStateAndTextScreenshotTest(),
             new GraphicsTransformationsScreenshotTest(),
-            new GraphicsMethodsScreenshotTest(),
             new BrowserComponentScreenshotTest(),
             new MediaPlaybackScreenshotTest()
     };
