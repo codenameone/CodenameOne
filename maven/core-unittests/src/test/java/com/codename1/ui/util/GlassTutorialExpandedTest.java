@@ -4,6 +4,7 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestUtils;
 import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
@@ -60,15 +61,24 @@ class GlassTutorialExpandedTest extends UITestBase {
         Form form = new Form();
         form.show();
 
-        final int tapX = com.codename1.ui.Display.getInstance().getDisplayWidth() / 2;
-        final int tapY = com.codename1.ui.Display.getInstance().getDisplayHeight() / 2;
+        final Display display = Display.getInstance();
+        final int tapX = display.getDisplayWidth() / 2;
+        final int tapY = display.getDisplayHeight() / 2;
 
         Thread dismiss = new Thread(new Runnable() {
             public void run() {
-                while (!(com.codename1.ui.Display.getInstance().getCurrent() instanceof Dialog)) {
+                long deadline = System.currentTimeMillis() + 2000;
+                while (!(display.getCurrent() instanceof Dialog) && System.currentTimeMillis() < deadline) {
                     TestUtils.waitFor(5);
                 }
-                implementation.dispatchPointerPressAndRelease(tapX, tapY);
+                while (display.getCurrent() instanceof Dialog && System.currentTimeMillis() < deadline) {
+                    display.callSerially(new Runnable() {
+                        public void run() {
+                            implementation.dispatchPointerPressAndRelease(tapX, tapY);
+                        }
+                    });
+                    TestUtils.waitFor(25);
+                }
             }
         });
         dismiss.start();

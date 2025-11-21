@@ -23,9 +23,9 @@ class UIBuilderStateAndCommandTest extends UITestBase {
 
         List list = new List(new DefaultListModel(new String[]{"a", "b", "c"}));
         list.setName("list");
-        list.setSelectedIndex(1);
         source.add(BorderLayout.CENTER, list);
         source.show();
+        list.setSelectedIndex(1);
         source.setFocused(list);
 
         Hashtable state = builder.getFormState(source);
