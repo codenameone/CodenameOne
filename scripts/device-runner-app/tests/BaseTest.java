@@ -13,12 +13,16 @@ public abstract class BaseTest extends AbstractTest {
         return new Form(title, layout) {
             @Override
             protected void onShowCompleted() {
-                UITimer.timer(500, false, this, () -> {
+                registerReadyCallback(this, () -> {
                     Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName);
                     done = true;
                 });
             }
         };
+    }
+
+    protected void registerReadyCallback(Form parent, Runnable run) {
+        UITimer.timer(500, false, parent, run);
     }
 
     protected boolean waitForDone() {

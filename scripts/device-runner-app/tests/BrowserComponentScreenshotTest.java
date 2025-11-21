@@ -4,20 +4,26 @@ import com.codename1.testing.AbstractTest;
 import com.codename1.testing.TestUtils;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Form;
+import com.codename1.ui.CN;
 import com.codename1.ui.layouts.BorderLayout;
 
 public class BrowserComponentScreenshotTest extends BaseTest {
+    private BrowserComponent browser;
     @Override
     public boolean runTest() throws Exception {
         if (!BrowserComponent.isNativeBrowserSupported()) {
             return true;
         }
         Form form = createForm("Browser Test", new BorderLayout(), "BrowserComponent");
-        BrowserComponent browser = new BrowserComponent();
+        browser = new BrowserComponent();
         browser.setPage(buildHtml(), null);
         form.add(BorderLayout.CENTER, browser);
         form.show();
         return waitForDone();
+    }
+
+    protected void registerReadyCallback(Form parent, final Runnable run) {
+        browser.addWebEventListener(BrowserComponent.onLoad, evt -> CN.callSerially(run));
     }
 
     private static String buildHtml() {
