@@ -129,7 +129,7 @@ class LayoutsCoverageTest extends UITestBase {
     @FormTest
     void textModeLayoutGroupsInputsAndClonesConstraints() {
         Hashtable theme = new Hashtable();
-        theme.put("textComponentOnTopBool", Boolean.TRUE);
+        theme.put("@textComponentOnTopBool", "true");
         UIManager.getInstance().setThemeProps(theme);
         TextModeLayout textLayout = new TextModeLayout(2, 1);
         Container container = new Container(textLayout);
