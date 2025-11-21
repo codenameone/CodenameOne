@@ -72,11 +72,7 @@ class GlassTutorialExpandedTest extends UITestBase {
                     TestUtils.waitFor(5);
                 }
                 while (display.getCurrent() instanceof Dialog && System.currentTimeMillis() < deadline) {
-                    display.callSerially(new Runnable() {
-                        public void run() {
-                            implementation.dispatchPointerPressAndRelease(tapX, tapY);
-                        }
-                    });
+                    implementation.dispatchPointerPressAndRelease(tapX, tapY);
                     TestUtils.waitFor(25);
                 }
             }
