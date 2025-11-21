@@ -174,7 +174,9 @@ jobs:
 
         # Run the configured report execution (with additional JavaSE classes/sources)
         # instead of the default CLI goal so merged coverage includes the JavaSE port.
-        mvn -f maven/core-unittests/pom.xml -P unittests -DunitTests=true -DskipTests prepare-package
+        # Build through the root POM with -am to ensure dependent modules (e.g. codenameone-factory)
+        # are available when generating the report.
+        mvn -f maven/pom.xml -P unittests -DunitTests=true -pl core-unittests -am -DskipTests prepare-package
 
     - name: Generate static analysis HTML summaries
       if: ${{ always() }}
