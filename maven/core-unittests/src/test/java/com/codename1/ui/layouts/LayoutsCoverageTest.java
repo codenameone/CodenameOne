@@ -180,8 +180,8 @@ class LayoutsCoverageTest extends UITestBase {
         assertEquals("2px", baseConstraint.right().getValueAsString());
 
         LayeredLayout.LayeredLayoutConstraint overlayConstraint = layeredLayout.getLayeredLayoutConstraint(overlay);
-        assertSame(base, overlayConstraint.left().referenceComponent());
-        assertEquals(1f, overlayConstraint.left().referencePosition());
-        assertEquals(0f, overlayConstraint.top().referencePosition());
+        assertSame(base, overlayConstraint.left().getReferenceComponent());
+        assertEquals(1f, overlayConstraint.left().getReferencePosition());
+        assertEquals(0f, overlayConstraint.top().getReferencePosition());
     }
 }
