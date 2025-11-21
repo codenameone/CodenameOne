@@ -20,7 +20,6 @@ public class BrowserComponentScreenshotTest extends AbstractTest {
             }
         };
         BrowserComponent browser = new BrowserComponent();
-        browser.addWebEventListener(BrowserComponent.onLoad, evt -> loadFinished[0] = true);
         browser.setPage(buildHtml(), null);
         form.add(BorderLayout.CENTER, browser);
         form.show();

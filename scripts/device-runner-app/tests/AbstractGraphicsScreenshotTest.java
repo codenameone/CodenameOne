@@ -17,7 +17,7 @@ abstract class AbstractGraphicsScreenshotTest extends AbstractTest {
             protected void onShowCompleted() {
                 Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(screenshotName());
             }
-        }
+        };
         form.add(BorderLayout.CENTER, createContent());
         form.show();
         return true;

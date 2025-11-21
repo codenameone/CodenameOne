@@ -28,7 +28,7 @@ public class MediaPlaybackScreenshotTest extends AbstractTest {
         if (tonePath == null) {
             updateStatus(statusLabel, form, "Failed to generate tone file");
         } else {
-            Media media = MediaManager.createMedia(mediaPath, false);
+            Media media = MediaManager.createMedia(tonePath, false);
             if (media == null) {
                 updateStatus(statusLabel, form, "Media creation returned null");
             }
