@@ -6,22 +6,24 @@ import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 
 public final class Cn1ssDeviceRunner extends DeviceRunner {
-    private static final String[] TEST_CLASSES = new String[] {
-            MainScreenScreenshotTest.class.getName(),
-            GraphicsPipelineScreenshotTest.class.getName(),
-            GraphicsShapesAndGradientsScreenshotTest.class.getName(),
-            GraphicsStateAndTextScreenshotTest.class.getName(),
-            GraphicsTransformationsScreenshotTest.class.getName(),
-            GraphicsMethodsScreenshotTest.class.getName(),
-            BrowserComponentScreenshotTest.class.getName(),
-            MediaPlaybackScreenshotTest.class.getName()
+    private static final AbstractTest[] TEST_CLASSES = new AbstractTest[] {
+            new MainScreenScreenshotTest(),
+            new GraphicsPipelineScreenshotTest(),
+            new GraphicsShapesAndGradientsScreenshotTest(),
+            new GraphicsStateAndTextScreenshotTest(),
+            new GraphicsTransformationsScreenshotTest(),
+            new GraphicsMethodsScreenshotTest(),
+            new BrowserComponentScreenshotTest(),
+            new MediaPlaybackScreenshotTest()
     };
 
     public void runSuite() {
-        for (String testClass : TEST_CLASSES) {
+        for (AbstractTest testClass : TEST_CLASSES) {
             log("CN1SS:INFO:suite starting test=" + testClass);
             try {
-                runTest(testClass);
+                testClass.prepare();
+                testClass.runTest();
+                testClass.cleanup();
                 log("CN1SS:INFO:suite finished test=" + testClass);
             } catch (Throwable t) {
                 log("CN1SS:ERR:suite test=" + testClass + " failed=" + t);
