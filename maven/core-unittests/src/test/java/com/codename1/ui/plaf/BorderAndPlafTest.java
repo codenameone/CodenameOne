@@ -165,7 +165,7 @@ class BorderAndPlafTest extends UITestBase {
         assertEquals("native:Other native:Other", mutatedFont.toString());
         assertEquals("native:Other", mutatedFont.getName());
         assertEquals(2, copied.getMargin().getValue(Component.TOP).getValue(), 0.01);
-        assertEquals("1px solid ff0000", copied.getBorder().toString());
+        assertEquals("1.0px solid ff0000", copied.getBorder().toString());
 
         StyleInfo empty = new StyleInfo((String[]) null);
         assertNull(empty.getFont());
