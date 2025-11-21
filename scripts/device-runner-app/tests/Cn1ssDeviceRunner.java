@@ -4,6 +4,7 @@ import com.codename1.testing.DeviceRunner;
 import com.codename1.testing.TestReporting;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
+import com.codename1.testing.AbstractTest;
 
 public final class Cn1ssDeviceRunner extends DeviceRunner {
     private static final AbstractTest[] TEST_CLASSES = new AbstractTest[] {
