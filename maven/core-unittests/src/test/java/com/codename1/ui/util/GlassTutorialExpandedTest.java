@@ -69,7 +69,9 @@ class GlassTutorialExpandedTest extends UITestBase {
 
         assertTrue(com.codename1.ui.Display.getInstance().getCurrent() instanceof Dialog);
 
-        implementation.dispatchPointerPressAndRelease(1, 1);
+        int tapX = com.codename1.ui.Display.getInstance().getDisplayWidth() / 2;
+        int tapY = com.codename1.ui.Display.getInstance().getDisplayHeight() / 2;
+        implementation.dispatchPointerPressAndRelease(tapX, tapY);
         flushSerialCalls();
 
         int attempts = 0;

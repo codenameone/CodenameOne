@@ -16,13 +16,15 @@ class ResourcesManualPopulationTest extends UITestBase {
         Resources res = new Resources();
         Image img = Image.createImage(3, 3);
         Font font = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM);
+        Hashtable<String, Hashtable<String, String>> localeToBundle = new Hashtable<String, Hashtable<String, String>>();
         Hashtable<String, String> bundle = new Hashtable<String, String>();
         bundle.put("hi", "there");
+        localeToBundle.put("en", bundle);
 
         res.setResource("img", Resources.MAGIC_IMAGE, img);
         res.setResource("font", Resources.MAGIC_FONT, font);
         res.setResource("data", Resources.MAGIC_DATA, new byte[]{1, 2, 3});
-        res.setResource("l10n", Resources.MAGIC_L10N, bundle);
+        res.setResource("l10n", Resources.MAGIC_L10N, localeToBundle);
 
         Resources.setGlobalResources(res);
         assertSame(res, Resources.getGlobalResources());
@@ -35,8 +37,15 @@ class ResourcesManualPopulationTest extends UITestBase {
         assertArrayEquals(new String[]{"l10n"}, res.getL10NResourceNames());
 
         assertSame(img, res.getImage("img"));
-        assertArrayEquals(new byte[]{1, 2, 3}, res.getData("data"));
-        assertEquals("there", ((Hashtable) res.getL10N("l10n")).get("hi"));
+        byte[] expected = new byte[]{1, 2, 3};
+        byte[] actual = new byte[expected.length];
+        try {
+            res.getData("data").read(actual);
+        } catch (Exception ex) {
+            fail(ex);
+        }
+        assertArrayEquals(expected, actual);
+        assertEquals("there", ((Hashtable) res.getL10N("l10n", "en")).get("hi"));
 
         res.setResource("img", Resources.MAGIC_IMAGE, null);
         assertEquals(0, res.getImageResourceNames().length);
