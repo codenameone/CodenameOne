@@ -37,7 +37,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.7</version> <!-- Use the latest version -->
+                <version>0.8.11</version>
                 <configuration>
                     <excludes>
                         <exclude>com/codename1/ui/html/**</exclude>
@@ -66,6 +66,7 @@
                         <configuration>
                             <additionalClassDirs>
                                 <additionalClassDir>${project.basedir}/../../Ports/JavaSE/dist/JavaSE.jar</additionalClassDir>
+                                <additionalClassDir>${project.basedir}/../../Ports/JavaSE/build/classes</additionalClassDir>
                             </additionalClassDirs>
                             <additionalSourceDirs>
                                 <additionalSourceDir>${project.basedir}/../../Ports/JavaSE/src</additionalSourceDir>

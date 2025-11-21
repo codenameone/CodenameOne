@@ -146,7 +146,7 @@ jobs:
     - name: Merge JaCoCo coverage data and regenerate report
       if: ${{ always() }}
       env:
-        JACOCO_VERSION: 0.8.7
+        JACOCO_VERSION: 0.8.11
       run: |
         set -euo pipefail
 
