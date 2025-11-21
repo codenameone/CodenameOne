@@ -172,7 +172,9 @@ jobs:
         java -jar "$JACOCO_CLI_JAR" merge "$UNIT_EXEC" "$DEVICE_EXEC" --destfile "$MERGED_EXEC"
         mv "$MERGED_EXEC" "$UNIT_EXEC"
 
-        mvn -f maven/core-unittests/pom.xml -P unittests -DunitTests=true -DskipTests jacoco:report
+        # Run the configured report execution (with additional JavaSE classes/sources)
+        # instead of the default CLI goal so merged coverage includes the JavaSE port.
+        mvn -f maven/core-unittests/pom.xml -P unittests -DunitTests=true -DskipTests prepare-package
 
     - name: Generate static analysis HTML summaries
       if: ${{ always() }}
