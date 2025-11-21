@@ -19,7 +19,7 @@ if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/Cn1ssChunkTools.java" ]; then
   exit 2
 fi
 
-JACOCO_VERSION="${JACOCO_VERSION:-0.8.7}"
+JACOCO_VERSION="${JACOCO_VERSION:-0.8.11}"
 JACOCO_AGENT_JAR="${JACOCO_AGENT_JAR:-$HOME/.m2/repository/org/jacoco/org.jacoco.agent/${JACOCO_VERSION}/org.jacoco.agent-${JACOCO_VERSION}-runtime.jar}"
 JACOCO_DESTFILE="${JACOCO_DESTFILE:-${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}/jacoco-device.exec}"
 JACOCO_AGENT_ENABLED="${JACOCO_AGENT_ENABLED:-1}"

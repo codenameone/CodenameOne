@@ -153,6 +153,7 @@ jobs:
         UNIT_EXEC="maven/core-unittests/target/jacoco.exec"
         DEVICE_EXEC="artifacts/desktop-device-runner/jacoco-device.exec"
         MERGED_EXEC="maven/core-unittests/target/jacoco-merged.exec"
+        REPORT_DIR="maven/core-unittests/target/site/jacoco"
 
         if [ ! -f "$UNIT_EXEC" ]; then
           echo "Unit test JaCoCo exec file not found at $UNIT_EXEC" >&2
@@ -172,11 +173,18 @@ jobs:
         java -jar "$JACOCO_CLI_JAR" merge "$UNIT_EXEC" "$DEVICE_EXEC" --destfile "$MERGED_EXEC"
         mv "$MERGED_EXEC" "$UNIT_EXEC"
 
-        # Run the configured report execution (with additional JavaSE classes/sources)
-        # instead of the default CLI goal so merged coverage includes the JavaSE port.
-        # Build through the root POM with -am to ensure dependent modules (e.g. codenameone-factory)
-        # are available when generating the report.
-        mvn -f maven/pom.xml -P unittests -DunitTests=true -pl core-unittests -am -DskipTests prepare-package
+        rm -rf "$REPORT_DIR"
+        mkdir -p "$REPORT_DIR"
+
+        java -jar "$JACOCO_CLI_JAR" report "$UNIT_EXEC" \
+          --classfiles maven/core-unittests/target/classes \
+          --classfiles Ports/JavaSE/build/classes \
+          --classfiles Ports/JavaSE/dist/JavaSE.jar \
+          --sourcefiles CodenameOne/src \
+          --sourcefiles Ports/JavaSE/src \
+          --html "$REPORT_DIR" \
+          --xml "$REPORT_DIR/jacoco.xml" \
+          --csv "$REPORT_DIR/jacoco.csv"
 
     - name: Generate static analysis HTML summaries
       if: ${{ always() }}

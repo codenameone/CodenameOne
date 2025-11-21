@@ -63,15 +63,6 @@
                         <goals>
                             <goal>report</goal>
                         </goals>
-                        <configuration>
-                            <additionalClassDirs>
-                                <additionalClassDir>${project.basedir}/../../Ports/JavaSE/dist/JavaSE.jar</additionalClassDir>
-                                <additionalClassDir>${project.basedir}/../../Ports/JavaSE/build/classes</additionalClassDir>
-                            </additionalClassDirs>
-                            <additionalSourceDirs>
-                                <additionalSourceDir>${project.basedir}/../../Ports/JavaSE/src</additionalSourceDir>
-                            </additionalSourceDirs>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>
