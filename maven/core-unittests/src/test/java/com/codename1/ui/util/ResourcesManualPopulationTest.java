@@ -1,6 +1,7 @@
 package com.codename1.ui.util;
 
 import com.codename1.junit.FormTest;
+import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Font;
 import com.codename1.ui.Image;
@@ -53,7 +54,13 @@ class ResourcesManualPopulationTest extends UITestBase {
 
     @FormTest
     void systemResourceLookupFailsGracefully() {
-        Resources sys = Resources.getSystemResource();
-        assertNull(sys);
+        TestLogger.install();
+        try {
+            Resources sys = Resources.getSystemResource();
+            assertNull(sys);
+            assertFalse(TestLogger.getThrowables().isEmpty());
+        } finally {
+            TestLogger.remove();
+        }
     }
 }

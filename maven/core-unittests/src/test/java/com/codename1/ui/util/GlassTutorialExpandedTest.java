@@ -60,24 +60,25 @@ class GlassTutorialExpandedTest extends UITestBase {
         Form form = new Form();
         form.show();
 
-        com.codename1.ui.CN.callSerially(new Runnable() {
+        final int tapX = com.codename1.ui.Display.getInstance().getDisplayWidth() / 2;
+        final int tapY = com.codename1.ui.Display.getInstance().getDisplayHeight() / 2;
+
+        Thread dismiss = new Thread(new Runnable() {
             public void run() {
-                tutorial.showOn(form);
+                while (!(com.codename1.ui.Display.getInstance().getCurrent() instanceof Dialog)) {
+                    TestUtils.waitFor(5);
+                }
+                implementation.dispatchPointerPressAndRelease(tapX, tapY);
             }
         });
-        flushSerialCalls();
+        dismiss.start();
 
-        assertTrue(com.codename1.ui.Display.getInstance().getCurrent() instanceof Dialog);
-
-        int tapX = com.codename1.ui.Display.getInstance().getDisplayWidth() / 2;
-        int tapY = com.codename1.ui.Display.getInstance().getDisplayHeight() / 2;
-        implementation.dispatchPointerPressAndRelease(tapX, tapY);
-        flushSerialCalls();
-
-        int attempts = 0;
-        while (com.codename1.ui.Display.getInstance().getCurrent() instanceof Dialog && attempts < 50) {
-            TestUtils.waitFor(20);
-            attempts++;
+        tutorial.showOn(form);
+        try {
+            dismiss.join(2000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            fail(e.getMessage());
         }
 
         assertSame(form, com.codename1.ui.Display.getInstance().getCurrent());

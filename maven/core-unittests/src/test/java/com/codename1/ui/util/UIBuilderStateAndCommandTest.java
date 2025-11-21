@@ -25,6 +25,7 @@ class UIBuilderStateAndCommandTest extends UITestBase {
         list.setName("list");
         list.setSelectedIndex(1);
         source.add(BorderLayout.CENTER, list);
+        source.show();
         source.setFocused(list);
 
         Hashtable state = builder.getFormState(source);
@@ -38,6 +39,7 @@ class UIBuilderStateAndCommandTest extends UITestBase {
         destList.setName("list");
         destination.add(BorderLayout.CENTER, destList);
 
+        destination.show();
         builder.setFormState(destination, state);
         assertEquals("list", destination.getFocused().getName());
         assertEquals(1, destList.getSelectedIndex());
