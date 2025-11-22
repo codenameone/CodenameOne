@@ -17,6 +17,7 @@ public abstract class BaseTest extends AbstractTest {
         currentScreenshotName = Cn1ssDeviceRunnerHelper.sanitizeTestName(imageName);
         logEmitted = false;
         Cn1ssDeviceRunnerHelper.resetLogCapture(currentScreenshotName);
+        Cn1ssDeviceRunnerHelper.emitTestStartMarker(currentScreenshotName);
         return new Form(title, layout) {
             @Override
             protected void onShowCompleted() {

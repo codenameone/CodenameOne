@@ -12,12 +12,14 @@ import com.codename1.util.Base64;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 final class Cn1ssDeviceRunnerHelper {
     private static final int CHUNK_SIZE = 900;
     private static final int MAX_PREVIEW_BYTES = 20 * 1024;
     private static final String PREVIEW_CHANNEL = "PREVIEW";
     private static final String LOG_CHANNEL = "LOG";
+    private static final String START_CHANNEL = "START";
     private static final String LOG_FILE_NAME = "cn1ss-device-runner.log";
     private static final int[] PREVIEW_QUALITIES = new int[] {60, 50, 40, 35, 30, 25, 20, 18, 16, 14, 12, 10, 8, 6, 5, 4, 3, 2, 1};
     private static final String LOG_FILE_PATH = initializeLogFile();
@@ -49,6 +51,11 @@ final class Cn1ssDeviceRunnerHelper {
         Log.getInstance().setFileURL(LOG_FILE_PATH);
         Log.getInstance().setFileWriteEnabled(true);
         println("CN1SS:INFO:test=" + safeName + " log_reset=true path=" + LOG_FILE_PATH);
+    }
+
+    static void emitTestStartMarker(String testName) {
+        String safeName = sanitizeTestName(testName);
+        emitChannel(("start:" + safeName).getBytes(StandardCharsets.UTF_8), safeName, START_CHANNEL);
     }
 
     static void runOnEdtSync(Runnable runnable) {
