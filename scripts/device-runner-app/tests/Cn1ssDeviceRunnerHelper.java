@@ -37,6 +37,20 @@ final class Cn1ssDeviceRunnerHelper {
         return path;
     }
 
+    static void resetLogCapture(String testName) {
+        if (LOG_FILE_PATH == null || LOG_FILE_PATH.length() == 0) {
+            return;
+        }
+        String safeName = sanitizeTestName(testName);
+        FileSystemStorage storage = FileSystemStorage.getInstance();
+        if (storage.exists(LOG_FILE_PATH)) {
+            storage.delete(LOG_FILE_PATH);
+        }
+        Log.getInstance().setFileURL(LOG_FILE_PATH);
+        Log.getInstance().setFileWriteEnabled(true);
+        println("CN1SS:INFO:test=" + safeName + " log_reset=true path=" + LOG_FILE_PATH);
+    }
+
     static void runOnEdtSync(Runnable runnable) {
         Display display = Display.getInstance();
         if (display.isEdt()) {

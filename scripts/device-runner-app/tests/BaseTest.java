@@ -9,16 +9,20 @@ import com.codename1.testing.TestUtils;
 
 public abstract class BaseTest extends AbstractTest {
     private boolean done;
+    private boolean logEmitted;
     private String currentScreenshotName = "default";
 
     protected Form createForm(String title, Layout layout, final String imageName) {
         currentScreenshotName = Cn1ssDeviceRunnerHelper.sanitizeTestName(imageName);
+        logEmitted = false;
+        Cn1ssDeviceRunnerHelper.resetLogCapture(currentScreenshotName);
         return new Form(title, layout) {
             @Override
             protected void onShowCompleted() {
                 Log.p("CN1SS: form ready for screenshot -> " + imageName);
                 registerReadyCallback(this, () -> {
                     Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName);
+                    logEmitted = true;
                     done = true;
                 });
             }
@@ -38,12 +42,17 @@ public abstract class BaseTest extends AbstractTest {
             if(timeout == 0) {
                 Log.p("CN1SS: timeout waiting for screenshot emission");
                 Cn1ssDeviceRunnerHelper.emitLogChannel(currentScreenshotName);
+                logEmitted = true;
                 return false;
             }
         }
         // give the test a few additional milliseconds for the screenshot emission
         TestUtils.waitFor(100);
         Log.p("CN1SS: screenshot emission completed");
+        if (!logEmitted) {
+            Cn1ssDeviceRunnerHelper.emitLogChannel(currentScreenshotName);
+            logEmitted = true;
+        }
         return true;
     }
 }
