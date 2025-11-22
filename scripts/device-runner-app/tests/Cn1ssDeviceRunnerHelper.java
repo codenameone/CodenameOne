@@ -115,6 +115,12 @@ final class Cn1ssDeviceRunnerHelper {
         }
     }
 
+    static void emitLogChannel(String testName) {
+        String safeName = sanitizeTestName(testName);
+        emitLogOutput(safeName);
+        println("CN1SS:END:" + safeName);
+    }
+
     private static byte[] encodePreview(ImageIO io, Image screenshot, String safeName) throws IOException {
         byte[] chosenPreview = null;
         int chosenQuality = 0;

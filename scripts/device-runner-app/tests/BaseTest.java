@@ -9,8 +9,10 @@ import com.codename1.testing.TestUtils;
 
 public abstract class BaseTest extends AbstractTest {
     private boolean done;
+    private String currentScreenshotName = "default";
 
     protected Form createForm(String title, Layout layout, final String imageName) {
+        currentScreenshotName = Cn1ssDeviceRunnerHelper.sanitizeTestName(imageName);
         return new Form(title, layout) {
             @Override
             protected void onShowCompleted() {
@@ -35,6 +37,7 @@ public abstract class BaseTest extends AbstractTest {
             timeout--;
             if(timeout == 0) {
                 Log.p("CN1SS: timeout waiting for screenshot emission");
+                Cn1ssDeviceRunnerHelper.emitLogChannel(currentScreenshotName);
                 return false;
             }
         }

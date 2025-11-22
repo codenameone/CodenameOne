@@ -129,7 +129,7 @@ public class Cn1ssChunkTools {
         }
         Path path = Path.of(args[0]);
         List<String> names = new ArrayList<>();
-        for (Chunk chunk : iterateChunks(path, Optional.empty(), Optional.of(DEFAULT_CHANNEL))) {
+        for (Chunk chunk : iterateChunks(path, Optional.empty(), Optional.empty())) {
             if (!names.contains(chunk.testName)) {
                 names.add(chunk.testName);
             }
