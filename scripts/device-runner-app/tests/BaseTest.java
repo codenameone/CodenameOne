@@ -12,9 +12,6 @@ public abstract class BaseTest extends AbstractTest {
     private String currentScreenshotName = "default";
 
     protected Form createForm(String title, Layout layout, final String imageName) {
-        // Ensure each test starts from a clean completion state so we don't skip
-        // the wait loop when multiple tests run in sequence.
-        done = false;
         currentScreenshotName = Cn1ssDeviceRunnerHelper.sanitizeTestName(imageName);
         return new Form(title, layout) {
             @Override
