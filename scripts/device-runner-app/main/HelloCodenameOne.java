@@ -17,7 +17,6 @@ import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunnerReporter
 
 public class HelloCodenameOne {
     private Form current;
-    private Form mainForm;
     private static boolean deviceRunnerExecuted;
 
     public void init(Object context) {
@@ -29,11 +28,13 @@ public class HelloCodenameOne {
             current.show();
             return;
         }
-        if (!deviceRunnerExecuted) {
+        Form c = CN.getCurrentForm();
+        if (!deviceRunnerExecuted || c == null) {
             deviceRunnerExecuted = true;
             CN.callSerially(() -> new Cn1ssDeviceRunner().runSuite());
+            return;
         }
-        mainForm.show();
+        c.show();
     }
 
     public void stop() {
