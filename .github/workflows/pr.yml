@@ -181,6 +181,12 @@ jobs:
           exit 1
         fi
 
+        CORE_CLASSES="$(mktemp -d "${RUNNER_TEMP:-/tmp}/jacoco-core-classes-XXXXXX")"
+        rsync -a --exclude 'com/codename1/impl/***' maven/core-unittests/target/classes/ "$CORE_CLASSES/" || {
+          echo "Failed to stage core class files without impl duplicates" >&2
+          exit 1
+        }
+
         JSE_IMPL_CLASSES="$(mktemp -d "${RUNNER_TEMP:-/tmp}/jacoco-javase-impl-XXXXXX")"
         unzip -qq Ports/JavaSE/dist/JavaSE.jar -d "$JSE_IMPL_CLASSES" || {
           echo "Failed to extract classes from Ports/JavaSE/dist/JavaSE.jar" >&2
@@ -190,7 +196,7 @@ jobs:
         find "$JSE_IMPL_CLASSES" -type d -empty -delete
 
         java -jar "$JACOCO_CLI_JAR" report "$UNIT_EXEC" \
-          --classfiles maven/core-unittests/target/classes \
+          --classfiles "$CORE_CLASSES" \
           --classfiles "$JSE_IMPL_CLASSES" \
           --sourcefiles CodenameOne/src \
           --sourcefiles Ports/JavaSE/src \
