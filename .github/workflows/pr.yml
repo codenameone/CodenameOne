@@ -176,9 +176,18 @@ jobs:
         rm -rf "$REPORT_DIR"
         mkdir -p "$REPORT_DIR"
 
+        if [ ! -d Ports/JavaSE/build/classes ]; then
+          echo "JavaSE build outputs not found at Ports/JavaSE/build/classes" >&2
+          exit 1
+        fi
+
+        PORT_IMPL_CLASSES="$(mktemp -d "${RUNNER_TEMP:-/tmp}/jacoco-javase-impl-XXXXXX")"
+        rsync -a --include 'com/' --include 'com/codename1/' --include 'com/codename1/impl/***' --exclude '*' \
+          Ports/JavaSE/build/classes/ "$PORT_IMPL_CLASSES/"
+
         java -jar "$JACOCO_CLI_JAR" report "$UNIT_EXEC" \
           --classfiles maven/core-unittests/target/classes \
-          --classfiles Ports/JavaSE/build/classes \
+          --classfiles "$PORT_IMPL_CLASSES" \
           --sourcefiles CodenameOne/src \
           --sourcefiles Ports/JavaSE/src \
           --html "$REPORT_DIR" \
