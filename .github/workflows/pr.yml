@@ -185,8 +185,11 @@ jobs:
         rsync -a --include 'com/' --include 'com/codename1/' --include 'com/codename1/impl/***' --exclude '*' \
           Ports/JavaSE/build/classes/ "$PORT_IMPL_CLASSES/"
 
+        CORE_CLASSES_NO_IMPL="$(mktemp -d "${RUNNER_TEMP:-/tmp}/jacoco-core-no-impl-XXXXXX")"
+        rsync -a --exclude 'com/codename1/impl/***' maven/core-unittests/target/classes/ "$CORE_CLASSES_NO_IMPL/"
+
         java -jar "$JACOCO_CLI_JAR" report "$UNIT_EXEC" \
-          --classfiles maven/core-unittests/target/classes \
+          --classfiles "$CORE_CLASSES_NO_IMPL" \
           --classfiles "$PORT_IMPL_CLASSES" \
           --sourcefiles CodenameOne/src \
           --sourcefiles Ports/JavaSE/src \
