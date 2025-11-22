@@ -20,38 +20,36 @@ final class Cn1ssDeviceRunnerHelper {
     private static final String PREVIEW_CHANNEL = "PREVIEW";
     private static final String LOG_CHANNEL = "LOG";
     private static final String START_CHANNEL = "START";
-    private static final String LOG_FILE_NAME = "cn1ss-device-runner.log";
+    private static final String LOG_FILE_NAME_PREFIX = "cn1ss-device-runner-";
     private static final int[] PREVIEW_QUALITIES = new int[] {60, 50, 40, 35, 30, 25, 20, 18, 16, 14, 12, 10, 8, 6, 5, 4, 3, 2, 1};
-    private static final String LOG_FILE_PATH = initializeLogFile();
+    private static final String LOG_FILE_BASE = initializeLogBasePath();
+    private static String currentLogPath = initializeLogFile();
     private static boolean globalErrorHooksInstalled;
 
     private Cn1ssDeviceRunnerHelper() {
     }
 
-    private static String initializeLogFile() {
+    private static String initializeLogBasePath() {
         FileSystemStorage storage = FileSystemStorage.getInstance();
-        String path = storage.getAppHomePath() + LOG_FILE_NAME;
-        if (storage.exists(path)) {
-            storage.delete(path);
-        }
-        Log.getInstance().setFileURL(path);
-        Log.getInstance().setFileWriteEnabled(true);
-        Log.p("CN1SS logging initialized at " + path);
+        String base = storage.getAppHomePath() + LOG_FILE_NAME_PREFIX;
+        return base;
+    }
+
+    private static String initializeLogFile() {
+        String path = LOG_FILE_BASE + "session.log";
+        setupLogFile(path);
         return path;
     }
 
     static void resetLogCapture(String testName) {
-        if (LOG_FILE_PATH == null || LOG_FILE_PATH.length() == 0) {
+        if (LOG_FILE_BASE == null || LOG_FILE_BASE.length() == 0) {
             return;
         }
         String safeName = sanitizeTestName(testName);
-        FileSystemStorage storage = FileSystemStorage.getInstance();
-        if (storage.exists(LOG_FILE_PATH)) {
-            storage.delete(LOG_FILE_PATH);
-        }
-        Log.getInstance().setFileURL(LOG_FILE_PATH);
-        Log.getInstance().setFileWriteEnabled(true);
-        println("CN1SS:INFO:test=" + safeName + " log_reset=true path=" + LOG_FILE_PATH);
+        String path = LOG_FILE_BASE + safeName + ".log";
+        setupLogFile(path);
+        currentLogPath = path;
+        println("CN1SS:INFO:test=" + safeName + " log_reset=true path=" + path);
     }
 
     static void emitTestStartMarker(String testName) {
@@ -278,16 +276,16 @@ final class Cn1ssDeviceRunnerHelper {
     }
 
     private static byte[] readLogBytes() {
-        if (LOG_FILE_PATH == null || LOG_FILE_PATH.length() == 0) {
+        if (currentLogPath == null || currentLogPath.length() == 0) {
             return null;
         }
         FileSystemStorage storage = FileSystemStorage.getInstance();
-        if (!storage.exists(LOG_FILE_PATH)) {
+        if (!storage.exists(currentLogPath)) {
             return null;
         }
         InputStream input = null;
         try {
-            input = storage.openInputStream(LOG_FILE_PATH);
+            input = storage.openInputStream(currentLogPath);
             return Util.readInputStream(input);
         } catch (IOException ex) {
             Log.e(ex);
@@ -299,5 +297,15 @@ final class Cn1ssDeviceRunnerHelper {
 
     private static void println(String line) {
         System.out.println(line);
+    }
+
+    private static void setupLogFile(String path) {
+        FileSystemStorage storage = FileSystemStorage.getInstance();
+        if (storage.exists(path)) {
+            storage.delete(path);
+        }
+        Log.getInstance().setFileURL(path);
+        Log.getInstance().setFileWriteEnabled(true);
+        Log.p("CN1SS logging initialized at " + path);
     }
 }
