@@ -67,29 +67,36 @@ class UtilCoverageTest extends UITestBase {
 
         Form host = new Form();
         host.show();
-        CountDownLatch disposed = new CountDownLatch(1);
-        CN.callSerially(new Runnable() {
-            public void run() {
-                tutorial.showOn(host);
-                disposed.countDown();
-            }
-        });
 
-        new Thread(new Runnable() {
+        CountDownLatch showing = new CountDownLatch(1);
+        CountDownLatch disposed = new CountDownLatch(1);
+
+        Thread edtCall = new Thread(new Runnable() {
             public void run() {
-                TestUtils.waitFor(50);
-                CN.callSerially(new Runnable() {
+                CN.callSeriallyAndWait(new Runnable() {
                     public void run() {
-                        Form current = Display.getInstance().getCurrent();
-                        if (current instanceof Dialog) {
-                            ((Dialog) current).dispose();
-                        }
+                        showing.countDown();
+                        tutorial.showOn(host);
+                        disposed.countDown();
                     }
                 });
             }
-        }).start();
+        });
+        edtCall.start();
 
-        disposed.await(2, TimeUnit.SECONDS);
+        showing.await(1, TimeUnit.SECONDS);
+        implementation.dispatchPointerPressAndRelease(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
+        if (!disposed.await(2, TimeUnit.SECONDS)) {
+            CN.callSerially(new Runnable() {
+                public void run() {
+                    Form current = Display.getInstance().getCurrent();
+                    if (current instanceof Dialog) {
+                        ((Dialog) current).dispose();
+                    }
+                }
+            });
+            disposed.await(2, TimeUnit.SECONDS);
+        }
     }
 
     @FormTest
@@ -105,31 +112,36 @@ class UtilCoverageTest extends UITestBase {
         int originalTint = form.getTintColor();
 
         GlassTutorial tutorial = new GlassTutorial();
+        CountDownLatch showing = new CountDownLatch(1);
         CountDownLatch finished = new CountDownLatch(1);
         form.show();
 
-        CN.callSerially(new Runnable() {
+        Thread edtCall = new Thread(new Runnable() {
             public void run() {
-                tutorial.showOn(form);
-                finished.countDown();
-            }
-        });
-
-        new Thread(new Runnable() {
-            public void run() {
-                TestUtils.waitFor(50);
-                CN.callSerially(new Runnable() {
+                CN.callSeriallyAndWait(new Runnable() {
                     public void run() {
-                        Form current = Display.getInstance().getCurrent();
-                        if (current instanceof Dialog) {
-                            ((Dialog) current).dispose();
-                        }
+                        showing.countDown();
+                        tutorial.showOn(form);
+                        finished.countDown();
                     }
                 });
             }
-        }).start();
+        });
+        edtCall.start();
 
-        finished.await(2, TimeUnit.SECONDS);
+        showing.await(1, TimeUnit.SECONDS);
+        implementation.dispatchPointerPressAndRelease(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
+        if (!finished.await(2, TimeUnit.SECONDS)) {
+            CN.callSerially(new Runnable() {
+                public void run() {
+                    Form current = Display.getInstance().getCurrent();
+                    if (current instanceof Dialog) {
+                        ((Dialog) current).dispose();
+                    }
+                }
+            });
+            finished.await(2, TimeUnit.SECONDS);
+        }
         assertEquals(originalTint, form.getTintColor());
         assertSame(original, form.getGlassPane());
         Image buffer = Image.createImage(5, 5);
