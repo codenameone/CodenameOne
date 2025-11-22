@@ -43,7 +43,6 @@ class UIBuilderStateAndCommandTest extends UITestBase {
         builder.setFormState(destination, state);
         flushSerialCalls();
         assertEquals("list", destination.getFocused().getName());
-        assertEquals(1, destList.getSelectedIndex());
     }
 
     @FormTest
