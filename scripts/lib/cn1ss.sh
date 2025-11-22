@@ -186,6 +186,11 @@ cn1ss_verify_png() {
   head -c 8 "$file" | od -An -t x1 | tr -d ' \n' | grep -qi '^89504e470d0a1a0a$'
 }
 
+cn1ss_verify_text() {
+  local file="$1"
+  [ -f "$file" ]
+}
+
 cn1ss_verify_jpeg() {
   local file="$1"
   [ -s "$file" ] || return 1
@@ -232,6 +237,12 @@ cn1ss_decode_test_preview() {
   local test="$1"; shift
   local dest="$1"; shift
   cn1ss_decode_test_asset "$test" "$dest" "PREVIEW" cn1ss_verify_jpeg "$@"
+}
+
+cn1ss_decode_test_log() {
+  local test="$1"; shift
+  local dest="$1"; shift
+  cn1ss_decode_test_asset "$test" "$dest" "LOG" cn1ss_verify_text "$@"
 }
 
 cn1ss_file_size() {

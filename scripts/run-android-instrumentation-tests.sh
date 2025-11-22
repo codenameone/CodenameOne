@@ -189,6 +189,7 @@ ra_log "Detected CN1SS test streams: ${TEST_NAMES[*]}"
 declare -A TEST_OUTPUTS=()
 declare -A TEST_SOURCES=()
 declare -A PREVIEW_OUTPUTS=()
+declare -A LOG_OUTPUTS=()
 
 ensure_dir "$SCREENSHOT_PREVIEW_DIR"
 
@@ -204,6 +205,13 @@ for test in "${TEST_NAMES[@]}"; do
       ra_log "Decoded preview for '$test' (source=${preview_source}, size: $(cn1ss_file_size "$preview_dest") bytes)"
     else
       rm -f "$preview_dest" 2>/dev/null || true
+    fi
+    log_dest="$SCREENSHOT_TMP_DIR/${test}.log"
+    if log_source="$(cn1ss_decode_test_log "$test" "$log_dest" "${CN1SS_SOURCES[@]}")"; then
+      LOG_OUTPUTS["$test"]="$log_dest"
+      ra_log "Decoded log for '$test' (source=${log_source}, size: $(cn1ss_file_size "$log_dest") bytes)"
+    else
+      rm -f "$log_dest" 2>/dev/null || true
     fi
   else
     ra_log "FATAL: Failed to extract/decode CN1SS payload for test '$test'"
@@ -282,6 +290,10 @@ if [ -s "$SUMMARY_FILE" ]; then
     fi
     if [ -n "${preview_note:-}" ]; then
       ra_log "  Preview note: ${preview_note}"
+    fi
+    if [ -n "${LOG_OUTPUTS[$test]:-}" ] && [ -f "${LOG_OUTPUTS[$test]}" ]; then
+      cp -f "${LOG_OUTPUTS[$test]}" "$ARTIFACTS_DIR/${test}.log" 2>/dev/null || true
+      ra_log "  -> Stored log artifact copy at $ARTIFACTS_DIR/${test}.log"
     fi
   done < "$SUMMARY_FILE"
 fi
