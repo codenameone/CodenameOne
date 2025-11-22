@@ -73,6 +73,7 @@ final class Cn1ssDeviceRunnerHelper {
             return;
         }
         globalErrorHooksInstalled = true;
+        Log.bindCrashProtection(true);
         Display.getInstance().addEdtErrorHandler(evt -> {
             Object source = evt.getSource();
             if (source instanceof Throwable) {
@@ -82,12 +83,6 @@ final class Cn1ssDeviceRunnerHelper {
             } else {
                 println("CN1SS:ERR:edt event=" + source);
             }
-        });
-        Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
-            if (throwable != null) {
-                Log.e(throwable);
-            }
-            println("CN1SS:ERR:thread name=" + thread.getName() + " throwable=" + throwable);
         });
         println("CN1SS:INFO:global error taps installed");
     }
