@@ -52,6 +52,7 @@ extern void repaintUI();
 @synthesize drawable;
 @synthesize peerComponentsLayer;
 @synthesize currentEncoder;
+@synthesize persistentTexture;
 
 - (CGSize)drawableSize {
     CAMetalLayer *layer = (CAMetalLayer *)self.layer;
@@ -128,7 +129,9 @@ extern BOOL isRetinaBug();
         metalLayer.device = self.device;
         metalLayer.opaque = TRUE;
         metalLayer.pixelFormat = MTLPixelFormatBGRA8Unorm;
-        metalLayer.framebufferOnly = YES;
+        metalLayer.framebufferOnly = NO;  // Allow blit operations on drawable
+        // Use triple buffering for better CPU/GPU pipelining
+        metalLayer.maximumDrawableCount = 3;
         self.commandQueue = [self.device newCommandQueue];
         
     }
@@ -139,6 +142,8 @@ extern BOOL isRetinaBug();
 - (void)dealloc
 {
 #ifndef CN1_USE_ARC
+    // Property setter handles release when set to nil
+    self.persistentTexture = nil;
     [super dealloc];
 #endif
 }
@@ -157,19 +162,72 @@ extern BOOL isRetinaBug();
     
 }
 
+-(void)ensurePersistentTexture:(CGSize)size {
+    // Validate size - can't create 0x0 textures
+    if (size.width <= 0 || size.height <= 0) {
+        return;
+    }
+
+    // Create or resize persistent texture to match drawable size
+    if (self.persistentTexture == nil ||
+        self.persistentTexture.width != (NSUInteger)size.width ||
+        self.persistentTexture.height != (NSUInteger)size.height) {
+
+        MTLTextureDescriptor *desc = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+                                                                                        width:(NSUInteger)size.width
+                                                                                       height:(NSUInteger)size.height
+                                                                                    mipmapped:NO];
+        desc.usage = MTLTextureUsageShaderRead | MTLTextureUsageRenderTarget;
+        desc.storageMode = MTLStorageModePrivate;
+
+        // newTextureWithDescriptor returns a retained object (+1)
+        // Property setter will release old and retain new, so we need to release our +1
+        id<MTLTexture> newTexture = [self.device newTextureWithDescriptor:desc];
+        self.persistentTexture = newTexture;
+#ifndef CN1_USE_ARC
+        [newTexture release]; // Balance the +1 from newTextureWithDescriptor
+#endif
+        // Mark that this new texture needs to be cleared before first use
+        self.persistentTextureNeedsClear = YES;
+    }
+}
+
 -(void)createRenderPassDescriptor {
     CAMetalLayer *layer = (CAMetalLayer*)self.layer;
+
+    // Get drawable first - its texture has the correct size even if layer.drawableSize is 0
     self.drawable = [layer nextDrawable];
     if (self.drawable == nil) {
-        NSLog(@"METALView: Failed to get drawable");
+        return;
+    }
+
+    // Get size from drawable texture (more reliable than layer.drawableSize)
+    CGSize size = CGSizeMake(self.drawable.texture.width, self.drawable.texture.height);
+
+    // Skip if size is invalid (during initialization)
+    if (size.width <= 0 || size.height <= 0) {
+        return;
+    }
+
+    // Ensure persistent texture exists - this is our actual render target
+    [self ensurePersistentTexture:size];
+    if (self.persistentTexture == nil) {
         return;
     }
 
     self.renderPassDescriptor = [MTLRenderPassDescriptor renderPassDescriptor];
     MTLRenderPassColorAttachmentDescriptor* colorAttachment = self.renderPassDescriptor.colorAttachments[0];
-    colorAttachment.texture = self.drawable.texture;
-    colorAttachment.loadAction = MTLLoadActionClear;
-    colorAttachment.clearColor = MTLClearColorMake(1.0, 1.0, 1.0, 1.0);
+    // Render to persistent texture (not drawable) - content is naturally preserved
+    colorAttachment.texture = self.persistentTexture;
+
+    // Clear on first use, then load to preserve content
+    if (self.persistentTextureNeedsClear) {
+        colorAttachment.loadAction = MTLLoadActionClear;
+        colorAttachment.clearColor = MTLClearColorMake(1.0, 1.0, 1.0, 1.0); // White background
+        self.persistentTextureNeedsClear = NO;
+    } else {
+        colorAttachment.loadAction = MTLLoadActionLoad;
+    }
     colorAttachment.storeAction = MTLStoreActionStore;
 
     // Note: Blending is configured on MTLRenderPipelineDescriptor, not here
@@ -181,12 +239,16 @@ extern BOOL isRetinaBug();
     [self setFramebuffer];
 
     // Create render command encoder for this frame
+    // We render directly to persistentTexture, so content is naturally preserved
     if (self.renderPassDescriptor != nil && self.commandBuffer != nil) {
         self.currentEncoder = [self.commandBuffer renderCommandEncoderWithDescriptor:self.renderPassDescriptor];
 
-        // Apply scissor rectangle if enabled
-        if (self.scissorEnabled && self.currentEncoder != nil) {
-            [self.currentEncoder setScissorRect:self.scissorRect];
+        // Reset scissor to full texture at frame start (matches ES2 behavior)
+        self.scissorEnabled = NO;
+        if (self.currentEncoder != nil) {
+            CGSize drawableSize = [self drawableSize];
+            MTLScissorRect fullRect = {0, 0, (NSUInteger)drawableSize.width, (NSUInteger)drawableSize.height};
+            [self.currentEncoder setScissorRect:fullRect];
         }
     }
 }
@@ -213,17 +275,31 @@ extern BOOL isRetinaBug();
 
 - (BOOL)presentFramebuffer
 {
-    // End encoding before presenting
+    // End render encoding before blitting
     if (self.currentEncoder) {
         [self.currentEncoder endEncoding];
         self.currentEncoder = nil;
     }
 
-    if (self.commandBuffer && self.drawable) {
+    if (self.commandBuffer && self.drawable && self.persistentTexture) {
+        // Single blit: copy from persistent texture to drawable for display
+        CGSize size = [self drawableSize];
+        id<MTLBlitCommandEncoder> blitEncoder = [self.commandBuffer blitCommandEncoder];
+        [blitEncoder copyFromTexture:self.persistentTexture
+                         sourceSlice:0
+                         sourceLevel:0
+                        sourceOrigin:MTLOriginMake(0, 0, 0)
+                          sourceSize:MTLSizeMake(size.width, size.height, 1)
+                           toTexture:self.drawable.texture
+                    destinationSlice:0
+                    destinationLevel:0
+                   destinationOrigin:MTLOriginMake(0, 0, 0)];
+        [blitEncoder endEncoding];
+
         [self.commandBuffer presentDrawable:self.drawable];
         [self.commandBuffer commit];
 
-        // Clear for next frame
+        // Clear for next frame (property setters handle release for retain/strong)
         self.commandBuffer = nil;
         self.renderPassDescriptor = nil;
         self.drawable = nil;
