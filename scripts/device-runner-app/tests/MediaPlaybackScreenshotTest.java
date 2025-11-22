@@ -15,88 +15,38 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 
-public class MediaPlaybackScreenshotTest extends AbstractTest {
+public class MediaPlaybackScreenshotTest extends BaseTest {
     private static final int SAMPLE_RATE = 44100;
     private static final double TONE_FREQUENCY = 440.0;
     private static final double TONE_DURATION_SECONDS = 1.2;
 
     @Override
     public boolean runTest() throws Exception {
-        final Label statusLabel = new Label("Preparing media sample…");
-        final Form[] formHolder = new Form[1];
-        Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {
-            Form form = new Form("Media Playback", new BorderLayout());
-            Container content = new Container(BoxLayout.y());
-            content.getAllStyles().setPadding(6, 6, 6, 6);
-            content.add(new Label("Media playback regression"));
-            content.add(new Label("Verifies createMedia() against filesystem URI"));
-            content.add(statusLabel);
-            form.add(BorderLayout.CENTER, content);
-            formHolder[0] = form;
-            form.show();
-        });
-
+        Form form = createForm("Media Playback", new BorderLayout(), "MediaPlayback");
         String tonePath = writeToneWav();
+        final Label statusLabel = new Label("Preparing media sample…");
         if (tonePath == null) {
-            updateStatus(statusLabel, formHolder[0], "Failed to generate tone file");
-            return false;
-        }
-
-        final String mediaPath = tonePath;
-        final Media[] mediaHolder = new Media[1];
-        final boolean[] playbackFailed = new boolean[1];
-        Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {
-            try {
-                Media media = MediaManager.createMedia(mediaPath, false);
-                if (media == null) {
-                    updateStatus(statusLabel, formHolder[0], "Media creation returned null");
-                    playbackFailed[0] = true;
-                    return;
-                }
-                media.setTime(0);
-                media.play();
-                statusLabel.setText("Starting playback…");
-                formHolder[0].revalidate();
-                mediaHolder[0] = media;
-            } catch (IOException ex) {
-                TestUtils.log("Unable to create media: " + ex.getMessage());
-                updateStatus(statusLabel, formHolder[0], "Unable to create media");
-                playbackFailed[0] = true;
+            updateStatus(statusLabel, form, "Failed to generate tone file");
+        } else {
+            Media media = MediaManager.createMedia(tonePath, false);
+            if (media == null) {
+                updateStatus(statusLabel, form, "Media creation returned null");
             }
-        });
-
-        if (playbackFailed[0]) {
-            cleanupMedia(mediaHolder[0]);
-            FileSystemStorage.getInstance().delete(mediaPath);
-            return false;
+            media.setTime(0);
+            media.play();
+            statusLabel.setText("Starting playback…");
         }
+        Container content = new Container(BoxLayout.y());
+        content.getAllStyles().setPadding(6, 6, 6, 6);
+        content.add(new Label("Media playback regression"));
+        content.add(new Label("Verifies createMedia() against filesystem URI"));
+        content.add(statusLabel);
+        form.add(BorderLayout.CENTER, content);
 
-        final boolean[] playbackStarted = new boolean[1];
-        for (int elapsed = 0; elapsed < 5000 && !playbackStarted[0]; elapsed += 200) {
-            Cn1ssDeviceRunnerHelper.waitForMillis(200);
-            Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {
-                if (mediaHolder[0] != null && mediaHolder[0].isPlaying()) {
-                    playbackStarted[0] = true;
-                }
-            });
-        }
-
-        Cn1ssDeviceRunnerHelper.runOnEdtSync(() -> {
-            if (playbackStarted[0]) {
-                statusLabel.setText("Media playback started successfully");
-            } else {
-                statusLabel.setText("Media playback did not start");
-            }
-            formHolder[0].revalidate();
-        });
+        form.show();
 
         Cn1ssDeviceRunnerHelper.waitForMillis(800);
-        boolean screenshotSuccess = Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("MediaPlayback");
-
-        cleanupMedia(mediaHolder[0]);
-        FileSystemStorage.getInstance().delete(mediaPath);
-
-        return playbackStarted[0] && screenshotSuccess;
+        return waitForDone();
     }
 
     private static void updateStatus(Label label, Form form, String message) {
