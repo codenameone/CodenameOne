@@ -13,6 +13,7 @@ public abstract class BaseTest extends AbstractTest {
     private String currentScreenshotName = "default";
 
     protected Form createForm(String title, Layout layout, final String imageName) {
+        done = false;
         currentScreenshotName = Cn1ssDeviceRunnerHelper.sanitizeTestName(imageName);
         logEmitted = false;
         Cn1ssDeviceRunnerHelper.resetLogCapture(currentScreenshotName);
