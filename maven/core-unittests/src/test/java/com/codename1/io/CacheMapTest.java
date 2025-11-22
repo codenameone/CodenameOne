@@ -1,5 +1,6 @@
 package com.codename1.io;
 
+import com.codename1.impl.ImplementationFactory;
 import com.codename1.junit.EdtTest;
 import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.Display;
@@ -17,6 +18,15 @@ class CacheMapTest {
     @BeforeEach
     void setUp() {
         implementation = new TestCodenameOneImplementation(true);
+        ImplementationFactory.setInstance(new ImplementationFactory() {
+            @Override
+            public Object createImplementation() {
+                return implementation;
+            }
+        });
+        if (!Display.isInitialized()) {
+            Display.init(null);
+        }
         Util.setImplementation(implementation);
         Storage.setStorageInstance(null);
     }
@@ -25,6 +35,7 @@ class CacheMapTest {
     void tearDown() {
         Storage.setStorageInstance(null);
         Util.setImplementation(null);
+        Display.deinitialize();
     }
 
     @Test
