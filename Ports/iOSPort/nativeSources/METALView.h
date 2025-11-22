@@ -50,6 +50,8 @@
 @property (nonatomic, readonly) CGSize drawableSize;
 @property (nonatomic, assign) MTLScissorRect scissorRect;
 @property (nonatomic, assign) BOOL scissorEnabled;
+@property (nonatomic, strong) id<MTLTexture> persistentTexture;
+@property (nonatomic, assign) BOOL persistentTextureNeedsClear;
 
 -(void)textViewDidChange:(UITextView *)textView;
 -(void)deleteFramebuffer;

@@ -103,27 +103,10 @@ static CGRect drawingRect;
         return;
     }
 
+    // In Metal, don't clamp clips to drawingRect - allow full screen clipping
+    // The Java layer sends proper background fills, and clamping causes issues
+    // with partial repaints and buffer synchronization
     clipIsTexture = NO;
-    int x2 = x + width;
-    int y2 = y + height;
-    int orX = drawingRect.origin.x;
-    int orY = drawingRect.origin.y;
-    if(x < orX) {
-        x = orX;
-        width = x2 - x;
-    }
-    if(y < orY) {
-        y = orY;
-        height = y2 - y;
-    }
-    int destX2 = (int)(drawingRect.origin.x + drawingRect.size.width);
-    int destY2 = (int)(drawingRect.origin.y + drawingRect.size.height);
-    if(x2 > destX2) {
-        width = destX2 - x;
-    }
-    if(y2 > destY2) {
-        height = destY2 - y;
-    }
 
     if(width > 0 && height > 0) {
         [super clipBlock:NO];
@@ -154,9 +137,46 @@ static CGRect drawingRect;
 
         [ClipRect updateClipToScale];
 
+        // Note: Input coordinates appear to already be in physical pixels (pre-scaled)
+        // Just clamp to drawable bounds for safety (Metal requires this)
+        CGSize drawableSize = [[[CodenameOne_GLViewController instance] metalView] drawableSize];
+        int drawableW = (int)drawableSize.width;
+        int drawableH = (int)drawableSize.height;
+
+        int finalX = clipX;
+        int finalY = clipY;
+        int finalW = clipW;
+        int finalH = clipH;
+
+        if (finalX < 0) {
+            finalW += finalX;
+            finalX = 0;
+        }
+        if (finalY < 0) {
+            finalH += finalY;
+            finalY = 0;
+        }
+        if (finalX + finalW > drawableW) {
+            finalW = drawableW - finalX;
+        }
+        if (finalY + finalH > drawableH) {
+            finalH = drawableH - finalY;
+        }
+        if (finalW < 0) finalW = 0;
+        if (finalH < 0) finalH = 0;
+        if (finalX >= drawableW || finalY >= drawableH || finalW == 0 || finalH == 0) {
+            // Scissor is completely outside drawable - block drawing
+            [super clipBlock:YES];
+            return;
+        }
+
         // Apply scissor to Metal encoder
-        MTLScissorRect scissor = {clipX, clipY, clipW, clipH};
-        [[CodenameOne_GLViewController instance] setScissorRect:scissor enabled:YES];
+        MTLScissorRect scissor = {finalX, finalY, finalW, finalH};
+
+        // Match ES2 behavior: only apply scissor when no transform is active
+        if (currentScaleX == 1 && currentScaleY == 1) {
+            [[CodenameOne_GLViewController instance] setScissorRect:scissor enabled:YES];
+        }
 
         clipApplied = YES;
     } else {
