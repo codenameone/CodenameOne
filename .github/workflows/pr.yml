@@ -179,7 +179,6 @@ jobs:
         java -jar "$JACOCO_CLI_JAR" report "$UNIT_EXEC" \
           --classfiles maven/core-unittests/target/classes \
           --classfiles Ports/JavaSE/build/classes \
-          --classfiles Ports/JavaSE/dist/JavaSE.jar \
           --sourcefiles CodenameOne/src \
           --sourcefiles Ports/JavaSE/src \
           --html "$REPORT_DIR" \
