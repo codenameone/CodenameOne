@@ -121,8 +121,25 @@ mkdir -p "$BUILD_DIR/src"
 rsync -a "$MAIN_SRC/" "$BUILD_DIR/src/"
 rsync -a "$TEST_SRC/" "$BUILD_DIR/src/"
 
+PREF_HELPER="$BUILD_DIR/src/Cn1EnableDesktopMode.java"
+cat > "$PREF_HELPER" <<'EOF'
+import com.codename1.impl.javase.JavaSEPort;
+import java.util.prefs.Preferences;
+
+public final class Cn1EnableDesktopMode {
+    private Cn1EnableDesktopMode() {}
+
+    public static void main(String[] args) {
+        Preferences.userNodeForPackage(JavaSEPort.class).putBoolean("desktopSkin", true);
+    }
+}
+EOF
+
 jd_log "Compiling device-runner application sources"
 find "$BUILD_DIR/src" -name '*.java' -print0 | xargs -0 "$JAVAC_BIN" -cp "$CN1_CLASSPATH" -d "$BUILD_DIR/classes"
+
+jd_log "Configuring Java SE port preferences for desktop mode"
+"$JAVA_BIN" -cp "$CN1_CLASSPATH:$BUILD_DIR/classes" Cn1EnableDesktopMode
 
 SIM_TIMEOUT_SECONDS=${SIM_TIMEOUT_SECONDS:-420}
 SIM_KILL_GRACE_SECONDS=${SIM_KILL_GRACE_SECONDS:-30}
