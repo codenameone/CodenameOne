@@ -1,6 +1,5 @@
 package com.codename1.ui.util;
 
-import com.codename1.io.Util;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.io.FileSystemStorage;
@@ -66,17 +65,24 @@ class UtilCoverageTest extends UITestBase {
         tutorial.addHint(east, destination, BorderLayout.EAST);
         tutorial.addHint(west, destination, BorderLayout.WEST);
 
-        CN.callSerially(() -> tutorial.showOn(CN.getCurrentForm()));
-        new Thread(() -> {
-            while (!(CN.getCurrentForm() instanceof Dialog)) {
-                Util.sleep(10);
+        Form host = new Form();
+        host.show();
+        CountDownLatch disposed = new CountDownLatch(1);
+        CN.callSerially(new Runnable() {
+            public void run() {
+                tutorial.showOn(host);
+                Form current = Display.getInstance().getCurrent();
+                if (current instanceof Dialog) {
+                    ((Dialog) current).dispose();
+                }
+                disposed.countDown();
             }
-            CN.callSerially(() -> ((Dialog)CN.getCurrentForm()).dispose());
-        }).start();
+        });
+        disposed.await(1, TimeUnit.SECONDS);
     }
 
     @FormTest
-    void glassTutorialShowOnRestoresGlassPaneAndTint() {
+    void glassTutorialShowOnRestoresGlassPaneAndTint() throws InterruptedException {
         Form form = new Form();
         final boolean[] painted = new boolean[1];
         Painter original = new Painter() {
@@ -88,30 +94,20 @@ class UtilCoverageTest extends UITestBase {
         int originalTint = form.getTintColor();
 
         GlassTutorial tutorial = new GlassTutorial();
-        final boolean[] finished = new boolean[1];
+        CountDownLatch finished = new CountDownLatch(1);
+        form.show();
         CN.callSerially(new Runnable() {
             public void run() {
                 tutorial.showOn(form);
-                finished[0] = true;
-            }
-        });
-
-        CN.callSerially(new Runnable() {
-            public void run() {
                 Form current = Display.getInstance().getCurrent();
                 if (current instanceof Dialog) {
                     ((Dialog) current).dispose();
                 }
+                finished.countDown();
             }
         });
 
-        int attempts = 0;
-        while (!finished[0] && attempts < 40) {
-            TestUtils.waitFor(50);
-            attempts++;
-        }
-
-        assertTrue(finished[0]);
+        finished.await(1, TimeUnit.SECONDS);
         assertEquals(originalTint, form.getTintColor());
         assertSame(original, form.getGlassPane());
         Image buffer = Image.createImage(5, 5);
