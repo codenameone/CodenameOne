@@ -176,21 +176,22 @@ jobs:
         rm -rf "$REPORT_DIR"
         mkdir -p "$REPORT_DIR"
 
-        if [ ! -d Ports/JavaSE/build/classes ]; then
-          echo "JavaSE build outputs not found at Ports/JavaSE/build/classes" >&2
+        if [ ! -f Ports/JavaSE/dist/JavaSE.jar ]; then
+          echo "JavaSE jar not found at Ports/JavaSE/dist/JavaSE.jar" >&2
           exit 1
         fi
 
-        PORT_IMPL_CLASSES="$(mktemp -d "${RUNNER_TEMP:-/tmp}/jacoco-javase-impl-XXXXXX")"
-        rsync -a --include 'com/' --include 'com/codename1/' --include 'com/codename1/impl/***' --exclude '*' \
-          Ports/JavaSE/build/classes/ "$PORT_IMPL_CLASSES/"
-
-        CORE_CLASSES_NO_IMPL="$(mktemp -d "${RUNNER_TEMP:-/tmp}/jacoco-core-no-impl-XXXXXX")"
-        rsync -a --exclude 'com/codename1/impl/***' maven/core-unittests/target/classes/ "$CORE_CLASSES_NO_IMPL/"
+        JSE_IMPL_CLASSES="$(mktemp -d "${RUNNER_TEMP:-/tmp}/jacoco-javase-impl-XXXXXX")"
+        unzip -qq Ports/JavaSE/dist/JavaSE.jar -d "$JSE_IMPL_CLASSES" || {
+          echo "Failed to extract classes from Ports/JavaSE/dist/JavaSE.jar" >&2
+          exit 1
+        }
+        find "$JSE_IMPL_CLASSES" -type f ! -path '*/com/codename1/impl/javase/*' -delete
+        find "$JSE_IMPL_CLASSES" -type d -empty -delete
 
         java -jar "$JACOCO_CLI_JAR" report "$UNIT_EXEC" \
-          --classfiles "$CORE_CLASSES_NO_IMPL" \
-          --classfiles "$PORT_IMPL_CLASSES" \
+          --classfiles maven/core-unittests/target/classes \
+          --classfiles "$JSE_IMPL_CLASSES" \
           --sourcefiles CodenameOne/src \
           --sourcefiles Ports/JavaSE/src \
           --html "$REPORT_DIR" \
