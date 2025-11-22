@@ -43,6 +43,7 @@ ENV_FILE="$ENV_DIR/env.sh"
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-${GITHUB_WORKSPACE:-$REPO_ROOT}/artifacts}"
 ensure_dir "$ARTIFACTS_DIR"
 TEST_LOG="$ARTIFACTS_DIR/connectedAndroidTest.log"
+CN1SS_LOG_LINES="$ARTIFACTS_DIR/cn1ss-lines.log"
 SCREENSHOT_REF_DIR="$SCRIPT_DIR/android/screenshots"
 SCREENSHOT_TMP_DIR="$(mktemp -d "${TMPDIR}/cn1ss-XXXXXX" 2>/dev/null || echo "${TMPDIR}/cn1ss-tmp")"
 ensure_dir "$SCREENSHOT_TMP_DIR"
@@ -157,6 +158,15 @@ fi
 
 declare -a CN1SS_SOURCES=("LOGCAT:$TEST_LOG")
 
+# Extract CN1SS-prefixed lines for quick inspection
+grep -E "CN1SS" "$TEST_LOG" > "$CN1SS_LOG_LINES" 2>/dev/null || true
+if [ -s "$CN1SS_LOG_LINES" ]; then
+  ra_log "CN1SS log lines written to $CN1SS_LOG_LINES"
+else
+  echo "(no CN1SS-prefixed lines found in logcat)" > "$CN1SS_LOG_LINES"
+  ra_log "No CN1SS-prefixed lines detected; wrote placeholder to $CN1SS_LOG_LINES"
+fi
+
 
 # ---- Chunk accounting (diagnostics) ---------------------------------------
 
@@ -175,13 +185,23 @@ fi
 # ---- Identify CN1SS test streams -----------------------------------------
 
 TEST_NAMES_RAW="$(cn1ss_list_tests "$TEST_LOG" 2>/dev/null | awk 'NF' | sort -u || true)"
+FORM_READY_NAMES_RAW="$(grep -oE "CN1SS: form ready for screenshot -> .*" "$TEST_LOG" 2>/dev/null | sed 's/.*-> //' | sed 's/[^A-Za-z0-9_.-]/_/g' | awk 'NF' | sort -u || true)"
 declare -a TEST_NAMES=()
 if [ -n "$TEST_NAMES_RAW" ]; then
   while IFS= read -r name; do
     [ -n "$name" ] || continue
     TEST_NAMES+=("$name")
   done <<< "$TEST_NAMES_RAW"
-else
+fi
+if [ -n "$FORM_READY_NAMES_RAW" ]; then
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    if [[ ! " ${TEST_NAMES[*]} " =~ " ${name} " ]]; then
+      TEST_NAMES+=("$name")
+    fi
+  done <<< "$FORM_READY_NAMES_RAW"
+fi
+if [ ${#TEST_NAMES[@]} -eq 0 ]; then
   TEST_NAMES+=("default")
 fi
 ra_log "Detected CN1SS test streams: ${TEST_NAMES[*]}"
@@ -189,12 +209,15 @@ ra_log "Detected CN1SS test streams: ${TEST_NAMES[*]}"
 declare -A TEST_OUTPUTS=()
 declare -A TEST_SOURCES=()
 declare -A PREVIEW_OUTPUTS=()
+declare -A LOG_OUTPUTS=()
 
 ensure_dir "$SCREENSHOT_PREVIEW_DIR"
 
 for test in "${TEST_NAMES[@]}"; do
   dest="$SCREENSHOT_TMP_DIR/${test}.png"
-  if source_label="$(cn1ss_decode_test_png "$test" "$dest" "${CN1SS_SOURCES[@]}")"; then
+  rm -f "$dest" 2>/dev/null || true
+  png_chunks="$(cn1ss_count_chunks "$TEST_LOG" "$test")"; png_chunks="${png_chunks//[^0-9]/}"; : "${png_chunks:=0}"
+  if [ "$png_chunks" -gt 0 ] && source_label="$(cn1ss_decode_test_png "$test" "$dest" "${CN1SS_SOURCES[@]}")"; then
     TEST_OUTPUTS["$test"]="$dest"
     TEST_SOURCES["$test"]="$source_label"
     ra_log "Decoded screenshot for '$test' (source=${source_label}, size: $(cn1ss_file_size "$dest") bytes)"
@@ -206,15 +229,17 @@ for test in "${TEST_NAMES[@]}"; do
       rm -f "$preview_dest" 2>/dev/null || true
     fi
   else
-    ra_log "FATAL: Failed to extract/decode CN1SS payload for test '$test'"
-    RAW_B64_OUT="$SCREENSHOT_TMP_DIR/${test}.raw.b64"
-    if cn1ss_extract_base64 "$TEST_LOG" "$test" > "$RAW_B64_OUT" 2>/dev/null; then
-      if [ -s "$RAW_B64_OUT" ]; then
-        head -c 64 "$RAW_B64_OUT" | sed 's/^/[CN1SS-B64-HEAD] /'
-        ra_log "Partial base64 saved at: $RAW_B64_OUT"
-      fi
-    fi
-    exit 12
+    ra_log "WARN: No screenshot payload decoded for '$test' (png_chunks=${png_chunks})"
+  fi
+
+  log_dest="$SCREENSHOT_TMP_DIR/${test}.log"
+  log_chunks="$(cn1ss_count_chunks "$TEST_LOG" "$test" "LOG")"; log_chunks="${log_chunks//[^0-9]/}"; : "${log_chunks:=0}"
+  if [ "$log_chunks" -gt 0 ] && log_source="$(cn1ss_decode_test_log "$test" "$log_dest" "${CN1SS_SOURCES[@]}")"; then
+    LOG_OUTPUTS["$test"]="$log_dest"
+    ra_log "Decoded log for '$test' (source=${log_source}, size: $(cn1ss_file_size "$log_dest") bytes)"
+  else
+    rm -f "$log_dest" 2>/dev/null || true
+    ra_log "INFO: No CN1SS log payload available for '$test' (log_chunks=${log_chunks})"
   fi
 done
 
@@ -222,8 +247,7 @@ done
 
 COMPARE_ARGS=()
 for test in "${TEST_NAMES[@]}"; do
-  dest="${TEST_OUTPUTS[$test]:-}"
-  [ -n "$dest" ] || continue
+  dest="${TEST_OUTPUTS[$test]:-$SCREENSHOT_TMP_DIR/${test}.png}"
   COMPARE_ARGS+=("--actual" "${test}=${dest}")
 done
 
@@ -282,6 +306,10 @@ if [ -s "$SUMMARY_FILE" ]; then
     fi
     if [ -n "${preview_note:-}" ]; then
       ra_log "  Preview note: ${preview_note}"
+    fi
+    if [ -n "${LOG_OUTPUTS[$test]:-}" ] && [ -f "${LOG_OUTPUTS[$test]}" ]; then
+      cp -f "${LOG_OUTPUTS[$test]}" "$ARTIFACTS_DIR/${test}.log" 2>/dev/null || true
+      ra_log "  -> Stored log artifact copy at $ARTIFACTS_DIR/${test}.log"
     fi
   done < "$SUMMARY_FILE"
 fi

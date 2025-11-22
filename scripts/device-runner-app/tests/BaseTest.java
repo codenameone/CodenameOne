@@ -1,5 +1,6 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
+import com.codename1.io.Log;
 import com.codename1.testing.AbstractTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.util.UITimer;
@@ -8,13 +9,23 @@ import com.codename1.testing.TestUtils;
 
 public abstract class BaseTest extends AbstractTest {
     private boolean done;
+    private boolean logEmitted;
+    private String currentScreenshotName = "default";
 
     protected Form createForm(String title, Layout layout, final String imageName) {
+        done = false;
+        currentScreenshotName = Cn1ssDeviceRunnerHelper.sanitizeTestName(imageName);
+        logEmitted = false;
+        Cn1ssDeviceRunnerHelper.ensureGlobalErrorTaps();
+        Cn1ssDeviceRunnerHelper.resetLogCapture(currentScreenshotName);
+        Cn1ssDeviceRunnerHelper.emitTestStartMarker(currentScreenshotName);
         return new Form(title, layout) {
             @Override
             protected void onShowCompleted() {
+                Log.p("CN1SS: form ready for screenshot -> " + imageName);
                 registerReadyCallback(this, () -> {
                     Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName);
+                    logEmitted = true;
                     done = true;
                 });
             }
@@ -32,11 +43,19 @@ public abstract class BaseTest extends AbstractTest {
             TestUtils.waitFor(20);
             timeout--;
             if(timeout == 0) {
+                Log.p("CN1SS: timeout waiting for screenshot emission");
+                Cn1ssDeviceRunnerHelper.emitLogChannel(currentScreenshotName);
+                logEmitted = true;
                 return false;
             }
         }
         // give the test a few additional milliseconds for the screenshot emission
         TestUtils.waitFor(100);
+        Log.p("CN1SS: screenshot emission completed");
+        if (!logEmitted) {
+            Cn1ssDeviceRunnerHelper.emitLogChannel(currentScreenshotName);
+            logEmitted = true;
+        }
         return true;
     }
 }

@@ -2,6 +2,7 @@ package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.testing.DeviceRunner;
 import com.codename1.testing.TestReporting;
+import com.codename1.io.Log;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.testing.AbstractTest;
@@ -18,18 +19,22 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     };
 
     public void runSuite() {
+        Log.p("CN1SS: starting device runner suite with " + TEST_CLASSES.length + " tests");
         for (AbstractTest testClass : TEST_CLASSES) {
             log("CN1SS:INFO:suite starting test=" + testClass);
             try {
+                Log.p("CN1SS: preparing test " + testClass);
                 testClass.prepare();
                 testClass.runTest();
                 testClass.cleanup();
+                Log.p("CN1SS: finished test " + testClass);
                 log("CN1SS:INFO:suite finished test=" + testClass);
             } catch (Throwable t) {
                 log("CN1SS:ERR:suite test=" + testClass + " failed=" + t);
                 t.printStackTrace();
             }
         }
+        Log.p("CN1SS: device runner suite complete");
         log("CN1SS:SUITE:FINISHED");
         TestReporting.getInstance().testExecutionFinished(getClass().getName());
     }
