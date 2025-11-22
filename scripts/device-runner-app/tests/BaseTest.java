@@ -22,7 +22,8 @@ public abstract class BaseTest extends AbstractTest {
     }
 
     protected void registerReadyCallback(Form parent, Runnable run) {
-        UITimer.timer(500, false, parent, run);
+        // Android misses some images when the time is lower
+        UITimer.timer(1500, false, parent, run);
     }
 
     protected boolean waitForDone() {
@@ -34,6 +35,8 @@ public abstract class BaseTest extends AbstractTest {
                 return false;
             }
         }
+        // give the test a few additional milliseconds for the screenshot emission
+        TestUtils.waitFor(100);
         return true;
     }
 }
