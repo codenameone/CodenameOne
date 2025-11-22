@@ -25,7 +25,7 @@ class PropertiesPackageTest extends UITestBase {
 
     @BeforeEach
     void setup() throws Exception {
-        CN.callSeriallyAndWait(new Runnable() {
+        Runnable setupTask = new Runnable() {
             public void run() {
                 originalPreferencesLocation = Preferences.getPreferencesLocation();
                 Preferences.setPreferencesLocation("PropertiesTest-" + System.nanoTime());
@@ -36,12 +36,17 @@ class PropertiesPackageTest extends UITestBase {
                 PropertyBase.bindGlobalGetListener(null);
                 PropertyBase.bindGlobalSetListener(null);
             }
-        });
+        };
+        if (CN.isEdt()) {
+            setupTask.run();
+        } else {
+            CN.callSeriallyAndWait(setupTask);
+        }
     }
 
     @AfterEach
     void tearDown() throws Exception {
-        CN.callSeriallyAndWait(new Runnable() {
+        Runnable teardownTask = new Runnable() {
             public void run() {
                 PropertyBase.bindGlobalGetListener(null);
                 PropertyBase.bindGlobalSetListener(null);
@@ -52,7 +57,12 @@ class PropertiesPackageTest extends UITestBase {
                 Storage.getInstance().clearCache();
                 implementation.clearStorage();
             }
-        });
+        };
+        if (CN.isEdt()) {
+            teardownTask.run();
+        } else {
+            CN.callSeriallyAndWait(teardownTask);
+        }
     }
 
     @EdtTest
