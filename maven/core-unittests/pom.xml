@@ -16,6 +16,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <src.dir>../../CodenameOne/src</src.dir>
+        <skipDeviceRunnerIT>false</skipDeviceRunnerIT>
     </properties>
     <build>
         <testSourceDirectory>${basedir}/src/test/java</testSourceDirectory>
@@ -154,6 +155,28 @@
                         </googleJavaFormat>
                     </java>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>javase-device-runner</id>
+                        <phase>integration-test</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${skipDeviceRunnerIT}</skip>
+                            <executable>${project.basedir}/../../scripts/run-javase-device-tests.sh</executable>
+                            <workingDirectory>${project.basedir}/../..</workingDirectory>
+                            <environmentVariables>
+                                <ARTIFACTS_DIR>${project.build.directory}/device-runner-artifacts</ARTIFACTS_DIR>
+                            </environmentVariables>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
