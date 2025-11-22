@@ -28,11 +28,8 @@ final class Cn1ssDeviceRunnerHelper {
     private static String initializeLogFile() {
         FileSystemStorage storage = FileSystemStorage.getInstance();
         String path = storage.getAppHomePath() + LOG_FILE_NAME;
-        try {
-            if (storage.exists(path)) {
-                storage.delete(path);
-            }
-        } catch (IOException ignored) {
+        if (storage.exists(path)) {
+            storage.delete(path);
         }
         Log.getInstance().setFileURL(path);
         Log.getInstance().setFileWriteEnabled(true);
