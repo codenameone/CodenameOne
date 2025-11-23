@@ -213,6 +213,13 @@ fi
 
 SIM_EXIT_CODE=$rc
 
+# Detect failed tests reported in the simulator log and surface them as a build failure
+FAILED_TEST_COUNT=$(sed -n 's/.*Failed: \([0-9]\+\) tests.*/\1/p' "$LOG_FILE" | tail -n1)
+if [ -n "$FAILED_TEST_COUNT" ] && [ "$FAILED_TEST_COUNT" -gt 0 ]; then
+  jd_log "Detected $FAILED_TEST_COUNT failed test(s) in simulator output"
+  SIM_EXIT_CODE=1
+fi
+
 TEST_NAMES_RAW="$(cn1ss_list_tests "$LOG_FILE" 2>/dev/null | awk 'NF' | sort -u || true)"
 declare -a TEST_NAMES=()
 if [ -n "$TEST_NAMES_RAW" ]; then
