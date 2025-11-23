@@ -16,6 +16,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <src.dir>../../CodenameOne/src</src.dir>
+        <skipDeviceRunnerIT>false</skipDeviceRunnerIT>
     </properties>
     <build>
         <testSourceDirectory>${basedir}/src/test/java</testSourceDirectory>
@@ -37,6 +38,7 @@
                     <!-- Run each test in its own forked JVM to ensure an isolated classloader. -->
                     <forkCount>1</forkCount>
                     <reuseForks>false</reuseForks>
+                    <argLine>${jacocoArgLine}</argLine>
                 </configuration>
             </plugin>
             <plugin>
@@ -44,8 +46,10 @@
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <version>0.8.7</version> <!-- Use the latest version -->
                 <configuration>
+                    <propertyName>jacocoArgLine</propertyName>
+                    <destFile>${project.build.directory}/jacoco.exec</destFile>
+                    <append>true</append>
                     <excludes>
-                        <exclude>com/codename1/impl/**</exclude>
                         <exclude>com/codename1/ui/html/**</exclude>
                         <exclude>com/codename1/ads/**</exclude>
                         <exclude>com/codename1/facebook/**</exclude>
@@ -65,7 +69,7 @@
                     </execution>
                     <execution>
                         <id>report</id>
-                        <phase>prepare-package</phase>
+                        <phase>verify</phase>
                         <goals>
                             <goal>report</goal>
                         </goals>
@@ -154,6 +158,29 @@
                         </googleJavaFormat>
                     </java>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>javase-device-runner</id>
+                        <phase>integration-test</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <skip>${skipDeviceRunnerIT}</skip>
+                            <executable>${project.basedir}/../../scripts/run-javase-device-tests.sh</executable>
+                            <workingDirectory>${project.basedir}/../..</workingDirectory>
+                            <environmentVariables>
+                                <ARTIFACTS_DIR>${project.build.directory}/device-runner-artifacts</ARTIFACTS_DIR>
+                                <JACOCO_AGENT_ARGLINE>${jacocoArgLine}</JACOCO_AGENT_ARGLINE>
+                            </environmentVariables>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

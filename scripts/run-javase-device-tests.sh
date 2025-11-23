@@ -121,12 +121,38 @@ mkdir -p "$BUILD_DIR/src"
 rsync -a "$MAIN_SRC/" "$BUILD_DIR/src/"
 rsync -a "$TEST_SRC/" "$BUILD_DIR/src/"
 
+PREF_HELPER="$BUILD_DIR/src/Cn1EnableDesktopMode.java"
+cat > "$PREF_HELPER" <<'EOF'
+import com.codename1.impl.javase.JavaSEPort;
+import java.util.prefs.Preferences;
+
+public final class Cn1EnableDesktopMode {
+    private Cn1EnableDesktopMode() {}
+
+    public static void main(String[] args) {
+        Preferences.userNodeForPackage(JavaSEPort.class).putBoolean("desktopSkin", true);
+    }
+}
+EOF
+
 jd_log "Compiling device-runner application sources"
 find "$BUILD_DIR/src" -name '*.java' -print0 | xargs -0 "$JAVAC_BIN" -cp "$CN1_CLASSPATH" -d "$BUILD_DIR/classes"
 
+jd_log "Configuring Java SE port preferences for desktop mode"
+"$JAVA_BIN" -cp "$CN1_CLASSPATH:$BUILD_DIR/classes" Cn1EnableDesktopMode
+
 SIM_TIMEOUT_SECONDS=${SIM_TIMEOUT_SECONDS:-420}
 SIM_KILL_GRACE_SECONDS=${SIM_KILL_GRACE_SECONDS:-30}
-JAVA_CMD=(xvfb-run -a "$JAVA_BIN" \
+JAVA_CMD=(xvfb-run -a "$JAVA_BIN")
+
+if [ -n "${JACOCO_AGENT_ARGLINE:-}" ]; then
+  jd_log "Applying JaCoCo agent to Java SE simulator"
+  # shellcheck disable=SC2206
+  JACOCO_AGENT_ARGS=(${JACOCO_AGENT_ARGLINE})
+  JAVA_CMD+=("${JACOCO_AGENT_ARGS[@]}")
+fi
+
+JAVA_CMD+=(
   -cp "$CN1_CLASSPATH:$BUILD_DIR/classes" \
   com.codename1.impl.javase.Simulator com.codenameone.examples.hellocodenameone.HelloCodenameOne)
 
@@ -186,6 +212,13 @@ if [ $rc -ne 0 ]; then
 fi
 
 SIM_EXIT_CODE=$rc
+
+# Detect failed tests reported in the simulator log and surface them as a build failure
+FAILED_TEST_COUNT=$(sed -n 's/.*Failed: \([0-9]\+\) tests.*/\1/p' "$LOG_FILE" | tail -n1)
+if [ -n "$FAILED_TEST_COUNT" ] && [ "$FAILED_TEST_COUNT" -gt 0 ]; then
+  jd_log "Detected $FAILED_TEST_COUNT failed test(s) in simulator output"
+  SIM_EXIT_CODE=1
+fi
 
 TEST_NAMES_RAW="$(cn1ss_list_tests "$LOG_FILE" 2>/dev/null | awk 'NF' | sort -u || true)"
 declare -a TEST_NAMES=()
