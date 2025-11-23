@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>NumericConstraint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.validation</a> &gt; <span class="el_source">NumericConstraint.java</span></div><h1>NumericConstraint.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.validation;
+
+/**
+ * Forces the value to be a number potentially within specific bounds
+ *
+ * @author Shai Almog
+ */
+public class NumericConstraint implements Constraint {
+    private final boolean dec;
+    private final double minimum;
+    private final double maximum;
+    private final String errorMessage;
+
+    /**
+     * Creates a new numeric constraint
+     *
+     * @param dec          whether the number is decimal or integer, true for decimal
+     * @param minimum      the minimal value to a number or Double.NaN for no minimum value
+     * @param maximum      the maximum value to a number or Double.NaN for no minimum value
+     * @param errorMessage the default error message if the constraint fails
+     */
+<span class="fc" id="L44">    public NumericConstraint(boolean dec, double minimum, double maximum, String errorMessage) {</span>
+<span class="fc" id="L45">        this.dec = dec;</span>
+<span class="fc" id="L46">        this.minimum = minimum;</span>
+<span class="fc" id="L47">        this.maximum = maximum;</span>
+<span class="fc" id="L48">        this.errorMessage = errorMessage;</span>
+<span class="fc" id="L49">    }</span>
+
+
+    /**
+     * Creates a new numeric constraint
+     *
+     * @param dec whether the number is decimal or integer, true for decimal
+     */
+    public NumericConstraint(boolean dec) {
+<span class="fc" id="L58">        this(dec, Integer.MIN_VALUE, Integer.MAX_VALUE, null);</span>
+<span class="fc" id="L59">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean isValid(Object value) {
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (value != null) {</span>
+<span class="fc" id="L67">            String s = value.toString();</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            if (!dec) {</span>
+                try {
+<span class="fc" id="L70">                    return checkRange(Integer.parseInt(s));</span>
+<span class="fc" id="L71">                } catch (NumberFormatException e) {</span>
+<span class="fc" id="L72">                    return false;</span>
+                }
+            }
+            try {
+<span class="nc" id="L76">                return checkRange(Double.parseDouble(s));</span>
+<span class="nc" id="L77">            } catch (NumberFormatException e) {</span>
+<span class="nc" id="L78">                return false;</span>
+            }
+        }
+<span class="nc" id="L81">        return false;</span>
+    }
+
+    private boolean checkRange(double v) {
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">        if (minimum != Double.NaN) {</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            if (maximum != Double.NaN) {</span>
+<span class="pc bpc" id="L87" title="2 of 4 branches missed.">                return v &gt;= minimum &amp;&amp; v &lt;= maximum;</span>
+            }
+<span class="nc bnc" id="L89" title="All 2 branches missed.">            return v &gt;= minimum;</span>
+        } else {
+<span class="nc bnc" id="L91" title="All 2 branches missed.">            if (maximum != Double.NaN) {</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                return v &lt;= maximum;</span>
+            }
+        }
+<span class="nc" id="L95">        return true;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String getDefaultFailMessage() {
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (errorMessage == null) {</span>
+<span class="nc" id="L104">            String round = &quot;&quot;;</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">            if (!dec) {</span>
+<span class="nc" id="L106">                round = &quot;round &quot;;</span>
+            }
+<span class="nc bnc" id="L108" title="All 2 branches missed.">            if (minimum != Double.NaN) {</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">                if (maximum != Double.NaN) {</span>
+<span class="nc" id="L110">                    return &quot;The value must be a valid &quot; + round + &quot;number between &quot; + minimum + &quot; and &quot; + maximum;</span>
+                }
+<span class="nc" id="L112">                return &quot;The value must be a valid &quot; + round + &quot;number larger than &quot; + minimum;</span>
+            } else {
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                if (maximum != Double.NaN) {</span>
+<span class="nc" id="L115">                    return &quot;The value must be a valid &quot; + round + &quot;number larger than &quot; + maximum;</span>
+                }
+            }
+<span class="nc" id="L118">            return &quot;The value must be a valid &quot; + round + &quot;number&quot;;</span>
+        }
+<span class="nc" id="L120">        return errorMessage;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

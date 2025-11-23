@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>L10NManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.l10n</a> &gt; <span class="el_source">L10NManager.java</span></div><h1>L10NManager.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.l10n;
+
+import com.codename1.io.Util;
+import com.codename1.ui.Display;
+
+import java.util.Date;
+
+/**
+ * &lt;p&gt;The localization manager allows adapting values for display in different locales thru parsing and formatting
+ * capabilities (similar to JavaSE's DateFormat/NumberFormat). It also includes language/locale/currency
+ * related API's similar to Locale/currency API's from JavaSE.&lt;br&gt;
+ * The sample code below just lists the various capabilities of the API:&lt;/p&gt;
+ *
+ * &lt;script src=&quot;https://gist.github.com/codenameone/6d93edd5e6b69e7c088a.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/l10n-manager.png&quot; alt=&quot;Localization formatting/parsing and information&quot; /&gt;
+ *
+ * @author Shai Almog
+ */
+public class L10NManager {
+    private String language;
+    private String locale;
+    private DateFormatSymbols symbols;
+
+    /**
+     * Instances of this class should be received via the Display class
+     */
+<span class="fc" id="L49">    protected L10NManager(String language, String locale) {</span>
+<span class="fc" id="L50">        this.language = language;</span>
+<span class="fc" id="L51">        this.locale = locale;</span>
+<span class="fc" id="L52">    }</span>
+
+    /**
+     * Convenience method that invokes Display.getLocalizationManager()
+     *
+     * @return the L10NManager instance
+     */
+    public static L10NManager getInstance() {
+<span class="fc" id="L60">        return Display.getInstance().getLocalizationManager();</span>
+    }
+
+    private DateFormatSymbols getSymbols() {
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        if (symbols == null) {</span>
+<span class="nc" id="L65">            symbols = new DateFormatSymbols();</span>
+        }
+<span class="nc" id="L67">        return symbols;</span>
+    }
+
+    /**
+     * Returns the current locale language as an ISO 639 two letter code
+     *
+     * @return iso language string
+     */
+    public String getLanguage() {
+<span class="nc" id="L76">        return language;</span>
+    }
+
+    /**
+     * Forces the locale/language
+     *
+     * @param locale   the new locale
+     * @param language the language to use
+     */
+    public void setLocale(String locale, String language) {
+<span class="nc" id="L86">        this.language = language;</span>
+<span class="nc" id="L87">        this.locale = locale;</span>
+<span class="nc" id="L88">    }</span>
+
+    /**
+     * Format an integer number for this locale
+     *
+     * @param number the number to format
+     * @return a string representation of a number
+     */
+    public String format(int number) {
+<span class="nc" id="L97">        return &quot;&quot; + number;</span>
+    }
+
+    /**
+     * Format a double number for this locale
+     *
+     * @param number the number to format
+     * @return a string representation of a number
+     */
+    public String format(double number) {
+<span class="fc" id="L107">        return &quot;&quot; + number;</span>
+    }
+
+    /**
+     * Gets the short month name in the current locale for the given date.
+     *
+     * @param date The date.
+     * @return Short month name.  E.g. Jan, Feb, etc..
+     * @since 7.0
+     */
+    public String getShortMonthName(Date date) {
+<span class="nc" id="L118">        return limitLength(getLongMonthName(date), 3);</span>
+    }
+
+    /**
+     * Gets the long month name in the current locale for the given date.
+     *
+     * @param date The date.
+     * @return Long month name.  E.g. January, February, etc..
+     * @since 7.0
+     */
+    public String getLongMonthName(Date date) {
+<span class="nc" id="L129">        String fmt = formatDateLongStyle(date);</span>
+        try {
+<span class="nc" id="L131">            return extractMonthName(fmt);</span>
+<span class="nc" id="L132">        } catch (ParseException ex) {</span>
+<span class="nc" id="L133">            int v = java.util.Calendar.getInstance().get(java.util.Calendar.MONTH) - java.util.Calendar.JANUARY;</span>
+
+<span class="nc" id="L135">            return getSymbols().getMonths()[v];</span>
+        }
+    }
+
+    private String limitLength(String s, int len) {
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        if (s.length() &gt; len) {</span>
+<span class="nc" id="L141">            return s.substring(0, len);</span>
+        }
+<span class="nc" id="L143">        return s;</span>
+    }
+
+    private String extractMonthName(String dateStr) throws ParseException {
+<span class="nc" id="L147">        String[] parts = Util.split(dateStr, &quot; &quot;);</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">        for (String part : parts) {</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">            if (part.length() == 0) {</span>
+<span class="nc" id="L150">                continue;</span>
+            }
+<span class="nc bnc" id="L152" title="All 2 branches missed.">            if (part.equalsIgnoreCase(&quot;de&quot;)) {</span>
+<span class="nc" id="L153">                continue;</span>
+            }
+<span class="nc" id="L155">            String firstChar = part.substring(0, 1);</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">            if (!firstChar.toLowerCase().equals(firstChar.toUpperCase())) {</span>
+<span class="nc" id="L157">                return part;</span>
+            }
+        }
+<span class="nc" id="L160">        throw new ParseException(&quot;Cannot extract month from string&quot;, 0);</span>
+
+    }
+
+    /**
+     * Format a currency value
+     *
+     * @param currency the monetary value
+     * @return a string representation of a number
+     */
+    public String formatCurrency(double currency) {
+<span class="nc" id="L171">        return &quot;&quot; + currency;</span>
+    }
+
+    /**
+     * Returns the currency symbol for this locale
+     *
+     * @return currency symbol
+     */
+    public String getCurrencySymbol() {
+<span class="nc" id="L180">        return &quot;$&quot;;</span>
+    }
+
+    /**
+     * Formats a date in a long form e.g. Sunday January 1st 2001
+     *
+     * @param d the date
+     * @return the long form string
+     */
+    public String formatDateLongStyle(Date d) {
+<span class="fc" id="L190">        return d.toString();</span>
+    }
+
+    /**
+     * Formats a date in a short form e.g. 1/1/2011
+     *
+     * @param d the date
+     * @return the short form string
+     */
+    public String formatDateShortStyle(Date d) {
+<span class="fc" id="L200">        return d.toString();</span>
+    }
+
+    /**
+     * Formats a date and a time in a default form e.g. 1/1/2011 10:00AM
+     *
+     * @param d the date
+     * @return the date and time
+     */
+    public String formatDateTime(Date d) {
+<span class="nc" id="L210">        return d.toString();</span>
+    }
+
+    /**
+     * Formats a date and a time in a default form e.g. 1/1/2011 10:00AM
+     *
+     * @param d the date
+     * @return the date and time
+     */
+    public String formatDateTimeMedium(Date d) {
+<span class="nc" id="L220">        return d.toString();</span>
+    }
+
+    /**
+     * Formats the time in a default form e.g. 10:00AM
+     *
+     * @param d the date time object
+     * @return the time as a String
+     */
+    public String formatTime(Date d) {
+<span class="nc" id="L230">        String s = formatDateTimeMedium(d);</span>
+<span class="nc" id="L231">        int pos = s.lastIndexOf(&quot; &quot;);</span>
+
+        // this can be just the AM or PM
+<span class="nc bnc" id="L234" title="All 2 branches missed.">        if (s.length() - pos &lt; 4) {</span>
+<span class="nc" id="L235">            pos = s.lastIndexOf(&quot; &quot;, pos - 1);</span>
+        }
+<span class="nc" id="L237">        s = s.substring(pos + 1);</span>
+<span class="nc" id="L238">        return s;</span>
+    }
+
+    /**
+     * Formats a date and a time in a default form e.g. 1/1/2011 10:00AM
+     *
+     * @param d the date
+     * @return the date and time
+     */
+    public String formatDateTimeShort(Date d) {
+<span class="fc" id="L248">        return d.toString();</span>
+    }
+
+    /**
+     * Indicates whether the language is a right to left language
+     *
+     * @return true for bidi/rtl languages
+     */
+    public boolean isRTLLocale() {
+<span class="nc bnc" id="L257" title="All 4 branches missed.">        return &quot;iw&quot;.equals(language) || &quot;ar&quot;.equals(language);</span>
+    }
+
+    /**
+     * Determines the locale (location) as an ISO 3166 country code
+     *
+     * @return the locale
+     */
+    public String getLocale() {
+<span class="nc" id="L266">        return locale;</span>
+    }
+
+    /**
+     * Formats a number as a String with a fixed number of decimal places
+     *
+     * @param number        the number
+     * @param decimalPlaces decimals
+     * @return formatted string
+     */
+    public String format(double number, int decimalPlaces) {
+<span class="nc bnc" id="L277" title="All 2 branches missed.">        if (decimalPlaces == 0) {</span>
+<span class="nc" id="L278">            return format((double) ((long) number));</span>
+        }
+
+<span class="nc" id="L281">        double pos = 10;</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">        for (int iter = 1; iter &lt; decimalPlaces; iter++) {</span>
+<span class="nc" id="L283">            pos *= 10;</span>
+        }
+<span class="nc" id="L285">        long ln = Math.round(number * pos);</span>
+<span class="nc" id="L286">        number = ((double) ln) / pos;</span>
+<span class="nc" id="L287">        return format(number);</span>
+    }
+
+    /**
+     * Parses a double based on locale conventions
+     *
+     * @param localeFormattedDecimal the locale formatted number
+     * @return the parsed double
+     */
+    public double parseDouble(String localeFormattedDecimal) {
+<span class="nc" id="L297">        return Double.parseDouble(localeFormattedDecimal);</span>
+    }
+
+    /**
+     * Parses a long based on locale conventions
+     *
+     * @param localeFormattedLong the number
+     * @return a long
+     */
+    public long parseLong(String localeFormattedLong) {
+<span class="nc" id="L307">        return Long.parseLong(localeFormattedLong);</span>
+    }
+
+    /**
+     * Parses an integer based on locale conventions
+     *
+     * @param localeFormattedInteger the number
+     * @return a parsed number
+     */
+    public int parseInt(String localeFormattedInteger) {
+<span class="nc" id="L317">        return Integer.parseInt(localeFormattedInteger);</span>
+    }
+
+    /**
+     * Parses the currency value
+     *
+     * @param amount the amount
+     * @return a numeric value for the currency
+     */
+    public double parseCurrency(String amount) {
+<span class="nc" id="L327">        StringBuilder b = new StringBuilder();</span>
+<span class="nc" id="L328">        int l = amount.length();</span>
+<span class="nc bnc" id="L329" title="All 2 branches missed.">        for (int iter = 0; iter &lt; l; iter++) {</span>
+<span class="nc" id="L330">            char c = amount.charAt(iter);</span>
+<span class="nc bnc" id="L331" title="All 8 branches missed.">            if (Character.isDigit(c) || c == '.' || c == ',' || c == '-') {</span>
+<span class="nc" id="L332">                b.append(c);</span>
+            }
+        }
+<span class="nc" id="L335">        return parseDouble(b.toString());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

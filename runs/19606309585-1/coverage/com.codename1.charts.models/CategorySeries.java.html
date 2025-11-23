@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CategorySeries.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.models</a> &gt; <span class="el_source">CategorySeries.java</span></div><h1>CategorySeries.java</h1><pre class="source lang-java linenums">/**
+ * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.codename1.charts.models;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * A series for the category charts like the pie ones.
+ */
+public class CategorySeries {
+    /** The series title. */
+    private final String mTitle;
+    /** The series categories. */
+<span class="fc" id="L28">    private final List&lt;String&gt; mCategories = new ArrayList&lt;String&gt;();</span>
+    /** The series values. */
+<span class="fc" id="L30">    private final List&lt;Double&gt; mValues = new ArrayList&lt;Double&gt;();</span>
+
+    /**
+     * Builds a new category series.
+     *
+     * @param title the series title
+     */
+<span class="fc" id="L37">    public CategorySeries(String title) {</span>
+<span class="fc" id="L38">        mTitle = title;</span>
+<span class="fc" id="L39">    }</span>
+
+    /**
+     * Returns the series title.
+     *
+     * @return the series title
+     */
+    public String getTitle() {
+<span class="fc" id="L47">        return mTitle;</span>
+    }
+
+    /**
+     * Adds a new value to the series
+     *
+     * @param value the new value
+     */
+    public synchronized void add(double value) {
+<span class="nc" id="L56">        add(mCategories.size() + &quot;&quot;, value);</span>
+<span class="nc" id="L57">    }</span>
+
+    /**
+     * Adds a new value to the series.
+     *
+     * @param category the category
+     * @param value the new value
+     */
+    public synchronized void add(String category, double value) {
+<span class="fc" id="L66">        mCategories.add(category);</span>
+<span class="fc" id="L67">        mValues.add(value);</span>
+<span class="fc" id="L68">    }</span>
+
+    /**
+     * Replaces the value at the specific index in the series.
+     *
+     * @param index the index in the series
+     * @param category the category
+     * @param value the new value
+     */
+    public synchronized void set(int index, String category, double value) {
+<span class="nc" id="L78">        mCategories.set(index, category);</span>
+<span class="nc" id="L79">        mValues.set(index, value);</span>
+<span class="nc" id="L80">    }</span>
+
+    /**
+     * Removes an existing value from the series.
+     *
+     * @param index the index in the series of the value to remove
+     */
+    public synchronized void remove(int index) {
+<span class="nc" id="L88">        mCategories.remove(index);</span>
+<span class="nc" id="L89">        mValues.remove(index);</span>
+<span class="nc" id="L90">    }</span>
+
+    /**
+     * Removes all the existing values from the series.
+     */
+    public synchronized void clear() {
+<span class="nc" id="L96">        mCategories.clear();</span>
+<span class="nc" id="L97">        mValues.clear();</span>
+<span class="nc" id="L98">    }</span>
+
+    /**
+     * Returns the value at the specified index.
+     *
+     * @param index the index
+     * @return the value at the index
+     */
+    public synchronized double getValue(int index) {
+<span class="fc" id="L107">        return mValues.get(index);</span>
+    }
+
+    /**
+     * Returns the category name at the specified index.
+     *
+     * @param index the index
+     * @return the category name at the index
+     */
+    public synchronized String getCategory(int index) {
+<span class="fc" id="L117">        return mCategories.get(index);</span>
+    }
+
+    /**
+     * Returns the series item count.
+     *
+     * @return the series item count
+     */
+    public synchronized int getItemCount() {
+<span class="fc" id="L126">        return mCategories.size();</span>
+    }
+
+    /**
+     * Transforms the category series to an XY series.
+     *
+     * @return the XY series
+     */
+    public XYSeries toXYSeries() {
+<span class="nc" id="L135">        XYSeries xySeries = new XYSeries(mTitle);</span>
+<span class="nc" id="L136">        int k = 0;</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        for (double value : mValues) {</span>
+<span class="nc" id="L138">            xySeries.add(++k, value);</span>
+<span class="nc" id="L139">        }</span>
+<span class="nc" id="L140">        return xySeries;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,453 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AnimationObject.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.animations</a> &gt; <span class="el_source">AnimationObject.java</span></div><h1>AnimationObject.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.ui.animations;
+
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.util.Resources;
+
+/**
+ * An animation object is an element within the timeline that has a visibility state
+ * for rendering at a given point in time. E.g. the object can be queried of its position
+ * and render itself for any time.
+ *
+ * @author Shai Almog
+ */
+public final class AnimationObject {
+    /**
+     * Used to define the motion type used when manipulating an animation property
+     */
+    public static final int MOTION_TYPE_SPLINE = 2;
+
+    /**
+     * Used to define the motion type used when manipulating an animation property
+     */
+    public static final int MOTION_TYPE_LINEAR = 1;
+
+    // these are package protected for the resource editor
+    String imageName;
+    Resources res;
+    Image img;
+    Image[] frames;
+    Motion motionX;
+    Motion motionY;
+    Motion orientation;
+    Motion width;
+    Motion height;
+    Motion opacity;
+    int frameWidth;
+    int frameHeight;
+<span class="nc" id="L62">    int frameDelay = -1;</span>
+<span class="nc" id="L63">    private boolean framesInitialized = true;</span>
+<span class="nc" id="L64">    private int startTime = -1;</span>
+<span class="nc" id="L65">    private int endTime = -1;</span>
+
+<span class="nc" id="L67">    private AnimationObject() {</span>
+<span class="nc" id="L68">    }</span>
+
+    /**
+     * Creates an animation object instance that can define the animation properties for an image
+     *
+     * @param img the image to animate within the timeline
+     * @param x   position of the animation
+     * @param y   position of the animation
+     * @return new animation object
+     */
+    public static AnimationObject createAnimationImage(Image img, int x, int y) {
+<span class="nc" id="L79">        AnimationObject o = new AnimationObject();</span>
+<span class="nc" id="L80">        o.img = img;</span>
+<span class="nc" id="L81">        o.motionX = Motion.createLinearMotion(x, x, 1);</span>
+<span class="nc" id="L82">        o.motionX.setStartTime(Long.MAX_VALUE);</span>
+<span class="nc" id="L83">        o.motionY = Motion.createLinearMotion(y, y, 1);</span>
+<span class="nc" id="L84">        o.motionY.setStartTime(Long.MAX_VALUE);</span>
+<span class="nc" id="L85">        return o;</span>
+    }
+
+    /**
+     * Creates an animation object instance that can define the animation properties for an image.
+     * This version of the method is useful while a resource file is in the process of being loaded
+     * and not all images are in place. Loading will finish implicitly when the image is first used.
+     *
+     * @param imageName the image to animate within the timeline
+     * @param res       the resources file from which the image should be fetched.
+     * @param x         position of the animation
+     * @param y         position of the animation
+     * @return new animation object
+     */
+    public static AnimationObject createAnimationImage(String imageName, Resources res, int x, int y) {
+<span class="nc" id="L100">        AnimationObject o = new AnimationObject();</span>
+<span class="nc" id="L101">        o.imageName = imageName;</span>
+<span class="nc" id="L102">        o.res = res;</span>
+<span class="nc" id="L103">        o.motionX = Motion.createLinearMotion(x, x, 1);</span>
+<span class="nc" id="L104">        o.motionX.setStartTime(Long.MAX_VALUE);</span>
+<span class="nc" id="L105">        o.motionY = Motion.createLinearMotion(y, y, 1);</span>
+<span class="nc" id="L106">        o.motionY.setStartTime(Long.MAX_VALUE);</span>
+<span class="nc" id="L107">        return o;</span>
+    }
+
+    /**
+     * Creates a copy of the given animation object
+     *
+     * @return a new instance of the Animation object with the same state
+     */
+    public AnimationObject copy() {
+<span class="nc" id="L116">        AnimationObject o = new AnimationObject();</span>
+<span class="nc" id="L117">        o.imageName = imageName;</span>
+<span class="nc" id="L118">        o.res = res;</span>
+<span class="nc" id="L119">        o.img = img;</span>
+<span class="nc" id="L120">        o.frames = frames;</span>
+<span class="nc" id="L121">        o.motionX = motionX;</span>
+<span class="nc" id="L122">        o.motionY = motionY;</span>
+<span class="nc" id="L123">        o.orientation = orientation;</span>
+<span class="nc" id="L124">        o.width = width;</span>
+<span class="nc" id="L125">        o.height = height;</span>
+<span class="nc" id="L126">        o.opacity = opacity;</span>
+<span class="nc" id="L127">        o.frameWidth = frameWidth;</span>
+<span class="nc" id="L128">        o.frameHeight = frameHeight;</span>
+<span class="nc" id="L129">        o.frameDelay = frameDelay;</span>
+<span class="nc" id="L130">        o.framesInitialized = framesInitialized;</span>
+<span class="nc" id="L131">        o.startTime = startTime;</span>
+<span class="nc" id="L132">        o.endTime = endTime;</span>
+<span class="nc" id="L133">        return o;</span>
+    }
+
+    void lock() {
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if (img != null) {</span>
+<span class="nc" id="L138">            img.lock();</span>
+        }
+<span class="nc" id="L140">    }</span>
+
+    void unlock() {
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (img != null) {</span>
+<span class="nc" id="L144">            img.unlock();</span>
+        }
+<span class="nc" id="L146">    }</span>
+
+    /**
+     * Defines the frames of the animation if this is a frame changing animation (e.g.
+     * a sprite of a walking person).
+     * Notice that this method must not be invoked more than once or after the image
+     * was initilized
+     *
+     * @param frameWidth  the width of the frame within the image object
+     * @param frameHeight the height of the frame within the image object
+     * @param frameDelay  the delay of the frame
+     */
+    public void defineFrames(int frameWidth, int frameHeight, int frameDelay) {
+<span class="nc" id="L159">        this.frameWidth = frameWidth;</span>
+<span class="nc" id="L160">        this.frameHeight = frameHeight;</span>
+<span class="nc" id="L161">        this.frameDelay = frameDelay;</span>
+<span class="nc" id="L162">        framesInitialized = false;</span>
+<span class="nc" id="L163">    }</span>
+
+    /**
+     * @return the img
+     */
+    Image getImage() {
+<span class="nc bnc" id="L169" title="All 4 branches missed.">        if (img == null &amp;&amp; res != null) {</span>
+<span class="nc" id="L170">            img = res.getImage(imageName);</span>
+
+            // can happen due to a race condition we try to fail &quot;gracefully&quot;
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            if (img == null) {</span>
+<span class="nc" id="L174">                return null;</span>
+            }
+<span class="nc" id="L176">            res = null;</span>
+        }
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (frameDelay &gt; -1) {</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">            if (!framesInitialized) {</span>
+                // break up the image to smaller images
+<span class="nc" id="L181">                frames = new Image[img.getWidth() / frameWidth * img.getHeight() / frameHeight];</span>
+<span class="nc" id="L182">                int currentX = 0;</span>
+<span class="nc" id="L183">                int currentY = 0;</span>
+<span class="nc" id="L184">                int flen = frames.length;</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">                for (int iter = 0; iter &lt; flen; iter++) {</span>
+<span class="nc" id="L186">                    frames[iter] = img.subImage(currentX, currentY, frameWidth, frameHeight, true);</span>
+<span class="nc" id="L187">                    currentX += frameWidth;</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">                    if (currentX + frameWidth &gt; img.getWidth()) {</span>
+<span class="nc" id="L189">                        currentX = 0;</span>
+<span class="nc" id="L190">                        currentY += frameHeight;</span>
+                    }
+                }
+                // if we are on a device we no longer need the img from now on and can use 
+                // only the frames. However, in the resource editor we still need the image instance
+                // for internal references
+<span class="nc bnc" id="L196" title="All 2 branches missed.">                if (System.getProperty(&quot;microedition.platform&quot;) != null) {</span>
+<span class="nc" id="L197">                    img = null;</span>
+                }
+            }
+<span class="nc" id="L200">            long time = motionX.getCurrentMotionTime();</span>
+<span class="nc" id="L201">            int frameCount = Math.max(1, frames.length);</span>
+<span class="nc" id="L202">            int frame = Math.min(Math.max(0, (int) ((time / Math.max(1, frameDelay)) % frameCount)), frameCount - 1);</span>
+<span class="nc" id="L203">            return frames[frame];</span>
+        }
+<span class="nc" id="L205">        return img;</span>
+    }
+
+    private void setTimeNotNull(Motion m, int time) {
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        if (m != null) {</span>
+<span class="nc" id="L210">            m.setCurrentMotionTime(time);</span>
+        }
+<span class="nc" id="L212">    }</span>
+
+    void setTime(int time) {
+<span class="nc" id="L215">        motionX.setCurrentMotionTime(time);</span>
+<span class="nc" id="L216">        motionY.setCurrentMotionTime(time);</span>
+<span class="nc" id="L217">        setTimeNotNull(orientation, time);</span>
+<span class="nc" id="L218">        setTimeNotNull(width, time);</span>
+<span class="nc" id="L219">        setTimeNotNull(height, time);</span>
+<span class="nc" id="L220">        setTimeNotNull(opacity, time);</span>
+<span class="nc" id="L221">    }</span>
+
+    /**
+     * Defines a motion on the x axis starting at the given time/value and ending at the given position
+     *
+     * @param motionType the type of the motion (spline/linear)
+     * @param startTime  the start time for the motion within the timeline timeframe
+     * @param duration   the duration of the motion
+     * @param start      the starting position (the value before startTime)
+     * @param end        the ending position for the property (the value after endTime)
+     */
+    public void defineMotionX(int motionType, int startTime, int duration, int start, int end) {
+<span class="nc" id="L233">        motionX = createMotion(motionType, startTime, duration, start, end);</span>
+<span class="nc" id="L234">    }</span>
+
+
+    /**
+     * Defines a motion on the y axis starting at the given time/value and ending at the given position
+     *
+     * @param motionType the type of the motion (spline/linear)
+     * @param startTime  the start time for the motion within the timeline timeframe
+     * @param duration   the duration of the motion
+     * @param start      the starting position (the value before startTime)
+     * @param end        the ending position for the property (the value after endTime)
+     */
+    public void defineMotionY(int motionType, int startTime, int duration, int start, int end) {
+<span class="nc" id="L247">        motionY = createMotion(motionType, startTime, duration, start, end);</span>
+<span class="nc" id="L248">    }</span>
+
+
+    /**
+     * Defines a rotation animation starting at the given time/value and ending at the given position
+     *
+     * @param motionType the type of the motion (spline/linear)
+     * @param startTime  the start time for the motion within the timeline timeframe
+     * @param duration   the duration of the motion
+     * @param start      the starting position (the value before startTime)
+     * @param end        the ending position for the property (the value after endTime)
+     */
+    public void defineOrientation(int motionType, int startTime, int duration, int start, int end) {
+<span class="nc" id="L261">        orientation = createMotion(motionType, startTime, duration, start, end);</span>
+<span class="nc" id="L262">    }</span>
+
+
+    /**
+     * Defines opacity (translucency) starting at the given time/value and ending at the given position.
+     * Values should rance from 0 (transparent) to 255 (opaque).
+     *
+     * @param motionType the type of the motion (spline/linear)
+     * @param startTime  the start time for the motion within the timeline timeframe
+     * @param duration   the duration of the motion
+     * @param start      the starting position (the value before startTime)
+     * @param end        the ending position for the property (the value after endTime)
+     */
+    public void defineOpacity(int motionType, int startTime, int duration, int start, int end) {
+<span class="nc" id="L276">        opacity = createMotion(motionType, startTime, duration, start, end);</span>
+<span class="nc" id="L277">    }</span>
+
+
+    /**
+     * Defines the width of the object starting at the given time/value and ending at the given position
+     *
+     * @param motionType the type of the motion (spline/linear)
+     * @param startTime  the start time for the motion within the timeline timeframe
+     * @param duration   the duration of the motion
+     * @param start      the starting position (the value before startTime)
+     * @param end        the ending position for the property (the value after endTime)
+     */
+    public void defineWidth(int motionType, int startTime, int duration, int start, int end) {
+<span class="nc" id="L290">        width = createMotion(motionType, startTime, duration, start, end);</span>
+<span class="nc" id="L291">    }</span>
+
+
+    /**
+     * Defines the height of the object starting at the given time/value and ending at the given position
+     *
+     * @param motionType the type of the motion (spline/linear)
+     * @param startTime  the start time for the motion within the timeline timeframe
+     * @param duration   the duration of the motion
+     * @param start      the starting position (the value before startTime)
+     * @param end        the ending position for the property (the value after endTime)
+     */
+    public void defineHeight(int motionType, int startTime, int duration, int start, int end) {
+<span class="nc" id="L304">        height = createMotion(motionType, startTime, duration, start, end);</span>
+<span class="nc" id="L305">    }</span>
+
+
+    private Motion createMotion(int motionType, int startTime, int duration, int start, int end) {
+        Motion m;
+<span class="nc bnc" id="L310" title="All 3 branches missed.">        switch (motionType) {</span>
+            case MOTION_TYPE_LINEAR:
+<span class="nc" id="L312">                m = Motion.createLinearMotion(start, end, startTime + duration);</span>
+<span class="nc" id="L313">                break;</span>
+            case MOTION_TYPE_SPLINE:
+<span class="nc" id="L315">                m = Motion.createSplineMotion(start, end, startTime + duration);</span>
+<span class="nc" id="L316">                break;</span>
+            default:
+<span class="nc" id="L318">                throw new IllegalArgumentException(&quot;Motion type: &quot; + motionType);</span>
+        }
+<span class="nc" id="L320">        m.setStartTime(startTime);</span>
+<span class="nc" id="L321">        return m;</span>
+    }
+
+    int getX() {
+<span class="nc" id="L325">        return motionX.getValue();</span>
+    }
+
+    /**
+     * @return the motionY
+     */
+    int getY() {
+<span class="nc" id="L332">        return motionY.getValue();</span>
+    }
+
+    /**
+     * @return the orientation
+     */
+    int getOrientation() {
+<span class="nc bnc" id="L339" title="All 2 branches missed.">        if (orientation == null) {</span>
+<span class="nc" id="L340">            return 0;</span>
+        }
+<span class="nc" id="L342">        return orientation.getValue();</span>
+    }
+
+    /**
+     * @return the width
+     */
+    int getWidth() {
+<span class="nc bnc" id="L349" title="All 2 branches missed.">        if (width == null) {</span>
+<span class="nc bnc" id="L350" title="All 2 branches missed.">            if (getImage() != null) {</span>
+<span class="nc" id="L351">                return getImage().getWidth();</span>
+            }
+<span class="nc" id="L353">            return 20;</span>
+        }
+<span class="nc" id="L355">        return width.getValue();</span>
+    }
+
+    /**
+     * @return the height
+     */
+    int getHeight() {
+<span class="nc bnc" id="L362" title="All 2 branches missed.">        if (height == null) {</span>
+<span class="nc bnc" id="L363" title="All 2 branches missed.">            if (getImage() != null) {</span>
+<span class="nc" id="L364">                return getImage().getHeight();</span>
+            }
+<span class="nc" id="L366">            return 20;</span>
+        }
+<span class="nc" id="L368">        return height.getValue();</span>
+    }
+
+    /**
+     * @return the opacity
+     */
+    int getOpacity() {
+<span class="nc bnc" id="L375" title="All 2 branches missed.">        if (opacity == null) {</span>
+<span class="nc" id="L376">            return 255;</span>
+        }
+<span class="nc" id="L378">        return opacity.getValue();</span>
+    }
+
+    void draw(Graphics g, float scaleX, float scaleY) {
+<span class="nc" id="L382">        int o = getOpacity();</span>
+<span class="nc bnc" id="L383" title="All 2 branches missed.">        if (o == 0) {</span>
+<span class="nc" id="L384">            return;</span>
+        }
+<span class="nc" id="L386">        Image i = getImage();</span>
+
+        // this can happen due to a race condition, mostly in the resource editor which
+        // works in a separate thread
+<span class="nc bnc" id="L390" title="All 2 branches missed.">        if (i == null) {</span>
+<span class="nc" id="L391">            return;</span>
+        }
+<span class="nc" id="L393">        int scaledImageW = (int) (getWidth() * scaleX);</span>
+<span class="nc" id="L394">        int scaledImageH = (int) (getHeight() * scaleY);</span>
+<span class="nc bnc" id="L395" title="All 4 branches missed.">        if (scaledImageH &lt; 1 || scaledImageW &lt; 1) {</span>
+<span class="nc" id="L396">            return;</span>
+        }
+<span class="nc" id="L398">        i = getImage().scaled(scaledImageW, scaledImageH);</span>
+<span class="nc bnc" id="L399" title="All 2 branches missed.">        if (o != 255) {</span>
+<span class="nc" id="L400">            i = i.modifyAlphaWithTranslucency((byte) o);</span>
+        }
+<span class="nc" id="L402">        int r = getOrientation();</span>
+<span class="nc bnc" id="L403" title="All 2 branches missed.">        if (r != 0) {</span>
+<span class="nc" id="L404">            i = i.rotate(r);</span>
+        }
+<span class="nc" id="L406">        int x = getX();</span>
+<span class="nc" id="L407">        int y = getY();</span>
+<span class="nc" id="L408">        x = (int) (x * scaleX);</span>
+<span class="nc" id="L409">        y = (int) (y * scaleY);</span>
+<span class="nc" id="L410">        g.drawImage(i, x, y);</span>
+<span class="nc" id="L411">    }</span>
+
+    /**
+     * The start time of the animation determines when we start actually drawing
+     * the animation object. -1 means the duration of the entire animation.
+     *
+     * @return the startTime in timeline time
+     */
+    public int getStartTime() {
+<span class="nc" id="L420">        return startTime;</span>
+    }
+
+    /**
+     * The start time of the animation determines when we start actually drawing
+     * the animation object. -1 means the duration of the entire animation.
+     *
+     * @param startTime the startTime to set
+     */
+    public void setStartTime(int startTime) {
+<span class="nc" id="L430">        this.startTime = startTime;</span>
+<span class="nc" id="L431">    }</span>
+
+    /**
+     * The end time of the animation determines when we finish actually drawing
+     * the animation object. -1 means the duration of the entire animation.
+     *
+     * @return the endTime in timeline time
+     */
+    public int getEndTime() {
+<span class="nc" id="L440">        return endTime;</span>
+    }
+
+    /**
+     * The end time of the animation determines when we finish actually drawing
+     * the animation object. -1 means the duration of the entire animation.
+     *
+     * @param endTime the endTime to set
+     */
+    public void setEndTime(int endTime) {
+<span class="nc" id="L450">        this.endTime = endTime;</span>
+<span class="nc" id="L451">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

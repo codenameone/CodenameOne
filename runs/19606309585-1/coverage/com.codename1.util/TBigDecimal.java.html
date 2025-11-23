@@ -1,0 +1,2912 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TBigDecimal.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">TBigDecimal.java</span></div><h1>TBigDecimal.java</h1><pre class="source lang-java linenums">/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the &quot;License&quot;); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package com.codename1.util;
+
+
+/**
+ * This class represents immutable arbitrary precision decimal numbers. Each
+ * {@code BigDecimal} instance is represented with a unscaled arbitrary
+ * precision mantissa (the unscaled value) and a scale. The value of the {@code
+ * BigDecimal} is {@code unscaledValue} 10^(-{@code scale}).
+ */
+class TBigDecimal {
+
+    /**
+     * The constant zero as a {@code BigDecimal}.
+     */
+<span class="fc" id="L32">    public static final TBigDecimal ZERO = new TBigDecimal(0, 0);</span>
+
+    /**
+     * The constant one as a {@code BigDecimal}.
+     */
+<span class="fc" id="L37">    public static final TBigDecimal ONE = new TBigDecimal(1, 0);</span>
+
+    /**
+     * The constant ten as a {@code BigDecimal}.
+     */
+<span class="fc" id="L42">    public static final TBigDecimal TEN = new TBigDecimal(10, 0);</span>
+
+    /**
+     * Rounding mode where positive values are rounded towards positive infinity
+     * and negative values towards negative infinity.
+     *
+     * @see TRoundingMode#UP
+     */
+    public static final int ROUND_UP = 0;
+
+    /**
+     * Rounding mode where the values are rounded towards zero.
+     *
+     * @see TRoundingMode#DOWN
+     */
+    public static final int ROUND_DOWN = 1;
+
+    /**
+     * Rounding mode to round towards positive infinity. For positive values
+     * this rounding mode behaves as {@link #ROUND_UP}, for negative values as
+     * {@link #ROUND_DOWN}.
+     *
+     * @see TRoundingMode#CEILING
+     */
+    public static final int ROUND_CEILING = 2;
+
+    /**
+     * Rounding mode to round towards negative infinity. For positive values
+     * this rounding mode behaves as {@link #ROUND_DOWN}, for negative values as
+     * {@link #ROUND_UP}.
+     *
+     * @see TRoundingMode#FLOOR
+     */
+    public static final int ROUND_FLOOR = 3;
+
+    /**
+     * Rounding mode where values are rounded towards the nearest neighbor.
+     * Ties are broken by rounding up.
+     *
+     * @see TRoundingMode#HALF_UP
+     */
+    public static final int ROUND_HALF_UP = 4;
+
+    /**
+     * Rounding mode where values are rounded towards the nearest neighbor.
+     * Ties are broken by rounding down.
+     *
+     * @see TRoundingMode#HALF_DOWN
+     */
+    public static final int ROUND_HALF_DOWN = 5;
+
+    /**
+     * Rounding mode where values are rounded towards the nearest neighbor.
+     * Ties are broken by rounding to the even neighbor.
+     *
+     * @see TRoundingMode#HALF_EVEN
+     */
+    public static final int ROUND_HALF_EVEN = 6;
+
+    /**
+     * Rounding mode where the rounding operations throws an {@code
+     * ArithmeticException} for the case that rounding is necessary, i.e. for
+     * the case that the value cannot be represented exactly.
+     *
+     * @see TRoundingMode#UNNECESSARY
+     */
+    public static final int ROUND_UNNECESSARY = 7;
+
+    /**
+     * This is the serialVersionUID used by the sun implementation.
+     */
+    private static final long serialVersionUID = 6108874887143696463L;
+
+    /**
+     * The double closer to &lt;code&gt;Log10(2)&lt;/code&gt;.
+     */
+    private static final double LOG10_2 = 0.3010299956639812;
+    /**
+     * An array with powers of five that fit in the type &lt;code&gt;long&lt;/code&gt;
+     * (&lt;code&gt;5^0,5^1,...,5^27&lt;/code&gt;).
+     */
+    private static final TBigInteger[] FIVE_POW;
+    /**
+     * An array with powers of ten that fit in the type &lt;code&gt;long&lt;/code&gt;
+     * (&lt;code&gt;10^0,10^1,...,10^18&lt;/code&gt;).
+     */
+    private static final TBigInteger[] TEN_POW;
+    /**
+     * An array with powers of ten that fit in the type &lt;code&gt;long&lt;/code&gt;
+     * (&lt;code&gt;10^0,10^1,...,10^18&lt;/code&gt;).
+     */
+<span class="fc" id="L133">    private static final long[] LONG_TEN_POW = new long[]</span>
+            {1L,
+                    10L,
+                    100L,
+                    1000L,
+                    10000L,
+                    100000L,
+                    1000000L,
+                    10000000L,
+                    100000000L,
+                    1000000000L,
+                    10000000000L,
+                    100000000000L,
+                    1000000000000L,
+                    10000000000000L,
+                    100000000000000L,
+                    1000000000000000L,
+                    10000000000000000L,
+                    100000000000000000L,
+                    1000000000000000000L,};
+<span class="fc" id="L153">    private static final long[] LONG_FIVE_POW = new long[]</span>
+            {1L,
+                    5L,
+                    25L,
+                    125L,
+                    625L,
+                    3125L,
+                    15625L,
+                    78125L,
+                    390625L,
+                    1953125L,
+                    9765625L,
+                    48828125L,
+                    244140625L,
+                    1220703125L,
+                    6103515625L,
+                    30517578125L,
+                    152587890625L,
+                    762939453125L,
+                    3814697265625L,
+                    19073486328125L,
+                    95367431640625L,
+                    476837158203125L,
+                    2384185791015625L,
+                    11920928955078125L,
+                    59604644775390625L,
+                    298023223876953125L,
+                    1490116119384765625L,
+                    7450580596923828125L,};
+<span class="fc" id="L182">    private static final int[] LONG_FIVE_POW_BIT_LENGTH = new int[LONG_FIVE_POW.length];</span>
+<span class="fc" id="L183">    private static final int[] LONG_TEN_POW_BIT_LENGTH = new int[LONG_TEN_POW.length];</span>
+    private static final int BI_SCALED_BY_ZERO_LENGTH = 11;
+    /**
+     * An array with the first &lt;code&gt;BigInteger&lt;/code&gt; scaled by zero.
+     * (&lt;code&gt;[0,0],[1,0],...,[10,0]&lt;/code&gt;).
+     */
+<span class="fc" id="L189">    private static final TBigDecimal[] BI_SCALED_BY_ZERO = new TBigDecimal[BI_SCALED_BY_ZERO_LENGTH];</span>
+    /**
+     * An array with the zero number scaled by the first positive scales.
+     * (&lt;code&gt;0*10^0, 0*10^1, ..., 0*10^10&lt;/code&gt;).
+     */
+<span class="fc" id="L194">    private static final TBigDecimal[] ZERO_SCALED_BY = new TBigDecimal[11];</span>
+    /**
+     * An array filled with characters &lt;code&gt;'0'&lt;/code&gt;.
+     */
+<span class="fc" id="L198">    private static final char[] CH_ZEROS = new char[100];</span>
+
+    static {
+        // To fill all static arrays.
+<span class="fc" id="L202">        int i = 0;</span>
+
+<span class="fc bfc" id="L204" title="All 2 branches covered.">        for (; i &lt; ZERO_SCALED_BY.length; i++) {</span>
+<span class="fc" id="L205">            BI_SCALED_BY_ZERO[i] = new TBigDecimal(i, 0);</span>
+<span class="fc" id="L206">            ZERO_SCALED_BY[i] = new TBigDecimal(0, i);</span>
+<span class="fc" id="L207">            CH_ZEROS[i] = '0';</span>
+        }
+
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        for (; i &lt; CH_ZEROS.length; i++) {</span>
+<span class="fc" id="L211">            CH_ZEROS[i] = '0';</span>
+        }
+<span class="fc bfc" id="L213" title="All 2 branches covered.">        for (int j = 0; j &lt; LONG_FIVE_POW_BIT_LENGTH.length; j++) {</span>
+<span class="fc" id="L214">            LONG_FIVE_POW_BIT_LENGTH[j] = bitLength(LONG_FIVE_POW[j]);</span>
+        }
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        for (int j = 0; j &lt; LONG_TEN_POW_BIT_LENGTH.length; j++) {</span>
+<span class="fc" id="L217">            LONG_TEN_POW_BIT_LENGTH[j] = bitLength(LONG_TEN_POW[j]);</span>
+        }
+
+        // Taking the references of useful powers.
+<span class="fc" id="L221">        TEN_POW = TMultiplication.bigTenPows;</span>
+<span class="fc" id="L222">        FIVE_POW = TMultiplication.bigFivePows;</span>
+<span class="fc" id="L223">    }</span>
+
+    /**
+     * The &lt;code&gt;String&lt;/code&gt; representation is cached.
+     */
+<span class="pc" id="L228">    private transient String toStringImage = null;</span>
+    /**
+     * Cache for the hash code.
+     */
+<span class="pc" id="L232">    private transient int hashCode = 0;</span>
+    /**
+     * The arbitrary precision integer (unscaled value) in the internal
+     * representation of {@code BigDecimal}.
+     */
+    private TBigInteger intVal;
+
+    private transient int bitLength;
+
+    private transient long smallValue;
+
+    /**
+     * The 32-bit integer scale in the internal representation of {@code BigDecimal}.
+     */
+    private int scale;
+
+    /**
+     * Represent the number of decimal digits in the unscaled value. This
+     * precision is calculated the first time, and used in the following calls
+     * of method &lt;code&gt;precision()&lt;/code&gt;. Note that some call to the private
+     * method &lt;code&gt;inplaceRound()&lt;/code&gt; could update this field.
+     *
+     * @see #precision()
+     * @see #inplaceRound(TMathContext)
+     */
+<span class="pc" id="L257">    private transient int precision = 0;</span>
+
+<span class="fc" id="L259">    private TBigDecimal(long smallValue, int scale) {</span>
+<span class="fc" id="L260">        this.smallValue = smallValue;</span>
+<span class="fc" id="L261">        this.scale = scale;</span>
+<span class="fc" id="L262">        this.bitLength = bitLength(smallValue);</span>
+<span class="fc" id="L263">    }</span>
+
+<span class="fc" id="L265">    private TBigDecimal(int smallValue, int scale) {</span>
+<span class="fc" id="L266">        this.smallValue = smallValue;</span>
+<span class="fc" id="L267">        this.scale = scale;</span>
+<span class="fc" id="L268">        this.bitLength = bitLength(smallValue);</span>
+<span class="fc" id="L269">    }</span>
+
+    /**
+     * Constructs a new {@code BigDecimal} instance from a string representation
+     * given as a character array.
+     *
+     * @param in     array of characters containing the string representation of
+     *               this {@code BigDecimal}.
+     * @param offset first index to be copied.
+     * @param len    number of characters to be used.
+     * @throws NullPointerException  if {@code in == null}.
+     * @throws NumberFormatException if {@code offset &lt; 0} or {@code len &lt;= 0} or {@code
+     *                               offset+len-1 &lt; 0} or {@code offset+len-1 &gt;= in.length}.
+     * @throws NumberFormatException if in does not contain a valid string representation of a big
+     *                               decimal.
+     */
+<span class="fc" id="L285">    public TBigDecimal(char[] in, int offset, int len) {</span>
+<span class="fc" id="L286">        int begin = offset; // first index to be copied</span>
+<span class="fc" id="L287">        int last = offset + (len - 1); // last index to be copied</span>
+<span class="fc" id="L288">        String scaleString = null; // buffer for scale</span>
+        StringBuilder unscaledBuffer; // buffer for unscaled value
+        long newScale; // the new scale
+
+<span class="pc bpc" id="L292" title="1 of 2 branches missed.">        if (in == null) {</span>
+<span class="nc" id="L293">            throw new NullPointerException();</span>
+        }
+<span class="pc bpc" id="L295" title="4 of 8 branches missed.">        if ((last &gt;= in.length) || (offset &lt; 0) || (len &lt;= 0) || (last &lt; 0)) {</span>
+<span class="nc" id="L296">            throw new NumberFormatException();</span>
+        }
+<span class="fc" id="L298">        unscaledBuffer = new StringBuilder(len);</span>
+<span class="fc" id="L299">        int bufLength = 0;</span>
+        // To skip a possible '+' symbol
+<span class="pc bpc" id="L301" title="2 of 4 branches missed.">        if ((offset &lt;= last) &amp;&amp; (in[offset] == '+')) {</span>
+<span class="nc" id="L302">            offset++;</span>
+<span class="nc" id="L303">            begin++;</span>
+        }
+<span class="fc" id="L305">        int counter = 0;</span>
+<span class="fc" id="L306">        boolean wasNonZero = false;</span>
+        // Accumulating all digits until a possible decimal point
+        for (; (offset &lt;= last) &amp;&amp; (in[offset] != '.')
+<span class="pc bpc" id="L309" title="3 of 8 branches missed.">                &amp;&amp; (in[offset] != 'e') &amp;&amp; (in[offset] != 'E'); offset++) {</span>
+<span class="fc bfc" id="L310" title="All 2 branches covered.">            if (!wasNonZero) {</span>
+<span class="pc bpc" id="L311" title="1 of 2 branches missed.">                if (in[offset] == '0') {</span>
+<span class="nc" id="L312">                    counter++;</span>
+                } else {
+<span class="fc" id="L314">                    wasNonZero = true;</span>
+                }
+            }
+
+        }
+<span class="fc" id="L319">        unscaledBuffer.append(in, begin, offset - begin);</span>
+<span class="fc" id="L320">        bufLength += offset - begin;</span>
+        // A decimal point was found
+<span class="pc bpc" id="L322" title="2 of 4 branches missed.">        if ((offset &lt;= last) &amp;&amp; (in[offset] == '.')) {</span>
+<span class="fc" id="L323">            offset++;</span>
+            // Accumulating all digits until a possible exponent
+<span class="fc" id="L325">            begin = offset;</span>
+            for (; (offset &lt;= last) &amp;&amp; (in[offset] != 'e')
+<span class="pc bpc" id="L327" title="2 of 6 branches missed.">                    &amp;&amp; (in[offset] != 'E'); offset++) {</span>
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">                if (!wasNonZero) {</span>
+<span class="nc bnc" id="L329" title="All 2 branches missed.">                    if (in[offset] == '0') {</span>
+<span class="nc" id="L330">                        counter++;</span>
+                    } else {
+<span class="nc" id="L332">                        wasNonZero = true;</span>
+                    }
+                }
+            }
+<span class="fc" id="L336">            scale = offset - begin;</span>
+<span class="fc" id="L337">            bufLength += scale;</span>
+<span class="fc" id="L338">            unscaledBuffer.append(in, begin, scale);</span>
+        } else {
+<span class="nc" id="L340">            scale = 0;</span>
+        }
+        // An exponent was found
+<span class="pc bpc" id="L343" title="5 of 6 branches missed.">        if ((offset &lt;= last) &amp;&amp; ((in[offset] == 'e') || (in[offset] == 'E'))) {</span>
+<span class="nc" id="L344">            offset++;</span>
+            // Checking for a possible sign of scale
+<span class="nc" id="L346">            begin = offset;</span>
+<span class="nc bnc" id="L347" title="All 4 branches missed.">            if ((offset &lt;= last) &amp;&amp; (in[offset] == '+')) {</span>
+<span class="nc" id="L348">                offset++;</span>
+<span class="nc bnc" id="L349" title="All 4 branches missed.">                if ((offset &lt;= last) &amp;&amp; (in[offset] != '-')) {</span>
+<span class="nc" id="L350">                    begin++;</span>
+                }
+            }
+            // Accumulating all remaining digits
+<span class="nc" id="L354">            scaleString = String.valueOf(in, begin, last + 1 - begin);</span>
+            // Checking if the scale is defined
+<span class="nc" id="L356">            newScale = (long) scale - Integer.parseInt(scaleString);</span>
+<span class="nc" id="L357">            scale = (int) newScale;</span>
+<span class="nc bnc" id="L358" title="All 2 branches missed.">            if (newScale != scale) {</span>
+<span class="nc" id="L359">                throw new NumberFormatException(&quot;Scale out of range.&quot;);</span>
+            }
+        }
+        // Parsing the unscaled value
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">        if (bufLength &lt; 19) {</span>
+<span class="fc" id="L364">            smallValue = Long.parseLong(unscaledBuffer.toString());</span>
+<span class="fc" id="L365">            bitLength = bitLength(smallValue);</span>
+        } else {
+<span class="nc" id="L367">            setUnscaledValue(new TBigInteger(unscaledBuffer.toString()));</span>
+        }
+<span class="fc" id="L369">        precision = unscaledBuffer.length() - counter;</span>
+<span class="pc bpc" id="L370" title="1 of 2 branches missed.">        if (unscaledBuffer.charAt(0) == '-') {</span>
+<span class="nc" id="L371">            precision--;</span>
+        }
+<span class="fc" id="L373">    }</span>
+
+    /**
+     * Constructs a new {@code BigDecimal} instance from a string representation
+     * given as a character array.
+     *
+     * @param in     array of characters containing the string representation of
+     *               this {@code BigDecimal}.
+     * @param offset first index to be copied.
+     * @param len    number of characters to be used.
+     * @param mc     rounding mode and precision for the result of this operation.
+     * @throws NullPointerException  if {@code in == null}.
+     * @throws NumberFormatException if {@code offset &lt; 0} or {@code len &lt;= 0} or {@code
+     *                               offset+len-1 &lt; 0} or {@code offset+len-1 &gt;= in.length}.
+     * @throws NumberFormatException if {@code in} does not contain a valid string representation
+     *                               of a big decimal.
+     * @throws ArithmeticException   if {@code mc.precision &gt; 0} and {@code mc.roundingMode ==
+     *                               UNNECESSARY} and the new big decimal cannot be represented
+     *                               within the given precision without rounding.
+     */
+    public TBigDecimal(char[] in, int offset, int len, TMathContext mc) {
+<span class="nc" id="L394">        this(in, offset, len);</span>
+<span class="nc" id="L395">        inplaceRound(mc);</span>
+<span class="nc" id="L396">    }</span>
+
+    /**
+     * Constructs a new {@code BigDecimal} instance from a string representation
+     * given as a character array.
+     *
+     * @param in array of characters containing the string representation of
+     *           this {@code BigDecimal}.
+     * @throws NullPointerException  if {@code in == null}.
+     * @throws NumberFormatException if {@code in} does not contain a valid string representation
+     *                               of a big decimal.
+     */
+    public TBigDecimal(char[] in) {
+<span class="nc" id="L409">        this(in, 0, in.length);</span>
+<span class="nc" id="L410">    }</span>
+
+    /**
+     * Constructs a new {@code BigDecimal} instance from a string representation
+     * given as a character array. The result is rounded according to the
+     * specified math context.
+     *
+     * @param in array of characters containing the string representation of
+     *           this {@code BigDecimal}.
+     * @param mc rounding mode and precision for the result of this operation.
+     * @throws NullPointerException  if {@code in == null}.
+     * @throws NumberFormatException if {@code in} does not contain a valid string representation
+     *                               of a big decimal.
+     * @throws ArithmeticException   if {@code mc.precision &gt; 0} and {@code mc.roundingMode ==
+     *                               UNNECESSARY} and the new big decimal cannot be represented
+     *                               within the given precision without rounding.
+     */
+    public TBigDecimal(char[] in, TMathContext mc) {
+<span class="nc" id="L428">        this(in, 0, in.length);</span>
+<span class="nc" id="L429">        inplaceRound(mc);</span>
+<span class="nc" id="L430">    }</span>
+
+    /**
+     * Constructs a new {@code BigDecimal} instance from a string
+     * representation.
+     *
+     * @param val string containing the string representation of this {@code
+     *            BigDecimal}.
+     * @throws NumberFormatException if {@code val} does not contain a valid string representation
+     *                               of a big decimal.
+     */
+    public TBigDecimal(String val) {
+<span class="nc" id="L442">        this(val.toCharArray(), 0, val.length());</span>
+<span class="nc" id="L443">    }</span>
+
+    /**
+     * Constructs a new {@code BigDecimal} instance from a string
+     * representation. The result is rounded according to the specified math
+     * context.
+     *
+     * @param val string containing the string representation of this {@code
+     *            BigDecimal}.
+     * @param mc  rounding mode and precision for the result of this operation.
+     * @throws NumberFormatException if {@code val} does not contain a valid string representation
+     *                               of a big decimal.
+     * @throws ArithmeticException   if {@code mc.precision &gt; 0} and {@code mc.roundingMode ==
+     *                               UNNECESSARY} and the new big decimal cannot be represented
+     *                               within the given precision without rounding.
+     */
+    public TBigDecimal(String val, TMathContext mc) {
+<span class="fc" id="L460">        this(val.toCharArray(), 0, val.length());</span>
+<span class="fc" id="L461">        inplaceRound(mc);</span>
+<span class="fc" id="L462">    }</span>
+
+
+    /**
+     * Constructs a new {@code BigDecimal} instance from the 64bit double
+     * {@code val}. The constructed big decimal is equivalent to the given
+     * double. For example, {@code new BigDecimal(0.1)} is equal to {@code
+     * 0.1000000000000000055511151231257827021181583404541015625}. This happens
+     * as {@code 0.1} cannot be represented exactly in binary.
+     * &lt;p&gt;
+     * To generate a big decimal instance which is equivalent to {@code 0.1} use
+     * the {@code BigDecimal(String)} constructor.
+     *
+     * @param val double value to be converted to a {@code BigDecimal} instance.
+     * @throws NumberFormatException if {@code val} is infinity or not a number.
+     */
+<span class="nc" id="L478">    public TBigDecimal(double val) {</span>
+<span class="nc bnc" id="L479" title="All 4 branches missed.">        if (Double.isInfinite(val) || Double.isNaN(val)) {</span>
+<span class="nc" id="L480">            throw new NumberFormatException(&quot;Infinite or NaN&quot;);</span>
+        }
+<span class="nc" id="L482">        long bits = Double.doubleToLongBits(val); // IEEE-754</span>
+        long mantisa;
+        int trailingZeros;
+        // Extracting the exponent, note that the bias is 1023
+<span class="nc" id="L486">        scale = 1075 - (int) ((bits &gt;&gt; 52) &amp; 0x7FFL);</span>
+        // Extracting the 52 bits of the mantisa.
+<span class="nc bnc" id="L488" title="All 2 branches missed.">        mantisa = scale == 1075 ? (bits &amp; 0xFFFFFFFFFFFFFL) &lt;&lt; 1 : (bits &amp; 0xFFFFFFFFFFFFFL) | 0x10000000000000L;</span>
+<span class="nc bnc" id="L489" title="All 2 branches missed.">        if (mantisa == 0) {</span>
+<span class="nc" id="L490">            scale = 0;</span>
+<span class="nc" id="L491">            precision = 1;</span>
+        }
+        // To simplify all factors '2' in the mantisa
+<span class="nc bnc" id="L494" title="All 2 branches missed.">        if (scale &gt; 0) {</span>
+<span class="nc" id="L495">            trailingZeros = Math.min(scale, numberOfTrailingZeros(mantisa));</span>
+<span class="nc" id="L496">            mantisa &gt;&gt;&gt;= trailingZeros;</span>
+<span class="nc" id="L497">            scale -= trailingZeros;</span>
+        }
+        // Calculating the new unscaled value and the new scale
+<span class="nc bnc" id="L500" title="All 2 branches missed.">        if ((bits &gt;&gt; 63) != 0) {</span>
+<span class="nc" id="L501">            mantisa = -mantisa;</span>
+        }
+<span class="nc" id="L503">        int mantisaBits = bitLength(mantisa);</span>
+<span class="nc bnc" id="L504" title="All 2 branches missed.">        if (scale &lt; 0) {</span>
+<span class="nc bnc" id="L505" title="All 2 branches missed.">            bitLength = mantisaBits == 0 ? 0 : mantisaBits - scale;</span>
+<span class="nc bnc" id="L506" title="All 2 branches missed.">            if (bitLength &lt; 64) {</span>
+<span class="nc" id="L507">                smallValue = mantisa &lt;&lt; (-scale);</span>
+            } else {
+<span class="nc" id="L509">                intVal = TBigInteger.valueOf(mantisa).shiftLeft(-scale);</span>
+            }
+<span class="nc" id="L511">            scale = 0;</span>
+<span class="nc bnc" id="L512" title="All 2 branches missed.">        } else if (scale &gt; 0) {</span>
+            // m * 2^e =  (m * 5^(-e)) * 10^e
+<span class="nc bnc" id="L514" title="All 4 branches missed.">            if (scale &lt; LONG_FIVE_POW.length &amp;&amp; mantisaBits + LONG_FIVE_POW_BIT_LENGTH[scale] &lt; 64) {</span>
+<span class="nc" id="L515">                smallValue = mantisa * LONG_FIVE_POW[scale];</span>
+<span class="nc" id="L516">                bitLength = bitLength(smallValue);</span>
+            } else {
+<span class="nc" id="L518">                setUnscaledValue(TMultiplication.multiplyByFivePow(TBigInteger.valueOf(mantisa), scale));</span>
+            }
+        } else { // scale == 0
+<span class="nc" id="L521">            smallValue = mantisa;</span>
+<span class="nc" id="L522">            bitLength = mantisaBits;</span>
+        }
+<span class="nc" id="L524">    }</span>
+
+    /**
+     * Constructs a new {@code BigDecimal} instance from the 64bit double
+     * {@code val}. The constructed big decimal is equivalent to the given
+     * double. For example, {@code new BigDecimal(0.1)} is equal to {@code
+     * 0.1000000000000000055511151231257827021181583404541015625}. This happens
+     * as {@code 0.1} cannot be represented exactly in binary.
+     * &lt;p&gt;
+     * To generate a big decimal instance which is equivalent to {@code 0.1} use
+     * the {@code BigDecimal(String)} constructor.
+     *
+     * @param val double value to be converted to a {@code BigDecimal} instance.
+     * @param mc  rounding mode and precision for the result of this operation.
+     * @throws NumberFormatException if {@code val} is infinity or not a number.
+     * @throws ArithmeticException   if {@code mc.precision &gt; 0} and {@code mc.roundingMode ==
+     *                               UNNECESSARY} and the new big decimal cannot be represented
+     *                               within the given precision without rounding.
+     */
+    public TBigDecimal(double val, TMathContext mc) {
+<span class="nc" id="L544">        this(val);</span>
+<span class="nc" id="L545">        inplaceRound(mc);</span>
+<span class="nc" id="L546">    }</span>
+
+    /**
+     * Constructs a new {@code BigDecimal} instance from the given big integer
+     * {@code val}. The scale of the result is {@code 0}.
+     *
+     * @param val {@code BigInteger} value to be converted to a {@code
+     *            BigDecimal} instance.
+     */
+    public TBigDecimal(TBigInteger val) {
+<span class="fc" id="L556">        this(val, 0);</span>
+<span class="fc" id="L557">    }</span>
+
+
+    /**
+     * Constructs a new {@code BigDecimal} instance from the given big integer
+     * {@code val}. The scale of the result is {@code 0}.
+     *
+     * @param val {@code BigInteger} value to be converted to a {@code
+     *            BigDecimal} instance.
+     * @param mc  rounding mode and precision for the result of this operation.
+     * @throws ArithmeticException if {@code mc.precision &gt; 0} and {@code mc.roundingMode ==
+     *                             UNNECESSARY} and the new big decimal cannot be represented
+     *                             within the given precision without rounding.
+     */
+    public TBigDecimal(TBigInteger val, TMathContext mc) {
+<span class="nc" id="L572">        this(val);</span>
+<span class="nc" id="L573">        inplaceRound(mc);</span>
+<span class="nc" id="L574">    }</span>
+
+    /**
+     * Constructs a new {@code BigDecimal} instance from a given unscaled value
+     * {@code unscaledVal} and a given scale. The value of this instance is
+     * {@code unscaledVal} 10^(-{@code scale}).
+     *
+     * @param unscaledVal {@code BigInteger} representing the unscaled value of this
+     *                    {@code BigDecimal} instance.
+     * @param scale       scale of this {@code BigDecimal} instance.
+     * @throws NullPointerException if {@code unscaledVal == null}.
+     */
+<span class="fc" id="L586">    public TBigDecimal(TBigInteger unscaledVal, int scale) {</span>
+<span class="pc bpc" id="L587" title="1 of 2 branches missed.">        if (unscaledVal == null) {</span>
+<span class="nc" id="L588">            throw new NullPointerException();</span>
+        }
+<span class="fc" id="L590">        this.scale = scale;</span>
+<span class="fc" id="L591">        setUnscaledValue(unscaledVal);</span>
+<span class="fc" id="L592">    }</span>
+
+    /**
+     * Constructs a new {@code BigDecimal} instance from a given unscaled value
+     * {@code unscaledVal} and a given scale. The value of this instance is
+     * {@code unscaledVal} 10^(-{@code scale}). The result is rounded according
+     * to the specified math context.
+     *
+     * @param unscaledVal {@code BigInteger} representing the unscaled value of this
+     *                    {@code BigDecimal} instance.
+     * @param scale       scale of this {@code BigDecimal} instance.
+     * @param mc          rounding mode and precision for the result of this operation.
+     * @throws ArithmeticException  if {@code mc.precision &gt; 0} and {@code mc.roundingMode ==
+     *                              UNNECESSARY} and the new big decimal cannot be represented
+     *                              within the given precision without rounding.
+     * @throws NullPointerException if {@code unscaledVal == null}.
+     */
+    public TBigDecimal(TBigInteger unscaledVal, int scale, TMathContext mc) {
+<span class="fc" id="L610">        this(unscaledVal, scale);</span>
+<span class="fc" id="L611">        inplaceRound(mc);</span>
+<span class="fc" id="L612">    }</span>
+
+    /**
+     * Constructs a new {@code BigDecimal} instance from the given int
+     * {@code val}. The scale of the result is 0.
+     *
+     * @param val int value to be converted to a {@code BigDecimal} instance.
+     */
+    public TBigDecimal(int val) {
+<span class="nc" id="L621">        this(val, 0);</span>
+<span class="nc" id="L622">    }</span>
+
+    /**
+     * Constructs a new {@code BigDecimal} instance from the given int {@code
+     * val}. The scale of the result is {@code 0}. The result is rounded
+     * according to the specified math context.
+     *
+     * @param val int value to be converted to a {@code BigDecimal} instance.
+     * @param mc  rounding mode and precision for the result of this operation.
+     * @throws ArithmeticException if {@code mc.precision &gt; 0} and {@code c.roundingMode ==
+     *                             UNNECESSARY} and the new big decimal cannot be represented
+     *                             within the given precision without rounding.
+     */
+    public TBigDecimal(int val, TMathContext mc) {
+<span class="nc" id="L636">        this(val, 0);</span>
+<span class="nc" id="L637">        inplaceRound(mc);</span>
+<span class="nc" id="L638">    }</span>
+
+    /**
+     * Constructs a new {@code BigDecimal} instance from the given long {@code
+     * val}. The scale of the result is {@code 0}.
+     *
+     * @param val long value to be converted to a {@code BigDecimal} instance.
+     */
+    public TBigDecimal(long val) {
+<span class="nc" id="L647">        this(val, 0);</span>
+<span class="nc" id="L648">    }</span>
+
+    /**
+     * Constructs a new {@code BigDecimal} instance from the given long {@code
+     * val}. The scale of the result is {@code 0}. The result is rounded
+     * according to the specified math context.
+     *
+     * @param val long value to be converted to a {@code BigDecimal} instance.
+     * @param mc  rounding mode and precision for the result of this operation.
+     * @throws ArithmeticException if {@code mc.precision &gt; 0} and {@code mc.roundingMode ==
+     *                             UNNECESSARY} and the new big decimal cannot be represented
+     *                             within the given precision without rounding.
+     */
+    public TBigDecimal(long val, TMathContext mc) {
+<span class="nc" id="L662">        this(val);</span>
+<span class="nc" id="L663">        inplaceRound(mc);</span>
+<span class="nc" id="L664">    }</span>
+
+    /**
+     * &lt;p&gt;
+     * Determines the number of trailing zeros in the &lt;code&gt;long&lt;/code&gt; passed
+     * after the {@link #lowestOneBit(long) lowest one bit}.
+     * &lt;/p&gt;
+     *
+     * @param lng The &lt;code&gt;long&lt;/code&gt; to process.
+     * @return The number of trailing zeros.
+     * @since 1.5
+     */
+    static int numberOfTrailingZeros(long lng) {
+<span class="fc" id="L677">        return bitCount((lng &amp; -lng) - 1);</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Determines the number of leading zeros in the &lt;code&gt;long&lt;/code&gt; passed
+     * prior to the {@link #highestOneBit(long) highest one bit}.
+     * &lt;/p&gt;
+     *
+     * @param lng The &lt;code&gt;long&lt;/code&gt; to process.
+     * @return The number of leading zeros.
+     * @since 1.5
+     */
+    public static int numberOfLeadingZeros(long lng) {
+<span class="fc" id="L691">        lng |= lng &gt;&gt; 1;</span>
+<span class="fc" id="L692">        lng |= lng &gt;&gt; 2;</span>
+<span class="fc" id="L693">        lng |= lng &gt;&gt; 4;</span>
+<span class="fc" id="L694">        lng |= lng &gt;&gt; 8;</span>
+<span class="fc" id="L695">        lng |= lng &gt;&gt; 16;</span>
+<span class="fc" id="L696">        lng |= lng &gt;&gt; 32;</span>
+<span class="fc" id="L697">        return bitCount(~lng);</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Counts the number of 1 bits in the &lt;code&gt;long&lt;/code&gt; value passed; this
+     * is sometimes referred to as a population count.
+     * &lt;/p&gt;
+     *
+     * @param lng The &lt;code&gt;long&lt;/code&gt; value to process.
+     * @return The number of 1 bits.
+     * @since 1.5
+     */
+    static int bitCount(long lng) {
+<span class="fc" id="L711">        lng = (lng &amp; 0x5555555555555555L) + ((lng &gt;&gt; 1) &amp; 0x5555555555555555L);</span>
+<span class="fc" id="L712">        lng = (lng &amp; 0x3333333333333333L) + ((lng &gt;&gt; 2) &amp; 0x3333333333333333L);</span>
+        // adjust for 64-bit integer
+<span class="fc" id="L714">        int i = (int) ((lng &gt;&gt;&gt; 32) + lng);</span>
+<span class="fc" id="L715">        i = (i &amp; 0x0F0F0F0F) + ((i &gt;&gt; 4) &amp; 0x0F0F0F0F);</span>
+<span class="fc" id="L716">        i = (i &amp; 0x00FF00FF) + ((i &gt;&gt; 8) &amp; 0x00FF00FF);</span>
+<span class="fc" id="L717">        i = (i &amp; 0x0000FFFF) + ((i &gt;&gt; 16) &amp; 0x0000FFFF);</span>
+<span class="fc" id="L718">        return i;</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * The &lt;code&gt;signum&lt;/code&gt; function for &lt;code&gt;long&lt;/code&gt; values. This
+     * method returns -1 for negative values, 1 for positive values and 0 for
+     * the value 0.
+     * &lt;/p&gt;
+     *
+     * @param lng The &lt;code&gt;long&lt;/code&gt; value.
+     * @return -1 if negative, 1 if positive otherwise 0.
+     * @since 1.5
+     */
+    static int signum(long lng) {
+<span class="pc bpc" id="L733" title="1 of 4 branches missed.">        return (lng == 0 ? 0 : (lng &lt; 0 ? -1 : 1));</span>
+    }
+
+    static char forDigit(int digit, int radix) {
+<span class="nc bnc" id="L737" title="All 6 branches missed.">        if (radix &lt; 2 || radix &gt; 36 || digit &gt;= radix) {</span>
+<span class="nc" id="L738">            return '\0';</span>
+        }
+<span class="nc bnc" id="L740" title="All 2 branches missed.">        return digit &lt; 10 ? (char) ('0' + digit) : (char) ('a' + digit - 10);</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Determines the highest (leftmost) bit that is 1 and returns the value
+     * that is the bit mask for that bit. This is sometimes referred to as the
+     * Most Significant 1 Bit.
+     * &lt;/p&gt;
+     *
+     * @param i The &lt;code&gt;int&lt;/code&gt; to interrogate.
+     * @return The bit mask indicating the highest 1 bit.
+     * @since 1.5
+     */
+    static int highestOneBit(int i) {
+<span class="nc" id="L755">        i |= (i &gt;&gt; 1);</span>
+<span class="nc" id="L756">        i |= (i &gt;&gt; 2);</span>
+<span class="nc" id="L757">        i |= (i &gt;&gt; 4);</span>
+<span class="nc" id="L758">        i |= (i &gt;&gt; 8);</span>
+<span class="nc" id="L759">        i |= (i &gt;&gt; 16);</span>
+<span class="nc" id="L760">        return (i &amp; ~(i &gt;&gt;&gt; 1));</span>
+    }
+
+    /* Public Methods */
+
+    /**
+     * Returns a new {@code BigDecimal} instance whose value is equal to {@code
+     * unscaledVal} 10^(-{@code scale}). The scale of the result is {@code
+     * scale}, and its unscaled value is {@code unscaledVal}.
+     *
+     * @param unscaledVal unscaled value to be used to construct the new {@code
+     *                    BigDecimal}.
+     * @param scale       scale to be used to construct the new {@code BigDecimal}.
+     * @return {@code BigDecimal} instance with the value {@code unscaledVal}*
+     * 10^(-{@code unscaledVal}).
+     */
+    public static TBigDecimal valueOf(long unscaledVal, int scale) {
+<span class="fc bfc" id="L777" title="All 2 branches covered.">        if (scale == 0) {</span>
+<span class="fc" id="L778">            return valueOf(unscaledVal);</span>
+        }
+<span class="pc bpc" id="L780" title="5 of 6 branches missed.">        if ((unscaledVal == 0) &amp;&amp; (scale &gt;= 0)</span>
+                &amp;&amp; (scale &lt; ZERO_SCALED_BY.length)) {
+<span class="nc" id="L782">            return ZERO_SCALED_BY[scale];</span>
+        }
+<span class="fc" id="L784">        return new TBigDecimal(unscaledVal, scale);</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} instance whose value is equal to {@code
+     * unscaledVal}. The scale of the result is {@code 0}, and its unscaled
+     * value is {@code unscaledVal}.
+     *
+     * @param unscaledVal value to be converted to a {@code BigDecimal}.
+     * @return {@code BigDecimal} instance with the value {@code unscaledVal}.
+     */
+    public static TBigDecimal valueOf(long unscaledVal) {
+<span class="pc bpc" id="L796" title="1 of 4 branches missed.">        if ((unscaledVal &gt;= 0) &amp;&amp; (unscaledVal &lt; BI_SCALED_BY_ZERO_LENGTH)) {</span>
+<span class="fc" id="L797">            return BI_SCALED_BY_ZERO[(int) unscaledVal];</span>
+        }
+<span class="fc" id="L799">        return new TBigDecimal(unscaledVal, 0);</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} instance whose value is equal to {@code
+     * val}. The new decimal is constructed as if the {@code BigDecimal(String)}
+     * constructor is called with an argument which is equal to {@code
+     * Double.toString(val)}. For example, {@code valueOf(&quot;0.1&quot;)} is converted to
+     * (unscaled=1, scale=1), although the double {@code 0.1} cannot be
+     * represented exactly as a double value. In contrast to that, a new {@code
+     * BigDecimal(0.1)} instance has the value {@code
+     * 0.1000000000000000055511151231257827021181583404541015625} with an
+     * unscaled value {@code 1000000000000000055511151231257827021181583404541015625}
+     * and the scale {@code 55}.
+     *
+     * @param val double value to be converted to a {@code BigDecimal}.
+     * @return {@code BigDecimal} instance with the value {@code val}.
+     * @throws NumberFormatException if {@code val} is infinite or {@code val} is not a number
+     */
+    public static TBigDecimal valueOf(double val) {
+<span class="nc bnc" id="L819" title="All 4 branches missed.">        if (Double.isInfinite(val) || Double.isNaN(val)) {</span>
+<span class="nc" id="L820">            throw new NumberFormatException(&quot;Infinity or NaN&quot;);</span>
+        }
+<span class="nc" id="L822">        return new TBigDecimal(Double.toString(val));</span>
+    }
+
+    private static TBigDecimal addAndMult10(TBigDecimal thisValue, TBigDecimal augend, int diffScale) {
+<span class="pc bpc" id="L826" title="1 of 2 branches missed.">        if (diffScale &lt; LONG_TEN_POW.length &amp;&amp;</span>
+<span class="pc bpc" id="L827" title="1 of 2 branches missed.">                Math.max(thisValue.bitLength, augend.bitLength + LONG_TEN_POW_BIT_LENGTH[diffScale]) + 1 &lt; 64) {</span>
+<span class="fc" id="L828">            return valueOf(thisValue.smallValue + augend.smallValue * LONG_TEN_POW[diffScale], thisValue.scale);</span>
+        }
+<span class="nc" id="L830">        return new TBigDecimal(thisValue.getUnscaledValue().add(</span>
+<span class="nc" id="L831">                TMultiplication.multiplyByTenPow(augend.getUnscaledValue(), diffScale)), thisValue.scale);</span>
+    }
+
+    private static TBigDecimal divideBigIntegers(TBigInteger scaledDividend, TBigInteger scaledDivisor, int scale,
+                                                 TRoundingMode roundingMode) {
+<span class="nc" id="L836">        TBigInteger[] quotAndRem = scaledDividend.divideAndRemainder(scaledDivisor);  // quotient and remainder</span>
+        // If after division there is a remainder...
+<span class="nc" id="L838">        TBigInteger quotient = quotAndRem[0];</span>
+<span class="nc" id="L839">        TBigInteger remainder = quotAndRem[1];</span>
+<span class="nc bnc" id="L840" title="All 2 branches missed.">        if (remainder.signum() == 0) {</span>
+<span class="nc" id="L841">            return new TBigDecimal(quotient, scale);</span>
+        }
+<span class="nc" id="L843">        int sign = scaledDividend.signum() * scaledDivisor.signum();</span>
+        int compRem;                                      // 'compare to remainder'
+<span class="nc bnc" id="L845" title="All 2 branches missed.">        if (scaledDivisor.bitLength() &lt; 63) { // 63 in order to avoid out of long after &lt;&lt;1</span>
+<span class="nc" id="L846">            long rem = remainder.longValue();</span>
+<span class="nc" id="L847">            long divisor = scaledDivisor.longValue();</span>
+<span class="nc" id="L848">            compRem = longCompareTo(Math.abs(rem) &lt;&lt; 1, Math.abs(divisor));</span>
+            // To look if there is a carry
+<span class="nc bnc" id="L850" title="All 2 branches missed.">            compRem = roundingBehavior(quotient.testBit(0) ? 1 : 0,</span>
+                    sign * (5 + compRem), roundingMode);
+
+<span class="nc" id="L853">        } else {</span>
+            // Checking if:  remainder * 2 &gt;= scaledDivisor
+<span class="nc" id="L855">            compRem = remainder.abs().shiftLeftOneBit().compareTo(scaledDivisor.abs());</span>
+<span class="nc bnc" id="L856" title="All 2 branches missed.">            compRem = roundingBehavior(quotient.testBit(0) ? 1 : 0, sign * (5 + compRem), roundingMode);</span>
+        }
+<span class="nc bnc" id="L858" title="All 2 branches missed.">        if (compRem != 0) {</span>
+<span class="nc bnc" id="L859" title="All 2 branches missed.">            if (quotient.bitLength() &lt; 63) {</span>
+<span class="nc" id="L860">                return valueOf(quotient.longValue() + compRem, scale);</span>
+            }
+<span class="nc" id="L862">            quotient = quotient.add(TBigInteger.valueOf(compRem));</span>
+<span class="nc" id="L863">            return new TBigDecimal(quotient, scale);</span>
+        }
+        // Constructing the result with the appropriate unscaled value
+<span class="nc" id="L866">        return new TBigDecimal(quotient, scale);</span>
+    }
+
+    private static TBigDecimal dividePrimitiveLongs(long scaledDividend, long scaledDivisor, int scale,
+                                                    TRoundingMode roundingMode) {
+<span class="fc" id="L871">        long quotient = scaledDividend / scaledDivisor;</span>
+<span class="fc" id="L872">        long remainder = scaledDividend % scaledDivisor;</span>
+<span class="fc" id="L873">        int sign = signum(scaledDividend) * signum(scaledDivisor);</span>
+<span class="pc bpc" id="L874" title="1 of 2 branches missed.">        if (remainder != 0) {</span>
+            // Checking if:  remainder * 2 &gt;= scaledDivisor
+            int compRem;                                      // 'compare to remainder'
+<span class="nc" id="L877">            compRem = longCompareTo(Math.abs(remainder) &lt;&lt; 1, Math.abs(scaledDivisor));</span>
+            // To look if there is a carry
+<span class="nc" id="L879">            quotient += roundingBehavior(((int) quotient) &amp; 1, sign * (5 + compRem), roundingMode);</span>
+        }
+        // Constructing the result with the appropriate unscaled value
+<span class="fc" id="L882">        return valueOf(quotient, scale);</span>
+    }
+
+    private static int longCompareTo(long value1, long value2) {
+<span class="pc bpc" id="L886" title="3 of 4 branches missed.">        return value1 &gt; value2 ? 1 : (value1 &lt; value2 ? -1 : 0);</span>
+    }
+
+    /**
+     * Return an increment that can be -1,0 or 1, depending of
+     * {@code roundingMode}.
+     *
+     * @param parityBit    can be 0 or 1, it's only used in the case
+     *                     {@code HALF_EVEN}
+     * @param fraction     the mantisa to be analyzed
+     * @param roundingMode the type of rounding
+     * @return the carry propagated after rounding
+     */
+    private static int roundingBehavior(int parityBit, int fraction, TRoundingMode roundingMode) {
+<span class="fc" id="L900">        int increment = 0; // the carry after rounding</span>
+
+<span class="pc bpc" id="L902" title="8 of 9 branches missed.">        switch (roundingMode) {</span>
+            case UNNECESSARY:
+<span class="nc bnc" id="L904" title="All 2 branches missed.">                if (fraction != 0) {</span>
+<span class="nc" id="L905">                    throw new ArithmeticException(&quot;Rounding necessary&quot;);</span>
+                }
+                break;
+            case UP:
+<span class="nc" id="L909">                increment = signum(fraction);</span>
+<span class="nc" id="L910">                break;</span>
+            case DOWN:
+<span class="nc" id="L912">                break;</span>
+            case CEILING:
+<span class="nc" id="L914">                increment = Math.max(signum(fraction), 0);</span>
+<span class="nc" id="L915">                break;</span>
+            case FLOOR:
+<span class="nc" id="L917">                increment = Math.min(signum(fraction), 0);</span>
+<span class="nc" id="L918">                break;</span>
+            case HALF_UP:
+<span class="pc bpc" id="L920" title="1 of 2 branches missed.">                if (Math.abs(fraction) &gt;= 5) {</span>
+<span class="fc" id="L921">                    increment = signum(fraction);</span>
+                }
+                break;
+            case HALF_DOWN:
+<span class="nc bnc" id="L925" title="All 2 branches missed.">                if (Math.abs(fraction) &gt; 5) {</span>
+<span class="nc" id="L926">                    increment = signum(fraction);</span>
+                }
+                break;
+            case HALF_EVEN:
+<span class="nc bnc" id="L930" title="All 2 branches missed.">                if (Math.abs(fraction) + parityBit &gt; 5) {</span>
+<span class="nc" id="L931">                    increment = signum(fraction);</span>
+                }
+                break;
+        }
+<span class="fc" id="L935">        return increment;</span>
+    }
+
+    /**
+     * It tests if a scale of type {@code long} fits in 32 bits. It
+     * returns the same scale being casted to {@code int} type when is
+     * possible, otherwise throws an exception.
+     *
+     * @param longScale a 64 bit scale
+     * @return a 32 bit scale when is possible
+     * @throws ArithmeticException when {@code scale} doesn't
+     *                             fit in {@code int} type
+     * @see #scale
+     */
+    private static int toIntScale(long longScale) {
+<span class="pc bpc" id="L950" title="1 of 2 branches missed.">        if (longScale &lt; Integer.MIN_VALUE) {</span>
+<span class="nc" id="L951">            throw new ArithmeticException(&quot;Overflow&quot;);</span>
+<span class="pc bpc" id="L952" title="1 of 2 branches missed.">        } else if (longScale &gt; Integer.MAX_VALUE) {</span>
+<span class="nc" id="L953">            throw new ArithmeticException(&quot;Underflow&quot;);</span>
+        } else {
+<span class="fc" id="L955">            return (int) longScale;</span>
+        }
+    }
+
+    /**
+     * It returns the value 0 with the most approximated scale of type
+     * {@code int}. if {@code longScale &gt; Integer.MAX_VALUE} the
+     * scale will be {@code Integer.MAX_VALUE}; if
+     * {@code longScale &lt; Integer.MIN_VALUE} the scale will be
+     * {@code Integer.MIN_VALUE}; otherwise {@code longScale} is
+     * casted to the type {@code int}.
+     *
+     * @param longScale the scale to which the value 0 will be scaled.
+     * @return the value 0 scaled by the closer scale of type {@code int}.
+     * @see #scale
+     */
+    private static TBigDecimal zeroScaledBy(long longScale) {
+<span class="nc bnc" id="L972" title="All 2 branches missed.">        if (longScale == (int) longScale) {</span>
+<span class="nc" id="L973">            return valueOf(0, (int) longScale);</span>
+        }
+<span class="nc bnc" id="L975" title="All 2 branches missed.">        if (longScale &gt;= 0) {</span>
+<span class="nc" id="L976">            return new TBigDecimal(0, Integer.MAX_VALUE);</span>
+        }
+<span class="nc" id="L978">        return new TBigDecimal(0, Integer.MIN_VALUE);</span>
+    }
+
+    private static int bitLength(long smallValue) {
+<span class="fc bfc" id="L982" title="All 2 branches covered.">        if (smallValue &lt; 0) {</span>
+<span class="fc" id="L983">            smallValue = ~smallValue;</span>
+        }
+<span class="fc" id="L985">        return 64 - numberOfLeadingZeros(smallValue);</span>
+    }
+
+    private static int bitLength(int smallValue) {
+<span class="pc bpc" id="L989" title="1 of 2 branches missed.">        if (smallValue &lt; 0) {</span>
+<span class="nc" id="L990">            smallValue = ~smallValue;</span>
+        }
+<span class="fc" id="L992">        return 32 - numberOfLeadingZeros(smallValue);</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code this + augend}.
+     * The scale of the result is the maximum of the scales of the two
+     * arguments.
+     *
+     * @param augend value to be added to {@code this}.
+     * @return {@code this + augend}.
+     * @throws NullPointerException if {@code augend == null}.
+     */
+    public TBigDecimal add(TBigDecimal augend) {
+<span class="fc" id="L1005">        int diffScale = this.scale - augend.scale;</span>
+        // Fast return when some operand is zero
+<span class="pc bpc" id="L1007" title="1 of 2 branches missed.">        if (this.isZero()) {</span>
+<span class="nc bnc" id="L1008" title="All 2 branches missed.">            if (diffScale &lt;= 0) {</span>
+<span class="nc" id="L1009">                return augend;</span>
+            }
+<span class="nc bnc" id="L1011" title="All 2 branches missed.">            if (augend.isZero()) {</span>
+<span class="nc" id="L1012">                return this;</span>
+            }
+<span class="pc bpc" id="L1014" title="1 of 2 branches missed.">        } else if (augend.isZero()) {</span>
+<span class="nc bnc" id="L1015" title="All 2 branches missed.">            if (diffScale &gt;= 0) {</span>
+<span class="nc" id="L1016">                return this;</span>
+            }
+        }
+        // Let be:  this = [u1,s1]  and  augend = [u2,s2]
+<span class="fc bfc" id="L1020" title="All 2 branches covered.">        if (diffScale == 0) {</span>
+            // case s1 == s2: [u1 + u2 , s1]
+<span class="pc bpc" id="L1022" title="1 of 2 branches missed.">            if (Math.max(this.bitLength, augend.bitLength) + 1 &lt; 64) {</span>
+<span class="fc" id="L1023">                return valueOf(this.smallValue + augend.smallValue, this.scale);</span>
+            }
+<span class="nc" id="L1025">            return new TBigDecimal(this.getUnscaledValue().add(augend.getUnscaledValue()), this.scale);</span>
+<span class="pc bpc" id="L1026" title="1 of 2 branches missed.">        } else if (diffScale &gt; 0) {</span>
+            // case s1 &gt; s2 : [(u1 + u2) * 10 ^ (s1 - s2) , s1]
+<span class="nc" id="L1028">            return addAndMult10(this, augend, diffScale);</span>
+        } else {// case s2 &gt; s1 : [(u2 + u1) * 10 ^ (s2 - s1) , s2]
+<span class="fc" id="L1030">            return addAndMult10(augend, this, -diffScale);</span>
+        }
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code this + augend}.
+     * The result is rounded according to the passed context {@code mc}.
+     *
+     * @param augend value to be added to {@code this}.
+     * @param mc     rounding mode and precision for the result of this operation.
+     * @return {@code this + augend}.
+     * @throws NullPointerException if {@code augend == null} or {@code mc == null}.
+     */
+    public TBigDecimal add(TBigDecimal augend, TMathContext mc) {
+        TBigDecimal larger; // operand with the largest unscaled value
+        TBigDecimal smaller; // operand with the smallest unscaled value
+        TBigInteger tempBI;
+<span class="fc" id="L1047">        long diffScale = (long) this.scale - augend.scale;</span>
+        int largerSignum;
+        // Some operand is zero or the precision is infinity
+<span class="pc bpc" id="L1050" title="3 of 6 branches missed.">        if ((augend.isZero()) || (this.isZero()) || (mc.getPrecision() == 0)) {</span>
+<span class="nc" id="L1051">            return add(augend).round(mc);</span>
+        }
+        // Cases where there is room for optimizations
+<span class="pc bpc" id="L1054" title="1 of 2 branches missed.">        if (this.aproxPrecision() &lt; diffScale - 1) {</span>
+<span class="nc" id="L1055">            larger = augend;</span>
+<span class="nc" id="L1056">            smaller = this;</span>
+<span class="pc bpc" id="L1057" title="1 of 2 branches missed.">        } else if (augend.aproxPrecision() &lt; -diffScale - 1) {</span>
+<span class="nc" id="L1058">            larger = this;</span>
+<span class="nc" id="L1059">            smaller = augend;</span>
+        } else {// No optimization is done
+<span class="fc" id="L1061">            return add(augend).round(mc);</span>
+        }
+<span class="nc bnc" id="L1063" title="All 2 branches missed.">        if (mc.getPrecision() &gt;= larger.aproxPrecision()) {</span>
+            // No optimization is done
+<span class="nc" id="L1065">            return add(augend).round(mc);</span>
+        }
+        // Cases where it's unnecessary to add two numbers with very different scales
+<span class="nc" id="L1068">        largerSignum = larger.signum();</span>
+<span class="nc bnc" id="L1069" title="All 2 branches missed.">        if (largerSignum == smaller.signum()) {</span>
+<span class="nc" id="L1070">            tempBI = TMultiplication.multiplyByPositiveInt(larger.getUnscaledValue(), 10)</span>
+<span class="nc" id="L1071">                    .add(TBigInteger.valueOf(largerSignum));</span>
+        } else {
+<span class="nc" id="L1073">            tempBI = larger.getUnscaledValue().subtract(TBigInteger.valueOf(largerSignum));</span>
+<span class="nc" id="L1074">            tempBI = TMultiplication.multiplyByPositiveInt(tempBI, 10).add(TBigInteger.valueOf(largerSignum * 9L));</span>
+        }
+        // Rounding the improved adding
+<span class="nc" id="L1077">        larger = new TBigDecimal(tempBI, larger.scale + 1);</span>
+<span class="nc" id="L1078">        return larger.round(mc);</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code this - subtrahend}.
+     * The scale of the result is the maximum of the scales of the two arguments.
+     *
+     * @param subtrahend value to be subtracted from {@code this}.
+     * @return {@code this - subtrahend}.
+     * @throws NullPointerException if {@code subtrahend == null}.
+     */
+    public TBigDecimal subtract(TBigDecimal subtrahend) {
+<span class="fc" id="L1090">        int diffScale = this.scale - subtrahend.scale;</span>
+        // Fast return when some operand is zero
+<span class="pc bpc" id="L1092" title="1 of 2 branches missed.">        if (this.isZero()) {</span>
+<span class="nc bnc" id="L1093" title="All 2 branches missed.">            if (diffScale &lt;= 0) {</span>
+<span class="nc" id="L1094">                return subtrahend.negate();</span>
+            }
+<span class="nc bnc" id="L1096" title="All 2 branches missed.">            if (subtrahend.isZero()) {</span>
+<span class="nc" id="L1097">                return this;</span>
+            }
+<span class="pc bpc" id="L1099" title="1 of 2 branches missed.">        } else if (subtrahend.isZero()) {</span>
+<span class="nc bnc" id="L1100" title="All 2 branches missed.">            if (diffScale &gt;= 0) {</span>
+<span class="nc" id="L1101">                return this;</span>
+            }
+        }
+        // Let be: this = [u1,s1] and subtrahend = [u2,s2] so:
+<span class="fc bfc" id="L1105" title="All 2 branches covered.">        if (diffScale == 0) {</span>
+            // case s1 = s2 : [u1 - u2 , s1]
+<span class="pc bpc" id="L1107" title="1 of 2 branches missed.">            if (Math.max(this.bitLength, subtrahend.bitLength) + 1 &lt; 64) {</span>
+<span class="fc" id="L1108">                return valueOf(this.smallValue - subtrahend.smallValue, this.scale);</span>
+            }
+<span class="nc" id="L1110">            return new TBigDecimal(this.getUnscaledValue().subtract(subtrahend.getUnscaledValue()), this.scale);</span>
+<span class="fc bfc" id="L1111" title="All 2 branches covered.">        } else if (diffScale &gt; 0) {</span>
+            // case s1 &gt; s2 : [ u1 - u2 * 10 ^ (s1 - s2) , s1 ]
+<span class="pc bpc" id="L1113" title="1 of 2 branches missed.">            if (diffScale &lt; LONG_TEN_POW.length &amp;&amp;</span>
+<span class="pc bpc" id="L1114" title="1 of 2 branches missed.">                    Math.max(this.bitLength, subtrahend.bitLength + LONG_TEN_POW_BIT_LENGTH[diffScale]) + 1 &lt; 64) {</span>
+<span class="fc" id="L1115">                return valueOf(this.smallValue - subtrahend.smallValue * LONG_TEN_POW[diffScale], this.scale);</span>
+            }
+<span class="nc" id="L1117">            return new TBigDecimal(this.getUnscaledValue().subtract(</span>
+<span class="nc" id="L1118">                    TMultiplication.multiplyByTenPow(subtrahend.getUnscaledValue(), diffScale)), this.scale);</span>
+        } else {// case s2 &gt; s1 : [ u1 * 10 ^ (s2 - s1) - u2 , s2 ]
+<span class="fc" id="L1120">            diffScale = -diffScale;</span>
+<span class="pc bpc" id="L1121" title="1 of 2 branches missed.">            if (diffScale &lt; LONG_TEN_POW.length &amp;&amp;</span>
+<span class="pc bpc" id="L1122" title="1 of 2 branches missed.">                    Math.max(this.bitLength + LONG_TEN_POW_BIT_LENGTH[diffScale], subtrahend.bitLength) + 1 &lt; 64) {</span>
+<span class="fc" id="L1123">                return valueOf(this.smallValue * LONG_TEN_POW[diffScale] - subtrahend.smallValue, subtrahend.scale);</span>
+            }
+<span class="nc" id="L1125">            return new TBigDecimal(TMultiplication.multiplyByTenPow(this.getUnscaledValue(), diffScale)</span>
+<span class="nc" id="L1126">                    .subtract(subtrahend.getUnscaledValue()), subtrahend.scale);</span>
+        }
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code this - subtrahend}.
+     * The result is rounded according to the passed context {@code mc}.
+     *
+     * @param subtrahend value to be subtracted from {@code this}.
+     * @param mc         rounding mode and precision for the result of this operation.
+     * @return {@code this - subtrahend}.
+     * @throws NullPointerException if {@code subtrahend == null} or {@code mc == null}.
+     */
+    public TBigDecimal subtract(TBigDecimal subtrahend, TMathContext mc) {
+<span class="fc" id="L1140">        long diffScale = subtrahend.scale - (long) this.scale;</span>
+        int thisSignum;
+        TBigDecimal leftOperand; // it will be only the left operand (this)
+        TBigInteger tempBI;
+        // Some operand is zero or the precision is infinity
+<span class="pc bpc" id="L1145" title="3 of 6 branches missed.">        if (subtrahend.isZero() || isZero() || mc.getPrecision() == 0) {</span>
+<span class="nc" id="L1146">            return subtract(subtrahend).round(mc);</span>
+        }
+        // Now:   this != 0   and   subtrahend != 0
+<span class="pc bpc" id="L1149" title="1 of 2 branches missed.">        if (subtrahend.aproxPrecision() &lt; diffScale - 1) {</span>
+            // Cases where it is unnecessary to subtract two numbers with very different scales
+<span class="nc bnc" id="L1151" title="All 2 branches missed.">            if (mc.getPrecision() &lt; this.aproxPrecision()) {</span>
+<span class="nc" id="L1152">                thisSignum = this.signum();</span>
+<span class="nc bnc" id="L1153" title="All 2 branches missed.">                if (thisSignum != subtrahend.signum()) {</span>
+<span class="nc" id="L1154">                    tempBI = TMultiplication.multiplyByPositiveInt(this.getUnscaledValue(), 10)</span>
+<span class="nc" id="L1155">                            .add(TBigInteger.valueOf(thisSignum));</span>
+                } else {
+<span class="nc" id="L1157">                    tempBI = this.getUnscaledValue().subtract(TBigInteger.valueOf(thisSignum));</span>
+<span class="nc" id="L1158">                    tempBI = TMultiplication.multiplyByPositiveInt(tempBI, 10)</span>
+<span class="nc" id="L1159">                            .add(TBigInteger.valueOf(thisSignum * 9L));</span>
+                }
+                // Rounding the improved subtracting
+<span class="nc" id="L1162">                leftOperand = new TBigDecimal(tempBI, this.scale + 1);</span>
+<span class="nc" id="L1163">                return leftOperand.round(mc);</span>
+            }
+        }
+        // No optimization is done
+<span class="fc" id="L1167">        return subtract(subtrahend).round(mc);</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code this *
+     * multiplicand}. The scale of the result is the sum of the scales of the
+     * two arguments.
+     *
+     * @param multiplicand value to be multiplied with {@code this}.
+     * @return {@code this * multiplicand}.
+     * @throws NullPointerException if {@code multiplicand == null}.
+     */
+    public TBigDecimal multiply(TBigDecimal multiplicand) {
+<span class="fc" id="L1180">        long newScale = (long) this.scale + multiplicand.scale;</span>
+
+<span class="pc bpc" id="L1182" title="2 of 4 branches missed.">        if (isZero() || multiplicand.isZero()) {</span>
+<span class="nc" id="L1183">            return zeroScaledBy(newScale);</span>
+        }
+        /* Let be: this = [u1,s1] and multiplicand = [u2,s2] so:
+         * this x multiplicand = [ s1 * s2 , s1 + s2 ] */
+<span class="pc bpc" id="L1187" title="1 of 2 branches missed.">        if (this.bitLength + multiplicand.bitLength &lt; 64) {</span>
+<span class="fc" id="L1188">            return valueOf(this.smallValue * multiplicand.smallValue, toIntScale(newScale));</span>
+        }
+<span class="nc" id="L1190">        return new TBigDecimal(this.getUnscaledValue().multiply(</span>
+<span class="nc" id="L1191">                multiplicand.getUnscaledValue()), toIntScale(newScale));</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code this *
+     * multiplicand}. The result is rounded according to the passed context
+     * {@code mc}.
+     *
+     * @param multiplicand value to be multiplied with {@code this}.
+     * @param mc           rounding mode and precision for the result of this operation.
+     * @return {@code this * multiplicand}.
+     * @throws NullPointerException if {@code multiplicand == null} or {@code mc == null}.
+     */
+    public TBigDecimal multiply(TBigDecimal multiplicand, TMathContext mc) {
+<span class="fc" id="L1205">        TBigDecimal result = multiply(multiplicand);</span>
+
+<span class="fc" id="L1207">        result.inplaceRound(mc);</span>
+<span class="fc" id="L1208">        return result;</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code this / divisor}.
+     * As scale of the result the parameter {@code scale} is used. If rounding
+     * is required to meet the specified scale, then the specified rounding mode
+     * {@code roundingMode} is applied.
+     *
+     * @param divisor      value by which {@code this} is divided.
+     * @param scale        the scale of the result returned.
+     * @param roundingMode rounding mode to be used to round the result.
+     * @return {@code this / divisor} rounded according to the given rounding
+     * mode.
+     * @throws NullPointerException     if {@code divisor == null}.
+     * @throws IllegalArgumentException if {@code roundingMode} is not a valid rounding mode.
+     * @throws ArithmeticException      if {@code divisor == 0}.
+     * @throws ArithmeticException      if {@code roundingMode == ROUND_UNNECESSARY} and rounding is
+     *                                  necessary according to the given scale.
+     */
+    public TBigDecimal divide(TBigDecimal divisor, int scale, int roundingMode) {
+<span class="nc" id="L1229">        return divide(divisor, scale, TRoundingMode.valueOf(roundingMode));</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code this / divisor}.
+     * As scale of the result the parameter {@code scale} is used. If rounding
+     * is required to meet the specified scale, then the specified rounding mode
+     * {@code roundingMode} is applied.
+     *
+     * @param divisor      value by which {@code this} is divided.
+     * @param scale        the scale of the result returned.
+     * @param roundingMode rounding mode to be used to round the result.
+     * @return {@code this / divisor} rounded according to the given rounding
+     * mode.
+     * @throws NullPointerException if {@code divisor == null} or {@code roundingMode == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
+     * @throws ArithmeticException  if {@code roundingMode == RoundingMode.UNNECESSAR}Y and
+     *                              rounding is necessary according to the given scale and given
+     *                              precision.
+     */
+    public TBigDecimal divide(TBigDecimal divisor, int scale, TRoundingMode roundingMode) {
+        // Let be: this = [u1,s1]  and  divisor = [u2,s2]
+<span class="nc bnc" id="L1251" title="All 2 branches missed.">        if (roundingMode == null) {</span>
+<span class="nc" id="L1252">            throw new NullPointerException();</span>
+        }
+<span class="nc bnc" id="L1254" title="All 2 branches missed.">        if (divisor.isZero()) {</span>
+<span class="nc" id="L1255">            throw new ArithmeticException(&quot;Division by zero&quot;);</span>
+        }
+
+<span class="nc" id="L1258">        long diffScale = ((long) this.scale - divisor.scale) - scale;</span>
+<span class="nc bnc" id="L1259" title="All 4 branches missed.">        if (this.bitLength &lt; 64 &amp;&amp; divisor.bitLength &lt; 64) {</span>
+<span class="nc bnc" id="L1260" title="All 2 branches missed.">            if (diffScale == 0) {</span>
+<span class="nc" id="L1261">                return dividePrimitiveLongs(this.smallValue, divisor.smallValue, scale, roundingMode);</span>
+<span class="nc bnc" id="L1262" title="All 2 branches missed.">            } else if (diffScale &gt; 0) {</span>
+<span class="nc bnc" id="L1263" title="All 4 branches missed.">                if (diffScale &lt; LONG_TEN_POW.length &amp;&amp;</span>
+                        divisor.bitLength + LONG_TEN_POW_BIT_LENGTH[(int) diffScale] &lt; 64) {
+<span class="nc" id="L1265">                    return dividePrimitiveLongs(this.smallValue,</span>
+                            divisor.smallValue * LONG_TEN_POW[(int) diffScale],
+                            scale,
+                            roundingMode);
+                }
+            } else { // diffScale &lt; 0
+<span class="nc bnc" id="L1271" title="All 4 branches missed.">                if (-diffScale &lt; LONG_TEN_POW.length &amp;&amp;</span>
+                        this.bitLength + LONG_TEN_POW_BIT_LENGTH[(int) -diffScale] &lt; 64) {
+<span class="nc" id="L1273">                    return dividePrimitiveLongs(this.smallValue * LONG_TEN_POW[(int) -diffScale],</span>
+                            divisor.smallValue, scale, roundingMode);
+                }
+            }
+        }
+<span class="nc" id="L1278">        TBigInteger scaledDividend = this.getUnscaledValue();</span>
+<span class="nc" id="L1279">        TBigInteger scaledDivisor = divisor.getUnscaledValue(); // for scaling of 'u2'</span>
+
+<span class="nc bnc" id="L1281" title="All 2 branches missed.">        if (diffScale &gt; 0) {</span>
+            // Multiply 'u2'  by:  10^((s1 - s2) - scale)
+<span class="nc" id="L1283">            scaledDivisor = TMultiplication.multiplyByTenPow(scaledDivisor, (int) diffScale);</span>
+<span class="nc bnc" id="L1284" title="All 2 branches missed.">        } else if (diffScale &lt; 0) {</span>
+            // Multiply 'u1'  by:  10^(scale - (s1 - s2))
+<span class="nc" id="L1286">            scaledDividend = TMultiplication.multiplyByTenPow(scaledDividend, (int) -diffScale);</span>
+        }
+<span class="nc" id="L1288">        return divideBigIntegers(scaledDividend, scaledDivisor, scale, roundingMode);</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code this / divisor}.
+     * The scale of the result is the scale of {@code this}. If rounding is
+     * required to meet the specified scale, then the specified rounding mode
+     * {@code roundingMode} is applied.
+     *
+     * @param divisor      value by which {@code this} is divided.
+     * @param roundingMode rounding mode to be used to round the result.
+     * @return {@code this / divisor} rounded according to the given rounding
+     * mode.
+     * @throws NullPointerException     if {@code divisor == null}.
+     * @throws IllegalArgumentException if {@code roundingMode} is not a valid rounding mode.
+     * @throws ArithmeticException      if {@code divisor == 0}.
+     * @throws ArithmeticException      if {@code roundingMode == ROUND_UNNECESSARY} and rounding is
+     *                                  necessary according to the scale of this.
+     */
+    public TBigDecimal divide(TBigDecimal divisor, int roundingMode) {
+<span class="nc" id="L1308">        return divide(divisor, scale, TRoundingMode.valueOf(roundingMode));</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code this / divisor}.
+     * The scale of the result is the scale of {@code this}. If rounding is
+     * required to meet the specified scale, then the specified rounding mode
+     * {@code roundingMode} is applied.
+     *
+     * @param divisor      value by which {@code this} is divided.
+     * @param roundingMode rounding mode to be used to round the result.
+     * @return {@code this / divisor} rounded according to the given rounding
+     * mode.
+     * @throws NullPointerException if {@code divisor == null} or {@code roundingMode == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
+     * @throws ArithmeticException  if {@code roundingMode == RoundingMode.UNNECESSARY} and
+     *                              rounding is necessary according to the scale of this.
+     */
+    public TBigDecimal divide(TBigDecimal divisor, TRoundingMode roundingMode) {
+<span class="nc" id="L1327">        return divide(divisor, scale, roundingMode);</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code this / divisor}.
+     * The scale of the result is the difference of the scales of {@code this}
+     * and {@code divisor}. If the exact result requires more digits, then the
+     * scale is adjusted accordingly. For example, {@code 1/128 = 0.0078125}
+     * which has a scale of {@code 7} and precision {@code 5}.
+     *
+     * @param divisor value by which {@code this} is divided.
+     * @return {@code this / divisor}.
+     * @throws NullPointerException if {@code divisor == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
+     * @throws ArithmeticException  if the result cannot be represented exactly.
+     */
+    public TBigDecimal divide(TBigDecimal divisor) {
+<span class="fc" id="L1344">        TBigInteger p = this.getUnscaledValue();</span>
+<span class="fc" id="L1345">        TBigInteger q = divisor.getUnscaledValue();</span>
+        TBigInteger gcd; // greatest common divisor between 'p' and 'q'
+        TBigInteger[] quotAndRem;
+<span class="fc" id="L1348">        long diffScale = (long) scale - divisor.scale;</span>
+        int newScale; // the new scale for final quotient
+        int k; // number of factors &quot;2&quot; in 'q'
+<span class="fc" id="L1351">        int l = 0; // number of factors &quot;5&quot; in 'q'</span>
+<span class="fc" id="L1352">        int i = 1;</span>
+<span class="fc" id="L1353">        int lastPow = FIVE_POW.length - 1;</span>
+
+<span class="pc bpc" id="L1355" title="1 of 2 branches missed.">        if (divisor.isZero()) {</span>
+<span class="nc" id="L1356">            throw new ArithmeticException(&quot;Division by zero&quot;);</span>
+        }
+<span class="pc bpc" id="L1358" title="1 of 2 branches missed.">        if (p.signum() == 0) {</span>
+<span class="nc" id="L1359">            return zeroScaledBy(diffScale);</span>
+        }
+        // To divide both by the GCD
+<span class="fc" id="L1362">        gcd = p.gcd(q);</span>
+<span class="fc" id="L1363">        p = p.divide(gcd);</span>
+<span class="fc" id="L1364">        q = q.divide(gcd);</span>
+        // To simplify all &quot;2&quot; factors of q, dividing by 2^k
+<span class="fc" id="L1366">        k = q.getLowestSetBit();</span>
+<span class="fc" id="L1367">        q = q.shiftRight(k);</span>
+        // To simplify all &quot;5&quot; factors of q, dividing by 5^l
+        do {
+<span class="fc" id="L1370">            quotAndRem = q.divideAndRemainder(FIVE_POW[i]);</span>
+<span class="pc bpc" id="L1371" title="1 of 2 branches missed.">            if (quotAndRem[1].signum() == 0) {</span>
+<span class="nc" id="L1372">                l += i;</span>
+<span class="nc bnc" id="L1373" title="All 2 branches missed.">                if (i &lt; lastPow) {</span>
+<span class="nc" id="L1374">                    i++;</span>
+                }
+<span class="nc" id="L1376">                q = quotAndRem[0];</span>
+            } else {
+<span class="pc bpc" id="L1378" title="1 of 2 branches missed.">                if (i == 1) {</span>
+<span class="fc" id="L1379">                    break;</span>
+                }
+<span class="nc" id="L1381">                i = 1;</span>
+            }
+<span class="nc" id="L1383">        } while (true);</span>
+        // If  abs(q) != 1  then the quotient is periodic
+<span class="pc bpc" id="L1385" title="1 of 2 branches missed.">        if (!q.abs().equals(TBigInteger.ONE)) {</span>
+<span class="nc" id="L1386">            throw new ArithmeticException(&quot;Non-terminating decimal expansion; no exact representable decimal result.&quot;);</span>
+        }
+        // The sign of the is fixed and the quotient will be saved in 'p'
+<span class="pc bpc" id="L1389" title="1 of 2 branches missed.">        if (q.signum() &lt; 0) {</span>
+<span class="nc" id="L1390">            p = p.negate();</span>
+        }
+        // Checking if the new scale is out of range
+<span class="fc" id="L1393">        newScale = toIntScale(diffScale + Math.max(k, l));</span>
+        // k &gt;= 0  and  l &gt;= 0  implies that  k - l  is in the 32-bit range
+<span class="fc" id="L1395">        i = k - l;</span>
+
+<span class="pc bpc" id="L1397" title="1 of 2 branches missed.">        p = (i &gt; 0) ? TMultiplication.multiplyByFivePow(p, i)</span>
+<span class="fc" id="L1398">                : p.shiftLeft(-i);</span>
+<span class="fc" id="L1399">        return new TBigDecimal(p, newScale);</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code this / divisor}.
+     * The result is rounded according to the passed context {@code mc}. If the
+     * passed math context specifies precision {@code 0}, then this call is
+     * equivalent to {@code this.divide(divisor)}.
+     *
+     * @param divisor value by which {@code this} is divided.
+     * @param mc      rounding mode and precision for the result of this operation.
+     * @return {@code this / divisor}.
+     * @throws NullPointerException if {@code divisor == null} or {@code mc == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
+     * @throws ArithmeticException  if {@code mc.getRoundingMode() == UNNECESSARY} and rounding
+     *                              is necessary according {@code mc.getPrecision()}.
+     */
+    public TBigDecimal divide(TBigDecimal divisor, TMathContext mc) {
+        /* Calculating how many zeros must be append to 'dividend'
+         * to obtain a  quotient with at least 'mc.precision()' digits */
+<span class="fc" id="L1419">        long traillingZeros = mc.getPrecision() + 2L + divisor.aproxPrecision() - aproxPrecision();</span>
+<span class="fc" id="L1420">        long diffScale = (long) scale - divisor.scale;</span>
+<span class="fc" id="L1421">        long newScale = diffScale; // scale of the final quotient</span>
+        int compRem; // to compare the remainder
+<span class="fc" id="L1423">        int i = 1; // index</span>
+<span class="fc" id="L1424">        int lastPow = TEN_POW.length - 1; // last power of ten</span>
+        TBigInteger integerQuot; // for temporal results
+<span class="fc" id="L1426">        TBigInteger[] quotAndRem = {getUnscaledValue()};</span>
+        // In special cases it reduces the problem to call the dual method
+<span class="pc bpc" id="L1428" title="2 of 4 branches missed.">        if ((mc.getPrecision() == 0) || (this.isZero())</span>
+<span class="pc bpc" id="L1429" title="1 of 2 branches missed.">                || (divisor.isZero())) {</span>
+<span class="nc" id="L1430">            return this.divide(divisor);</span>
+        }
+<span class="pc bpc" id="L1432" title="1 of 2 branches missed.">        if (traillingZeros &gt; 0) {</span>
+            // To append trailing zeros at end of dividend
+<span class="fc" id="L1434">            quotAndRem[0] = getUnscaledValue().multiply(TMultiplication.powerOf10(traillingZeros));</span>
+<span class="fc" id="L1435">            newScale += traillingZeros;</span>
+        }
+<span class="fc" id="L1437">        quotAndRem = quotAndRem[0].divideAndRemainder(divisor.getUnscaledValue());</span>
+<span class="fc" id="L1438">        integerQuot = quotAndRem[0];</span>
+        // Calculating the exact quotient with at least 'mc.precision()' digits
+<span class="pc bpc" id="L1440" title="1 of 2 branches missed.">        if (quotAndRem[1].signum() != 0) {</span>
+            // Checking if:   2 * remainder &gt;= divisor ?
+<span class="nc" id="L1442">            compRem = quotAndRem[1].shiftLeftOneBit().compareTo(divisor.getUnscaledValue());</span>
+            // quot := quot * 10 + r;     with 'r' in {-6,-5,-4, 0,+4,+5,+6}
+<span class="nc" id="L1444">            integerQuot = integerQuot.multiply(TBigInteger.TEN)</span>
+<span class="nc" id="L1445">                    .add(TBigInteger.valueOf((long) quotAndRem[0].signum() * (5 + compRem)));</span>
+<span class="nc" id="L1446">            newScale++;</span>
+        } else {
+            // To strip trailing zeros until the preferred scale is reached
+<span class="fc bfc" id="L1449" title="All 2 branches covered.">            while (!integerQuot.testBit(0)) {</span>
+<span class="fc" id="L1450">                quotAndRem = integerQuot.divideAndRemainder(TEN_POW[i]);</span>
+<span class="pc bpc" id="L1451" title="1 of 4 branches missed.">                if ((quotAndRem[1].signum() == 0)</span>
+                        &amp;&amp; (newScale - i &gt;= diffScale)) {
+<span class="fc" id="L1453">                    newScale -= i;</span>
+<span class="pc bpc" id="L1454" title="1 of 2 branches missed.">                    if (i &lt; lastPow) {</span>
+<span class="fc" id="L1455">                        i++;</span>
+                    }
+<span class="fc" id="L1457">                    integerQuot = quotAndRem[0];</span>
+                } else {
+<span class="pc bpc" id="L1459" title="1 of 2 branches missed.">                    if (i == 1) {</span>
+<span class="nc" id="L1460">                        break;</span>
+                    }
+<span class="fc" id="L1462">                    i = 1;</span>
+                }
+            }
+        }
+        // To perform rounding
+<span class="fc" id="L1467">        return new TBigDecimal(integerQuot, toIntScale(newScale), mc);</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is the integral part of
+     * {@code this / divisor}. The quotient is rounded down towards zero to the
+     * next integer. For example, {@code 0.5/0.2 = 2}.
+     *
+     * @param divisor value by which {@code this} is divided.
+     * @return integral part of {@code this / divisor}.
+     * @throws NullPointerException if {@code divisor == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
+     */
+    public TBigDecimal divideToIntegralValue(TBigDecimal divisor) {
+        TBigInteger integralValue; // the integer of result
+        TBigInteger powerOfTen; // some power of ten
+<span class="nc" id="L1483">        long newScale = (long) this.scale - divisor.scale;</span>
+<span class="nc" id="L1484">        long tempScale = 0;</span>
+<span class="nc" id="L1485">        int i = 1;</span>
+<span class="nc" id="L1486">        int lastPow = TEN_POW.length - 1;</span>
+
+<span class="nc bnc" id="L1488" title="All 2 branches missed.">        if (divisor.isZero()) {</span>
+<span class="nc" id="L1489">            throw new ArithmeticException(&quot;Division by zero&quot;);</span>
+        }
+<span class="nc bnc" id="L1491" title="All 2 branches missed.">        if ((divisor.aproxPrecision() + newScale &gt; this.aproxPrecision() + 1L)</span>
+<span class="nc bnc" id="L1492" title="All 2 branches missed.">                || (this.isZero())) {</span>
+            /* If the divisor's integer part is greater than this's integer part,
+             * the result must be zero with the appropriate scale */
+<span class="nc" id="L1495">            integralValue = TBigInteger.ZERO;</span>
+<span class="nc bnc" id="L1496" title="All 2 branches missed.">        } else if (newScale == 0) {</span>
+<span class="nc" id="L1497">            integralValue = getUnscaledValue().divide(divisor.getUnscaledValue());</span>
+<span class="nc bnc" id="L1498" title="All 2 branches missed.">        } else if (newScale &gt; 0) {</span>
+<span class="nc" id="L1499">            powerOfTen = TMultiplication.powerOf10(newScale);</span>
+<span class="nc" id="L1500">            integralValue = getUnscaledValue().divide(divisor.getUnscaledValue().multiply(powerOfTen));</span>
+<span class="nc" id="L1501">            integralValue = integralValue.multiply(powerOfTen);</span>
+        } else {// (newScale &lt; 0)
+<span class="nc" id="L1503">            powerOfTen = TMultiplication.powerOf10(-newScale);</span>
+<span class="nc" id="L1504">            integralValue = getUnscaledValue().multiply(powerOfTen).divide(divisor.getUnscaledValue());</span>
+            // To strip trailing zeros approximating to the preferred scale
+            TBigInteger[] quotAndRem;
+<span class="nc bnc" id="L1507" title="All 2 branches missed.">            while (!integralValue.testBit(0)) {</span>
+<span class="nc" id="L1508">                quotAndRem = integralValue.divideAndRemainder(TEN_POW[i]);</span>
+<span class="nc bnc" id="L1509" title="All 4 branches missed.">                if ((quotAndRem[1].signum() == 0)</span>
+                        &amp;&amp; (tempScale - i &gt;= newScale)) {
+<span class="nc" id="L1511">                    tempScale -= i;</span>
+<span class="nc bnc" id="L1512" title="All 2 branches missed.">                    if (i &lt; lastPow) {</span>
+<span class="nc" id="L1513">                        i++;</span>
+                    }
+<span class="nc" id="L1515">                    integralValue = quotAndRem[0];</span>
+                } else {
+<span class="nc bnc" id="L1517" title="All 2 branches missed.">                    if (i == 1) {</span>
+<span class="nc" id="L1518">                        break;</span>
+                    }
+<span class="nc" id="L1520">                    i = 1;</span>
+                }
+            }
+<span class="nc" id="L1523">            newScale = tempScale;</span>
+        }
+<span class="nc bnc" id="L1525" title="All 2 branches missed.">        return ((integralValue.signum() == 0)</span>
+<span class="nc" id="L1526">                ? zeroScaledBy(newScale)</span>
+<span class="nc" id="L1527">                : new TBigDecimal(integralValue, toIntScale(newScale)));</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is the integral part of
+     * {@code this / divisor}. The quotient is rounded down towards zero to the
+     * next integer. The rounding mode passed with the parameter {@code mc} is
+     * not considered. But if the precision of {@code mc &gt; 0} and the integral
+     * part requires more digits, then an {@code ArithmeticException} is thrown.
+     *
+     * @param divisor value by which {@code this} is divided.
+     * @param mc      math context which determines the maximal precision of the
+     *                result.
+     * @return integral part of {@code this / divisor}.
+     * @throws NullPointerException if {@code divisor == null} or {@code mc == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
+     * @throws ArithmeticException  if {@code mc.getPrecision() &gt; 0} and the result requires more
+     *                              digits to be represented.
+     */
+    public TBigDecimal divideToIntegralValue(TBigDecimal divisor, TMathContext mc) {
+<span class="fc" id="L1547">        int mcPrecision = mc.getPrecision();</span>
+<span class="fc" id="L1548">        int diffPrecision = this.precision() - divisor.precision();</span>
+<span class="fc" id="L1549">        int lastPow = TEN_POW.length - 1;</span>
+<span class="fc" id="L1550">        long diffScale = (long) this.scale - divisor.scale;</span>
+<span class="fc" id="L1551">        long newScale = diffScale;</span>
+<span class="fc" id="L1552">        long quotPrecision = diffPrecision - diffScale + 1;</span>
+<span class="fc" id="L1553">        TBigInteger[] quotAndRem = new TBigInteger[2];</span>
+        // In special cases it call the dual method
+<span class="pc bpc" id="L1555" title="3 of 6 branches missed.">        if ((mcPrecision == 0) || (this.isZero()) || (divisor.isZero())) {</span>
+<span class="nc" id="L1556">            return this.divideToIntegralValue(divisor);</span>
+        }
+        // Let be:   this = [u1,s1]   and   divisor = [u2,s2]
+<span class="pc bpc" id="L1559" title="1 of 2 branches missed.">        if (quotPrecision &lt;= 0) {</span>
+<span class="nc" id="L1560">            quotAndRem[0] = TBigInteger.ZERO;</span>
+<span class="pc bpc" id="L1561" title="1 of 2 branches missed.">        } else if (diffScale == 0) {</span>
+            // CASE s1 == s2:  to calculate   u1 / u2
+<span class="nc" id="L1563">            quotAndRem[0] = this.getUnscaledValue().divide(divisor.getUnscaledValue());</span>
+<span class="pc bpc" id="L1564" title="1 of 2 branches missed.">        } else if (diffScale &gt; 0) {</span>
+            // CASE s1 &gt;= s2:  to calculate   u1 / (u2 * 10^(s1-s2)
+<span class="fc" id="L1566">            quotAndRem[0] = this.getUnscaledValue().divide(</span>
+<span class="fc" id="L1567">                    divisor.getUnscaledValue().multiply(TMultiplication.powerOf10(diffScale)));</span>
+            // To chose  10^newScale  to get a quotient with at least 'mc.precision()' digits
+<span class="fc" id="L1569">            newScale = Math.min(diffScale, Math.max(mcPrecision - quotPrecision + 1, 0));</span>
+            // To calculate: (u1 / (u2 * 10^(s1-s2)) * 10^newScale
+<span class="fc" id="L1571">            quotAndRem[0] = quotAndRem[0].multiply(TMultiplication.powerOf10(newScale));</span>
+        } else {// CASE s2 &gt; s1:
+            /* To calculate the minimum power of ten, such that the quotient
+             *   (u1 * 10^exp) / u2   has at least 'mc.precision()' digits. */
+<span class="nc" id="L1575">            long exp = Math.min(-diffScale, Math.max((long) mcPrecision - diffPrecision, 0));</span>
+            long compRemDiv;
+            // Let be:   (u1 * 10^exp) / u2 = [q,r]
+<span class="nc" id="L1578">            quotAndRem = this.getUnscaledValue().multiply(TMultiplication.powerOf10(exp)).</span>
+<span class="nc" id="L1579">                    divideAndRemainder(divisor.getUnscaledValue());</span>
+<span class="nc" id="L1580">            newScale += exp; // To fix the scale</span>
+<span class="nc" id="L1581">            exp = -newScale; // The remaining power of ten</span>
+            // If after division there is a remainder...
+<span class="nc bnc" id="L1583" title="All 4 branches missed.">            if ((quotAndRem[1].signum() != 0) &amp;&amp; (exp &gt; 0)) {</span>
+                // Log10(r) + ((s2 - s1) - exp) &gt; mc.precision ?
+<span class="nc" id="L1585">                compRemDiv = (new TBigDecimal(quotAndRem[1])).precision()</span>
+<span class="nc" id="L1586">                        + exp - divisor.precision();</span>
+<span class="nc bnc" id="L1587" title="All 2 branches missed.">                if (compRemDiv == 0) {</span>
+                    // To calculate:  (r * 10^exp2) / u2
+<span class="nc" id="L1589">                    quotAndRem[1] = quotAndRem[1].multiply(TMultiplication.powerOf10(exp)).</span>
+<span class="nc" id="L1590">                            divide(divisor.getUnscaledValue());</span>
+<span class="nc" id="L1591">                    compRemDiv = Math.abs(quotAndRem[1].signum());</span>
+                }
+<span class="nc bnc" id="L1593" title="All 2 branches missed.">                if (compRemDiv &gt; 0) {</span>
+                    // The quotient won't fit in 'mc.precision()' digits
+<span class="nc" id="L1595">                    throw new ArithmeticException(&quot;Division impossible&quot;);</span>
+                }
+            }
+        }
+        // Fast return if the quotient is zero
+<span class="pc bpc" id="L1600" title="1 of 2 branches missed.">        if (quotAndRem[0].signum() == 0) {</span>
+<span class="nc" id="L1601">            return zeroScaledBy(diffScale);</span>
+        }
+<span class="fc" id="L1603">        TBigInteger strippedBI = quotAndRem[0];</span>
+<span class="fc" id="L1604">        TBigDecimal integralValue = new TBigDecimal(quotAndRem[0]);</span>
+<span class="fc" id="L1605">        long resultPrecision = integralValue.precision();</span>
+<span class="fc" id="L1606">        int i = 1;</span>
+        // To strip trailing zeros until the specified precision is reached
+<span class="pc bpc" id="L1608" title="1 of 2 branches missed.">        while (!strippedBI.testBit(0)) {</span>
+<span class="fc" id="L1609">            quotAndRem = strippedBI.divideAndRemainder(TEN_POW[i]);</span>
+<span class="pc bpc" id="L1610" title="3 of 6 branches missed.">            if ((quotAndRem[1].signum() == 0) &amp;&amp;</span>
+                    ((resultPrecision - i &gt;= mcPrecision)
+                            || (newScale - i &gt;= diffScale))) {
+<span class="nc" id="L1613">                resultPrecision -= i;</span>
+<span class="nc" id="L1614">                newScale -= i;</span>
+<span class="nc bnc" id="L1615" title="All 2 branches missed.">                if (i &lt; lastPow) {</span>
+<span class="nc" id="L1616">                    i++;</span>
+                }
+<span class="nc" id="L1618">                strippedBI = quotAndRem[0];</span>
+            } else {
+<span class="pc bpc" id="L1620" title="1 of 2 branches missed.">                if (i == 1) {</span>
+<span class="fc" id="L1621">                    break;</span>
+                }
+<span class="nc" id="L1623">                i = 1;</span>
+            }
+        }
+        // To check if the result fit in 'mc.precision()' digits
+<span class="pc bpc" id="L1627" title="1 of 2 branches missed.">        if (resultPrecision &gt; mcPrecision) {</span>
+<span class="nc" id="L1628">            throw new ArithmeticException(&quot;Division impossible&quot;);</span>
+        }
+<span class="fc" id="L1630">        integralValue.scale = toIntScale(newScale);</span>
+<span class="fc" id="L1631">        integralValue.setUnscaledValue(strippedBI);</span>
+<span class="fc" id="L1632">        return integralValue;</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code this % divisor}.
+     * &lt;p&gt;
+     * The remainder is defined as {@code this -
+     * this.divideToIntegralValue(divisor) * divisor}.
+     *
+     * @param divisor value by which {@code this} is divided.
+     * @return {@code this % divisor}.
+     * @throws NullPointerException if {@code divisor == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
+     */
+    public TBigDecimal remainder(TBigDecimal divisor) {
+<span class="nc" id="L1647">        return divideAndRemainder(divisor)[1];</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code this % divisor}.
+     * &lt;p&gt;
+     * The remainder is defined as {@code this -
+     * this.divideToIntegralValue(divisor) * divisor}.
+     * &lt;p&gt;
+     * The specified rounding mode {@code mc} is used for the division only.
+     *
+     * @param divisor value by which {@code this} is divided.
+     * @param mc      rounding mode and precision to be used.
+     * @return {@code this % divisor}.
+     * @throws NullPointerException if {@code divisor == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
+     * @throws ArithmeticException  if {@code mc.getPrecision() &gt; 0} and the result of {@code
+     *                              this.divideToIntegralValue(divisor, mc)} requires more digits
+     *                              to be represented.
+     */
+    public TBigDecimal remainder(TBigDecimal divisor, TMathContext mc) {
+<span class="nc" id="L1668">        return divideAndRemainder(divisor, mc)[1];</span>
+    }
+
+    /**
+     * Returns a {@code BigDecimal} array which contains the integral part of
+     * {@code this / divisor} at index 0 and the remainder {@code this %
+     * divisor} at index 1. The quotient is rounded down towards zero to the
+     * next integer.
+     *
+     * @param divisor value by which {@code this} is divided.
+     * @return {@code [this.divideToIntegralValue(divisor),
+     * this.remainder(divisor)]}.
+     * @throws NullPointerException if {@code divisor == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
+     * @see #divideToIntegralValue
+     * @see #remainder
+     */
+    public TBigDecimal[] divideAndRemainder(TBigDecimal divisor) {
+<span class="nc" id="L1686">        TBigDecimal[] quotAndRem = new TBigDecimal[2];</span>
+
+<span class="nc" id="L1688">        quotAndRem[0] = this.divideToIntegralValue(divisor);</span>
+<span class="nc" id="L1689">        quotAndRem[1] = this.subtract(quotAndRem[0].multiply(divisor));</span>
+<span class="nc" id="L1690">        return quotAndRem;</span>
+    }
+
+    /**
+     * Returns a {@code BigDecimal} array which contains the integral part of
+     * {@code this / divisor} at index 0 and the remainder {@code this %
+     * divisor} at index 1. The quotient is rounded down towards zero to the
+     * next integer. The rounding mode passed with the parameter {@code mc} is
+     * not considered. But if the precision of {@code mc &gt; 0} and the integral
+     * part requires more digits, then an {@code ArithmeticException} is thrown.
+     *
+     * @param divisor value by which {@code this} is divided.
+     * @param mc      math context which determines the maximal precision of the
+     *                result.
+     * @return {@code [this.divideToIntegralValue(divisor),
+     * this.remainder(divisor)]}.
+     * @throws NullPointerException if {@code divisor == null}.
+     * @throws ArithmeticException  if {@code divisor == 0}.
+     * @see #divideToIntegralValue
+     * @see #remainder
+     */
+    public TBigDecimal[] divideAndRemainder(TBigDecimal divisor, TMathContext mc) {
+<span class="fc" id="L1712">        TBigDecimal[] quotAndRem = new TBigDecimal[2];</span>
+
+<span class="fc" id="L1714">        quotAndRem[0] = this.divideToIntegralValue(divisor, mc);</span>
+<span class="fc" id="L1715">        quotAndRem[1] = this.subtract(quotAndRem[0].multiply(divisor));</span>
+<span class="fc" id="L1716">        return quotAndRem;</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code this ^ n}. The
+     * scale of the result is {@code n} times the scales of {@code this}.
+     * &lt;p&gt;
+     * {@code x.pow(0)} returns {@code 1}, even if {@code x == 0}.
+     * &lt;p&gt;
+     * Implementation Note: The implementation is based on the ANSI standard
+     * X3.274-1996 algorithm.
+     *
+     * @param n exponent to which {@code this} is raised.
+     * @return {@code this ^ n}.
+     * @throws ArithmeticException if {@code n &lt; 0} or {@code n &gt; 999999999}.
+     */
+    public TBigDecimal pow(int n) {
+<span class="nc bnc" id="L1733" title="All 2 branches missed.">        if (n == 0) {</span>
+<span class="nc" id="L1734">            return ONE;</span>
+        }
+<span class="nc bnc" id="L1736" title="All 4 branches missed.">        if ((n &lt; 0) || (n &gt; 999999999)) {</span>
+<span class="nc" id="L1737">            throw new ArithmeticException(&quot;Invalid Operation&quot;);</span>
+        }
+<span class="nc" id="L1739">        long newScale = scale * (long) n;</span>
+        // Let be: this = [u,s]   so:  this^n = [u^n, s*n]
+<span class="nc bnc" id="L1741" title="All 2 branches missed.">        return ((isZero())</span>
+<span class="nc" id="L1742">                ? zeroScaledBy(newScale)</span>
+<span class="nc" id="L1743">                : new TBigDecimal(getUnscaledValue().pow(n), toIntScale(newScale)));</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code this ^ n}. The
+     * result is rounded according to the passed context {@code mc}.
+     * &lt;p&gt;
+     * Implementation Note: The implementation is based on the ANSI standard
+     * X3.274-1996 algorithm.
+     *
+     * @param n  exponent to which {@code this} is raised.
+     * @param mc rounding mode and precision for the result of this operation.
+     * @return {@code this ^ n}.
+     * @throws ArithmeticException if {@code n &lt; 0} or {@code n &gt; 999999999}.
+     */
+    public TBigDecimal pow(int n, TMathContext mc) {
+        // The ANSI standard X3.274-1996 algorithm
+<span class="nc" id="L1760">        int m = Math.abs(n);</span>
+<span class="nc" id="L1761">        int mcPrecision = mc.getPrecision();</span>
+<span class="nc" id="L1762">        int elength = (int) MathUtil.log10(m) + 1;   // decimal digits in 'n'</span>
+        int oneBitMask; // mask of bits
+        TBigDecimal accum; // the single accumulator
+<span class="nc" id="L1765">        TMathContext newPrecision = mc; // MathContext by default</span>
+
+        // In particular cases, it reduces the problem to call the other 'pow()'
+<span class="nc bnc" id="L1768" title="All 6 branches missed.">        if ((n == 0) || ((isZero()) &amp;&amp; (n &gt; 0))) {</span>
+<span class="nc" id="L1769">            return pow(n);</span>
+        }
+<span class="nc bnc" id="L1771" title="All 10 branches missed.">        if ((m &gt; 999999999) || ((mcPrecision == 0) &amp;&amp; (n &lt; 0))</span>
+                || ((mcPrecision &gt; 0) &amp;&amp; (elength &gt; mcPrecision))) {
+<span class="nc" id="L1773">            throw new ArithmeticException(&quot;Invalid Operation&quot;);</span>
+        }
+<span class="nc bnc" id="L1775" title="All 2 branches missed.">        if (mcPrecision &gt; 0) {</span>
+<span class="nc" id="L1776">            newPrecision = new TMathContext(mcPrecision + elength + 1,</span>
+<span class="nc" id="L1777">                    mc.getRoundingMode());</span>
+        }
+        // The result is calculated as if 'n' were positive
+<span class="nc" id="L1780">        accum = round(newPrecision);</span>
+<span class="nc" id="L1781">        oneBitMask = highestOneBit(m) &gt;&gt; 1;</span>
+
+<span class="nc bnc" id="L1783" title="All 2 branches missed.">        while (oneBitMask &gt; 0) {</span>
+<span class="nc" id="L1784">            accum = accum.multiply(accum, newPrecision);</span>
+<span class="nc bnc" id="L1785" title="All 2 branches missed.">            if ((m &amp; oneBitMask) == oneBitMask) {</span>
+<span class="nc" id="L1786">                accum = accum.multiply(this, newPrecision);</span>
+            }
+<span class="nc" id="L1788">            oneBitMask &gt;&gt;= 1;</span>
+        }
+        // If 'n' is negative, the value is divided into 'ONE'
+<span class="nc bnc" id="L1791" title="All 2 branches missed.">        if (n &lt; 0) {</span>
+<span class="nc" id="L1792">            accum = ONE.divide(accum, newPrecision);</span>
+        }
+        // The final value is rounded to the destination precision
+<span class="nc" id="L1795">        accum.inplaceRound(mc);</span>
+<span class="nc" id="L1796">        return accum;</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is the absolute value of
+     * {@code this}. The scale of the result is the same as the scale of this.
+     *
+     * @return {@code abs(this)}
+     */
+    public TBigDecimal abs() {
+<span class="fc bfc" id="L1806" title="All 2 branches covered.">        return ((signum() &lt; 0) ? negate() : this);</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is the absolute value of
+     * {@code this}. The result is rounded according to the passed context
+     * {@code mc}.
+     *
+     * @param mc rounding mode and precision for the result of this operation.
+     * @return {@code abs(this)}
+     */
+    public TBigDecimal abs(TMathContext mc) {
+<span class="nc" id="L1818">        return round(mc).abs();</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is the {@code -this}. The
+     * scale of the result is the same as the scale of this.
+     *
+     * @return {@code -this}
+     */
+    public TBigDecimal negate() {
+<span class="pc bpc" id="L1828" title="5 of 6 branches missed.">        if (bitLength &lt; 63 || (bitLength == 63 &amp;&amp; smallValue != Long.MIN_VALUE)) {</span>
+<span class="fc" id="L1829">            return valueOf(-smallValue, scale);</span>
+        }
+<span class="nc" id="L1831">        return new TBigDecimal(getUnscaledValue().negate(), scale);</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is the {@code -this}. The
+     * result is rounded according to the passed context {@code mc}.
+     *
+     * @param mc rounding mode and precision for the result of this operation.
+     * @return {@code -this}
+     */
+    public TBigDecimal negate(TMathContext mc) {
+<span class="nc" id="L1842">        return round(mc).negate();</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code +this}. The scale
+     * of the result is the same as the scale of this.
+     *
+     * @return {@code this}
+     */
+    public TBigDecimal plus() {
+<span class="nc" id="L1852">        return this;</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code +this}. The result
+     * is rounded according to the passed context {@code mc}.
+     *
+     * @param mc rounding mode and precision for the result of this operation.
+     * @return {@code this}, rounded
+     */
+    public TBigDecimal plus(TMathContext mc) {
+<span class="nc" id="L1863">        return round(mc);</span>
+    }
+
+    /**
+     * Returns the sign of this {@code BigDecimal}.
+     *
+     * @return {@code -1} if {@code this &lt; 0},
+     * {@code 0} if {@code this == 0},
+     * {@code 1} if {@code this &gt; 0}.
+     */
+    public int signum() {
+<span class="pc bpc" id="L1874" title="1 of 2 branches missed.">        if (bitLength &lt; 64) {</span>
+<span class="fc" id="L1875">            return signum(this.smallValue);</span>
+        }
+<span class="nc" id="L1877">        return getUnscaledValue().signum();</span>
+    }
+
+    private boolean isZero() {
+        //Watch out: -1 has a bitLength=0
+<span class="pc bpc" id="L1882" title="3 of 4 branches missed.">        return bitLength == 0 &amp;&amp; this.smallValue != -1;</span>
+    }
+
+    /**
+     * Returns the scale of this {@code BigDecimal}. The scale is the number of
+     * digits behind the decimal point. The value of this {@code BigDecimal} is
+     * the unsignedValue * 10^(-scale). If the scale is negative, then this
+     * {@code BigDecimal} represents a big integer.
+     *
+     * @return the scale of this {@code BigDecimal}.
+     */
+    public int scale() {
+<span class="fc" id="L1894">        return scale;</span>
+    }
+
+    /**
+     * Returns the precision of this {@code BigDecimal}. The precision is the
+     * number of decimal digits used to represent this decimal. It is equivalent
+     * to the number of digits of the unscaled value. The precision of {@code 0}
+     * is {@code 1} (independent of the scale).
+     *
+     * @return the precision of this {@code BigDecimal}.
+     */
+    public int precision() {
+        // Checking if the precision already was calculated
+<span class="pc bpc" id="L1907" title="1 of 2 branches missed.">        if (precision &gt; 0) {</span>
+<span class="nc" id="L1908">            return precision;</span>
+        }
+<span class="fc" id="L1910">        int bitLength = this.bitLength;</span>
+<span class="fc" id="L1911">        int decimalDigits = 1; // the precision to be calculated</span>
+<span class="fc" id="L1912">        double doubleUnsc = 1;  // intVal in 'double'</span>
+
+<span class="pc bpc" id="L1914" title="1 of 2 branches missed.">        if (bitLength &lt; 1024) {</span>
+            // To calculate the precision for small numbers
+<span class="pc bpc" id="L1916" title="1 of 2 branches missed.">            if (bitLength &gt;= 64) {</span>
+<span class="nc" id="L1917">                doubleUnsc = getUnscaledValue().doubleValue();</span>
+<span class="pc bpc" id="L1918" title="1 of 2 branches missed.">            } else if (bitLength &gt;= 1) {</span>
+<span class="fc" id="L1919">                doubleUnsc = smallValue;</span>
+            }
+<span class="fc" id="L1921">            decimalDigits += MathUtil.log10(Math.abs(doubleUnsc));</span>
+        } else {// (bitLength &gt;= 1024)
+            /* To calculate the precision for large numbers
+             * Note that: 2 ^(bitlength() - 1) &lt;= intVal &lt; 10 ^(precision()) */
+<span class="nc" id="L1925">            decimalDigits += (bitLength - 1) * LOG10_2;</span>
+            // If after division the number isn't zero, exists an aditional digit
+<span class="nc bnc" id="L1927" title="All 2 branches missed.">            if (getUnscaledValue().divide(TMultiplication.powerOf10(decimalDigits)).signum() != 0) {</span>
+<span class="nc" id="L1928">                decimalDigits++;</span>
+            }
+        }
+<span class="fc" id="L1931">        precision = decimalDigits;</span>
+<span class="fc" id="L1932">        return precision;</span>
+    }
+
+    /**
+     * Returns the unscaled value (mantissa) of this {@code BigDecimal} instance
+     * as a {@code BigInteger}. The unscaled value can be computed as {@code
+     * this} 10^(scale).
+     *
+     * @return unscaled value (this * 10^(scale)).
+     */
+    public TBigInteger unscaledValue() {
+<span class="nc" id="L1943">        return getUnscaledValue();</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code this}, rounded
+     * according to the passed context {@code mc}.
+     * &lt;p&gt;
+     * If {@code mc.precision = 0}, then no rounding is performed.
+     * &lt;p&gt;
+     * If {@code mc.precision &gt; 0} and {@code mc.roundingMode == UNNECESSARY},
+     * then an {@code ArithmeticException} is thrown if the result cannot be
+     * represented exactly within the given precision.
+     *
+     * @param mc rounding mode and precision for the result of this operation.
+     * @return {@code this} rounded according to the passed context.
+     * @throws ArithmeticException if {@code mc.precision &gt; 0} and {@code mc.roundingMode ==
+     *                             UNNECESSARY} and this cannot be represented within the given
+     *                             precision.
+     */
+    public TBigDecimal round(TMathContext mc) {
+<span class="fc" id="L1963">        TBigDecimal thisBD = new TBigDecimal(getUnscaledValue(), scale);</span>
+
+<span class="fc" id="L1965">        thisBD.inplaceRound(mc);</span>
+<span class="fc" id="L1966">        return thisBD;</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} instance with the specified scale.
+     * &lt;p&gt;
+     * If the new scale is greater than the old scale, then additional zeros are
+     * added to the unscaled value. In this case no rounding is necessary.
+     * &lt;p&gt;
+     * If the new scale is smaller than the old scale, then trailing digits are
+     * removed. If these trailing digits are not zero, then the remaining
+     * unscaled value has to be rounded. For this rounding operation the
+     * specified rounding mode is used.
+     *
+     * @param newScale     scale of the result returned.
+     * @param roundingMode rounding mode to be used to round the result.
+     * @return a new {@code BigDecimal} instance with the specified scale.
+     * @throws NullPointerException if {@code roundingMode == null}.
+     * @throws ArithmeticException  if {@code roundingMode == ROUND_UNNECESSARY} and rounding is
+     *                              necessary according to the given scale.
+     */
+    public TBigDecimal setScale(int newScale, TRoundingMode roundingMode) {
+<span class="pc bpc" id="L1988" title="1 of 2 branches missed.">        if (roundingMode == null) {</span>
+<span class="nc" id="L1989">            throw new NullPointerException();</span>
+        }
+<span class="fc" id="L1991">        long diffScale = newScale - (long) scale;</span>
+        // Let be:  'this' = [u,s]
+<span class="pc bpc" id="L1993" title="1 of 2 branches missed.">        if (diffScale == 0) {</span>
+<span class="nc" id="L1994">            return this;</span>
+        }
+<span class="pc bpc" id="L1996" title="1 of 2 branches missed.">        if (diffScale &gt; 0) {</span>
+            // return  [u * 10^(s2 - s), newScale]
+<span class="nc bnc" id="L1998" title="All 4 branches missed.">            if (diffScale &lt; LONG_TEN_POW.length &amp;&amp;</span>
+                    (this.bitLength + LONG_TEN_POW_BIT_LENGTH[(int) diffScale]) &lt; 64) {
+<span class="nc" id="L2000">                return valueOf(this.smallValue * LONG_TEN_POW[(int) diffScale], newScale);</span>
+            }
+<span class="nc" id="L2002">            return new TBigDecimal(TMultiplication.multiplyByTenPow(getUnscaledValue(), (int) diffScale), newScale);</span>
+        }
+        // diffScale &lt; 0
+        // return  [u,s] / [1,newScale]  with the appropriate scale and rounding
+<span class="pc bpc" id="L2006" title="2 of 4 branches missed.">        if (this.bitLength &lt; 64 &amp;&amp; -diffScale &lt; LONG_TEN_POW.length) {</span>
+<span class="fc" id="L2007">            return dividePrimitiveLongs(this.smallValue, LONG_TEN_POW[(int) -diffScale], newScale, roundingMode);</span>
+        }
+<span class="nc" id="L2009">        return divideBigIntegers(this.getUnscaledValue(), TMultiplication.powerOf10(-diffScale), newScale, roundingMode);</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} instance with the specified scale.
+     * &lt;p&gt;
+     * If the new scale is greater than the old scale, then additional zeros are
+     * added to the unscaled value. In this case no rounding is necessary.
+     * &lt;p&gt;
+     * If the new scale is smaller than the old scale, then trailing digits are
+     * removed. If these trailing digits are not zero, then the remaining
+     * unscaled value has to be rounded. For this rounding operation the
+     * specified rounding mode is used.
+     *
+     * @param newScale     scale of the result returned.
+     * @param roundingMode rounding mode to be used to round the result.
+     * @return a new {@code BigDecimal} instance with the specified scale.
+     * @throws IllegalArgumentException if {@code roundingMode} is not a valid rounding mode.
+     * @throws ArithmeticException      if {@code roundingMode == ROUND_UNNECESSARY} and rounding is
+     *                                  necessary according to the given scale.
+     */
+    public TBigDecimal setScale(int newScale, int roundingMode) {
+<span class="nc" id="L2031">        return setScale(newScale, TRoundingMode.valueOf(roundingMode));</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} instance with the specified scale. If
+     * the new scale is greater than the old scale, then additional zeros are
+     * added to the unscaled value. If the new scale is smaller than the old
+     * scale, then trailing zeros are removed. If the trailing digits are not
+     * zeros then an ArithmeticException is thrown.
+     * &lt;p&gt;
+     * If no exception is thrown, then the following equation holds: {@code
+     * x.setScale(s).compareTo(x) == 0}.
+     *
+     * @param newScale scale of the result returned.
+     * @return a new {@code BigDecimal} instance with the specified scale.
+     * @throws ArithmeticException if rounding would be necessary.
+     */
+    public TBigDecimal setScale(int newScale) {
+<span class="fc" id="L2049">        return setScale(newScale, TRoundingMode.UNNECESSARY);</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} instance where the decimal point has
+     * been moved {@code n} places to the left. If {@code n &lt; 0} then the
+     * decimal point is moved {@code -n} places to the right.
+     * &lt;p&gt;
+     * The result is obtained by changing its scale. If the scale of the result
+     * becomes negative, then its precision is increased such that the scale is
+     * zero.
+     * &lt;p&gt;
+     * Note, that {@code movePointLeft(0)} returns a result which is
+     * mathematically equivalent, but which has {@code scale &gt;= 0}.
+     *
+     * @param n number of placed the decimal point has to be moved.
+     * @return {@code this * 10^(-n}).
+     */
+    public TBigDecimal movePointLeft(int n) {
+<span class="nc" id="L2068">        return movePoint(scale + (long) n);</span>
+    }
+
+    private TBigDecimal movePoint(long newScale) {
+<span class="nc bnc" id="L2072" title="All 2 branches missed.">        if (isZero()) {</span>
+<span class="nc" id="L2073">            return zeroScaledBy(Math.max(newScale, 0));</span>
+        }
+        /* When:  'n'== Integer.MIN_VALUE  isn't possible to call to movePointRight(-n)
+         * since  -Integer.MIN_VALUE == Integer.MIN_VALUE */
+<span class="nc bnc" id="L2077" title="All 2 branches missed.">        if (newScale &gt;= 0) {</span>
+<span class="nc bnc" id="L2078" title="All 2 branches missed.">            if (bitLength &lt; 64) {</span>
+<span class="nc" id="L2079">                return valueOf(smallValue, toIntScale(newScale));</span>
+            }
+<span class="nc" id="L2081">            return new TBigDecimal(getUnscaledValue(), toIntScale(newScale));</span>
+        }
+<span class="nc bnc" id="L2083" title="All 4 branches missed.">        if (-newScale &lt; LONG_TEN_POW.length &amp;&amp;</span>
+                bitLength + LONG_TEN_POW_BIT_LENGTH[(int) -newScale] &lt; 64) {
+<span class="nc" id="L2085">            return valueOf(smallValue * LONG_TEN_POW[(int) -newScale], 0);</span>
+        }
+<span class="nc" id="L2087">        return new TBigDecimal(TMultiplication.multiplyByTenPow(getUnscaledValue(), (int) -newScale), 0);</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} instance where the decimal point has
+     * been moved {@code n} places to the right. If {@code n &lt; 0} then the
+     * decimal point is moved {@code -n} places to the left.
+     * &lt;p&gt;
+     * The result is obtained by changing its scale. If the scale of the result
+     * becomes negative, then its precision is increased such that the scale is
+     * zero.
+     * &lt;p&gt;
+     * Note, that {@code movePointRight(0)} returns a result which is
+     * mathematically equivalent, but which has scale &gt;= 0.
+     *
+     * @param n number of placed the decimal point has to be moved.
+     * @return {@code this * 10^n}.
+     */
+    public TBigDecimal movePointRight(int n) {
+<span class="nc" id="L2106">        return movePoint(scale - (long) n);</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} whose value is {@code this} 10^{@code n}.
+     * The scale of the result is {@code this.scale()} - {@code n}.
+     * The precision of the result is the precision of {@code this}.
+     * &lt;p&gt;
+     * This method has the same effect as {@link #movePointRight}, except that
+     * the precision is not changed.
+     *
+     * @param n number of places the decimal point has to be moved.
+     * @return {@code this * 10^n}
+     */
+    public TBigDecimal scaleByPowerOfTen(int n) {
+<span class="nc" id="L2121">        long newScale = scale - (long) n;</span>
+<span class="nc bnc" id="L2122" title="All 2 branches missed.">        if (bitLength &lt; 64) {</span>
+            //Taking care when a 0 is to be scaled
+<span class="nc bnc" id="L2124" title="All 2 branches missed.">            if (smallValue == 0) {</span>
+<span class="nc" id="L2125">                return zeroScaledBy(newScale);</span>
+            }
+<span class="nc" id="L2127">            return valueOf(smallValue, toIntScale(newScale));</span>
+        }
+<span class="nc" id="L2129">        return new TBigDecimal(getUnscaledValue(), toIntScale(newScale));</span>
+    }
+
+    /**
+     * Returns a new {@code BigDecimal} instance with the same value as {@code
+     * this} but with a unscaled value where the trailing zeros have been
+     * removed. If the unscaled value of {@code this} has n trailing zeros, then
+     * the scale and the precision of the result has been reduced by n.
+     *
+     * @return a new {@code BigDecimal} instance equivalent to this where the
+     * trailing zeros of the unscaled value have been removed.
+     */
+    public TBigDecimal stripTrailingZeros() {
+<span class="nc" id="L2142">        int i = 1; // 1 &lt;= i &lt;= 18</span>
+<span class="nc" id="L2143">        int lastPow = TEN_POW.length - 1;</span>
+<span class="nc" id="L2144">        long newScale = scale;</span>
+
+<span class="nc bnc" id="L2146" title="All 2 branches missed.">        if (isZero()) {</span>
+<span class="nc" id="L2147">            return new TBigDecimal(&quot;0&quot;);</span>
+        }
+<span class="nc" id="L2149">        TBigInteger strippedBI = getUnscaledValue();</span>
+        TBigInteger[] quotAndRem;
+
+        // while the number is even...
+<span class="nc bnc" id="L2153" title="All 2 branches missed.">        while (!strippedBI.testBit(0)) {</span>
+            // To divide by 10^i
+<span class="nc" id="L2155">            quotAndRem = strippedBI.divideAndRemainder(TEN_POW[i]);</span>
+            // To look the remainder
+<span class="nc bnc" id="L2157" title="All 2 branches missed.">            if (quotAndRem[1].signum() == 0) {</span>
+                // To adjust the scale
+<span class="nc" id="L2159">                newScale -= i;</span>
+<span class="nc bnc" id="L2160" title="All 2 branches missed.">                if (i &lt; lastPow) {</span>
+                    // To set to the next power
+<span class="nc" id="L2162">                    i++;</span>
+                }
+<span class="nc" id="L2164">                strippedBI = quotAndRem[0];</span>
+            } else {
+<span class="nc bnc" id="L2166" title="All 2 branches missed.">                if (i == 1) {</span>
+                    // 'this' has no more trailing zeros
+<span class="nc" id="L2168">                    break;</span>
+                }
+                // To set to the smallest power of ten
+<span class="nc" id="L2171">                i = 1;</span>
+            }
+        }
+<span class="nc" id="L2174">        return new TBigDecimal(strippedBI, toIntScale(newScale));</span>
+    }
+
+    /**
+     * Compares this {@code BigDecimal} with {@code val}. Returns one of the
+     * three values {@code 1}, {@code 0}, or {@code -1}. The method behaves as
+     * if {@code this.subtract(val)} is computed. If this difference is &gt; 0 then
+     * 1 is returned, if the difference is &lt; 0 then -1 is returned, and if the
+     * difference is 0 then 0 is returned. This means, that if two decimal
+     * instances are compared which are equal in value but differ in scale, then
+     * these two instances are considered as equal.
+     *
+     * @param val value to be compared with {@code this}.
+     * @return {@code 1} if {@code this &gt; val}, {@code -1} if {@code this &lt; val},
+     * {@code 0} if {@code this == val}.
+     * @throws NullPointerException if {@code val == null}.
+     */
+    //@Override
+    public int compareTo(TBigDecimal val) {
+<span class="fc" id="L2193">        int thisSign = signum();</span>
+<span class="fc" id="L2194">        int valueSign = val.signum();</span>
+
+<span class="fc bfc" id="L2196" title="All 2 branches covered.">        if (thisSign == valueSign) {</span>
+<span class="pc bpc" id="L2197" title="5 of 6 branches missed.">            if (this.scale == val.scale &amp;&amp; this.bitLength &lt; 64 &amp;&amp; val.bitLength &lt; 64) {</span>
+<span class="nc bnc" id="L2198" title="All 4 branches missed.">                return (smallValue &lt; val.smallValue) ? -1 : (smallValue &gt; val.smallValue) ? 1 : 0;</span>
+            }
+<span class="fc" id="L2200">            long diffScale = (long) this.scale - val.scale;</span>
+<span class="fc" id="L2201">            int diffPrecision = this.aproxPrecision() - val.aproxPrecision();</span>
+<span class="pc bpc" id="L2202" title="1 of 2 branches missed.">            if (diffPrecision &gt; diffScale + 1) {</span>
+<span class="fc" id="L2203">                return thisSign;</span>
+<span class="nc bnc" id="L2204" title="All 2 branches missed.">            } else if (diffPrecision &lt; diffScale - 1) {</span>
+<span class="nc" id="L2205">                return -thisSign;</span>
+            } else {// thisSign == val.signum()  and  diffPrecision is aprox. diffScale
+<span class="nc" id="L2207">                TBigInteger thisUnscaled = this.getUnscaledValue();</span>
+<span class="nc" id="L2208">                TBigInteger valUnscaled = val.getUnscaledValue();</span>
+                // If any of both precision is bigger, append zeros to the shorter one
+<span class="nc bnc" id="L2210" title="All 2 branches missed.">                if (diffScale &lt; 0) {</span>
+<span class="nc" id="L2211">                    thisUnscaled = thisUnscaled.multiply(TMultiplication.powerOf10(-diffScale));</span>
+<span class="nc bnc" id="L2212" title="All 2 branches missed.">                } else if (diffScale &gt; 0) {</span>
+<span class="nc" id="L2213">                    valUnscaled = valUnscaled.multiply(TMultiplication.powerOf10(diffScale));</span>
+                }
+<span class="nc" id="L2215">                return thisUnscaled.compareTo(valUnscaled);</span>
+            }
+<span class="pc bpc" id="L2217" title="1 of 2 branches missed.">        } else if (thisSign &lt; valueSign) {</span>
+<span class="fc" id="L2218">            return -1;</span>
+        } else {
+<span class="nc" id="L2220">            return 1;</span>
+        }
+    }
+
+    /**
+     * Returns {@code true} if {@code x} is a {@code BigDecimal} instance and if
+     * this instance is equal to this big decimal. Two big decimals are equal if
+     * their unscaled value and their scale is equal. For example, 1.0
+     * (10*10^(-1)) is not equal to 1.00 (100*10^(-2)). Similarly, zero
+     * instances are not equal if their scale differs.
+     *
+     * @param x object to be compared with {@code this}.
+     * @return true if {@code x} is a {@code BigDecimal} and {@code this == x}.
+     */
+    @Override
+    public boolean equals(Object x) {
+<span class="nc bnc" id="L2236" title="All 2 branches missed.">        if (this == x) {</span>
+<span class="nc" id="L2237">            return true;</span>
+        }
+<span class="nc bnc" id="L2239" title="All 2 branches missed.">        if (x instanceof TBigDecimal) {</span>
+<span class="nc" id="L2240">            TBigDecimal x1 = (TBigDecimal) x;</span>
+<span class="nc bnc" id="L2241" title="All 6 branches missed.">            return x1.scale == scale</span>
+                    &amp;&amp; (bitLength &lt; 64 ? (x1.smallValue == smallValue)
+<span class="nc bnc" id="L2243" title="All 2 branches missed.">                    : intVal.equals(x1.intVal));</span>
+
+
+        }
+<span class="nc" id="L2247">        return false;</span>
+    }
+
+    /**
+     * Returns the minimum of this {@code BigDecimal} and {@code val}.
+     *
+     * @param val value to be used to compute the minimum with this.
+     * @return {@code min(this, val}.
+     * @throws NullPointerException if {@code val == null}.
+     */
+    public TBigDecimal min(TBigDecimal val) {
+<span class="nc bnc" id="L2258" title="All 2 branches missed.">        return ((compareTo(val) &lt;= 0) ? this : val);</span>
+    }
+
+    /**
+     * Returns the maximum of this {@code BigDecimal} and {@code val}.
+     *
+     * @param val value to be used to compute the maximum with this.
+     * @return {@code max(this, val}.
+     * @throws NullPointerException if {@code val == null}.
+     */
+    public TBigDecimal max(TBigDecimal val) {
+<span class="nc bnc" id="L2269" title="All 2 branches missed.">        return ((compareTo(val) &gt;= 0) ? this : val);</span>
+    }
+
+    /**
+     * Returns a hash code for this {@code BigDecimal}.
+     *
+     * @return hash code for {@code this}.
+     */
+    @Override
+    public int hashCode() {
+<span class="nc bnc" id="L2279" title="All 2 branches missed.">        if (hashCode != 0) {</span>
+<span class="nc" id="L2280">            return hashCode;</span>
+        }
+<span class="nc bnc" id="L2282" title="All 2 branches missed.">        if (bitLength &lt; 64) {</span>
+<span class="nc" id="L2283">            hashCode = (int) (smallValue &amp; 0xffffffff);</span>
+<span class="nc" id="L2284">            hashCode = 33 * hashCode + (int) ((smallValue &gt;&gt; 32) &amp; 0xffffffff);</span>
+<span class="nc" id="L2285">            hashCode = 17 * hashCode + scale;</span>
+<span class="nc" id="L2286">            return hashCode;</span>
+        }
+<span class="nc" id="L2288">        hashCode = 17 * intVal.hashCode() + scale;</span>
+<span class="nc" id="L2289">        return hashCode;</span>
+    }
+
+    /**
+     * Returns a canonical string representation of this {@code BigDecimal}. If
+     * necessary, scientific notation is used. This representation always prints
+     * all significant digits of this value.
+     * &lt;p&gt;
+     * If the scale is negative or if {@code scale - precision &gt;= 6} then
+     * scientific notation is used.
+     *
+     * @return a string representation of {@code this} in scientific notation if
+     * necessary.
+     */
+    @Override
+    public String toString() {
+<span class="fc bfc" id="L2305" title="All 2 branches covered.">        if (toStringImage != null) {</span>
+<span class="fc" id="L2306">            return toStringImage;</span>
+        }
+<span class="pc bpc" id="L2308" title="1 of 2 branches missed.">        if (bitLength &lt; 32) {</span>
+<span class="fc" id="L2309">            toStringImage = TConversion.toDecimalScaledString(smallValue, scale);</span>
+<span class="fc" id="L2310">            return toStringImage;</span>
+        }
+<span class="nc" id="L2312">        String intString = getUnscaledValue().toString();</span>
+<span class="nc bnc" id="L2313" title="All 2 branches missed.">        if (scale == 0) {</span>
+<span class="nc" id="L2314">            return intString;</span>
+        }
+<span class="nc bnc" id="L2316" title="All 2 branches missed.">        int begin = (getUnscaledValue().signum() &lt; 0) ? 2 : 1;</span>
+<span class="nc" id="L2317">        int end = intString.length();</span>
+<span class="nc" id="L2318">        long exponent = -(long) scale + end - begin;</span>
+<span class="nc" id="L2319">        StringBuilder result = new StringBuilder();</span>
+
+<span class="nc" id="L2321">        result.append(intString);</span>
+<span class="nc bnc" id="L2322" title="All 4 branches missed.">        if ((scale &gt; 0) &amp;&amp; (exponent &gt;= -6)) {</span>
+<span class="nc bnc" id="L2323" title="All 2 branches missed.">            if (exponent &gt;= 0) {</span>
+<span class="nc" id="L2324">                result.insert(end - scale, '.');</span>
+            } else {
+<span class="nc" id="L2326">                result.insert(begin - 1, &quot;0.&quot;);</span>
+
+<span class="nc" id="L2328">                result.insert(begin + 1, String.valueOf(CH_ZEROS).substring(0, -(int) exponent - 1));</span>
+            }
+        } else {
+<span class="nc bnc" id="L2331" title="All 2 branches missed.">            if (end - begin &gt;= 1) {</span>
+<span class="nc" id="L2332">                result.insert(begin, '.');</span>
+<span class="nc" id="L2333">                end++;</span>
+            }
+<span class="nc" id="L2335">            result.insert(end, 'E');</span>
+<span class="nc bnc" id="L2336" title="All 2 branches missed.">            if (exponent &gt; 0) {</span>
+<span class="nc" id="L2337">                result.insert(++end, '+');</span>
+            }
+<span class="nc" id="L2339">            result.insert(++end, exponent);</span>
+        }
+<span class="nc" id="L2341">        toStringImage = result.toString();</span>
+<span class="nc" id="L2342">        return toStringImage;</span>
+    }
+
+    /**
+     * Returns a string representation of this {@code BigDecimal}. This
+     * representation always prints all significant digits of this value.
+     * &lt;p&gt;
+     * If the scale is negative or if {@code scale - precision &gt;= 6} then
+     * engineering notation is used. Engineering notation is similar to the
+     * scientific notation except that the exponent is made to be a multiple of
+     * 3 such that the integer part is &gt;= 1 and &lt; 1000.
+     *
+     * @return a string representation of {@code this} in engineering notation
+     * if necessary.
+     */
+    public String toEngineeringString() {
+<span class="nc" id="L2358">        String intString = getUnscaledValue().toString();</span>
+<span class="nc bnc" id="L2359" title="All 2 branches missed.">        if (scale == 0) {</span>
+<span class="nc" id="L2360">            return intString;</span>
+        }
+<span class="nc bnc" id="L2362" title="All 2 branches missed.">        int begin = (getUnscaledValue().signum() &lt; 0) ? 2 : 1;</span>
+<span class="nc" id="L2363">        int end = intString.length();</span>
+<span class="nc" id="L2364">        long exponent = -(long) scale + end - begin;</span>
+<span class="nc" id="L2365">        StringBuilder result = new StringBuilder(intString);</span>
+
+<span class="nc bnc" id="L2367" title="All 4 branches missed.">        if ((scale &gt; 0) &amp;&amp; (exponent &gt;= -6)) {</span>
+<span class="nc bnc" id="L2368" title="All 2 branches missed.">            if (exponent &gt;= 0) {</span>
+<span class="nc" id="L2369">                result.insert(end - scale, '.');</span>
+            } else {
+<span class="nc" id="L2371">                result.insert(begin - 1, &quot;0.&quot;); //$NON-NLS-1$</span>
+<span class="nc" id="L2372">                result.insert(begin + 1, String.valueOf(CH_ZEROS).substring(0, -(int) exponent - 1));</span>
+            }
+        } else {
+<span class="nc" id="L2375">            int delta = end - begin;</span>
+<span class="nc" id="L2376">            int rem = (int) (exponent % 3);</span>
+
+<span class="nc bnc" id="L2378" title="All 2 branches missed.">            if (rem != 0) {</span>
+                // adjust exponent so it is a multiple of three
+<span class="nc bnc" id="L2380" title="All 2 branches missed.">                if (getUnscaledValue().signum() == 0) {</span>
+                    // zero value
+<span class="nc bnc" id="L2382" title="All 2 branches missed.">                    rem = (rem &lt; 0) ? -rem : 3 - rem;</span>
+<span class="nc" id="L2383">                    exponent += rem;</span>
+                } else {
+                    // nonzero value
+<span class="nc bnc" id="L2386" title="All 2 branches missed.">                    rem = (rem &lt; 0) ? rem + 3 : rem;</span>
+<span class="nc" id="L2387">                    exponent -= rem;</span>
+<span class="nc" id="L2388">                    begin += rem;</span>
+                }
+<span class="nc bnc" id="L2390" title="All 2 branches missed.">                if (delta &lt; 3) {</span>
+<span class="nc bnc" id="L2391" title="All 2 branches missed.">                    for (int i = rem - delta; i &gt; 0; i--) {</span>
+<span class="nc" id="L2392">                        result.insert(end++, '0');</span>
+                    }
+                }
+            }
+<span class="nc bnc" id="L2396" title="All 2 branches missed.">            if (end - begin &gt;= 1) {</span>
+<span class="nc" id="L2397">                result.insert(begin, '.');</span>
+<span class="nc" id="L2398">                end++;</span>
+            }
+<span class="nc bnc" id="L2400" title="All 2 branches missed.">            if (exponent != 0) {</span>
+<span class="nc" id="L2401">                result.insert(end, 'E');</span>
+<span class="nc bnc" id="L2402" title="All 2 branches missed.">                if (exponent &gt; 0) {</span>
+<span class="nc" id="L2403">                    result.insert(++end, '+');</span>
+                }
+<span class="nc" id="L2405">                result.insert(++end, exponent);</span>
+            }
+        }
+<span class="nc" id="L2408">        return result.toString();</span>
+    }
+
+    /**
+     * Returns a string representation of this {@code BigDecimal}. No scientific
+     * notation is used. This methods adds zeros where necessary.
+     * &lt;p&gt;
+     * If this string representation is used to create a new instance, this
+     * instance is generally not identical to {@code this} as the precision
+     * changes.
+     * &lt;p&gt;
+     * {@code x.equals(new BigDecimal(x.toPlainString())} usually returns
+     * {@code false}.
+     * &lt;p&gt;
+     * {@code x.compareTo(new BigDecimal(x.toPlainString())} returns {@code 0}.
+     *
+     * @return a string representation of {@code this} without exponent part.
+     */
+    public String toPlainString() {
+<span class="nc" id="L2427">        String intStr = getUnscaledValue().toString();</span>
+<span class="nc bnc" id="L2428" title="All 6 branches missed.">        if ((scale == 0) || ((isZero()) &amp;&amp; (scale &lt; 0))) {</span>
+<span class="nc" id="L2429">            return intStr;</span>
+        }
+<span class="nc bnc" id="L2431" title="All 2 branches missed.">        int begin = (signum() &lt; 0) ? 1 : 0;</span>
+<span class="nc" id="L2432">        int delta = scale;</span>
+        // We take space for all digits, plus a possible decimal point, plus 'scale'
+<span class="nc" id="L2434">        StringBuilder result = new StringBuilder(intStr.length() + 1 + Math.abs(scale));</span>
+
+<span class="nc bnc" id="L2436" title="All 2 branches missed.">        if (begin == 1) {</span>
+            // If the number is negative, we insert a '-' character at front
+<span class="nc" id="L2438">            result.append('-');</span>
+        }
+<span class="nc bnc" id="L2440" title="All 2 branches missed.">        if (scale &gt; 0) {</span>
+<span class="nc" id="L2441">            delta -= (intStr.length() - begin);</span>
+<span class="nc bnc" id="L2442" title="All 2 branches missed.">            if (delta &gt;= 0) {</span>
+<span class="nc" id="L2443">                result.append(&quot;0.&quot;); //$NON-NLS-1$</span>
+                // To append zeros after the decimal point
+<span class="nc bnc" id="L2445" title="All 2 branches missed.">                for (; delta &gt; CH_ZEROS.length; delta -= CH_ZEROS.length) {</span>
+<span class="nc" id="L2446">                    result.append(CH_ZEROS);</span>
+                }
+<span class="nc" id="L2448">                result.append(CH_ZEROS, 0, delta);</span>
+<span class="nc" id="L2449">                result.append(intStr.substring(begin));</span>
+            } else {
+<span class="nc" id="L2451">                delta = begin - delta;</span>
+<span class="nc" id="L2452">                result.append(intStr.substring(begin, delta));</span>
+<span class="nc" id="L2453">                result.append('.');</span>
+<span class="nc" id="L2454">                result.append(intStr.substring(delta));</span>
+            }
+        } else {// (scale &lt;= 0)
+<span class="nc" id="L2457">            result.append(intStr.substring(begin));</span>
+            // To append trailing zeros
+<span class="nc bnc" id="L2459" title="All 2 branches missed.">            for (; delta &lt; -CH_ZEROS.length; delta += CH_ZEROS.length) {</span>
+<span class="nc" id="L2460">                result.append(CH_ZEROS);</span>
+            }
+<span class="nc" id="L2462">            result.append(CH_ZEROS, 0, -delta);</span>
+        }
+<span class="nc" id="L2464">        return result.toString();</span>
+    }
+
+    /**
+     * Returns this {@code BigDecimal} as a big integer instance. A fractional
+     * part is discarded.
+     *
+     * @return this {@code BigDecimal} as a big integer instance.
+     */
+    public TBigInteger toBigInteger() {
+<span class="pc bpc" id="L2474" title="2 of 4 branches missed.">        if ((scale == 0) || (isZero())) {</span>
+<span class="nc" id="L2475">            return getUnscaledValue();</span>
+<span class="pc bpc" id="L2476" title="1 of 2 branches missed.">        } else if (scale &lt; 0) {</span>
+<span class="nc" id="L2477">            return getUnscaledValue().multiply(TMultiplication.powerOf10(-(long) scale));</span>
+        } else {// (scale &gt; 0)
+<span class="fc" id="L2479">            return getUnscaledValue().divide(TMultiplication.powerOf10(scale));</span>
+        }
+    }
+
+    /**
+     * Returns this {@code BigDecimal} as a big integer instance if it has no
+     * fractional part. If this {@code BigDecimal} has a fractional part, i.e.
+     * if rounding would be necessary, an {@code ArithmeticException} is thrown.
+     *
+     * @return this {@code BigDecimal} as a big integer value.
+     * @throws ArithmeticException if rounding is necessary.
+     */
+    public TBigInteger toBigIntegerExact() {
+<span class="nc bnc" id="L2492" title="All 4 branches missed.">        if ((scale == 0) || (isZero())) {</span>
+<span class="nc" id="L2493">            return getUnscaledValue();</span>
+<span class="nc bnc" id="L2494" title="All 2 branches missed.">        } else if (scale &lt; 0) {</span>
+<span class="nc" id="L2495">            return getUnscaledValue().multiply(TMultiplication.powerOf10(-(long) scale));</span>
+        } else {// (scale &gt; 0)
+            TBigInteger[] integerAndFraction;
+            // An optimization before do a heavy division
+<span class="nc bnc" id="L2499" title="All 4 branches missed.">            if ((scale &gt; aproxPrecision()) || (scale &gt; getUnscaledValue().getLowestSetBit())) {</span>
+<span class="nc" id="L2500">                throw new ArithmeticException(&quot;Rounding necessary&quot;);</span>
+            }
+<span class="nc" id="L2502">            integerAndFraction = getUnscaledValue().divideAndRemainder(TMultiplication.powerOf10(scale));</span>
+<span class="nc bnc" id="L2503" title="All 2 branches missed.">            if (integerAndFraction[1].signum() != 0) {</span>
+                // It exists a non-zero fractional part
+<span class="nc" id="L2505">                throw new ArithmeticException(&quot;Rounding necessary&quot;);</span>
+            }
+<span class="nc" id="L2507">            return integerAndFraction[0];</span>
+        }
+    }
+
+    /**
+     * Returns this {@code BigDecimal} as a long value. Any fractional part is
+     * discarded. If the integral part of {@code this} is too big to be
+     * represented as a long, then {@code this} % 2^64 is returned.
+     *
+     * @return this {@code BigDecimal} as a long value.
+     */
+    //@Override
+    public long longValue() {
+        /* If scale &lt;= -64 there are at least 64 trailing bits zero in 10^(-scale).
+         * If the scale is positive and very large the long value could be zero. */
+<span class="nc bnc" id="L2522" title="All 4 branches missed.">        return ((scale &lt;= -64) || (scale &gt; aproxPrecision())</span>
+                ? 0L
+<span class="nc" id="L2524">                : toBigInteger().longValue());</span>
+    }
+
+    /**
+     * Returns this {@code BigDecimal} as a long value if it has no fractional
+     * part and if its value fits to the int range ([-2^{63}..2^{63}-1]). If
+     * these conditions are not met, an {@code ArithmeticException} is thrown.
+     *
+     * @return this {@code BigDecimal} as a long value.
+     * @throws ArithmeticException if rounding is necessary or the number doesn't fit in a long.
+     */
+    public long longValueExact() {
+<span class="nc" id="L2536">        return valueExact(64);</span>
+    }
+
+    /**
+     * Returns this {@code BigDecimal} as an int value. Any fractional part is
+     * discarded. If the integral part of {@code this} is too big to be
+     * represented as an int, then {@code this} % 2^32 is returned.
+     *
+     * @return this {@code BigDecimal} as a int value.
+     */
+    //@Override
+    public int intValue() {
+        /* If scale &lt;= -32 there are at least 32 trailing bits zero in 10^(-scale).
+         * If the scale is positive and very large the long value could be zero. */
+<span class="nc bnc" id="L2550" title="All 4 branches missed.">        return ((scale &lt;= -32) || (scale &gt; aproxPrecision())</span>
+                ? 0
+<span class="nc" id="L2552">                : toBigInteger().intValue());</span>
+    }
+
+    /* Private Methods */
+
+    /**
+     * Returns this {@code BigDecimal} as a int value if it has no fractional
+     * part and if its value fits to the int range ([-2^{31}..2^{31}-1]). If
+     * these conditions are not met, an {@code ArithmeticException} is thrown.
+     *
+     * @return this {@code BigDecimal} as a int value.
+     * @throws ArithmeticException if rounding is necessary or the number doesn't fit in a int.
+     */
+    public int intValueExact() {
+<span class="nc" id="L2566">        return (int) valueExact(32);</span>
+    }
+
+    /**
+     * Returns this {@code BigDecimal} as a short value if it has no fractional
+     * part and if its value fits to the short range ([-2^{15}..2^{15}-1]). If
+     * these conditions are not met, an {@code ArithmeticException} is thrown.
+     *
+     * @return this {@code BigDecimal} as a short value.
+     * @throws ArithmeticException if rounding is necessary of the number doesn't fit in a
+     *                             short.
+     */
+    public short shortValueExact() {
+<span class="nc" id="L2579">        return (short) valueExact(16);</span>
+    }
+
+    /**
+     * Returns this {@code BigDecimal} as a byte value if it has no fractional
+     * part and if its value fits to the byte range ([-128..127]). If these
+     * conditions are not met, an {@code ArithmeticException} is thrown.
+     *
+     * @return this {@code BigDecimal} as a byte value.
+     * @throws ArithmeticException if rounding is necessary or the number doesn't fit in a byte.
+     */
+    public byte byteValueExact() {
+<span class="nc" id="L2591">        return (byte) valueExact(8);</span>
+    }
+
+    /**
+     * Returns this {@code BigDecimal} as a float value. If {@code this} is too
+     * big to be represented as a float, then {@code Float.POSITIVE_INFINITY}
+     * or {@code Float.NEGATIVE_INFINITY} is returned.
+     * &lt;p&gt;
+     * Note, that if the unscaled value has more than 24 significant digits,
+     * then this decimal cannot be represented exactly in a float variable. In
+     * this case the result is rounded.
+     * &lt;p&gt;
+     * For example, if the instance {@code x1 = new BigDecimal(&quot;0.1&quot;)} cannot be
+     * represented exactly as a float, and thus {@code x1.equals(new
+     * BigDecimal(x1.folatValue())} returns {@code false} for this case.
+     * &lt;p&gt;
+     * Similarly, if the instance {@code new BigDecimal(16777217)} is converted
+     * to a float, the result is {@code 1.6777216E}7.
+     *
+     * @return this {@code BigDecimal} as a float value.
+     */
+    //@Override
+    public float floatValue() {
+        /* A similar code like in doubleValue() could be repeated here,
+         * but this simple implementation is quite efficient. */
+<span class="nc" id="L2616">        float floatResult = signum();</span>
+<span class="nc" id="L2617">        long powerOfTwo = this.bitLength - (long) (scale / LOG10_2);</span>
+<span class="nc bnc" id="L2618" title="All 4 branches missed.">        if ((powerOfTwo &lt; -149) || (floatResult == 0.0f)) {</span>
+            // Cases which 'this' is very small
+<span class="nc" id="L2620">            floatResult *= 0.0f;</span>
+<span class="nc bnc" id="L2621" title="All 2 branches missed.">        } else if (powerOfTwo &gt; 129) {</span>
+            // Cases which 'this' is very large
+<span class="nc" id="L2623">            floatResult *= Float.POSITIVE_INFINITY;</span>
+        } else {
+<span class="nc" id="L2625">            floatResult = (float) doubleValue();</span>
+        }
+<span class="nc" id="L2627">        return floatResult;</span>
+    }
+
+    /**
+     * Returns this {@code BigDecimal} as a double value. If {@code this} is too
+     * big to be represented as a float, then {@code Double.POSITIVE_INFINITY}
+     * or {@code Double.NEGATIVE_INFINITY} is returned.
+     * &lt;p&gt;
+     * Note, that if the unscaled value has more than 53 significant digits,
+     * then this decimal cannot be represented exactly in a double variable. In
+     * this case the result is rounded.
+     * &lt;p&gt;
+     * For example, if the instance {@code x1 = new BigDecimal(&quot;0.1&quot;)} cannot be
+     * represented exactly as a double, and thus {@code x1.equals(new
+     * BigDecimal(x1.doubleValue())} returns {@code false} for this case.
+     * &lt;p&gt;
+     * Similarly, if the instance {@code new BigDecimal(9007199254740993L)} is
+     * converted to a double, the result is {@code 9.007199254740992E15}.
+     * &lt;p&gt;
+     *
+     * @return this {@code BigDecimal} as a double value.
+     */
+    //@Override
+    public double doubleValue() {
+<span class="nc" id="L2651">        int sign = signum();</span>
+<span class="nc" id="L2652">        int exponent = 1076; // bias + 53</span>
+        int lowestSetBit;
+        int discardedSize;
+<span class="nc" id="L2655">        long powerOfTwo = this.bitLength - (long) (scale / LOG10_2);</span>
+        long bits; // IEEE-754 Standard
+        long tempBits; // for temporal calculations
+        TBigInteger mantisa;
+
+<span class="nc bnc" id="L2660" title="All 4 branches missed.">        if ((powerOfTwo &lt; -1074) || (sign == 0)) {</span>
+            // Cases which 'this' is very small
+<span class="nc" id="L2662">            return (sign * 0.0d);</span>
+<span class="nc bnc" id="L2663" title="All 2 branches missed.">        } else if (powerOfTwo &gt; 1025) {</span>
+            // Cases which 'this' is very large
+<span class="nc" id="L2665">            return (sign * Double.POSITIVE_INFINITY);</span>
+        }
+<span class="nc" id="L2667">        mantisa = getUnscaledValue().abs();</span>
+        // Let be:  this = [u,s], with s &gt; 0
+<span class="nc bnc" id="L2669" title="All 2 branches missed.">        if (scale &lt;= 0) {</span>
+            // mantisa = abs(u) * 10^s
+<span class="nc" id="L2671">            mantisa = mantisa.multiply(TMultiplication.powerOf10(-scale));</span>
+        } else {// (scale &gt; 0)
+            TBigInteger[] quotAndRem;
+<span class="nc" id="L2674">            TBigInteger powerOfTen = TMultiplication.powerOf10(scale);</span>
+<span class="nc" id="L2675">            int k = 100 - (int) powerOfTwo;</span>
+            int compRem;
+
+<span class="nc bnc" id="L2678" title="All 2 branches missed.">            if (k &gt; 0) {</span>
+                /* Computing (mantisa * 2^k) , where 'k' is a enough big
+                 * power of '2' to can divide by 10^s */
+<span class="nc" id="L2681">                mantisa = mantisa.shiftLeft(k);</span>
+<span class="nc" id="L2682">                exponent -= k;</span>
+            }
+            // Computing (mantisa * 2^k) / 10^s
+<span class="nc" id="L2685">            quotAndRem = mantisa.divideAndRemainder(powerOfTen);</span>
+            // To check if the fractional part &gt;= 0.5
+<span class="nc" id="L2687">            compRem = quotAndRem[1].shiftLeftOneBit().compareTo(powerOfTen);</span>
+            // To add two rounded bits at end of mantisa
+<span class="nc" id="L2689">            mantisa = quotAndRem[0].shiftLeft(2).add(</span>
+<span class="nc" id="L2690">                    TBigInteger.valueOf(((long) compRem * (compRem + 3)) / 2 + 1));</span>
+<span class="nc" id="L2691">            exponent -= 2;</span>
+        }
+<span class="nc" id="L2693">        lowestSetBit = mantisa.getLowestSetBit();</span>
+<span class="nc" id="L2694">        discardedSize = mantisa.bitLength() - 54;</span>
+<span class="nc bnc" id="L2695" title="All 2 branches missed.">        if (discardedSize &gt; 0) {// (n &gt; 54)</span>
+            // mantisa = (abs(u) * 10^s) &gt;&gt; (n - 54)
+<span class="nc" id="L2697">            bits = mantisa.shiftRight(discardedSize).longValue();</span>
+<span class="nc" id="L2698">            tempBits = bits;</span>
+            // #bits = 54, to check if the discarded fraction produces a carry
+<span class="nc bnc" id="L2700" title="All 6 branches missed.">            if ((((bits &amp; 1) == 1) &amp;&amp; (lowestSetBit &lt; discardedSize))</span>
+                    || ((bits &amp; 3) == 3)) {
+<span class="nc" id="L2702">                bits += 2;</span>
+            }
+        } else {// (n &lt;= 54)
+            // mantisa = (abs(u) * 10^s) &lt;&lt; (54 - n)
+<span class="nc" id="L2706">            bits = mantisa.longValue() &lt;&lt; -discardedSize;</span>
+<span class="nc" id="L2707">            tempBits = bits;</span>
+            // #bits = 54, to check if the discarded fraction produces a carry:
+<span class="nc bnc" id="L2709" title="All 2 branches missed.">            if ((bits &amp; 3) == 3) {</span>
+<span class="nc" id="L2710">                bits += 2;</span>
+            }
+        }
+        // Testing bit 54 to check if the carry creates a new binary digit
+<span class="nc bnc" id="L2714" title="All 2 branches missed.">        if ((bits &amp; 0x40000000000000L) == 0) {</span>
+            // To drop the last bit of mantisa (first discarded)
+<span class="nc" id="L2716">            bits &gt;&gt;= 1;</span>
+            // exponent = 2^(s-n+53+bias)
+<span class="nc" id="L2718">            exponent += discardedSize;</span>
+        } else {// #bits = 54
+<span class="nc" id="L2720">            bits &gt;&gt;= 2;</span>
+<span class="nc" id="L2721">            exponent += discardedSize + 1;</span>
+        }
+        // To test if the 53-bits number fits in 'double'
+<span class="nc bnc" id="L2724" title="All 2 branches missed.">        if (exponent &gt; 2046) {// (exponent - bias &gt; 1023)</span>
+<span class="nc" id="L2725">            return (sign * Double.POSITIVE_INFINITY);</span>
+<span class="nc bnc" id="L2726" title="All 2 branches missed.">        } else if (exponent &lt;= 0) {// (exponent - bias &lt;= -1023)</span>
+            // Denormalized numbers (having exponent == 0)
+<span class="nc bnc" id="L2728" title="All 2 branches missed.">            if (exponent &lt; -53) {// exponent - bias &lt; -1076</span>
+<span class="nc" id="L2729">                return (sign * 0.0d);</span>
+            }
+            // -1076 &lt;= exponent - bias &lt;= -1023
+            // To discard '- exponent + 1' bits
+<span class="nc" id="L2733">            bits = tempBits &gt;&gt; 1;</span>
+<span class="nc" id="L2734">            tempBits = bits &amp; (-1L &gt;&gt;&gt; (63 + exponent));</span>
+<span class="nc" id="L2735">            bits &gt;&gt;= (-exponent);</span>
+            // To test if after discard bits, a new carry is generated
+<span class="nc bnc" id="L2737" title="All 8 branches missed.">            if (((bits &amp; 3) == 3) || (((bits &amp; 1) == 1) &amp;&amp; (tempBits != 0)</span>
+                    &amp;&amp; (lowestSetBit &lt; discardedSize))) {
+<span class="nc" id="L2739">                bits += 1;</span>
+            }
+<span class="nc" id="L2741">            exponent = 0;</span>
+<span class="nc" id="L2742">            bits &gt;&gt;= 1;</span>
+        }
+        // Construct the 64 double bits: [sign(1), exponent(11), mantisa(52)]
+<span class="nc" id="L2745">        bits = (sign &amp; 0x8000000000000000L) | ((long) exponent &lt;&lt; 52) | (bits &amp; 0xFFFFFFFFFFFFFL);</span>
+<span class="nc" id="L2746">        return Double.longBitsToDouble(bits);</span>
+    }
+
+    /**
+     * Returns the unit in the last place (ULP) of this {@code BigDecimal}
+     * instance. An ULP is the distance to the nearest big decimal with the same
+     * precision.
+     * &lt;p&gt;
+     * The amount of a rounding error in the evaluation of a floating-point
+     * operation is often expressed in ULPs. An error of 1 ULP is often seen as
+     * a tolerable error.
+     * &lt;p&gt;
+     * For class {@code BigDecimal}, the ULP of a number is simply 10^(-scale).
+     * &lt;p&gt;
+     * For example, {@code new BigDecimal(0.1).ulp()} returns {@code 1E-55}.
+     *
+     * @return unit in the last place (ULP) of this {@code BigDecimal} instance.
+     */
+    public TBigDecimal ulp() {
+<span class="nc" id="L2765">        return valueOf(1, scale);</span>
+    }
+
+    /**
+     * It does all rounding work of the public method
+     * {@code round(MathContext)}, performing an inplace rounding
+     * without creating a new object.
+     *
+     * @param mc the {@code MathContext} for perform the rounding.
+     * @see #round(TMathContext)
+     */
+    private void inplaceRound(TMathContext mc) {
+<span class="fc" id="L2777">        int mcPrecision = mc.getPrecision();</span>
+<span class="pc bpc" id="L2778" title="1 of 4 branches missed.">        if (aproxPrecision() - mcPrecision &lt;= 0 || mcPrecision == 0) {</span>
+<span class="fc" id="L2779">            return;</span>
+        }
+<span class="fc" id="L2781">        int discardedPrecision = precision() - mcPrecision;</span>
+        // If no rounding is necessary it returns immediately
+<span class="pc bpc" id="L2783" title="1 of 2 branches missed.">        if ((discardedPrecision &lt;= 0)) {</span>
+<span class="nc" id="L2784">            return;</span>
+        }
+        // When the number is small perform an efficient rounding
+<span class="pc bpc" id="L2787" title="1 of 2 branches missed.">        if (this.bitLength &lt; 64) {</span>
+<span class="fc" id="L2788">            smallRound(mc, discardedPrecision);</span>
+<span class="fc" id="L2789">            return;</span>
+        }
+        // Getting the integer part and the discarded fraction
+<span class="nc" id="L2792">        TBigInteger sizeOfFraction = TMultiplication.powerOf10(discardedPrecision);</span>
+<span class="nc" id="L2793">        TBigInteger[] integerAndFraction = getUnscaledValue().divideAndRemainder(sizeOfFraction);</span>
+<span class="nc" id="L2794">        long newScale = (long) scale - discardedPrecision;</span>
+        int compRem;
+        TBigDecimal tempBD;
+        // If the discarded fraction is non-zero, perform rounding
+<span class="nc bnc" id="L2798" title="All 2 branches missed.">        if (integerAndFraction[1].signum() != 0) {</span>
+            // To check if the discarded fraction &gt;= 0.5
+<span class="nc" id="L2800">            compRem = (integerAndFraction[1].abs().shiftLeftOneBit().compareTo(sizeOfFraction));</span>
+            // To look if there is a carry
+<span class="nc bnc" id="L2802" title="All 2 branches missed.">            compRem = roundingBehavior(integerAndFraction[0].testBit(0) ? 1 : 0,</span>
+<span class="nc" id="L2803">                    integerAndFraction[1].signum() * (5 + compRem),</span>
+<span class="nc" id="L2804">                    mc.getRoundingMode());</span>
+<span class="nc bnc" id="L2805" title="All 2 branches missed.">            if (compRem != 0) {</span>
+<span class="nc" id="L2806">                integerAndFraction[0] = integerAndFraction[0].add(TBigInteger.valueOf(compRem));</span>
+            }
+<span class="nc" id="L2808">            tempBD = new TBigDecimal(integerAndFraction[0]);</span>
+            // If after to add the increment the precision changed, we normalize the size
+<span class="nc bnc" id="L2810" title="All 2 branches missed.">            if (tempBD.precision() &gt; mcPrecision) {</span>
+<span class="nc" id="L2811">                integerAndFraction[0] = integerAndFraction[0].divide(TBigInteger.TEN);</span>
+<span class="nc" id="L2812">                newScale--;</span>
+            }
+        }
+        // To update all internal fields
+<span class="nc" id="L2816">        scale = toIntScale(newScale);</span>
+<span class="nc" id="L2817">        precision = mcPrecision;</span>
+<span class="nc" id="L2818">        setUnscaledValue(integerAndFraction[0]);</span>
+<span class="nc" id="L2819">    }</span>
+
+    /**
+     * This method implements an efficient rounding for numbers which unscaled
+     * value fits in the type {@code long}.
+     *
+     * @param mc                 the context to use
+     * @param discardedPrecision the number of decimal digits that are discarded
+     * @see #round(TMathContext)
+     */
+    private void smallRound(TMathContext mc, int discardedPrecision) {
+<span class="fc" id="L2830">        long sizeOfFraction = LONG_TEN_POW[discardedPrecision];</span>
+<span class="fc" id="L2831">        long newScale = (long) scale - discardedPrecision;</span>
+<span class="fc" id="L2832">        long unscaledVal = smallValue;</span>
+        // Getting the integer part and the discarded fraction
+<span class="fc" id="L2834">        long integer = unscaledVal / sizeOfFraction;</span>
+<span class="fc" id="L2835">        long fraction = unscaledVal % sizeOfFraction;</span>
+        int compRem;
+        // If the discarded fraction is non-zero perform rounding
+<span class="pc bpc" id="L2838" title="1 of 2 branches missed.">        if (fraction != 0) {</span>
+            // To check if the discarded fraction &gt;= 0.5
+<span class="fc" id="L2840">            compRem = longCompareTo(Math.abs(fraction) &lt;&lt; 1, sizeOfFraction);</span>
+            // To look if there is a carry
+<span class="fc" id="L2842">            integer += roundingBehavior(((int) integer) &amp; 1,</span>
+<span class="fc" id="L2843">                    signum(fraction) * (5 + compRem),</span>
+<span class="fc" id="L2844">                    mc.getRoundingMode());</span>
+            // If after to add the increment the precision changed, we normalize the size
+<span class="pc bpc" id="L2846" title="1 of 2 branches missed.">            if (MathUtil.log10(Math.abs(integer)) &gt;= mc.getPrecision()) {</span>
+<span class="nc" id="L2847">                integer /= 10;</span>
+<span class="nc" id="L2848">                newScale--;</span>
+            }
+        }
+        // To update all internal fields
+<span class="fc" id="L2852">        scale = toIntScale(newScale);</span>
+<span class="fc" id="L2853">        precision = mc.getPrecision();</span>
+<span class="fc" id="L2854">        smallValue = integer;</span>
+<span class="fc" id="L2855">        bitLength = bitLength(integer);</span>
+<span class="fc" id="L2856">        intVal = null;</span>
+<span class="fc" id="L2857">    }</span>
+
+    /**
+     * If {@code intVal} has a fractional part throws an exception,
+     * otherwise it counts the number of bits of value and checks if it's out of
+     * the range of the primitive type. If the number fits in the primitive type
+     * returns this number as {@code long}, otherwise throws an
+     * exception.
+     *
+     * @param bitLengthOfType number of bits of the type whose value will be calculated
+     *                        exactly
+     * @return the exact value of the integer part of {@code BigDecimal}
+     * when is possible
+     * @throws ArithmeticException when rounding is necessary or the
+     *                             number don't fit in the primitive type
+     */
+    private long valueExact(int bitLengthOfType) {
+<span class="nc" id="L2874">        TBigInteger bigInteger = toBigIntegerExact();</span>
+
+<span class="nc bnc" id="L2876" title="All 2 branches missed.">        if (bigInteger.bitLength() &lt; bitLengthOfType) {</span>
+            // It fits in the primitive type
+<span class="nc" id="L2878">            return bigInteger.longValue();</span>
+        }
+<span class="nc" id="L2880">        throw new ArithmeticException(&quot;Rounding necessary&quot;);</span>
+    }
+
+    /**
+     * If the precision already was calculated it returns that value, otherwise
+     * it calculates a very good approximation efficiently . Note that this
+     * value will be {@code precision()} or {@code precision()-1}
+     * in the worst case.
+     *
+     * @return an approximation of {@code precision()} value
+     */
+    private int aproxPrecision() {
+<span class="fc bfc" id="L2892" title="All 2 branches covered.">        return (precision &gt; 0) ? precision</span>
+                : ((int) ((this.bitLength - 1) * LOG10_2)) + 1;
+    }
+
+    private TBigInteger getUnscaledValue() {
+<span class="fc bfc" id="L2897" title="All 2 branches covered.">        if (intVal == null) {</span>
+<span class="fc" id="L2898">            intVal = TBigInteger.valueOf(smallValue);</span>
+        }
+<span class="fc" id="L2900">        return intVal;</span>
+    }
+
+    private void setUnscaledValue(TBigInteger unscaledValue) {
+<span class="fc" id="L2904">        this.intVal = unscaledValue;</span>
+<span class="fc" id="L2905">        this.bitLength = unscaledValue.bitLength();</span>
+<span class="pc bpc" id="L2906" title="1 of 2 branches missed.">        if (this.bitLength &lt; 64) {</span>
+<span class="fc" id="L2907">            this.smallValue = unscaledValue.longValue();</span>
+        }
+<span class="fc" id="L2909">    }</span>
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,430 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Command.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">Command.java</span></div><h1>Command.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.ui;
+
+import com.codename1.compat.java.util.Objects;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+
+import java.util.HashMap;
+
+/**
+ * The Command class provides a useful extension to the ActionListener
+ * interface in cases where the same functionality may be accessed by several controls.
+ *
+ * @author Nir Shabi
+ */
+public class Command implements ActionListener {
+<span class="fc" id="L40">    private boolean disposesDialog = true;</span>
+    private Image icon;
+    private char materialIcon;
+    private char fontIcon;
+    private Font iconFont;
+    private Image pressedIcon;
+    private Image rolloverIcon;
+    private Image disabledIcon;
+    private String command;
+<span class="fc" id="L49">    private boolean enabled = true;</span>
+<span class="fc" id="L50">    private float iconGapMM = -1;</span>
+<span class="fc" id="L51">    private float materialIconSize = -1;</span>
+
+    /**
+     * Simplifies code dealing with commands allowing them to be used in switch statements
+     * more easily
+     */
+    private int commandId;
+
+    private HashMap&lt;String, Object&gt; clientProperties;
+
+    /**
+     * Creates a new instance of Command
+     *
+     * @param command the string that will be placed on the Soft buttons\Menu
+     */
+<span class="fc" id="L66">    public Command(String command) {</span>
+<span class="fc" id="L67">        this.command = command;</span>
+<span class="fc" id="L68">    }</span>
+
+    /**
+     * Creates a new instance of Command
+     *
+     * @param command the string that will be placed on the Soft buttons\Menu
+     * @param icon    the icon representing the command
+     */
+<span class="fc" id="L76">    public Command(String command, Image icon) {</span>
+<span class="fc" id="L77">        this.command = command;</span>
+<span class="fc" id="L78">        this.icon = icon;</span>
+<span class="fc" id="L79">    }</span>
+
+
+    /**
+     * Creates a new instance of Command
+     *
+     * @param command the string that will be placed on the Soft buttons\Menu
+     * @param id      user defined ID for a command simplifying switch statement code
+     *                working with a command
+     */
+<span class="fc" id="L89">    public Command(String command, int id) {</span>
+<span class="fc" id="L90">        this.command = command;</span>
+<span class="fc" id="L91">        this.commandId = id;</span>
+<span class="fc" id="L92">    }</span>
+
+    /**
+     * Creates a new instance of Command
+     *
+     * @param command the string that will be placed on the Soft buttons\Menu
+     * @param icon    the icon representing the command
+     * @param id      user defined ID for a command simplifying switch statement code
+     *                working with a command
+     */
+<span class="fc" id="L102">    public Command(String command, Image icon, int id) {</span>
+<span class="fc" id="L103">        this.command = command;</span>
+<span class="fc" id="L104">        this.commandId = id;</span>
+<span class="fc" id="L105">        this.icon = icon;</span>
+<span class="fc" id="L106">    }</span>
+
+    /**
+     * Creates a new command instance that encapsulates the action listener and details, the main
+     * value of this approach is in our ability to write commands using the shorthand lambda syntax
+     * of Java 8.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     */
+    public static Command create(String name, Image icon, final ActionListener ev) {
+<span class="fc" id="L119">        Command cmd = new Command(name) {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L122">                ev.actionPerformed(evt);</span>
+<span class="fc" id="L123">            }</span>
+        };
+<span class="fc" id="L125">        cmd.setIcon(icon);</span>
+<span class="fc" id="L126">        return cmd;</span>
+    }
+
+    /**
+     * Creates a new command instance that encapsulates the action listener and details, the main
+     * value of this approach is in our ability to write commands using the shorthand lambda syntax
+     * of Java 8.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     * @since 6.0
+     */
+    public static Command createMaterial(String name, char icon, final ActionListener ev) {
+<span class="fc" id="L141">        Command cmd = new Command(name) {</span>
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L144">                ev.actionPerformed(evt);</span>
+<span class="fc" id="L145">            }</span>
+        };
+<span class="fc" id="L147">        cmd.setMaterialIcon(icon);</span>
+<span class="fc" id="L148">        return cmd;</span>
+    }
+
+    /**
+     * Return the command ID
+     *
+     * @return the command ID
+     */
+    public int getId() {
+<span class="fc" id="L157">        return commandId;</span>
+    }
+
+    /**
+     * gets the Command Name
+     *
+     * @return the Command name
+     */
+    public String getCommandName() {
+<span class="fc" id="L166">        return command;</span>
+    }
+
+    /**
+     * sets the Command name
+     *
+     * @param command
+     */
+    public void setCommandName(String command) {
+<span class="fc" id="L175">        this.command = command;</span>
+<span class="fc" id="L176">    }</span>
+
+    /**
+     * Returns the icon representing the command
+     *
+     * @return an icon representing the command
+     */
+    public Image getIcon() {
+<span class="fc" id="L184">        return icon;</span>
+    }
+
+    /**
+     * Sets the icon for the command
+     *
+     * @param icon the new icon
+     */
+    public void setIcon(Image icon) {
+<span class="fc" id="L193">        this.icon = icon;</span>
+<span class="fc" id="L194">    }</span>
+
+    /**
+     * Returns a string representation of the object
+     *
+     * @return Returns a string representation of the object
+     */
+    public String toString() {
+<span class="fc" id="L202">        return getCommandName();</span>
+    }
+
+    /**
+     * Indicates the icon that is displayed on the button when the button is in
+     * pressed state
+     *
+     * @return icon used
+     */
+    public Image getPressedIcon() {
+<span class="fc" id="L212">        return pressedIcon;</span>
+    }
+
+    /**
+     * Indicates the icon that is displayed on the button when the button is in
+     * pressed state
+     *
+     * @param pressedIcon icon used
+     */
+    public void setPressedIcon(Image pressedIcon) {
+<span class="fc" id="L222">        this.pressedIcon = pressedIcon;</span>
+<span class="fc" id="L223">    }</span>
+
+    /**
+     * Indicates the icon that is displayed on the button when the button is in
+     * the disabled state
+     *
+     * @return icon used
+     */
+    public Image getDisabledIcon() {
+<span class="fc" id="L232">        return disabledIcon;</span>
+    }
+
+    /**
+     * Indicates the icon that is displayed on the button when the button is in
+     * the disabled state
+     *
+     * @param disabledIcon icon used
+     */
+    public void setDisabledIcon(Image disabledIcon) {
+<span class="fc" id="L242">        this.disabledIcon = disabledIcon;</span>
+<span class="fc" id="L243">    }</span>
+
+    /**
+     * Indicates the icon that is displayed on the button when the button is in
+     * rolled over state
+     *
+     * @return icon used
+     */
+    public Image getRolloverIcon() {
+<span class="fc" id="L252">        return rolloverIcon;</span>
+    }
+
+    /**
+     * Indicates the icon that is displayed on the button when the button is in
+     * rolled over state
+     *
+     * @param rolloverIcon icon to use
+     */
+    public void setRolloverIcon(Image rolloverIcon) {
+<span class="fc" id="L262">        this.rolloverIcon = rolloverIcon;</span>
+<span class="fc" id="L263">    }</span>
+
+    /**
+     * compare two commands
+     *
+     * @param obj a Command Object to compare
+     * @return true if the obj has the same command name
+     */
+    public boolean equals(Object obj) {
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">        if (!(obj instanceof Command)) {</span>
+<span class="nc" id="L273">            return false;</span>
+        }
+<span class="fc bfc" id="L275" title="All 2 branches covered.">        if (((Command) obj).command == null) {</span>
+<span class="pc bpc" id="L276" title="7 of 14 branches missed.">            return (obj != null) &amp;&amp; obj.getClass() == getClass() &amp;&amp; command == null &amp;&amp;</span>
+                    ((Command) obj).icon == icon &amp;&amp; ((Command) obj).commandId == commandId &amp;&amp;
+                    ((Command) obj).materialIcon == materialIcon &amp;&amp; ((Command) obj).materialIconSize == materialIconSize &amp;&amp;
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">                    (Objects.equals(clientProperties, ((Command) obj).clientProperties));</span>
+        } else {
+<span class="pc bpc" id="L281" title="6 of 14 branches missed.">            return (obj != null) &amp;&amp; obj.getClass() == getClass() &amp;&amp; ((Command) obj).command.equals(command) &amp;&amp;</span>
+                    ((Command) obj).icon == icon &amp;&amp; ((Command) obj).commandId == commandId &amp;&amp;
+                    ((Command) obj).materialIcon == materialIcon &amp;&amp; ((Command) obj).materialIconSize == materialIconSize &amp;&amp;
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">                    (Objects.equals(clientProperties, ((Command) obj).clientProperties));</span>
+        }
+    }
+
+    /**
+     * Allows storing commands in a vector/hashtable
+     *
+     * @return unique hashcode for the command class
+     */
+    public int hashCode() {
+<span class="fc" id="L294">        return getClass().hashCode() + commandId;</span>
+    }
+
+    /**
+     * This method is called when the soft button/Menu item is clicked
+     *
+     * @param evt the Event Object
+     */
+    public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L303">    }</span>
+
+    /**
+     * Indicates whether this command causes the dialog to dispose implicitly, defaults to true
+     */
+    public boolean isDisposesDialog() {
+<span class="fc" id="L309">        return disposesDialog;</span>
+    }
+
+    /**
+     * Indicates whether this command causes the dialog to dispose implicitly, defaults to true
+     */
+    public void setDisposesDialog(boolean disposesDialog) {
+<span class="nc" id="L316">        this.disposesDialog = disposesDialog;</span>
+<span class="nc" id="L317">    }</span>
+
+    /**
+     * Allows disabling/enabling the command
+     *
+     * @return the enabled
+     */
+    public boolean isEnabled() {
+<span class="fc" id="L325">        return enabled;</span>
+    }
+
+    /**
+     * Allows disabling/enabling the command
+     *
+     * @param enabled the enabled to set
+     */
+    public void setEnabled(boolean enabled) {
+<span class="nc" id="L334">        this.enabled = enabled;</span>
+<span class="nc" id="L335">    }</span>
+
+    /**
+     * The client properties are a useful way to associate meta-data with a command
+     * without subclassing
+     *
+     * @param key an arbitrary user key
+     * @return an arbitrary user object
+     */
+    public Object getClientProperty(String key) {
+<span class="fc bfc" id="L345" title="All 2 branches covered.">        if (clientProperties != null) {</span>
+<span class="fc" id="L346">            return clientProperties.get(key);</span>
+        }
+<span class="fc" id="L348">        return null;</span>
+    }
+
+    /**
+     * The client properties are a useful way to associate meta-data with a command
+     * without sub classing
+     *
+     * @param key   an arbitrary user key
+     * @param value an arbitrary user object, null to remove
+     */
+    public void putClientProperty(String key, Object value) {
+<span class="fc bfc" id="L359" title="All 2 branches covered.">        if (clientProperties == null) {</span>
+<span class="fc" id="L360">            clientProperties = new HashMap&lt;String, Object&gt;();</span>
+        }
+<span class="fc bfc" id="L362" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L363">            clientProperties.remove(key);</span>
+        } else {
+<span class="fc" id="L365">            clientProperties.put(key, value);</span>
+        }
+<span class="fc" id="L367">    }</span>
+
+    /**
+     * @return the materialIcon
+     */
+    public char getMaterialIcon() {
+<span class="fc" id="L373">        return materialIcon;</span>
+    }
+
+    /**
+     * @param materialIcon the materialIcon to set
+     */
+    public void setMaterialIcon(char materialIcon) {
+<span class="fc" id="L380">        this.materialIcon = materialIcon;</span>
+<span class="fc" id="L381">    }</span>
+
+    /**
+     * The gap between the text and the icon in millimeters or -1 for default
+     *
+     * @return the iconGapMM
+     */
+    public float getIconGapMM() {
+<span class="fc" id="L389">        return iconGapMM;</span>
+    }
+
+    /**
+     * The gap between the text and the icon in millimeters or -1 for default
+     *
+     * @param iconGapMM the iconGapMM to set
+     */
+    public void setIconGapMM(float iconGapMM) {
+<span class="fc" id="L398">        this.iconGapMM = iconGapMM;</span>
+<span class="fc" id="L399">    }</span>
+
+    /**
+     * @return the materialIconSize
+     */
+    public float getMaterialIconSize() {
+<span class="fc" id="L405">        return materialIconSize;</span>
+    }
+
+    /**
+     * @param materialIconSize the materialIconSize to set
+     */
+    public void setMaterialIconSize(float materialIconSize) {
+<span class="fc" id="L412">        this.materialIconSize = materialIconSize;</span>
+<span class="fc" id="L413">    }</span>
+
+    /**
+     * @return the set iconFont or null if none defined (meaning for material icons instead of the system default MaterialDesign font
+     */
+    public Font getIconFont() {
+<span class="fc" id="L419">        return iconFont;</span>
+    }
+
+    /**
+     * @param iconFont use iconFont for material icons instead of the system default MaterialDesign font
+     */
+    public void setIconFont(Font iconFont) {
+<span class="fc" id="L426">        this.iconFont = iconFont;</span>
+<span class="fc" id="L427">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

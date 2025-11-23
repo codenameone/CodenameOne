@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CachedDataService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.services</a> &gt; <span class="el_source">CachedDataService.java</span></div><h1>CachedDataService.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.services;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkEvent;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.Util;
+import com.codename1.ui.events.ActionListener;
+
+import java.io.IOException;
+import java.io.InputStream;
+
+/**
+ * Simple service that allows downloading and caching data locally.
+ * When the data is requested again the server is queried with a conditional
+ * get query.
+ *
+ * @author Shai Almog
+ */
+public class CachedDataService extends ConnectionRequest {
+<span class="fc" id="L42">    private final CachedData data = new CachedData();</span>
+
+<span class="fc" id="L44">    private CachedDataService() {</span>
+<span class="fc" id="L45">        setReadResponseForErrors(false);</span>
+<span class="fc" id="L46">    }</span>
+
+    /**
+     * Makes sure the cached data class is properly registered as an externalizable. This must
+     * be invoked for caching to work
+     */
+    public static void register() {
+<span class="fc" id="L53">        Util.register(&quot;CachedData&quot;, CachedData.class);</span>
+<span class="fc" id="L54">    }</span>
+
+    /**
+     * Checks that the cached data is up to date and if a newer version exits it updates the data in place
+     *
+     * @param d        the data to check
+     * @param callback optional callback to be invoked on request completion
+     */
+    public static void updateData(CachedData d, ActionListener callback) {
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">        if (d.isFetching()) {</span>
+<span class="nc" id="L64">            return;</span>
+        }
+<span class="fc" id="L66">        d.setFetching(true);</span>
+<span class="fc" id="L67">        CachedDataService c = new CachedDataService();</span>
+<span class="fc" id="L68">        c.setUrl(d.getUrl());</span>
+<span class="fc" id="L69">        c.setPost(false);</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if (callback != null) {</span>
+<span class="fc" id="L71">            c.addResponseListener(callback);</span>
+        }
+<span class="pc bpc" id="L73" title="2 of 4 branches missed.">        if (d.getModified() != null &amp;&amp; d.getModified().length() &gt; 0) {</span>
+<span class="fc" id="L74">            c.addRequestHeader(&quot;If-Modified-Since&quot;, d.getModified());</span>
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">            if (d.getEtag() != null) {</span>
+<span class="fc" id="L76">                c.addRequestHeader(&quot;If-None-Match&quot;, d.getEtag());</span>
+            }
+        }
+<span class="fc" id="L79">        NetworkManager.getInstance().addToQueue(c);</span>
+<span class="fc" id="L80">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void handleException(Exception err) {
+<span class="nc" id="L86">        data.setFetching(false);</span>
+<span class="nc" id="L87">        super.handleException(err);</span>
+<span class="nc" id="L88">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void handleErrorResponseCode(int code, String message) {
+<span class="fc" id="L94">        data.setFetching(false);</span>
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (code == 304) {</span>
+            // data unmodified
+<span class="fc" id="L97">            return;</span>
+        }
+<span class="nc" id="L99">        super.handleErrorResponseCode(code, message);</span>
+<span class="nc" id="L100">    }</span>
+
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void readHeaders(Object connection) throws IOException {
+<span class="fc" id="L107">        String last = getHeader(connection, &quot;Last-Modified&quot;);</span>
+<span class="fc" id="L108">        String etag = getHeader(connection, &quot;ETag&quot;);</span>
+<span class="pc bpc" id="L109" title="1 of 4 branches missed.">        if (last != null &amp;&amp; last.length() &gt; 0) {</span>
+<span class="fc" id="L110">            data.setModified(last);</span>
+<span class="fc" id="L111">            data.setEtag(etag);</span>
+        }
+<span class="fc" id="L113">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void readResponse(InputStream input) throws IOException {
+<span class="fc" id="L119">        data.setData(Util.readInputStream(input));</span>
+<span class="fc" id="L120">        fireResponseListener(new NetworkEvent(this, data));</span>
+<span class="fc" id="L121">        data.setFetching(false);</span>
+<span class="fc" id="L122">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

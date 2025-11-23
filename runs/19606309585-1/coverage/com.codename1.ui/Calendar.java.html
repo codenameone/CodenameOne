@@ -1,0 +1,1311 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Calendar.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">Calendar.java</span></div><h1>Calendar.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.animations.Transition;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.list.DefaultListModel;
+import com.codename1.ui.list.ListModel;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.EventDispatcher;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.TimeZone;
+import java.util.Vector;
+
+/**
+ * &lt;p&gt;
+ * Date widget for selecting a date/time value.&lt;br&gt;
+ * To localize strings for month names use the values &quot;Calendar.Month&quot; using the
+ * 3 first characters of the month name in the resource localization e.g.
+ * &quot;{@code Calendar.Jan}&quot;, &quot;{@code Calendar.Feb}&quot; etc...&lt;br&gt;
+ * To localize strings for day names use the values &quot;Calendar.Day&quot; in the
+ * resource localization e.g. &quot;{@code Calendar.Sunday}&quot;,
+ * &quot;{@code Calendar.Monday}&quot; etc...&lt;/p&gt;
+ *
+ * &lt;p&gt;
+ * Note that we recommend using the {@link com.codename1.ui.spinner.Picker}
+ * class which is superior when running on the device for most use cases.
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/8f520493f7681b5d16a3.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-calendar.png&quot; alt=&quot;Default calendar look&quot; /&gt;
+ *
+ * @author Iddo Ari, Shai Almog
+ */
+public class Calendar extends Container implements ActionSource {
+
+<span class="fc" id="L72">    private static final String[] MONTHS = new String[]{&quot;Jan&quot;, &quot;Feb&quot;, &quot;Mar&quot;, &quot;Apr&quot;, &quot;May&quot;, &quot;Jun&quot;, &quot;Jul&quot;, &quot;Aug&quot;, &quot;Sep&quot;, &quot;Oct&quot;, &quot;Nov&quot;, &quot;Dec&quot;};</span>
+<span class="fc" id="L73">    private static final String[] DAYS = {&quot;Sunday&quot;, &quot;Monday&quot;, &quot;Tuesday&quot;, &quot;Wednesday&quot;, &quot;Thursday&quot;, &quot;Friday&quot;, &quot;Saturday&quot;};</span>
+<span class="fc" id="L74">    private static final String[] LABELS = {&quot;Su&quot;, &quot;M&quot;, &quot;Tu&quot;, &quot;W&quot;, &quot;Th&quot;, &quot;F&quot;, &quot;Sa&quot;};</span>
+    /**
+     * When set to true days will be rendered as 2 digits with 0 preceding
+     * single digit days
+     */
+    private boolean twoDigitMode;
+    private ComboBox month;
+    private ComboBox year;
+    private MonthView mv;
+    private Label dateLabel;
+<span class="fc" id="L84">    private final EventDispatcher dispatcher = new EventDispatcher();</span>
+<span class="fc" id="L85">    private final EventDispatcher dataChangedListeners = new EventDispatcher();</span>
+<span class="fc" id="L86">    private final EventDispatcher monthChangedListeners = new EventDispatcher();</span>
+<span class="fc" id="L87">    private final long[] dates = new long[42];</span>
+<span class="fc" id="L88">    private boolean changesSelectedDateEnabled = true;</span>
+    private TimeZone tmz;
+<span class="fc" id="L90">    private long SELECTED_DAY = -1;</span>
+<span class="fc" id="L91">    private final Collection&lt;Date&gt; selectedDays = new ArrayList&lt;Date&gt;();</span>
+<span class="fc" id="L92">    private boolean multipleSelectionEnabled = false;</span>
+<span class="fc" id="L93">    private String selectedDaysUIID = &quot;CalendarMultipleDay&quot;;</span>
+<span class="fc" id="L94">    private final Map&lt;String, Collection&lt;Date&gt;&gt; highlightGroup = new HashMap&lt;String, Collection&lt;Date&gt;&gt;();</span>
+<span class="fc" id="L95">    private final ArrayList&lt;ActionListener&gt; dayListeners = new ArrayList&lt;ActionListener&gt;();</span>
+
+    /**
+     * Creates a new instance of Calendar set to the given date based on time
+     * since epoch (the java.util.Date convention)
+     *
+     * @param time time since epoch
+     */
+    public Calendar(long time) {
+<span class="fc" id="L104">        this(time, java.util.TimeZone.getDefault());</span>
+<span class="fc" id="L105">    }</span>
+
+    /**
+     * Constructs a calendar with the current date and time
+     */
+    public Calendar() {
+<span class="fc" id="L111">        this(System.currentTimeMillis());</span>
+<span class="fc" id="L112">    }</span>
+
+    /**
+     * Creates a new instance of Calendar set to the given date based on time
+     * since epoch (the java.util.Date convention)
+     *
+     * @param time time since epoch
+     * @param tmz  a reference timezone
+     */
+    public Calendar(long time, TimeZone tmz) {
+<span class="fc" id="L122">        this(time, java.util.TimeZone.getDefault(), null, null);</span>
+<span class="fc" id="L123">    }</span>
+
+    /**
+     * Constructs a calendar with the current date and time with left and right
+     * images set
+     *
+     * @param leftArrowImage  an image for calendar left arrow
+     * @param rightArrowImage an image for calendar right arrow
+     */
+    public Calendar(Image leftArrowImage, Image rightArrowImage) {
+<span class="nc" id="L133">        this(System.currentTimeMillis(), java.util.TimeZone.getDefault(), leftArrowImage, rightArrowImage);</span>
+<span class="nc" id="L134">    }</span>
+
+    /**
+     * Creates a new instance of Calendar set to the given date based on time
+     * since epoch (the java.util.Date convention)
+     *
+     * @param time            time since epoch
+     * @param tmz             a reference timezone
+     * @param leftArrowImage  an image for calendar left arrow
+     * @param rightArrowImage an image for calendar right arrow
+     */
+    public Calendar(long time, TimeZone tmz, Image leftArrowImage, Image rightArrowImage) {
+<span class="fc" id="L146">        super(new BorderLayout());</span>
+<span class="fc" id="L147">        this.tmz = tmz;</span>
+<span class="fc" id="L148">        setUIID(&quot;Calendar&quot;);</span>
+<span class="fc" id="L149">        mv = new MonthView(time);</span>
+
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        Image leftArrow = leftArrowImage != null ? leftArrowImage : UIManager.getInstance().getThemeImageConstant(&quot;calendarLeftImage&quot;);</span>
+<span class="pc bpc" id="L152" title="1 of 2 branches missed.">        Image rightArrow = rightArrowImage != null ? rightArrowImage : UIManager.getInstance().getThemeImageConstant(&quot;calendarRightImage&quot;);</span>
+<span class="pc bpc" id="L153" title="3 of 4 branches missed.">        if (leftArrow != null &amp;&amp; rightArrow != null) {</span>
+<span class="nc" id="L154">            final Button left = new Button(leftArrow, &quot;CalendarLeft&quot;);</span>
+<span class="nc" id="L155">            final Button right = new Button(rightArrow, &quot;CalendarRight&quot;);</span>
+<span class="nc" id="L156">            ActionListener progress = new ActionListener() {</span>
+<span class="nc" id="L157">                private boolean lock = false;</span>
+
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                    if (lock) {</span>
+<span class="nc" id="L161">                        return;</span>
+                    }
+<span class="nc" id="L163">                    lock = true;</span>
+<span class="nc" id="L164">                    int month = mv.getMonth();</span>
+<span class="nc" id="L165">                    int year = mv.getYear();</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">                    if (evt.getSource() == left) {</span>
+<span class="nc" id="L167">                        month--;</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">                        if (month &lt; java.util.Calendar.JANUARY) {</span>
+<span class="nc" id="L169">                            month = java.util.Calendar.DECEMBER;</span>
+<span class="nc" id="L170">                            year--;</span>
+                        }
+                    } else {
+<span class="nc" id="L173">                        month++;</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">                        if (month &gt; java.util.Calendar.DECEMBER) {</span>
+<span class="nc" id="L175">                            month = java.util.Calendar.JANUARY;</span>
+<span class="nc" id="L176">                            year++;</span>
+                        }
+                    }
+<span class="nc" id="L179">                    boolean tran = UIManager.getInstance().isThemeConstant(&quot;calTransitionBool&quot;, true);</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">                    if (tran) {</span>
+                        Transition cm;
+<span class="nc bnc" id="L182" title="All 2 branches missed.">                        if (UIManager.getInstance().isThemeConstant(&quot;calTransitionVertBool&quot;, false)) {</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">                            cm = CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, evt.getSource() == left, 300);</span>
+                        } else {
+<span class="nc bnc" id="L185" title="All 2 branches missed.">                            cm = CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, evt.getSource() == left, 300);</span>
+                        }
+<span class="nc" id="L187">                        MonthView newMv = new MonthView(mv.currentDay);</span>
+<span class="nc" id="L188">                        newMv.setMonth(year, month);</span>
+<span class="nc" id="L189">                        replaceAndWait(mv, newMv, cm);</span>
+<span class="nc" id="L190">                        mv = newMv;</span>
+<span class="nc" id="L191">                        newMv.fireActionEvent();</span>
+<span class="nc" id="L192">                    } else {</span>
+<span class="nc" id="L193">                        mv.setMonth(year, month);</span>
+<span class="nc" id="L194">                        componentChanged();</span>
+                    }
+<span class="nc" id="L196">                    dateLabel.setText(getLocalizedMonth(month) + &quot; &quot; + year);</span>
+<span class="nc" id="L197">                    lock = false;</span>
+<span class="nc" id="L198">                }</span>
+            };
+<span class="nc" id="L200">            left.addActionListener(progress);</span>
+<span class="nc" id="L201">            right.addActionListener(progress);</span>
+
+<span class="nc" id="L203">            Container dateCnt = new Container(new BorderLayout());</span>
+<span class="nc" id="L204">            dateCnt.setUIID(&quot;CalendarDate&quot;);</span>
+<span class="nc" id="L205">            dateLabel = new Label();</span>
+<span class="nc" id="L206">            dateLabel.setUIID(&quot;CalendarDateLabel&quot;);</span>
+<span class="nc" id="L207">            dateLabel.setText(getLocalizedMonth(mv.getMonth()) + &quot; &quot; + mv.getYear());</span>
+
+<span class="nc" id="L209">            dateCnt.addComponent(BorderLayout.CENTER, dateLabel);</span>
+<span class="nc" id="L210">            dateCnt.addComponent(BorderLayout.EAST, right);</span>
+<span class="nc" id="L211">            dateCnt.addComponent(BorderLayout.WEST, left);</span>
+
+<span class="nc" id="L213">            addComponent(BorderLayout.NORTH, dateCnt);</span>
+<span class="nc" id="L214">        } else {</span>
+<span class="fc" id="L215">            month = new ComboBox();</span>
+<span class="fc" id="L216">            year = new ComboBox();</span>
+<span class="fc" id="L217">            Vector months = new Vector();</span>
+<span class="fc bfc" id="L218" title="All 2 branches covered.">            for (int i = 0; i &lt; MONTHS.length; i++) {</span>
+<span class="fc" id="L219">                months.addElement(getLocalizedMonth(i));</span>
+            }
+<span class="fc" id="L221">            ListModel monthsModel = new DefaultListModel(months);</span>
+<span class="fc" id="L222">            int selected = months.indexOf(getLocalizedMonth(mv.getMonth()));</span>
+<span class="fc" id="L223">            month.setModel(monthsModel);</span>
+<span class="fc" id="L224">            month.setSelectedIndex(selected);</span>
+<span class="fc" id="L225">            month.addActionListener(mv);</span>
+
+<span class="fc" id="L227">            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);</span>
+<span class="fc" id="L228">            cal.setTime(new java.util.Date(time));</span>
+<span class="fc" id="L229">            month.getStyle().setBgTransparency(0);</span>
+<span class="fc" id="L230">            int y = cal.get(java.util.Calendar.YEAR);</span>
+<span class="fc" id="L231">            Vector years = new Vector();</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">            for (int i = 2100; i &gt;= 1900; i--) {</span>
+<span class="fc" id="L233">                years.addElement(&quot;&quot; + i);</span>
+            }
+<span class="fc" id="L235">            ListModel yearModel = new DefaultListModel(years);</span>
+<span class="fc" id="L236">            selected = years.indexOf(&quot;&quot; + y);</span>
+<span class="fc" id="L237">            year.setModel(yearModel);</span>
+<span class="fc" id="L238">            year.setSelectedIndex(selected);</span>
+<span class="fc" id="L239">            year.getStyle().setBgTransparency(0);</span>
+<span class="fc" id="L240">            year.addActionListener(mv);</span>
+<span class="fc" id="L241">            Container cnt = new Container(new BoxLayout(BoxLayout.X_AXIS));</span>
+<span class="fc" id="L242">            cnt.setRTL(false);</span>
+
+<span class="fc" id="L244">            Container dateCnt = new Container(new BoxLayout(BoxLayout.X_AXIS));</span>
+<span class="fc" id="L245">            dateCnt.setUIID(&quot;CalendarDate&quot;);</span>
+<span class="fc" id="L246">            dateCnt.addComponent(month);</span>
+<span class="fc" id="L247">            dateCnt.addComponent(year);</span>
+<span class="fc" id="L248">            cnt.addComponent(dateCnt);</span>
+
+<span class="fc" id="L250">            Container upper = new Container(new FlowLayout(Component.CENTER));</span>
+<span class="fc" id="L251">            upper.addComponent(cnt);</span>
+
+<span class="fc" id="L253">            addComponent(BorderLayout.NORTH, upper);</span>
+        }
+<span class="fc" id="L255">        addComponent(BorderLayout.CENTER, mv);</span>
+<span class="fc" id="L256">    }</span>
+
+    /**
+     * Returns the time for the current calendar.
+     *
+     * @return the time for the current calendar.
+     */
+    public long getSelectedDay() {
+<span class="nc" id="L264">        return mv.getSelectedDay();</span>
+    }
+
+    private String getLocalizedMonth(int i) {
+<span class="fc" id="L268">        Map&lt;String, String&gt; t = getUIManager().getBundle();</span>
+<span class="fc" id="L269">        String text = MONTHS[i];</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">        if (t != null) {</span>
+<span class="nc" id="L271">            Object o = t.get(&quot;Calendar.&quot; + text);</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">            if (o != null) {</span>
+<span class="nc" id="L273">                text = (String) o;</span>
+            }
+        }
+<span class="fc" id="L276">        return text;</span>
+    }
+
+    void componentChanged() {
+<span class="fc" id="L280">        java.util.Calendar cal = java.util.Calendar.getInstance(tmz);</span>
+<span class="fc" id="L281">        cal.set(java.util.Calendar.YEAR, mv.getYear());</span>
+<span class="fc" id="L282">        cal.set(java.util.Calendar.MONTH, mv.getMonth());</span>
+<span class="fc" id="L283">        cal.set(java.util.Calendar.DAY_OF_MONTH, mv.getDayOfMonth());</span>
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">        if (month != null) {</span>
+<span class="fc" id="L285">            month.getParent().revalidate();</span>
+        }
+<span class="fc" id="L287">    }</span>
+
+    /**
+     * Return the date object matching the current selection
+     *
+     * @return the date object matching the current selection
+     */
+    public Date getDate() {
+<span class="fc" id="L295">        return new Date(mv.getSelectedDay());</span>
+    }
+
+    /**
+     * Sets the current date in the view and the selected date to be the same.
+     *
+     * @param d new date
+     */
+    public void setDate(Date d) {
+<span class="fc" id="L304">        mv.setSelectedDay(d.getTime());</span>
+<span class="fc" id="L305">        mv.setCurrentDay(SELECTED_DAY, true);</span>
+<span class="fc" id="L306">        componentChanged();</span>
+<span class="fc" id="L307">    }</span>
+
+    /**
+     * Sets the Calendar min and max years
+     *
+     * @param minYear the min year
+     * @param maxYear the max year
+     */
+    public void setYearRange(int minYear, int maxYear) {
+<span class="nc bnc" id="L316" title="All 2 branches missed.">        if (minYear &gt; maxYear) {</span>
+<span class="nc" id="L317">            throw new IllegalArgumentException(&quot;Max year should be bigger than or equal to min year!&quot;);</span>
+        }
+        //The year combobox may not exist in the current context
+<span class="nc bnc" id="L320" title="All 2 branches missed.">        if (year != null) {</span>
+<span class="nc" id="L321">            Object previouslySelectedYear = year.getSelectedItem();</span>
+<span class="nc" id="L322">            Vector years = new Vector();</span>
+<span class="nc bnc" id="L323" title="All 2 branches missed.">            for (int i = maxYear; i &gt;= minYear; i--) {</span>
+<span class="nc" id="L324">                years.addElement(&quot;&quot; + i);</span>
+            }
+<span class="nc" id="L326">            ListModel yearModel = new DefaultListModel(years);</span>
+<span class="nc" id="L327">            year.setModel(yearModel);</span>
+<span class="nc bnc" id="L328" title="All 2 branches missed.">            if (years.contains(previouslySelectedYear)) {</span>
+<span class="nc" id="L329">                year.setSelectedItem(previouslySelectedYear);</span>
+            }
+        }
+<span class="nc" id="L332">    }</span>
+
+    /**
+     * This method sets the Calendar selected day
+     *
+     * @param d the selected day
+     */
+    public void setSelectedDate(Date d) {
+<span class="nc" id="L340">        mv.setSelectedDay(d.getTime());</span>
+<span class="nc" id="L341">        mv.setCurrentDay(SELECTED_DAY, true);</span>
+<span class="nc" id="L342">        componentChanged();</span>
+<span class="nc" id="L343">    }</span>
+
+    /**
+     * Returns the currently viewed date (as opposed to the selected date)
+     *
+     * @return the currently viewed date
+     */
+    public Date getCurrentDate() {
+<span class="nc" id="L351">        return new Date(mv.getCurrentDay());</span>
+    }
+
+    /**
+     * Sets the Calendar view on the given date, only the the month and year are
+     * being considered.
+     *
+     * @param d the date to set the calendar view on.
+     */
+    public void setCurrentDate(Date d) {
+<span class="nc" id="L361">        mv.setCurrentDay(d.getTime(), true);</span>
+<span class="nc" id="L362">        componentChanged();</span>
+<span class="nc" id="L363">    }</span>
+
+    /**
+     * Gets the Calendar timezone
+     *
+     * @return Calendar TimeZone
+     */
+    public TimeZone getTimeZone() {
+<span class="nc" id="L371">        return tmz;</span>
+    }
+
+    /**
+     * Sets the Calendar timezone, if not specified Calendar will use the
+     * default timezone
+     *
+     * @param tmz the timezone
+     */
+    public void setTimeZone(TimeZone tmz) {
+<span class="nc" id="L381">        this.tmz = tmz;</span>
+<span class="nc" id="L382">    }</span>
+
+    /**
+     * Gets the selected style of the month view component within the calendar
+     *
+     * @return the style of the month view
+     */
+    public Style getMonthViewSelectedStyle() {
+<span class="nc" id="L390">        return mv.getSelectedStyle();</span>
+    }
+
+    /**
+     * Sets the selected style of the month view component within the calendar
+     *
+     * @param s style for the month view
+     */
+    public void setMonthViewSelectedStyle(Style s) {
+<span class="nc" id="L399">        mv.setSelectedStyle(s);</span>
+<span class="nc" id="L400">    }</span>
+
+    /**
+     * Gets the un selected style of the month view component within the
+     * calendar
+     *
+     * @return the style of the month view
+     */
+    public Style getMonthViewUnSelectedStyle() {
+<span class="nc" id="L409">        return mv.getUnselectedStyle();</span>
+    }
+
+    /**
+     * Sets the un selected style of the month view component within the
+     * calendar
+     *
+     * @param s style for the month view
+     */
+    public void setMonthViewUnSelectedStyle(Style s) {
+<span class="nc" id="L419">        mv.setUnselectedStyle(s);</span>
+<span class="nc" id="L420">    }</span>
+
+    /**
+     * Fires when a change is made to the month view of this component
+     *
+     * @param l listener to add
+     */
+    public void addActionListener(ActionListener l) {
+<span class="nc" id="L428">        mv.addActionListener(l);</span>
+<span class="nc" id="L429">    }</span>
+
+    /**
+     * Fires when a change is made to the month view of this component
+     *
+     * @param l listener to remove
+     */
+    public void removeActionListener(ActionListener l) {
+<span class="nc" id="L437">        mv.removeActionListener(l);</span>
+<span class="nc" id="L438">    }</span>
+
+    /**
+     * Fires when a new month is selected
+     *
+     * @param l listener to add
+     */
+    public void addMonthChangedListener(ActionListener l) {
+<span class="nc" id="L446">        mv.addMonthChangedListener(l);</span>
+<span class="nc" id="L447">    }</span>
+
+    /**
+     * Fires when a new month is selected
+     *
+     * @param l listener to remove
+     */
+    public void removeMonthChangedListener(ActionListener l) {
+<span class="nc" id="L455">        mv.removeMonthChangedListener(l);</span>
+<span class="nc" id="L456">    }</span>
+
+    /**
+     * Adds an ActionListener to the day buttons. This is different from
+     * {@code Calendar.addActionListener} and will only fire when an active day
+     * is selected.
+     *
+     * @param l listener to add
+     */
+    public void addDayActionListener(ActionListener l) {
+<span class="nc" id="L466">        mv.addDayActionListener(l);</span>
+<span class="nc" id="L467">    }</span>
+
+    /**
+     * Removes ActionListener from day buttons
+     *
+     * @param l listener to remove
+     */
+    public void removeDayActionListener(ActionListener l) {
+<span class="nc" id="L475">        mv.removeDayActionListener(l);</span>
+<span class="nc" id="L476">    }</span>
+
+    /**
+     * Allows tracking selection changes in the calendar in real time
+     *
+     * @param l listener to add
+     */
+    public void addDataChangedListener(DataChangedListener l) {
+<span class="nc" id="L484">        mv.addDataChangedListener(l);</span>
+<span class="nc" id="L485">    }</span>
+
+    /**
+     * Allows tracking selection changes in the calendar in real time
+     *
+     * @param l listener to remove
+     */
+    public void removeDataChangedListener(DataChangedListener l) {
+<span class="nc" id="L493">        mv.removeDataChangedListener(l);</span>
+<span class="nc" id="L494">    }</span>
+
+    /**
+     * Allows tracking selection changes in the calendar in real time
+     *
+     * @param l listener to add
+     * @deprecated use #addDataChangedListener(DataChangedListener) instead
+     */
+    public void addDataChangeListener(DataChangedListener l) {
+<span class="nc" id="L503">        mv.addDataChangedListener(l);</span>
+<span class="nc" id="L504">    }</span>
+
+    /**
+     * Allows tracking selection changes in the calendar in real time
+     *
+     * @param l listener to remove
+     * @deprecated use #removeDataChangedListener(DataChangedListener) instead
+     */
+    public void removeDataChangeListener(DataChangedListener l) {
+<span class="nc" id="L513">        mv.removeDataChangedListener(l);</span>
+<span class="nc" id="L514">    }</span>
+
+    /**
+     * This flag determines if selected date can be changed by selecting an
+     * alternative date
+     *
+     * @return true if enabled
+     */
+    public boolean isChangesSelectedDateEnabled() {
+<span class="nc" id="L523">        return changesSelectedDateEnabled;</span>
+    }
+
+    /**
+     * This flag determines if selected date can be changed by selecting an
+     * alternative date
+     *
+     * @param changesSelectedDateEnabled if true pressing on a date will cause
+     *                                   the selected date to be changed to the pressed one
+     */
+    public void setChangesSelectedDateEnabled(boolean changesSelectedDateEnabled) {
+<span class="fc" id="L534">        this.changesSelectedDateEnabled = changesSelectedDateEnabled;</span>
+<span class="fc" id="L535">    }</span>
+
+    /**
+     * This method creates the Day Button Component for the Month View
+     *
+     * @return a Button that corresponds to the Days Components
+     * @deprecated override {@code createDayComponent()} instead
+     */
+    protected Button createDay() {
+<span class="fc" id="L544">        Button day = new Button(&quot;&quot;, &quot;CalendarDay&quot;);</span>
+<span class="fc" id="L545">        day.setAlignment(CENTER);</span>
+<span class="fc" id="L546">        day.setEndsWith3Points(false);</span>
+<span class="fc" id="L547">        day.setTickerEnabled(false);</span>
+<span class="fc" id="L548">        return day;</span>
+    }
+
+    /**
+     * This method creates the Day title Component for the Month View
+     *
+     * @param day the relevant day values are 0-6 where 0 is Sunday.
+     * @return a Label that corresponds to the relevant Day
+     */
+    protected Label createDayTitle(int day) {
+<span class="fc" id="L558">        String value = getUIManager().localize(&quot;Calendar.&quot; + DAYS[day], LABELS[day]);</span>
+<span class="fc" id="L559">        Label dayh = new Label(value, &quot;CalendarTitle&quot;);</span>
+<span class="fc" id="L560">        dayh.setEndsWith3Points(false);</span>
+<span class="fc" id="L561">        dayh.setTickerEnabled(false);</span>
+<span class="fc" id="L562">        return dayh;</span>
+    }
+
+    /**
+     * This method updates the Button day.
+     *
+     * @param dayButton    the button to be updated
+     * @param year         the current year
+     * @param currentMonth the current month
+     * @param day          the new button day
+     */
+    protected void updateButtonDayDate(Component dayButton, int year, int currentMonth, int day) {
+<span class="pc bpc" id="L574" title="1 of 2 branches missed.">        if (dayButton instanceof Button) {</span>
+<span class="fc" id="L575">            updateButtonDayDate((Button) dayButton, currentMonth, day);</span>
+        }
+<span class="fc" id="L577">    }</span>
+
+    /**
+     * This method updates the Button day.
+     *
+     * @param dayButton    the button to be updated
+     * @param currentMonth the current month
+     * @param day          the new button day
+     */
+    protected void updateButtonDayDate(Component dayButton, int currentMonth, int day) {
+<span class="nc bnc" id="L587" title="All 2 branches missed.">        if (dayButton instanceof Button) {</span>
+<span class="nc" id="L588">            updateButtonDayDate((Button) dayButton, currentMonth, day);</span>
+        }
+<span class="nc" id="L590">    }</span>
+
+    /**
+     * This method updates the Button day.
+     *
+     * @param dayButton    the button to be updated
+     * @param year         the current year
+     * @param currentMonth the current month
+     * @param day          the new button day
+     * @deprecated override the method that accepts a generic component
+     */
+    protected void updateButtonDayDate(Button dayButton, int year, int currentMonth, int day) {
+<span class="nc" id="L602">        updateButtonDayDate(dayButton, currentMonth, day);</span>
+<span class="nc" id="L603">    }</span>
+
+    /**
+     * This method updates the Button day.
+     *
+     * @param dayButton    the button to be updated
+     * @param currentMonth the current month
+     * @param day          the new button day
+     * @deprecated override the method that accepts a generic component
+     */
+    protected void updateButtonDayDate(Button dayButton, int currentMonth, int day) {
+<span class="pc bpc" id="L614" title="1 of 2 branches missed.">        if (twoDigitMode) {</span>
+<span class="nc bnc" id="L615" title="All 2 branches missed.">            if (day &lt; 10) {</span>
+<span class="nc" id="L616">                dayButton.setText(&quot;0&quot; + day);</span>
+            } else {
+<span class="nc" id="L618">                dayButton.setText(&quot;&quot; + day);</span>
+            }
+        } else {
+<span class="fc bfc" id="L621" title="All 2 branches covered.">            if (day &lt; 10) {</span>
+<span class="fc" id="L622">                dayButton.setText(&quot; &quot; + day + &quot; &quot;); //To match the space occupied by 2 digits buttons</span>
+            } else {
+<span class="fc" id="L624">                dayButton.setText(&quot;&quot; + day);</span>
+            }
+        }
+<span class="fc" id="L627">    }</span>
+
+    /**
+     * When set to true days will be rendered as 2 digits with 0 preceding
+     * single digit days
+     *
+     * @return the twoDigitMode
+     */
+    public boolean isTwoDigitMode() {
+<span class="nc" id="L636">        return twoDigitMode;</span>
+    }
+
+    /**
+     * When set to true days will be rendered as 2 digits with 0 preceding
+     * single digit days
+     *
+     * @param twoDigitMode the twoDigitMode to set
+     */
+    public void setTwoDigitMode(boolean twoDigitMode) {
+<span class="nc" id="L646">        this.twoDigitMode = twoDigitMode;</span>
+<span class="nc" id="L647">    }</span>
+
+    /**
+     * Gets the dates selected on the calendar or null if no date is selected
+     *
+     * @return the selected days
+     */
+    public Collection&lt;Date&gt; getSelectedDays() {
+<span class="fc" id="L655">        return selectedDays;</span>
+    }
+
+    /**
+     * Sets the dates to be selected on the calendar
+     *
+     * @param selectedDays the multipleDateSelection to set
+     */
+    public void setSelectedDays(Collection&lt;Date&gt; selectedDays) {
+<span class="nc bnc" id="L664" title="All 2 branches missed.">        for (Date selectedDay : selectedDays) {</span>
+<span class="nc" id="L665">            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);</span>
+<span class="nc" id="L666">            cal.setTime(selectedDay);</span>
+<span class="nc" id="L667">            cal.set(java.util.Calendar.HOUR, 1);</span>
+<span class="nc" id="L668">            cal.set(java.util.Calendar.HOUR_OF_DAY, 1);</span>
+<span class="nc" id="L669">            cal.set(java.util.Calendar.MINUTE, 0);</span>
+<span class="nc" id="L670">            cal.set(java.util.Calendar.SECOND, 0);</span>
+<span class="nc" id="L671">            cal.set(java.util.Calendar.MILLISECOND, 0);</span>
+<span class="nc" id="L672">            this.selectedDays.add(cal.getTime());</span>
+<span class="nc" id="L673">        }</span>
+<span class="nc" id="L674">        selectedDaysUIID = &quot;CalendarMultipleDay&quot;;</span>
+<span class="nc" id="L675">        mv.setCurrentDay(SELECTED_DAY, true);</span>
+<span class="nc" id="L676">        componentChanged();</span>
+<span class="nc" id="L677">    }</span>
+
+    /**
+     * Sets the dates to be selected on the calendar with a custom uiid. To use
+     * default uiid &quot;{@code CalendarMultipleDay}&quot;, call this method without the
+     * &quot;{@code uiid} parameter&quot;
+     *
+     * @param selectedDays the multipleDateSelection to set
+     * @param uiid         a custom uiid to be used in the dates selected
+     */
+    public void setSelectedDays(Collection&lt;Date&gt; selectedDays, String uiid) {
+<span class="nc bnc" id="L688" title="All 2 branches missed.">        for (Date selectedDay : selectedDays) {</span>
+<span class="nc" id="L689">            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);</span>
+<span class="nc" id="L690">            cal.setTime(selectedDay);</span>
+<span class="nc" id="L691">            cal.set(java.util.Calendar.HOUR, 1);</span>
+<span class="nc" id="L692">            cal.set(java.util.Calendar.HOUR_OF_DAY, 1);</span>
+<span class="nc" id="L693">            cal.set(java.util.Calendar.MINUTE, 0);</span>
+<span class="nc" id="L694">            cal.set(java.util.Calendar.SECOND, 0);</span>
+<span class="nc" id="L695">            cal.set(java.util.Calendar.MILLISECOND, 0);</span>
+<span class="nc" id="L696">            this.selectedDays.add(cal.getTime());</span>
+<span class="nc" id="L697">        }</span>
+<span class="nc" id="L698">        selectedDaysUIID = uiid;</span>
+<span class="nc" id="L699">        mv.setCurrentDay(SELECTED_DAY, true);</span>
+<span class="nc" id="L700">        componentChanged();</span>
+<span class="nc" id="L701">    }</span>
+
+    /**
+     * @return selectedDays uiid
+     */
+    public String getSelectedDaysUIID() {
+<span class="nc" id="L707">        return selectedDaysUIID;</span>
+    }
+
+    /**
+     * Sets the selectedDays UIID to the given uiid. being considered.
+     *
+     * @param uiid the uiid to change to
+     */
+    public void setSelectedDaysUIID(String uiid) {
+<span class="nc" id="L716">        this.selectedDaysUIID = uiid;</span>
+<span class="nc" id="L717">    }</span>
+
+    /**
+     * Highlights a date on the calendar using the supplied uiid. (Selected
+     * dates uiid takes precedence over highlighted dates uiid)
+     *
+     * @param date the date to be highlighted
+     * @param uiid a custom uiid to be used in highlighting the date
+     */
+    public void highlightDate(Date date, String uiid) {
+<span class="nc" id="L727">        java.util.Calendar cal = java.util.Calendar.getInstance(tmz);</span>
+<span class="nc" id="L728">        cal.setTime(date);</span>
+<span class="nc" id="L729">        cal.set(java.util.Calendar.HOUR, 1);</span>
+<span class="nc" id="L730">        cal.set(java.util.Calendar.HOUR_OF_DAY, 1);</span>
+<span class="nc" id="L731">        cal.set(java.util.Calendar.MINUTE, 0);</span>
+<span class="nc" id="L732">        cal.set(java.util.Calendar.SECOND, 0);</span>
+<span class="nc" id="L733">        cal.set(java.util.Calendar.MILLISECOND, 0);</span>
+
+<span class="nc bnc" id="L735" title="All 2 branches missed.">        if (!highlightGroup.isEmpty()) {</span>
+<span class="nc" id="L736">            Collection&lt;Date&gt; datesArray = new ArrayList&lt;Date&gt;();</span>
+<span class="nc bnc" id="L737" title="All 2 branches missed.">            if (highlightGroup.containsKey(uiid)) {</span>
+<span class="nc" id="L738">                datesArray = highlightGroup.get(uiid);</span>
+            }
+<span class="nc" id="L740">            datesArray.add(cal.getTime());</span>
+<span class="nc" id="L741">            highlightGroup.put(uiid, datesArray);</span>
+<span class="nc" id="L742">        } else {</span>
+<span class="nc" id="L743">            Collection&lt;Date&gt; datesArray = new ArrayList&lt;Date&gt;();</span>
+<span class="nc" id="L744">            datesArray.add(cal.getTime());</span>
+<span class="nc" id="L745">            highlightGroup.put(uiid, datesArray);</span>
+        }
+<span class="nc" id="L747">        mv.setCurrentDay(SELECTED_DAY, true);</span>
+<span class="nc" id="L748">        componentChanged();</span>
+<span class="nc" id="L749">    }</span>
+
+    /**
+     * Highlights dates on the calendar using the supplied uiid. (Selected dates
+     * uiid takes precedence over highlighted dates uiid)
+     *
+     * @param dates the dates to be highlighted
+     * @param uiid  a custom uiid to be used in highlighting the dates
+     */
+    public void highlightDates(Collection&lt;Date&gt; dates, String uiid) {
+<span class="nc bnc" id="L759" title="All 2 branches missed.">        for (Date selectedDay : dates) {</span>
+<span class="nc" id="L760">            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);</span>
+<span class="nc" id="L761">            cal.setTime(selectedDay);</span>
+<span class="nc" id="L762">            cal.set(java.util.Calendar.HOUR, 1);</span>
+<span class="nc" id="L763">            cal.set(java.util.Calendar.HOUR_OF_DAY, 1);</span>
+<span class="nc" id="L764">            cal.set(java.util.Calendar.MINUTE, 0);</span>
+<span class="nc" id="L765">            cal.set(java.util.Calendar.SECOND, 0);</span>
+<span class="nc" id="L766">            cal.set(java.util.Calendar.MILLISECOND, 0);</span>
+
+<span class="nc bnc" id="L768" title="All 2 branches missed.">            if (!highlightGroup.isEmpty()) {</span>
+<span class="nc" id="L769">                Collection&lt;Date&gt; datesArray = new ArrayList&lt;Date&gt;();</span>
+<span class="nc bnc" id="L770" title="All 2 branches missed.">                if (highlightGroup.containsKey(uiid)) {</span>
+<span class="nc" id="L771">                    datesArray = highlightGroup.get(uiid);</span>
+                }
+<span class="nc" id="L773">                datesArray.add(cal.getTime());</span>
+<span class="nc" id="L774">                highlightGroup.put(uiid, datesArray);</span>
+<span class="nc" id="L775">            } else {</span>
+<span class="nc" id="L776">                Collection&lt;Date&gt; datesArray = new ArrayList&lt;Date&gt;();</span>
+<span class="nc" id="L777">                datesArray.add(cal.getTime());</span>
+<span class="nc" id="L778">                highlightGroup.put(uiid, datesArray);</span>
+            }
+<span class="nc" id="L780">        }</span>
+<span class="nc" id="L781">        mv.setCurrentDay(SELECTED_DAY, true);</span>
+<span class="nc" id="L782">        componentChanged();</span>
+<span class="nc" id="L783">    }</span>
+
+    /**
+     * Un-highlights dates on the calendar by removing the highlighting uiid.
+     * ({@code selectedDaysUIID} uiid will be applied to any of the dates that
+     * are part of {@code selectedDays})
+     *
+     * @param dates the dates to be un-highlighted
+     */
+    public void unHighlightDates(Collection&lt;Date&gt; dates) {
+<span class="nc bnc" id="L793" title="All 2 branches missed.">        if (!highlightGroup.isEmpty()) {</span>
+<span class="nc bnc" id="L794" title="All 2 branches missed.">            for (Date selectedDay : dates) {</span>
+<span class="nc" id="L795">                java.util.Calendar cal = java.util.Calendar.getInstance(tmz);</span>
+<span class="nc" id="L796">                cal.setTime(selectedDay);</span>
+<span class="nc" id="L797">                cal.set(java.util.Calendar.HOUR, 1);</span>
+<span class="nc" id="L798">                cal.set(java.util.Calendar.HOUR_OF_DAY, 1);</span>
+<span class="nc" id="L799">                cal.set(java.util.Calendar.MINUTE, 0);</span>
+<span class="nc" id="L800">                cal.set(java.util.Calendar.SECOND, 0);</span>
+<span class="nc" id="L801">                cal.set(java.util.Calendar.MILLISECOND, 0);</span>
+
+<span class="nc" id="L803">                Iterator it = highlightGroup.entrySet().iterator();</span>
+<span class="nc bnc" id="L804" title="All 2 branches missed.">                while (it.hasNext()) {</span>
+<span class="nc" id="L805">                    Map.Entry&lt;String, Collection&lt;Date&gt;&gt; entry = (Map.Entry) it.next();</span>
+<span class="nc bnc" id="L806" title="All 2 branches missed.">                    if (entry.getValue().contains(cal.getTime())) {</span>
+<span class="nc" id="L807">                        entry.getValue().remove(cal.getTime());</span>
+<span class="nc bnc" id="L808" title="All 2 branches missed.">                        if (entry.getValue().isEmpty()) {</span>
+<span class="nc" id="L809">                            it.remove();</span>
+                        }
+                    }
+<span class="nc" id="L812">                }</span>
+<span class="nc" id="L813">            }</span>
+<span class="nc" id="L814">            mv.setCurrentDay(SELECTED_DAY, true);</span>
+<span class="nc" id="L815">            componentChanged();</span>
+        }
+<span class="nc" id="L817">    }</span>
+
+    /**
+     * Un-highlights dates on the calendar by removing the highlighting uiid.
+     * ({@code selectedDaysUIID} uiid will be applied to the date if it is part
+     * of {@code selectedDays})
+     *
+     * @param date the date to be un-highlighted
+     */
+    public void unHighlightDate(Date date) {
+<span class="nc bnc" id="L827" title="All 2 branches missed.">        if (!highlightGroup.isEmpty()) {</span>
+<span class="nc" id="L828">            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);</span>
+<span class="nc" id="L829">            cal.setTime(date);</span>
+<span class="nc" id="L830">            cal.set(java.util.Calendar.HOUR, 1);</span>
+<span class="nc" id="L831">            cal.set(java.util.Calendar.HOUR_OF_DAY, 1);</span>
+<span class="nc" id="L832">            cal.set(java.util.Calendar.MINUTE, 0);</span>
+<span class="nc" id="L833">            cal.set(java.util.Calendar.SECOND, 0);</span>
+<span class="nc" id="L834">            cal.set(java.util.Calendar.MILLISECOND, 0);</span>
+
+<span class="nc" id="L836">            Iterator it = highlightGroup.entrySet().iterator();</span>
+<span class="nc bnc" id="L837" title="All 2 branches missed.">            while (it.hasNext()) {</span>
+<span class="nc" id="L838">                Map.Entry&lt;String, Collection&lt;Date&gt;&gt; entry = (Map.Entry) it.next();</span>
+<span class="nc bnc" id="L839" title="All 2 branches missed.">                if (entry.getValue().contains(cal.getTime())) {</span>
+<span class="nc" id="L840">                    entry.getValue().remove(cal.getTime());</span>
+<span class="nc bnc" id="L841" title="All 2 branches missed.">                    if (entry.getValue().isEmpty()) {</span>
+<span class="nc" id="L842">                        it.remove();</span>
+                    }
+                }
+<span class="nc" id="L845">            }</span>
+<span class="nc" id="L846">            mv.setCurrentDay(SELECTED_DAY, true);</span>
+<span class="nc" id="L847">            componentChanged();</span>
+        }
+<span class="nc" id="L849">    }</span>
+
+    /**
+     * If true multiple days can be selected on a calendar and
+     * &quot;{@code getSelectedDays()}&quot; will return the dates selected
+     *
+     * @return the multipleSelectionEnabled
+     */
+    public boolean isMultipleSelectionEnabled() {
+<span class="nc" id="L858">        return multipleSelectionEnabled;</span>
+    }
+
+    /**
+     * When set to true multiple days can be selected on a calendar and
+     * &quot;{@code getSelectedDays()}&quot; will return the dates selected
+     *
+     * @param multipleSelectionEnabled the multipleSelectionEnabled to set
+     */
+    public void setMultipleSelectionEnabled(boolean multipleSelectionEnabled) {
+<span class="fc" id="L868">        this.multipleSelectionEnabled = multipleSelectionEnabled;</span>
+<span class="fc" id="L869">    }</span>
+
+    /**
+     * Creates a day within the Calendar, this method is protected allowing
+     * Calendar to be subclassed to replace the rendering logic of individual
+     * day buttons.
+     *
+     * @return a button representing the day within the Calendar
+     */
+    protected Component createDayComponent() {
+<span class="fc" id="L879">        return createDay();</span>
+    }
+
+    /**
+     * Since a day may be any component type, developers should override this
+     * method to add support for binding the click listener to the given
+     * component.
+     *
+     * @param l   listener interface
+     * @param cmp day component returned by createDayComponent()
+     */
+    protected void bindDayListener(Component cmp, ActionListener l) {
+<span class="pc bpc" id="L891" title="1 of 2 branches missed.">        if (cmp instanceof Button) {</span>
+<span class="fc" id="L892">            ((Button) cmp).addActionListener(l);</span>
+        }
+<span class="fc" id="L894">    }</span>
+
+    /**
+     * Since a day may be any component type, developers should override this
+     * method to add support for removing the click listener from the given
+     * component.
+     *
+     * @param l   listener interface
+     * @param cmp day component returned by createDayComponent()
+     */
+    private void unBindDayListener(Component cmp, ActionListener l) {
+<span class="nc bnc" id="L905" title="All 2 branches missed.">        if (cmp instanceof Button) {</span>
+<span class="nc" id="L906">            ((Button) cmp).removeActionListener(l);</span>
+        }
+<span class="nc" id="L908">    }</span>
+
+    /**
+     * Since a day may be any component type, developers should override this
+     * method to add support for setting the displayed string.
+     *
+     * @param text the text set the component to
+     * @param cmp  day component returned by createDayComponent()
+     */
+    protected void setDayText(Component cmp, String text) {
+<span class="pc bpc" id="L918" title="1 of 2 branches missed.">        if (cmp instanceof Button) {</span>
+<span class="fc" id="L919">            ((Button) cmp).setText(text);</span>
+        }
+<span class="fc" id="L921">    }</span>
+
+    /**
+     * Since a day may be any component type, developers should override this
+     * method to add support for removing the click listener from the given
+     * component.
+     *
+     * @param cmp day component returned by createDayComponent
+     * @return the day text
+     */
+    protected String getDayText(Component cmp) {
+<span class="pc bpc" id="L932" title="1 of 2 branches missed.">        if (cmp instanceof Button) {</span>
+<span class="fc" id="L933">            return ((Button) cmp).getText();</span>
+        }
+<span class="nc" id="L935">        return null;</span>
+    }
+
+    /**
+     * Since a day may be any component type, developers should override this
+     * method to add support for setting the right component's UIID.
+     *
+     * @param cmp  day component returned by createDayComponent()
+     * @param uiid the text set the component to
+     */
+    protected void setDayUIID(Component cmp, String uiid) {
+<span class="fc" id="L946">        cmp.setUIID(uiid);</span>
+<span class="fc" id="L947">    }</span>
+
+    /**
+     * Since a day may be any component type, developers should override this
+     * method to add support for enabling or disabling the right component.
+     *
+     * @param cmp    day component returned by createDayComponent()
+     * @param enable the text set the component to
+     */
+    protected void setDayEnabled(Component cmp, boolean enable) {
+<span class="fc" id="L957">        cmp.setEnabled(enable);</span>
+<span class="fc" id="L958">    }</span>
+
+    class MonthView extends Container implements ActionListener {
+
+<span class="fc" id="L962">        private final Component[] components = new Component[42];</span>
+        private final Container titles;
+        private final Container days;
+        long currentDay;
+        private Component selected;
+
+<span class="fc" id="L968">        public MonthView(long time) {</span>
+<span class="fc" id="L969">            super(new BoxLayout(BoxLayout.Y_AXIS));</span>
+<span class="fc" id="L970">            setUIID(&quot;MonthView&quot;);</span>
+<span class="fc" id="L971">            titles = new Container(new GridLayout(1, 7));</span>
+<span class="fc" id="L972">            days = new Container(new GridLayout(6, 7));</span>
+<span class="fc" id="L973">            addComponent(titles);</span>
+<span class="fc" id="L974">            addComponent(days);</span>
+<span class="pc bpc" id="L975" title="1 of 2 branches missed.">            if (UIManager.getInstance().isThemeConstant(&quot;calTitleDayStyleBool&quot;, false)) {</span>
+<span class="nc" id="L976">                titles.setUIID(&quot;CalendarTitleArea&quot;);</span>
+<span class="nc" id="L977">                days.setUIID(&quot;CalendarDayArea&quot;);</span>
+            }
+<span class="fc bfc" id="L979" title="All 2 branches covered.">            for (int iter = 0; iter &lt; DAYS.length; iter++) {</span>
+<span class="fc" id="L980">                titles.addComponent(createDayTitle(iter));</span>
+            }
+<span class="fc bfc" id="L982" title="All 2 branches covered.">            for (int iter = 0; iter &lt; components.length; iter++) {</span>
+<span class="fc" id="L983">                components[iter] = createDayComponent();</span>
+<span class="fc" id="L984">                days.add(components[iter]);</span>
+<span class="fc bfc" id="L985" title="All 2 branches covered.">                if (iter &lt;= 7) {</span>
+<span class="fc" id="L986">                    components[iter].setNextFocusUp(year);</span>
+                }
+<span class="fc" id="L988">                bindDayListener(components[iter], this);</span>
+<span class="pc bpc" id="L989" title="1 of 2 branches missed.">                for (ActionListener dayListener : dayListeners) {</span>
+<span class="nc" id="L990">                    bindDayListener(components[iter], dayListener);</span>
+<span class="nc" id="L991">                }</span>
+            }
+<span class="fc" id="L993">            setCurrentDay(time);</span>
+
+<span class="fc" id="L995">        }</span>
+
+        public long getCurrentDay() {
+<span class="nc" id="L998">            return currentDay;</span>
+        }
+
+        public void setCurrentDay(long day) {
+<span class="fc" id="L1002">            setCurrentDay(day, false);</span>
+<span class="fc" id="L1003">        }</span>
+
+        private void setCurrentDay(long day, boolean force) {
+<span class="fc" id="L1006">            repaint();</span>
+<span class="fc" id="L1007">            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);</span>
+<span class="fc" id="L1008">            cal.setTime(new Date(currentDay));</span>
+<span class="fc" id="L1009">            cal.set(java.util.Calendar.HOUR, 1);</span>
+<span class="fc" id="L1010">            cal.set(java.util.Calendar.HOUR_OF_DAY, 1);</span>
+<span class="fc" id="L1011">            cal.set(java.util.Calendar.MINUTE, 0);</span>
+<span class="fc" id="L1012">            cal.set(java.util.Calendar.SECOND, 0);</span>
+<span class="fc" id="L1013">            cal.set(java.util.Calendar.MILLISECOND, 0);</span>
+
+<span class="fc" id="L1015">            int yearOld = cal.get(java.util.Calendar.YEAR);</span>
+<span class="fc" id="L1016">            int monthOld = cal.get(java.util.Calendar.MONTH);</span>
+<span class="fc" id="L1017">            int dayOld = cal.get(java.util.Calendar.DAY_OF_MONTH);</span>
+<span class="fc" id="L1018">            Date dateObject = new Date(day);</span>
+<span class="fc" id="L1019">            cal.setTime(dateObject);</span>
+<span class="fc" id="L1020">            cal.set(java.util.Calendar.HOUR, 1);</span>
+<span class="fc" id="L1021">            cal.set(java.util.Calendar.HOUR_OF_DAY, 1);</span>
+<span class="fc" id="L1022">            cal.set(java.util.Calendar.MINUTE, 0);</span>
+<span class="fc" id="L1023">            cal.set(java.util.Calendar.SECOND, 0);</span>
+<span class="fc" id="L1024">            cal.set(java.util.Calendar.MILLISECOND, 0);</span>
+<span class="fc" id="L1025">            int yearNew = cal.get(java.util.Calendar.YEAR);</span>
+<span class="fc" id="L1026">            int monthNew = cal.get(java.util.Calendar.MONTH);</span>
+<span class="fc" id="L1027">            int dayNew = cal.get(java.util.Calendar.DAY_OF_MONTH);</span>
+<span class="fc bfc" id="L1028" title="All 2 branches covered.">            if (month != null) {</span>
+<span class="fc" id="L1029">                year.setSelectedItem(&quot;&quot; + yearNew);</span>
+<span class="fc" id="L1030">                month.setSelectedIndex(monthNew);</span>
+            } else {
+<span class="pc bpc" id="L1032" title="1 of 2 branches missed.">                if (dateLabel != null) {</span>
+<span class="nc" id="L1033">                    dateLabel.setText(getLocalizedMonth(monthNew) + &quot; &quot; + yearNew);</span>
+                }
+            }
+
+<span class="pc bpc" id="L1037" title="7 of 8 branches missed.">            if (yearNew != yearOld || monthNew != monthOld || dayNew != dayOld || force) {</span>
+<span class="fc" id="L1038">                currentDay = cal.getTime().getTime();</span>
+<span class="fc bfc" id="L1039" title="All 2 branches covered.">                if (SELECTED_DAY == -1) {</span>
+<span class="fc" id="L1040">                    SELECTED_DAY = currentDay;</span>
+                }
+<span class="fc" id="L1042">                int month = cal.get(java.util.Calendar.MONTH);</span>
+<span class="fc" id="L1043">                cal.set(java.util.Calendar.DAY_OF_MONTH, 1);</span>
+<span class="fc" id="L1044">                long startDate = cal.getTime().getTime();</span>
+<span class="fc" id="L1045">                int dow = cal.get(java.util.Calendar.DAY_OF_WEEK);</span>
+<span class="fc" id="L1046">                cal.setTime(new Date(cal.getTime().getTime()));</span>
+<span class="fc" id="L1047">                cal.add(java.util.Calendar.DAY_OF_MONTH, -1);</span>
+<span class="fc" id="L1048">                int lastDay = cal.get(java.util.Calendar.DAY_OF_MONTH);</span>
+<span class="fc" id="L1049">                int i = 0;</span>
+<span class="fc bfc" id="L1050" title="All 2 branches covered.">                if (dow &gt; java.util.Calendar.SUNDAY) {</span>
+                    //last day of previous month
+
+<span class="fc bfc" id="L1053" title="All 2 branches covered.">                    while (dow &gt; java.util.Calendar.SUNDAY) {</span>
+<span class="fc" id="L1054">                        cal.add(java.util.Calendar.DAY_OF_MONTH, -1);</span>
+<span class="fc" id="L1055">                        dow = cal.get(java.util.Calendar.DAY_OF_WEEK);</span>
+                    }
+<span class="fc" id="L1057">                    int previousMonthSunday = cal.get(java.util.Calendar.DAY_OF_MONTH);</span>
+<span class="fc bfc" id="L1058" title="All 2 branches covered.">                    for (; i &lt;= lastDay - previousMonthSunday; i++) {</span>
+<span class="fc" id="L1059">                        setDayUIID(components[i], &quot;CalendarDay&quot;);</span>
+<span class="fc" id="L1060">                        setDayEnabled(components[i], false);</span>
+<span class="fc" id="L1061">                        setDayText(components[i], &quot;&quot; + (previousMonthSunday + i));</span>
+                    }
+                }
+                //last day of current month
+<span class="fc" id="L1065">                cal.set(java.util.Calendar.MONTH, (month + 1) % 12);</span>
+<span class="fc bfc" id="L1066" title="All 2 branches covered.">                while (cal.get(java.util.Calendar.MONTH) != month) {</span>
+<span class="fc" id="L1067">                    cal.add(java.util.Calendar.DAY_OF_MONTH, -1);</span>
+                }
+
+<span class="fc" id="L1070">                lastDay = cal.get(java.util.Calendar.DAY_OF_MONTH);</span>
+
+<span class="fc" id="L1072">                int j = i;</span>
+<span class="pc bpc" id="L1073" title="1 of 4 branches missed.">                for (; j &lt; components.length &amp;&amp; (j - i + 1) &lt;= lastDay; j++) {</span>
+<span class="fc" id="L1074">                    setDayEnabled(components[j], true);</span>
+<span class="fc" id="L1075">                    dates[j] = startDate;</span>
+<span class="fc bfc" id="L1076" title="All 2 branches covered.">                    if (dates[j] == SELECTED_DAY) {</span>
+<span class="fc" id="L1077">                        setDayUIID(components[j], &quot;CalendarSelectedDay&quot;);</span>
+<span class="fc" id="L1078">                        selected = components[j];</span>
+                    } else {
+<span class="fc" id="L1080">                        setDayUIID(components[j], &quot;CalendarDay&quot;);</span>
+                    }
+
+<span class="pc bpc" id="L1083" title="1 of 2 branches missed.">                    for (Map.Entry&lt;String, Collection&lt;Date&gt;&gt; entry : highlightGroup.entrySet()) {</span>
+<span class="nc bnc" id="L1084" title="All 2 branches missed.">                        if (entry.getValue().contains(new Date(dates[j]))) {</span>
+<span class="nc" id="L1085">                            setDayUIID(components[j], entry.getKey());</span>
+                        }
+<span class="nc" id="L1087">                    }</span>
+
+<span class="fc bfc" id="L1089" title="All 2 branches covered.">                    if (multipleSelectionEnabled) {</span>
+<span class="pc bpc" id="L1090" title="1 of 2 branches missed.">                        if (selectedDays.contains(new Date(dates[j]))) {</span>
+<span class="nc" id="L1091">                            setDayUIID(components[j], selectedDaysUIID);</span>
+                        }
+                    }
+<span class="fc" id="L1094">                    updateButtonDayDate(components[j], yearNew, month, j - i + 1);</span>
+<span class="fc" id="L1095">                    cal.setTime(new Date(startDate));</span>
+<span class="fc" id="L1096">                    cal.add(java.util.Calendar.DAY_OF_MONTH, 1);</span>
+<span class="fc" id="L1097">                    startDate = cal.getTime().getTime();</span>
+                }
+<span class="fc" id="L1099">                int d = 1;</span>
+<span class="fc bfc" id="L1100" title="All 2 branches covered.">                for (; j &lt; components.length; j++) {</span>
+<span class="fc" id="L1101">                    setDayUIID(components[j], &quot;CalendarDay&quot;);</span>
+<span class="fc" id="L1102">                    setDayEnabled(components[j], false);</span>
+<span class="fc" id="L1103">                    setDayText(components[j], &quot;&quot; + d++);</span>
+                }
+            }
+<span class="fc" id="L1106">        }</span>
+
+        public int getDayOfMonth() {
+<span class="fc" id="L1109">            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);</span>
+<span class="fc" id="L1110">            cal.setTime(new Date(currentDay));</span>
+<span class="fc" id="L1111">            return cal.get(java.util.Calendar.DAY_OF_MONTH);</span>
+        }
+
+        public int getMonth() {
+<span class="fc" id="L1115">            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);</span>
+<span class="fc" id="L1116">            cal.setTime(new Date(currentDay));</span>
+<span class="fc" id="L1117">            return cal.get(java.util.Calendar.MONTH);</span>
+        }
+
+        public void incrementMonth() {
+<span class="nc" id="L1121">            int month = getMonth();</span>
+<span class="nc" id="L1122">            month++;</span>
+<span class="nc" id="L1123">            int year = getYear();</span>
+<span class="nc bnc" id="L1124" title="All 2 branches missed.">            if (month &gt; java.util.Calendar.DECEMBER) {</span>
+<span class="nc" id="L1125">                month = java.util.Calendar.JANUARY;</span>
+<span class="nc" id="L1126">                year++;</span>
+            }
+<span class="nc" id="L1128">            setMonth(year, month);</span>
+<span class="nc" id="L1129">        }</span>
+
+        private long getSelectedDay() {
+<span class="fc" id="L1132">            return SELECTED_DAY;</span>
+        }
+
+        public void setSelectedDay(long selectedDay) {
+<span class="fc" id="L1136">            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);</span>
+<span class="fc" id="L1137">            cal.setTime(new Date(selectedDay));</span>
+<span class="fc" id="L1138">            cal.set(java.util.Calendar.HOUR, 1);</span>
+<span class="fc" id="L1139">            cal.set(java.util.Calendar.HOUR_OF_DAY, 1);</span>
+<span class="fc" id="L1140">            cal.set(java.util.Calendar.MINUTE, 0);</span>
+<span class="fc" id="L1141">            cal.set(java.util.Calendar.SECOND, 0);</span>
+<span class="fc" id="L1142">            cal.set(java.util.Calendar.MILLISECOND, 0);</span>
+<span class="fc" id="L1143">            SELECTED_DAY = cal.getTime().getTime();</span>
+<span class="fc" id="L1144">        }</span>
+
+        private void setMonth(int year, int month) {
+<span class="nc" id="L1147">            fireMonthChangedEvent();</span>
+<span class="nc" id="L1148">            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);</span>
+<span class="nc" id="L1149">            cal.setTimeZone(TimeZone.getDefault());</span>
+<span class="nc" id="L1150">            cal.set(java.util.Calendar.MONTH, month);</span>
+<span class="nc" id="L1151">            cal.set(java.util.Calendar.DAY_OF_MONTH, 1);</span>
+<span class="nc" id="L1152">            cal.set(java.util.Calendar.YEAR, year);</span>
+
+            // if this is past the last day of the month (e.g. going from January 31st
+            // to February) we need to decrement the day until the month is correct
+<span class="nc bnc" id="L1156" title="All 2 branches missed.">            while (cal.get(java.util.Calendar.MONTH) != month) {</span>
+<span class="nc" id="L1157">                cal.add(java.util.Calendar.DAY_OF_MONTH, -1);</span>
+            }
+<span class="nc" id="L1159">            setCurrentDay(cal.getTime().getTime());</span>
+<span class="nc" id="L1160">        }</span>
+
+        public void decrementMonth() {
+<span class="nc" id="L1163">            int month = getMonth();</span>
+<span class="nc" id="L1164">            month--;</span>
+<span class="nc" id="L1165">            int year = getYear();</span>
+<span class="nc bnc" id="L1166" title="All 2 branches missed.">            if (month &lt; java.util.Calendar.JANUARY) {</span>
+<span class="nc" id="L1167">                month = java.util.Calendar.DECEMBER;</span>
+<span class="nc" id="L1168">                year--;</span>
+            }
+<span class="nc" id="L1170">            setMonth(year, month);</span>
+<span class="nc" id="L1171">        }</span>
+
+        public int getYear() {
+<span class="fc" id="L1174">            java.util.Calendar cal = java.util.Calendar.getInstance(tmz);</span>
+<span class="fc" id="L1175">            cal.setTime(new Date(currentDay));</span>
+<span class="fc" id="L1176">            return cal.get(java.util.Calendar.YEAR);</span>
+        }
+
+        public void addActionListener(ActionListener l) {
+<span class="nc" id="L1180">            dispatcher.addListener(l);</span>
+<span class="nc" id="L1181">        }</span>
+
+        public void removeActionListener(ActionListener l) {
+<span class="nc" id="L1184">            dispatcher.removeListener(l);</span>
+<span class="nc" id="L1185">        }</span>
+
+        public void addMonthChangedListener(ActionListener l) {
+<span class="nc" id="L1188">            monthChangedListeners.addListener(l);</span>
+<span class="nc" id="L1189">        }</span>
+
+        public void removeMonthChangedListener(ActionListener l) {
+<span class="nc" id="L1192">            monthChangedListeners.removeListener(l);</span>
+<span class="nc" id="L1193">        }</span>
+
+        public void addDayActionListener(ActionListener l) {
+<span class="nc" id="L1196">            dayListeners.add(l);</span>
+<span class="nc bnc" id="L1197" title="All 2 branches missed.">            for (Component cmp : components) {</span>
+<span class="nc" id="L1198">                bindDayListener(cmp, l);</span>
+            }
+<span class="nc" id="L1200">        }</span>
+
+        public void removeDayActionListener(ActionListener l) {
+<span class="nc" id="L1203">            dayListeners.remove(l);</span>
+<span class="nc bnc" id="L1204" title="All 2 branches missed.">            for (Component cmp : components) {</span>
+<span class="nc" id="L1205">                unBindDayListener(cmp, l);</span>
+            }
+<span class="nc" id="L1207">        }</span>
+
+        /**
+         * Allows tracking selection changes in the calendar in real time
+         *
+         * @param l listener to add
+         */
+        public void addDataChangedListener(DataChangedListener l) {
+<span class="nc" id="L1215">            dataChangedListeners.addListener(l);</span>
+<span class="nc" id="L1216">        }</span>
+
+        /**
+         * Allows tracking selection changes in the calendar in real time
+         *
+         * @param l listener to remove
+         */
+        public void removeDataChangedListener(DataChangedListener l) {
+<span class="nc" id="L1224">            dataChangedListeners.removeListener(l);</span>
+<span class="nc" id="L1225">        }</span>
+
+        protected void fireActionEvent() {
+<span class="fc" id="L1228">            componentChanged();</span>
+<span class="fc" id="L1229">            super.fireActionEvent();</span>
+<span class="fc" id="L1230">            dispatcher.fireActionEvent(new ActionEvent(Calendar.this, ActionEvent.Type.Calendar));</span>
+<span class="fc" id="L1231">        }</span>
+
+        protected void fireMonthChangedEvent() {
+<span class="nc" id="L1234">            monthChangedListeners.fireActionEvent(new ActionEvent(Calendar.this, ActionEvent.Type.Calendar));</span>
+<span class="nc" id="L1235">        }</span>
+
+        public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L1238">            Object src = evt.getSource();</span>
+<span class="pc bpc" id="L1239" title="1 of 2 branches missed.">            if (src instanceof ComboBox) {</span>
+<span class="nc" id="L1240">                setMonth(Integer.parseInt((String) year.getSelectedItem()), month.getSelectedIndex());</span>
+<span class="nc" id="L1241">                componentChanged();</span>
+<span class="nc" id="L1242">                return;</span>
+            }
+<span class="fc bfc" id="L1244" title="All 2 branches covered.">            if (changesSelectedDateEnabled) {</span>
+<span class="pc bpc" id="L1245" title="1 of 2 branches missed.">                for (int iter = 0; iter &lt; components.length; iter++) {</span>
+<span class="fc" id="L1246">                    boolean isContained = false;</span>
+<span class="pc bpc" id="L1247" title="1 of 2 branches missed.">                    if (components[iter] instanceof Container) {</span>
+<span class="nc" id="L1248">                        isContained = ((Container) components[iter]).contains((Component) src);</span>
+                    }
+
+<span class="pc bpc" id="L1251" title="1 of 4 branches missed.">                    if (src == components[iter] || isContained) {</span>
+<span class="fc bfc" id="L1252" title="All 2 branches covered.">                        if (multipleSelectionEnabled) {</span>
+<span class="pc bpc" id="L1253" title="1 of 2 branches missed.">                            if (selectedDays.contains(new Date(dates[iter]))) {</span>
+<span class="nc bnc" id="L1254" title="All 2 branches missed.">                                if (SELECTED_DAY == dates[iter]) {</span>
+<span class="nc" id="L1255">                                    setDayUIID(components[iter], &quot;CalendarSelectedDay&quot;);</span>
+                                } else {
+<span class="nc" id="L1257">                                    setDayUIID(components[iter], &quot;CalendarDay&quot;);</span>
+                                }
+<span class="nc bnc" id="L1259" title="All 2 branches missed.">                                if (!highlightGroup.isEmpty()) {</span>
+<span class="nc bnc" id="L1260" title="All 2 branches missed.">                                    for (Map.Entry&lt;String, Collection&lt;Date&gt;&gt; entry : highlightGroup.entrySet()) {</span>
+<span class="nc bnc" id="L1261" title="All 2 branches missed.">                                        if (entry.getValue().contains(new Date(dates[iter]))) {</span>
+<span class="nc" id="L1262">                                            setDayUIID(components[iter], entry.getKey());</span>
+<span class="nc" id="L1263">                                            break;</span>
+                                        }
+<span class="nc" id="L1265">                                    }</span>
+                                }
+
+<span class="nc" id="L1268">                                selectedDays.remove(new Date(dates[iter]));</span>
+                            } else {
+<span class="fc" id="L1270">                                setDayUIID(components[iter], selectedDaysUIID);</span>
+<span class="fc" id="L1271">                                selectedDays.add(new Date(dates[iter]));</span>
+                            }
+                        } else {
+<span class="pc bpc" id="L1274" title="1 of 2 branches missed.">                            if (selected != null) {</span>
+<span class="fc" id="L1275">                                setDayUIID(selected, &quot;CalendarDay&quot;);</span>
+<span class="fc" id="L1276">                                java.util.Calendar cal = java.util.Calendar.getInstance(tmz);</span>
+<span class="fc" id="L1277">                                cal.setTime(new Date(currentDay));</span>
+<span class="fc" id="L1278">                                cal.set(java.util.Calendar.DAY_OF_MONTH, Integer.parseInt(getDayText(selected).trim()));</span>
+<span class="fc" id="L1279">                                cal.set(java.util.Calendar.HOUR, 1);</span>
+<span class="fc" id="L1280">                                cal.set(java.util.Calendar.HOUR_OF_DAY, 1);</span>
+<span class="fc" id="L1281">                                cal.set(java.util.Calendar.MINUTE, 0);</span>
+<span class="fc" id="L1282">                                cal.set(java.util.Calendar.SECOND, 0);</span>
+<span class="fc" id="L1283">                                cal.set(java.util.Calendar.MILLISECOND, 0);</span>
+<span class="pc bpc" id="L1284" title="1 of 2 branches missed.">                                if (!highlightGroup.isEmpty()) {</span>
+<span class="nc bnc" id="L1285" title="All 2 branches missed.">                                    for (Map.Entry&lt;String, Collection&lt;Date&gt;&gt; entry : highlightGroup.entrySet()) {</span>
+<span class="nc bnc" id="L1286" title="All 2 branches missed.">                                        if (entry.getValue().contains(cal.getTime())) {</span>
+<span class="nc" id="L1287">                                            setDayUIID(selected, entry.getKey());</span>
+<span class="nc" id="L1288">                                            break;</span>
+                                        }
+<span class="nc" id="L1290">                                    }</span>
+                                }
+                            }
+<span class="fc" id="L1293">                            setDayUIID(components[iter], &quot;CalendarSelectedDay&quot;);</span>
+
+<span class="fc" id="L1295">                            SELECTED_DAY = dates[iter];</span>
+<span class="fc" id="L1296">                            selected = components[iter];</span>
+                        }
+<span class="fc" id="L1298">                        fireActionEvent();</span>
+<span class="pc bpc" id="L1299" title="1 of 2 branches missed.">                        if (!getComponentForm().isSingleFocusMode()) {</span>
+<span class="fc" id="L1300">                            setHandlesInput(false);</span>
+                        }
+<span class="fc" id="L1302">                        revalidate();</span>
+<span class="fc" id="L1303">                        return;</span>
+                    }
+                }
+            }
+<span class="fc" id="L1307">        }</span>
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,1846 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SideMenuBar.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">SideMenuBar.java</span></div><h1>SideMenuBar.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.io.Log;
+import com.codename1.ui.animations.Animation;
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.animations.Motion;
+import com.codename1.ui.animations.Transition;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.Resources;
+
+import java.util.Vector;
+
+/**
+ * This is Menu Bar that displays it's commands on a side bar navigation similar
+ * to Google+/Facbook apps navigation
+ *
+ * @author Chen
+ * @deprecated this class is still used internally but code should be migrated to use the
+ * {@link com.codename1.ui.Toolbar}
+ */
+public class SideMenuBar extends MenuBar {
+
+    /**
+     * This string can be used in putClientProperty within command to hint about
+     * the placement of the command
+     */
+    public static final String COMMAND_PLACEMENT_KEY = &quot;placement&quot;;
+    /**
+     * This string can be used in putClientProperty within command to hint about
+     * the placement of the command e.g.
+     * putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_RIGHT);
+     */
+    public static final String COMMAND_PLACEMENT_VALUE_RIGHT = &quot;right&quot;;
+    /**
+     * This string can be used in putClientProperty within command to hint about
+     * the placement of the command e.g.
+     * putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_TOP);
+     */
+    public static final String COMMAND_PLACEMENT_VALUE_TOP = &quot;top&quot;;
+    /**
+     * Allows placing a component instance into the client properties of the command so
+     * it is shown instead of the command e.g.:
+     * putClientProperty(SideMenuBar.COMMAND_SIDE_COMPONENT, myCustomComponentInstance);
+     */
+    public static final String COMMAND_SIDE_COMPONENT = &quot;SideComponent&quot;;
+    /**
+     * When using a side component we might want to only have it behave as a visual tool
+     * and still execute the command when it is clicked. The default behavior is to
+     * delegate events to the component, however if this flag is used the command
+     * will act as normal while using the COMMAND_SIDE_COMPONENT only for visual effect e.g.:
+     * putClientProperty(SideMenuBar.COMMAND_ACTIONABLE, Boolean.TRUE);
+     */
+    public static final String COMMAND_ACTIONABLE = &quot;Actionable&quot;;
+    int initialDragX;
+    int initialDragY;
+    boolean transitionRunning;
+    boolean sideSwipePotential;
+    private Button openButton;
+    private Button rightSideButton;
+    private Form parent;
+    private Form menu;
+    private Container rightPanel;
+    private boolean dragActivated;
+    private Transition in;
+    private Transition out;
+    private Container sidePanel;
+    private int draggedX;
+    private java.util.ArrayList rightCommands;
+    private java.util.ArrayList leftCommands;
+    private ActionListener pointerDragged;
+    private ActionListener pointerPressed;
+    private boolean rightSideSwipePotential;
+    private boolean topSwipePotential;
+
+    /**
+     * Empty Constructor
+     */
+<span class="fc" id="L108">    public SideMenuBar() {</span>
+<span class="fc" id="L109">    }</span>
+
+    /**
+     * Returns true if a side menu is currently controlling the screen
+     *
+     * @return true if a side menu is currently controlling the screen
+     */
+    public static boolean isShowing() {
+<span class="fc" id="L117">        Form f = Display.getInstance().getCurrent();</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        return f.getClientProperty(&quot;cn1$sideMenuParent&quot;) != null;</span>
+    }
+
+    /**
+     * Folds the current side menu if it is open, notice that the menu will
+     * close asynchronously
+     */
+    public static void closeCurrentMenu() {
+<span class="nc" id="L126">        Form f = Display.getInstance().getCurrent();</span>
+<span class="nc" id="L127">        SideMenuBar b = (SideMenuBar) f.getClientProperty(&quot;cn1$sideMenuParent&quot;);</span>
+<span class="nc bnc" id="L128" title="All 4 branches missed.">        if (b != null &amp;&amp; !b.transitionRunning) {</span>
+<span class="nc" id="L129">            b.closeMenu();</span>
+        }
+<span class="nc" id="L131">    }</span>
+
+    /**
+     * Folds the current side menu if it is open, when the menu is closed it
+     * will invoke the runnable callback method
+     *
+     * @param callback will be invoked when the menu is actually closed
+     */
+    public static void closeCurrentMenu(final Runnable callback) {
+<span class="pc bpc" id="L140" title="3 of 6 branches missed.">        if (Toolbar.isOnTopSideMenu() &amp;&amp; (Toolbar.isGlobalToolbar() || Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION)) {</span>
+<span class="nc" id="L141">            Display.getInstance().getCurrent().getToolbar().closeSideMenu();</span>
+<span class="nc" id="L142">            callback.run();</span>
+<span class="nc" id="L143">            return;</span>
+        }
+<span class="fc" id="L145">        Form f = Display.getInstance().getCurrent();</span>
+<span class="fc" id="L146">        final SideMenuBar b = (SideMenuBar) f.getClientProperty(&quot;cn1$sideMenuParent&quot;);</span>
+<span class="pc bpc" id="L147" title="3 of 4 branches missed.">        if (b != null &amp;&amp; !b.transitionRunning) {</span>
+<span class="nc" id="L148">            b.parent.addShowListener(new ActionListener() {</span>
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L150">                    b.parent.removeShowListener(this);</span>
+<span class="nc" id="L151">                    callback.run();</span>
+<span class="nc" id="L152">                }</span>
+            });
+<span class="nc" id="L154">            b.closeMenu();</span>
+        } else {
+<span class="fc" id="L156">            callback.run();</span>
+        }
+<span class="fc" id="L158">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void initMenuBar(Form parent) {
+<span class="pc bpc" id="L164" title="1 of 2 branches missed.">        if (parent.getClientProperty(&quot;Menu&quot;) != null) {</span>
+<span class="nc" id="L165">            return;</span>
+        }
+<span class="fc" id="L167">        super.initMenuBar(parent);</span>
+<span class="fc" id="L168">        this.parent = parent;</span>
+<span class="fc" id="L169">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void removeAllCommands() {
+<span class="nc" id="L176">        Container t = getTitleAreaContainer();</span>
+<span class="nc" id="L177">        int count = t.getComponentCount();</span>
+<span class="nc" id="L178">        Component[] cmps = new Component[count];</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="nc" id="L180">            cmps[i] = t.getComponentAt(i);</span>
+        }
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="nc" id="L183">            Component current = cmps[iter];</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">            if (current.getClientProperty(&quot;TitleCommand&quot;) != null) {</span>
+<span class="nc" id="L185">                Button b = (Button) current;</span>
+<span class="nc" id="L186">                t.removeComponent(current);</span>
+<span class="nc" id="L187">                t.revalidate();</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">                if (rightCommands != null) {</span>
+<span class="nc" id="L189">                    rightCommands.remove(b.getCommand());</span>
+                }
+<span class="nc bnc" id="L191" title="All 2 branches missed.">                if (leftCommands != null) {</span>
+<span class="nc" id="L192">                    leftCommands.remove(b.getCommand());</span>
+                }
+            }
+        }
+<span class="nc" id="L196">        super.removeAllCommands();</span>
+<span class="nc" id="L197">        initTitleBarStatus();</span>
+<span class="nc" id="L198">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void unInstallMenuBar() {
+<span class="nc" id="L205">        super.unInstallMenuBar();</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">        if (pointerDragged != null) {</span>
+<span class="nc" id="L207">            parent.removePointerDraggedListener(pointerDragged);</span>
+        }
+<span class="nc bnc" id="L209" title="All 2 branches missed.">        if (pointerPressed != null) {</span>
+<span class="nc" id="L210">            parent.removePointerPressedListener(pointerPressed);</span>
+        }
+<span class="nc" id="L212">    }</span>
+
+    /**
+     * Creates the Side Menu open button.
+     *
+     * @return a Button instance to place on the TitleArea
+     */
+    protected Button createOpenButton() {
+<span class="nc" id="L220">        Button ob = new Button();</span>
+<span class="nc" id="L221">        ob.setUIID(&quot;MenuButton&quot;);</span>
+<span class="nc" id="L222">        UIManager uim = parent.getUIManager();</span>
+<span class="nc" id="L223">        Image i = uim.getThemeImageConstant(&quot;sideMenuImage&quot;);</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        if (i != null) {</span>
+<span class="nc" id="L225">            ob.setIcon(i);</span>
+        } else {
+<span class="nc" id="L227">            float size = 4.5f;</span>
+            try {
+<span class="nc" id="L229">                size = Float.parseFloat(uim.getThemeConstant(&quot;menuImageSize&quot;, &quot;4.5&quot;));</span>
+<span class="nc" id="L230">            } catch (Throwable t) {</span>
+<span class="nc" id="L231">                Log.e(t);</span>
+<span class="nc" id="L232">            }</span>
+<span class="nc" id="L233">            FontImage.setMaterialIcon(ob, FontImage.MATERIAL_MENU, size);</span>
+        }
+<span class="nc" id="L235">        Image p = uim.getThemeImageConstant(&quot;sideMenuPressImage&quot;);</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">        if (p != null) {</span>
+<span class="nc" id="L237">            ob.setPressedIcon(p);</span>
+        }
+<span class="nc" id="L239">        return ob;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void installMenuBar() {
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        if (parent.getClientProperty(&quot;Menu&quot;) != null) {</span>
+<span class="nc" id="L247">            return;</span>
+        }
+<span class="nc" id="L249">        super.installMenuBar();</span>
+<span class="nc bnc" id="L250" title="All 2 branches missed.">        if (parent instanceof Dialog) {</span>
+<span class="nc" id="L251">            return;</span>
+        }
+<span class="nc" id="L253">        openButton = createOpenButton();</span>
+<span class="nc" id="L254">        openButton.addActionListener(new ActionListener() {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L257">                openMenu(null);</span>
+<span class="nc" id="L258">            }</span>
+        });
+<span class="nc" id="L260">        addOpenButton(null, true);</span>
+<span class="nc" id="L261">        UIManager uim = parent.getUIManager();</span>
+<span class="nc" id="L262">        final boolean[] hasSideMenus = new boolean[2];</span>
+
+
+<span class="nc bnc" id="L265" title="All 4 branches missed.">        if (uim.isThemeConstant(&quot;sideMenuFoldedSwipeBool&quot;, true) &amp;&amp; parent.getClientProperty(&quot;sideMenuFoldedSwipeListeners&quot;) == null) {</span>
+<span class="nc" id="L266">            pointerDragged = new ActionListener() {</span>
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L268" title="All 4 branches missed.">                    if (sideSwipePotential &amp;&amp; hasSideMenus[0]) {</span>
+<span class="nc" id="L269">                        final int x = evt.getX();</span>
+<span class="nc" id="L270">                        final int y = evt.getY();</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">                        if (Math.abs(y - initialDragY) &gt; x - initialDragX) {</span>
+<span class="nc" id="L272">                            sideSwipePotential = false;</span>
+<span class="nc" id="L273">                            return;</span>
+                        }
+<span class="nc" id="L275">                        evt.consume();</span>
+<span class="nc bnc" id="L276" title="All 2 branches missed.">                        if (x - initialDragX &gt; Display.getInstance().getDisplayWidth() / getUIManager().getThemeConstant(&quot;sideSwipeActivationInt&quot;, 15)) {</span>
+<span class="nc" id="L277">                            draggedX = x;</span>
+<span class="nc" id="L278">                            dragActivated = true;</span>
+<span class="nc" id="L279">                            parent.pointerReleased(-1, -1);</span>
+<span class="nc" id="L280">                            openMenu(null, 0, draggedX, false);</span>
+<span class="nc" id="L281">                            initialDragX = 0;</span>
+<span class="nc" id="L282">                            initialDragY = 0;</span>
+                        }
+<span class="nc" id="L284">                        return;</span>
+                    }
+<span class="nc bnc" id="L286" title="All 8 branches missed.">                    if (rightSideSwipePotential &amp;&amp; (hasSideMenus[1] || (hasSideMenus[0] &amp;&amp; isRTL()))) {</span>
+<span class="nc" id="L287">                        final int x = evt.getX();</span>
+<span class="nc" id="L288">                        final int y = evt.getY();</span>
+<span class="nc bnc" id="L289" title="All 4 branches missed.">                        if (x &lt; 0 || Math.abs(y - initialDragY) &gt; initialDragX - x) {</span>
+<span class="nc" id="L290">                            rightSideSwipePotential = false;</span>
+<span class="nc" id="L291">                            return;</span>
+                        }
+<span class="nc" id="L293">                        evt.consume();</span>
+<span class="nc bnc" id="L294" title="All 2 branches missed.">                        if (initialDragX - x &gt; Display.getInstance().getDisplayWidth() / getUIManager().getThemeConstant(&quot;sideSwipeActivationInt&quot;, 15)) {</span>
+<span class="nc" id="L295">                            draggedX = x;</span>
+<span class="nc" id="L296">                            dragActivated = true;</span>
+<span class="nc" id="L297">                            parent.pointerReleased(-1, -1);</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">                            if (isRTL()) {</span>
+<span class="nc" id="L299">                                openMenu(null, 0, draggedX, false);</span>
+                            } else {
+<span class="nc" id="L301">                                openMenu(COMMAND_PLACEMENT_VALUE_RIGHT, 0, draggedX, false);</span>
+                            }
+<span class="nc" id="L303">                            initialDragX = 0;</span>
+<span class="nc" id="L304">                            initialDragY = 0;</span>
+                        }
+                    }
+<span class="nc bnc" id="L307" title="All 2 branches missed.">                    if (topSwipePotential) {</span>
+<span class="nc" id="L308">                        final int x = evt.getX();</span>
+<span class="nc" id="L309">                        final int y = evt.getY();</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">                        if (Math.abs(y - initialDragY) &lt; x - initialDragX) {</span>
+<span class="nc" id="L311">                            topSwipePotential = false;</span>
+<span class="nc" id="L312">                            return;</span>
+                        }
+<span class="nc" id="L314">                        evt.consume();</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">                        if (initialDragY - y &gt; Display.getInstance().getDisplayHeight() / getUIManager().getThemeConstant(&quot;sideSwipeActivationInt&quot;, 15)) {</span>
+<span class="nc" id="L316">                            draggedX = y;</span>
+<span class="nc" id="L317">                            dragActivated = true;</span>
+<span class="nc" id="L318">                            parent.pointerReleased(-1, -1);</span>
+<span class="nc" id="L319">                            openMenu(COMMAND_PLACEMENT_VALUE_TOP, 0, draggedX, false);</span>
+<span class="nc" id="L320">                            initialDragX = 0;</span>
+<span class="nc" id="L321">                            initialDragY = 0;</span>
+                        }
+                    }
+<span class="nc" id="L324">                }</span>
+            };
+<span class="nc" id="L326">            parent.addPointerDraggedListener(pointerDragged);</span>
+<span class="nc" id="L327">            pointerPressed = new ActionListener() {</span>
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L329">                    rightSideSwipePotential = false;</span>
+<span class="nc" id="L330">                    topSwipePotential = false;</span>
+<span class="nc" id="L331">                    sideSwipePotential = false;</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">                    if (getCommandCount() == 0) {</span>
+<span class="nc" id="L333">                        return;</span>
+                    }
+<span class="nc bnc" id="L335" title="All 2 branches missed.">                    if (parent.getCommandCount() == 1) {</span>
+<span class="nc bnc" id="L336" title="All 2 branches missed.">                        if (parent.getCommand(0) == parent.getBackCommand()) {</span>
+<span class="nc" id="L337">                            return;</span>
+                        }
+                    }
+<span class="nc bnc" id="L340" title="All 2 branches missed.">                    for (int iter = 0; iter &lt; getCommandCount(); iter++) {</span>
+<span class="nc" id="L341">                        Command c = getCommand(iter);</span>
+<span class="nc" id="L342">                        String p = (String) c.getClientProperty(COMMAND_PLACEMENT_KEY);</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">                        if (p == null) {</span>
+                            //has left menu
+<span class="nc" id="L345">                            hasSideMenus[0] = true;</span>
+<span class="nc bnc" id="L346" title="All 2 branches missed.">                        } else if (p.equals(COMMAND_PLACEMENT_VALUE_RIGHT)) {</span>
+                            //has right menu
+<span class="nc" id="L348">                            hasSideMenus[1] = true;</span>
+                        }
+                    }
+<span class="nc" id="L351">                    int displayWidth = Display.getInstance().getDisplayWidth();</span>
+<span class="nc bnc" id="L352" title="All 4 branches missed.">                    if (rightSideButton != null || isRTL()) {</span>
+<span class="nc bnc" id="L353" title="All 4 branches missed.">                        rightSideSwipePotential = !transitionRunning &amp;&amp; evt.getX() &gt; displayWidth - displayWidth / getUIManager().getThemeConstant(&quot;sideSwipeSensitiveInt&quot;, 10);</span>
+                    }
+<span class="nc bnc" id="L355" title="All 2 branches missed.">                    if (getTitleComponent() instanceof Button) {</span>
+<span class="nc bnc" id="L356" title="All 4 branches missed.">                        topSwipePotential = !transitionRunning &amp;&amp; evt.getY() &lt; Display.getInstance().getDisplayHeight() / getUIManager().getThemeConstant(&quot;sideSwipeSensitiveInt&quot;, 10);</span>
+                    }
+<span class="nc bnc" id="L358" title="All 4 branches missed.">                    sideSwipePotential = !transitionRunning &amp;&amp; evt.getX() &lt; displayWidth / getUIManager().getThemeConstant(&quot;sideSwipeSensitiveInt&quot;, 10);</span>
+<span class="nc" id="L359">                    initialDragX = evt.getX();</span>
+<span class="nc" id="L360">                    initialDragY = evt.getY();</span>
+<span class="nc bnc" id="L361" title="All 6 branches missed.">                    if (sideSwipePotential || rightSideSwipePotential || topSwipePotential) {</span>
+<span class="nc" id="L362">                        Component c = Display.getInstance().getCurrent().getComponentAt(initialDragX, initialDragY);</span>
+<span class="nc bnc" id="L363" title="All 4 branches missed.">                        if (c != null &amp;&amp; c.shouldBlockSideSwipe()) {</span>
+<span class="nc" id="L364">                            sideSwipePotential = false;</span>
+                        }
+                    }
+<span class="nc" id="L367">                }</span>
+            };
+<span class="nc" id="L369">            parent.addPointerPressedListener(pointerPressed);</span>
+<span class="nc" id="L370">            parent.putClientProperty(&quot;sideMenuFoldedSwipeListeners&quot;, &quot;true&quot;);</span>
+        }
+<span class="nc" id="L372">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected int getDragRegionStatus(int x, int y) {
+<span class="nc bnc" id="L378" title="All 2 branches missed.">        if (getUIManager().isThemeConstant(&quot;sideMenuFoldedSwipeBool&quot;, true)) {</span>
+<span class="nc bnc" id="L379" title="All 4 branches missed.">            if (parent instanceof Dialog || getCommandCount() == 0) {</span>
+<span class="nc" id="L380">                return DRAG_REGION_NOT_DRAGGABLE;</span>
+            }
+<span class="nc bnc" id="L382" title="All 2 branches missed.">            if (parent.getCommandCount() == 1) {</span>
+<span class="nc bnc" id="L383" title="All 2 branches missed.">                if (parent.getCommand(0) == parent.getBackCommand()) {</span>
+<span class="nc" id="L384">                    return DRAG_REGION_NOT_DRAGGABLE;</span>
+                }
+            }
+<span class="nc bnc" id="L387" title="All 2 branches missed.">            if (x - initialDragX &lt; Display.getInstance().getDisplayWidth() / getUIManager().getThemeConstant(&quot;sideSwipeActivationInt&quot;, 15)) {</span>
+<span class="nc" id="L388">                return DRAG_REGION_LIKELY_DRAG_X;</span>
+            }
+        }
+<span class="nc" id="L391">        return DRAG_REGION_NOT_DRAGGABLE;</span>
+    }
+
+    void installRightCommands() {
+<span class="fc bfc" id="L395" title="All 2 branches covered.">        if (rightCommands != null) {</span>
+
+<span class="fc bfc" id="L397" title="All 2 branches covered.">            for (int i = 0; i &lt; rightCommands.size(); i++) {</span>
+<span class="fc" id="L398">                Command rightCommand = (Command) rightCommands.get(rightCommands.size() - 1 - i);</span>
+<span class="fc" id="L399">                String uiid = (String) rightCommand.getClientProperty(&quot;uiid&quot;);</span>
+<span class="fc" id="L400">                String landscapeUiid = (String) rightCommand.getClientProperty(&quot;luiid&quot;);</span>
+<span class="pc bpc" id="L401" title="1 of 2 branches missed.">                if (uiid == null) {</span>
+<span class="fc" id="L402">                    uiid = &quot;TitleCommand&quot;;</span>
+<span class="pc bpc" id="L403" title="2 of 4 branches missed.">                    if (landscapeUiid == null &amp;&amp; UIManager.getInstance().isThemeConstant(&quot;landscapeTitleUiidBool&quot;, false)) {</span>
+<span class="nc" id="L404">                        landscapeUiid = uiid + &quot;Landscape&quot;;</span>
+                    }
+                }
+<span class="fc" id="L407">                int txtPosition = Component.RIGHT;</span>
+<span class="fc" id="L408">                Integer pos = (Integer) rightCommand.getClientProperty(&quot;textPosition&quot;);</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">                if (pos != null) {</span>
+<span class="nc" id="L410">                    txtPosition = pos.intValue();</span>
+                }
+
+<span class="fc" id="L413">                Layout l = getTitleAreaContainer().getLayout();</span>
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">                if (l instanceof BorderLayout) {</span>
+<span class="fc" id="L415">                    final Button b = new Button(rightCommand);</span>
+<span class="fc" id="L416">                    b.setUIID(uiid, landscapeUiid);</span>
+<span class="fc" id="L417">                    b.putClientProperty(&quot;TitleCommand&quot;, Boolean.TRUE);</span>
+<span class="fc" id="L418">                    b.setTextPosition(txtPosition);</span>
+
+<span class="fc" id="L420">                    BorderLayout bl = (BorderLayout) l;</span>
+<span class="fc" id="L421">                    final Component east = bl.getEast();</span>
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">                    if (east == null) {</span>
+<span class="fc" id="L423">                        getTitleAreaContainer().addComponent(BorderLayout.EAST, b);</span>
+                    } else {
+<span class="nc bnc" id="L425" title="All 2 branches missed.">                        if (east instanceof Container) {</span>
+<span class="nc" id="L426">                            Container cnt = (Container) east;</span>
+                            //check if this command is already added
+<span class="nc" id="L428">                            boolean shouldAdd = true;</span>
+<span class="nc bnc" id="L429" title="All 2 branches missed.">                            for (int j = 0; j &lt; cnt.getComponentCount(); j++) {</span>
+<span class="nc" id="L430">                                Component c = cnt.getComponentAt(j);</span>
+<span class="nc bnc" id="L431" title="All 2 branches missed.">                                if (c instanceof Button) {</span>
+<span class="nc" id="L432">                                    Command cc = ((Button) c).getCommand();</span>
+<span class="nc bnc" id="L433" title="All 4 branches missed.">                                    if (cc != null &amp;&amp; cc.equals(b.getCommand())) {</span>
+<span class="nc" id="L434">                                        shouldAdd = false;</span>
+<span class="nc" id="L435">                                        break;</span>
+                                    }
+                                }
+                            }
+<span class="nc bnc" id="L439" title="All 2 branches missed.">                            if (shouldAdd) {</span>
+<span class="nc" id="L440">                                cnt.addComponent(b);</span>
+                            }
+<span class="nc" id="L442">                        } else {</span>
+<span class="nc bnc" id="L443" title="All 2 branches missed.">                            if (east instanceof Button) {</span>
+<span class="nc" id="L444">                                Command cc = ((Button) east).getCommand();</span>
+<span class="nc bnc" id="L445" title="All 4 branches missed.">                                if (cc != null &amp;&amp; cc.equals(b.getCommand())) {</span>
+<span class="nc" id="L446">                                    continue;</span>
+                                }
+                            }
+
+<span class="nc" id="L450">                            east.getParent().removeComponent(east);</span>
+<span class="nc" id="L451">                            Container buttons = new Container(new BoxLayout(BoxLayout.X_AXIS));</span>
+<span class="nc" id="L452">                            buttons.addComponent(east);</span>
+<span class="nc" id="L453">                            buttons.addComponent(b);</span>
+<span class="nc" id="L454">                            getTitleAreaContainer().addComponent(BorderLayout.EAST, buttons);</span>
+                        }
+                    }
+                }
+
+            }
+
+        }
+<span class="fc" id="L462">        initTitleBarStatus();</span>
+<span class="fc" id="L463">    }</span>
+
+    void installLeftCommands() {
+<span class="fc bfc" id="L466" title="All 2 branches covered.">        if (leftCommands != null) {</span>
+<span class="fc bfc" id="L467" title="All 2 branches covered.">            for (int i = 0; i &lt; leftCommands.size(); i++) {</span>
+<span class="fc" id="L468">                Command leftCommand = (Command) leftCommands.get(leftCommands.size() - 1 - i);</span>
+<span class="fc" id="L469">                String uiid = (String) leftCommand.getClientProperty(&quot;uiid&quot;);</span>
+<span class="fc" id="L470">                String landscapeUiid = (String) leftCommand.getClientProperty(&quot;luiid&quot;);</span>
+<span class="pc bpc" id="L471" title="1 of 2 branches missed.">                if (uiid == null) {</span>
+<span class="fc" id="L472">                    uiid = &quot;TitleCommand&quot;;</span>
+<span class="pc bpc" id="L473" title="2 of 4 branches missed.">                    if (landscapeUiid == null &amp;&amp; UIManager.getInstance().isThemeConstant(&quot;landscapeTitleUiidBool&quot;, false)) {</span>
+<span class="nc" id="L474">                        landscapeUiid = uiid + &quot;Landscape&quot;;</span>
+                    }
+                }
+<span class="fc" id="L477">                int txtPosition = Component.RIGHT;</span>
+<span class="fc" id="L478">                Integer pos = (Integer) leftCommand.getClientProperty(&quot;textPosition&quot;);</span>
+<span class="pc bpc" id="L479" title="1 of 2 branches missed.">                if (pos != null) {</span>
+<span class="nc" id="L480">                    txtPosition = pos.intValue();</span>
+                }
+
+<span class="fc" id="L483">                Layout l = getTitleAreaContainer().getLayout();</span>
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">                if (l instanceof BorderLayout) {</span>
+<span class="fc" id="L485">                    Button b = new Button(leftCommand);</span>
+<span class="fc" id="L486">                    b.setUIID(uiid, landscapeUiid);</span>
+<span class="fc" id="L487">                    b.putClientProperty(&quot;TitleCommand&quot;, Boolean.TRUE);</span>
+<span class="fc" id="L488">                    b.setTextPosition(txtPosition);</span>
+
+<span class="fc" id="L490">                    BorderLayout bl = (BorderLayout) l;</span>
+<span class="fc" id="L491">                    Component west = bl.getWest();</span>
+<span class="fc bfc" id="L492" title="All 2 branches covered.">                    if (west == null) {</span>
+<span class="fc" id="L493">                        getTitleAreaContainer().addComponent(BorderLayout.WEST, b);</span>
+                    } else {
+<span class="pc bpc" id="L495" title="1 of 2 branches missed.">                        if (west instanceof Container) {</span>
+<span class="nc" id="L496">                            Container cnt = (Container) west;</span>
+                            //check if this command is already added
+<span class="nc" id="L498">                            boolean shouldAdd = true;</span>
+<span class="nc bnc" id="L499" title="All 2 branches missed.">                            for (int j = 0; j &lt; cnt.getComponentCount(); j++) {</span>
+<span class="nc" id="L500">                                Component c = cnt.getComponentAt(j);</span>
+<span class="nc bnc" id="L501" title="All 2 branches missed.">                                if (c instanceof Button) {</span>
+<span class="nc" id="L502">                                    Command cc = ((Button) c).getCommand();</span>
+<span class="nc bnc" id="L503" title="All 4 branches missed.">                                    if (cc != null &amp;&amp; cc.equals(b.getCommand())) {</span>
+<span class="nc" id="L504">                                        shouldAdd = false;</span>
+<span class="nc" id="L505">                                        break;</span>
+                                    }
+                                }
+                            }
+<span class="nc bnc" id="L509" title="All 2 branches missed.">                            if (shouldAdd) {</span>
+<span class="nc" id="L510">                                cnt.addComponent(b);</span>
+                            }
+<span class="nc" id="L512">                        } else {</span>
+<span class="pc bpc" id="L513" title="1 of 2 branches missed.">                            if (west instanceof Button) {</span>
+<span class="fc" id="L514">                                Command cc = ((Button) west).getCommand();</span>
+<span class="pc bpc" id="L515" title="2 of 4 branches missed.">                                if (cc != null &amp;&amp; cc.equals(b.getCommand())) {</span>
+<span class="fc" id="L516">                                    continue;</span>
+                                }
+                            }
+
+<span class="nc" id="L520">                            west.getParent().removeComponent(west);</span>
+<span class="nc" id="L521">                            Container buttons = new Container(new BoxLayout(BoxLayout.X_AXIS));</span>
+<span class="nc" id="L522">                            buttons.addComponent(west);</span>
+<span class="nc" id="L523">                            buttons.addComponent(b);</span>
+<span class="nc" id="L524">                            getTitleAreaContainer().addComponent(BorderLayout.WEST, buttons);</span>
+                        }
+                    }
+                }
+
+            }
+
+        }
+<span class="fc" id="L532">        initTitleBarStatus();</span>
+<span class="fc" id="L533">    }</span>
+
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addCommand(Command cmd) {
+<span class="nc bnc" id="L540" title="All 2 branches missed.">        if (cmd.getClientProperty(&quot;TitleCommand&quot;) != null) {</span>
+<span class="nc bnc" id="L541" title="All 2 branches missed.">            if (cmd.getClientProperty(&quot;Left&quot;) != null) {</span>
+<span class="nc bnc" id="L542" title="All 2 branches missed.">                if (leftCommands == null) {</span>
+<span class="nc" id="L543">                    leftCommands = new java.util.ArrayList();</span>
+                }
+<span class="nc" id="L545">                leftCommands.add(0, cmd);</span>
+            } else {
+<span class="nc bnc" id="L547" title="All 2 branches missed.">                if (rightCommands == null) {</span>
+<span class="nc" id="L548">                    rightCommands = new java.util.ArrayList();</span>
+                }
+<span class="nc" id="L550">                rightCommands.add(0, cmd);</span>
+            }
+<span class="nc" id="L552">            addOpenButton(cmd, false);</span>
+<span class="nc" id="L553">            installRightCommands();</span>
+<span class="nc" id="L554">            installLeftCommands();</span>
+<span class="nc" id="L555">            return;</span>
+        }
+<span class="nc" id="L557">        super.addCommand(cmd);</span>
+<span class="nc bnc" id="L558" title="All 2 branches missed.">        if (parent instanceof Dialog) {</span>
+<span class="nc" id="L559">            return;</span>
+        }
+<span class="nc" id="L561">        addOpenButton(cmd, false);</span>
+<span class="nc" id="L562">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setBackCommand(Command backCommand) {
+<span class="fc" id="L568">        super.setBackCommand(backCommand);</span>
+<span class="pc bpc" id="L569" title="1 of 2 branches missed.">        if (parent instanceof Dialog) {</span>
+<span class="nc" id="L570">            return;</span>
+        }
+<span class="fc" id="L572">        addOpenButton(null, false);</span>
+<span class="fc" id="L573">        installRightCommands();</span>
+<span class="fc" id="L574">        installLeftCommands();</span>
+<span class="pc bpc" id="L575" title="1 of 2 branches missed.">        if (getBackCommand() != null</span>
+<span class="pc bpc" id="L576" title="1 of 2 branches missed.">                &amp;&amp; getCommandCount() &gt; 0</span>
+<span class="nc bnc" id="L577" title="All 2 branches missed.">                &amp;&amp; !UIManager.getInstance().isThemeConstant(&quot;hideBackCommandBool&quot;, false)</span>
+<span class="nc bnc" id="L578" title="All 2 branches missed.">                &amp;&amp; !getCommands().contains(getBackCommand())) {</span>
+<span class="nc" id="L579">            getCommands().insertElementAt(getBackCommand(), 0);</span>
+        }
+<span class="fc" id="L581">    }</span>
+
+    public int getCommandBehavior() {
+<span class="fc" id="L584">        return Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void addCommand(Command cmd, int index) {
+<span class="pc bpc" id="L591" title="1 of 2 branches missed.">        if (cmd.getClientProperty(&quot;TitleCommand&quot;) != null) {</span>
+<span class="fc bfc" id="L592" title="All 2 branches covered.">            if (cmd.getClientProperty(&quot;Left&quot;) != null) {</span>
+<span class="pc bpc" id="L593" title="1 of 2 branches missed.">                if (leftCommands == null) {</span>
+<span class="fc" id="L594">                    leftCommands = new java.util.ArrayList();</span>
+                }
+<span class="fc" id="L596">                leftCommands.add(0, cmd);</span>
+            } else {
+<span class="pc bpc" id="L598" title="1 of 2 branches missed.">                if (rightCommands == null) {</span>
+<span class="fc" id="L599">                    rightCommands = new java.util.ArrayList();</span>
+                }
+<span class="fc" id="L601">                rightCommands.add(0, cmd);</span>
+            }
+<span class="fc" id="L603">            addOpenButton(cmd, false);</span>
+<span class="fc" id="L604">            installRightCommands();</span>
+<span class="fc" id="L605">            installLeftCommands();</span>
+<span class="fc" id="L606">            return;</span>
+        }
+<span class="nc" id="L608">        super.addCommand(cmd, index);</span>
+<span class="nc bnc" id="L609" title="All 2 branches missed.">        if (parent instanceof Dialog) {</span>
+<span class="nc" id="L610">            return;</span>
+        }
+<span class="nc" id="L612">        addOpenButton(cmd, false);</span>
+<span class="nc bnc" id="L613" title="All 2 branches missed.">        if (getBackCommand() != null</span>
+<span class="nc bnc" id="L614" title="All 2 branches missed.">                &amp;&amp; getCommandCount() &gt; 0</span>
+<span class="nc bnc" id="L615" title="All 2 branches missed.">                &amp;&amp; !UIManager.getInstance().isThemeConstant(&quot;hideBackCommandBool&quot;, false)) {</span>
+<span class="nc" id="L616">            getCommands().remove(getBackCommand());</span>
+<span class="nc" id="L617">            getCommands().insertElementAt(getBackCommand(), getCommandCount());</span>
+        }
+<span class="nc" id="L619">    }</span>
+
+    private void removeCommandComponent(Container cnt, Command cmd) {
+<span class="fc" id="L622">        int count = cnt.getComponentCount();</span>
+<span class="pc bpc" id="L623" title="1 of 2 branches missed.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="fc" id="L624">            Component c = cnt.getComponentAt(iter);</span>
+<span class="pc bpc" id="L625" title="1 of 2 branches missed.">            if (c instanceof Container) {</span>
+<span class="nc" id="L626">                removeCommandComponent((Container) c, cmd);</span>
+<span class="nc" id="L627">                continue;</span>
+            }
+<span class="pc bpc" id="L629" title="2 of 4 branches missed.">            if (c instanceof Button &amp;&amp; ((Button) c).getCommand() == cmd) {</span>
+<span class="fc" id="L630">                Container cc = c.getParent();</span>
+<span class="pc bpc" id="L631" title="1 of 2 branches missed.">                if (cc != null) {</span>
+<span class="fc" id="L632">                    cc.removeComponent(c);</span>
+                }
+<span class="fc" id="L634">                return;</span>
+            }
+        }
+<span class="nc" id="L637">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void removeCommand(Command cmd) {
+<span class="fc" id="L643">        super.removeCommand(cmd);</span>
+<span class="pc bpc" id="L644" title="1 of 2 branches missed.">        if (parent instanceof Dialog) {</span>
+<span class="nc" id="L645">            return;</span>
+        }
+<span class="pc bpc" id="L647" title="1 of 4 branches missed.">        if (cmd.getClientProperty(&quot;TitleCommand&quot;) != null &amp;&amp; parent != null) {</span>
+<span class="fc" id="L648">            removeCommandComponent(getTitleAreaContainer(), cmd);</span>
+        }
+<span class="fc bfc" id="L650" title="All 2 branches covered.">        if (rightCommands != null) {</span>
+<span class="fc" id="L651">            rightCommands.remove(cmd);</span>
+        }
+<span class="fc bfc" id="L653" title="All 2 branches covered.">        if (leftCommands != null) {</span>
+<span class="fc" id="L654">            leftCommands.remove(cmd);</span>
+        }
+<span class="pc bpc" id="L656" title="1 of 2 branches missed.">        if (getCommandCount() == 0) {</span>
+<span class="pc bpc" id="L657" title="1 of 2 branches missed.">            if (getTitleComponent() != null) {</span>
+<span class="fc" id="L658">                getTitleComponent().getParent().removeAll();</span>
+            }
+<span class="fc" id="L660">            getTitleAreaContainer().removeAll();</span>
+<span class="fc" id="L661">            getTitleAreaContainer().addComponent(BorderLayout.CENTER, getTitleComponent());</span>
+        }
+<span class="fc" id="L663">        installRightCommands();</span>
+<span class="fc" id="L664">        installLeftCommands();</span>
+<span class="fc" id="L665">    }</span>
+
+    public void keyReleased(int keyCode) {
+<span class="nc bnc" id="L668" title="All 2 branches missed.">        if (keyCode == leftSK) {</span>
+<span class="nc bnc" id="L669" title="All 2 branches missed.">            if (getCommandCount() == 0) {</span>
+<span class="nc" id="L670">                return;</span>
+            }
+<span class="nc bnc" id="L672" title="All 2 branches missed.">            if (parent.getCommandCount() == 1) {</span>
+<span class="nc bnc" id="L673" title="All 2 branches missed.">                if (parent.getCommand(0) == parent.getBackCommand()) {</span>
+<span class="nc" id="L674">                    return;</span>
+                }
+            }
+
+<span class="nc" id="L678">            boolean[] hasSideMenus = new boolean[2];</span>
+
+<span class="nc bnc" id="L680" title="All 2 branches missed.">            for (int iter = 0; iter &lt; getCommandCount(); iter++) {</span>
+<span class="nc" id="L681">                Command c = getCommand(iter);</span>
+<span class="nc" id="L682">                String p = (String) c.getClientProperty(COMMAND_PLACEMENT_KEY);</span>
+<span class="nc bnc" id="L683" title="All 2 branches missed.">                if (p == null) {</span>
+                    //has left menu
+<span class="nc" id="L685">                    hasSideMenus[0] = true;</span>
+<span class="nc bnc" id="L686" title="All 2 branches missed.">                } else if (p.equals(COMMAND_PLACEMENT_VALUE_RIGHT)) {</span>
+                    //has right menu
+<span class="nc" id="L688">                    hasSideMenus[1] = true;</span>
+                }
+            }
+
+<span class="nc bnc" id="L692" title="All 2 branches missed.">            if (hasSideMenus[0]) {</span>
+<span class="nc" id="L693">                openMenu(null);</span>
+<span class="nc bnc" id="L694" title="All 2 branches missed.">            } else if (hasSideMenus[1]) {</span>
+<span class="nc" id="L695">                openMenu(COMMAND_PLACEMENT_VALUE_RIGHT);</span>
+            }
+        }
+<span class="nc" id="L698">        super.keyReleased(keyCode);</span>
+<span class="nc" id="L699">    }</span>
+
+    /**
+     * Closes the menu if it is currently open
+     */
+    public void closeMenu() {
+<span class="nc bnc" id="L705" title="All 6 branches missed.">        if (Toolbar.isOnTopSideMenu() &amp;&amp; Display.getInstance().getCurrent().getToolbar() != null &amp;&amp; Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION) {</span>
+<span class="nc" id="L706">            Display.getInstance().getCurrent().getToolbar().closeSideMenu();</span>
+<span class="nc" id="L707">            return;</span>
+        }
+<span class="nc bnc" id="L709" title="All 2 branches missed.">        if (transitionRunning) {</span>
+<span class="nc" id="L710">            return;</span>
+        }
+<span class="nc bnc" id="L712" title="All 2 branches missed.">        if (Display.getInstance().getCurrent() == menu) {</span>
+<span class="nc" id="L713">            parent.showBack();</span>
+        }
+<span class="nc" id="L715">    }</span>
+
+    /**
+     * Opens the menu if it is currently closed
+     */
+    public void openMenu(String direction) {
+<span class="nc" id="L721">        openMenu(direction, -1, getUIManager().getThemeConstant(&quot;sideMenuAnimSpeedInt&quot;, 300), true);</span>
+<span class="nc" id="L722">    }</span>
+
+    /**
+     * Opens the menu if it is currently closed
+     */
+    void openMenu(String direction, int time, int dest, boolean transition) {
+<span class="nc bnc" id="L728" title="All 2 branches missed.">        if (Display.getInstance().getCurrent() == parent) {</span>
+<span class="nc" id="L729">            menu = createMenu(direction);</span>
+            //replace transtions to perform the Form shift
+<span class="nc" id="L731">            out = parent.getTransitionOutAnimator();</span>
+<span class="nc" id="L732">            in = parent.getTransitionInAnimator();</span>
+<span class="nc" id="L733">            parent.setTransitionInAnimator(new SideMenuBar.MenuTransition(getUIManager().getThemeConstant(&quot;sideMenuAnimSpeedInt&quot;, 300), false, -1, direction));</span>
+<span class="nc bnc" id="L734" title="All 2 branches missed.">            if (transition) {</span>
+<span class="nc" id="L735">                parent.setTransitionOutAnimator(new SideMenuBar.MenuTransition(dest, true, time, direction));</span>
+<span class="nc" id="L736">                menu.show();</span>
+            } else {
+<span class="nc" id="L738">                parent.setTransitionOutAnimator(new SideMenuBar.MenuTransition(0, true, dest, direction));</span>
+<span class="nc" id="L739">                menu.show();</span>
+<span class="nc" id="L740">                parent.setTransitionOutAnimator(new SideMenuBar.MenuTransition(dest, true, time, direction));</span>
+            }
+        }
+<span class="nc" id="L743">    }</span>
+
+    /**
+     * Returns true if the Menu is currently open
+     *
+     * @return true if menu open
+     * @deprecated this code references functionality that is no longer supported and currently always returns false
+     */
+    public boolean isMenuOpen() {
+<span class="nc bnc" id="L752" title="All 2 branches missed.">        return Display.getInstance().getCurrent() == menu;</span>
+    }
+
+    private void addOpenButton(Command cmd, boolean checkCommands) {
+        // might be reached for a dialog
+<span class="pc bpc" id="L757" title="1 of 2 branches missed.">        if (openButton == null) {</span>
+<span class="fc" id="L758">            return;</span>
+        }
+<span class="nc bnc" id="L760" title="All 6 branches missed.">        if (parent != null &amp;&amp; getCommandCount() &gt; 0 &amp;&amp; openButton.getParent() == null) {</span>
+<span class="nc" id="L761">            Container titleArea = getTitleAreaContainer();</span>
+<span class="nc" id="L762">            titleArea.removeAll();</span>
+<span class="nc" id="L763">            String placement = null;</span>
+<span class="nc bnc" id="L764" title="All 2 branches missed.">            if (cmd != null) {</span>
+<span class="nc" id="L765">                placement = (String) cmd.getClientProperty(COMMAND_PLACEMENT_KEY);</span>
+            }
+<span class="nc bnc" id="L767" title="All 2 branches missed.">            if (checkCommands) {</span>
+<span class="nc bnc" id="L768" title="All 2 branches missed.">                for (int iter = 0; iter &lt; getCommandCount(); iter++) {</span>
+<span class="nc" id="L769">                    Command c = getCommand(iter);</span>
+<span class="nc" id="L770">                    String p = (String) c.getClientProperty(COMMAND_PLACEMENT_KEY);</span>
+<span class="nc bnc" id="L771" title="All 2 branches missed.">                    if (p != null) {</span>
+<span class="nc" id="L772">                        placement = p;</span>
+<span class="nc" id="L773">                        break;</span>
+                    }
+                }
+            }
+
+<span class="nc bnc" id="L778" title="All 4 branches missed.">            if (placement == null &amp;&amp; !parent.getUIManager().isThemeConstant(&quot;hideLeftSideMenuBool&quot;, false)) {</span>
+<span class="nc bnc" id="L779" title="All 2 branches missed.">                if (parent.getUIManager().isThemeConstant(&quot;menuButtonTopBool&quot;, false)) {</span>
+<span class="nc" id="L780">                    titleArea.addComponent(BorderLayout.WEST, BorderLayout.north(openButton));</span>
+                } else {
+<span class="nc bnc" id="L782" title="All 2 branches missed.">                    if (parent.getUIManager().isThemeConstant(&quot;menuButtonBottomBool&quot;, false)) {</span>
+<span class="nc" id="L783">                        titleArea.addComponent(BorderLayout.WEST, BorderLayout.south(openButton));</span>
+                    } else {
+<span class="nc" id="L785">                        titleArea.addComponent(BorderLayout.WEST, openButton);</span>
+                    }
+                }
+            }
+<span class="nc" id="L789">            Component l = getTitleComponent();</span>
+<span class="nc bnc" id="L790" title="All 2 branches missed.">            if (l.getParent() != null) {</span>
+<span class="nc" id="L791">                l.getParent().removeComponent(l);</span>
+            }
+<span class="nc" id="L793">            titleArea.addComponent(BorderLayout.CENTER, l);</span>
+<span class="nc" id="L794">            installRightCommands();</span>
+<span class="nc" id="L795">            installLeftCommands();</span>
+<span class="nc bnc" id="L796" title="All 2 branches missed.">            if (parent.getToolbar() != null) {</span>
+<span class="nc bnc" id="L797" title="All 2 branches missed.">                if (parent.getToolbar().isTitleCentered()) {</span>
+<span class="nc" id="L798">                    ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);</span>
+                } else {
+<span class="nc" id="L800">                    ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);</span>
+                }
+            } else {
+<span class="nc bnc" id="L803" title="All 2 branches missed.">                if (parent.getUIManager().isThemeConstant(&quot;leftAlignSideMenuBool&quot;, false)) {</span>
+<span class="nc" id="L804">                    ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);</span>
+                } else {
+<span class="nc" id="L806">                    ((BorderLayout) titleArea.getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L810" title="All 2 branches missed.">        if (cmd != null) {</span>
+<span class="nc" id="L811">            String placement = (String) cmd.getClientProperty(COMMAND_PLACEMENT_KEY);</span>
+<span class="nc bnc" id="L812" title="All 2 branches missed.">            if (placement != null) {</span>
+<span class="nc" id="L813">                validateCommandPlacement(placement);</span>
+            }
+<span class="nc" id="L815">        } else {</span>
+<span class="nc bnc" id="L816" title="All 2 branches missed.">            if (checkCommands) {</span>
+<span class="nc bnc" id="L817" title="All 2 branches missed.">                for (int iter = 0; iter &lt; getCommandCount(); iter++) {</span>
+<span class="nc" id="L818">                    Command c = getCommand(iter);</span>
+<span class="nc" id="L819">                    String placement = (String) c.getClientProperty(COMMAND_PLACEMENT_KEY);</span>
+<span class="nc bnc" id="L820" title="All 2 branches missed.">                    if (placement != null) {</span>
+<span class="nc" id="L821">                        validateCommandPlacement(placement);</span>
+                    }
+                }
+            }
+        }
+<span class="nc" id="L826">        initTitleBarStatus();</span>
+<span class="nc" id="L827">    }</span>
+
+    private void validateCommandPlacement(String placement) {
+<span class="nc bnc" id="L830" title="All 2 branches missed.">        if (placement == COMMAND_PLACEMENT_VALUE_TOP) {</span>
+<span class="nc" id="L831">            ((BorderLayout) getTitleAreaContainer().getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);</span>
+<span class="nc bnc" id="L832" title="All 2 branches missed.">            if (!(getTitleComponent() instanceof Button)) {</span>
+<span class="nc" id="L833">                Button b = new Button(parent.getTitle());</span>
+<span class="nc" id="L834">                b.setUIID(&quot;Title&quot;);</span>
+<span class="nc" id="L835">                parent.setTitleComponent(b);</span>
+<span class="nc" id="L836">                b.addActionListener(new ActionListener() {</span>
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L838">                        openMenu(COMMAND_PLACEMENT_VALUE_TOP);</span>
+<span class="nc" id="L839">                    }</span>
+                });
+            }
+<span class="nc" id="L842">            return;</span>
+        }
+<span class="nc bnc" id="L844" title="All 2 branches missed.">        if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {</span>
+<span class="nc bnc" id="L845" title="All 4 branches missed.">            if (rightSideButton != null &amp;&amp; rightSideButton.getParent() != null) {</span>
+<span class="nc" id="L846">                return;</span>
+            }
+<span class="nc" id="L848">            rightSideButton = new Button();</span>
+<span class="nc" id="L849">            rightSideButton.setUIID(&quot;MenuButtonRight&quot;);</span>
+<span class="nc" id="L850">            UIManager uim = parent.getUIManager();</span>
+<span class="nc" id="L851">            Image i = uim.getThemeImageConstant(&quot;rightSideMenuImage&quot;);</span>
+<span class="nc bnc" id="L852" title="All 2 branches missed.">            if (i != null) {</span>
+<span class="nc" id="L853">                rightSideButton.setIcon(i);</span>
+            } else {
+<span class="nc" id="L855">                FontImage.setMaterialIcon(rightSideButton, FontImage.MATERIAL_MENU);</span>
+            }
+<span class="nc" id="L857">            Image p = uim.getThemeImageConstant(&quot;rightSideMenuPressImage&quot;);</span>
+<span class="nc bnc" id="L858" title="All 2 branches missed.">            if (p != null) {</span>
+<span class="nc" id="L859">                rightSideButton.setPressedIcon(p);</span>
+            }
+<span class="nc" id="L861">            rightSideButton.addActionListener(new ActionListener() {</span>
+
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L864">                    openMenu(COMMAND_PLACEMENT_VALUE_RIGHT);</span>
+<span class="nc" id="L865">                }</span>
+            });
+<span class="nc" id="L867">            Container ta = getTitleAreaContainer();</span>
+<span class="nc" id="L868">            ta.addComponent(BorderLayout.EAST, rightSideButton);</span>
+<span class="nc" id="L869">            ta.revalidate();</span>
+        }
+<span class="nc" id="L871">    }</span>
+
+    private void clean() {
+<span class="nc bnc" id="L874" title="All 2 branches missed.">        if (out != null) {</span>
+<span class="nc" id="L875">            parent.setTransitionOutAnimator(out);</span>
+        }
+<span class="nc bnc" id="L877" title="All 2 branches missed.">        if (in != null) {</span>
+<span class="nc" id="L878">            parent.setTransitionInAnimator(in);</span>
+        }
+<span class="nc" id="L880">        out = null;</span>
+<span class="nc" id="L881">        in = null;</span>
+<span class="nc" id="L882">    }</span>
+
+    private void setMenuGlassPane(Form m, final String placement) {
+<span class="nc" id="L885">        boolean isRTLValue = m.isRTL();</span>
+<span class="nc bnc" id="L886" title="All 2 branches missed.">        if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {</span>
+<span class="nc bnc" id="L887" title="All 2 branches missed.">            isRTLValue = !isRTLValue;</span>
+        }
+<span class="nc" id="L889">        final boolean isRTL = isRTLValue;</span>
+<span class="nc" id="L890">        final Image image = rightPanel.getStyle().getBgImage();</span>
+<span class="nc" id="L891">        UIManager uim = rightPanel.getUIManager();</span>
+<span class="nc" id="L892">        Image sh = uim.getThemeImageConstant(&quot;sideMenuShadowImage&quot;);</span>
+<span class="nc bnc" id="L893" title="All 2 branches missed.">        if (sh == null) {</span>
+<span class="nc" id="L894">            sh = Resources.getSystemResource().getImage(&quot;sidemenu-shadow.png&quot;);</span>
+        }
+<span class="nc bnc" id="L896" title="All 2 branches missed.">        if (isRTL) {</span>
+<span class="nc" id="L897">            sh = sh.flipHorizontally(true);</span>
+        }
+<span class="nc" id="L899">        final Image shadow = sh;</span>
+
+<span class="nc bnc" id="L901" title="All 2 branches missed.">        if (m.getGlassPane() == null) {</span>
+<span class="nc" id="L902">            m.setGlassPane(new Painter() {</span>
+<span class="nc" id="L903">                Image img = image;</span>
+
+                public void paint(Graphics g, Rectangle rect) {
+<span class="nc bnc" id="L906" title="All 2 branches missed.">                    if (img == null) {</span>
+                        // will happen for areMutableImagesFast returning false on iOS and Windows Phone
+<span class="nc" id="L908">                        Component c = (Component) rightPanel.getClientProperty(&quot;$parent&quot;);</span>
+
+                        // not sure what is happening here
+<span class="nc bnc" id="L911" title="All 2 branches missed.">                        if (c == null) {</span>
+<span class="nc" id="L912">                            return;</span>
+                        }
+<span class="nc" id="L914">                        boolean b = c.isVisible();</span>
+<span class="nc" id="L915">                        c.setVisible(true);</span>
+<span class="nc bnc" id="L916" title="All 2 branches missed.">                        if (isRTL) {</span>
+<span class="nc" id="L917">                            int x = Math.max(draggedX, rightPanel.getWidth()) - c.getWidth();</span>
+<span class="nc" id="L918">                            g.translate(x, 0);</span>
+<span class="nc" id="L919">                            Container.sidemenuBarTranslation = x;</span>
+<span class="nc bnc" id="L920" title="All 2 branches missed.">                            if (shadow != null) {</span>
+<span class="nc" id="L921">                                g.tileImage(shadow, x + c.getWidth() - shadow.getWidth(), 0, shadow.getWidth(), rightPanel.getHeight());</span>
+                            }
+<span class="nc" id="L923">                            c.paintComponent(g, true);</span>
+<span class="nc" id="L924">                            Container.sidemenuBarTranslation = 0;</span>
+<span class="nc" id="L925">                            g.translate(-x, 0);</span>
+<span class="nc" id="L926">                        } else {</span>
+<span class="nc" id="L927">                            int x = Math.min(draggedX, rightPanel.getX());</span>
+<span class="nc" id="L928">                            g.translate(x, 0);</span>
+<span class="nc" id="L929">                            Container.sidemenuBarTranslation = x;</span>
+<span class="nc bnc" id="L930" title="All 2 branches missed.">                            if (shadow != null) {</span>
+<span class="nc" id="L931">                                g.tileImage(shadow, x - shadow.getWidth(), 0, shadow.getWidth(), rightPanel.getHeight());</span>
+                            }
+<span class="nc" id="L933">                            c.paintComponent(g, true);</span>
+<span class="nc" id="L934">                            Container.sidemenuBarTranslation = 0;</span>
+<span class="nc" id="L935">                            g.translate(-x, 0);</span>
+                        }
+<span class="nc" id="L937">                        c.setVisible(b);</span>
+<span class="nc" id="L938">                    } else {</span>
+<span class="nc bnc" id="L939" title="All 2 branches missed.">                        if (Display.getInstance().areMutableImagesFast()) {</span>
+<span class="nc bnc" id="L940" title="All 2 branches missed.">                            if (img.getHeight() != Display.getInstance().getDisplayHeight()) {</span>
+<span class="nc" id="L941">                                img = updateRightPanelBgImage(placement, parent);</span>
+                            }
+                        }
+<span class="nc bnc" id="L944" title="All 2 branches missed.">                        if (isRTL) {</span>
+<span class="nc" id="L945">                            int x = Math.max(draggedX, rightPanel.getWidth()) - img.getWidth();</span>
+<span class="nc bnc" id="L946" title="All 2 branches missed.">                            if (shadow != null) {</span>
+<span class="nc" id="L947">                                g.tileImage(shadow, x + img.getWidth() - shadow.getWidth(), 0, shadow.getWidth(), rightPanel.getHeight());</span>
+                            }
+<span class="nc" id="L949">                            g.drawImage(img, x, 0);</span>
+<span class="nc" id="L950">                        } else {</span>
+<span class="nc" id="L951">                            int x = Math.min(draggedX, rightPanel.getX());</span>
+<span class="nc bnc" id="L952" title="All 2 branches missed.">                            if (shadow != null) {</span>
+<span class="nc" id="L953">                                g.tileImage(shadow, x - shadow.getWidth(), 0, shadow.getWidth(), rightPanel.getHeight());</span>
+                            }
+<span class="nc" id="L955">                            g.drawImage(img, x, 0);</span>
+                        }
+                    }
+<span class="nc" id="L958">                }</span>
+            });
+        }
+
+<span class="nc" id="L962">    }</span>
+
+    /**
+     * Creates the side navigation component with the Commands
+     *
+     * @param commands the Command objects
+     * @return the Component to display on the navigation
+     */
+    protected Container createSideNavigationComponent(Vector commands) {
+<span class="nc" id="L971">        return createSideNavigationComponent(commands, null);</span>
+    }
+
+    /**
+     * Creates the side navigation component with the Commands
+     *
+     * @param commands the Command objects
+     * @return the Component to display on the navigation
+     */
+    protected Container createSideNavigationComponent(Vector commands, String placement) {
+<span class="nc" id="L981">        return createSideNavigationPanel(commands, placement);</span>
+    }
+
+    /**
+     * Creates an empty side navigation panel.
+     */
+    protected Container constructSideNavigationComponent() {
+<span class="nc" id="L988">        return constructSideNavigationPanel();</span>
+    }
+
+    Container constructSideNavigationPanel() {
+<span class="fc" id="L992">        Container menu = new Container(new BoxLayout(BoxLayout.Y_AXIS));</span>
+<span class="fc" id="L993">        menu.setUIID(&quot;SideNavigationPanel&quot;);</span>
+<span class="fc" id="L994">        Rectangle safeRect = new Rectangle();</span>
+<span class="fc" id="L995">        Display.getInstance().getDisplaySafeArea(safeRect);</span>
+<span class="fc" id="L996">        int paddingTop = menu.getStyle().getPaddingTop();</span>
+<span class="pc bpc" id="L997" title="1 of 2 branches missed.">        if (paddingTop &lt; safeRect.getY()) {</span>
+<span class="nc" id="L998">            menu.getStyle().setPaddingUnitTop(Style.UNIT_TYPE_PIXELS);</span>
+<span class="nc" id="L999">            menu.getStyle().setPaddingTop(safeRect.getY() + paddingTop);</span>
+        }
+<span class="fc" id="L1001">        menu.setScrollableY(true);</span>
+<span class="fc" id="L1002">        menu.setScrollVisible(getUIManager().isThemeConstant(&quot;sideMenuScrollVisibleBool&quot;, false));</span>
+<span class="fc" id="L1003">        return menu;</span>
+    }
+
+    Container constructRightSideNavigationPanel() {
+<span class="fc" id="L1007">        Container menu = new Container(new BoxLayout(BoxLayout.Y_AXIS));</span>
+<span class="fc" id="L1008">        menu.setUIID(&quot;RightSideNavigationPanel&quot;);</span>
+<span class="fc" id="L1009">        menu.setScrollableY(true);</span>
+<span class="fc" id="L1010">        menu.setScrollVisible(getUIManager().isThemeConstant(&quot;rightSideMenuScrollVisibleBool&quot;, false));</span>
+<span class="fc" id="L1011">        return menu;</span>
+    }
+
+    Container createSideNavigationPanel(Vector commands, String placement) {
+<span class="nc" id="L1015">        Container menu = constructSideNavigationComponent();</span>
+<span class="nc bnc" id="L1016" title="All 2 branches missed.">        if (getUIManager().isThemeConstant(&quot;paintsTitleBarBool&quot;, false)) {</span>
+<span class="nc" id="L1017">            Container bar = new Container();</span>
+<span class="nc" id="L1018">            bar.setUIID(&quot;StatusBarSideMenu&quot;);</span>
+<span class="nc" id="L1019">            addComponentToSideMenu(menu, bar);</span>
+        }
+<span class="nc bnc" id="L1021" title="All 2 branches missed.">        if (!getUIManager().isThemeConstant(&quot;sideMenuTensileDragBool&quot;, true)) {</span>
+<span class="nc" id="L1022">            menu.setTensileDragEnabled(false);</span>
+        }
+
+<span class="nc bnc" id="L1025" title="All 2 branches missed.">        for (int iter = commands.size() - 1; iter &gt; -1; iter--) {</span>
+<span class="nc" id="L1026">            Command c = (Command) commands.elementAt(iter);</span>
+<span class="nc bnc" id="L1027" title="All 2 branches missed.">            if (c.getClientProperty(COMMAND_PLACEMENT_KEY) != placement) {</span>
+<span class="nc" id="L1028">                continue;</span>
+            }
+<span class="nc" id="L1030">            Component cmp = (Component) c.getClientProperty(COMMAND_SIDE_COMPONENT);</span>
+<span class="nc bnc" id="L1031" title="All 2 branches missed.">            if (cmp != null) {</span>
+<span class="nc bnc" id="L1032" title="All 2 branches missed.">                if (cmp.getParent() != null) {</span>
+<span class="nc" id="L1033">                    cmp.getParent().removeAll();</span>
+                }
+<span class="nc bnc" id="L1035" title="All 4 branches missed.">                if (c.getClientProperty(COMMAND_ACTIONABLE) != null &amp;&amp; c.getClientProperty(COMMAND_ACTIONABLE).equals(Boolean.TRUE)) {</span>
+<span class="nc" id="L1036">                    Container cnt = new Container(new BorderLayout());</span>
+<span class="nc" id="L1037">                    cnt.addComponent(BorderLayout.CENTER, cmp);</span>
+<span class="nc" id="L1038">                    Button btn = createTouchCommandButton(c);</span>
+<span class="nc" id="L1039">                    btn.setParent(cnt);</span>
+<span class="nc" id="L1040">                    cnt.setLeadComponent(btn);</span>
+<span class="nc" id="L1041">                    addComponentToSideMenu(menu, cnt);</span>
+<span class="nc" id="L1042">                } else {</span>
+<span class="nc" id="L1043">                    addComponentToSideMenu(menu, cmp);</span>
+                }
+<span class="nc" id="L1045">                initTitleBarStatus();</span>
+            } else {
+                // special case: hide back button that doesn't have text, icon or a side component entry
+<span class="nc bnc" id="L1048" title="All 6 branches missed.">                if (parent.getBackCommand() == c &amp;&amp; (c.getCommandName() == null || c.getCommandName().length() == 0) &amp;&amp;</span>
+<span class="nc bnc" id="L1049" title="All 2 branches missed.">                        c.getIcon() == null) {</span>
+<span class="nc" id="L1050">                    continue;</span>
+                }
+<span class="nc" id="L1052">                addComponentToSideMenu(menu, createTouchCommandButton(c));</span>
+            }
+        }
+<span class="nc" id="L1055">        boolean isRTLValue = isRTL();</span>
+<span class="nc bnc" id="L1056" title="All 2 branches missed.">        if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {</span>
+<span class="nc bnc" id="L1057" title="All 2 branches missed.">            isRTLValue = !isRTLValue;</span>
+        }
+<span class="nc" id="L1059">        UIManager uim = menu.getUIManager();</span>
+<span class="nc" id="L1060">        boolean shadowEnabled = uim.isThemeConstant(&quot;sideMenuShadowBool&quot;, true);</span>
+<span class="nc" id="L1061">        Image sh = uim.getThemeImageConstant(&quot;sideMenuShadowImage&quot;);</span>
+<span class="nc bnc" id="L1062" title="All 4 branches missed.">        if (sh == null &amp;&amp; shadowEnabled) {</span>
+<span class="nc" id="L1063">            sh = Resources.getSystemResource().getImage(&quot;sidemenu-shadow.png&quot;);</span>
+        }
+<span class="nc bnc" id="L1065" title="All 4 branches missed.">        if (isRTLValue &amp;&amp; sh != null) {</span>
+<span class="nc" id="L1066">            sh = sh.flipHorizontally(true);</span>
+        }
+<span class="nc" id="L1068">        final Image shadow = sh;</span>
+
+<span class="nc bnc" id="L1070" title="All 2 branches missed.">        if (shadow == null) {</span>
+<span class="nc" id="L1071">            return menu;</span>
+        } else {
+<span class="nc" id="L1073">            Container main = new Container(new LayeredLayout());</span>
+<span class="nc" id="L1074">            Label shadowLabel = new Label();</span>
+<span class="nc" id="L1075">            shadowLabel.getStyle().setBackgroundType(Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER);</span>
+<span class="nc" id="L1076">            shadowLabel.getStyle().setBgImage(shadow);</span>
+<span class="nc" id="L1077">            shadowLabel.getStyle().setPadding(0, 0, 0, 0);</span>
+<span class="nc" id="L1078">            shadowLabel.getStyle().setMargin(0, 0, 0, 0);</span>
+<span class="nc" id="L1079">            shadowLabel.getStyle().setBgTransparency(0);</span>
+<span class="nc" id="L1080">            Container c = new Container(new BorderLayout());</span>
+<span class="nc bnc" id="L1081" title="All 2 branches missed.">            if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {</span>
+<span class="nc" id="L1082">                shadowLabel.setPreferredW(shadow.getWidth());</span>
+<span class="nc" id="L1083">                c.addComponent(BorderLayout.WEST, shadowLabel);</span>
+<span class="nc" id="L1084">                shadowLabel.getStyle().setBgImage(shadow.rotate180Degrees(true));</span>
+            } else {
+<span class="nc bnc" id="L1086" title="All 2 branches missed.">                if (placement == COMMAND_PLACEMENT_VALUE_TOP) {</span>
+                    //shadowLabel.setPreferredH(shadow.getHeight());
+                    //c.addComponent(BorderLayout.SOUTH, shadowLabel);
+                    //shadowLabel.getStyle().setBgImage(shadow.rotate90Degrees(true));
+                } else {
+<span class="nc" id="L1091">                    shadowLabel.setPreferredW(shadow.getWidth());</span>
+<span class="nc" id="L1092">                    c.addComponent(BorderLayout.EAST, shadowLabel);</span>
+                }
+            }
+
+<span class="nc" id="L1096">            main.addComponent(menu);</span>
+<span class="nc" id="L1097">            main.addComponent(c);</span>
+<span class="nc" id="L1098">            return main;</span>
+        }
+    }
+
+    /**
+     * This method responsible to add a Component to the side navigation panel.
+     *
+     * @param menu the Menu Container that was created in the
+     *             constructSideNavigationComponent() method
+     * @param cmp  the Component to add to the side menu
+     */
+    protected void addComponentToSideMenu(Container menu, Component cmp) {
+<span class="nc" id="L1110">        addComponentToSideMenuImpl(menu, cmp);</span>
+<span class="nc" id="L1111">    }</span>
+
+    void addComponentToSideMenuImpl(Container menu, Component cmp) {
+<span class="fc" id="L1114">        menu.addComponent(cmp);</span>
+<span class="fc" id="L1115">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected Button createTouchCommandButton(final Command c) {
+
+<span class="fc" id="L1122">        SideMenuBar.CommandWrapper wrapper = new SideMenuBar.CommandWrapper(c);</span>
+<span class="fc" id="L1123">        Button b = super.createTouchCommandButton(wrapper);</span>
+<span class="pc bpc" id="L1124" title="1 of 2 branches missed.">        if (c.getIcon() == null) {</span>
+<span class="fc" id="L1125">            b.setIcon(null);</span>
+        }
+<span class="fc" id="L1127">        b.setText(c.getCommandName());</span>
+<span class="fc" id="L1128">        b.setTextPosition(Label.RIGHT);</span>
+<span class="fc" id="L1129">        String uiid = (String) c.getClientProperty(&quot;uiid&quot;);</span>
+<span class="fc" id="L1130">        String landscapeUiid = (String) c.getClientProperty(&quot;luiid&quot;);</span>
+<span class="pc bpc" id="L1131" title="1 of 2 branches missed.">        if (uiid != null) {</span>
+<span class="nc" id="L1132">            b.setUIID(uiid, landscapeUiid);</span>
+        } else {
+<span class="fc" id="L1134">            b.setUIID(&quot;SideCommand&quot;, landscapeUiid);</span>
+        }
+<span class="fc" id="L1136">        return b;</span>
+    }
+
+    private Form createMenu(final String placement) {
+<span class="nc" id="L1140">        final Form m = new Form() {</span>
+            private boolean pressedInRightPanel;
+            private boolean manualMotionLock;
+
+            protected boolean shouldSendPointerReleaseToOtherForm() {
+<span class="nc" id="L1145">                return true;</span>
+            }
+
+            void actionCommandImpl(Command cmd, ActionEvent ev) {
+<span class="nc bnc" id="L1149" title="All 2 branches missed.">                if (cmd instanceof SideMenuBar.CommandWrapper) {</span>
+<span class="nc" id="L1150">                    cmd = ((SideMenuBar.CommandWrapper) cmd).cmd;</span>
+<span class="nc" id="L1151">                    ev = new ActionEvent(cmd, ActionEvent.Type.Command);</span>
+                }
+<span class="nc" id="L1153">                final Command c = cmd;</span>
+<span class="nc" id="L1154">                final ActionEvent e = ev;</span>
+
+<span class="nc" id="L1156">                Display.getInstance().scheduleBackgroundTask(new Runnable() {</span>
+
+                    public void run() {
+<span class="nc" id="L1159">                        Display.getInstance().invokeAndBlock(new Runnable() {</span>
+
+                            public void run() {
+<span class="nc bnc" id="L1162" title="All 2 branches missed.">                                while (Display.getInstance().getCurrent() != parent) {</span>
+                                    try {
+<span class="nc" id="L1164">                                        Thread.sleep(40);</span>
+<span class="nc" id="L1165">                                    } catch (InterruptedException ex) {</span>
+<span class="nc" id="L1166">                                        Thread.currentThread().interrupt();</span>
+<span class="nc" id="L1167">                                        return;</span>
+<span class="nc" id="L1168">                                    }</span>
+                                }
+<span class="nc" id="L1170">                            }</span>
+                        });
+
+<span class="nc" id="L1173">                        Display.getInstance().callSerially(new Runnable() {</span>
+
+                            public void run() {
+<span class="nc" id="L1176">                                parent.actionCommandImpl(c, e);</span>
+<span class="nc" id="L1177">                            }</span>
+                        });
+<span class="nc" id="L1179">                    }</span>
+                });
+
+<span class="nc" id="L1182">            }</span>
+
+            protected void sizeChanged(int w, int h) {
+<span class="nc" id="L1185">                Style formStyle = getStyle();</span>
+<span class="nc" id="L1186">                int width = w - (formStyle.getHorizontalMargins());</span>
+
+<span class="nc" id="L1188">                parent.sizeChangedInternal(w, h);</span>
+                //if the size changed event came from a keyboard open/close don't 
+                //close the menu
+<span class="nc bnc" id="L1191" title="All 2 branches missed.">                if (getWidth() != width) {</span>
+<span class="nc" id="L1192">                    closeMenu();</span>
+                }
+<span class="nc" id="L1194">                super.sizeChanged(w, h);</span>
+<span class="nc" id="L1195">            }</span>
+
+            public void pointerPressed(int x, int y) {
+<span class="nc bnc" id="L1198" title="All 2 branches missed.">                if (manualMotionLock) {</span>
+<span class="nc" id="L1199">                    return;</span>
+                }
+<span class="nc" id="L1201">                super.pointerPressed(x, y);</span>
+<span class="nc bnc" id="L1202" title="All 2 branches missed.">                if (rightPanel.contains(x, y)) {</span>
+<span class="nc" id="L1203">                    pressedInRightPanel = true;</span>
+                }
+<span class="nc" id="L1205">            }</span>
+
+            public void pointerDragged(int[] x, int[] y) {
+<span class="nc bnc" id="L1208" title="All 2 branches missed.">                if (manualMotionLock) {</span>
+<span class="nc" id="L1209">                    return;</span>
+                }
+<span class="nc bnc" id="L1211" title="All 4 branches missed.">                if (!transitionRunning &amp;&amp; pressedInRightPanel) {</span>
+<span class="nc" id="L1212">                    dragActivated = true;</span>
+<span class="nc" id="L1213">                    pressedInRightPanel = false;</span>
+                }
+<span class="nc bnc" id="L1215" title="All 2 branches missed.">                if (dragActivated) {</span>
+<span class="nc" id="L1216">                    setMenuGlassPane(menu, placement);</span>
+<span class="nc" id="L1217">                    draggedX = x[0];</span>
+<span class="nc" id="L1218">                    repaint();</span>
+<span class="nc" id="L1219">                    return;</span>
+                }
+<span class="nc" id="L1221">                super.pointerDragged(x, y);</span>
+<span class="nc" id="L1222">            }</span>
+
+            public void pointerReleased(int x, int y) {
+<span class="nc bnc" id="L1225" title="All 2 branches missed.">                if (manualMotionLock) {</span>
+<span class="nc" id="L1226">                    return;</span>
+                }
+<span class="nc" id="L1228">                super.pointerReleased(x, y);</span>
+<span class="nc" id="L1229">                boolean isRTLValue = isRTL();</span>
+<span class="nc bnc" id="L1230" title="All 2 branches missed.">                if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {</span>
+<span class="nc bnc" id="L1231" title="All 2 branches missed.">                    isRTLValue = !isRTLValue;</span>
+                }
+<span class="nc" id="L1233">                int displayWidth = Display.getInstance().getDisplayWidth();</span>
+<span class="nc bnc" id="L1234" title="All 2 branches missed.">                if (isRTLValue) {</span>
+<span class="nc bnc" id="L1235" title="All 6 branches missed.">                    if (!transitionRunning &amp;&amp; dragActivated &amp;&amp; x &lt; (displayWidth - rightPanel.getWidth()) / 2) {</span>
+<span class="nc" id="L1236">                        final Motion motion = Motion.createEaseInOutMotion(draggedX, rightPanel.getWidth(), 200);</span>
+<span class="nc" id="L1237">                        motion.start();</span>
+<span class="nc" id="L1238">                        registerAnimated(new Animation() {</span>
+                            public boolean animate() {
+<span class="nc" id="L1240">                                draggedX = motion.getValue();</span>
+<span class="nc bnc" id="L1241" title="All 2 branches missed.">                                if (motion.isFinished()) {</span>
+<span class="nc" id="L1242">                                    dragActivated = false;</span>
+<span class="nc" id="L1243">                                    Display.getInstance().getCurrent().setGlassPane(null);</span>
+<span class="nc" id="L1244">                                    deregisterAnimated(this);</span>
+                                }
+<span class="nc" id="L1246">                                return true;</span>
+                            }
+
+                            public void paint(Graphics g) {
+<span class="nc" id="L1250">                                repaint();</span>
+<span class="nc" id="L1251">                            }</span>
+                        });
+<span class="nc" id="L1253">                        return;</span>
+                    }
+                } else {
+<span class="nc bnc" id="L1256" title="All 6 branches missed.">                    if (!transitionRunning &amp;&amp; dragActivated &amp;&amp; x &gt; (displayWidth - rightPanel.getWidth()) / 2) {</span>
+<span class="nc" id="L1257">                        final Motion motion = Motion.createEaseInOutMotion(draggedX, Display.getInstance().getDisplayWidth() - rightPanel.getWidth(), 200);</span>
+<span class="nc" id="L1258">                        motion.start();</span>
+<span class="nc" id="L1259">                        registerAnimated(new Animation() {</span>
+                            public boolean animate() {
+<span class="nc" id="L1261">                                draggedX = motion.getValue();</span>
+<span class="nc bnc" id="L1262" title="All 2 branches missed.">                                if (motion.isFinished()) {</span>
+<span class="nc" id="L1263">                                    dragActivated = false;</span>
+<span class="nc" id="L1264">                                    Display.getInstance().getCurrent().setGlassPane(null);</span>
+<span class="nc" id="L1265">                                    deregisterAnimated(this);</span>
+                                }
+<span class="nc" id="L1267">                                return true;</span>
+                            }
+
+                            public void paint(Graphics g) {
+<span class="nc" id="L1271">                                repaint();</span>
+<span class="nc" id="L1272">                            }</span>
+                        });
+<span class="nc" id="L1274">                        return;</span>
+                    }
+                }
+<span class="nc bnc" id="L1277" title="All 4 branches missed.">                if (dragActivated || rightPanel.contains(x, y)) {</span>
+<span class="nc" id="L1278">                    setMenuGlassPane(menu, placement);</span>
+<span class="nc" id="L1279">                    draggedX = x;</span>
+<span class="nc" id="L1280">                    int start = x;</span>
+<span class="nc" id="L1281">                    int end = 0;</span>
+<span class="nc bnc" id="L1282" title="All 2 branches missed.">                    if (isRTLValue) {</span>
+<span class="nc" id="L1283">                        end = getWidth();</span>
+                    }
+<span class="nc" id="L1285">                    final Motion motion = Motion.createEaseInOutMotion(start, end, getUIManager().getThemeConstant(&quot;sideMenuAnimSpeedInt&quot;, 300));</span>
+<span class="nc" id="L1286">                    motion.start();</span>
+<span class="nc" id="L1287">                    manualMotionLock = true;</span>
+<span class="nc" id="L1288">                    sideSwipePotential = false;</span>
+<span class="nc" id="L1289">                    rightSideSwipePotential = false;</span>
+<span class="nc" id="L1290">                    topSwipePotential = false;</span>
+<span class="nc" id="L1291">                    registerAnimated(new Animation() {</span>
+
+                        public boolean animate() {
+<span class="nc" id="L1294">                            draggedX = motion.getValue();</span>
+<span class="nc bnc" id="L1295" title="All 2 branches missed.">                            if (motion.isFinished()) {</span>
+<span class="nc" id="L1296">                                dragActivated = false;</span>
+                            }
+<span class="nc" id="L1298">                            return true;</span>
+                        }
+
+                        public void paint(Graphics g) {
+<span class="nc" id="L1302">                            repaint();</span>
+<span class="nc bnc" id="L1303" title="All 4 branches missed.">                            if (draggedX == motion.getDestinationValue() &amp;&amp; motion.isFinished()) {</span>
+<span class="nc" id="L1304">                                parent.setTransitionInAnimator(CommonTransitions.createEmpty());</span>
+<span class="nc" id="L1305">                                parent.show();</span>
+<span class="nc" id="L1306">                                deregisterAnimated(this);</span>
+<span class="nc" id="L1307">                                Display.getInstance().callSerially(new Runnable() {</span>
+
+                                    public void run() {
+<span class="nc" id="L1310">                                        clean();</span>
+<span class="nc" id="L1311">                                    }</span>
+                                });
+                            }
+
+<span class="nc" id="L1315">                        }</span>
+                    });
+                }
+<span class="nc" id="L1318">            }</span>
+
+            public void keyReleased(int keyCode) {
+<span class="nc bnc" id="L1321" title="All 2 branches missed.">                if (keyCode == leftSK) {</span>
+<span class="nc bnc" id="L1322" title="All 2 branches missed.">                    if (transitionRunning) {</span>
+<span class="nc" id="L1323">                        return;</span>
+                    }
+<span class="nc" id="L1325">                    closeMenu();</span>
+<span class="nc" id="L1326">                    return;</span>
+                }
+<span class="nc" id="L1328">                super.keyReleased(keyCode);</span>
+<span class="nc" id="L1329">            }</span>
+
+        };
+
+<span class="nc" id="L1333">        m.setScrollable(false);</span>
+<span class="nc" id="L1334">        m.removeComponentFromForm(m.getTitleArea());</span>
+<span class="nc" id="L1335">        m.putClientProperty(&quot;Menu&quot;, &quot;true&quot;);</span>
+<span class="nc" id="L1336">        m.setTransitionInAnimator(CommonTransitions.createEmpty());</span>
+<span class="nc" id="L1337">        m.setTransitionOutAnimator(CommonTransitions.createEmpty());</span>
+<span class="nc" id="L1338">        m.setBackCommand(new Command(&quot;&quot;) {</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L1341" title="All 2 branches missed.">                if (transitionRunning) {</span>
+<span class="nc" id="L1342">                    return;</span>
+                }
+<span class="nc" id="L1344">                closeMenu();</span>
+<span class="nc" id="L1345">            }</span>
+        });
+<span class="nc" id="L1347">        m.setLayout(new BorderLayout());</span>
+<span class="nc bnc" id="L1348" title="All 2 branches missed.">        if (Display.getInstance().areMutableImagesFast()) {</span>
+<span class="nc" id="L1349">            rightPanel = new Container(new BorderLayout());</span>
+        } else {
+<span class="nc" id="L1351">            rightPanel = new Container(new BorderLayout()) {</span>
+                public void paintBackground(Graphics g) {
+<span class="nc" id="L1353">                }</span>
+
+                public void paintBackgrounds(Graphics g) {
+<span class="nc" id="L1356">                }</span>
+
+                public void paint(Graphics g) {
+<span class="nc" id="L1359">                    Component c = (Component) rightPanel.getClientProperty(&quot;$parent&quot;);</span>
+
+                    // not sure why its happening: https://code.google.com/p/codenameone/issues/detail?id=1072
+<span class="nc bnc" id="L1362" title="All 2 branches missed.">                    if (c != null) {</span>
+<span class="nc" id="L1363">                        boolean b = c.isVisible();</span>
+<span class="nc" id="L1364">                        c.setVisible(true);</span>
+<span class="nc" id="L1365">                        int x = getAbsoluteX();</span>
+<span class="nc" id="L1366">                        g.translate(x, 0);</span>
+<span class="nc" id="L1367">                        Container.sidemenuBarTranslation = x;</span>
+<span class="nc" id="L1368">                        c.paintComponent(g, true);</span>
+<span class="nc" id="L1369">                        Container.sidemenuBarTranslation = 0;</span>
+<span class="nc" id="L1370">                        g.translate(-x, 0);</span>
+<span class="nc" id="L1371">                        c.setVisible(b);</span>
+                    }
+<span class="nc" id="L1373">                }</span>
+            };
+        }
+
+<span class="nc bnc" id="L1377" title="All 2 branches missed.">        if (placement == COMMAND_PLACEMENT_VALUE_TOP) {</span>
+<span class="nc" id="L1378">            int v = 0;</span>
+<span class="nc bnc" id="L1379" title="All 2 branches missed.">            if (Display.getInstance().isPortrait()) {</span>
+<span class="nc bnc" id="L1380" title="All 2 branches missed.">                if (Display.getInstance().isTablet()) {</span>
+<span class="nc" id="L1381">                    v = getUIManager().getThemeConstant(&quot;topMenuSizeTabPortraitInt&quot;, -1);</span>
+<span class="nc bnc" id="L1382" title="All 2 branches missed.">                    if (v &lt; 0) {</span>
+<span class="nc" id="L1383">                        v = m.getHeight() * 2 / 3;</span>
+                    } else {
+<span class="nc" id="L1385">                        v = m.getHeight() / 100 * v;</span>
+                    }
+                } else {
+<span class="nc" id="L1388">                    v = getUIManager().getThemeConstant(&quot;topMenuSizePortraitInt&quot;, -1);</span>
+<span class="nc bnc" id="L1389" title="All 2 branches missed.">                    if (v &lt; 0) {</span>
+<span class="nc" id="L1390">                        v = openButton.getHeight();</span>
+                    } else {
+<span class="nc" id="L1392">                        v = m.getHeight() / 100 * v;</span>
+                    }
+                }
+            } else {
+<span class="nc bnc" id="L1396" title="All 2 branches missed.">                if (Display.getInstance().isTablet()) {</span>
+<span class="nc" id="L1397">                    v = getUIManager().getThemeConstant(&quot;topMenuSizeTabLandscapeInt&quot;, -1);</span>
+<span class="nc bnc" id="L1398" title="All 2 branches missed.">                    if (v &lt; 0) {</span>
+<span class="nc" id="L1399">                        v = m.getHeight() * 3 / 4;</span>
+                    } else {
+<span class="nc" id="L1401">                        v = m.getWidth() / 100 * v;</span>
+                    }
+                } else {
+<span class="nc" id="L1404">                    v = getUIManager().getThemeConstant(&quot;topMenuSizeLandscapeInt&quot;, -1);</span>
+<span class="nc bnc" id="L1405" title="All 2 branches missed.">                    if (v &lt; 0) {</span>
+<span class="nc" id="L1406">                        v = m.getHeight() * 4 / 10;</span>
+                    } else {
+<span class="nc" id="L1408">                        v = m.getHeight() / 100 * v;</span>
+                    }
+                }
+            }
+
+<span class="nc" id="L1413">            rightPanel.setPreferredH(v);</span>
+<span class="nc" id="L1414">        } else {</span>
+<span class="nc bnc" id="L1415" title="All 2 branches missed.">            if (Display.getInstance().isPortrait()) {</span>
+<span class="nc" id="L1416">                int v = 0;</span>
+<span class="nc bnc" id="L1417" title="All 2 branches missed.">                if (Display.getInstance().isTablet()) {</span>
+<span class="nc" id="L1418">                    v = getUIManager().getThemeConstant(&quot;sideMenuSizeTabPortraitInt&quot;, -1);</span>
+<span class="nc bnc" id="L1419" title="All 2 branches missed.">                    if (v &lt; 0) {</span>
+<span class="nc" id="L1420">                        v = m.getWidth() * 2 / 3;</span>
+                    } else {
+<span class="nc" id="L1422">                        v = m.getWidth() / 100 * v;</span>
+                    }
+                } else {
+<span class="nc" id="L1425">                    v = getUIManager().getThemeConstant(&quot;sideMenuSizePortraitInt&quot;, -1);</span>
+<span class="nc bnc" id="L1426" title="All 2 branches missed.">                    if (v &lt; 0) {</span>
+<span class="nc bnc" id="L1427" title="All 2 branches missed.">                        if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {</span>
+<span class="nc bnc" id="L1428" title="All 2 branches missed.">                            if (isRTL()) {</span>
+<span class="nc" id="L1429">                                v = openButton.getWidth();</span>
+                            } else {
+<span class="nc" id="L1431">                                v = rightSideButton.getWidth();</span>
+                            }
+                        } else {
+<span class="nc" id="L1434">                            v = openButton.getWidth();</span>
+                        }
+                    } else {
+<span class="nc" id="L1437">                        v = m.getWidth() / 100 * v;</span>
+                    }
+                }
+<span class="nc" id="L1440">                rightPanel.setPreferredW(v);</span>
+<span class="nc" id="L1441">            } else {</span>
+<span class="nc" id="L1442">                int v = 0;</span>
+<span class="nc bnc" id="L1443" title="All 2 branches missed.">                if (Display.getInstance().isTablet()) {</span>
+<span class="nc" id="L1444">                    v = getUIManager().getThemeConstant(&quot;sideMenuSizeTabLandscapeInt&quot;, -1);</span>
+<span class="nc bnc" id="L1445" title="All 2 branches missed.">                    if (v &lt; 0) {</span>
+<span class="nc" id="L1446">                        v = m.getWidth() * 3 / 4;</span>
+                    } else {
+<span class="nc" id="L1448">                        v = m.getWidth() / 100 * v;</span>
+                    }
+                } else {
+<span class="nc" id="L1451">                    v = getUIManager().getThemeConstant(&quot;sideMenuSizeLandscapeInt&quot;, -1);</span>
+<span class="nc bnc" id="L1452" title="All 2 branches missed.">                    if (v &lt; 0) {</span>
+<span class="nc" id="L1453">                        v = m.getWidth() * 4 / 10;</span>
+                    } else {
+<span class="nc" id="L1455">                        v = m.getWidth() / 100 * v;</span>
+                    }
+                }
+<span class="nc" id="L1458">                rightPanel.setPreferredW(v);</span>
+            }
+        }
+<span class="nc bnc" id="L1461" title="All 2 branches missed.">        if (sidePanel != null) {</span>
+<span class="nc" id="L1462">            sidePanel.removeAll();</span>
+<span class="nc" id="L1463">            sidePanel = null;</span>
+        }
+<span class="nc" id="L1465">        sidePanel = createSideNavigationComponent(getCommands(), placement);</span>
+<span class="nc bnc" id="L1466" title="All 2 branches missed.">        if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {</span>
+<span class="nc" id="L1467">            m.addComponent(BorderLayout.WEST, rightPanel);</span>
+<span class="nc" id="L1468">            m.addComponent(BorderLayout.CENTER, sidePanel);</span>
+        } else {
+<span class="nc bnc" id="L1470" title="All 2 branches missed.">            if (placement == COMMAND_PLACEMENT_VALUE_TOP) {</span>
+<span class="nc" id="L1471">                m.addComponent(BorderLayout.NORTH, rightPanel);</span>
+<span class="nc" id="L1472">                m.addComponent(BorderLayout.CENTER, sidePanel);</span>
+<span class="nc" id="L1473">                Button button = new Button(&quot; &quot;);</span>
+<span class="nc" id="L1474">                button.setUIID(&quot;Container&quot;);</span>
+<span class="nc" id="L1475">                button.setPreferredH(Display.getInstance().getDisplayHeight() / 10);</span>
+<span class="nc" id="L1476">                m.addComponent(BorderLayout.SOUTH, button);</span>
+<span class="nc" id="L1477">                button.addActionListener(new ActionListener() {</span>
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L1479">                        closeMenu();</span>
+<span class="nc" id="L1480">                    }</span>
+                });
+<span class="nc" id="L1482">            } else {</span>
+<span class="nc" id="L1483">                m.addComponent(BorderLayout.EAST, rightPanel);</span>
+<span class="nc" id="L1484">                m.addComponent(BorderLayout.CENTER, sidePanel);</span>
+            }
+        }
+<span class="nc" id="L1487">        m.putClientProperty(&quot;cn1$sideMenuParent&quot;, this);</span>
+<span class="nc" id="L1488">        return m;</span>
+    }
+
+    Image updateRightPanelBgImage(String placement, Component c) {
+<span class="nc" id="L1492">        Image img = rightPanel.getStyle().getBgImage();</span>
+<span class="nc bnc" id="L1493" title="All 4 branches missed.">        if (img != null &amp;&amp; img.getHeight() == Display.getInstance().getDisplayHeight()) {</span>
+<span class="nc" id="L1494">            return img;</span>
+        }
+<span class="nc" id="L1496">        boolean v = c.isVisible();</span>
+<span class="nc" id="L1497">        c.setVisible(true);</span>
+<span class="nc" id="L1498">        Image buffer = ImageFactory.createImage(this, Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight(), 0);</span>
+<span class="nc" id="L1499">        Graphics g = buffer.getGraphics();</span>
+<span class="nc" id="L1500">        c.paintComponent(g);</span>
+<span class="nc" id="L1501">        rightPanel.getStyle().setBgImage(buffer);</span>
+<span class="nc" id="L1502">        c.setVisible(v);</span>
+<span class="nc" id="L1503">        return buffer;</span>
+    }
+
+    Command unwrapCommand(Command cmd) {
+<span class="pc bpc" id="L1507" title="1 of 2 branches missed.">        if (cmd instanceof CommandWrapper) {</span>
+<span class="fc" id="L1508">            return ((CommandWrapper) cmd).cmd;</span>
+        }
+<span class="nc" id="L1510">        return cmd;</span>
+    }
+
+    Command wrapCommand(Command cmd) {
+<span class="fc" id="L1514">        return new CommandWrapper(cmd);</span>
+    }
+
+    /**
+     * Returns the Parent Form of this menu
+     *
+     * @return Form Object
+     */
+    public Form getParentForm() {
+<span class="nc" id="L1523">        return parent;</span>
+    }
+
+    class MenuTransition extends Transition {
+
+        private final int speed;
+        private final boolean fwd;
+        private Motion motion;
+        private int position;
+        private Image buffer;
+        private final int dest;
+        private Image shadow;
+        private final String placement;
+        private boolean isRTL;
+
+<span class="nc" id="L1538">        public MenuTransition(int speed, boolean fwd, int dest, String placement) {</span>
+<span class="nc" id="L1539">            this.speed = speed;</span>
+<span class="nc" id="L1540">            this.fwd = fwd;</span>
+<span class="nc" id="L1541">            this.dest = dest;</span>
+<span class="nc" id="L1542">            this.placement = placement;</span>
+<span class="nc" id="L1543">        }</span>
+
+        public void initTransition() {
+<span class="nc" id="L1546">            super.initTransition();</span>
+<span class="nc bnc" id="L1547" title="All 2 branches missed.">            if (placement == COMMAND_PLACEMENT_VALUE_TOP) {</span>
+<span class="nc bnc" id="L1548" title="All 2 branches missed.">                if (Display.getInstance().areMutableImagesFast()) {</span>
+<span class="nc bnc" id="L1549" title="All 2 branches missed.">                    if (fwd) {</span>
+<span class="nc" id="L1550">                        buffer = updateRightPanelBgImage(placement, getSource());</span>
+<span class="nc bnc" id="L1551" title="All 2 branches missed.">                        if (dest &gt; -1) {</span>
+<span class="nc" id="L1552">                            motion = Motion.createEaseInOutMotion(0, dest, speed);</span>
+                        } else {
+<span class="nc" id="L1554">                            motion = Motion.createEaseInOutMotion(0, buffer.getHeight() - rightPanel.getHeight(), speed);</span>
+                        }
+                    } else {
+<span class="nc" id="L1557">                        buffer = updateRightPanelBgImage(placement, getDestination());</span>
+<span class="nc bnc" id="L1558" title="All 2 branches missed.">                        if (dest &gt; -1) {</span>
+<span class="nc" id="L1559">                            motion = Motion.createEaseInOutMotion(dest, 0, speed);</span>
+                        } else {
+<span class="nc" id="L1561">                            motion = Motion.createEaseInOutMotion(buffer.getHeight() - rightPanel.getHeight(), 0, speed);</span>
+                        }
+                    }
+<span class="nc" id="L1564">                    rightPanel.getStyle().setBackgroundType(Style.BACKGROUND_IMAGE_ALIGNED_TOP);</span>
+                } else {
+<span class="nc bnc" id="L1566" title="All 2 branches missed.">                    if (fwd) {</span>
+<span class="nc" id="L1567">                        motion = Motion.createEaseInOutMotion(0, Display.getInstance().getDisplayHeight() - rightPanel.getHeight(), speed);</span>
+<span class="nc" id="L1568">                        rightPanel.putClientProperty(&quot;$parent&quot;, getSource());</span>
+                    } else {
+<span class="nc" id="L1570">                        motion = Motion.createEaseInOutMotion(Display.getInstance().getDisplayHeight() - rightPanel.getHeight(), 0, speed);</span>
+<span class="nc" id="L1571">                        rightPanel.putClientProperty(&quot;$parent&quot;, getDestination());</span>
+                    }
+                }
+            } else {
+<span class="nc" id="L1575">                isRTL = (getSource().getUIManager().getLookAndFeel().isRTL());</span>
+<span class="nc bnc" id="L1576" title="All 2 branches missed.">                if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {</span>
+<span class="nc bnc" id="L1577" title="All 2 branches missed.">                    isRTL = !isRTL;</span>
+                }
+<span class="nc bnc" id="L1579" title="All 2 branches missed.">                if (Display.getInstance().areMutableImagesFast()) {</span>
+<span class="nc bnc" id="L1580" title="All 2 branches missed.">                    if (fwd) {</span>
+<span class="nc" id="L1581">                        buffer = updateRightPanelBgImage(placement, getSource());</span>
+<span class="nc bnc" id="L1582" title="All 2 branches missed.">                        if (dest &gt; -1) {</span>
+<span class="nc" id="L1583">                            motion = Motion.createEaseInOutMotion(0, dest, speed);</span>
+                        } else {
+<span class="nc" id="L1585">                            motion = Motion.createEaseInOutMotion(0, buffer.getWidth() - rightPanel.getWidth(), speed);</span>
+                        }
+                    } else {
+<span class="nc" id="L1588">                        buffer = updateRightPanelBgImage(placement, getDestination());</span>
+<span class="nc bnc" id="L1589" title="All 2 branches missed.">                        if (dest &gt; -1) {</span>
+<span class="nc" id="L1590">                            motion = Motion.createEaseInOutMotion(dest, 0, speed);</span>
+                        } else {
+<span class="nc" id="L1592">                            motion = Motion.createEaseInOutMotion(buffer.getWidth() - rightPanel.getWidth(), 0, speed);</span>
+                        }
+                    }
+<span class="nc bnc" id="L1595" title="All 2 branches missed.">                    if (isRTL) {</span>
+<span class="nc" id="L1596">                        rightPanel.getStyle().setBackgroundType(Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT);</span>
+                    } else {
+<span class="nc" id="L1598">                        rightPanel.getStyle().setBackgroundType(Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT);</span>
+                    }
+<span class="nc" id="L1600">                    rightPanel.getStyle().setBgImage(buffer);</span>
+                } else {
+<span class="nc bnc" id="L1602" title="All 2 branches missed.">                    if (fwd) {</span>
+<span class="nc" id="L1603">                        motion = Motion.createEaseInOutMotion(0, Display.getInstance().getDisplayWidth() - rightPanel.getWidth(), speed);</span>
+<span class="nc" id="L1604">                        rightPanel.putClientProperty(&quot;$parent&quot;, getSource());</span>
+                    } else {
+<span class="nc" id="L1606">                        motion = Motion.createEaseInOutMotion(Display.getInstance().getDisplayWidth() - rightPanel.getWidth(), 0, speed);</span>
+<span class="nc" id="L1607">                        rightPanel.putClientProperty(&quot;$parent&quot;, getDestination());</span>
+                    }
+                }
+            }
+<span class="nc" id="L1611">            boolean shadowEnabled = getUIManager().isThemeConstant(&quot;sideMenuShadowBool&quot;, true);</span>
+
+<span class="nc" id="L1613">            shadow = getUIManager().getThemeImageConstant(&quot;sideMenuShadowImage&quot;);</span>
+<span class="nc bnc" id="L1614" title="All 4 branches missed.">            if (shadow == null &amp;&amp; shadowEnabled) {</span>
+<span class="nc" id="L1615">                shadow = Resources.getSystemResource().getImage(&quot;sidemenu-shadow.png&quot;);</span>
+            }
+<span class="nc" id="L1617">            boolean isRTLValue = isRTL();</span>
+<span class="nc bnc" id="L1618" title="All 2 branches missed.">            if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {</span>
+<span class="nc bnc" id="L1619" title="All 2 branches missed.">                isRTLValue = !isRTLValue;</span>
+            }
+<span class="nc bnc" id="L1621" title="All 2 branches missed.">            if (isRTLValue) {</span>
+<span class="nc bnc" id="L1622" title="All 2 branches missed.">                if (shadow != null) {</span>
+<span class="nc" id="L1623">                    shadow = shadow.flipHorizontally(true);</span>
+                }
+            }
+
+<span class="nc" id="L1627">            motion.start();</span>
+<span class="nc" id="L1628">        }</span>
+
+        public boolean animate() {
+<span class="nc bnc" id="L1631" title="All 2 branches missed.">            if (motion != null) {</span>
+<span class="nc" id="L1632">                position = motion.getValue();</span>
+<span class="nc bnc" id="L1633" title="All 2 branches missed.">                transitionRunning = !motion.isFinished();</span>
+<span class="nc" id="L1634">                return transitionRunning;</span>
+            }
+<span class="nc" id="L1636">            transitionRunning = false;</span>
+<span class="nc" id="L1637">            return false;</span>
+        }
+
+        public void cleanup() {
+<span class="nc" id="L1641">            transitionRunning = false;</span>
+<span class="nc" id="L1642">            clean();</span>
+<span class="nc" id="L1643">        }</span>
+
+        public void paint(Graphics g) {
+<span class="nc bnc" id="L1646" title="All 2 branches missed.">            if (Display.getInstance().areMutableImagesFast()) {</span>
+                // workaround for Android issue where the VKB breaks on screen size change
+<span class="nc bnc" id="L1648" title="All 2 branches missed.">                if (buffer.getHeight() != Display.getInstance().getDisplayHeight()) {</span>
+<span class="nc bnc" id="L1649" title="All 2 branches missed.">                    if (fwd) {</span>
+<span class="nc" id="L1650">                        buffer = updateRightPanelBgImage(placement, getSource());</span>
+                    } else {
+<span class="nc" id="L1652">                        buffer = updateRightPanelBgImage(placement, getDestination());</span>
+                    }
+                }
+            }
+<span class="nc" id="L1656">            Component src = getSource();</span>
+<span class="nc" id="L1657">            Component dest = getDestination();</span>
+<span class="nc bnc" id="L1658" title="All 2 branches missed.">            if (placement == COMMAND_PLACEMENT_VALUE_TOP) {</span>
+<span class="nc bnc" id="L1659" title="All 2 branches missed.">                if (Display.getInstance().areMutableImagesFast()) {</span>
+<span class="nc bnc" id="L1660" title="All 2 branches missed.">                    if (fwd) {</span>
+<span class="nc" id="L1661">                        dest.paintComponent(g, true);</span>
+<span class="nc" id="L1662">                        g.drawImage(buffer, 0, position);</span>
+                    } else {
+<span class="nc" id="L1664">                        src.paintComponent(g, true);</span>
+<span class="nc" id="L1665">                        g.drawImage(buffer, 0, position);</span>
+                    }
+                } else {
+<span class="nc bnc" id="L1668" title="All 2 branches missed.">                    if (fwd) {</span>
+<span class="nc" id="L1669">                        dest.paintComponent(g, true);</span>
+<span class="nc" id="L1670">                        g.translate(0, position);</span>
+<span class="nc" id="L1671">                        src.paintComponent(g, true);</span>
+<span class="nc" id="L1672">                        g.translate(0, -position);</span>
+                    } else {
+<span class="nc" id="L1674">                        src.paintComponent(g, true);</span>
+<span class="nc" id="L1675">                        g.translate(0, position);</span>
+<span class="nc" id="L1676">                        dest.paintComponent(g, true);</span>
+<span class="nc" id="L1677">                        g.translate(-position, 0);</span>
+                    }
+                }
+<span class="nc" id="L1680">                return;</span>
+            }
+<span class="nc bnc" id="L1682" title="All 2 branches missed.">            if (isRTL) {</span>
+<span class="nc" id="L1683">                position = position * -1;</span>
+            }
+<span class="nc bnc" id="L1685" title="All 2 branches missed.">            if (Display.getInstance().areMutableImagesFast()) {</span>
+<span class="nc bnc" id="L1686" title="All 2 branches missed.">                if (fwd) {</span>
+<span class="nc" id="L1687">                    dest.paintComponent(g, true);</span>
+<span class="nc bnc" id="L1688" title="All 2 branches missed.">                    if (shadow != null) {</span>
+<span class="nc" id="L1689">                        g.tileImage(shadow, position - shadow.getWidth(), 0, shadow.getWidth(), src.getHeight());</span>
+                    }
+<span class="nc" id="L1691">                    g.drawImage(buffer, position, 0);</span>
+                } else {
+<span class="nc" id="L1693">                    src.paintComponent(g, true);</span>
+<span class="nc bnc" id="L1694" title="All 2 branches missed.">                    if (shadow != null) {</span>
+<span class="nc" id="L1695">                        g.tileImage(shadow, position - shadow.getWidth(), 0, shadow.getWidth(), src.getHeight());</span>
+                    }
+<span class="nc" id="L1697">                    g.drawImage(buffer, position, 0);</span>
+                }
+            } else {
+<span class="nc bnc" id="L1700" title="All 2 branches missed.">                if (fwd) {</span>
+<span class="nc" id="L1701">                    dest.paintComponent(g, true);</span>
+<span class="nc" id="L1702">                    g.translate(position, 0);</span>
+<span class="nc" id="L1703">                    Container.sidemenuBarTranslation = position;</span>
+<span class="nc bnc" id="L1704" title="All 2 branches missed.">                    if (shadow != null) {</span>
+<span class="nc" id="L1705">                        g.tileImage(shadow, position - shadow.getWidth(), 0, shadow.getWidth(), src.getHeight());</span>
+                    }
+<span class="nc" id="L1707">                    src.paintComponent(g, true);</span>
+<span class="nc" id="L1708">                    Container.sidemenuBarTranslation = 0;</span>
+<span class="nc" id="L1709">                    g.translate(-position, 0);</span>
+                } else {
+<span class="nc" id="L1711">                    src.paintComponent(g, true);</span>
+<span class="nc" id="L1712">                    g.translate(position, 0);</span>
+<span class="nc" id="L1713">                    Container.sidemenuBarTranslation = position;</span>
+<span class="nc bnc" id="L1714" title="All 2 branches missed.">                    if (shadow != null) {</span>
+<span class="nc" id="L1715">                        g.tileImage(shadow, position - shadow.getWidth(), 0, shadow.getWidth(), src.getHeight());</span>
+                    }
+<span class="nc" id="L1717">                    dest.paintComponent(g, true);</span>
+<span class="nc" id="L1718">                    Container.sidemenuBarTranslation = 0;</span>
+<span class="nc" id="L1719">                    g.translate(-position, 0);</span>
+                }
+            }
+<span class="nc" id="L1722">        }</span>
+    }
+
+    class CommandWrapper extends Command {
+
+        Command cmd;
+
+<span class="fc" id="L1729">        public CommandWrapper(Command cmd) {</span>
+<span class="fc" id="L1730">            super(cmd.getCommandName(), cmd.getIcon(), cmd.getId());</span>
+<span class="fc" id="L1731">            super.setIconFont(cmd.getIconFont()); //if defined, use cmd's IconFont</span>
+<span class="fc" id="L1732">            super.setMaterialIcon(cmd.getMaterialIcon());</span>
+<span class="fc" id="L1733">            super.setPressedIcon(cmd.getPressedIcon());</span>
+<span class="fc" id="L1734">            super.setRolloverIcon(cmd.getRolloverIcon());</span>
+<span class="fc" id="L1735">            super.setDisabledIcon(cmd.getDisabledIcon());</span>
+<span class="fc" id="L1736">            super.setIconGapMM(cmd.getIconGapMM());</span>
+<span class="fc" id="L1737">            this.cmd = cmd;</span>
+<span class="fc" id="L1738">        }</span>
+
+        public Object getClientProperty(String key) {
+<span class="fc" id="L1741">            return this.cmd.getClientProperty(key);</span>
+        }
+
+        public void putClientProperty(String key, Object value) {
+<span class="nc" id="L1745">            this.cmd.putClientProperty(key, value);</span>
+<span class="nc" id="L1746">        }</span>
+
+        public boolean isEnabled() {
+<span class="fc" id="L1749">            return cmd.isEnabled();</span>
+        }
+
+        public void setEnabled(boolean b) {
+<span class="nc" id="L1753">            cmd.setEnabled(b);</span>
+<span class="nc" id="L1754">        }</span>
+
+        @Override
+        public char getMaterialIcon() {
+<span class="fc" id="L1758">            return cmd.getMaterialIcon();</span>
+        }
+
+        @Override
+        public void setMaterialIcon(char materialIcon) {
+<span class="nc" id="L1763">            cmd.setMaterialIcon(materialIcon);</span>
+<span class="nc" id="L1764">        }</span>
+
+        public void actionPerformed(final ActionEvent evt) {
+<span class="pc bpc" id="L1767" title="3 of 6 branches missed.">            if (Toolbar.isOnTopSideMenu() &amp;&amp; (Toolbar.isGlobalToolbar() || Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION)) {</span>
+<span class="fc" id="L1768">                Display.getInstance().getCurrent().getToolbar().closeSideMenu();</span>
+<span class="fc" id="L1769">                cmd.actionPerformed(evt);</span>
+<span class="fc" id="L1770">                return;</span>
+            }
+<span class="nc bnc" id="L1772" title="All 2 branches missed.">            if (transitionRunning) {</span>
+<span class="nc" id="L1773">                return;</span>
+            }
+            //if this is a navigation command clear the current Form to make the
+            //transition more pleasent
+<span class="nc bnc" id="L1777" title="All 2 branches missed.">            if (cmd instanceof NavigationCommand) {</span>
+<span class="nc" id="L1778">                rightPanel.getStyle().setBgImage(null);</span>
+<span class="nc" id="L1779">                parent.getContentPane().setVisible(false);</span>
+<span class="nc" id="L1780">                Image img = updateRightPanelBgImage(null, parent);</span>
+<span class="nc" id="L1781">                rightPanel.getStyle().setBgImage(img);</span>
+            }
+
+<span class="nc" id="L1784">            closeMenu();</span>
+<span class="nc" id="L1785">            clean();</span>
+<span class="nc" id="L1786">            parent.addShowListener(pointerDragged);</span>
+<span class="nc" id="L1787">            Display.getInstance().startThread(new ShowWaiter(), &quot;Show Waiter&quot;).start();</span>
+<span class="nc" id="L1788">        }</span>
+
+        class ShowWaiter implements Runnable, ActionListener {
+<span class="nc" id="L1791">            private final Object LOCK = new Object();</span>
+
+<span class="nc" id="L1793">            ShowWaiter() {</span>
+<span class="nc" id="L1794">                parent.addShowListener(this);</span>
+<span class="nc" id="L1795">            }</span>
+
+            public void run() {
+<span class="nc bnc" id="L1798" title="All 2 branches missed.">                if (Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L1799">                    ActionEvent e = new ActionEvent(cmd, ActionEvent.Type.Command);</span>
+<span class="nc bnc" id="L1800" title="All 2 branches missed.">                    if (cmd instanceof NavigationCommand) {</span>
+<span class="nc" id="L1801">                        parent.getContentPane().setVisible(true);</span>
+<span class="nc" id="L1802">                        final Form nextForm = ((NavigationCommand) cmd).getNextForm();</span>
+<span class="nc bnc" id="L1803" title="All 2 branches missed.">                        if (nextForm != null) {</span>
+<span class="nc" id="L1804">                            final Transition out = parent.getTransitionOutAnimator();</span>
+<span class="nc" id="L1805">                            final Transition in = nextForm.getTransitionInAnimator();</span>
+<span class="nc" id="L1806">                            parent.setTransitionOutAnimator(CommonTransitions.createEmpty());</span>
+<span class="nc" id="L1807">                            nextForm.setTransitionInAnimator(CommonTransitions.createEmpty());</span>
+<span class="nc" id="L1808">                            nextForm.addShowListener(new ActionListener() {</span>
+
+                                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L1811">                                    parent.setTransitionOutAnimator(out);</span>
+<span class="nc" id="L1812">                                    nextForm.setTransitionInAnimator(in);</span>
+<span class="nc" id="L1813">                                    nextForm.removeShowListener(this);</span>
+<span class="nc" id="L1814">                                }</span>
+                            });
+                        }
+                    }
+<span class="nc" id="L1818">                    parent.dispatchCommand(cmd, e);</span>
+
+<span class="nc" id="L1820">                    return;</span>
+                }
+
+<span class="nc" id="L1823">                synchronized (LOCK) {</span>
+<span class="nc bnc" id="L1824" title="All 2 branches missed.">                    while (Display.getInstance().getCurrent() != parent) {</span>
+                        try {
+<span class="nc" id="L1826">                            LOCK.wait(40);</span>
+<span class="nc" id="L1827">                        } catch (InterruptedException ex) {</span>
+<span class="nc" id="L1828">                            Thread.currentThread().interrupt();</span>
+<span class="nc" id="L1829">                            return;</span>
+<span class="nc" id="L1830">                        }</span>
+                    }
+<span class="nc" id="L1832">                }</span>
+<span class="nc" id="L1833">                Display.getInstance().callSerially(this);</span>
+<span class="nc" id="L1834">            }</span>
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L1837">                synchronized (LOCK) {</span>
+<span class="nc" id="L1838">                    LOCK.notify();</span>
+<span class="nc" id="L1839">                }</span>
+<span class="nc" id="L1840">            }</span>
+
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

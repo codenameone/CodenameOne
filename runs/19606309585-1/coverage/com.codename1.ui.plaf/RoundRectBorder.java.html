@@ -1,0 +1,1184 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RoundRectBorder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.plaf</a> &gt; <span class="el_source">RoundRectBorder.java</span></div><h1>RoundRectBorder.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.plaf;
+
+import com.codename1.ui.CN;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.ImageFactory;
+import com.codename1.ui.Stroke;
+import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.geom.Rectangle;
+
+/**
+ * &lt;p&gt;Customizable rounded rectangle border that breaks down the border into customizable pieces.
+ * &lt;p&gt;
+ * The background is inherited from the parent UIID but stroke and shadow can be customized via user settings.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * &lt;strong&gt;IMPORTANT:&lt;/strong&gt; {@code RoundRectBorder} instances can't be reused
+ * you would need to create a separate instance for each style object!
+ * See &lt;a href=&quot;https://github.com/codenameone/CodenameOne/issues/2578#issuecomment-429554441&quot;&gt;this issue&lt;/a&gt; for further details.
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/27bd5a15c7000118089d8037e2dd9367.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/blog/round-rect-sample.png&quot; alt=&quot;Round Rect Border&quot; /&gt;
+ *
+ * @author Shai Almog
+ */
+public class RoundRectBorder extends Border {
+    private static final String CACHE_KEY = &quot;cn1$$-rrbcache&quot;;
+    // these allow us to have more than one border per component in cache which is important for selected/unselected/pressed values
+    private static int instanceCounter;
+    private final int instanceVal;
+<span class="fc" id="L56">    private boolean useCache = true;</span>
+<span class="fc" id="L57">    private boolean dirty = true;</span>
+    /**
+     * The color of the edge of the border if applicable
+     */
+<span class="fc" id="L61">    private int strokeColor = 0;</span>
+    /**
+     * The opacity of the edge of the border if applicable
+     */
+<span class="fc" id="L65">    private int strokeOpacity = 255;</span>
+    private Stroke stroke;
+    /**
+     * Var to explicitly set the position of the arrow when tracking a component. Values
+     * between 0 and 1, with zero being the Top, and 1 being the bottom.  Default negative
+     * value indicates that it should just calculate the position as normal, suing the
+     * the provided tracking component bounds.
+     *
+     * @since 7.0
+     */
+<span class="fc" id="L75">    private float trackComponentVerticalPosition = -1;</span>
+    /**
+     * Var to explicitly set the position of the arrow when tracking a component. Values
+     * between 0 and 1, with zero being the left, and 1 being the right.  Default negative
+     * value indicates that it should just calculate the position as normal, suing the
+     * the provided tracking component bounds.
+     *
+     * @since 7.0
+     */
+<span class="fc" id="L84">    private float trackComponentHorizontalPosition = -1;</span>
+    /**
+     * Var to explicitly set the position of the arrow when tracking a component. Acceptable
+     * values {@link Component#TOP}, {@link Component#BOTTOM}, {@link Component#LEFT}, {@link Component#RIGHT}.
+     *
+     * @since 7.0
+     */
+<span class="fc" id="L91">    private int trackComponentSide = -1;</span>
+    /**
+     * The thickness of the edge of the border if applicable, 0 if no stroke is needed
+     */
+    private float strokeThickness;
+    /**
+     * True if the thickness of the stroke is in millimeters
+     */
+    private boolean strokeMM;
+    /**
+     * The spread of the shadow in millimeters
+     */
+    private float shadowSpread;
+    /**
+     * The opacity of the shadow between 0 and 255
+     */
+<span class="fc" id="L107">    private int shadowOpacity = 0;</span>
+    /**
+     * The color of the shadow as an RRGGBB color (no alpha)
+     */
+<span class="fc" id="L111">    private int shadowColor = 0;</span>
+    /**
+     * X axis bias of the shadow between 0 and 1 where 0 is to the top and 1 is to the bottom, defaults to 0.5
+     */
+<span class="fc" id="L115">    private float shadowX = 0.5f;</span>
+    /**
+     * Y axis bias of the shadow between 0 and 1 where 0 is to the left and 1 is to the right, defaults to 0.5
+     */
+<span class="fc" id="L119">    private float shadowY = 0.5f;</span>
+    /**
+     * The Gaussian blur size
+     */
+<span class="fc" id="L123">    private float shadowBlur = 10;</span>
+    /**
+     * The radius of the corners in millimeters
+     */
+<span class="fc" id="L127">    private float cornerRadius = 2;</span>
+    /**
+     * True if the corners are bezier curves, otherwise the corners are drawn as a regular arc
+     */
+    private boolean bezierCorners;
+<span class="fc" id="L132">    private boolean topLeft = true, topRight = true, bottomLeft = true, bottomRight = true;</span>
+
+<span class="fc" id="L134">    private int arrowPosition = -1;</span>
+<span class="fc" id="L135">    private int arrowDirection = -1;</span>
+
+
+<span class="fc" id="L138">    private float arrowSize = 1.5f;</span>
+    private Stroke stroke1;
+
+<span class="fc" id="L141">    private RoundRectBorder() {</span>
+<span class="fc" id="L142">        shadowSpread = Display.getInstance().convertToPixels(0.2f);</span>
+<span class="fc" id="L143">        instanceCounter++;</span>
+<span class="fc" id="L144">        instanceVal = instanceCounter;</span>
+<span class="fc" id="L145">    }</span>
+
+    /**
+     * Creates a flat border with styles derived from the component UIID
+     *
+     * @return a border instance
+     */
+    public static RoundRectBorder create() {
+<span class="fc" id="L153">        return new RoundRectBorder();</span>
+    }
+
+    /**
+     * Change the size of the arrow used for component tracking.
+     *
+     * @param size Size of arrow in millimeters.
+     * @return a border instance
+     * @since 7.0
+     */
+    public RoundRectBorder arrowSize(float size) {
+<span class="nc" id="L164">        this.arrowSize = size;</span>
+<span class="nc" id="L165">        return this;</span>
+    }
+
+    /**
+     * Change the size of the arrow used for component tracking.
+     *
+     * @param size Size of arrow in millimeters.
+     * @since 7.0
+     */
+    public void setArrowSize(float size) {
+<span class="nc" id="L175">        this.arrowSize = size;</span>
+<span class="nc" id="L176">    }</span>
+
+    /**
+     * Sets the opacity of the stroke line around the border
+     *
+     * @param strokeOpacity the opacity from 0-255 where 255 is completely opaque
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder strokeOpacity(int strokeOpacity) {
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (strokeOpacity != this.strokeOpacity) {</span>
+<span class="nc" id="L186">            this.strokeOpacity = strokeOpacity;</span>
+<span class="nc" id="L187">            dirty = true;</span>
+        }
+<span class="fc" id="L189">        return this;</span>
+    }
+
+    /**
+     * Explicitly positions the arrow used for component tracking to a particular
+     * side of the border. This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component ({@link #setTrackComponent(com.codename1.ui.geom.Rectangle) }).
+     * Use in conjunction with {@link #trackComponentHorizontalPosition(float) }, and {@link #trackComponentHorizontalPosition}.
+     *
+     * @param side The side to place the tracking arrow on.  Values {@link Component#TOP}, {@link Component#BOTTOM}, {@link Component#LEFT},
+     *             or {@link Component#BOTTOM}.  Set negative value for default behaviour, which is to just calculate the arrow position
+     *             based on the tracking component bounds.
+     * @return Self for chaining.
+     * @since 7.0
+     */
+    public RoundRectBorder trackComponentSide(int side) {
+<span class="nc" id="L204">        this.trackComponentSide = side;</span>
+<span class="nc" id="L205">        return this;</span>
+    }
+
+    /**
+     * Gets the side that the tracking component should be displayed on if using explicit placement.
+     *
+     * @return The side that the arrow should be rendered on. Values {@link Component#TOP}, {@link Component#BOTTOM}, {@link Component#LEFT}, or a negative number to indicate that the position will be calculated based on the position of the tracking component.
+     * or {@link Component#BOTTOM}.
+     * @since 7.0
+     */
+    public int getTrackComponentSide() {
+<span class="nc" id="L216">        return trackComponentSide;</span>
+    }
+
+    /**
+     * Explicitly sets the vertical position of the tracking arrow.   This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component ({@link #setTrackComponent(com.codename1.ui.geom.Rectangle) }).
+     *
+     * @param pos Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from top to bottom.  Negative values result in
+     *            default behaviour, which is to calculate the position based on the tracking component position.
+     * @return Self for chainging.
+     * @since 7.0
+     */
+    public RoundRectBorder trackComponentVerticalPosition(float pos) {
+<span class="nc" id="L228">        this.trackComponentVerticalPosition = pos;</span>
+<span class="nc" id="L229">        return this;</span>
+    }
+
+    /**
+     * Gets the explicitly set vertical position of the tracking arrow.   This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component ({@link #setTrackComponent(com.codename1.ui.geom.Rectangle) }).
+     *
+     * @return Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from top to bottom.  Negative values result in
+     * default behaviour, which is to calculate the position based on the tracking component position.
+     * @since 7.0
+     */
+    public float getTrackComponentVerticalPosition() {
+<span class="nc" id="L240">        return trackComponentVerticalPosition;</span>
+    }
+
+    /**
+     * Explicitly sets the horizontal position of the tracking arrow.   This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component ({@link #setTrackComponent(com.codename1.ui.geom.Rectangle) }).
+     *
+     * @param pos Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from left to right.  Negative values result in
+     *            default behaviour, which is to calculate the position based on the tracking component position.
+     * @return Self for chainging.
+     * @since 7.0
+     */
+    public RoundRectBorder trackComponentHorizontalPosition(float pos) {
+<span class="nc" id="L252">        this.trackComponentHorizontalPosition = pos;</span>
+<span class="nc" id="L253">        return this;</span>
+    }
+
+    /**
+     * Gets the explicitly set horizontal position of the tracking arrow.   This can be used to override the default positioning, which is to place the arrow according to the position of the tracking component ({@link #setTrackComponent(com.codename1.ui.geom.Rectangle) }).
+     *
+     * @return Vertical position of the arrow.  Values between 0 and 1 will place the arrow in the range from left to right.  Negative values result in
+     * default behaviour, which is to calculate the position based on the tracking component position.
+     * @since 7.0
+     */
+    public float getTrackComponentHorizontalPosition() {
+<span class="nc" id="L264">        return trackComponentHorizontalPosition;</span>
+    }
+
+    /**
+     * Sets whether this RoundRectBorder instance should cache the border as a background image.
+     *
+     * &lt;p&gt;This setting is on by default, but can be turned off, as some older, low-memory devices may run into
+     * memory trouble if it is using a lot of RoundRectBorders.  Turn the cache off for low-memory devices.&lt;/p&gt;
+     *
+     * &lt;p&gt;&lt;strong&gt;NOTE:&lt;/strong&gt; Using the cache is required for gaussian blur to work.  If cache is disabled,
+     * then gaussian blur settings will be ignored.&lt;/p&gt;
+     *
+     * @param useCache True to cache the border as a mutable image on the Component.
+     * @return Self for chaining.
+     * @since 8.0
+     */
+    public RoundRectBorder useCache(boolean useCache) {
+<span class="nc" id="L281">        this.useCache = useCache;</span>
+<span class="nc" id="L282">        return this;</span>
+    }
+
+    /**
+     * Checks whether this RoundRectBorder instance caches the border as a background image.
+     *
+     * @return
+     */
+    public boolean isUseCache() {
+<span class="nc" id="L291">        return this.useCache;</span>
+    }
+
+    /**
+     * Sets the stroke color of the border
+     *
+     * @param strokeColor the color
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder strokeColor(int strokeColor) {
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        if (strokeColor != this.strokeColor) {</span>
+<span class="nc" id="L302">            this.strokeColor = strokeColor;</span>
+<span class="nc" id="L303">            dirty = true;</span>
+        }
+<span class="fc" id="L305">        return this;</span>
+    }
+
+    /**
+     * Sets the stroke of the border
+     *
+     * @param stroke the stroke object
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder stroke(Stroke stroke) {
+<span class="nc bnc" id="L315" title="All 2 branches missed.">        if (stroke != null) {</span>
+<span class="nc" id="L316">            strokeThickness = stroke.getLineWidth();</span>
+<span class="nc" id="L317">            strokeMM = false;</span>
+        }
+<span class="nc" id="L319">        this.stroke = stroke;</span>
+<span class="nc" id="L320">        dirty = true;</span>
+<span class="nc" id="L321">        return this;</span>
+    }
+
+    /**
+     * Sets the stroke of the border
+     *
+     * @param stroke the thickness of the stroke object
+     * @param mm     set to true to indicate the value is in millimeters, false indicates pixels
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder stroke(float stroke, boolean mm) {
+<span class="fc" id="L332">        strokeThickness = stroke;</span>
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">        if (strokeThickness == 0) {</span>
+<span class="fc" id="L334">            this.stroke = null;</span>
+<span class="fc" id="L335">            return this;</span>
+        }
+<span class="nc" id="L337">        strokeMM = mm;</span>
+<span class="nc bnc" id="L338" title="All 2 branches missed.">        if (mm) {</span>
+<span class="nc" id="L339">            stroke = Display.getInstance().convertToPixels(stroke);</span>
+        }
+<span class="nc" id="L341">        this.stroke = new Stroke(stroke, Stroke.CAP_SQUARE, Stroke.JOIN_MITER, 1);</span>
+<span class="nc" id="L342">        dirty = true;</span>
+<span class="nc" id="L343">        return this;</span>
+    }
+
+    /**
+     * Sets the spread of the shadow in millimeters i.e how much bigger is it than the actual border
+     *
+     * @param shadowSpread the amount in millimeters representing the size of the shadow
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder shadowSpread(float shadowSpread) {
+<span class="fc bfc" id="L353" title="All 2 branches covered.">        if (shadowSpread != this.shadowSpread) {</span>
+<span class="fc" id="L354">            this.shadowSpread = shadowSpread;</span>
+<span class="fc" id="L355">            dirty = true;</span>
+        }
+<span class="fc" id="L357">        return this;</span>
+    }
+
+    /**
+     * Sets the spread in pixels of the shadow i.e how much bigger is it than the actual border
+     *
+     * @param shadowSpread the amount in pixels representing the size of the shadow
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder shadowSpread(int shadowSpread) {
+<span class="nc" id="L367">        this.shadowSpread = shadowSpread * 100f / Display.getInstance().convertToPixels(100f);</span>
+<span class="nc" id="L368">        dirty = true;</span>
+<span class="nc" id="L369">        return this;</span>
+    }
+
+    /**
+     * Sets the opacity of the shadow from 0 - 255 where 0 means no shadow and 255 means opaque black shadow
+     *
+     * @param shadowOpacity the opacity of the shadow
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder shadowOpacity(int shadowOpacity) {
+<span class="fc bfc" id="L379" title="All 2 branches covered.">        if (shadowOpacity != this.shadowOpacity) {</span>
+<span class="fc" id="L380">            this.shadowOpacity = shadowOpacity;</span>
+<span class="fc" id="L381">            dirty = true;</span>
+        }
+<span class="fc" id="L383">        return this;</span>
+    }
+
+    /**
+     * Sets the color of the shadow as an RRGGBB color
+     *
+     * @param shadowColor the color of the shadow
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder shadowColor(int shadowColor) {
+<span class="pc bpc" id="L393" title="1 of 2 branches missed.">        if (shadowColor != this.shadowColor) {</span>
+<span class="nc" id="L394">            this.shadowColor = shadowColor;</span>
+<span class="nc" id="L395">            dirty = true;</span>
+        }
+<span class="fc" id="L397">        return this;</span>
+    }
+
+    /**
+     * The position of the shadow on the X axis where 0.5f means the center and higher values draw it to the right side
+     *
+     * @param shadowX the position of the shadow between 0 - 1 where 0 equals left and 1 equals right
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder shadowX(float shadowX) {
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">        if (shadowX != this.shadowX) {</span>
+<span class="nc" id="L408">            this.shadowX = shadowX;</span>
+<span class="nc" id="L409">            dirty = true;</span>
+        }
+<span class="fc" id="L411">        return this;</span>
+    }
+
+    /**
+     * The position of the shadow on the Y axis where 0.5f means the center and higher values draw it to the bottom
+     *
+     * @param shadowY the position of the shadow between 0 - 1 where 0 equals top and 1 equals bottom
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder shadowY(float shadowY) {
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">        if (shadowY != this.shadowY) {</span>
+<span class="nc" id="L422">            this.shadowY = shadowY;</span>
+<span class="nc" id="L423">            dirty = true;</span>
+        }
+<span class="fc" id="L425">        return this;</span>
+    }
+
+    /**
+     * The blur on the shadow this is the standard Gaussian blur radius
+     *
+     * @param shadowBlur The blur on the shadow this is the standard Gaussian blur radius
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder shadowBlur(float shadowBlur) {
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">        if (shadowBlur != this.shadowBlur) {</span>
+<span class="nc" id="L436">            this.shadowBlur = shadowBlur;</span>
+<span class="nc" id="L437">            dirty = true;</span>
+        }
+<span class="fc" id="L439">        return this;</span>
+    }
+
+    /**
+     * The radius of the corners in millimeters
+     *
+     * @param cornerRadius the radius value
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder cornerRadius(float cornerRadius) {
+<span class="fc bfc" id="L449" title="All 2 branches covered.">        if (cornerRadius != this.cornerRadius) {</span>
+<span class="fc" id="L450">            this.cornerRadius = cornerRadius;</span>
+<span class="fc" id="L451">            dirty = true;</span>
+        }
+<span class="fc" id="L453">        return this;</span>
+    }
+
+    /**
+     * True if the corners are Bezier curves, otherwise the corners are drawn as a regular arc
+     *
+     * @param bezierCorners true if the corners use a bezier curve for drawing
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder bezierCorners(boolean bezierCorners) {
+<span class="fc bfc" id="L463" title="All 2 branches covered.">        if (bezierCorners != this.bezierCorners) {</span>
+<span class="fc" id="L464">            this.bezierCorners = bezierCorners;</span>
+<span class="fc" id="L465">            dirty = true;</span>
+        }
+<span class="fc" id="L467">        return this;</span>
+    }
+
+    /**
+     * True to draw the top left corner rounded, false to draw it as a corner
+     *
+     * @param topLeft true for round false for sharp
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder topLeftMode(boolean topLeft) {
+<span class="fc bfc" id="L477" title="All 2 branches covered.">        if (topLeft != this.topLeft) {</span>
+<span class="fc" id="L478">            this.topLeft = topLeft;</span>
+<span class="fc" id="L479">            dirty = true;</span>
+        }
+
+<span class="fc" id="L482">        return this;</span>
+    }
+
+    /**
+     * True to draw the top right corner rounded, false to draw it as a corner
+     *
+     * @param topRight true for round false for sharp
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder topRightMode(boolean topRight) {
+<span class="pc bpc" id="L492" title="1 of 2 branches missed.">        if (topRight != this.topRight) {</span>
+<span class="nc" id="L493">            this.topRight = topRight;</span>
+<span class="nc" id="L494">            dirty = true;</span>
+        }
+<span class="fc" id="L496">        return this;</span>
+    }
+
+    /**
+     * True to draw the bottom left corner rounded, false to draw it as a corner
+     *
+     * @param bottomLeft true for round false for sharp
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder bottomLeftMode(boolean bottomLeft) {
+<span class="fc bfc" id="L506" title="All 2 branches covered.">        if (bottomLeft != this.bottomLeft) {</span>
+<span class="fc" id="L507">            this.bottomLeft = bottomLeft;</span>
+<span class="fc" id="L508">            dirty = true;</span>
+        }
+<span class="fc" id="L510">        return this;</span>
+    }
+
+    /**
+     * True to draw the bottom right corner rounded, false to draw it as a corner
+     *
+     * @param bottomRight true for round false for sharp
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder bottomRightMode(boolean bottomRight) {
+<span class="fc bfc" id="L520" title="All 2 branches covered.">        if (bottomRight != this.bottomRight) {</span>
+<span class="fc" id="L521">            this.bottomRight = bottomRight;</span>
+<span class="fc" id="L522">            dirty = true;</span>
+        }
+<span class="fc" id="L524">        return this;</span>
+    }
+
+    /**
+     * Special mode where only the top of the round rectangle is rounded and the bottom is a regular rectangle
+     *
+     * @param topOnlyMode new value for top only mode
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder topOnlyMode(boolean topOnlyMode) {
+<span class="nc bnc" id="L534" title="All 2 branches missed.">        if (topOnlyMode) {</span>
+<span class="nc" id="L535">            topLeftMode(true);</span>
+<span class="nc" id="L536">            topRightMode(true);</span>
+<span class="nc" id="L537">            bottomLeftMode(false);</span>
+<span class="nc" id="L538">            bottomRightMode(false);</span>
+        } else {
+<span class="nc" id="L540">            topLeftMode(false);</span>
+<span class="nc" id="L541">            topRightMode(false);</span>
+
+        }
+<span class="nc" id="L544">        return this;</span>
+    }
+
+    /**
+     * Special mode where only the bottom of the round rectangle is rounded and the top is a regular rectangle
+     *
+     * @param bottomOnlyMode new value for bottom only mode
+     * @return border instance so these calls can be chained
+     */
+    public RoundRectBorder bottomOnlyMode(boolean bottomOnlyMode) {
+<span class="nc bnc" id="L554" title="All 2 branches missed.">        if (bottomOnlyMode) {</span>
+<span class="nc" id="L555">            topLeftMode(false);</span>
+<span class="nc" id="L556">            topRightMode(false);</span>
+<span class="nc" id="L557">            bottomLeftMode(true);</span>
+<span class="nc" id="L558">            bottomRightMode(true);</span>
+        } else {
+<span class="nc" id="L560">            bottomLeftMode(false);</span>
+<span class="nc" id="L561">            bottomRightMode(false);</span>
+
+        }
+<span class="nc" id="L564">        return this;</span>
+    }
+
+    private Image createTargetComponentImage(final Component c, final int w, final int h, final boolean fast) {
+<span class="nc" id="L568">        return new com.codename1.ui.ComponentImage(new Component() {</span>
+            @Override
+            public void paint(Graphics g) {
+<span class="nc" id="L571">                super.paint(g);</span>
+                try {
+<span class="nc" id="L573">                    g.translate(getX(), getY());</span>
+<span class="nc" id="L574">                    int shapeX = 0;</span>
+<span class="nc" id="L575">                    int shapeY = 0;</span>
+<span class="nc" id="L576">                    int shapeW = w;</span>
+<span class="nc" id="L577">                    int shapeH = h;</span>
+
+<span class="nc" id="L579">                    Graphics tg = g;</span>
+<span class="nc" id="L580">                    tg.setAntiAliased(true);</span>
+
+<span class="nc" id="L582">                    int shadowSpreadL = Display.getInstance().convertToPixels(shadowSpread);</span>
+
+<span class="nc bnc" id="L584" title="All 2 branches missed.">                    if (shadowOpacity &gt; 0) {</span>
+<span class="nc" id="L585">                        shapeW -= shadowSpreadL;</span>
+<span class="nc" id="L586">                        shapeH -= shadowSpreadL;</span>
+<span class="nc" id="L587">                        shapeX += Math.round(((float) shadowSpreadL) * shadowX);</span>
+<span class="nc" id="L588">                        shapeY += Math.round(((float) shadowSpreadL) * shadowY);</span>
+
+                        // draw a gradient of sort for the shadow
+<span class="nc bnc" id="L591" title="All 2 branches missed.">                        for (int iter = shadowSpreadL - 1; iter &gt;= 0; iter--) {</span>
+<span class="nc" id="L592">                            tg.translate(iter, iter);</span>
+<span class="nc" id="L593">                            int iterOpacity = Math.max(0, Math.min(255, (int) (shadowOpacity * (shadowSpreadL - iter) / (float) shadowSpreadL)));</span>
+<span class="nc" id="L594">                            drawShape(tg, shadowColor, shadowOpacity - iterOpacity, w - (iter * 2), h - (iter * 2));</span>
+<span class="nc" id="L595">                            tg.translate(-iter, -iter);</span>
+                        }
+                    }
+<span class="nc" id="L598">                    tg.translate(shapeX, shapeY);</span>
+
+<span class="nc" id="L600">                    GeneralPath gp = createShape(shapeW, shapeH);</span>
+<span class="nc" id="L601">                    Style s = c.getStyle();</span>
+<span class="nc bnc" id="L602" title="All 2 branches missed.">                    if (s.getBgImage() == null) {</span>
+<span class="nc" id="L603">                        byte type = s.getBackgroundType();</span>
+<span class="nc bnc" id="L604" title="All 4 branches missed.">                        if (type == Style.BACKGROUND_IMAGE_SCALED || type == Style.BACKGROUND_NONE) {</span>
+<span class="nc" id="L605">                            byte bgt = c.getStyle().getBgTransparency();</span>
+<span class="nc bnc" id="L606" title="All 2 branches missed.">                            if (bgt != 0) {</span>
+<span class="nc" id="L607">                                tg.setAlpha(bgt &amp; 0xff);</span>
+<span class="nc" id="L608">                                tg.setColor(s.getBgColor());</span>
+<span class="nc" id="L609">                                tg.fillShape(gp);</span>
+                            }
+<span class="nc bnc" id="L611" title="All 6 branches missed.">                            if (RoundRectBorder.this.stroke != null &amp;&amp; strokeOpacity &gt; 0 &amp;&amp; strokeThickness &gt; 0) {</span>
+<span class="nc" id="L612">                                tg.setAlpha(strokeOpacity);</span>
+<span class="nc" id="L613">                                tg.setColor(strokeColor);</span>
+<span class="nc" id="L614">                                tg.drawShape(gp, RoundRectBorder.this.stroke);</span>
+                            }
+<span class="nc" id="L616">                            return;</span>
+                        }
+                    }
+
+<span class="nc" id="L620">                    c.getStyle().setBorder(Border.createEmpty());</span>
+<span class="nc" id="L621">                    tg.setClip(gp);</span>
+<span class="nc" id="L622">                    s.getBgPainter().paint(tg, new Rectangle(0, 0, w, h));</span>
+<span class="nc bnc" id="L623" title="All 6 branches missed.">                    if (RoundRectBorder.this.stroke != null &amp;&amp; strokeOpacity &gt; 0 &amp;&amp; strokeThickness &gt; 0) {</span>
+<span class="nc" id="L624">                        tg.setClip(0, 0, w, h);</span>
+<span class="nc" id="L625">                        tg.setAlpha(strokeOpacity);</span>
+<span class="nc" id="L626">                        tg.setColor(strokeColor);</span>
+<span class="nc" id="L627">                        tg.drawShape(gp, RoundRectBorder.this.stroke);</span>
+                    }
+<span class="nc" id="L629">                    c.getStyle().setBorder(RoundRectBorder.this);</span>
+                } finally {
+<span class="nc" id="L631">                    g.translate(-getX(), -getY());</span>
+                }
+<span class="nc" id="L633">            }</span>
+        }, w, h);
+
+
+    }
+
+    private Image createTargetImage(Component c, int w, int h, boolean fast) {
+<span class="pc bpc" id="L640" title="1 of 2 branches missed.">        if (!useCache) {</span>
+<span class="nc" id="L641">            return createTargetComponentImage(c, w, h, fast);</span>
+        }
+<span class="fc" id="L643">        Image target = ImageFactory.createImage(c, w, h, 0);</span>
+
+<span class="fc" id="L645">        int shapeX = 0;</span>
+<span class="fc" id="L646">        int shapeY = 0;</span>
+<span class="fc" id="L647">        int shapeW = w;</span>
+<span class="fc" id="L648">        int shapeH = h;</span>
+
+<span class="fc" id="L650">        Graphics tg = target.getGraphics();</span>
+<span class="fc" id="L651">        tg.setAntiAliased(true);</span>
+
+<span class="fc" id="L653">        int shadowSpreadL = Display.getInstance().convertToPixels(shadowSpread);</span>
+
+<span class="pc bpc" id="L655" title="1 of 2 branches missed.">        if (shadowOpacity &gt; 0) {</span>
+<span class="fc" id="L656">            shapeW -= shadowSpreadL;</span>
+<span class="fc" id="L657">            shapeH -= shadowSpreadL;</span>
+<span class="fc" id="L658">            shapeX += Math.round(((float) shadowSpreadL) * shadowX);</span>
+<span class="fc" id="L659">            shapeY += Math.round(((float) shadowSpreadL) * shadowY);</span>
+
+            // draw a gradient of sort for the shadow
+<span class="fc bfc" id="L662" title="All 2 branches covered.">            for (int iter = shadowSpreadL - 1; iter &gt;= 0; iter--) {</span>
+<span class="fc" id="L663">                tg.translate(iter, iter);</span>
+<span class="fc" id="L664">                int iterOpacity = Math.max(0, Math.min(255, (int) (shadowOpacity * (shadowSpreadL - iter) / (float) shadowSpreadL)));</span>
+<span class="fc" id="L665">                drawShape(tg, shadowColor, shadowOpacity - iterOpacity, w - (iter * 2), h - (iter * 2));</span>
+<span class="fc" id="L666">                tg.translate(-iter, -iter);</span>
+            }
+
+<span class="pc bpc" id="L669" title="3 of 4 branches missed.">            if (Display.getInstance().isGaussianBlurSupported() &amp;&amp; !fast) {</span>
+<span class="nc" id="L670">                Image blured = Display.getInstance().gaussianBlurImage(target, shadowBlur / 2);</span>
+<span class="nc" id="L671">                target = ImageFactory.createImage(c, w, h, 0);</span>
+<span class="nc" id="L672">                tg = target.getGraphics();</span>
+<span class="nc" id="L673">                tg.drawImage(blured, 0, 0);</span>
+<span class="nc" id="L674">                tg.setAntiAliased(true);</span>
+            }
+        }
+<span class="fc" id="L677">        tg.translate(shapeX, shapeY);</span>
+
+<span class="fc" id="L679">        GeneralPath gp = createShape(shapeW, shapeH);</span>
+<span class="fc" id="L680">        Style s = c.getStyle();</span>
+<span class="pc bpc" id="L681" title="1 of 2 branches missed.">        if (s.getBgImage() == null) {</span>
+<span class="fc" id="L682">            byte type = s.getBackgroundType();</span>
+<span class="pc bpc" id="L683" title="3 of 4 branches missed.">            if (type == Style.BACKGROUND_IMAGE_SCALED || type == Style.BACKGROUND_NONE) {</span>
+<span class="fc" id="L684">                byte bgt = c.getStyle().getBgTransparency();</span>
+<span class="pc bpc" id="L685" title="1 of 2 branches missed.">                if (bgt != 0) {</span>
+<span class="fc" id="L686">                    tg.setAlpha(bgt &amp; 0xff);</span>
+<span class="fc" id="L687">                    tg.setColor(s.getBgColor());</span>
+<span class="fc" id="L688">                    tg.fillShape(gp);</span>
+                }
+<span class="pc bpc" id="L690" title="5 of 6 branches missed.">                if (this.stroke != null &amp;&amp; strokeOpacity &gt; 0 &amp;&amp; strokeThickness &gt; 0) {</span>
+<span class="nc" id="L691">                    tg.setAlpha(strokeOpacity);</span>
+<span class="nc" id="L692">                    tg.setColor(strokeColor);</span>
+<span class="nc" id="L693">                    tg.drawShape(gp, this.stroke);</span>
+                }
+<span class="fc" id="L695">                return target;</span>
+            }
+        }
+
+<span class="nc" id="L699">        c.getStyle().setBorder(Border.createEmpty());</span>
+<span class="nc" id="L700">        tg.setClip(gp);</span>
+<span class="nc" id="L701">        s.getBgPainter().paint(tg, new Rectangle(0, 0, w, h));</span>
+<span class="nc bnc" id="L702" title="All 6 branches missed.">        if (this.stroke != null &amp;&amp; strokeOpacity &gt; 0 &amp;&amp; strokeThickness &gt; 0) {</span>
+<span class="nc" id="L703">            tg.setClip(0, 0, w, h);</span>
+<span class="nc" id="L704">            tg.setAlpha(strokeOpacity);</span>
+<span class="nc" id="L705">            tg.setColor(strokeColor);</span>
+<span class="nc" id="L706">            tg.drawShape(gp, this.stroke);</span>
+        }
+<span class="nc" id="L708">        c.getStyle().setBorder(this);</span>
+<span class="nc" id="L709">        return target;</span>
+    }
+
+    @Override
+    public void paintBorderBackground(Graphics g, final Component c) {
+<span class="fc bfc" id="L714" title="All 2 branches covered.">        if (getTrackComponent() != null) {</span>
+<span class="fc" id="L715">            int cabsY = c.getAbsoluteY();</span>
+<span class="fc" id="L716">            int trackY = getTrackComponent().getY();</span>
+<span class="fc" id="L717">            int trackX = getTrackComponent().getX();</span>
+<span class="fc" id="L718">            int cabsX = c.getAbsoluteX();</span>
+<span class="fc" id="L719">            int arrowWH = CN.convertToPixels(arrowSize);</span>
+<span class="pc bpc" id="L720" title="1 of 2 branches missed.">            if (cabsY &gt;= trackY + getTrackComponent().getHeight()) {</span>
+                // we are below the component
+<span class="fc" id="L722">                arrowDirection = CN.TOP;</span>
+<span class="fc" id="L723">                arrowPosition = (trackX + getTrackComponent().getWidth() / 2) - cabsX - arrowWH / 2;</span>
+            } else {
+<span class="nc bnc" id="L725" title="All 4 branches missed.">                if (trackComponentSide == CN.BOTTOM || cabsY + c.getHeight() &lt;= trackY) {</span>
+                    // we are above the component
+<span class="nc" id="L727">                    arrowDirection = CN.BOTTOM;</span>
+<span class="nc" id="L728">                    arrowPosition = (trackX + getTrackComponent().getWidth() / 2) - cabsX - arrowWH / 2;</span>
+                } else {
+<span class="nc bnc" id="L730" title="All 2 branches missed.">                    if (cabsX &gt;= trackX + getTrackComponent().getWidth()) {</span>
+                        // we are to the right of the component
+<span class="nc" id="L732">                        arrowDirection = CN.LEFT;</span>
+<span class="nc" id="L733">                        arrowPosition = (trackY + getTrackComponent().getHeight() / 2) - cabsY - arrowWH / 2;</span>
+                    } else {
+<span class="nc bnc" id="L735" title="All 2 branches missed.">                        if (cabsX + c.getWidth() &lt;= trackX) {</span>
+                            // we are to the left of the component
+<span class="nc" id="L737">                            arrowDirection = CN.RIGHT;</span>
+<span class="nc" id="L738">                            arrowPosition = (trackY + getTrackComponent().getHeight() / 2) - cabsY - arrowWH / 2;</span>
+                        }
+                    }
+                }
+            }
+<span class="pc bpc" id="L743" title="1 of 2 branches missed.">        } else if (trackComponentSide &gt;= 0) {</span>
+<span class="nc bnc" id="L744" title="All 5 branches missed.">            switch (trackComponentSide) {</span>
+                case CN.TOP:
+<span class="nc" id="L746">                    arrowDirection = CN.TOP;</span>
+<span class="nc" id="L747">                    arrowPosition = 0;</span>
+<span class="nc bnc" id="L748" title="All 2 branches missed.">                    if (trackComponentHorizontalPosition &gt;= 0) {</span>
+<span class="nc" id="L749">                        arrowPosition = (int) (c.getWidth() * trackComponentHorizontalPosition);</span>
+                    }
+                    break;
+                case CN.BOTTOM:
+<span class="nc" id="L753">                    arrowDirection = CN.BOTTOM;</span>
+<span class="nc" id="L754">                    arrowPosition = 0;</span>
+<span class="nc bnc" id="L755" title="All 2 branches missed.">                    if (trackComponentHorizontalPosition &gt;= 0) {</span>
+<span class="nc" id="L756">                        arrowPosition = (int) (c.getWidth() * trackComponentHorizontalPosition);</span>
+                    }
+                    break;
+                case CN.LEFT:
+<span class="nc" id="L760">                    arrowDirection = CN.LEFT;</span>
+<span class="nc" id="L761">                    arrowPosition = 0;</span>
+<span class="nc bnc" id="L762" title="All 2 branches missed.">                    if (trackComponentVerticalPosition &gt;= 0) {</span>
+<span class="nc" id="L763">                        arrowPosition = (int) (c.getHeight() * trackComponentVerticalPosition);</span>
+                    }
+                    break;
+                case CN.RIGHT:
+<span class="nc" id="L767">                    arrowDirection = CN.RIGHT;</span>
+<span class="nc" id="L768">                    arrowPosition = 0;</span>
+<span class="nc bnc" id="L769" title="All 2 branches missed.">                    if (trackComponentVerticalPosition &gt;= 0) {</span>
+<span class="nc" id="L770">                        arrowPosition = (int) (c.getHeight() * trackComponentVerticalPosition);</span>
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
+<span class="fc" id="L778">        final int w = c.getWidth();</span>
+<span class="fc" id="L779">        final int h = c.getHeight();</span>
+<span class="fc" id="L780">        int x = c.getX();</span>
+<span class="fc" id="L781">        int y = c.getY();</span>
+<span class="fc" id="L782">        boolean antiAliased = g.isAntiAliased();</span>
+<span class="fc" id="L783">        g.setAntiAliased(true);</span>
+        try {
+<span class="fc bfc" id="L785" title="All 2 branches covered.">            if (shadowOpacity == 0) {</span>
+<span class="fc" id="L786">                Style s = c.getStyle();</span>
+<span class="pc bpc" id="L787" title="1 of 2 branches missed.">                if (s.getBgImage() == null) {</span>
+<span class="fc" id="L788">                    byte type = s.getBackgroundType();</span>
+<span class="pc bpc" id="L789" title="1 of 4 branches missed.">                    if (type == Style.BACKGROUND_IMAGE_SCALED || type == Style.BACKGROUND_NONE) {</span>
+<span class="fc" id="L790">                        GeneralPath gp = createShape(w, h);</span>
+<span class="fc" id="L791">                        byte bgt = c.getStyle().getBgTransparency();</span>
+<span class="pc bpc" id="L792" title="1 of 2 branches missed.">                        if (bgt != 0) {</span>
+<span class="fc" id="L793">                            int a = g.getAlpha();</span>
+<span class="fc" id="L794">                            g.setAlpha(bgt &amp; 0xff);</span>
+<span class="fc" id="L795">                            g.setColor(s.getBgColor());</span>
+<span class="fc" id="L796">                            g.translate(x, y);</span>
+<span class="fc" id="L797">                            g.fillShape(gp);</span>
+<span class="pc bpc" id="L798" title="5 of 6 branches missed.">                            if (this.stroke != null &amp;&amp; strokeOpacity &gt; 0 &amp;&amp; strokeThickness &gt; 0) {</span>
+<span class="nc" id="L799">                                g.setAlpha(strokeOpacity);</span>
+<span class="nc" id="L800">                                g.setColor(strokeColor);</span>
+<span class="nc" id="L801">                                g.drawShape(gp, this.stroke);</span>
+                            }
+<span class="fc" id="L803">                            g.translate(-x, -y);</span>
+<span class="fc" id="L804">                            g.setAlpha(a);</span>
+                        }
+<span class="pc bpc" id="L806" title="5 of 6 branches missed.">                        if (this.stroke != null &amp;&amp; strokeOpacity &gt; 0 &amp;&amp; strokeThickness &gt; 0) {</span>
+<span class="nc" id="L807">                            int a = g.getAlpha();</span>
+<span class="nc" id="L808">                            g.setAlpha(strokeOpacity);</span>
+<span class="nc" id="L809">                            g.setColor(strokeColor);</span>
+<span class="nc" id="L810">                            g.translate(x, y);</span>
+<span class="nc" id="L811">                            g.drawShape(gp, this.stroke);</span>
+<span class="nc" id="L812">                            g.translate(-x, -y);</span>
+<span class="nc" id="L813">                            g.setAlpha(a);</span>
+                        }
+<span class="fc" id="L815">                        return;</span>
+                    }
+                }
+            }
+<span class="pc bpc" id="L819" title="2 of 4 branches missed.">            if (w &gt; 0 &amp;&amp; h &gt; 0) {</span>
+<span class="fc" id="L820">                Image background = (Image) c.getClientProperty(CACHE_KEY + instanceVal);</span>
+<span class="pc bpc" id="L821" title="7 of 8 branches missed.">                if (!dirty &amp;&amp; background != null &amp;&amp; background.getWidth() == w &amp;&amp; background.getHeight() == h) {</span>
+<span class="nc" id="L822">                    g.drawImage(background, x, y);</span>
+<span class="nc" id="L823">                    return;</span>
+                }
+<span class="fc" id="L825">            } else {</span>
+<span class="nc" id="L826">                return;</span>
+            }
+<span class="fc" id="L828">            Image target = createTargetImage(c, w, h, true);</span>
+<span class="fc" id="L829">            g.drawImage(target, x, y);</span>
+<span class="fc" id="L830">            c.putClientProperty(CACHE_KEY + instanceVal, target);</span>
+<span class="fc" id="L831">            dirty = false;</span>
+            // update the cache with a more refined version and repaint
+<span class="pc bpc" id="L833" title="1 of 2 branches missed.">            if (!useCache) {</span>
+<span class="nc" id="L834">                Display.getInstance().callSeriallyOnIdle(new Runnable() {</span>
+                    public void run() {
+<span class="nc bnc" id="L836" title="All 4 branches missed.">                        if (w == c.getWidth() &amp;&amp; h == c.getHeight()) {</span>
+<span class="nc" id="L837">                            Image target = createTargetImage(c, w, h, false);</span>
+<span class="nc" id="L838">                            c.putClientProperty(CACHE_KEY + instanceVal, target);</span>
+<span class="nc" id="L839">                            c.repaint();</span>
+                        }
+<span class="nc" id="L841">                    }</span>
+                });
+            }
+        } finally {
+<span class="fc" id="L845">            g.setAntiAliased(antiAliased);</span>
+        }
+<span class="fc" id="L847">    }</span>
+
+    private GeneralPath createShape(int shapeW, int shapeH) {
+<span class="fc" id="L850">        GeneralPath gp = new GeneralPath();</span>
+<span class="fc" id="L851">        float radius = Display.getInstance().convertToPixels(cornerRadius);</span>
+<span class="fc" id="L852">        float x = 0;</span>
+<span class="fc" id="L853">        float y = 0;</span>
+<span class="fc" id="L854">        float widthF = shapeW;</span>
+<span class="fc" id="L855">        float heightF = shapeH;</span>
+
+<span class="pc bpc" id="L857" title="1 of 4 branches missed.">        if (getTrackComponent() != null || trackComponentSide &gt;= 0) {</span>
+<span class="fc" id="L858">            int ah = CN.convertToPixels(arrowSize);</span>
+<span class="pc bpc" id="L859" title="4 of 5 branches missed.">            switch (arrowDirection) {</span>
+                case CN.TOP:
+<span class="fc" id="L861">                    y = ah;</span>
+                    // intentional fall through to the next statement...
+                case CN.BOTTOM:
+<span class="fc" id="L864">                    heightF -= ah;</span>
+<span class="fc" id="L865">                    break;</span>
+                case CN.LEFT:
+<span class="nc" id="L867">                    x = ah;</span>
+                    // intentional fall through to the next statement...
+                case CN.RIGHT:
+<span class="nc" id="L870">                    widthF -= ah;</span>
+                    break;
+            }
+        }
+
+<span class="pc bpc" id="L875" title="5 of 6 branches missed.">        if (this.stroke != null &amp;&amp; strokeOpacity &gt; 0 &amp;&amp; strokeThickness &gt; 0) {</span>
+<span class="nc" id="L876">            int strokePx = (int) strokeThickness;</span>
+<span class="nc bnc" id="L877" title="All 2 branches missed.">            if (strokeMM) {</span>
+<span class="nc" id="L878">                strokePx = Display.getInstance().convertToPixels(strokeThickness);</span>
+            }
+<span class="nc" id="L880">            widthF -= strokePx;</span>
+<span class="nc" id="L881">            heightF -= strokePx;</span>
+<span class="nc" id="L882">            x += strokePx / 2;</span>
+<span class="nc" id="L883">            y += strokePx / 2;</span>
+
+<span class="nc bnc" id="L885" title="All 2 branches missed.">            if (strokePx % 2 == 1) {</span>
+<span class="nc" id="L886">                x += 0.5f;</span>
+<span class="nc" id="L887">                y += 0.5f;</span>
+            }
+        }
+
+<span class="pc bpc" id="L891" title="1 of 2 branches missed.">        if (topLeft) {</span>
+<span class="fc" id="L892">            gp.moveTo(x + radius, y);</span>
+        } else {
+<span class="nc" id="L894">            gp.moveTo(x, y);</span>
+        }
+<span class="pc bpc" id="L896" title="2 of 6 branches missed.">        if ((trackComponentSide &gt;= 0 || getTrackComponent() != null) &amp;&amp; arrowDirection == CN.TOP) {</span>
+<span class="fc" id="L897">            int actualArrowPosition = (int)</span>
+<span class="fc" id="L898">                    Math.min(x + widthF,</span>
+<span class="fc" id="L899">                            Math.max(arrowPosition, x + radius));</span>
+<span class="fc" id="L900">            gp.lineTo(actualArrowPosition, y);</span>
+<span class="fc" id="L901">            int ah = CN.convertToPixels(arrowSize);</span>
+<span class="fc" id="L902">            gp.lineTo(actualArrowPosition + ah / 2 - 4, 4);</span>
+<span class="fc" id="L903">            gp.quadTo(actualArrowPosition + ah / 2, 4, actualArrowPosition + ah / 2 + 4, 4);</span>
+<span class="fc" id="L904">            gp.lineTo(actualArrowPosition + ah, y);</span>
+
+<span class="fc" id="L906">            gp.lineTo(x + widthF - radius, y);</span>
+<span class="fc" id="L907">            gp.quadTo(x + widthF, y, x + widthF, y + radius);</span>
+<span class="fc" id="L908">        } else {</span>
+<span class="pc bpc" id="L909" title="1 of 2 branches missed.">            if (topRight) {</span>
+<span class="fc" id="L910">                gp.lineTo(x + widthF - radius, y);</span>
+<span class="fc" id="L911">                gp.quadTo(x + widthF, y, x + widthF, y + radius);</span>
+            } else {
+<span class="nc" id="L913">                gp.lineTo(x + widthF, y);</span>
+            }
+        }
+
+<span class="fc bfc" id="L917" title="All 2 branches covered.">        if (bottomRight) {</span>
+<span class="fc" id="L918">            gp.lineTo(x + widthF, y + heightF - radius);</span>
+<span class="fc" id="L919">            gp.quadTo(x + widthF, y + heightF, x + widthF - radius, y + heightF);</span>
+        } else {
+<span class="fc" id="L921">            gp.lineTo(x + widthF, y + heightF);</span>
+        }
+
+
+<span class="pc bpc" id="L925" title="2 of 6 branches missed.">        if ((trackComponentSide &gt;= 0 || getTrackComponent() != null) &amp;&amp; arrowDirection == CN.BOTTOM) {</span>
+<span class="nc" id="L926">            int actualArrowPosition = (int)</span>
+<span class="nc" id="L927">                    Math.min(x + widthF,</span>
+<span class="nc" id="L928">                            Math.max(arrowPosition, x + radius));</span>
+<span class="nc" id="L929">            gp.lineTo(actualArrowPosition, y + heightF);</span>
+<span class="nc" id="L930">            int ah = CN.convertToPixels(arrowSize);</span>
+<span class="nc" id="L931">            gp.lineTo(actualArrowPosition + ah / 2 - 4, y + heightF + ah - 4);</span>
+<span class="nc" id="L932">            gp.quadTo(actualArrowPosition + ah / 2, y + heightF + ah - 4, actualArrowPosition + ah / 2 + 4, y + heightF + ah - 4);</span>
+<span class="nc" id="L933">            gp.lineTo(actualArrowPosition + ah, y + heightF);</span>
+
+<span class="nc" id="L935">            gp.lineTo(x + radius, y + heightF);</span>
+<span class="nc" id="L936">            gp.quadTo(x, y + heightF, x, y + heightF - radius);</span>
+<span class="nc" id="L937">        } else {</span>
+<span class="fc bfc" id="L938" title="All 2 branches covered.">            if (bottomLeft) {</span>
+<span class="fc" id="L939">                gp.lineTo(x + radius, y + heightF);</span>
+<span class="fc" id="L940">                gp.quadTo(x, y + heightF, x, y + heightF - radius);</span>
+            } else {
+<span class="fc" id="L942">                gp.lineTo(x, y + heightF);</span>
+            }
+        }
+
+
+<span class="pc bpc" id="L947" title="1 of 2 branches missed.">        if (topLeft) {</span>
+<span class="fc" id="L948">            gp.lineTo(x, y + radius);</span>
+<span class="fc" id="L949">            gp.quadTo(x, y, x + radius, y);</span>
+        } else {
+<span class="nc" id="L951">            gp.lineTo(x, y);</span>
+        }
+
+
+<span class="fc" id="L955">        gp.closePath();</span>
+
+<span class="pc bpc" id="L957" title="2 of 6 branches missed.">        if ((trackComponentSide &gt;= 0 || getTrackComponent() != null) &amp;&amp; arrowDirection == CN.LEFT) {</span>
+<span class="nc" id="L958">            int ah = CN.convertToPixels(arrowSize);</span>
+<span class="nc" id="L959">            int actualArrowPosition = (int)</span>
+<span class="nc" id="L960">                    Math.max(y,</span>
+<span class="nc" id="L961">                            Math.min(arrowPosition, y + heightF - radius - 4));</span>
+
+<span class="nc" id="L963">            gp.moveTo(0, actualArrowPosition);</span>
+<span class="nc" id="L964">            gp.lineTo(x, actualArrowPosition - ah / 2);</span>
+<span class="nc" id="L965">            gp.lineTo(x, actualArrowPosition + ah / 2);</span>
+<span class="nc" id="L966">            gp.lineTo(0, actualArrowPosition);</span>
+<span class="nc" id="L967">            gp.closePath();</span>
+        }
+<span class="pc bpc" id="L969" title="2 of 6 branches missed.">        if ((trackComponentSide &gt;= 0 || getTrackComponent() != null) &amp;&amp; arrowDirection == CN.RIGHT) {</span>
+<span class="nc" id="L970">            int ah = CN.convertToPixels(arrowSize);</span>
+<span class="nc" id="L971">            int actualArrowPosition = (int)</span>
+<span class="nc" id="L972">                    Math.max(y,</span>
+<span class="nc" id="L973">                            Math.min(arrowPosition, y + heightF - radius - 4));</span>
+
+<span class="nc" id="L975">            gp.moveTo(x + widthF + ah, actualArrowPosition);</span>
+<span class="nc" id="L976">            gp.lineTo(x + widthF, actualArrowPosition + ah / 2);</span>
+<span class="nc" id="L977">            gp.lineTo(x + widthF, actualArrowPosition - ah / 2);</span>
+<span class="nc" id="L978">            gp.lineTo(x + widthF + ah, actualArrowPosition);</span>
+<span class="nc" id="L979">            gp.closePath();</span>
+
+        }
+<span class="fc" id="L982">        return gp;</span>
+    }
+
+    @Override
+    public int getMinimumHeight() {
+<span class="fc" id="L987">        return Display.getInstance().convertToPixels(shadowSpread) + Display.getInstance().convertToPixels(cornerRadius) * 2;</span>
+    }
+
+    @Override
+    public int getMinimumWidth() {
+<span class="fc" id="L992">        return Display.getInstance().convertToPixels(shadowSpread) + Display.getInstance().convertToPixels(cornerRadius) * 2;</span>
+    }
+
+    private void drawShape(Graphics g, int color, int opacity, int width, int height) {
+<span class="fc" id="L996">        g.setColor(color);</span>
+<span class="fc" id="L997">        g.setAlpha(opacity);</span>
+<span class="fc" id="L998">        GeneralPath gp = createShape(width, height);</span>
+<span class="fc bfc" id="L999" title="All 2 branches covered.">        if (stroke1 == null) {</span>
+<span class="fc" id="L1000">            stroke1 = new Stroke(1f, Stroke.CAP_ROUND, Stroke.JOIN_MITER, 1f);</span>
+        }
+<span class="fc" id="L1002">        g.drawShape(gp, stroke1);</span>
+
+<span class="fc" id="L1004">    }</span>
+
+    @Override
+    public boolean isBackgroundPainter() {
+<span class="fc" id="L1008">        return true;</span>
+    }
+
+    /**
+     * The color of the edge of the border if applicable
+     *
+     * @return the strokeColor
+     */
+    public int getStrokeColor() {
+<span class="fc" id="L1017">        return strokeColor;</span>
+    }
+
+    /**
+     * The opacity of the edge of the border if applicable
+     *
+     * @return the strokeOpacity
+     */
+    public int getStrokeOpacity() {
+<span class="fc" id="L1026">        return strokeOpacity;</span>
+    }
+
+    /**
+     * The thickness of the edge of the border if applicable, 0 if no stroke is needed
+     *
+     * @return the strokeThickness
+     */
+    public float getStrokeThickness() {
+<span class="fc" id="L1035">        return strokeThickness;</span>
+    }
+
+    /**
+     * True if the thickness of the stroke is in millimeters
+     *
+     * @return the strokeMM
+     */
+    public boolean isStrokeMM() {
+<span class="fc" id="L1044">        return strokeMM;</span>
+    }
+
+    /**
+     * True if the corners are bezier curves, otherwise the corners are drawn as a regular arc
+     *
+     * @return true if the corners are a curve
+     */
+    public boolean isBezierCorners() {
+<span class="fc" id="L1053">        return bezierCorners;</span>
+    }
+
+    /**
+     * The spread of the shadow in pixels of millimeters
+     *
+     * @return the shadowSpread
+     */
+    public float getShadowSpread() {
+<span class="fc" id="L1062">        return shadowSpread;</span>
+    }
+
+    /**
+     * The opacity of the shadow between 0 and 255
+     *
+     * @return the shadowOpacity
+     */
+    public int getShadowOpacity() {
+<span class="fc" id="L1071">        return shadowOpacity;</span>
+    }
+
+    /**
+     * The color of the shadow as an RRGGBB color
+     *
+     * @return the shadowColor
+     */
+    public int getShadowColor() {
+<span class="fc" id="L1080">        return shadowColor;</span>
+    }
+
+    /**
+     * X axis bias of the shadow between 0 and 1 where 0 is to the top and 1 is to the bottom, defaults to 0.5
+     *
+     * @return the shadowX
+     */
+    public float getShadowX() {
+<span class="fc" id="L1089">        return shadowX;</span>
+    }
+
+    /**
+     * Y axis bias of the shadow between 0 and 1 where 0 is to the left and 1 is to the right, defaults to 0.5
+     *
+     * @return the shadowY
+     */
+    public float getShadowY() {
+<span class="fc" id="L1098">        return shadowY;</span>
+    }
+
+    /**
+     * The Gaussian blur size
+     *
+     * @return the shadowBlur
+     */
+    public float getShadowBlur() {
+<span class="fc" id="L1107">        return shadowBlur;</span>
+    }
+
+
+    /**
+     * The radius of the corners in millimeters
+     *
+     * @return the radius
+     */
+    public float getCornerRadius() {
+<span class="fc" id="L1117">        return cornerRadius;</span>
+    }
+
+
+    /**
+     * Special mode where only the top of the round rectangle is rounded and the bottom is a regular rectangle
+     *
+     * @return whether this is the top only mode
+     */
+    public boolean isTopOnlyMode() {
+<span class="nc bnc" id="L1127" title="All 8 branches missed.">        return topLeft &amp;&amp; topRight &amp;&amp; (!bottomLeft) &amp;&amp; (!bottomRight);</span>
+    }
+
+    /**
+     * Special mode where only the bottom of the round rectangle is rounded and the top is a regular rectangle
+     *
+     * @return whether this is the bottom only mode
+     */
+    public boolean isBottomOnlyMode() {
+<span class="nc bnc" id="L1136" title="All 8 branches missed.">        return (!topLeft) &amp;&amp; (!topRight) &amp;&amp; bottomLeft &amp;&amp; bottomRight;</span>
+    }
+
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="pc bpc" id="L1142" title="1 of 2 branches missed.">        return obj == this;</span>
+    }
+
+
+    /**
+     * Returns true if this border corner is round and false if it's square
+     *
+     * @return the topLeft value
+     */
+    public boolean isTopLeft() {
+<span class="fc" id="L1152">        return topLeft;</span>
+    }
+
+    /**
+     * Returns true if this border corner is round and false if it's square
+     *
+     * @return the topRight value
+     */
+    public boolean isTopRight() {
+<span class="fc" id="L1161">        return topRight;</span>
+    }
+
+    /**
+     * Returns true if this border corner is round and false if it's square
+     *
+     * @return the bottomLeft value
+     */
+    public boolean isBottomLeft() {
+<span class="fc" id="L1170">        return bottomLeft;</span>
+    }
+
+    /**
+     * Returns true if this border corner is round and false if it's square
+     *
+     * @return the bottomRight value
+     */
+    public boolean isBottomRight() {
+<span class="fc" id="L1179">        return bottomRight;</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

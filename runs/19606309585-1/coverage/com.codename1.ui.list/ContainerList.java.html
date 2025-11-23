@@ -1,0 +1,490 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ContainerList.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.list</a> &gt; <span class="el_source">ContainerList.java</span></div><h1>ContainerList.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.list;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.events.SelectionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.util.EventDispatcher;
+
+import java.util.Collection;
+import java.util.Vector;
+
+/**
+ * This is a &quot;list component&quot; implemented as a container with a layout manager
+ * which provides &lt;b&gt;some&lt;/b&gt; of the ui advantages of a Container and some of a
+ * list while pulling out some of the drawbacks of both.
+ * This container uses the model/renderer approach for populating itself, adding/removing
+ * entries will probably break it. It still provides most of the large size advantages
+ * a list offers since the components within it are very simple and don't contain any
+ * actual state other than layout information. The big advantage with this class is
+ * the ability to leverage elaborate CodenameOne layouts such as Grid, Table &amp;amp; flow layout
+ * to provide other ways of rendering the content of a list model.
+ *
+ * @author Shai Almog
+ * @deprecated the performance of ContainerList is worse than the performance of List or Container. The API/behaviors
+ * are problematic and we don't think its the right choice for any project. It is our recommendation that you use
+ * Container, InfiniteContainer etc.
+ */
+public class ContainerList extends Container {
+<span class="pc" id="L60">    private CellRenderer renderer = new DefaultListCellRenderer();</span>
+    private ListModel model;
+    private Listeners listener;
+<span class="pc" id="L63">    private final EventDispatcher dispatcher = new EventDispatcher();</span>
+
+    /**
+     * Default constructor
+     */
+    public ContainerList() {
+<span class="nc" id="L69">        this(new DefaultListModel());</span>
+<span class="nc" id="L70">    }</span>
+
+    /**
+     * Constructs a container list with the given model
+     *
+     * @param m the model
+     */
+<span class="fc" id="L77">    public ContainerList(ListModel m) {</span>
+<span class="fc" id="L78">        init(m);</span>
+<span class="fc" id="L79">    }</span>
+
+    /**
+     * Constructs a container list with the given model and layout
+     *
+     * @param l layout manager
+     * @param m the model
+     */
+    public ContainerList(Layout l, ListModel m) {
+<span class="nc" id="L88">        super(l);</span>
+<span class="nc" id="L89">        init(m);</span>
+<span class="nc" id="L90">    }</span>
+
+    private void init(ListModel m) {
+<span class="fc" id="L93">        setModel(m);</span>
+<span class="fc" id="L94">        setUIID(&quot;ContainerList&quot;);</span>
+<span class="fc" id="L95">        setScrollableY(true);</span>
+<span class="fc" id="L96">    }</span>
+
+    /**
+     * The renderer used to draw the container list elements
+     */
+    public CellRenderer getRenderer() {
+<span class="fc" id="L102">        return renderer;</span>
+    }
+
+    /**
+     * The renderer used to draw the container list elements
+     *
+     * @param r renderer instance
+     */
+    public void setRenderer(CellRenderer r) {
+<span class="fc" id="L111">        renderer = r;</span>
+<span class="fc bfc" id="L112" title="All 2 branches covered.">        for (int iter = 0; iter &lt; getComponentCount(); iter++) {</span>
+<span class="fc" id="L113">            getComponentAt(iter).setShouldCalcPreferredSize(true);</span>
+        }
+<span class="fc" id="L115">        setScrollSize(null);</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (isInitialized()) {</span>
+<span class="fc" id="L117">            revalidate();</span>
+        }
+<span class="fc" id="L119">    }</span>
+
+    private void updateComponentCount() {
+<span class="fc" id="L122">        int cc = getComponentCount();</span>
+<span class="fc" id="L123">        int modelCount = model.getSize();</span>
+<span class="pc bpc" id="L124" title="1 of 2 branches missed.">        if (cc != modelCount) {</span>
+<span class="fc bfc" id="L125" title="All 2 branches covered.">            if (cc &lt; modelCount) {</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">                for (int iter = cc; iter &lt; modelCount; iter++) {</span>
+<span class="fc" id="L127">                    addComponent(new Entry(iter));</span>
+                }
+            } else {
+<span class="fc bfc" id="L130" title="All 2 branches covered.">                while (getComponentCount() &gt; modelCount) {</span>
+<span class="fc" id="L131">                    removeComponent(getComponentAt(getComponentCount() - 1));</span>
+                }
+            }
+<span class="fc" id="L134">            Form f = getComponentForm();</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (f != null) {</span>
+<span class="fc" id="L136">                f.revalidate();</span>
+            }
+        }
+<span class="fc" id="L139">    }</span>
+
+    /**
+     * Returns the list model
+     *
+     * @return the list model
+     */
+    public ListModel getModel() {
+<span class="fc" id="L147">        return model;</span>
+    }
+
+    /**
+     * Set the model for the container list
+     *
+     * @param model a model class that is mapped into the internal components
+     */
+    public void setModel(ListModel model) {
+<span class="pc bpc" id="L156" title="1 of 4 branches missed.">        if (this.model != null &amp;&amp; listener != null) {</span>
+<span class="fc" id="L157">            this.model.removeDataChangedListener(listener);</span>
+<span class="fc" id="L158">            this.model.removeSelectionListener(listener);</span>
+<span class="fc" id="L159">            listener = null;</span>
+        }
+<span class="fc" id="L161">        this.model = model;</span>
+<span class="fc" id="L162">        updateComponentCount();</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if (model.getSelectedIndex() &gt; 0) {</span>
+<span class="nc" id="L164">            getComponentAt(model.getSelectedIndex()).requestFocus();</span>
+        }
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (isInitialized()) {</span>
+<span class="fc" id="L167">            bindListeners();</span>
+        }
+<span class="fc" id="L169">        repaint();</span>
+<span class="fc" id="L170">    }</span>
+
+    /**
+     * Allows binding a listener to user selection actions
+     *
+     * @param l the action listener to be added
+     */
+    public void addActionListener(ActionListener l) {
+<span class="fc" id="L178">        dispatcher.addListener(l);</span>
+<span class="fc" id="L179">    }</span>
+
+    /**
+     * This method allows extracting the action listeners from the current list
+     *
+     * @return vector containing the action listeners on the list
+     * @deprecated use getListeners instead
+     */
+    public Vector getActionListeners() {
+<span class="nc" id="L188">        return dispatcher.getListenerVector();</span>
+    }
+
+    /**
+     * This method allows extracting the action listeners from the current list
+     *
+     * @return Collection containing the action listeners on the list
+     */
+    public Collection getListeners() {
+<span class="nc" id="L197">        return dispatcher.getListenerCollection();</span>
+    }
+
+    /**
+     * Allows binding a listener to user selection actions
+     *
+     * @param l the action listener to be removed
+     */
+    public void removeActionListener(ActionListener l) {
+<span class="nc" id="L206">        dispatcher.removeListener(l);</span>
+<span class="nc" id="L207">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void initComponent() {
+<span class="pc bpc" id="L213" title="1 of 2 branches missed.">        if (model != null) {</span>
+<span class="fc" id="L214">            int i = model.getSelectedIndex();</span>
+<span class="pc bpc" id="L215" title="1 of 2 branches missed.">            if (i &gt; 0) {</span>
+<span class="nc" id="L216">                getComponentAt(i).requestFocus();</span>
+            }
+<span class="fc" id="L218">            bindListeners();</span>
+        }
+<span class="fc" id="L220">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void deinitialize() {
+<span class="nc bnc" id="L226" title="All 4 branches missed.">        if (this.model != null &amp;&amp; listener != null) {</span>
+<span class="nc" id="L227">            this.model.removeDataChangedListener(listener);</span>
+<span class="nc" id="L228">            this.model.removeSelectionListener(listener);</span>
+<span class="nc" id="L229">            listener = null;</span>
+        }
+<span class="nc" id="L231">    }</span>
+
+    private void bindListeners() {
+<span class="pc bpc" id="L234" title="1 of 2 branches missed.">        if (listener == null) {</span>
+<span class="fc" id="L235">            listener = new Listeners();</span>
+<span class="fc" id="L236">            model.addDataChangedListener(listener);</span>
+<span class="fc" id="L237">            model.addSelectionListener(listener);</span>
+        }
+<span class="fc" id="L239">    }</span>
+
+    /**
+     * Returns the current/last selected item
+     *
+     * @return selected item or null
+     */
+    public Object getSelectedItem() {
+<span class="fc" id="L247">        int i = model.getSelectedIndex();</span>
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">        if (i &gt; -1) {</span>
+<span class="fc" id="L249">            return model.getItemAt(i);</span>
+        }
+<span class="nc" id="L251">        return null;</span>
+    }
+
+
+    /**
+     * Returns the current selected offset in the list
+     *
+     * @return the current selected offset in the list
+     */
+    public int getSelectedIndex() {
+<span class="fc" id="L261">        return model.getSelectedIndex();</span>
+    }
+
+    /**
+     * Sets the current selected offset in the list, by default this implementation
+     * will scroll the list to the selection if the selection is outside of the screen
+     *
+     * @param index the current selected offset in the list
+     */
+    public void setSelectedIndex(int index) {
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">        if (index &lt; 0) {</span>
+<span class="nc" id="L272">            throw new IllegalArgumentException(&quot;Selection index is negative:&quot; + index);</span>
+        }
+<span class="fc" id="L274">        getComponentAt(index).requestFocus();</span>
+<span class="fc" id="L275">        model.setSelectedIndex(index);</span>
+<span class="fc" id="L276">    }</span>
+
+    /**
+     * Triggers the event to the listeners
+     *
+     * @param evt the event to fire
+     */
+    protected void fireActionEvent(ActionEvent evt) {
+<span class="pc bpc" id="L284" title="2 of 4 branches missed.">        if (isEnabled() &amp;&amp; !Display.getInstance().hasDragOccured()) {</span>
+<span class="fc" id="L285">            dispatcher.fireActionEvent(evt);</span>
+        }
+<span class="fc" id="L287">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+<span class="fc" id="L293">        return new String[]{&quot;ListItems&quot;, &quot;Renderer&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+<span class="fc" id="L300">        return new Class[]{com.codename1.impl.CodenameOneImplementation.getObjectArrayClass(), CellRenderer.class};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyTypeNames() {
+<span class="nc" id="L307">        return new String[]{&quot;Object[]&quot;, &quot;CellRenderer&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">        if (name.equals(&quot;ListItems&quot;)) {</span>
+<span class="fc" id="L315">            Object[] obj = new Object[model.getSize()];</span>
+<span class="fc" id="L316">            int olen = obj.length;</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">            for (int iter = 0; iter &lt; olen; iter++) {</span>
+<span class="fc" id="L318">                obj[iter] = model.getItemAt(iter);</span>
+            }
+<span class="fc" id="L320">            return obj;</span>
+        }
+<span class="nc bnc" id="L322" title="All 2 branches missed.">        if (name.equals(&quot;Renderer&quot;)) {</span>
+<span class="nc" id="L323">            return getRenderer();</span>
+        }
+<span class="nc" id="L325">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+<span class="fc bfc" id="L332" title="All 2 branches covered.">        if (name.equals(&quot;ListItems&quot;)) {</span>
+<span class="fc" id="L333">            setModel(new DefaultListModel((Object[]) value));</span>
+<span class="fc" id="L334">            return null;</span>
+        }
+<span class="pc bpc" id="L336" title="1 of 2 branches missed.">        if (name.equals(&quot;Renderer&quot;)) {</span>
+<span class="fc" id="L337">            setRenderer((CellRenderer) value);</span>
+<span class="fc" id="L338">            return null;</span>
+        }
+<span class="nc" id="L340">        return super.setPropertyValue(name, value);</span>
+    }
+
+    @Override
+    public Rectangle getSelectedRect() {
+<span class="fc" id="L345">        Component cmp = getComponentAt(getSelectedIndex());</span>
+<span class="fc" id="L346">        return cmp.getSelectedRect();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected int getDragRegionStatus(int x, int y) {
+<span class="pc bpc" id="L353" title="1 of 2 branches missed.">        if (!isScrollable()) {</span>
+<span class="fc" id="L354">            return DRAG_REGION_NOT_DRAGGABLE;</span>
+        }
+<span class="nc bnc" id="L356" title="All 2 branches missed.">        if (isScrollableX()) {</span>
+<span class="nc bnc" id="L357" title="All 2 branches missed.">            if (isScrollableY()) {</span>
+<span class="nc" id="L358">                return DRAG_REGION_POSSIBLE_DRAG_XY;</span>
+            }
+<span class="nc" id="L360">            return DRAG_REGION_POSSIBLE_DRAG_X;</span>
+        }
+<span class="nc" id="L362">        return DRAG_REGION_POSSIBLE_DRAG_Y;</span>
+    }
+
+
+    /**
+     * This class is an internal implementation detail
+     */
+    class Entry extends Component {
+        private int offset;
+
+<span class="fc" id="L372">        Entry(int off) {</span>
+<span class="fc" id="L373">            setUIID(&quot;Container&quot;);</span>
+<span class="fc" id="L374">            setFocusable(true);</span>
+<span class="fc" id="L375">            offset = off;</span>
+<span class="fc" id="L376">        }</span>
+
+        public void initComponent() {
+<span class="fc" id="L379">            offset = getParent().getComponentIndex(this);</span>
+<span class="fc" id="L380">        }</span>
+
+        protected void focusGained() {
+<span class="fc" id="L383">            model.setSelectedIndex(offset);</span>
+<span class="fc" id="L384">        }</span>
+
+        public void paintBackground(Graphics g) {
+<span class="fc" id="L387">        }</span>
+
+        public void paintBorder(Graphics g) {
+<span class="nc" id="L390">        }</span>
+
+        public void paint(Graphics g) {
+<span class="fc" id="L393">            Component cmp = renderer.getCellRendererComponent(ContainerList.this, model, model.getItemAt(offset), offset, hasFocus());</span>
+<span class="fc" id="L394">            cmp.setX(getX());</span>
+<span class="fc" id="L395">            cmp.setY(getY());</span>
+<span class="fc" id="L396">            cmp.setWidth(getWidth());</span>
+<span class="fc" id="L397">            cmp.setHeight(getHeight());</span>
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">            if (cmp instanceof Container) {</span>
+<span class="nc" id="L399">                ((Container) cmp).revalidate();</span>
+            }
+<span class="fc" id="L401">            cmp.setFocus(hasFocus());</span>
+<span class="fc" id="L402">            cmp.paintComponent(g);</span>
+<span class="fc" id="L403">        }</span>
+
+        public void longPointerPress(int x, int y) {
+<span class="fc" id="L406">            super.longPointerPress(x, y);</span>
+<span class="fc" id="L407">            pointerReleasedImpl(x, y, true);</span>
+<span class="fc" id="L408">        }</span>
+
+        public void pointerReleased(int x, int y) {
+<span class="fc" id="L411">            super.pointerReleased(x, y);</span>
+<span class="fc" id="L412">            pointerReleasedImpl(x, y, false);</span>
+<span class="fc" id="L413">        }</span>
+
+
+        /**
+         * {@inheritDoc}
+         */
+        public void pointerReleasedImpl(int x, int y, boolean longPress) {
+<span class="pc bpc" id="L420" title="1 of 2 branches missed.">            if (!isDragActivated()) {</span>
+                // fire the action event into the selected component
+<span class="fc" id="L422">                Component cmp = renderer.getCellRendererComponent(ContainerList.this, model, model.getItemAt(offset), offset, hasFocus());</span>
+<span class="pc bpc" id="L423" title="1 of 2 branches missed.">                if (cmp instanceof Container) {</span>
+<span class="nc" id="L424">                    int absX = getAbsoluteX();</span>
+<span class="nc" id="L425">                    int absY = getAbsoluteY();</span>
+<span class="nc" id="L426">                    int newX = x - absX + cmp.getX();</span>
+<span class="nc" id="L427">                    int newY = y - absY + cmp.getY();</span>
+<span class="nc" id="L428">                    Component selectionCmp = ((Container) cmp).getComponentAt(newX, newY);</span>
+<span class="nc bnc" id="L429" title="All 2 branches missed.">                    if (selectionCmp != null) {</span>
+<span class="nc" id="L430">                        selectionCmp.setX(0);</span>
+<span class="nc" id="L431">                        selectionCmp.setY(0);</span>
+<span class="nc bnc" id="L432" title="All 2 branches missed.">                        if (longPress) {</span>
+<span class="nc" id="L433">                            selectionCmp.longPointerPress(newX, newY);</span>
+<span class="nc" id="L434">                            fireActionEvent(new ActionEvent(ContainerList.this, x, y, true));</span>
+<span class="nc" id="L435">                            return;</span>
+                        } else {
+<span class="nc" id="L437">                            selectionCmp.pointerPressed(newX, newY);</span>
+<span class="nc" id="L438">                            selectionCmp.pointerReleased(newX, newY);</span>
+                        }
+                    }
+                }
+<span class="fc" id="L442">                fireActionEvent(new ActionEvent(ContainerList.this, x, y, longPress));</span>
+            }
+<span class="fc" id="L444">        }</span>
+
+        /**
+         * {@inheritDoc}
+         */
+        public void keyReleased(int keyCode) {
+<span class="fc" id="L450">            super.keyReleased(keyCode);</span>
+<span class="pc bpc" id="L451" title="1 of 2 branches missed.">            if (Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE) {</span>
+<span class="fc" id="L452">                fireActionEvent(new ActionEvent(ContainerList.this, keyCode));</span>
+            }
+<span class="fc" id="L454">        }</span>
+
+        @Override
+        public Dimension getPreferredSize() {
+<span class="fc" id="L458">            ContainerList.this.setScrollSize(null);</span>
+<span class="fc" id="L459">            return calcPreferredSize();</span>
+        }
+
+        public Dimension calcPreferredSize() {
+<span class="fc" id="L463">            Component c = renderer.getCellRendererComponent(ContainerList.this, model, model.getItemAt(offset), offset, hasFocus());</span>
+<span class="fc bfc" id="L464" title="All 2 branches covered.">            if (getWidth() &lt;= 0) {</span>
+<span class="fc" id="L465">                c.setWidth(Display.getInstance().getDisplayWidth());</span>
+<span class="fc" id="L466">                c.setHeight(Display.getInstance().getDisplayHeight());</span>
+            } else {
+<span class="fc" id="L468">                c.setWidth(getWidth());</span>
+<span class="fc" id="L469">                c.setHeight(getHeight());</span>
+            }
+<span class="pc bpc" id="L471" title="1 of 2 branches missed.">            if (c instanceof Container) {</span>
+<span class="nc" id="L472">                ((Container) c).revalidate();</span>
+            }
+<span class="fc" id="L474">            Dimension d = c.getPreferredSize();</span>
+<span class="fc" id="L475">            return d;</span>
+        }
+    }
+
+<span class="fc" id="L479">    private class Listeners implements DataChangedListener, SelectionListener {</span>
+
+        public void dataChanged(int status, int index) {
+<span class="nc" id="L482">            updateComponentCount();</span>
+<span class="nc" id="L483">        }</span>
+
+        public void selectionChanged(int oldSelected, int newSelected) {
+<span class="fc" id="L486">            getComponentAt(newSelected).requestFocus();</span>
+<span class="fc" id="L487">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

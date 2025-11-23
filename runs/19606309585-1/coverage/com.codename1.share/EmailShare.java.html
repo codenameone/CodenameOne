@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EmailShare.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.share</a> &gt; <span class="el_source">EmailShare.java</span></div><h1>EmailShare.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.share;
+
+import com.codename1.components.MultiButton;
+import com.codename1.contacts.ContactsManager;
+import com.codename1.contacts.ContactsModel;
+import com.codename1.messaging.Message;
+import com.codename1.ui.Command;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.List;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.list.GenericListCellRenderer;
+import com.codename1.ui.list.ListCellRenderer;
+import com.codename1.ui.util.Resources;
+
+import java.util.Hashtable;
+
+/**
+ * Email sharing service.
+ *
+ * @author Chen
+ */
+public class EmailShare extends ShareService {
+
+    /**
+     * Default Constructor
+     */
+    public EmailShare() {
+<span class="fc" id="L56">        super(&quot;Email&quot;, null);</span>
+<span class="fc" id="L57">    }</span>
+
+    @Override
+    public Image getIcon() {
+<span class="nc" id="L61">        Image i = super.getIcon();</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (i == null) {</span>
+<span class="nc" id="L63">            i = Resources.getSystemResource().getImage(&quot;mail.png&quot;);</span>
+<span class="nc" id="L64">            setIcon(i);</span>
+        }
+<span class="nc" id="L66">        return i;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void share(final String toShare, final String image, final String mimeType) {
+<span class="nc" id="L73">        final Form currentForm = Display.getInstance().getCurrent();</span>
+<span class="nc" id="L74">        final Form contactsForm = new Form(&quot;Contacts&quot;);</span>
+<span class="nc" id="L75">        contactsForm.setLayout(new BorderLayout());</span>
+<span class="nc" id="L76">        contactsForm.setScrollable(false);</span>
+<span class="nc" id="L77">        contactsForm.addComponent(BorderLayout.CENTER, new Label(&quot;Please wait...&quot;));</span>
+<span class="nc" id="L78">        contactsForm.show();</span>
+<span class="nc" id="L79">        Display.getInstance().startThread(new Runnable() {</span>
+
+            public void run() {
+
+<span class="nc" id="L83">                String[] ids = ContactsManager.getAllContacts();</span>
+<span class="nc bnc" id="L84" title="All 4 branches missed.">                if (ids == null || ids.length == 0) {</span>
+<span class="nc" id="L85">                    Display.getInstance().callSerially(new Runnable() {</span>
+                        public void run() {
+<span class="nc" id="L87">                            Dialog.show(&quot;Failed to Share&quot;, &quot;No Contacts Found&quot;, &quot;Ok&quot;, null);</span>
+<span class="nc" id="L88">                            currentForm.showBack();</span>
+<span class="nc" id="L89">                        }</span>
+                    });
+<span class="nc" id="L91">                    return;</span>
+                }
+<span class="nc" id="L93">                ContactsModel model = new ContactsModel(ids);</span>
+<span class="nc" id="L94">                final List contacts = new List(model);</span>
+<span class="nc" id="L95">                contacts.setRenderer(createListRenderer());</span>
+<span class="nc" id="L96">                Display.getInstance().callSerially(new Runnable() {</span>
+
+                    public void run() {
+
+<span class="nc" id="L100">                        contacts.addActionListener(new ActionListener() {</span>
+
+                            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L103">                                final ShareForm[] f = new ShareForm[1];</span>
+<span class="nc" id="L104">                                Hashtable contact = (Hashtable) contacts.getSelectedItem();</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">                                if (image == null) {</span>
+<span class="nc" id="L106">                                    f[0] = new ShareForm(contactsForm, &quot;Send Email&quot;, (String) contact.get(&quot;email&quot;), toShare,</span>
+<span class="nc" id="L107">                                            new ActionListener() {</span>
+
+                                                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L110">                                                    String[] recieptents = new String[1];</span>
+<span class="nc" id="L111">                                                    recieptents[0] = f[0].getTo();</span>
+<span class="nc" id="L112">                                                    Message msg = new Message(toShare);</span>
+<span class="nc" id="L113">                                                    Message.sendMessage(recieptents, &quot;share&quot;, msg);</span>
+<span class="nc" id="L114">                                                    finish();</span>
+<span class="nc" id="L115">                                                }</span>
+                                            });
+<span class="nc" id="L117">                                    f[0].show();</span>
+                                } else {
+<span class="nc" id="L119">                                    f[0] = new ShareForm(contactsForm, &quot;Send Email&quot;, (String) contact.get(&quot;email&quot;), toShare, image,</span>
+<span class="nc" id="L120">                                            new ActionListener() {</span>
+
+                                                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L123">                                                    String[] recieptents = new String[1];</span>
+<span class="nc" id="L124">                                                    recieptents[0] = f[0].getTo();</span>
+<span class="nc" id="L125">                                                    Message msg = new Message(toShare);</span>
+<span class="nc" id="L126">                                                    msg.setAttachment(image);</span>
+<span class="nc" id="L127">                                                    msg.setMimeType(mimeType);</span>
+<span class="nc" id="L128">                                                    Message.sendMessage(recieptents, &quot;share&quot;, msg);</span>
+<span class="nc" id="L129">                                                    finish();</span>
+<span class="nc" id="L130">                                                }</span>
+                                            });
+<span class="nc" id="L132">                                    f[0].show();</span>
+                                }
+<span class="nc" id="L134">                            }</span>
+                        });
+<span class="nc" id="L136">                        contactsForm.addComponent(BorderLayout.CENTER, contacts);</span>
+<span class="nc" id="L137">                        Command back = new Command(&quot;Back&quot;) {</span>
+
+                            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L140">                                currentForm.showBack();</span>
+<span class="nc" id="L141">                            }</span>
+
+                        };
+<span class="nc" id="L144">                        contactsForm.addCommand(back);</span>
+<span class="nc" id="L145">                        contactsForm.setBackCommand(back);</span>
+<span class="nc" id="L146">                        contactsForm.revalidate();</span>
+<span class="nc" id="L147">                    }</span>
+                });
+<span class="nc" id="L149">            }</span>
+<span class="nc" id="L150">        }, &quot;Email Thread&quot;).start();</span>
+<span class="nc" id="L151">    }</span>
+
+
+    /**
+     * {@inheritDoc}
+     */
+    public void share(final String toShare) {
+<span class="nc" id="L158">        share(toShare, null, null);</span>
+<span class="nc" id="L159">    }</span>
+
+
+    private MultiButton createRendererMultiButton() {
+<span class="nc" id="L163">        MultiButton b = new MultiButton();</span>
+<span class="nc" id="L164">        b.setIconName(&quot;icon&quot;);</span>
+<span class="nc" id="L165">        b.setNameLine1(&quot;fname&quot;);</span>
+<span class="nc" id="L166">        b.setNameLine2(&quot;phone&quot;);</span>
+<span class="nc" id="L167">        b.setUIID(&quot;Label&quot;);</span>
+<span class="nc" id="L168">        return b;</span>
+    }
+
+    private ListCellRenderer createListRenderer() {
+<span class="nc" id="L172">        MultiButton sel = createRendererMultiButton();</span>
+<span class="nc" id="L173">        MultiButton unsel = createRendererMultiButton();</span>
+<span class="nc" id="L174">        return new GenericListCellRenderer(sel, unsel);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean canShareImage() {
+<span class="nc" id="L181">        return true;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

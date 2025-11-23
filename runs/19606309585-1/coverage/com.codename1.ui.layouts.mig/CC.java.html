@@ -1,0 +1,1935 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CC.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts.mig</a> &gt; <span class="el_source">CC.java</span></div><h1>CC.java</h1><pre class="source lang-java linenums">package com.codename1.ui.layouts.mig;
+
+import java.util.ArrayList;
+/*
+ * License (BSD):
+ * ==============
+ *
+ * Copyright (c) 2004, Mikael Grev, MiG InfoCom AB. (miglayout (at) miginfocom (dot) com)
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * Neither the name of the MiG InfoCom AB nor the names of its contributors may be
+ * used to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ *
+ * @version 1.0
+ * @author Mikael Grev, MiG InfoCom AB
+ *         Date: 2006-sep-08
+ */
+
+/**
+ * A simple value holder for one component's constraint.
+ */
+public final class CC {
+<span class="fc" id="L42">    static final String[] DOCK_SIDES = {&quot;north&quot;, &quot;west&quot;, &quot;south&quot;, &quot;east&quot;};</span>
+<span class="fc" id="L43">    private static final BoundSize DEF_GAP = BoundSize.NULL_SIZE;    // Only used to denote default wrap/newline gap.</span>
+
+    // See the getters and setters for information about the properties below.
+<span class="fc" id="L46">    private static final String[] EMPTY_ARR = new String[0];</span>
+<span class="fc" id="L47">    private int dock = -1;</span>
+<span class="fc" id="L48">    private UnitValue[] pos = null; // [x1, y1, x2, y2]</span>
+<span class="fc" id="L49">    private UnitValue[] padding = null;   // top, left, bottom, right</span>
+<span class="fc" id="L50">    private UnitValue[] visualPadding = null;   // top, left, bottom, right</span>
+<span class="fc" id="L51">    private Boolean flowX = null;</span>
+<span class="fc" id="L52">    private int skip = 0;</span>
+<span class="fc" id="L53">    private int split = 1;</span>
+<span class="fc" id="L54">    private int spanX = 1, spanY = 1;</span>
+<span class="fc" id="L55">    private int cellX = -1, cellY = 0; // If cellX is -1 then cellY is also considered -1. cellY is never negative.</span>
+<span class="fc" id="L56">    private String tag = null;</span>
+<span class="fc" id="L57">    private String id = null;</span>
+<span class="fc" id="L58">    private int hideMode = -1;</span>
+<span class="fc" id="L59">    private DimConstraint hor = new DimConstraint();</span>
+<span class="fc" id="L60">    private DimConstraint ver = new DimConstraint();</span>
+<span class="fc" id="L61">    private BoundSize newline = null;</span>
+<span class="fc" id="L62">    private BoundSize wrap = null;</span>
+<span class="fc" id="L63">    private boolean boundsInGrid = true;</span>
+<span class="fc" id="L64">    private boolean external = false;</span>
+
+
+    // ***** Tmp cache field
+<span class="fc" id="L68">    private Float pushX = null, pushY = null;</span>
+<span class="fc" id="L69">    private transient String[] linkTargets = null;</span>
+
+    /**
+     * Empty constructor.
+     */
+<span class="fc" id="L74">    public CC() {</span>
+<span class="fc" id="L75">    }</span>
+
+    String[] getLinkTargets() {
+<span class="fc bfc" id="L78" title="All 2 branches covered.">        if (linkTargets == null) {</span>
+<span class="fc" id="L79">            final ArrayList&lt;String&gt; targets = new ArrayList&lt;String&gt;(2);</span>
+
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">            if (pos != null) {</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">                for (int i = 0; i &lt; pos.length; i++)</span>
+<span class="nc" id="L83">                    addLinkTargetIDs(targets, pos[i]);</span>
+            }
+
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            linkTargets = targets.size() == 0 ? EMPTY_ARR : targets.toArray(new String[targets.size()]);</span>
+        }
+<span class="fc" id="L88">        return linkTargets;</span>
+    }
+
+    private void addLinkTargetIDs(ArrayList&lt;String&gt; targets, UnitValue uv) {
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        if (uv != null) {</span>
+<span class="nc" id="L93">            String linkId = uv.getLinkTargetId();</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">            if (linkId != null) {</span>
+<span class="nc" id="L95">                targets.add(linkId);</span>
+            } else {
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                for (int i = uv.getSubUnitCount() - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L98">                    UnitValue subUv = uv.getSubUnitValue(i);</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">                    if (subUv.isLinkedDeep())</span>
+<span class="nc" id="L100">                        addLinkTargetIDs(targets, subUv);</span>
+                }
+            }
+        }
+<span class="nc" id="L104">    }</span>
+
+    // **********************************************************
+    // Chaining constraint setters
+    // **********************************************************
+
+    /**
+     * Specifies that the component should be put in the end group &lt;code&gt;s&lt;/code&gt; and will thus share the same ending
+     * coordinate as them within the group.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param s A name to associate on the group that should be the same for other rows/columns in the same group.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC endGroupX(String s) {
+<span class="nc" id="L120">        hor.setEndGroup(s);</span>
+<span class="nc" id="L121">        return this;</span>
+    }
+
+    /**
+     * Specifies that the component should be put in the size group &lt;code&gt;s&lt;/code&gt; and will thus share the same size
+     * as them within the group.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param s A name to associate on the group that should be the same for other rows/columns in the same group.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC sizeGroupX(String s) {
+<span class="nc" id="L134">        hor.setSizeGroup(s);</span>
+<span class="nc" id="L135">        return this;</span>
+    }
+
+    /**
+     * The minimum size for the component. The value will override any value that is set on the component itself.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param size The size expressed as a &lt;code&gt;UnitValue&lt;/code&gt;. E.g. &quot;100px&quot; or &quot;200mm&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC minWidth(String size) {
+<span class="nc" id="L147">        hor.setSize(LayoutUtil.derive(hor.getSize(), ConstraintParser.parseUnitValue(size, true), null, null));</span>
+<span class="nc" id="L148">        return this;</span>
+    }
+
+    /**
+     * The size for the component as a min and/or preferred and/or maximum size. The value will override any value that is set on
+     * the component itself.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param size The size expressed as a &lt;code&gt;BoundSize&lt;/code&gt;. E.g. &quot;50:100px:200mm&quot; or &quot;100px&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC width(String size) {
+<span class="nc" id="L161">        hor.setSize(ConstraintParser.parseBoundSize(size, false, true));</span>
+<span class="nc" id="L162">        return this;</span>
+    }
+
+    /**
+     * The maximum size for the component. The value will override any value that is set on the component itself.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param size The size expressed as a &lt;code&gt;UnitValue&lt;/code&gt;. E.g. &quot;100px&quot; or &quot;200mm&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC maxWidth(String size) {
+<span class="nc" id="L174">        hor.setSize(LayoutUtil.derive(hor.getSize(), null, null, ConstraintParser.parseUnitValue(size, true)));</span>
+<span class="nc" id="L175">        return this;</span>
+    }
+
+
+    /**
+     * The horizontal gap before and/or after the component. The gap is towards cell bounds and/or other component bounds.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param before The size of the gap expressed as a &lt;code&gt;BoundSize&lt;/code&gt;. E.g. &quot;50:100px:200mm&quot; or &quot;100px!&quot;.
+     * @param after  The size of the gap expressed as a &lt;code&gt;BoundSize&lt;/code&gt;. E.g. &quot;50:100px:200mm&quot; or &quot;100px!&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC gapX(String before, String after) {
+<span class="nc bnc" id="L189" title="All 2 branches missed.">        if (before != null)</span>
+<span class="nc" id="L190">            hor.setGapBefore(ConstraintParser.parseBoundSize(before, true, true));</span>
+
+<span class="nc bnc" id="L192" title="All 2 branches missed.">        if (after != null)</span>
+<span class="nc" id="L193">            hor.setGapAfter(ConstraintParser.parseBoundSize(after, true, true));</span>
+
+<span class="nc" id="L195">        return this;</span>
+    }
+
+    /**
+     * Same functionality as &lt;code&gt;getHorizontal().setAlign(ConstraintParser.parseUnitValue(unitValue, true))&lt;/code&gt; only this method
+     * returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param align The align keyword or for instance &quot;100px&quot;. E.g &quot;left&quot;, &quot;right&quot;, &quot;leading&quot; or &quot;trailing&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC alignX(String align) {
+<span class="nc" id="L208">        hor.setAlign(ConstraintParser.parseUnitValueOrAlign(align, true, null));</span>
+<span class="nc" id="L209">        return this;</span>
+    }
+
+    /**
+     * The grow priority compared to other components in the same cell.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param p The grow priority.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC growPrioX(int p) {
+<span class="nc" id="L221">        hor.setGrowPriority(p);</span>
+<span class="nc" id="L222">        return this;</span>
+    }
+
+    /**
+     * Grow priority for the component horizontally and optionally vertically.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param widthHeight The new shrink weight and height. 1-2 arguments, never null.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public CC growPrio(int... widthHeight) {
+<span class="nc bnc" id="L235" title="All 3 branches missed.">        switch (widthHeight.length) {</span>
+            default:
+<span class="nc" id="L237">                throw new IllegalArgumentException(&quot;Illegal argument count: &quot; + widthHeight.length);</span>
+            case 2:
+<span class="nc" id="L239">                growPrioY(widthHeight[1]);</span>
+            case 1:
+<span class="nc" id="L241">                growPrioX(widthHeight[0]);</span>
+        }
+<span class="nc" id="L243">        return this;</span>
+    }
+
+    /**
+     * Grow weight for the component horizontally. It default to weight &lt;code&gt;100&lt;/code&gt;.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #growX(float)
+     */
+    public CC growX() {
+<span class="nc" id="L255">        hor.setGrow(ResizeConstraint.WEIGHT_100);</span>
+<span class="nc" id="L256">        return this;</span>
+    }
+
+    /**
+     * Grow weight for the component horizontally.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param w The new grow weight.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC growX(float w) {
+<span class="nc" id="L268">        hor.setGrow(Float.valueOf(w));</span>
+<span class="nc" id="L269">        return this;</span>
+    }
+
+    /**
+     * grow weight for the component horizontally and optionally vertically.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param widthHeight The new shrink weight and height. 1-2 arguments, never null.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public CC grow(float... widthHeight) {
+<span class="nc bnc" id="L282" title="All 3 branches missed.">        switch (widthHeight.length) {</span>
+            default:
+<span class="nc" id="L284">                throw new IllegalArgumentException(&quot;Illegal argument count: &quot; + widthHeight.length);</span>
+            case 2:
+<span class="nc" id="L286">                growY(Float.valueOf(widthHeight[1]));</span>
+            case 1:
+<span class="nc" id="L288">                growX(widthHeight[0]);</span>
+        }
+<span class="nc" id="L290">        return this;</span>
+    }
+
+    /**
+     * The shrink priority compared to other components in the same cell.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param p The shrink priority.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC shrinkPrioX(int p) {
+<span class="nc" id="L302">        hor.setShrinkPriority(p);</span>
+<span class="nc" id="L303">        return this;</span>
+    }
+
+    /**
+     * Shrink priority for the component horizontally and optionally vertically.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param widthHeight The new shrink weight and height. 1-2 arguments, never null.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public CC shrinkPrio(int... widthHeight) {
+<span class="nc bnc" id="L316" title="All 3 branches missed.">        switch (widthHeight.length) {</span>
+            default:
+<span class="nc" id="L318">                throw new IllegalArgumentException(&quot;Illegal argument count: &quot; + widthHeight.length);</span>
+            case 2:
+<span class="nc" id="L320">                shrinkPrioY(widthHeight[1]);</span>
+            case 1:
+<span class="nc" id="L322">                shrinkPrioX(widthHeight[0]);</span>
+        }
+<span class="nc" id="L324">        return this;</span>
+    }
+
+    /**
+     * Shrink weight for the component horizontally.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param w The new shrink weight.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC shrinkX(float w) {
+<span class="nc" id="L336">        hor.setShrink(new Float(w));</span>
+<span class="nc" id="L337">        return this;</span>
+    }
+
+    /**
+     * Shrink weight for the component horizontally and optionally vertically.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param widthHeight The new shrink weight and height. 1-2 arguments, never null.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public CC shrink(float... widthHeight) {
+<span class="nc bnc" id="L350" title="All 3 branches missed.">        switch (widthHeight.length) {</span>
+            default:
+<span class="nc" id="L352">                throw new IllegalArgumentException(&quot;Illegal argument count: &quot; + widthHeight.length);</span>
+            case 2:
+<span class="nc" id="L354">                shrinkY(widthHeight[1]);</span>
+            case 1:
+<span class="nc" id="L356">                shrinkX(widthHeight[0]);</span>
+        }
+<span class="nc" id="L358">        return this;</span>
+    }
+
+    /**
+     * The end group that this component should be placed in.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param s The name of the group. If &lt;code&gt;null&lt;/code&gt; that means no group (default)
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC endGroupY(String s) {
+<span class="nc" id="L370">        ver.setEndGroup(s);</span>
+<span class="nc" id="L371">        return this;</span>
+    }
+
+    /**
+     * The end group(s) that this component should be placed in.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param xy The end group for x and y respectively. 1-2 arguments, not null.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public CC endGroup(String... xy) {
+<span class="nc bnc" id="L384" title="All 3 branches missed.">        switch (xy.length) {</span>
+            default:
+<span class="nc" id="L386">                throw new IllegalArgumentException(&quot;Illegal argument count: &quot; + xy.length);</span>
+            case 2:
+<span class="nc" id="L388">                endGroupY(xy[1]);</span>
+            case 1:
+<span class="nc" id="L390">                endGroupX(xy[0]);</span>
+        }
+<span class="nc" id="L392">        return this;</span>
+    }
+
+    /**
+     * The size group that this component should be placed in.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param s The name of the group. If &lt;code&gt;null&lt;/code&gt; that means no group (default)
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC sizeGroupY(String s) {
+<span class="nc" id="L404">        ver.setSizeGroup(s);</span>
+<span class="nc" id="L405">        return this;</span>
+    }
+
+    /**
+     * The size group(s) that this component should be placed in.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param xy The size group for x and y respectively. 1-2 arguments, not null.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public CC sizeGroup(String... xy) {
+<span class="nc bnc" id="L418" title="All 3 branches missed.">        switch (xy.length) {</span>
+            default:
+<span class="nc" id="L420">                throw new IllegalArgumentException(&quot;Illegal argument count: &quot; + xy.length);</span>
+            case 2:
+<span class="nc" id="L422">                sizeGroupY(xy[1]);</span>
+            case 1:
+<span class="nc" id="L424">                sizeGroupX(xy[0]);</span>
+        }
+<span class="nc" id="L426">        return this;</span>
+    }
+
+    /**
+     * The minimum size for the component. The value will override any value that is set on the component itself.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param size The size expressed as a &lt;code&gt;UnitValue&lt;/code&gt;. E.g. &quot;100px&quot; or &quot;200mm&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC minHeight(String size) {
+<span class="nc" id="L438">        ver.setSize(LayoutUtil.derive(ver.getSize(), ConstraintParser.parseUnitValue(size, false), null, null));</span>
+<span class="nc" id="L439">        return this;</span>
+    }
+
+    /**
+     * The size for the component as a min and/or preferred and/or maximum size. The value will override any value that is set on
+     * the component itself.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param size The size expressed as a &lt;code&gt;BoundSize&lt;/code&gt;. E.g. &quot;50:100px:200mm&quot; or &quot;100px&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC height(String size) {
+<span class="nc" id="L452">        ver.setSize(ConstraintParser.parseBoundSize(size, false, false));</span>
+<span class="nc" id="L453">        return this;</span>
+    }
+
+    /**
+     * The maximum size for the component. The value will override any value that is set on the component itself.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param size The size expressed as a &lt;code&gt;UnitValue&lt;/code&gt;. E.g. &quot;100px&quot; or &quot;200mm&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC maxHeight(String size) {
+<span class="nc" id="L465">        ver.setSize(LayoutUtil.derive(ver.getSize(), null, null, ConstraintParser.parseUnitValue(size, false)));</span>
+<span class="nc" id="L466">        return this;</span>
+    }
+
+    /**
+     * The vertical gap before (normally above) and/or after (normally below) the component. The gap is towards cell bounds and/or other component bounds.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param before The size of the gap expressed as a &lt;code&gt;BoundSize&lt;/code&gt;. E.g. &quot;50:100px:200mm&quot; or &quot;100px!&quot;.
+     * @param after  The size of the gap expressed as a &lt;code&gt;BoundSize&lt;/code&gt;. E.g. &quot;50:100px:200mm&quot; or &quot;100px!&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC gapY(String before, String after) {
+<span class="nc bnc" id="L479" title="All 2 branches missed.">        if (before != null)</span>
+<span class="nc" id="L480">            ver.setGapBefore(ConstraintParser.parseBoundSize(before, true, false));</span>
+
+<span class="nc bnc" id="L482" title="All 2 branches missed.">        if (after != null)</span>
+<span class="nc" id="L483">            ver.setGapAfter(ConstraintParser.parseBoundSize(after, true, false));</span>
+
+<span class="nc" id="L485">        return this;</span>
+    }
+
+    /**
+     * Same functionality as &lt;code&gt;getVertical().setAlign(ConstraintParser.parseUnitValue(unitValue, true))&lt;/code&gt; only this method
+     * returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param align The align keyword or for instance &quot;100px&quot;. E.g &quot;top&quot; or &quot;bottom&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC alignY(String align) {
+<span class="nc" id="L498">        ver.setAlign(ConstraintParser.parseUnitValueOrAlign(align, false, null));</span>
+<span class="nc" id="L499">        return this;</span>
+    }
+
+    /**
+     * The grow priority compared to other components in the same cell.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param p The grow priority.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC growPrioY(int p) {
+<span class="nc" id="L511">        ver.setGrowPriority(p);</span>
+<span class="nc" id="L512">        return this;</span>
+    }
+
+    /**
+     * Grow weight for the component vertically. Defaults to &lt;code&gt;100&lt;/code&gt;.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #growY(Float)
+     */
+    public CC growY() {
+<span class="nc" id="L524">        ver.setGrow(ResizeConstraint.WEIGHT_100);</span>
+<span class="nc" id="L525">        return this;</span>
+    }
+
+    /**
+     * Grow weight for the component vertically.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param w The new grow weight.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC growY(Float w) {
+<span class="nc" id="L537">        ver.setGrow(w);</span>
+<span class="nc" id="L538">        return this;</span>
+    }
+
+    /**
+     * The shrink priority compared to other components in the same cell.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param p The shrink priority.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC shrinkPrioY(int p) {
+<span class="nc" id="L550">        ver.setShrinkPriority(p);</span>
+<span class="nc" id="L551">        return this;</span>
+    }
+
+    /**
+     * Shrink weight for the component horizontally.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param w The new shrink weight.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC shrinkY(float w) {
+<span class="nc" id="L563">        ver.setShrink(new Float(w));</span>
+<span class="nc" id="L564">        return this;</span>
+    }
+
+    /**
+     * How this component, if hidden (not visible), should be treated.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param mode The mode. Default to the mode in the {@link net.miginfocom.layout.LC}.
+     *             0 == Normal. Bounds will be calculated as if the component was visible.&lt;br&gt;
+     *             1 == If hidden the size will be 0, 0 but the gaps remain.&lt;br&gt;
+     *             2 == If hidden the size will be 0, 0 and gaps set to zero.&lt;br&gt;
+     *             3 == If hidden the component will be disregarded completely and not take up a cell in the grid..
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC hideMode(int mode) {
+<span class="nc" id="L580">        setHideMode(mode);</span>
+<span class="nc" id="L581">        return this;</span>
+    }
+
+    /**
+     * The id used to reference this component in some constraints.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param s The id or &lt;code&gt;null&lt;/code&gt;. May consist of a groupID and a componentID which are separated by a dot: &quot;.&quot;. E.g. &quot;grp1.id1&quot;.
+     *          The dot should never be first or last if present.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public CC id(String s) {
+<span class="nc" id="L594">        setId(s);</span>
+<span class="nc" id="L595">        return this;</span>
+    }
+
+    /**
+     * Same functionality as {@link #setTag(String tag)} only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param tag The new tag. May be &lt;code&gt;null&lt;/code&gt;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setTag(String)
+     */
+    public CC tag(String tag) {
+<span class="nc" id="L608">        setTag(tag);</span>
+<span class="nc" id="L609">        return this;</span>
+    }
+
+    /**
+     * Set the cell(s) that the component should occupy in the grid. Same functionality as {@link #setCellX(int col)} and
+     * {@link #setCellY(int row)} together with {@link #setSpanX(int width)} and {@link #setSpanY(int height)}. This method
+     * returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param colRowWidthHeight cellX, cellY, spanX, spanY repectively. 1-4 arguments, not null.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setCellX(int)
+     * @see #setCellY(int)
+     * @see #setSpanX(int)
+     * @see #setSpanY(int)
+     * @since 3.7.2. Replacing cell(int, int) and cell(int, int, int, int)
+     */
+    public CC cell(int... colRowWidthHeight) {
+<span class="nc bnc" id="L628" title="All 5 branches missed.">        switch (colRowWidthHeight.length) {</span>
+            default:
+<span class="nc" id="L630">                throw new IllegalArgumentException(&quot;Illegal argument count: &quot; + colRowWidthHeight.length);</span>
+            case 4:
+<span class="nc" id="L632">                setSpanY(colRowWidthHeight[3]);</span>
+            case 3:
+<span class="nc" id="L634">                setSpanX(colRowWidthHeight[2]);</span>
+            case 2:
+<span class="nc" id="L636">                setCellY(colRowWidthHeight[1]);</span>
+            case 1:
+<span class="nc" id="L638">                setCellX(colRowWidthHeight[0]);</span>
+        }
+<span class="nc" id="L640">        return this;</span>
+    }
+
+    /**
+     * Same functionality as &lt;code&gt;spanX(cellsX).spanY(cellsY)&lt;/code&gt; which means this cell will span cells in both x and y.
+     * This method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     * Since 3.7.2 this takes an array/vararg whereas it previously only took two specific values, xSpan and ySpan.
+     *
+     * @param cells spanX and spanY, when present, and in that order.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setSpanY(int)
+     * @see #setSpanX(int)
+     * @see #spanY()
+     * @see #spanX()
+     * @since 3.7.2 Replaces span(int, int).
+     */
+    public CC span(int... cells) {
+<span class="nc bnc" id="L659" title="All 4 branches missed.">        if (cells == null || cells.length == 0) {</span>
+<span class="nc" id="L660">            setSpanX(LayoutUtil.INF);</span>
+<span class="nc" id="L661">            setSpanY(1);</span>
+<span class="nc bnc" id="L662" title="All 2 branches missed.">        } else if (cells.length == 1) {</span>
+<span class="nc" id="L663">            setSpanX(cells[0]);</span>
+<span class="nc" id="L664">            setSpanY(1);</span>
+        } else {
+<span class="nc" id="L666">            setSpanX(cells[0]);</span>
+<span class="nc" id="L667">            setSpanY(cells[1]);</span>
+        }
+<span class="nc" id="L669">        return this;</span>
+    }
+
+    /**
+     * Corresponds exactly to the &quot;gap left right top bottom&quot; keyword.
+     *
+     * @param args Same as for the &quot;gap&quot; keyword. Length 1-4, never null buf elements can be null.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public CC gap(String... args) {
+<span class="nc bnc" id="L680" title="All 5 branches missed.">        switch (args.length) {</span>
+            default:
+<span class="nc" id="L682">                throw new IllegalArgumentException(&quot;Illegal argument count: &quot; + args.length);</span>
+            case 4:
+<span class="nc" id="L684">                gapBottom(args[3]);</span>
+            case 3:
+<span class="nc" id="L686">                gapTop(args[2]);</span>
+            case 2:
+<span class="nc" id="L688">                gapRight(args[1]);</span>
+            case 1:
+<span class="nc" id="L690">                gapLeft(args[0]);</span>
+        }
+<span class="nc" id="L692">        return this;</span>
+    }
+
+    /**
+     * Sets the horizontal gap before the component.
+     * &lt;p&gt;
+     * Note! This is currently same as gapLeft(). This might change in 4.x.
+     *
+     * @param boundsSize The size of the gap expressed as a &lt;code&gt;BoundSize&lt;/code&gt;. E.g. &quot;50:100px:200mm&quot; or &quot;100px!&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public CC gapBefore(String boundsSize) {
+<span class="nc" id="L705">        hor.setGapBefore(ConstraintParser.parseBoundSize(boundsSize, true, true));</span>
+<span class="nc" id="L706">        return this;</span>
+    }
+
+    /**
+     * Sets the horizontal gap after the component.
+     * &lt;p&gt;
+     * Note! This is currently same as gapLeft(). This might change in 4.x.
+     *
+     * @param boundsSize The size of the gap expressed as a &lt;code&gt;BoundSize&lt;/code&gt;. E.g. &quot;50:100px:200mm&quot; or &quot;100px!&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public CC gapAfter(String boundsSize) {
+<span class="nc" id="L719">        hor.setGapAfter(ConstraintParser.parseBoundSize(boundsSize, true, true));</span>
+<span class="nc" id="L720">        return this;</span>
+    }
+
+    /**
+     * Sets the gap above the component.
+     *
+     * @param boundsSize The size of the gap expressed as a &lt;code&gt;BoundSize&lt;/code&gt;. E.g. &quot;50:100px:200mm&quot; or &quot;100px!&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public CC gapTop(String boundsSize) {
+<span class="nc" id="L731">        ver.setGapBefore(ConstraintParser.parseBoundSize(boundsSize, true, false));</span>
+<span class="nc" id="L732">        return this;</span>
+    }
+
+    /**
+     * Sets the gap to the left the component.
+     *
+     * @param boundsSize The size of the gap expressed as a &lt;code&gt;BoundSize&lt;/code&gt;. E.g. &quot;50:100px:200mm&quot; or &quot;100px!&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public CC gapLeft(String boundsSize) {
+<span class="nc" id="L743">        hor.setGapBefore(ConstraintParser.parseBoundSize(boundsSize, true, true));</span>
+<span class="nc" id="L744">        return this;</span>
+    }
+
+    /**
+     * Sets the gap below the component.
+     *
+     * @param boundsSize The size of the gap expressed as a &lt;code&gt;BoundSize&lt;/code&gt;. E.g. &quot;50:100px:200mm&quot; or &quot;100px!&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public CC gapBottom(String boundsSize) {
+<span class="nc" id="L755">        ver.setGapAfter(ConstraintParser.parseBoundSize(boundsSize, true, false));</span>
+<span class="nc" id="L756">        return this;</span>
+    }
+
+    /**
+     * Sets the gap to the right of the component.
+     *
+     * @param boundsSize The size of the gap expressed as a &lt;code&gt;BoundSize&lt;/code&gt;. E.g. &quot;50:100px:200mm&quot; or &quot;100px!&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public CC gapRight(String boundsSize) {
+<span class="nc" id="L767">        hor.setGapAfter(ConstraintParser.parseBoundSize(boundsSize, true, true));</span>
+<span class="nc" id="L768">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setSpanY(int)} with &lt;code&gt;LayoutUtil.INF&lt;/code&gt; which means this cell will span the rest of the column.
+     * This method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setSpanY(int)
+     * @see #spanY()
+     */
+    public CC spanY() {
+<span class="nc" id="L782">        return spanY(LayoutUtil.INF);</span>
+    }
+
+    /**
+     * Same functionality as {@link #setSpanY(int)} only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param cells The number of cells to span (i.e. merge).
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setSpanY(int)
+     */
+    public CC spanY(int cells) {
+<span class="nc" id="L795">        setSpanY(cells);</span>
+<span class="nc" id="L796">        return this;</span>
+    }
+
+    /**
+     * Same functionality as {@link #setSpanX(int)} which means this cell will span the rest of the row.
+     * This method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setSpanX(int)
+     * @see #spanX()
+     */
+    public CC spanX() {
+<span class="nc" id="L810">        return spanX(LayoutUtil.INF);</span>
+    }
+
+    /**
+     * Same functionality as {@link #setSpanX(int)} only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param cells The number of cells to span (i.e. merge).
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setSpanY(int)
+     */
+    public CC spanX(int cells) {
+<span class="nc" id="L823">        setSpanX(cells);</span>
+<span class="nc" id="L824">        return this;</span>
+    }
+
+    /**
+     * Same functionality as &lt;code&gt;pushX().pushY()&lt;/code&gt; which means this cell will push in both x and y dimensions.
+     * This method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setPushX(Float)
+     * @see #setPushX(Float)
+     * @see #pushY()
+     * @see #pushX()
+     */
+    public CC push() {
+<span class="nc" id="L840">        return pushX().pushY();</span>
+    }
+
+    /**
+     * Same functionality as &lt;code&gt;pushX(weightX).pushY(weightY)&lt;/code&gt; which means this cell will push in both x and y dimensions.
+     * This method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param weightX The weight used in the push.
+     * @param weightY The weight used in the push.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setPushY(Float)
+     * @see #setPushX(Float)
+     * @see #pushY()
+     * @see #pushX()
+     */
+    public CC push(Float weightX, Float weightY) {
+<span class="nc" id="L858">        return pushX(weightX).pushY(weightY);</span>
+    }
+
+    /**
+     * Same functionality as {@link #setPushY(Float)} which means this cell will push the rest of the column.
+     * This method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setPushY(Float)
+     */
+    public CC pushY() {
+<span class="nc" id="L871">        return pushY(ResizeConstraint.WEIGHT_100);</span>
+    }
+
+    /**
+     * Same functionality as {@link #setPushY(Float weight)} only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param weight The weight used in the push.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setPushY(Float)
+     */
+    public CC pushY(Float weight) {
+<span class="nc" id="L884">        setPushY(weight);</span>
+<span class="nc" id="L885">        return this;</span>
+    }
+
+    /**
+     * Same functionality as {@link #setPushX(Float)} which means this cell will push the rest of the row.
+     * This method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setPushX(Float)
+     */
+    public CC pushX() {
+<span class="nc" id="L898">        return pushX(ResizeConstraint.WEIGHT_100);</span>
+    }
+
+    /**
+     * Same functionality as {@link #setPushX(Float weight)} only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param weight The weight used in the push.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setPushY(Float)
+     */
+    public CC pushX(Float weight) {
+<span class="nc" id="L911">        setPushX(weight);</span>
+<span class="nc" id="L912">        return this;</span>
+    }
+
+    /**
+     * Same functionality as {@link #setSplit(int parts)} only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param parts The number of parts (i.e. component slots) the cell should be divided into.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setSplit(int)
+     */
+    public CC split(int parts) {
+<span class="nc" id="L925">        setSplit(parts);</span>
+<span class="nc" id="L926">        return this;</span>
+    }
+
+    /**
+     * Same functionality as split(LayoutUtil.INF), which means split until one of the keywords that breaks the split is found for
+     * a component after this one (e.g. wrap, newline and skip).
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setSplit(int)
+     * @since 3.7.2
+     */
+    public CC split() {
+<span class="nc" id="L940">        setSplit(LayoutUtil.INF);</span>
+<span class="nc" id="L941">        return this;</span>
+    }
+
+    /**
+     * Same functionality as {@link #setSkip(int)} only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param cells How many cells in the grid that should be skipped &lt;b&gt;before&lt;/b&gt; the component that this constraint belongs to
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setSkip(int)
+     */
+    public CC skip(int cells) {
+<span class="nc" id="L954">        setSkip(cells);</span>
+<span class="nc" id="L955">        return this;</span>
+    }
+
+    /**
+     * Same functionality as skip(1).
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setSkip(int)
+     * @since 3.7.2
+     */
+    public CC skip() {
+<span class="nc" id="L968">        setSkip(1);</span>
+<span class="nc" id="L969">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setExternal(boolean)} with &lt;code&gt;true&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setExternal(boolean)
+     */
+    public CC external() {
+<span class="nc" id="L981">        setExternal(true);</span>
+<span class="nc" id="L982">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setFlowX(Boolean)} with &lt;code&gt;Boolean.TRUE&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setFlowX(Boolean)
+     */
+    public CC flowX() {
+<span class="nc" id="L994">        setFlowX(Boolean.TRUE);</span>
+<span class="nc" id="L995">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setFlowX(Boolean)} with &lt;code&gt;Boolean.FALSE&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setFlowX(Boolean)
+     */
+    public CC flowY() {
+<span class="nc" id="L1007">        setFlowX(Boolean.FALSE);</span>
+<span class="nc" id="L1008">        return this;</span>
+    }
+
+
+    /**
+     * Same functionality as {@link #growX()} and {@link #growY()}.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #growX()
+     * @see #growY()
+     */
+    public CC grow() {
+<span class="nc" id="L1022">        growX();</span>
+<span class="nc" id="L1023">        growY();</span>
+<span class="nc" id="L1024">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setNewline(boolean)} with &lt;code&gt;true&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setNewline(boolean)
+     */
+    public CC newline() {
+<span class="nc" id="L1036">        setNewline(true);</span>
+<span class="nc" id="L1037">        return this;</span>
+    }
+
+    /**
+     * Same functionality as {@link #setNewlineGapSize(BoundSize)} only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param gapSize The gap size that will override the gap size in the row/colum constraints if &lt;code&gt;!= null&lt;/code&gt;. E.g. &quot;5px&quot; or &quot;unrel&quot;.
+     *                If &lt;code&gt;null&lt;/code&gt; or &lt;code&gt;&quot;&quot;&lt;/code&gt; the newline size will be set to the default size and turned on. This is different compared to
+     *                {@link #setNewlineGapSize(BoundSize)}.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setNewlineGapSize(BoundSize)
+     */
+    public CC newline(String gapSize) {
+<span class="nc bnc" id="L1052" title="All 4 branches missed.">        BoundSize bs = ConstraintParser.parseBoundSize(gapSize, true, (flowX != null &amp;&amp; !flowX));</span>
+<span class="nc bnc" id="L1053" title="All 2 branches missed.">        if (bs != null) {</span>
+<span class="nc" id="L1054">            setNewlineGapSize(bs);</span>
+        } else {
+<span class="nc" id="L1056">            setNewline(true);</span>
+        }
+<span class="nc" id="L1058">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setWrap(boolean)} with &lt;code&gt;true&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setWrap(boolean)
+     */
+    public CC wrap() {
+<span class="nc" id="L1070">        setWrap(true);</span>
+<span class="nc" id="L1071">        return this;</span>
+    }
+
+    /**
+     * Same functionality as {@link #setWrapGapSize(BoundSize)} only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param gapSize The gap size that will override the gap size in the row/colum constraints if &lt;code&gt;!= null&lt;/code&gt;. E.g. &quot;5px&quot; or &quot;unrel&quot;.
+     *                If &lt;code&gt;null&lt;/code&gt; or &lt;code&gt;&quot;&quot;&lt;/code&gt; the wrap size will be set to the default size and turned on. This is different compared to
+     *                {@link #setWrapGapSize(BoundSize)}.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setWrapGapSize(BoundSize)
+     */
+    public CC wrap(String gapSize) {
+<span class="nc bnc" id="L1086" title="All 4 branches missed.">        BoundSize bs = ConstraintParser.parseBoundSize(gapSize, true, (flowX != null &amp;&amp; !flowX));</span>
+<span class="nc bnc" id="L1087" title="All 2 branches missed.">        if (bs != null) {</span>
+<span class="nc" id="L1088">            setWrapGapSize(bs);</span>
+        } else {
+<span class="nc" id="L1090">            setWrap(true);</span>
+        }
+<span class="nc" id="L1092">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setDockSide(int)} with &lt;code&gt;0&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setDockSide(int)
+     */
+    public CC dockNorth() {
+<span class="nc" id="L1104">        setDockSide(0);</span>
+<span class="nc" id="L1105">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setDockSide(int)} with &lt;code&gt;1&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setDockSide(int)
+     */
+    public CC dockWest() {
+<span class="nc" id="L1117">        setDockSide(1);</span>
+<span class="nc" id="L1118">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setDockSide(int)} with &lt;code&gt;2&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setDockSide(int)
+     */
+    public CC dockSouth() {
+<span class="nc" id="L1130">        setDockSide(2);</span>
+<span class="nc" id="L1131">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setDockSide(int)} with &lt;code&gt;3&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setDockSide(int)
+     */
+    public CC dockEast() {
+<span class="nc" id="L1143">        setDockSide(3);</span>
+<span class="nc" id="L1144">        return this;</span>
+    }
+
+    /**
+     * Sets the x-coordinate for the component. This is used to set the x coordinate position to a specific value. The component
+     * bounds is still precalculated to the grid cell and this method should be seen as a way to correct the x position.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param x The x position as a UnitValue. E.g. &quot;10&quot; or &quot;40mm&quot; or &quot;container.x+10&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setPos(UnitValue[])
+     * @see #setBoundsInGrid(boolean)
+     */
+    public CC x(String x) {
+<span class="nc" id="L1159">        return corrPos(x, 0);</span>
+    }
+
+    /**
+     * Sets the y-coordinate for the component. This is used to set the y coordinate position to a specific value. The component
+     * bounds is still precalculated to the grid cell and this method should be seen as a way to correct the y position.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param y The y position as a UnitValue. E.g. &quot;10&quot; or &quot;40mm&quot; or &quot;container.x+10&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setPos(UnitValue[])
+     * @see #setBoundsInGrid(boolean)
+     */
+    public CC y(String y) {
+<span class="nc" id="L1174">        return corrPos(y, 1);</span>
+    }
+
+    /**
+     * Sets the x2-coordinate for the component (right side). This is used to set the x2 coordinate position to a specific value. The component
+     * bounds is still precalculated to the grid cell and this method should be seen as a way to correct the x position.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param x2 The x2 side's position as a UnitValue. E.g. &quot;10&quot; or &quot;40mm&quot; or &quot;container.x2 - 10&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setPos(UnitValue[])
+     * @see #setBoundsInGrid(boolean)
+     */
+    public CC x2(String x2) {
+<span class="nc" id="L1189">        return corrPos(x2, 2);</span>
+    }
+
+    /**
+     * Sets the y2-coordinate for the component (bottom side). This is used to set the y2 coordinate position to a specific value. The component
+     * bounds is still precalculated to the grid cell and this method should be seen as a way to correct the y position.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param y2 The y2 side's position as a UnitValue. E.g. &quot;10&quot; or &quot;40mm&quot; or &quot;container.x2 - 10&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setPos(UnitValue[])
+     * @see #setBoundsInGrid(boolean)
+     */
+    public CC y2(String y2) {
+<span class="nc" id="L1204">        return corrPos(y2, 3);</span>
+    }
+
+    private CC corrPos(String uv, int ix) {
+<span class="nc" id="L1208">        UnitValue[] b = getPos();</span>
+<span class="nc bnc" id="L1209" title="All 2 branches missed.">        if (b == null)</span>
+<span class="nc" id="L1210">            b = new UnitValue[4];</span>
+
+<span class="nc bnc" id="L1212" title="All 2 branches missed.">        b[ix] = ConstraintParser.parseUnitValue(uv, (ix % 2 == 0));</span>
+<span class="nc" id="L1213">        setPos(b);</span>
+
+<span class="nc" id="L1215">        setBoundsInGrid(true);</span>
+<span class="nc" id="L1216">        return this;</span>
+    }
+
+    /**
+     * Same functionality as {@link #x(String x)} and {@link #y(String y)} toghether.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param x The x position as a UnitValue. E.g. &quot;10&quot; or &quot;40mm&quot; or &quot;container.x+10&quot;.
+     * @param y The y position as a UnitValue. E.g. &quot;10&quot; or &quot;40mm&quot; or &quot;container.x+10&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setPos(UnitValue[])
+     */
+    public CC pos(String x, String y) {
+<span class="nc" id="L1230">        UnitValue[] b = getPos();</span>
+<span class="nc bnc" id="L1231" title="All 2 branches missed.">        if (b == null)</span>
+<span class="nc" id="L1232">            b = new UnitValue[4];</span>
+
+<span class="nc" id="L1234">        b[0] = ConstraintParser.parseUnitValue(x, true);</span>
+<span class="nc" id="L1235">        b[1] = ConstraintParser.parseUnitValue(y, false);</span>
+<span class="nc" id="L1236">        setPos(b);</span>
+
+<span class="nc" id="L1238">        setBoundsInGrid(false);</span>
+<span class="nc" id="L1239">        return this;</span>
+    }
+
+    /**
+     * Same functionality as {@link #x(String x)}, {@link #y(String y)}, {@link #y2(String y)} and {@link #y2(String y)} toghether.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param x  The x position as a UnitValue. E.g. &quot;10&quot; or &quot;40mm&quot; or &quot;container.x+10&quot;.
+     * @param y  The y position as a UnitValue. E.g. &quot;10&quot; or &quot;40mm&quot; or &quot;container.x+10&quot;.
+     * @param x2 The x2 side's position as a UnitValue. E.g. &quot;10&quot; or &quot;40mm&quot; or &quot;container.x2 - 10&quot;.
+     * @param y2 The y2 side's position as a UnitValue. E.g. &quot;10&quot; or &quot;40mm&quot; or &quot;container.x2 - 10&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setPos(UnitValue[])
+     */
+    public CC pos(String x, String y, String x2, String y2) {
+<span class="nc" id="L1255">        setPos(new UnitValue[]{</span>
+<span class="nc" id="L1256">                ConstraintParser.parseUnitValue(x, true),</span>
+<span class="nc" id="L1257">                ConstraintParser.parseUnitValue(y, false),</span>
+<span class="nc" id="L1258">                ConstraintParser.parseUnitValue(x2, true),</span>
+<span class="nc" id="L1259">                ConstraintParser.parseUnitValue(y2, false),</span>
+        });
+<span class="nc" id="L1261">        setBoundsInGrid(false);</span>
+<span class="nc" id="L1262">        return this;</span>
+    }
+
+    /**
+     * Same functionality as {@link #setPadding(UnitValue[])} but the unit values as absolute pixels. This method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param top    The top padding that will be added to the y coordinate at the last stage in the layout.
+     * @param left   The top padding that will be added to the x coordinate at the last stage in the layout.
+     * @param bottom The top padding that will be added to the y2 coordinate at the last stage in the layout.
+     * @param right  The top padding that will be added to the x2 coordinate at the last stage in the layout.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setTag(String)
+     */
+    public CC pad(int top, int left, int bottom, int right) {
+<span class="nc" id="L1278">        setPadding(new UnitValue[]{</span>
+                new UnitValue(top), new UnitValue(left), new UnitValue(bottom), new UnitValue(right)
+        });
+<span class="nc" id="L1281">        return this;</span>
+    }
+
+    /**
+     * Same functionality as &lt;code&gt;setPadding(ConstraintParser.parseInsets(pad, false))}&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param pad The string to parse. E.g. &quot;10 10 10 10&quot; or &quot;20&quot;. If less than 4 groups the last will be used for the missing.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new ComponentConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setTag(String)
+     */
+    public CC pad(String pad) {
+<span class="nc bnc" id="L1294" title="All 2 branches missed.">        setPadding(pad != null ? ConstraintParser.parseInsets(pad, false) : null);</span>
+<span class="nc" id="L1295">        return this;</span>
+    }
+
+    // **********************************************************
+    // Bean properties
+    // **********************************************************
+
+    /**
+     * Returns the horizontal dimension constraint for this component constraint. It has constraints for the horizontal size
+     * and grow/shink priorities and weights.
+     * &lt;p&gt;
+     * Note! If any changes is to be made it must be made direct when the object is returned. It is not allowed to save the
+     * constraint for later use.
+     *
+     * @return The current dimension constraint. Never &lt;code&gt;null&lt;/code&gt;.
+     */
+    public DimConstraint getHorizontal() {
+<span class="fc" id="L1312">        return hor;</span>
+    }
+
+    /**
+     * Sets the horizontal dimension constraint for this component constraint. It has constraints for the horizontal size
+     * and grow/shrink priorities and weights.
+     *
+     * @param h The new dimension constraint. If &lt;code&gt;null&lt;/code&gt; it will be reset to &lt;code&gt;new DimConstraint();&lt;/code&gt;
+     */
+    public void setHorizontal(DimConstraint h) {
+<span class="nc bnc" id="L1322" title="All 2 branches missed.">        hor = h != null ? h : new DimConstraint();</span>
+<span class="nc" id="L1323">    }</span>
+
+    /**
+     * Returns the vertical dimension constraint for this component constraint. It has constraints for the vertical size
+     * and grow/shrink priorities and weights.
+     * &lt;p&gt;
+     * Note! If any changes is to be made it must be made direct when the object is returned. It is not allowed to save the
+     * constraint for later use.
+     *
+     * @return The current dimension constraint. Never &lt;code&gt;null&lt;/code&gt;.
+     */
+    public DimConstraint getVertical() {
+<span class="fc" id="L1335">        return ver;</span>
+    }
+
+    /**
+     * Sets the vertical dimension constraint for this component constraint. It has constraints for the vertical size
+     * and grow/shrink priorities and weights.
+     *
+     * @param v The new dimension constraint. If &lt;code&gt;null&lt;/code&gt; it will be reset to &lt;code&gt;new DimConstraint();&lt;/code&gt;
+     */
+    public void setVertical(DimConstraint v) {
+<span class="nc bnc" id="L1345" title="All 2 branches missed.">        ver = v != null ? v : new DimConstraint();</span>
+<span class="nc" id="L1346">    }</span>
+
+    /**
+     * Returns the vertical or horizontal dim constraint.
+     * &lt;p&gt;
+     * Note! If any changes is to be made it must be made direct when the object is returned. It is not allowed to save the
+     * constraint for later use.
+     *
+     * @param isHor If the horizontal constraint should be returned.
+     * @return The dim constraint. Never &lt;code&gt;null&lt;/code&gt;.
+     */
+    public DimConstraint getDimConstraint(boolean isHor) {
+<span class="fc bfc" id="L1358" title="All 2 branches covered.">        return isHor ? hor : ver;</span>
+    }
+
+    /**
+     * Returns the absolute positioning of one or more of the edges. This will be applied last in the layout cycle and will not
+     * affect the flow or grid positions. The positioning is relative to the parent and can not (as padding) be used
+     * to adjust the edges relative to the old value. May be &lt;code&gt;null&lt;/code&gt; and elements may be &lt;code&gt;null&lt;/code&gt;.
+     * &lt;code&gt;null&lt;/code&gt; value(s) for the x2 and y2 will be interpreted as to keep the preferred size and thus the x1
+     * and x2 will just absolutely positions the component.
+     * &lt;p&gt;
+     * Note that {@link #setBoundsInGrid(boolean)} changes the interpretation of thisproperty slightly.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current value as a new array, free to modify.
+     */
+    public UnitValue[] getPos() {
+<span class="pc bpc" id="L1375" title="1 of 2 branches missed.">        return pos != null ? new UnitValue[]{pos[0], pos[1], pos[2], pos[3]} : null;</span>
+    }
+
+    /**
+     * Sets absolute positioning of one or more of the edges. This will be applied last in the layout cycle and will not
+     * affect the flow or grid positions. The positioning is relative to the parent and can not (as padding) be used
+     * to adjust the edges relative to the old value. May be &lt;code&gt;null&lt;/code&gt; and elements may be &lt;code&gt;null&lt;/code&gt;.
+     * &lt;code&gt;null&lt;/code&gt; value(s) for the x2 and y2 will be interpreted as to keep the preferred size and thus the x1
+     * and x2 will just absolutely positions the component.
+     * &lt;p&gt;
+     * Note that {@link #setBoundsInGrid(boolean)} changes the interpretation of thisproperty slightly.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param pos &lt;code&gt;UnitValue[] {x, y, x2, y2}&lt;/code&gt;. Must be &lt;code&gt;null&lt;/code&gt; or of length 4. Elements can be &lt;code&gt;null&lt;/code&gt;.
+     */
+    public void setPos(UnitValue[] pos) {
+<span class="nc bnc" id="L1392" title="All 2 branches missed.">        this.pos = pos != null ? new UnitValue[]{pos[0], pos[1], pos[2], pos[3]} : null;</span>
+<span class="nc" id="L1393">        linkTargets = null;</span>
+<span class="nc" id="L1394">    }</span>
+
+    /**
+     * Returns if the absolute &lt;code&gt;pos&lt;/code&gt; value should be corrections to the component that is in a normal cell. If &lt;code&gt;false&lt;/code&gt;
+     * the value of &lt;code&gt;pos&lt;/code&gt; is truly absolute in that it will not affect the grid or have a default bounds in the grid.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current value.
+     * @see #getPos()
+     */
+    public boolean isBoundsInGrid() {
+<span class="nc" id="L1406">        return boundsInGrid;</span>
+    }
+
+    /**
+     * Sets if the absolute &lt;code&gt;pos&lt;/code&gt; value should be corrections to the component that is in a normal cell. If &lt;code&gt;false&lt;/code&gt;
+     * the value of &lt;code&gt;pos&lt;/code&gt; is truly absolute in that it will not affect the grid or have a default bounds in the grid.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param b &lt;code&gt;true&lt;/code&gt; for bounds taken from the grid position. &lt;code&gt;false&lt;/code&gt; is default.
+     * @see #setPos(UnitValue[])
+     */
+    void setBoundsInGrid(boolean b) {
+<span class="nc" id="L1419">        this.boundsInGrid = b;</span>
+<span class="nc" id="L1420">    }</span>
+
+    /**
+     * Returns the absolute cell position in the grid or &lt;code&gt;-1&lt;/code&gt; if cell positioning is not used.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current value.
+     */
+    public int getCellX() {
+<span class="fc" id="L1430">        return cellX;</span>
+    }
+
+    /**
+     * Set an absolute cell x-position in the grid. If &amp;gt;= 0 this point points to the absolute cell that this constaint's component should occupy.
+     * If there's already a component in that cell they will split the cell. The flow will then continue after this cell.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param x The x-position or &lt;code&gt;-1&lt;/code&gt; to disable cell positioning.
+     */
+    public void setCellX(int x) {
+<span class="nc" id="L1442">        cellX = x;</span>
+<span class="nc" id="L1443">    }</span>
+
+    /**
+     * Returns the absolute cell position in the grid or &lt;code&gt;-1&lt;/code&gt; if cell positioning is not used.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current value.
+     */
+    public int getCellY() {
+<span class="pc bpc" id="L1453" title="1 of 2 branches missed.">        return cellX &lt; 0 ? -1 : cellY;</span>
+    }
+
+    /**
+     * Set an absolute cell x-position in the grid. If &amp;gt;= 0 this point points to the absolute cell that this constaint's component should occupy.
+     * If there's already a component in that cell they will split the cell. The flow will then continue after this cell.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param y The y-position or &lt;code&gt;-1&lt;/code&gt; to disable cell positioning.
+     */
+    public void setCellY(int y) {
+<span class="nc bnc" id="L1465" title="All 2 branches missed.">        if (y &lt; 0)</span>
+<span class="nc" id="L1466">            cellX = -1;</span>
+<span class="nc bnc" id="L1467" title="All 2 branches missed.">        cellY = y &lt; 0 ? 0 : y;</span>
+<span class="nc" id="L1468">    }</span>
+
+    /**
+     * Sets the docking side. -1 means no docking.&lt;br&gt;
+     * Valid sides are: &lt;code&gt; north = 0, west = 1, south = 2, east = 3&lt;/code&gt;.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current side.
+     */
+    public int getDockSide() {
+<span class="fc" id="L1479">        return dock;</span>
+    }
+
+    /**
+     * Sets the docking side. -1 means no docking.&lt;br&gt;
+     * Valid sides are: &lt;code&gt; north = 0, west = 1, south = 2, east = 3&lt;/code&gt;.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param side -1 or 0-3.
+     */
+    public void setDockSide(int side) {
+<span class="nc bnc" id="L1491" title="All 4 branches missed.">        if (side &lt; -1 || side &gt; 3)</span>
+<span class="nc" id="L1492">            throw new IllegalArgumentException(&quot;Illegal dock side: &quot; + side);</span>
+<span class="nc" id="L1493">        dock = side;</span>
+<span class="nc" id="L1494">    }</span>
+
+    /**
+     * Returns if this component should have its bounds handled by an external source and not this layout manager.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current value.
+     */
+    public boolean isExternal() {
+<span class="fc" id="L1504">        return external;</span>
+    }
+
+    /**
+     * If this boolean is true this component is not handled in any way by the layout manager and the component can have its bounds set by an external
+     * handler which is normally by the use of some &lt;code&gt;component.setBounds(x, y, width, height)&lt;/code&gt; directly (for Swing).
+     * &lt;p&gt;
+     * The bounds &lt;b&gt;will not&lt;/b&gt; affect the minimum and preferred size of the container.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param b &lt;code&gt;true&lt;/code&gt; means that the bounds are not changed.
+     */
+    public void setExternal(boolean b) {
+<span class="nc" id="L1518">        this.external = b;</span>
+<span class="nc" id="L1519">    }</span>
+
+    /**
+     * Returns if the flow in the &lt;b&gt;cell&lt;/b&gt; is in the horizontal dimension. Vertical if &lt;code&gt;false&lt;/code&gt;. Only the first
+     * component is a cell can set the flow.
+     * &lt;p&gt;
+     * If &lt;code&gt;null&lt;/code&gt; the flow direction is inherited by from the {@link net.miginfocom.layout.LC}.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current value.
+     */
+    public Boolean getFlowX() {
+<span class="fc" id="L1532">        return flowX;</span>
+    }
+
+    /**
+     * Sets if the flow in the &lt;b&gt;cell&lt;/b&gt; is in the horizontal dimension. Vertical if &lt;code&gt;false&lt;/code&gt;. Only the first
+     * component is a cell can set the flow.
+     * &lt;p&gt;
+     * If &lt;code&gt;null&lt;/code&gt; the flow direction is inherited by from the {@link net.miginfocom.layout.LC}.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param b &lt;code&gt;Boolean.TRUE&lt;/code&gt; means horizontal flow in the cell.
+     */
+    public void setFlowX(Boolean b) {
+<span class="nc" id="L1546">        this.flowX = b;</span>
+<span class="nc" id="L1547">    }</span>
+
+    /**
+     * Sets how a component that is hidden (not visible) should be treated by default.
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The mode:&lt;br&gt;
+     * 0 == Normal. Bounds will be calculated as if the component was visible.&lt;br&gt;
+     * 1 == If hidden the size will be 0, 0 but the gaps remain.&lt;br&gt;
+     * 2 == If hidden the size will be 0, 0 and gaps set to zero.&lt;br&gt;
+     * 3 == If hidden the component will be disregarded completely and not take up a cell in the grid..
+     */
+    public int getHideMode() {
+<span class="nc" id="L1560">        return hideMode;</span>
+    }
+
+    /**
+     * Sets how a component that is hidden (not visible) should be treated by default.
+     *
+     * @param mode The mode:&lt;br&gt;
+     *             0 == Normal. Bounds will be calculated as if the component was visible.&lt;br&gt;
+     *             1 == If hidden the size will be 0, 0 but the gaps remain.&lt;br&gt;
+     *             2 == If hidden the size will be 0, 0 and gaps set to zero.&lt;br&gt;
+     *             3 == If hidden the component will be disregarded completely and not take up a cell in the grid..
+     */
+    public void setHideMode(int mode) {
+<span class="nc bnc" id="L1573" title="All 4 branches missed.">        if (mode &lt; -1 || mode &gt; 3)</span>
+<span class="nc" id="L1574">            throw new IllegalArgumentException(&quot;Wrong hideMode: &quot; + mode);</span>
+
+<span class="nc" id="L1576">        hideMode = mode;</span>
+<span class="nc" id="L1577">    }</span>
+
+    /**
+     * Returns the id used to reference this component in some constraints.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The id or &lt;code&gt;null&lt;/code&gt;. May consist of a groupID and a componentID which are separated by a dot: &quot;.&quot;. E.g. &quot;grp1.id1&quot;.
+     * The dot should never be first or last if present.
+     */
+    public String getId() {
+<span class="nc" id="L1588">        return id;</span>
+    }
+
+    /**
+     * Sets the id used to reference this component in some constraints.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param id The id or &lt;code&gt;null&lt;/code&gt;. May consist of a groupID and a componentID which are separated by a dot: &quot;.&quot;. E.g. &quot;grp1.id1&quot;.
+     *           The dot should never be first or last if present.
+     */
+    public void setId(String id) {
+<span class="nc" id="L1600">        this.id = id;</span>
+<span class="nc" id="L1601">    }</span>
+
+    /**
+     * Returns the absolute resizing in the last stage of the layout cycle. May be &lt;code&gt;null&lt;/code&gt; and elements may be &lt;code&gt;null&lt;/code&gt;.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current value. &lt;code&gt;null&lt;/code&gt; or of length 4.
+     */
+    public UnitValue[] getPadding() {
+<span class="pc bpc" id="L1611" title="1 of 2 branches missed.">        return padding != null ? new UnitValue[]{padding[0], padding[1], padding[2], padding[3]} : null;</span>
+    }
+
+    /**
+     * Sets the absolute resizing in the last stage of the layout cycle. These values are added to the edges and can thus for
+     * instance be used to grow or reduce the size or move the component an absolute number of pixels. May be &lt;code&gt;null&lt;/code&gt;
+     * and elements may be &lt;code&gt;null&lt;/code&gt;.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param sides top, left, bottom right. Must be &lt;code&gt;null&lt;/code&gt; or of length 4.
+     */
+    public void setPadding(UnitValue[] sides) {
+<span class="nc bnc" id="L1624" title="All 2 branches missed.">        this.padding = sides != null ? new UnitValue[]{sides[0], sides[1], sides[2], sides[3]} : null;</span>
+<span class="nc" id="L1625">    }</span>
+
+    /**
+     * Returns the visual padding used when laying out this Component. May be &lt;code&gt;null&lt;/code&gt; and elements may be &lt;code&gt;null&lt;/code&gt;.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current value. &lt;code&gt;null&lt;/code&gt; or of length 4.
+     */
+    public UnitValue[] getVisualPadding() {
+<span class="nc bnc" id="L1635" title="All 2 branches missed.">        return visualPadding != null ? new UnitValue[]{visualPadding[0], visualPadding[1], visualPadding[2], visualPadding[3]} : null;</span>
+    }
+
+    /**
+     * Sets the visual padding used when laying out this Component.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param sides top, left, bottom right. Must be &lt;code&gt;null&lt;/code&gt; or of length 4.
+     */
+    public void setVisualPadding(UnitValue[] sides) {
+<span class="nc bnc" id="L1646" title="All 2 branches missed.">        this.visualPadding = sides != null ? new UnitValue[]{sides[0], sides[1], sides[2], sides[3]} : null;</span>
+<span class="nc" id="L1647">    }</span>
+
+    /**
+     * Returns how many cells in the grid that should be skipped &lt;b&gt;before&lt;/b&gt; the component that this constraint belongs to.
+     * &lt;p&gt;
+     * Note that only the first component will be checked for this property.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current value. 0 if no skip.
+     */
+    public int getSkip() {
+<span class="fc" id="L1659">        return skip;</span>
+    }
+
+    /**
+     * Sets how many cells in the grid that should be skipped &lt;b&gt;before&lt;/b&gt; the component that this constraint belongs to.
+     * &lt;p&gt;
+     * Note that only the first component will be checked for this property.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param cells How many cells in the grid that should be skipped &lt;b&gt;before&lt;/b&gt; the component that this constraint belongs to
+     */
+    public void setSkip(int cells) {
+<span class="nc" id="L1672">        this.skip = cells;</span>
+<span class="nc" id="L1673">    }</span>
+
+    /**
+     * Returns the number of cells the cell that this constraint's component will span in the indicated dimension. &lt;code&gt;1&lt;/code&gt; is default and
+     * means that it only spans the current cell. &lt;code&gt;LayoutUtil.INF&lt;/code&gt; is used to indicate a span to the end of the column/row.
+     * &lt;p&gt;
+     * Note that only the first component will be checked for this property.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current value.
+     */
+    public int getSpanX() {
+<span class="fc" id="L1686">        return spanX;</span>
+    }
+
+    /**
+     * Sets the number of cells the cell that this constraint's component will span in the indicated dimension. &lt;code&gt;1&lt;/code&gt; is default and
+     * means that it only spans the current cell. &lt;code&gt;LayoutUtil.INF&lt;/code&gt; is used to indicate a span to the end of the column/row.
+     * &lt;p&gt;
+     * Note that only the first component will be checked for this property.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param cells The number of cells to span (i.e. merge).
+     */
+    public void setSpanX(int cells) {
+<span class="nc" id="L1700">        this.spanX = cells;</span>
+<span class="nc" id="L1701">    }</span>
+
+    /**
+     * Returns the number of cells the cell that this constraint's component will span in the indicated dimension. &lt;code&gt;1&lt;/code&gt; is default and
+     * means that it only spans the current cell. &lt;code&gt;LayoutUtil.INF&lt;/code&gt; is used to indicate a span to the end of the column/row.
+     * &lt;p&gt;
+     * Note that only the first component will be checked for this property.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current value.
+     */
+    public int getSpanY() {
+<span class="fc" id="L1714">        return spanY;</span>
+    }
+
+    /**
+     * Sets the number of cells the cell that this constraint's component will span in the indicated dimension. &lt;code&gt;1&lt;/code&gt; is default and
+     * means that it only spans the current cell. &lt;code&gt;LayoutUtil.INF&lt;/code&gt; is used to indicate a span to the end of the column/row.
+     * &lt;p&gt;
+     * Note that only the first component will be checked for this property.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param cells The number of cells to span (i.e. merge).
+     */
+    public void setSpanY(int cells) {
+<span class="nc" id="L1728">        this.spanY = cells;</span>
+<span class="nc" id="L1729">    }</span>
+
+    /**
+     * &quot;pushx&quot; indicates that the column that this component is in (this first if the component spans) should default to growing.
+     * If any other column has been set to grow this push value on the component does nothing as the column's explicit grow weight
+     * will take precedence. Push is normally used when the grid has not been defined in the layout.
+     * &lt;p&gt;
+     * If multiple components in a column has push weights set the largest one will be used for the column.
+     *
+     * @return The current push value. Default is &lt;code&gt;null&lt;/code&gt;.
+     */
+    public Float getPushX() {
+<span class="fc" id="L1741">        return pushX;</span>
+    }
+
+    /**
+     * &quot;pushx&quot; indicates that the column that this component is in (this first if the component spans) should default to growing.
+     * If any other column has been set to grow this push value on the component does nothing as the column's explicit grow weight
+     * will take precedence. Push is normally used when the grid has not been defined in the layout.
+     * &lt;p&gt;
+     * If multiple components in a column has push weights set the largest one will be used for the column.
+     *
+     * @param weight The new push value. Default is &lt;code&gt;null&lt;/code&gt;.
+     */
+    public void setPushX(Float weight) {
+<span class="nc" id="L1754">        this.pushX = weight;</span>
+<span class="nc" id="L1755">    }</span>
+
+    /**
+     * &quot;pushx&quot; indicates that the row that this component is in (this first if the component spans) should default to growing.
+     * If any other row has been set to grow this push value on the component does nothing as the row's explicit grow weight
+     * will take precedence. Push is normally used when the grid has not been defined in the layout.
+     * &lt;p&gt;
+     * If multiple components in a row has push weights set the largest one will be used for the row.
+     *
+     * @return The current push value. Default is &lt;code&gt;null&lt;/code&gt;.
+     */
+    public Float getPushY() {
+<span class="fc" id="L1767">        return pushY;</span>
+    }
+
+    /**
+     * &quot;pushx&quot; indicates that the row that this component is in (this first if the component spans) should default to growing.
+     * If any other row has been set to grow this push value on the component does nothing as the row's explicit grow weight
+     * will take precedence. Push is normally used when the grid has not been defined in the layout.
+     * &lt;p&gt;
+     * If multiple components in a row has push weights set the largest one will be used for the row.
+     *
+     * @param weight The new push value. Default is &lt;code&gt;null&lt;/code&gt;.
+     */
+    public void setPushY(Float weight) {
+<span class="nc" id="L1780">        this.pushY = weight;</span>
+<span class="nc" id="L1781">    }</span>
+
+    /**
+     * Returns in how many parts the current cell (that this constraint's component will be in) should be split in. If for instance
+     * it is split in two, the next component will also share the same cell. Note that the cell can also span a number of
+     * cells, which means that you can for instance span three cells and split that big cell for two components. Split can be
+     * set to a very high value to make all components in the same row/column share the same cell (e.g. &lt;code&gt;LayoutUtil.INF&lt;/code&gt;).
+     * &lt;p&gt;
+     * Note that only the first component will be checked for this property.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current value.
+     */
+    public int getSplit() {
+<span class="fc" id="L1796">        return split;</span>
+    }
+
+    /**
+     * Sets in how many parts the current cell (that this constraint's component will be in) should be split in. If for instance
+     * it is split in two, the next component will also share the same cell. Note that the cell can also span a number of
+     * cells, which means that you can for instance span three cells and split that big cell for two components. Split can be
+     * set to a very high value to make all components in the same row/column share the same cell (e.g. &lt;code&gt;LayoutUtil.INF&lt;/code&gt;).
+     * &lt;p&gt;
+     * Note that only the first component will be checked for this property.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param parts The number of parts (i.e. component slots) the cell should be divided into.
+     */
+    public void setSplit(int parts) {
+<span class="nc" id="L1812">        this.split = parts;</span>
+<span class="nc" id="L1813">    }</span>
+
+    /**
+     * Tags the component with metadata. Currently only used to tag buttons with for instance &quot;cancel&quot; or &quot;ok&quot; to make them
+     * show up in the correct order depending on platform. See {@link PlatformDefaults#setButtonOrder(String)} for information.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current value. May be &lt;code&gt;null&lt;/code&gt;.
+     */
+    public String getTag() {
+<span class="fc" id="L1824">        return tag;</span>
+    }
+
+    /**
+     * Optinal tag that gives more context to this constraint's component. It is for instance used to tag buttons in a
+     * button bar with the button type such as &quot;ok&quot;, &quot;help&quot; or &quot;cancel&quot;.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param tag The new tag. May be &lt;code&gt;null&lt;/code&gt;.
+     */
+    public void setTag(String tag) {
+<span class="nc" id="L1836">        this.tag = tag;</span>
+<span class="nc" id="L1837">    }</span>
+
+    /**
+     * Returns if the flow should wrap to the next line/column &lt;b&gt;after&lt;/b&gt; the component that this constraint belongs to.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current value.
+     */
+    public boolean isWrap() {
+<span class="pc bpc" id="L1847" title="1 of 2 branches missed.">        return wrap != null;</span>
+    }
+
+    /**
+     * Sets if the flow should wrap to the next line/column &lt;b&gt;after&lt;/b&gt; the component that this constraint belongs to.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param b &lt;code&gt;true&lt;/code&gt; means wrap after.
+     */
+    public void setWrap(boolean b) {
+<span class="nc bnc" id="L1858" title="All 4 branches missed.">        wrap = b ? (wrap == null ? DEF_GAP : wrap) : null;</span>
+<span class="nc" id="L1859">    }</span>
+
+    /**
+     * Returns the wrap size if it is a custom size. If wrap was set to true with {@link #setWrap(boolean)} then this method will
+     * return &lt;code&gt;null&lt;/code&gt; since that means that the gap size should be the default one as defined in the rows spec.
+     *
+     * @return The custom gap size. NOTE! Will return &lt;code&gt;null&lt;/code&gt; for both no wrap &lt;b&gt;and&lt;/b&gt; default wrap.
+     * @see #isWrap()
+     * @see #setWrap(boolean)
+     * @since 2.4.2
+     */
+    public BoundSize getWrapGapSize() {
+<span class="nc bnc" id="L1871" title="All 2 branches missed.">        return wrap == DEF_GAP ? null : wrap;</span>
+    }
+
+    /**
+     * Set the wrap size and turns wrap on if &lt;code&gt;!= null&lt;/code&gt;.
+     *
+     * @param s The custom gap size. NOTE! &lt;code&gt;null&lt;/code&gt; will not turn on or off wrap, it will only set the wrap gap size to &quot;default&quot;.
+     *          A non-null value will turn on wrap though.
+     * @see #isWrap()
+     * @see #setWrap(boolean)
+     * @since 2.4.2
+     */
+    public void setWrapGapSize(BoundSize s) {
+<span class="nc bnc" id="L1884" title="All 4 branches missed.">        wrap = s == null ? (wrap != null ? DEF_GAP : null) : s;</span>
+<span class="nc" id="L1885">    }</span>
+
+    /**
+     * Returns if the flow should wrap to the next line/column &lt;b&gt;before&lt;/b&gt; the component that this constraint belongs to.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return The current value.
+     */
+    public boolean isNewline() {
+<span class="pc bpc" id="L1895" title="1 of 2 branches missed.">        return newline != null;</span>
+    }
+
+    /**
+     * Sets if the flow should wrap to the next line/column &lt;b&gt;before&lt;/b&gt; the component that this constraint belongs to.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param b &lt;code&gt;true&lt;/code&gt; means wrap before.
+     */
+    public void setNewline(boolean b) {
+<span class="nc bnc" id="L1906" title="All 4 branches missed.">        newline = b ? (newline == null ? DEF_GAP : newline) : null;</span>
+<span class="nc" id="L1907">    }</span>
+
+    /**
+     * Returns the newline size if it is a custom size. If newline was set to true with {@link #setNewline(boolean)} then this method will
+     * return &lt;code&gt;null&lt;/code&gt; since that means that the gap size should be the default one as defined in the rows spec.
+     *
+     * @return The custom gap size. NOTE! Will return &lt;code&gt;null&lt;/code&gt; for both no newline &lt;b&gt;and&lt;/b&gt; default newline.
+     * @see #isNewline()
+     * @see #setNewline(boolean)
+     * @since 2.4.2
+     */
+    public BoundSize getNewlineGapSize() {
+<span class="nc bnc" id="L1919" title="All 2 branches missed.">        return newline == DEF_GAP ? null : newline;</span>
+    }
+
+    /**
+     * Set the newline size and turns newline on if &lt;code&gt;!= null&lt;/code&gt;.
+     *
+     * @param s The custom gap size. NOTE! &lt;code&gt;null&lt;/code&gt; will not turn on or off newline, it will only set the newline gap size to &quot;default&quot;.
+     *          A non-null value will turn on newline though.
+     * @see #isNewline()
+     * @see #setNewline(boolean)
+     * @since 2.4.2
+     */
+    public void setNewlineGapSize(BoundSize s) {
+<span class="nc bnc" id="L1932" title="All 4 branches missed.">        newline = s == null ? (newline != null ? DEF_GAP : null) : s;</span>
+<span class="nc" id="L1933">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

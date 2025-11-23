@@ -1,0 +1,1243 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SimpleDateFormat.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.l10n</a> &gt; <span class="el_source">SimpleDateFormat.java</span></div><h1>SimpleDateFormat.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Eric Coolman, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.l10n;
+
+import com.codename1.util.DateUtil;
+
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.TimeZone;
+import java.util.Vector;
+
+/**
+ * A class for parsing and formatting dates with a given pattern, compatible
+ * with the Java 6 API, as in the examples here: https://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
+ * &lt;br /&gt;&lt;br /&gt;
+ * To localize the formatted dates, see the discussion
+ * &lt;a href=&quot;https://stackoverflow.com/questions/57874534/format-a-localized-date-in-codename-one&quot;&gt;Format a localized date
+ * in Codename One&lt;/a&gt;.
+ *
+ * @author Eric Coolman
+ */
+public class SimpleDateFormat extends DateFormat {
+
+    /**
+     * Pattern character for ERA (ie. BC, AD).
+     */
+    private static final char ERA_LETTER = 'G';
+    /**
+     * Pattern character for year.
+     */
+    private static final char YEAR_LETTER = 'y';
+    /**
+     * Pattern character for month.
+     */
+    private static final char MONTH_LETTER = 'M';
+    /**
+     * Pattern character for week in year.
+     */
+    private static final char WEEK_IN_YEAR_LETTER = 'w';
+    /**
+     * Pattern character for week in month.
+     */
+    private static final char WEEK_IN_MONTH_LETTER = 'W';
+    /**
+     * Pattern character for day in year.
+     */
+    private static final char DAY_IN_YEAR_LETTER = 'D';
+    /**
+     * Pattern character for day.
+     */
+    private static final char DAY_LETTER = 'd';
+    /**
+     * Pattern character for day-of-week in month.
+     */
+    private static final char DOW_IN_MONTH_LETTER = 'F';
+    /**
+     * Pattern character for day of week.
+     */
+    private static final char DAY_OF_WEEK_LETTER = 'E';
+    /**
+     * Pattern character for am/pm.
+     */
+    private static final char AMPM_LETTER = 'a';
+    /**
+     * Pattern character for hour (0-23).
+     */
+    private static final char HOUR_LETTER = 'H';
+    /**
+     * Pattern character for 1-based hour (1-24).
+     */
+    private static final char HOUR_1_LETTER = 'k';
+    /**
+     * Pattern character for 12-hour (0-11).
+     */
+    private static final char HOUR12_LETTER = 'K';
+    /**
+     * Pattern character for 1-based 12-hour (1-12).
+     */
+    private static final char HOUR12_1_LETTER = 'h';
+    /**
+     * Pattern character for minute.
+     */
+    private static final char MINUTE_LETTER = 'm';
+    /**
+     * Pattern character for second.
+     */
+    private static final char SECOND_LETTER = 's';
+    /**
+     * Pattern character for millisecond.
+     */
+    private static final char MILLISECOND_LETTER = 'S';
+    /**
+     * Pattern character for general timezone.
+     */
+    private static final char TIMEZONE_LETTER = 'z';
+    /**
+     * Pattern character for RFC 822-style timezone.
+     */
+    private static final char TIMEZONE822_LETTER = 'Z';
+    /**
+     * Internally used character for literal text.
+     */
+    private static final char LITERAL_LETTER = '*';
+    /**
+     * Pattern character for starting/ending literal text explicitly in pattern.
+     */
+    private static final char EXPLICIT_LITERAL = '\'';
+    /**
+     * positive sign
+     */
+    private static final char SIGN_POSITIVE = '+';
+    /**
+     * negative sign
+     */
+    private static final char SIGN_NEGATIVE = '-';
+    /**
+     * The number of milliseconds in a minute.
+     */
+    private static final int MILLIS_TO_MINUTES = 60000;
+    /**
+     * Pattern characters recognized by this implementation (same as JDK 1.6).
+     */
+    private static final String PATTERN_LETTERS = &quot;adDEFGHhKkMmsSwWyzZ&quot;;
+    /**
+     * TimeZone ID for Greenwich Mean Time
+     */
+    private static final String GMT = &quot;GMT&quot;;
+    /**
+     * This is missing from the Codename One Calendar object, but required by
+     * TimeZone.getOffset()
+     */
+    private static final int ERA = 0;
+    /**
+     * More missing from the calendar object - being lower field values, it is
+     * likely they do exist on the devices Calendar object, if they don't,
+     * certain lesser-used letters will not work in a pattern.
+     */
+    private static final int WEEK_OF_MONTH = 4;
+    private static final int WEEK_OF_YEAR = 3;
+    private static final int DAY_OF_WEEK_IN_MONTH = 8;
+    private static final int DAY_OF_YEAR = 6;
+    /**
+     * When set to {@code true}, month names provided by the underlying platform
+     * will be truncated to match the number of pattern characters. This guards
+     * against platforms that may return longer month names than expected for
+     * patterns such as {@code MMM}. The flag is {@code false} by default for
+     * backwards compatibility.
+     */
+    private static boolean restrictMonthNameLength;
+    /**
+     * Localisation sensitive symbols used for handling text components.
+     */
+    private DateFormatSymbols dateFormatSymbols;
+    /**
+     * The user-supplied pattern
+     */
+    private String pattern;
+    /**
+     * The parsed pattern
+     */
+    private List&lt;String&gt; patternTokens;
+
+    /**
+     * Construct a SimpleDateFormat with no pattern.
+     */
+    public SimpleDateFormat() {
+<span class="nc" id="L188">        super();</span>
+<span class="nc" id="L189">    }</span>
+
+    /**
+     * Construct a SimpleDateFormat with a given pattern.
+     *
+     * @param pattern
+     */
+    public SimpleDateFormat(String pattern) {
+<span class="fc" id="L197">        super();</span>
+<span class="fc" id="L198">        this.pattern = pattern;</span>
+<span class="fc" id="L199">    }</span>
+
+    /**
+     * @return {@code true} if localized month names should be truncated to the
+     * requested pattern length.
+     */
+    public static boolean isRestrictMonthNameLength() {
+<span class="fc" id="L206">        return restrictMonthNameLength;</span>
+    }
+
+    /**
+     * Enables or disables truncating of localized month names so that they
+     * match the number of pattern characters that triggered their lookup.
+     *
+     * @param restrict {@code true} to truncate localized month names to the
+     *                 length requested by the pattern, {@code false} to keep the platform
+     *                 provided value as-is (default behaviour).
+     */
+    public static void setRestrictMonthNameLength(boolean restrict) {
+<span class="fc" id="L218">        restrictMonthNameLength = restrict;</span>
+<span class="fc" id="L219">    }</span>
+
+    private static String applyMonthLengthRestriction(String value, int len) {
+<span class="pc bpc" id="L222" title="3 of 6 branches missed.">        if (restrictMonthNameLength &amp;&amp; value != null &amp;&amp; value.length() &gt; len) {</span>
+<span class="fc" id="L223">            return value.substring(0, len);</span>
+        }
+<span class="nc" id="L225">        return value;</span>
+    }
+
+    /**
+     * @return the pattern
+     */
+    public String toPattern() {
+<span class="fc" id="L232">        return pattern;</span>
+    }
+
+    /**
+     * Get the date format symbols for parsing/formatting textual components of
+     * dates in a localization sensitive way.
+     *
+     * @return current symbols.
+     */
+    public DateFormatSymbols getDateFormatSymbols() {
+<span class="fc bfc" id="L242" title="All 2 branches covered.">        if (dateFormatSymbols == null) {</span>
+<span class="fc" id="L243">            dateFormatSymbols = new DateFormatSymbols();</span>
+        }
+<span class="fc" id="L245">        return dateFormatSymbols;</span>
+    }
+
+    /**
+     * Apply new date format symbols for parsing/formatting textual components
+     * of dates in a localisation sensitive way.
+     *
+     * @param newSymbols new format symbols.
+     */
+    public void setDateFormatSymbols(DateFormatSymbols newSymbols) {
+<span class="fc" id="L255">        dateFormatSymbols = newSymbols;</span>
+<span class="fc" id="L256">    }</span>
+
+    /**
+     * Apply a new pattern.
+     *
+     * @param pattern the pattern to set
+     */
+    public void applyPattern(String pattern) {
+<span class="fc" id="L264">        this.pattern = pattern;</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">        if (patternTokens != null) {</span>
+<span class="fc" id="L266">            patternTokens.clear();</span>
+<span class="fc" id="L267">            patternTokens = null;</span>
+        }
+<span class="fc" id="L269">    }</span>
+
+    /**
+     * G
+     *
+     * @return
+     */
+    List&lt;String&gt; getPatternTokens() {
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (this.patternTokens == null) {</span>
+<span class="fc" id="L278">            patternTokens = parseDatePattern(pattern);</span>
+        }
+<span class="fc" id="L280">        return patternTokens;</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see java.lang.Object#clone()
+     */
+    @Override
+    public Object clone() {
+<span class="fc" id="L290">        SimpleDateFormat sdf = new SimpleDateFormat(pattern);</span>
+<span class="fc" id="L291">        sdf.setDateFormatSymbols(dateFormatSymbols);</span>
+<span class="fc" id="L292">        return sdf;</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see java.text.DateFormat#format(java.util.Date)
+     */
+    @Override
+    public String format(Date source) {
+<span class="fc" id="L302">        return format(source, new StringBuilder());</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see java.text.DateFormat#format(java.util.Date, java.lang.StringBuffer)
+     */
+    @Override
+    String format(Date source, StringBuffer toAppendTo) {
+<span class="nc" id="L312">        StringBuilder sb = new StringBuilder();</span>
+<span class="nc" id="L313">        format(source, sb);</span>
+<span class="nc" id="L314">        toAppendTo.append(sb);</span>
+<span class="nc" id="L315">        return toAppendTo.toString();</span>
+
+    }
+
+    @Override
+    String format(Date source, StringBuilder toAppendTo) {
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">        if (pattern == null) {</span>
+<span class="nc" id="L322">            return super.format(source, toAppendTo);</span>
+        }
+        // format based on local timezone
+<span class="fc" id="L325">        Calendar calendar = Calendar.getInstance(TimeZone.getDefault());</span>
+<span class="fc" id="L326">        calendar.setTime(source);</span>
+<span class="fc" id="L327">        List&lt;String&gt; pattern = getPatternTokens();</span>
+<span class="fc bfc" id="L328" title="All 2 branches covered.">        for (int i = 0; i &lt; pattern.size(); i++) {</span>
+<span class="fc" id="L329">            String token = pattern.get(i);</span>
+<span class="fc" id="L330">            char patternChar = token.charAt(0);</span>
+<span class="fc" id="L331">            token = token.substring(1);</span>
+<span class="fc" id="L332">            int len = token.length();</span>
+<span class="fc" id="L333">            int v = -1;</span>
+<span class="pc bpc" id="L334" title="10 of 18 branches missed.">            switch (patternChar) {</span>
+                case LITERAL_LETTER:
+<span class="fc" id="L336">                    toAppendTo.append(token);</span>
+<span class="fc" id="L337">                    break;</span>
+                case AMPM_LETTER:
+<span class="nc bnc" id="L339" title="All 2 branches missed.">                    boolean am = calendar.get(Calendar.AM_PM) == Calendar.AM;</span>
+<span class="nc" id="L340">                    String[] ampm = getDateFormatSymbols().getAmPmStrings();</span>
+<span class="nc bnc" id="L341" title="All 2 branches missed.">                    toAppendTo.append(am ? ampm[0] : ampm[1]);</span>
+<span class="nc" id="L342">                    break;</span>
+                case ERA_LETTER:
+<span class="nc" id="L344">                    toAppendTo.append(getDateFormatSymbols().getEras()[calendar.get(ERA)]);</span>
+<span class="nc" id="L345">                    break;</span>
+                case DAY_OF_WEEK_LETTER:
+<span class="nc" id="L347">                    v = calendar.get(Calendar.DAY_OF_WEEK) - 1;</span>
+<span class="nc bnc" id="L348" title="All 2 branches missed.">                    if (len &gt; 3) {</span>
+<span class="nc" id="L349">                        toAppendTo.append(getDateFormatSymbols().getWeekdays()[v]);</span>
+                    } else {
+<span class="nc" id="L351">                        toAppendTo.append(getDateFormatSymbols().getShortWeekdays()[v]);</span>
+                    }
+<span class="nc" id="L353">                    break;</span>
+                case TIMEZONE_LETTER:
+<span class="nc" id="L355">                    String[] names = getTimeZoneDisplayNames(calendar.getTimeZone().getID());</span>
+<span class="nc bnc" id="L356" title="All 2 branches missed.">                    if (names == null) {</span>
+<span class="nc" id="L357">                        toAppendTo.append(calendar.getTimeZone().getID());</span>
+                    } else {
+<span class="nc" id="L359">                        DateUtil du = new DateUtil(TimeZone.getTimeZone(names[DateFormatSymbols.ZONE_ID]));</span>
+<span class="nc bnc" id="L360" title="All 2 branches missed.">                        toAppendTo.append(names[du.inDaylightTime(source) ? DateFormatSymbols.ZONE_SHORTNAME_DST : DateFormatSymbols.ZONE_SHORTNAME]);</span>
+                    }
+<span class="nc" id="L362">                    break;</span>
+                case TIMEZONE822_LETTER:
+<span class="nc" id="L364">                    v = getOffsetInMinutes(calendar, calendar.getTimeZone());</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">                    if (v &lt; 0) {</span>
+<span class="nc" id="L366">                        toAppendTo.append(SIGN_NEGATIVE);</span>
+<span class="nc" id="L367">                        v = -v;</span>
+                    } else {
+<span class="nc" id="L369">                        toAppendTo.append(SIGN_POSITIVE);</span>
+                    }
+<span class="nc" id="L371">                    toAppendTo.append(leftPad(v / 60, 2));</span>
+<span class="nc" id="L372">                    toAppendTo.append(leftPad(v % 60, 2));</span>
+<span class="nc" id="L373">                    break;</span>
+                case YEAR_LETTER:
+<span class="fc" id="L375">                    v = calendar.get(Calendar.YEAR);</span>
+<span class="pc bpc" id="L376" title="1 of 2 branches missed.">                    if (len == 2) {</span>
+<span class="nc" id="L377">                        v %= 100;</span>
+                    }
+<span class="fc" id="L379">                    toAppendTo.append(leftPad(v, len));</span>
+<span class="fc" id="L380">                    break;</span>
+                case MONTH_LETTER:
+<span class="fc" id="L382">                    v = calendar.get(Calendar.MONTH) - Calendar.JANUARY;</span>
+<span class="fc bfc" id="L383" title="All 2 branches covered.">                    if (len &gt; 3) {</span>
+<span class="fc" id="L384">                        toAppendTo.append(applyMonthLengthRestriction(L10NManager.getInstance().getLongMonthName(source), len));</span>
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">                    } else if (len == 3) {</span>
+<span class="nc" id="L386">                        toAppendTo.append(applyMonthLengthRestriction(L10NManager.getInstance().getShortMonthName(source), len));</span>
+                    } else {
+<span class="fc" id="L388">                        toAppendTo.append(leftPad(v + 1, len));</span>
+                    }
+<span class="fc" id="L390">                    break;</span>
+                case DAY_LETTER:
+<span class="fc" id="L392">                    v = calendar.get(Calendar.DAY_OF_MONTH);</span>
+<span class="fc" id="L393">                    toAppendTo.append(leftPad(v, len));</span>
+<span class="fc" id="L394">                    break;</span>
+                case HOUR_LETTER:
+                case HOUR_1_LETTER:
+                case HOUR12_LETTER:
+                case HOUR12_1_LETTER:
+<span class="fc" id="L399">                    v = calendar.get(Calendar.HOUR_OF_DAY);</span>
+
+<span class="pc bpc" id="L401" title="3 of 4 branches missed.">                    if (patternChar == HOUR_1_LETTER &amp;&amp; v == 0) {</span>
+<span class="nc" id="L402">                        v = 24;</span>
+                    }
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">                    if (patternChar == HOUR12_1_LETTER) {</span>
+<span class="nc" id="L405">                        v %= 12;</span>
+<span class="nc bnc" id="L406" title="All 2 branches missed.">                        if (v == 0) {</span>
+<span class="nc" id="L407">                            v = 12;</span>
+                        }
+                    } else {
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">                        if (patternChar == HOUR12_LETTER) {</span>
+<span class="nc" id="L411">                            v %= 12;</span>
+                        }
+                    }
+<span class="fc" id="L414">                    toAppendTo.append(leftPad(v, len));</span>
+<span class="fc" id="L415">                    break;</span>
+                case MINUTE_LETTER:
+<span class="fc" id="L417">                    v = calendar.get(Calendar.MINUTE);</span>
+<span class="fc" id="L418">                    toAppendTo.append(leftPad(v, len));</span>
+<span class="fc" id="L419">                    break;</span>
+                case SECOND_LETTER:
+<span class="fc" id="L421">                    v = calendar.get(Calendar.SECOND);</span>
+<span class="fc" id="L422">                    toAppendTo.append(leftPad(v, len));</span>
+<span class="fc" id="L423">                    break;</span>
+                case MILLISECOND_LETTER:
+<span class="fc" id="L425">                    v = calendar.get(Calendar.MILLISECOND);</span>
+<span class="fc" id="L426">                    toAppendTo.append(leftPad(v, len));</span>
+<span class="fc" id="L427">                    break;</span>
+                case WEEK_IN_YEAR_LETTER:
+<span class="nc" id="L429">                    v = calendar.get(WEEK_OF_YEAR);</span>
+<span class="nc" id="L430">                    toAppendTo.append(leftPad(v, len));</span>
+<span class="nc" id="L431">                    break;</span>
+                case WEEK_IN_MONTH_LETTER:
+<span class="nc" id="L433">                    v = calendar.get(WEEK_OF_MONTH);</span>
+<span class="nc" id="L434">                    toAppendTo.append(leftPad(v, len));</span>
+<span class="nc" id="L435">                    break;</span>
+                case DAY_IN_YEAR_LETTER:
+<span class="nc" id="L437">                    v = calendar.get(DAY_OF_YEAR);</span>
+<span class="nc" id="L438">                    toAppendTo.append(leftPad(v, len));</span>
+<span class="nc" id="L439">                    break;</span>
+                case DOW_IN_MONTH_LETTER:
+<span class="nc" id="L441">                    v = calendar.get(DAY_OF_WEEK_IN_MONTH);</span>
+<span class="nc" id="L442">                    toAppendTo.append(leftPad(v, len));</span>
+                    break;
+            }
+        }
+<span class="fc" id="L446">        return toAppendTo.toString();</span>
+    }
+
+    private String[] getTimeZoneDisplayNames(String id) {
+<span class="nc bnc" id="L450" title="All 2 branches missed.">        for (String[] zoneStrings : getDateFormatSymbols().getZoneStrings()) {</span>
+<span class="nc bnc" id="L451" title="All 2 branches missed.">            if (zoneStrings[DateFormatSymbols.ZONE_ID].equalsIgnoreCase(id)) {</span>
+<span class="nc" id="L452">                return zoneStrings;</span>
+            }
+        }
+<span class="nc" id="L455">        return null;</span>
+    }
+
+    String leftPad(int v, int size) {
+<span class="fc" id="L459">        String s = String.valueOf(v);</span>
+<span class="fc bfc" id="L460" title="All 2 branches covered.">        for (int i = s.length(); i &lt; size; i++) {</span>
+<span class="fc" id="L461">            s = '0' + s;</span>
+        }
+<span class="fc" id="L463">        return s;</span>
+    }
+
+    /**
+     * Parses text from a string to produce a Date.
+     */
+    @Override
+    public Date parse(String source) throws ParseException {
+<span class="pc bpc" id="L471" title="1 of 2 branches missed.">        if (pattern == null) {</span>
+<span class="nc" id="L472">            throw new ParseException(&quot;You must provide a template before calling the SimpleDateFormat.parse(...) method&quot;, 0);</span>
+        }
+<span class="fc" id="L474">        int startIndex = 0;</span>
+        // parse based on GMT timezone for handling offsets
+<span class="fc" id="L476">        Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone(GMT));</span>
+<span class="fc" id="L477">        TimeZone parsedTimeZone = null;</span>
+<span class="fc" id="L478">        calendar.set(Calendar.MINUTE, 0);</span>
+<span class="fc" id="L479">        calendar.set(Calendar.SECOND, 0);</span>
+<span class="fc" id="L480">        calendar.set(Calendar.MILLISECOND, 0);</span>
+<span class="fc" id="L481">        int tzMinutes = -1;</span>
+<span class="fc" id="L482">        int pmMinutes = 0;</span>
+<span class="fc" id="L483">        List&lt;String&gt; pattern = getPatternTokens();</span>
+<span class="fc bfc" id="L484" title="All 2 branches covered.">        for (int i = 0; i &lt; pattern.size(); i++) {</span>
+<span class="fc" id="L485">            String token = pattern.get(i);</span>
+<span class="fc" id="L486">            boolean adjacent = false;</span>
+<span class="fc bfc" id="L487" title="All 2 branches covered.">            if (i &lt; (pattern.size() - 1)) {</span>
+<span class="fc bfc" id="L488" title="All 2 branches covered.">                adjacent = pattern.get(i + 1).charAt(0) != LITERAL_LETTER;</span>
+            }
+<span class="fc" id="L490">            String s = null;</span>
+<span class="fc" id="L491">            int v = -1;</span>
+<span class="fc" id="L492">            char patternChar = token.charAt(0);</span>
+<span class="fc" id="L493">            token = token.substring(1);</span>
+<span class="pc bpc" id="L494" title="7 of 16 branches missed.">            switch (patternChar) {</span>
+                case LITERAL_LETTER:
+<span class="fc" id="L496">                    s = readLiteral(source, startIndex, token);</span>
+<span class="pc bpc" id="L497" title="1 of 2 branches missed.">                    if (!s.equalsIgnoreCase(token)) {</span>
+<span class="nc" id="L498">                        throw new ParseException(&quot;Unparseable string &quot; + source, startIndex);</span>
+                    }
+                    break;
+                case AMPM_LETTER:
+<span class="nc" id="L502">                    s = readAmPmMarker(source, startIndex);</span>
+<span class="nc bnc" id="L503" title="All 4 branches missed.">                    if (s == null || ((v = parseAmPmMarker(source, startIndex)) == -1)) {</span>
+<span class="nc" id="L504">                        throwInvalid(&quot;am/pm marker&quot;, startIndex);</span>
+                    }
+<span class="nc bnc" id="L506" title="All 2 branches missed.">                    if (v == Calendar.PM) {</span>
+<span class="nc" id="L507">                        pmMinutes = 12 * 60;</span>
+                    }
+                    break;
+                case DAY_OF_WEEK_LETTER:
+<span class="nc" id="L511">                    s = readDayOfWeek(source, startIndex);</span>
+<span class="nc bnc" id="L512" title="All 2 branches missed.">                    if (s == null) {</span>
+<span class="nc" id="L513">                        throwInvalid(&quot;weekday&quot;, startIndex);</span>
+                    }
+                    break;
+                case TIMEZONE_LETTER:
+                case TIMEZONE822_LETTER:
+<span class="fc" id="L518">                    s = readTimeZone(source, startIndex);</span>
+<span class="fc" id="L519">                    TimeZoneResult res = new TimeZoneResult();</span>
+<span class="pc bpc" id="L520" title="2 of 4 branches missed.">                    if (s == null || (v = parseTimeZone(s, startIndex, res)) == -1) {</span>
+
+<span class="nc" id="L522">                        throwInvalid(&quot;timezone&quot;, startIndex);</span>
+                    }
+<span class="pc bpc" id="L524" title="1 of 2 branches missed.">                    if (res != null) {</span>
+<span class="fc" id="L525">                        parsedTimeZone = res.timeZone;</span>
+                    }
+<span class="pc bpc" id="L527" title="1 of 2 branches missed.">                    tzMinutes = ((tzMinutes == -1) ? 0 : tzMinutes) + v;</span>
+<span class="fc" id="L528">                    break;</span>
+                case YEAR_LETTER:
+<span class="fc" id="L530">                    s = readNumber(source, startIndex, token, adjacent);</span>
+<span class="fc" id="L531">                    calendar.set(Calendar.YEAR, parseYear(s, token, startIndex));</span>
+<span class="fc" id="L532">                    break;</span>
+                case MONTH_LETTER:
+<span class="fc" id="L534">                    s = readMonth(source, startIndex, token, adjacent);</span>
+<span class="fc" id="L535">                    calendar.set(Calendar.MONTH, parseMonth(s, startIndex));</span>
+<span class="fc" id="L536">                    break;</span>
+                case DAY_LETTER:
+<span class="fc" id="L538">                    s = readNumber(source, startIndex, token, adjacent);</span>
+<span class="fc" id="L539">                    calendar.set(Calendar.DAY_OF_MONTH, parseNumber(s, startIndex, &quot;day of month&quot;, 1, 31));</span>
+<span class="fc" id="L540">                    break;</span>
+                case HOUR_LETTER:
+                case HOUR_1_LETTER:
+                case HOUR12_LETTER:
+                case HOUR12_1_LETTER:
+<span class="fc" id="L545">                    s = readNumber(source, startIndex, token, adjacent);</span>
+<span class="fc" id="L546">                    calendar.set(Calendar.HOUR_OF_DAY, parseHour(s, patternChar, startIndex));</span>
+<span class="fc" id="L547">                    break;</span>
+                case MINUTE_LETTER:
+<span class="fc" id="L549">                    s = readNumber(source, startIndex, token, adjacent);</span>
+<span class="fc" id="L550">                    calendar.set(Calendar.MINUTE, parseNumber(s, startIndex, &quot;minute&quot;, 0, 59));</span>
+<span class="fc" id="L551">                    break;</span>
+                case SECOND_LETTER:
+<span class="fc" id="L553">                    s = readNumber(source, startIndex, token, adjacent);</span>
+<span class="fc" id="L554">                    calendar.set(Calendar.SECOND, parseNumber(s, startIndex, &quot;second&quot;, 0, 59));</span>
+<span class="fc" id="L555">                    break;</span>
+                case MILLISECOND_LETTER:
+<span class="fc" id="L557">                    s = readNumber(source, startIndex, token, adjacent);</span>
+<span class="fc" id="L558">                    calendar.set(Calendar.MILLISECOND, parseNumber(s, startIndex, &quot;millisecond&quot;, 0, 999));</span>
+<span class="fc" id="L559">                    break;</span>
+                case WEEK_IN_YEAR_LETTER:
+<span class="nc" id="L561">                    s = readNumber(source, startIndex, token, adjacent);</span>
+<span class="nc" id="L562">                    calendar.set(WEEK_OF_YEAR, parseNumber(s, startIndex, &quot;week of year&quot;, 1, 52));</span>
+<span class="nc" id="L563">                    break;</span>
+                case WEEK_IN_MONTH_LETTER:
+<span class="nc" id="L565">                    s = readNumber(source, startIndex, token, adjacent);</span>
+<span class="nc" id="L566">                    calendar.set(WEEK_OF_MONTH, parseNumber(s, startIndex, &quot;week of month&quot;, 0, 5));</span>
+<span class="nc" id="L567">                    break;</span>
+                case DAY_IN_YEAR_LETTER:
+<span class="nc" id="L569">                    s = readNumber(source, startIndex, token, adjacent);</span>
+<span class="nc" id="L570">                    calendar.set(DAY_OF_YEAR, parseNumber(s, startIndex, &quot;day of year&quot;, 1, 365));</span>
+<span class="nc" id="L571">                    break;</span>
+                case DOW_IN_MONTH_LETTER:
+<span class="nc" id="L573">                    s = readNumber(source, startIndex, token, adjacent);</span>
+<span class="nc" id="L574">                    calendar.set(DAY_OF_WEEK_IN_MONTH,</span>
+<span class="nc" id="L575">                            parseNumber(s, startIndex, &quot;day of week in month&quot;, -5, 5));</span>
+                    break;
+            }
+<span class="pc bpc" id="L578" title="1 of 2 branches missed.">            if (s != null) {</span>
+<span class="fc" id="L579">                startIndex += s.length();</span>
+            }
+        }
+
+<span class="fc" id="L583">        TimeZone localTimezone = Calendar.getInstance().getTimeZone();</span>
+<span class="fc" id="L584">        calendar.getTime(); // this seems to be necessary to calculate the time before changing the timzezone</span>
+<span class="fc" id="L585">        calendar.setTimeZone(localTimezone);</span>
+<span class="pc bpc" id="L586" title="1 of 2 branches missed.">        if (pmMinutes != 0) {</span>
+<span class="nc" id="L587">            calendar.set(Calendar.MINUTE, calendar.get(Calendar.MINUTE) + pmMinutes);</span>
+        }
+<span class="fc" id="L589">        long rawOffset = localTimezone.getRawOffset();</span>
+<span class="fc" id="L590">        int rawOffsetMinutes = (int) (rawOffset / MILLIS_TO_MINUTES);</span>
+<span class="fc" id="L591">        int localDSTOffset = getLocalDSTOffset(calendar);</span>
+<span class="fc bfc" id="L592" title="All 2 branches covered.">        if (tzMinutes != -1) {</span>
+<span class="fc" id="L593">            tzMinutes = -rawOffsetMinutes - tzMinutes;</span>
+<span class="fc" id="L594">            int tzDstOffset = 0;</span>
+<span class="fc bfc" id="L595" title="All 2 branches covered.">            if (parsedTimeZone != null) {</span>
+<span class="fc" id="L596">                Calendar tzCalendar = Calendar.getInstance(parsedTimeZone);</span>
+<span class="fc" id="L597">                tzCalendar.setTime(calendar.getTime());</span>
+<span class="fc" id="L598">                tzDstOffset = getDSTOffset(tzCalendar);</span>
+            }
+<span class="fc" id="L600">            tzMinutes = tzMinutes - (localDSTOffset - tzDstOffset);</span>
+<span class="fc" id="L601">            calendar.set(Calendar.MINUTE, calendar.get(Calendar.MINUTE) - tzMinutes);</span>
+        }
+<span class="fc" id="L603">        calendar.set(Calendar.MINUTE, calendar.get(Calendar.MINUTE) - rawOffsetMinutes - localDSTOffset);</span>
+<span class="fc" id="L604">        return calendar.getTime();</span>
+    }
+
+    /**
+     * Parse a hour value. Depending on patternChar parameter, the hour can be
+     * 0-23, 1-24, 0-11, or 1-12. The returned value will always be 0 based.
+     *
+     * @param source as a string.
+     * @param offset the offset of original timestamp where marker started, for
+     *               error reporting.
+     * @return hour.
+     * @throws ParseException if the source could not be parsed. See http
+     *                        ://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
+     */
+    int parseHour(String source, char patternChar, int offset) throws ParseException {
+<span class="fc" id="L619">        int min = 0;</span>
+<span class="pc bpc" id="L620" title="2 of 4 branches missed.">        boolean oneBased = (patternChar == HOUR_1_LETTER || patternChar == HOUR12_1_LETTER);</span>
+<span class="pc bpc" id="L621" title="4 of 6 branches missed.">        int max = ((patternChar == HOUR_LETTER || patternChar == HOUR_1_LETTER) ? 23 : 11) + (oneBased ? 1 : 0);</span>
+<span class="fc" id="L622">        return parseNumber(source, offset, &quot;hour&quot;, min, max);</span>
+    }
+
+    /**
+     * Utility method to validate a number is within given range.
+     */
+    void validateNumber(int i, int ofs, String name, int min, int max) throws ParseException {
+<span class="pc bpc" id="L629" title="2 of 4 branches missed.">        if (i &lt; min || i &gt; max) {</span>
+<span class="nc" id="L630">            throwInvalid(name, ofs);</span>
+        }
+<span class="fc" id="L632">    }</span>
+
+    /**
+     * Utility method to keep parsing errors consistent.
+     *
+     * @param name   name of the element being parsed when error occurred.
+     * @param offset offset within the original timestamp where named element
+     *               beings.
+     */
+    int throwInvalid(String name, int offset) throws ParseException {
+<span class="fc" id="L642">        throw new ParseException(&quot;Invalid &quot; + name + &quot; value&quot;, offset);</span>
+    }
+
+    /**
+     * Parse a numeric value, validating against given min/max constraints.
+     *
+     * @param source as a string.
+     * @param ofs    the offset of original timestamp where number starts, for
+     *               error reporting.
+     * @return numeric value as an int
+     * @throws ParseException if the source could not be parsed.
+     */
+    int parseNumber(String source, int ofs, String name, int min, int max) throws ParseException {
+<span class="fc bfc" id="L655" title="All 2 branches covered.">        if (source == null) {</span>
+<span class="nc" id="L656">            throwInvalid(name, ofs);</span>
+        }
+<span class="fc" id="L658">        int v = -1;</span>
+        try {
+<span class="fc" id="L660">            v = Integer.parseInt(source);</span>
+<span class="nc" id="L661">        } catch (NumberFormatException nfe) {</span>
+<span class="nc" id="L662">            throwInvalid(name, ofs);</span>
+<span class="fc" id="L663">        }</span>
+<span class="fc bfc" id="L664" title="All 2 branches covered.">        if (min != max) {</span>
+<span class="fc" id="L665">            validateNumber(v, ofs, name, min, max);</span>
+        }
+<span class="fc" id="L667">        return v;</span>
+    }
+
+    /**
+     * Determine the number of minutes to adjust the date for local DST. This
+     * should provide a historically correct value, also accounting for changes
+     * in GMT offset. See TimeZone javadoc for more details.
+     *
+     * @param source
+     * @return
+     */
+    int getLocalDSTOffset(Calendar source) {
+<span class="fc" id="L679">        TimeZone localTimezone = Calendar.getInstance().getTimeZone();</span>
+<span class="fc" id="L680">        int rawOffset = localTimezone.getRawOffset() / MILLIS_TO_MINUTES;</span>
+<span class="fc" id="L681">        return getOffsetInMinutes(source, localTimezone) - rawOffset;</span>
+    }
+
+    int getDSTOffset(Calendar source) {
+<span class="fc" id="L685">        TimeZone timeZone = source.getTimeZone();</span>
+<span class="fc" id="L686">        int rawOffset = timeZone.getRawOffset() / MILLIS_TO_MINUTES;</span>
+<span class="fc" id="L687">        return getOffsetInMinutes(source, timeZone) - rawOffset;</span>
+    }
+
+    /**
+     * Get the offset from GMT for a given timezone.
+     *
+     * @param source
+     * @param timezone
+     * @return
+     */
+    int getOffsetInMinutes(Calendar source, TimeZone timezone) {
+<span class="fc" id="L698">        return timezone.getOffset(source.get(ERA), source.get(Calendar.YEAR), source.get(Calendar.MONTH),</span>
+<span class="fc" id="L699">                source.get(Calendar.DAY_OF_MONTH), source.get(Calendar.DAY_OF_WEEK), source.get(Calendar.MILLISECOND))</span>
+                / MILLIS_TO_MINUTES;
+    }
+
+    /**
+     * Read a substring from source.
+     *
+     * @param ofs start index of substring
+     * @param end end index of substring
+     * @throws ParseException if substring is out of bounds.
+     */
+    String readSubstring(String source, int ofs, int end) {
+<span class="pc bpc" id="L711" title="3 of 6 branches missed.">        if (source == null || ofs &gt; source.length() || end &gt; source.length()) {</span>
+<span class="nc" id="L712">            return null;</span>
+        }
+<span class="fc" id="L714">        return source.substring(ofs, end);</span>
+    }
+
+    /**
+     * Read a substring from source.
+     *
+     * @param ofs start index of substring
+     * @throws ParseException if substring is out of bounds.
+     */
+    String readSubstring(String source, int ofs) {
+<span class="fc" id="L724">        return readSubstring(source, ofs, source.length());</span>
+    }
+
+    /**
+     * Read an unparsable text string.
+     *
+     * @param source full timestamp
+     * @param ofs    offset within timestamp where text starts
+     * @return the text
+     */
+    String readLiteral(String source, int ofs, String token) {
+<span class="fc" id="L735">        return readSubstring(source, ofs, ofs + token.length());</span>
+    }
+
+    /**
+     * Read the number. Does not attempt to parse.
+     *
+     * @param source   full timestamp
+     * @param ofs      offset within timestamp where number starts
+     * @param token    the token currently being parsed
+     * @param adjacent true if the number is adjacent to next field with no
+     *                 literal separator.
+     * @return the number as a string, or null if could not read.
+     * @see #parseNumber(String, int, String, int, int)
+     */
+    String readNumber(String source, int ofs, String token, boolean adjacent) {
+<span class="pc bpc" id="L750" title="1 of 2 branches missed.">        if (adjacent) {</span>
+<span class="nc" id="L751">            return readSubstring(source, ofs, ofs + token.length());</span>
+        }
+<span class="fc" id="L753">        int len = source.length();</span>
+<span class="fc bfc" id="L754" title="All 2 branches covered.">        for (int i = ofs; i &lt; len; i++) {</span>
+<span class="fc" id="L755">            char ch = source.charAt(i);</span>
+<span class="fc bfc" id="L756" title="All 2 branches covered.">            if (!isNumeric(ch)) {</span>
+                // empty string would be invalid number
+<span class="fc bfc" id="L758" title="All 2 branches covered.">                if (i == 0) {</span>
+<span class="fc" id="L759">                    return null;</span>
+                }
+<span class="fc" id="L761">                return readSubstring(source, ofs, i);</span>
+            }
+        }
+<span class="fc" id="L764">        return readSubstring(source, ofs);</span>
+    }
+
+    /**
+     * Parse a year value. If the year is a two digit value, if the value is
+     * within 20 years ahead of the current year, current century will be used
+     * (ie. if current year is 2013, a value of &quot;33&quot; will return 2033),
+     * otherwise previous century is used (ie. with current year of 2012, a
+     * value of 97 will return &quot;1997&quot;). See Java 6 documentation for more
+     * details of this algorithm.
+     *
+     * @param source year as a string.
+     * @param ofs    the offset of original timestamp where marker started, for
+     *               error reporting.
+     * @return full year.
+     * @throws ParseException if the source could not be parsed. See http
+     *                        ://docs.oracle.com/javase/6/docs/api/java/text/SimpleDateFormat.html
+     */
+    int parseYear(String source, String token, int ofs) throws ParseException {
+<span class="fc" id="L783">        int year = parseNumber(source, ofs, &quot;year&quot;, -1, -1);</span>
+<span class="fc" id="L784">        int len = source.length();</span>
+<span class="fc" id="L785">        int tokenLen = token.length();</span>
+<span class="fc" id="L786">        int thisYear = Calendar.getInstance().get(Calendar.YEAR);</span>
+<span class="pc bpc" id="L787" title="3 of 4 branches missed.">        if ((len == 2) &amp;&amp; (tokenLen &lt; 3)) {</span>
+<span class="nc" id="L788">            int c = (thisYear / 100) * 100;</span>
+<span class="nc" id="L789">            year += c;</span>
+<span class="nc bnc" id="L790" title="All 2 branches missed.">            if (year &gt; (thisYear + 20)) {</span>
+<span class="nc" id="L791">                year -= 100;</span>
+            }
+<span class="nc" id="L793">            validateNumber(year, ofs, &quot;year&quot;, 1000, thisYear + 1000);</span>
+        }
+<span class="fc" id="L795">        return year;</span>
+    }
+
+    /**
+     * Read the day of week string. Does not attempt to parse.
+     *
+     * @param source full timestamp
+     * @param ofs    offset within timestamp where day of week starts
+     * @return the day of week as a string, or null if could not read.
+     */
+    String readDayOfWeek(String source, int ofs) {
+<span class="nc" id="L806">        int i = findEndText(source, ofs);</span>
+<span class="nc bnc" id="L807" title="All 2 branches missed.">        if (i == -1) {</span>
+<span class="nc" id="L808">            i = source.length();</span>
+        }
+<span class="nc" id="L810">        String fragment = readSubstring(source, ofs, i);</span>
+<span class="nc bnc" id="L811" title="All 2 branches missed.">        if (fragment == null) {</span>
+<span class="nc" id="L812">            return null;</span>
+        }
+<span class="nc" id="L814">        DateFormatSymbols ds = getDateFormatSymbols();</span>
+<span class="nc bnc" id="L815" title="All 2 branches missed.">        for (String weekday : ds.getWeekdays()) {</span>
+<span class="nc bnc" id="L816" title="All 2 branches missed.">            if (fragment.equalsIgnoreCase(weekday)) {</span>
+<span class="nc" id="L817">                return readSubstring(source, ofs, ofs + weekday.length());</span>
+            }
+        }
+<span class="nc bnc" id="L820" title="All 2 branches missed.">        for (String weekday : ds.getShortWeekdays()) {</span>
+<span class="nc bnc" id="L821" title="All 2 branches missed.">            if (fragment.equalsIgnoreCase(weekday)) {</span>
+<span class="nc" id="L822">                return readSubstring(source, ofs, ofs + weekday.length());</span>
+            }
+        }
+<span class="nc bnc" id="L825" title="All 2 branches missed.">        if (ds.isLocalized()) {</span>
+<span class="nc" id="L826">            ds.setLocalized(false);</span>
+<span class="nc" id="L827">            String s = readDayOfWeek(source, ofs);</span>
+<span class="nc" id="L828">            ds.setLocalized(true);</span>
+<span class="nc" id="L829">            return s;</span>
+        }
+<span class="nc" id="L831">        return null;</span>
+    }
+
+    /**
+     * Read the am/pm marker string. Does not attempt to parse.
+     *
+     * @param source full timestamp
+     * @param ofs    offset within timestamp where marker starts
+     * @return the marker as a string, or null if could not read.
+     * @see #parseAmPmMarker(String, int)
+     */
+    String readAmPmMarker(String source, int ofs) {
+<span class="nc" id="L843">        int i = findEndText(source, ofs);</span>
+<span class="nc bnc" id="L844" title="All 2 branches missed.">        if (i == -1) {</span>
+<span class="nc" id="L845">            i = source.length();</span>
+        }
+<span class="nc" id="L847">        String fragment = readSubstring(source, ofs, i).toLowerCase();</span>
+<span class="nc bnc" id="L848" title="All 2 branches missed.">        if (fragment == null) {</span>
+<span class="nc" id="L849">            return null;</span>
+        }
+<span class="nc" id="L851">        DateFormatSymbols ds = getDateFormatSymbols();</span>
+<span class="nc" id="L852">        String[] markers = ds.getAmPmStrings();</span>
+<span class="nc bnc" id="L853" title="All 2 branches missed.">        for (String marker : markers) {</span>
+<span class="nc bnc" id="L854" title="All 2 branches missed.">            if (fragment.toLowerCase().startsWith(marker.toLowerCase())) {</span>
+<span class="nc" id="L855">                return readSubstring(source, ofs, ofs + marker.length());</span>
+            }
+        }
+<span class="nc bnc" id="L858" title="All 2 branches missed.">        for (String marker : markers) {</span>
+<span class="nc bnc" id="L859" title="All 2 branches missed.">            if (fragment.toLowerCase().charAt(0) == marker.toLowerCase().charAt(0)) {</span>
+<span class="nc" id="L860">                return readSubstring(source, ofs, ofs + 1);</span>
+            }
+        }
+<span class="nc bnc" id="L863" title="All 2 branches missed.">        if (ds.isLocalized()) {</span>
+<span class="nc" id="L864">            ds.setLocalized(false);</span>
+<span class="nc" id="L865">            String s = readAmPmMarker(source, ofs);</span>
+<span class="nc" id="L866">            ds.setLocalized(true);</span>
+<span class="nc" id="L867">            return s;</span>
+        }
+<span class="nc" id="L869">        return null;</span>
+    }
+
+    /**
+     * Parse an AM/PM marker. The source marker can be the marker name as
+     * defined in DateFormatSymbols, or the first character of the marker name.
+     *
+     * @param source month as a string.
+     * @param ofs    the offset of original timestamp where marker started, for
+     *               error reporting.
+     * @return Calendar.AM or Calendar.PM
+     * @throws ParseException if the source could not be parsed.
+     * @see DateFormatSymbols
+     */
+    int parseAmPmMarker(String source, int ofs) throws ParseException {
+<span class="nc" id="L884">        DateFormatSymbols ds = getDateFormatSymbols();</span>
+<span class="nc" id="L885">        String[] markers = getDateFormatSymbols().getAmPmStrings();</span>
+<span class="nc" id="L886">        int mlen = markers.length;</span>
+<span class="nc bnc" id="L887" title="All 2 branches missed.">        for (int i = 0; i &lt; mlen; i++) {</span>
+<span class="nc bnc" id="L888" title="All 2 branches missed.">            if (markers[i].equalsIgnoreCase(source)) {</span>
+<span class="nc" id="L889">                return i;</span>
+            }
+        }
+<span class="nc" id="L892">        char ch = source.charAt(ofs);</span>
+<span class="nc bnc" id="L893" title="All 2 branches missed.">        if (ch == markers[0].charAt(0)) {</span>
+<span class="nc" id="L894">            return Calendar.AM;</span>
+        }
+<span class="nc bnc" id="L896" title="All 2 branches missed.">        if (ch == markers[1].charAt(0)) {</span>
+<span class="nc" id="L897">            return Calendar.PM;</span>
+        }
+<span class="nc bnc" id="L899" title="All 2 branches missed.">        if (ds.isLocalized()) {</span>
+<span class="nc" id="L900">            ds.setLocalized(false);</span>
+<span class="nc" id="L901">            int i = parseAmPmMarker(source, ofs);</span>
+<span class="nc" id="L902">            ds.setLocalized(true);</span>
+<span class="nc" id="L903">            return i;</span>
+        }
+<span class="nc" id="L905">        return throwInvalid(&quot;am/pm marker&quot;, ofs);</span>
+    }
+
+    /**
+     * Read the month string. Does not attempt to parse.
+     *
+     * @param source full timestamp
+     * @param ofs    offset within timestamp where month starts
+     * @return the month as a string, or null if could not read.
+     * @see #parseMonth(String, int)
+     */
+    String readMonth(String source, int ofs, String token, boolean adjacent) {
+<span class="fc bfc" id="L917" title="All 2 branches covered.">        if (token.length() &lt; 3) {</span>
+<span class="pc bpc" id="L918" title="1 of 2 branches missed.">            if (adjacent) {</span>
+<span class="nc" id="L919">                return readSubstring(source, ofs, ofs + token.length());</span>
+            }
+<span class="pc bpc" id="L921" title="1 of 2 branches missed.">            if (isNumeric(source.charAt(0))) {</span>
+<span class="fc" id="L922">                return readNumber(source, ofs, token, adjacent);</span>
+            }
+        }
+<span class="fc" id="L925">        int i = findEndText(source, ofs);</span>
+<span class="pc bpc" id="L926" title="1 of 2 branches missed.">        if (i == -1) {</span>
+<span class="nc" id="L927">            i = source.length();</span>
+        }
+<span class="fc" id="L929">        String fragment = readSubstring(source, ofs, i);</span>
+<span class="pc bpc" id="L930" title="1 of 2 branches missed.">        if (fragment == null) {</span>
+<span class="nc" id="L931">            return null;</span>
+        }
+<span class="fc" id="L933">        DateFormatSymbols ds = getDateFormatSymbols();</span>
+<span class="fc bfc" id="L934" title="All 2 branches covered.">        for (String month : ds.getMonths()) {</span>
+<span class="pc bpc" id="L935" title="1 of 2 branches missed.">            if (fragment.equalsIgnoreCase(month)) {</span>
+<span class="nc" id="L936">                return readSubstring(source, ofs, ofs + month.length());</span>
+            }
+        }
+<span class="pc bpc" id="L939" title="1 of 2 branches missed.">        for (String month : ds.getShortMonths()) {</span>
+<span class="fc bfc" id="L940" title="All 2 branches covered.">            if (fragment.equalsIgnoreCase(month)) {</span>
+<span class="fc" id="L941">                return readSubstring(source, ofs, ofs + month.length());</span>
+            }
+        }
+<span class="nc bnc" id="L944" title="All 2 branches missed.">        if (ds.isLocalized()) {</span>
+<span class="nc" id="L945">            ds.setLocalized(false);</span>
+<span class="nc" id="L946">            String s = readMonth(source, ofs, token, adjacent);</span>
+<span class="nc" id="L947">            ds.setLocalized(true);</span>
+<span class="nc" id="L948">            return s;</span>
+        }
+<span class="nc" id="L950">        return null;</span>
+    }
+
+    /**
+     * Parse a month value to an offset from Calendar.JANUARY. The source month
+     * value can be numeric (1-12), a shortform or longform month name as
+     * defined in DateFormatSymbols.
+     *
+     * @param month  as a string.
+     * @param offset the offset of original timestamp where month started, for
+     *               error reporting.
+     * @return month as an offset from Calendar.JANUARY.
+     * @throws ParseException if the source could not be parsed.
+     * @see DateFormatSymbols
+     */
+    int parseMonth(String month, int offset) throws ParseException {
+<span class="pc bpc" id="L966" title="1 of 2 branches missed.">        if (month == null) {</span>
+<span class="nc" id="L967">            throwInvalid(&quot;month&quot;, offset);</span>
+        }
+<span class="fc bfc" id="L969" title="All 2 branches covered.">        if (month.length() &lt; 3) {</span>
+<span class="fc" id="L970">            return (parseNumber(month, offset, &quot;month&quot;, 1, 12) - 1) + Calendar.JANUARY;</span>
+        }
+<span class="fc" id="L972">        DateFormatSymbols ds = getDateFormatSymbols();</span>
+<span class="fc" id="L973">        String[] months = ds.getMonths();</span>
+<span class="fc" id="L974">        int mlen = months.length;</span>
+<span class="fc bfc" id="L975" title="All 2 branches covered.">        for (int i = 0; i &lt; mlen; i++) {</span>
+<span class="pc bpc" id="L976" title="1 of 2 branches missed.">            if (month.equalsIgnoreCase(months[i])) {</span>
+<span class="nc" id="L977">                return i + Calendar.JANUARY;</span>
+            }
+        }
+<span class="fc" id="L980">        months = ds.getShortMonths();</span>
+<span class="fc" id="L981">        mlen = months.length;</span>
+<span class="pc bpc" id="L982" title="1 of 2 branches missed.">        for (int i = 0; i &lt; mlen; i++) {</span>
+<span class="fc bfc" id="L983" title="All 2 branches covered.">            if (month.equalsIgnoreCase(months[i])) {</span>
+<span class="fc" id="L984">                return i + Calendar.JANUARY;</span>
+            }
+        }
+<span class="nc bnc" id="L987" title="All 2 branches missed.">        if (ds.isLocalized()) {</span>
+<span class="nc" id="L988">            ds.setLocalized(false);</span>
+<span class="nc" id="L989">            int i = 0;</span>
+            try {
+<span class="nc" id="L991">                i = parseMonth(month, offset);</span>
+            } finally {
+<span class="nc" id="L993">                ds.setLocalized(true);</span>
+            }
+<span class="nc" id="L995">            return i;</span>
+        }
+
+<span class="nc" id="L998">        return throwInvalid(&quot;month&quot;, offset);</span>
+    }
+
+    /**
+     * Read the timezone string. Does not attempt to parse.
+     *
+     * @param source full timestamp
+     * @param ofs    offset within timestamp where timezone starts
+     * @return the timezone as a string or null if error reading.
+     * @see #parseTimeZone(String, int)
+     */
+    String readTimeZone(String source, int ofs) {
+<span class="fc" id="L1010">        int sp = source.indexOf(' ', ofs);</span>
+        String fragment;
+<span class="pc bpc" id="L1012" title="1 of 2 branches missed.">        if (sp != -1) {</span>
+<span class="nc" id="L1013">            fragment = readSubstring(source, ofs, sp);</span>
+        } else {
+<span class="fc" id="L1015">            fragment = readSubstring(source, ofs);</span>
+        }
+<span class="pc bpc" id="L1017" title="1 of 2 branches missed.">        if (fragment == null) {</span>
+<span class="nc" id="L1018">            return null;</span>
+        }
+<span class="fc" id="L1020">        int len = fragment.length();</span>
+<span class="pc bpc" id="L1021" title="1 of 2 branches missed.">        if (len == 0) {</span>
+<span class="nc" id="L1022">            return null;</span>
+        }
+        // handle zulu
+<span class="pc bpc" id="L1025" title="1 of 2 branches missed.">        if (len == 1) {</span>
+<span class="nc bnc" id="L1026" title="All 2 branches missed.">            if (fragment.equalsIgnoreCase(&quot;z&quot;)) {</span>
+<span class="nc" id="L1027">                return readSubstring(source, ofs, ofs + 1);</span>
+            }
+<span class="nc" id="L1029">            return null;</span>
+        }
+        // 8 is length of &quot;GMT-H:MM&quot;
+<span class="pc bpc" id="L1032" title="3 of 4 branches missed.">        if (len &gt;= 8 &amp;&amp; fragment.toUpperCase().startsWith(GMT)) {</span>
+<span class="nc" id="L1033">            return readSubstring(source, ofs);</span>
+        }
+<span class="fc" id="L1035">        int ch = fragment.charAt(0);</span>
+<span class="pc bpc" id="L1036" title="2 of 6 branches missed.">        if (len &gt;= 5 &amp;&amp; (ch == SIGN_NEGATIVE || ch == SIGN_POSITIVE)) {</span>
+<span class="fc" id="L1037">            return readSubstring(source, ofs, ofs + 5);</span>
+        }
+<span class="fc" id="L1039">        DateFormatSymbols ds = getDateFormatSymbols();</span>
+<span class="pc bpc" id="L1040" title="1 of 2 branches missed.">        for (String[] timezone : ds.getZoneStrings()) {</span>
+<span class="fc bfc" id="L1041" title="All 2 branches covered.">            for (String z : timezone) {</span>
+<span class="fc bfc" id="L1042" title="All 2 branches covered.">                if (z.equalsIgnoreCase(fragment)) {</span>
+<span class="fc" id="L1043">                    return readSubstring(source, ofs, ofs + z.length());</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L1047" title="All 2 branches missed.">        if (ds.isLocalized()) {</span>
+<span class="nc" id="L1048">            ds.setLocalized(false);</span>
+<span class="nc" id="L1049">            String s = readTimeZone(source, ofs);</span>
+<span class="nc" id="L1050">            ds.setLocalized(true);</span>
+<span class="nc" id="L1051">            return s;</span>
+        }
+<span class="nc" id="L1053">        return null;</span>
+    }
+
+    /**
+     * Parse the timezone to an offset from GMT in minutes. The source can be
+     * RFC-822 (ie. -0400), ISO8601 (ie. GMT+08:50), or TimeZone ID (ie. PDT,
+     * America/New_York, etc). This method does not adjust for DST.
+     *
+     * @param source source timezone.
+     * @param ofs    the offset of original timestamp where month started, for
+     *               error reporting.
+     * @return offset from GMT in minutes.
+     * @throws ParseException if the source could not be parsed.
+     */
+    int parseTimeZone(String source, int ofs, TimeZoneResult res) throws ParseException {
+<span class="pc bpc" id="L1068" title="1 of 2 branches missed.">        if (source == null) {</span>
+<span class="nc" id="L1069">            throwInvalid(&quot;timezone&quot;, ofs);</span>
+        }
+<span class="fc" id="L1071">        char tzSign = source.charAt(0);</span>
+<span class="pc bpc" id="L1072" title="2 of 4 branches missed.">        if (tzSign == 'z' || tzSign == 'Z') {</span>
+<span class="nc" id="L1073">            return 0;</span>
+        }
+        // handle RFC822 style GMT offset (-0500)
+<span class="pc bpc" id="L1076" title="1 of 4 branches missed.">        if (tzSign == SIGN_NEGATIVE || tzSign == SIGN_POSITIVE) {</span>
+<span class="fc" id="L1077">            source = readSubstring(source, 1);</span>
+<span class="pc bpc" id="L1078" title="1 of 2 branches missed.">            if (source == null) {</span>
+<span class="nc" id="L1079">                throwInvalid(&quot;timezone&quot;, ofs);</span>
+            }
+            // set the index to point to divider between hours
+            // and minutes. Hour can be one or two digits, minutes
+            // is always 2 digits.
+<span class="fc" id="L1084">            int index = 2;</span>
+<span class="pc bpc" id="L1085" title="1 of 2 branches missed.">            if (source.length() == 3) {</span>
+<span class="nc" id="L1086">                index--;</span>
+            }
+<span class="fc" id="L1088">            int tzHours = parseNumber(readSubstring(source, 0, index), ofs, &quot;timezone&quot;, 0, 23);</span>
+<span class="fc" id="L1089">            int tzMinutes = parseNumber(readSubstring(source, index), ofs, &quot;timezone&quot;, 0, 59);</span>
+<span class="fc" id="L1090">            tzMinutes += tzHours * 60;</span>
+<span class="pc bpc" id="L1091" title="1 of 2 branches missed.">            if (tzSign != SIGN_NEGATIVE) {</span>
+<span class="fc" id="L1092">                tzMinutes = -tzMinutes;</span>
+            }
+<span class="fc" id="L1094">            return tzMinutes;</span>
+        }
+        // handle explicit GMT offset (GMT+H:MM)
+<span class="pc bpc" id="L1097" title="1 of 2 branches missed.">        if (source.toUpperCase().startsWith(GMT)) {</span>
+<span class="nc" id="L1098">            int index = source.indexOf(':');</span>
+<span class="nc bnc" id="L1099" title="All 2 branches missed.">            if (index != -1) {</span>
+<span class="nc" id="L1100">                String part1 = readSubstring(source, 3, index);</span>
+<span class="nc" id="L1101">                String part2 = readSubstring(source, index + 1);</span>
+<span class="nc bnc" id="L1102" title="All 4 branches missed.">                if (part1 == null || part2 == null) {</span>
+<span class="nc" id="L1103">                    throwInvalid(&quot;timezone&quot;, ofs);</span>
+                }
+<span class="nc" id="L1105">                source = part1 + part2;</span>
+<span class="nc" id="L1106">            } else {</span>
+<span class="nc" id="L1107">                source = readSubstring(source, 3);</span>
+            }
+<span class="nc bnc" id="L1109" title="All 2 branches missed.">            if (source.length() == 0) {</span>
+<span class="nc" id="L1110">                return 0;</span>
+            }
+<span class="nc" id="L1112">            return parseTimeZone(source, ofs, res);</span>
+        }
+<span class="fc" id="L1114">        DateFormatSymbols ds = getDateFormatSymbols();</span>
+
+        // Handle timezone based on ID or full name
+<span class="pc bpc" id="L1117" title="1 of 2 branches missed.">        for (String[] timezone : ds.getZoneStrings()) {</span>
+<span class="fc bfc" id="L1118" title="All 2 branches covered.">            for (String z : timezone) {</span>
+<span class="fc bfc" id="L1119" title="All 2 branches covered.">                if (z.equalsIgnoreCase(source)) {</span>
+<span class="fc" id="L1120">                    TimeZone tz = TimeZone.getTimeZone(timezone[DateFormatSymbols.ZONE_ID]);</span>
+<span class="fc" id="L1121">                    res.timeZone = tz;</span>
+<span class="fc" id="L1122">                    return -(tz.getRawOffset() / MILLIS_TO_MINUTES);</span>
+                }
+            }
+        }
+
+<span class="nc bnc" id="L1127" title="All 2 branches missed.">        if (ds.isLocalized()) {</span>
+<span class="nc" id="L1128">            ds.setLocalized(false);</span>
+<span class="nc" id="L1129">            int i = 0;</span>
+            try {
+<span class="nc" id="L1131">                i = parseTimeZone(source, ofs, res);</span>
+            } finally {
+<span class="nc" id="L1133">                ds.setLocalized(true);</span>
+            }
+<span class="nc" id="L1135">            return i;</span>
+        }
+
+<span class="nc" id="L1138">        return throwInvalid(&quot;timezone&quot;, ofs);</span>
+    }
+
+    /**
+     * Attempt to find the end of a field if the length is not known.
+     *
+     * @param source the full source timestamp
+     * @param ofs    index of where current field starts.
+     * @return the index of the end of field, or -1 if couldn't determine.
+     */
+    int findEndText(String source, int ofs) {
+<span class="fc" id="L1149">        int slen = source.length();</span>
+<span class="pc bpc" id="L1150" title="1 of 2 branches missed.">        for (int i = ofs; i &lt; slen; i++) {</span>
+<span class="pc bpc" id="L1151" title="1 of 4 branches missed.">            if (!isAlpha(source.charAt(i)) &amp;&amp; !isNumeric(source.charAt(i))) {</span>
+<span class="fc" id="L1152">                return i;</span>
+            }
+        }
+<span class="nc" id="L1155">        return -1;</span>
+    }
+
+    /**
+     * Test if a character is alpha (A-Z,a-z).
+     */
+    boolean isAlpha(char ch) {
+<span class="pc bpc" id="L1162" title="1 of 8 branches missed.">        return ((ch &gt;= 'A' &amp;&amp; ch &lt;= 'Z') || (ch &gt;= 'a' &amp;&amp; ch &lt;= 'z'));</span>
+    }
+
+    /**
+     * Test if a character is number (0-9).
+     */
+    boolean isNumeric(char ch) {
+<span class="fc bfc" id="L1169" title="All 4 branches covered.">        return (ch &gt;= '0' &amp;&amp; ch &lt;= '9');</span>
+    }
+
+    /**
+     * Parse the date pattern.
+     * &lt;p&gt;
+     * The list will contain each token of the pattern. The first character of
+     * the token contains the pattern component type, or wildcard (*) for
+     * literal patterns.
+     *
+     * @param pattern
+     * @return parsed pattern.
+     */
+    List&lt;String&gt; parseDatePattern(String pattern) {
+<span class="fc" id="L1183">        List&lt;String&gt; tokens = new Vector&lt;String&gt;();</span>
+<span class="fc" id="L1184">        String tmp = null;</span>
+<span class="fc" id="L1185">        int plen = pattern.length();</span>
+<span class="fc bfc" id="L1186" title="All 2 branches covered.">        for (int i = 0; i &lt; plen; i++) {</span>
+<span class="fc" id="L1187">            char ch = pattern.charAt(i);</span>
+            // Handle literal text enclosed in quotes
+<span class="fc bfc" id="L1189" title="All 2 branches covered.">            if (ch == EXPLICIT_LITERAL) {</span>
+<span class="fc" id="L1190">                int n = pattern.indexOf(EXPLICIT_LITERAL, i + 1);</span>
+<span class="pc bpc" id="L1191" title="1 of 2 branches missed.">                if (n != -1) {</span>
+<span class="pc bpc" id="L1192" title="1 of 2 branches missed.">                    if (tmp != null) {</span>
+<span class="fc" id="L1193">                        tokens.add(tmp.charAt(0) + tmp);</span>
+<span class="fc" id="L1194">                        tmp = null;</span>
+                    }
+<span class="fc" id="L1196">                    tokens.add(LITERAL_LETTER + pattern.substring(i + 1, n));</span>
+                }
+<span class="fc" id="L1198">                i = n;</span>
+<span class="fc" id="L1199">                continue;</span>
+            }
+            // Any invalid non-alpha characters are treated as literal text.
+            // invalid alpha characters are illegal.
+<span class="fc bfc" id="L1203" title="All 2 branches covered.">            boolean isValid = PATTERN_LETTERS.indexOf(ch) != -1;</span>
+<span class="fc bfc" id="L1204" title="All 2 branches covered.">            if (!isValid) {</span>
+<span class="pc bpc" id="L1205" title="1 of 2 branches missed.">                if (tmp != null) {</span>
+<span class="fc" id="L1206">                    tokens.add(tmp.charAt(0) + tmp);</span>
+<span class="fc" id="L1207">                    tmp = null;</span>
+                }
+                int n;
+<span class="pc bpc" id="L1210" title="1 of 2 branches missed.">                for (n = i; n &lt; plen; n++) {</span>
+<span class="fc" id="L1211">                    ch = pattern.charAt(n);</span>
+<span class="fc bfc" id="L1212" title="All 2 branches covered.">                    if (PATTERN_LETTERS.indexOf(ch) != -1) {</span>
+<span class="fc" id="L1213">                        break;</span>
+                    }
+<span class="pc bpc" id="L1215" title="1 of 2 branches missed.">                    if (isAlpha(ch)) {</span>
+<span class="nc" id="L1216">                        throw new IllegalArgumentException(&quot;Illegal pattern character: &quot; + ch);</span>
+                    }
+                }
+<span class="fc" id="L1219">                tokens.add(LITERAL_LETTER + pattern.substring(i, n));</span>
+<span class="fc" id="L1220">                i = n - 1;</span>
+<span class="fc" id="L1221">                continue;</span>
+            }
+<span class="fc bfc" id="L1223" title="All 2 branches covered.">            if (tmp == null) {</span>
+<span class="fc" id="L1224">                tmp = String.valueOf(ch);</span>
+<span class="fc" id="L1225">                continue;</span>
+<span class="pc bpc" id="L1226" title="1 of 2 branches missed.">            } else if (ch == tmp.charAt(0)) {</span>
+<span class="fc" id="L1227">                tmp += ch;</span>
+            } else {
+<span class="nc" id="L1229">                tokens.add(tmp.charAt(0) + tmp);</span>
+<span class="nc" id="L1230">                tmp = String.valueOf(ch);</span>
+            }
+        }
+<span class="pc bpc" id="L1233" title="1 of 2 branches missed.">        if (tmp != null) {</span>
+<span class="fc" id="L1234">            tokens.add(tmp.charAt(0) + tmp);</span>
+        }
+<span class="fc" id="L1236">        return tokens;</span>
+    }
+
+    private static class TimeZoneResult {
+        TimeZone timeZone;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

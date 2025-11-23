@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XMLWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.xml</a> &gt; <span class="el_source">XMLWriter.java</span></div><h1>XMLWriter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+/*
+ * Copyright 2013 Paul Harrison Williams. All rights reserved.
+ *
+ * Please contact pwillcode@gmail.com if you have licensing questions.
+ */
+/*
+ * This was contributed as part of this issue: https://github.com/codenameone/CodenameOne/issues/753
+ * The original contribution comments were partially modified with the migration from Google Code to github.
+ */
+package com.codename1.xml;
+
+import com.codename1.util.StringUtil;
+
+import java.io.IOException;
+import java.io.Writer;
+import java.util.Enumeration;
+import java.util.Hashtable;
+
+/**
+ * &lt;p&gt;{@code XMLWriter} writes an XML {@link com.codename1.xml.Element} into an XML string/file
+ * this allowing us to serialize previously parsed and modified XML.&lt;/p&gt;
+ *
+ * @author Paul Harrison Williams&lt;pwillcode@gmail.com&gt;
+ */
+public class XMLWriter {
+
+<span class="fc" id="L49">    private static final String[][] escapes = {</span>
+            {&quot;&amp;&quot;, &quot;&amp;amp;&quot;},
+            {&quot;\&quot;&quot;, &quot;&amp;quot;&quot;},
+            {&quot;&lt;&quot;, &quot;&amp;lt;&quot;},
+            {&quot;&gt;&quot;, &quot;&amp;gt;&quot;},
+            {&quot;'&quot;, &quot;&amp;apos;&quot;}
+    };
+    private final boolean encodeText;
+
+    /**
+     * Creates a new XMLWriter.
+     *
+     * @param encodeText Determines whether or not text components (text
+     *                   content, tag names, attribute names, and attribute values) should be
+     *                   encoded with escapes when written. Use false if these values are already
+     *                   encoded.
+     */
+<span class="fc" id="L66">    public XMLWriter(boolean encodeText) {</span>
+<span class="fc" id="L67">        this.encodeText = encodeText;</span>
+<span class="fc" id="L68">    }</span>
+
+    /**
+     * Writes the XML of an Element to a Writer. Note: may output invalid XML if
+     * you created text Elements using un-escaped Strings.
+     *
+     * @param writer  The Writer to which the XML will be written.
+     * @param element The element whose XML will be written.
+     * @throws IOException if a write operation fails.
+     */
+    public void writeXML(Writer writer, Element element) throws IOException {
+<span class="nc" id="L79">        writeXML(writer, element, new StringBuilder(), false);</span>
+<span class="nc" id="L80">    }</span>
+
+    /**
+     * returns the XML as a String
+     *
+     * @param element the element to write
+     * @return the XML as a String
+     */
+    public String toXML(Element element) {
+<span class="fc" id="L89">        StringBuilder writer = new StringBuilder();</span>
+<span class="fc" id="L90">        toXML(writer, element, new StringBuilder(), false);</span>
+<span class="fc" id="L91">        return writer.toString();</span>
+    }
+
+    /**
+     * Writes the XML of an Element to a StringBuilder using a given starting
+     * indentation. Note: may output invalid XML if you created text Elements
+     * using un-escaped Strings.
+     *
+     * @param writer      The StringBuilder that will contain the output
+     * @param element     The element whose XML will be written.
+     * @param indentation A starting indentation for the given Element.
+     * @param isInline    Whether or not the given element Element should be
+     *                    treated as part of in-line content.
+     */
+    private void toXML(StringBuilder writer, Element element, StringBuilder indentation, boolean isInline) {
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (!isInline) {</span>
+<span class="fc" id="L107">            writer.append(indentation);</span>
+        }
+
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (element.isTextElement()) {</span>
+<span class="nc" id="L111">            writer.append(encodeIfRequired(element.getText()));</span>
+        } else {
+<span class="fc" id="L113">            writer.append('&lt;');</span>
+<span class="fc" id="L114">            String elementName = encodeIfRequired(element.getTagName());</span>
+<span class="fc" id="L115">            writer.append(elementName);</span>
+
+<span class="fc" id="L117">            Hashtable attributes = element.getAttributes();</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            if (attributes != null) {</span>
+<span class="nc bnc" id="L119" title="All 2 branches missed.">                for (Enumeration keys = attributes.keys(); keys.hasMoreElements(); ) {</span>
+<span class="nc" id="L120">                    String attributeKey = (String) keys.nextElement();</span>
+<span class="nc" id="L121">                    String attributeValue = (String) attributes.get(attributeKey);</span>
+<span class="nc" id="L122">                    writer.append(' ');</span>
+<span class="nc" id="L123">                    writer.append(encodeIfRequired(attributeKey));</span>
+<span class="nc" id="L124">                    writer.append(&quot;=\&quot;&quot;);</span>
+<span class="nc" id="L125">                    writer.append(encodeIfRequired(attributeValue));</span>
+<span class="nc" id="L126">                    writer.append('&quot;');</span>
+<span class="nc" id="L127">                }</span>
+            }
+
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">            if (element.isEmpty()) {</span>
+<span class="nc" id="L131">                writer.append(&quot; /&gt;&quot;);</span>
+            } else {
+<span class="fc" id="L133">                writer.append('&gt;');</span>
+
+<span class="pc bpc" id="L135" title="2 of 4 branches missed.">                if (!isInline &amp;&amp; !element.hasTextChild()) {</span>
+<span class="fc" id="L136">                    writer.append('\n');</span>
+<span class="fc" id="L137">                    indentation.append('\t');</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">                    for (Object child : element) {</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">                        if (child instanceof Element) {</span>
+<span class="nc" id="L140">                            toXML(writer, (Element) child, indentation, isInline);</span>
+                        } else {
+<span class="nc" id="L142">                            throw new IllegalStateException(&quot;Element contained child of invalid type&quot;);</span>
+                        }
+<span class="nc" id="L144">                        writer.append('\n');</span>
+<span class="pc" id="L145">                    }</span>
+                } else {
+<span class="nc" id="L147">                    isInline = true;</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">                    for (Object child : element) {</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                        if (child instanceof Element) {</span>
+<span class="nc" id="L150">                            toXML(writer, (Element) child, null, isInline);</span>
+                        } else {
+<span class="nc" id="L152">                            throw new IllegalStateException(&quot;Element contained child of invalid type&quot;);</span>
+                        }
+<span class="nc" id="L154">                    }</span>
+                }
+
+<span class="pc bpc" id="L157" title="1 of 2 branches missed.">                if (!isInline) {</span>
+<span class="fc" id="L158">                    indentation.deleteCharAt(indentation.length() - 1);</span>
+<span class="fc" id="L159">                    writer.append(indentation);</span>
+                }
+<span class="fc" id="L161">                writer.append(&quot;&lt;/&quot;);</span>
+<span class="fc" id="L162">                writer.append(elementName);</span>
+<span class="fc" id="L163">                writer.append('&gt;');</span>
+            }
+        }
+<span class="fc" id="L166">    }</span>
+
+    /**
+     * Writes the XML of an Element to a Writer using a given starting
+     * indentation. Note: may output invalid XML if you created text Elements
+     * using un-escaped Strings.
+     *
+     * @param writer      The Writer to which the XML will be written.
+     * @param element     The element whose XML will be written.
+     * @param indentation A starting indentation for the given Element.
+     * @param isInline    Whether or not the given element Element should be
+     *                    treated as part of in-line content.
+     * @throws IOException if a write operation fails.
+     */
+    private void writeXML(Writer writer, Element element,
+                          StringBuilder indentation, boolean isInline) throws IOException {
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        if (!isInline) {</span>
+<span class="nc" id="L183">            writer.write(indentation.toString());</span>
+        }
+
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        if (element.isTextElement()) {</span>
+<span class="nc" id="L187">            writer.write(encodeIfRequired(element.getText()));</span>
+        } else {
+<span class="nc" id="L189">            writer.write('&lt;');</span>
+<span class="nc" id="L190">            String elementName = encodeIfRequired(element.getTagName());</span>
+<span class="nc" id="L191">            writer.write(elementName);</span>
+
+<span class="nc" id="L193">            Hashtable attributes = element.getAttributes();</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">            if (attributes != null) {</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">                for (Enumeration keys = attributes.keys(); keys.hasMoreElements(); ) {</span>
+<span class="nc" id="L196">                    String attributeKey = (String) keys.nextElement();</span>
+<span class="nc" id="L197">                    String attributeValue = (String) attributes.get(attributeKey);</span>
+<span class="nc" id="L198">                    writer.write(' ');</span>
+<span class="nc" id="L199">                    writer.write(encodeIfRequired(attributeKey));</span>
+<span class="nc" id="L200">                    writer.write(&quot;=\&quot;&quot;);</span>
+<span class="nc" id="L201">                    writer.write(encodeIfRequired(attributeValue));</span>
+<span class="nc" id="L202">                    writer.write('&quot;');</span>
+<span class="nc" id="L203">                }</span>
+            }
+
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            if (element.isEmpty()) {</span>
+<span class="nc" id="L207">                writer.write(&quot; /&gt;&quot;);</span>
+            } else {
+<span class="nc" id="L209">                writer.write('&gt;');</span>
+
+<span class="nc bnc" id="L211" title="All 4 branches missed.">                if (!isInline &amp;&amp; !element.hasTextChild()) {</span>
+<span class="nc" id="L212">                    writer.write('\n');</span>
+<span class="nc" id="L213">                    indentation.append('\t');</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">                    for (Object child : element) {</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">                        if (child instanceof Element) {</span>
+<span class="nc" id="L216">                            writeXML(writer, (Element) child, indentation, isInline);</span>
+                        } else {
+<span class="nc" id="L218">                            throw new IllegalStateException(&quot;Element contained child of invalid type&quot;);</span>
+                        }
+<span class="nc" id="L220">                        writer.write('\n');</span>
+<span class="nc" id="L221">                    }</span>
+                } else {
+<span class="nc" id="L223">                    isInline = true;</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">                    for (Object child : element) {</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">                        if (child instanceof Element) {</span>
+<span class="nc" id="L226">                            writeXML(writer, (Element) child, null, isInline);</span>
+                        } else {
+<span class="nc" id="L228">                            throw new IllegalStateException(&quot;Element contained child of invalid type&quot;);</span>
+                        }
+<span class="nc" id="L230">                    }</span>
+                }
+
+<span class="nc bnc" id="L233" title="All 2 branches missed.">                if (!isInline) {</span>
+<span class="nc" id="L234">                    indentation.deleteCharAt(indentation.length() - 1);</span>
+<span class="nc" id="L235">                    writer.write(indentation.toString());</span>
+                }
+<span class="nc" id="L237">                writer.write(&quot;&lt;/&quot;);</span>
+<span class="nc" id="L238">                writer.write(elementName);</span>
+<span class="nc" id="L239">                writer.write('&gt;');</span>
+            }
+        }
+<span class="nc" id="L242">    }</span>
+
+    private String encodeIfRequired(String text) {
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        if (encodeText) {</span>
+<span class="fc" id="L246">            int elen = escapes.length;</span>
+<span class="fc bfc" id="L247" title="All 2 branches covered.">            for (int i = 0; i &lt; elen; i++) {</span>
+<span class="fc" id="L248">                text = StringUtil.replaceAll(text, escapes[i][0], escapes[i][1]);</span>
+            }
+        }
+<span class="fc" id="L251">        return text;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,635 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Node.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.scene</a> &gt; <span class="el_source">Node.java</span></div><h1>Node.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.scene;
+
+import com.codename1.properties.Property;
+import com.codename1.ui.Container;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.Transform;
+import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.geom.Rectangle2D;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.Style;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * Encapsulates a Node in the scene-graph.  This wraps a component (the &quot;renderer&quot; of the Node) and an associated transform
+ * that describes where, in the 3D space of the scene graph the component should be rendered.
+ *
+ * @author shannah
+ * @deprecated For internal use only.
+ */
+public class Node {
+    public final Property&lt;Double, Node&gt;
+            /**
+             * The scale to apply to the node, along the x-axis.
+             */
+            scaleX,
+
+    /**
+     * The scale to apply to the node along the y-axis.
+     */
+    scaleY,
+    /**
+     * The scale to apply to the node along the z-axis.
+     */
+    scaleZ,
+
+    /**
+     * X-coordinate in the Scene-graph where node should be rendered.
+     */
+    layoutX,
+
+    /**
+     * Y-coordinate in the scene graph where node should be rendered.
+     */
+    layoutY,
+
+    /**
+     * Z-coordinate in the scene graph where node should be rendered.
+     */
+    layoutZ,
+
+    /**
+     * X-translation to apply to the node.
+     */
+    translateX,
+
+
+    /**
+     * Y-translation to apply to the node.
+     */
+    translateY,
+
+    /**
+     * Z-translation to apply to the node.
+     */
+    translateZ,
+
+    /**
+     * Rotation to apply to the node.  In degrees.  Node is always rotated around its center.
+     */
+    rotate,
+
+    /**
+     * The depth of the coordinate at which the renderer should paint itself.
+     * By default nodes will have no depth, and renderer will be painted onto
+     * a rectangle on the Z=0 plane.  If you need to perform 3D rotations, you may want to
+     * give the node depth by setting the depth of {@link #boundsInLocal} and changing the
+     * {@link #localCanvasZ} to something other than 0 since the node will be rotated at its
+     * center point.
+     */
+    localCanvasZ,
+
+    opacity;
+    /**
+     * The rotation axis around which rotations should be performed. (0, 0, 1) results in a rotation
+     * around the z-axis, (1, 0, 0) results in a rotation around the x-axis, and (0, 1, 0) a rotation
+     * around the y-axis.
+     */
+    public final Property&lt;Point3D, Node&gt; rotationAxis;
+    /**
+     * The local bounds of the node (without any of the transforms applied to it).
+     */
+    public final Property&lt;Bounds, Node&gt; boundsInLocal;
+    /**
+     * Flag to indicate whether the node should be visible or not.
+     */
+    public final Property&lt;Boolean, Node&gt; visible;
+    /**
+     * The painting rectangle, into which the renderer should be painted inside the
+     * node's local bounds.
+     */
+    public final Property&lt;Rectangle, Node&gt; paintingRect;
+    /**
+     * The component that should be rendered inside this node.
+     */
+    //private Component renderer;
+    NodePainter renderer;
+
+    /**
+     * Private wrapper around the renderer component.  This gives us
+     * access to some package-private methods in Component that we need to use
+     * for rendering.
+     */
+    //private RenderableContainer rendererCnt;
+    /**
+     * The scene that the node is currently attached to.
+     */
+    private Scene scene;
+    /**
+     * The parent node.
+     */
+    private Node parent;
+    /**
+     * Child nodes.
+     */
+    private List&lt;Node&gt; children;
+    /**
+     * Tags that are attached to this node. These are like CSS classes.
+     */
+    private HashSet&lt;String&gt; tags;
+    private Style style;
+    /**
+     * Flag of whether to render the component onto an image buffer before rendering.
+     * Components that use 9-piece image borders may show lines between the border
+     * segments if renderered directly onto the scene graph. Setting this flag will
+     * resolve that (because it will first render to an image with the identity transform
+     * and then transform that image on the Graphics context).
+     */
+<span class="fc" id="L169">    private boolean renderAsImage = false;</span>
+    /**
+     * Flag to specify whether the node should have its children re-laid out
+     */
+<span class="fc" id="L173">    private boolean needsLayout = true;</span>
+
+
+<span class="fc" id="L176">    public Node() {</span>
+<span class="fc" id="L177">        scaleX = new Property&lt;Double, Node&gt;(&quot;scaleX&quot;, 1.0);</span>
+<span class="fc" id="L178">        scaleY = new Property&lt;Double, Node&gt;(&quot;scaleY&quot;, 1.0);</span>
+<span class="fc" id="L179">        scaleZ = new Property&lt;Double, Node&gt;(&quot;scaleZ&quot;, 1.0);</span>
+<span class="fc" id="L180">        layoutX = new Property&lt;Double, Node&gt;(&quot;layoutX&quot;, 0.0);</span>
+<span class="fc" id="L181">        layoutY = new Property&lt;Double, Node&gt;(&quot;layoutY&quot;, 0.0);</span>
+<span class="fc" id="L182">        layoutZ = new Property&lt;Double, Node&gt;(&quot;layoutZ&quot;, 0.0);</span>
+<span class="fc" id="L183">        translateX = new Property&lt;Double, Node&gt;(&quot;translateX&quot;, 0.0);</span>
+<span class="fc" id="L184">        translateY = new Property&lt;Double, Node&gt;(&quot;translateY&quot;, 0.0);</span>
+<span class="fc" id="L185">        translateZ = new Property&lt;Double, Node&gt;(&quot;translateZ&quot;, 0.0);</span>
+<span class="fc" id="L186">        rotate = new Property&lt;Double, Node&gt;(&quot;rotate&quot;, 0.0);</span>
+<span class="fc" id="L187">        rotationAxis = new Property&lt;Point3D, Node&gt;(&quot;rotationAxis&quot;, (Point3D) null);</span>
+<span class="fc" id="L188">        boundsInLocal = new Property&lt;Bounds, Node&gt;(&quot;boundsInLocal&quot;, new Bounds(0, 0, 0, 0, 0, 0));</span>
+<span class="fc" id="L189">        localCanvasZ = new Property&lt;Double, Node&gt;(&quot;localCanvasZ&quot;, 0.0);</span>
+<span class="fc" id="L190">        visible = new Property&lt;Boolean, Node&gt;(&quot;visible&quot;, true);</span>
+<span class="fc" id="L191">        paintingRect = new Property&lt;Rectangle, Node&gt;(&quot;paintingRect&quot;, (Rectangle) null);</span>
+<span class="fc" id="L192">        opacity = new Property&lt;Double, Node&gt;(&quot;opacity&quot;, 1.0);</span>
+
+<span class="fc" id="L194">    }</span>
+
+    private static void translate(Transform t, double tx, double ty, double tz) {
+<span class="fc" id="L197">        t.translate((float) tx, (float) ty, (float) tz);</span>
+<span class="fc" id="L198">    }</span>
+
+    private static void rotate(Transform t, double angle, double px, double py, double pz) {
+<span class="fc" id="L201">        t.rotate((float) angle, (float) px, (float) py, (float) pz);</span>
+<span class="fc" id="L202">    }</span>
+
+    private static void scale(Transform t, double x, double y, double z) {
+<span class="fc" id="L205">        t.scale((float) x, (float) y, (float) z);</span>
+<span class="fc" id="L206">    }</span>
+
+    /**
+     * Sets the render as image flag.  True to render this Node as an image.
+     *
+     * @param t
+     */
+    public void setRenderAsImage(boolean t) {
+<span class="nc" id="L214">        renderAsImage = t;</span>
+<span class="nc" id="L215">    }</span>
+
+    /**
+     * Adds tags to this node.
+     *
+     * @param tags
+     */
+    public void addTags(String... tags) {
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        if (this.tags == null) {</span>
+<span class="nc" id="L224">            this.tags = new HashSet&lt;String&gt;();</span>
+        }
+<span class="nc" id="L226">        Collections.addAll(this.tags, tags);</span>
+<span class="nc" id="L227">    }</span>
+
+    public Rectangle2D getBoundsInScene(Rectangle2D out) {
+<span class="fc" id="L230">        Transform t = getLocalToSceneTransform();</span>
+<span class="fc" id="L231">        Bounds localBounds = boundsInLocal.get();</span>
+<span class="fc" id="L232">        float[] pt = new float[]{(float) localBounds.getMinX(), (float) localBounds.getMinY(), 0};</span>
+<span class="fc" id="L233">        t.transformPoint(pt, pt);</span>
+<span class="fc" id="L234">        out.setX(pt[0]);</span>
+<span class="fc" id="L235">        out.setY(pt[1]);</span>
+<span class="fc" id="L236">        pt[0] = (float) (localBounds.getMinX() + localBounds.getWidth());</span>
+<span class="fc" id="L237">        pt[1] = (float) (localBounds.getMinY() + localBounds.getHeight());</span>
+
+<span class="fc" id="L239">        t.transformPoint(pt, pt);</span>
+<span class="fc" id="L240">        out.setWidth(pt[0] - out.getX());</span>
+<span class="fc" id="L241">        out.setHeight(pt[1] - out.getY());</span>
+<span class="fc" id="L242">        return out;</span>
+    }
+
+    //public void setLocalToParentTransform(Transform t) {
+    //    this.localToParentTransform = t.copy();
+    //}
+
+    /**
+     * Removes tags from this node.
+     *
+     * @param tags
+     */
+    public void removeTags(String... tags) {
+<span class="nc bnc" id="L255" title="All 2 branches missed.">        if (this.tags != null) {</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">            for (String tag : tags) {</span>
+<span class="nc" id="L257">                this.tags.remove(tag);</span>
+            }
+        }
+<span class="nc" id="L260">    }</span>
+
+    /**
+     * Check if this node has a tag.
+     *
+     * @param tag
+     * @return
+     */
+    public boolean hasTag(String tag) {
+<span class="nc bnc" id="L269" title="All 4 branches missed.">        return (tags != null &amp;&amp; tags.contains(tag));</span>
+    }
+
+    /**
+     * Gets the transform to use to transform the Node into its parent node's space.
+     *
+     * @return
+     */
+    public Transform getLocalToParentTransform() {
+<span class="fc" id="L278">        Transform t = Transform.makeIdentity();</span>
+<span class="fc" id="L279">        Point3D rotationAxis = this.rotationAxis.get();</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">        if (rotationAxis == null) {</span>
+<span class="fc" id="L281">            rotationAxis = new Point3D(0, 0, 1);</span>
+        }
+<span class="fc" id="L283">        Bounds localBounds = boundsInLocal.get();</span>
+
+
+        // Do translation
+<span class="fc" id="L287">        translate(t, layoutX.get() + translateX.get(), layoutY.get() + translateY.get(), layoutZ.get() + translateZ.get());</span>
+
+        // Do scale
+
+
+        // Do rotation
+<span class="fc" id="L293">        translate(t, localBounds.getWidth() / 2, localBounds.getHeight() / 2, localBounds.getDepth() / 2);</span>
+<span class="fc" id="L294">        scale(t, scaleX.get(), scaleY.get(), scaleZ.get());</span>
+<span class="fc" id="L295">        rotate(t, rotate.get() * Math.PI / 180.0, rotationAxis.getX(), rotationAxis.getY(), rotationAxis.getZ());</span>
+<span class="fc" id="L296">        translate(t, -localBounds.getWidth() / 2, -localBounds.getHeight() / 2, -localBounds.getDepth() / 2);</span>
+<span class="fc" id="L297">        translate(t, 0, 0, localCanvasZ.get());</span>
+<span class="fc" id="L298">        return t;</span>
+
+    }
+
+    /**
+     * Gets the transform to use to go from the local coordinates to scene coordinates.
+     *
+     * @return
+     */
+    public Transform getLocalToSceneTransform() {
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">        if (parent == null) {</span>
+<span class="fc" id="L309">            return getLocalToParentTransform();</span>
+        } else {
+<span class="nc" id="L311">            Transform t = parent.getLocalToSceneTransform();</span>
+<span class="nc" id="L312">            t.concatenate(getLocalToParentTransform());</span>
+<span class="nc" id="L313">            return t;</span>
+        }
+    }
+
+    /**
+     * Gets the scene that this node is attached to.
+     *
+     * @return the scene
+     */
+    public Scene getScene() {
+<span class="fc" id="L323">        return scene;</span>
+    }
+
+    /**
+     * Sets the scene that this node is attached to.
+     *
+     * @param scene
+     */
+    void setScene(Scene scene) {
+<span class="fc" id="L332">        this.scene = scene;</span>
+<span class="fc bfc" id="L333" title="All 2 branches covered.">        if (children != null) {</span>
+<span class="fc bfc" id="L334" title="All 2 branches covered.">            for (Node child : children) {</span>
+<span class="fc" id="L335">                child.setScene(scene);</span>
+<span class="fc" id="L336">            }</span>
+        }
+<span class="fc" id="L338">    }</span>
+
+    /**
+     * Returns true if this node needs to have its children re-laid out before rendering
+     *
+     * @return the needsLayout
+     */
+    public boolean isNeedsLayout() {
+<span class="nc" id="L346">        return needsLayout;</span>
+    }
+
+    /**
+     * @param needsLayout the needsLayout to set
+     */
+    public void setNeedsLayout(boolean needsLayout) {
+<span class="fc" id="L353">        this.needsLayout = needsLayout;</span>
+<span class="fc" id="L354">    }</span>
+
+    /**
+     * @return the style
+     */
+    public Style getStyle() {
+<span class="nc" id="L360">        return style;</span>
+    }
+
+    /**
+     * @param style the style to set
+     */
+    public void setStyle(Style style) {
+<span class="fc" id="L367">        this.style = style;</span>
+<span class="fc" id="L368">    }</span>
+
+    private Rectangle getPaintingRect() {
+<span class="nc bnc" id="L371" title="All 4 branches missed.">        if (paintingRect != null &amp;&amp; paintingRect.get() != null) {</span>
+<span class="nc" id="L372">            return paintingRect.get();</span>
+        } else {
+<span class="nc" id="L374">            return new Rectangle(0, 0, (int) boundsInLocal.get().getWidth(), (int) boundsInLocal.get().getHeight());</span>
+        }
+    }
+
+    /**
+     * This can be used to hit test pointer events against this node.  It checks whether
+     * a given absolute (x, y) coordinate hits the node.
+     *
+     * @param x
+     * @param y
+     * @return
+     */
+    public boolean contains(int x, int y) {
+<span class="nc" id="L387">        GeneralPath p = GeneralPath.createFromPool();</span>
+        try {
+<span class="nc" id="L389">            p.setRect(getPaintingRect(), getLocalToScreenTransform());</span>
+<span class="nc" id="L390">            return p.contains(x, y);</span>
+        } finally {
+<span class="nc" id="L392">            GeneralPath.recycle(p);</span>
+        }
+    }
+
+    private void findNodesWithTag(Set&lt;Node&gt; out, String tag) {
+<span class="nc bnc" id="L397" title="All 2 branches missed.">        if (hasTag(tag)) {</span>
+<span class="nc" id="L398">            out.add(this);</span>
+        }
+<span class="nc bnc" id="L400" title="All 2 branches missed.">        for (Node child : getChildNodes()) {</span>
+<span class="nc" id="L401">            child.findNodesWithTag(out, tag);</span>
+<span class="nc" id="L402">        }</span>
+<span class="nc" id="L403">    }</span>
+
+    public Collection&lt;Node&gt; findNodesWithTag(String tag) {
+<span class="nc" id="L406">        Set&lt;Node&gt; out = new HashSet&lt;Node&gt;();</span>
+<span class="nc" id="L407">        findNodesWithTag(out, tag);</span>
+<span class="nc" id="L408">        return out;</span>
+    }
+
+    public Transform getLocalToScreenTransform() {
+<span class="nc bnc" id="L412" title="All 4 branches missed.">        Transform newT = Transform.isPerspectiveSupported() &amp;&amp; scene.camera.get() != null ?</span>
+<span class="nc" id="L413">                scene.camera.get().getTransform() : Transform.makeIdentity();</span>
+<span class="nc" id="L414">        newT.translate(getScene().getAbsoluteX(), getScene().getAbsoluteY());</span>
+<span class="nc" id="L415">        newT.concatenate(getLocalToSceneTransform());</span>
+<span class="nc" id="L416">        return newT;</span>
+    }
+
+    /**
+     * Renders the node onto a graphics context.
+     *
+     * @param g
+     */
+    public void render(Graphics g) {
+<span class="nc bnc" id="L425" title="All 2 branches missed.">        if (!visible.get()) {</span>
+<span class="nc" id="L426">            return;</span>
+        }
+<span class="nc" id="L428">        Transform existingT = Transform.makeIdentity();</span>
+<span class="nc" id="L429">        g.getTransform(existingT);</span>
+
+<span class="nc bnc" id="L431" title="All 4 branches missed.">        Transform newT = Transform.isPerspectiveSupported() &amp;&amp; scene.camera.get() != null ?</span>
+<span class="nc" id="L432">                scene.camera.get().getTransform() :</span>
+<span class="nc" id="L433">                Transform.makeIdentity();</span>
+<span class="nc" id="L434">        newT.translate(getScene().getAbsoluteX(), getScene().getAbsoluteY());</span>
+<span class="nc" id="L435">        newT.concatenate(getLocalToSceneTransform());</span>
+<span class="nc" id="L436">        newT.translate(-scene.getAbsoluteX(), -scene.getAbsoluteY());</span>
+<span class="nc" id="L437">        g.setTransform(newT);</span>
+<span class="nc" id="L438">        int alpha = g.getAlpha();</span>
+<span class="nc" id="L439">        int nodeAlpha = (int) Math.round(alpha * opacity.get());</span>
+<span class="nc" id="L440">        nodeAlpha = Math.max(Math.min(255, nodeAlpha), 0);</span>
+<span class="nc" id="L441">        g.setAlpha(nodeAlpha);</span>
+        try {
+
+<span class="nc bnc" id="L444" title="All 2 branches missed.">            if (renderer != null) {</span>
+<span class="nc" id="L445">                Rectangle paintingRect = getPaintingRect();</span>
+                //System.out.println(&quot;Rendering on paint rect &quot;+paintingRect);
+                //System.out.println(&quot;Renderer: &quot;+renderer);
+                //rendererCnt.setX(paintingRect.getX());
+                //rendererCnt.setY(paintingRect.getY());
+                //rendererCnt.setWidth(Math.max(0, paintingRect.getWidth()));
+                //rendererCnt.setHeight(Math.max(paintingRect.getHeight(), 0));
+                //rendererCnt.layoutContainer();
+
+
+<span class="nc bnc" id="L455" title="All 2 branches missed.">                if (renderAsImage) {</span>
+
+<span class="nc" id="L457">                    Image im = Image.createImage(paintingRect.getWidth(), paintingRect.getHeight(), 0);</span>
+<span class="nc" id="L458">                    Graphics ig = im.getGraphics();</span>
+<span class="nc" id="L459">                    renderer.paint(ig, new Rectangle(0, 0, paintingRect.getWidth(), paintingRect.getHeight()), this);</span>
+
+<span class="nc" id="L461">                    g.drawImage(im, paintingRect.getX(), paintingRect.getY());</span>
+
+<span class="nc" id="L463">                } else {</span>
+                    //rendererCnt.render(g);
+<span class="nc" id="L465">                    renderer.paint(g, paintingRect, this);</span>
+                }
+
+            }
+<span class="nc" id="L469">            layoutChildrenInternal();</span>
+<span class="nc" id="L470">            renderChildren(g);</span>
+        } finally {
+<span class="nc" id="L472">            g.setAlpha(alpha);</span>
+<span class="nc" id="L473">            g.setTransform(existingT);</span>
+        }
+
+<span class="nc" id="L476">    }</span>
+
+    /**
+     * Renders the node's children.
+     *
+     * @param g
+     */
+    public void renderChildren(Graphics g) {
+<span class="nc bnc" id="L484" title="All 2 branches missed.">        if (children != null) {</span>
+<span class="nc bnc" id="L485" title="All 2 branches missed.">            for (Node child : children) {</span>
+<span class="nc" id="L486">                child.render(g);</span>
+<span class="nc" id="L487">            }</span>
+        }
+<span class="nc" id="L489">    }</span>
+
+    /**
+     * Gets the renderer component for this node.
+     *
+     * @return
+     */
+    public NodePainter getRenderer() {
+<span class="nc" id="L497">        return renderer;</span>
+    }
+
+    /**
+     * Sets the component that should be used to render the node's contents.
+     *
+     * @param comp
+     */
+    public void setRenderer(NodePainter comp) {
+<span class="fc" id="L506">        renderer = comp;</span>
+<span class="fc" id="L507">    }</span>
+
+    /**
+     * Adds a child node.
+     *
+     * @param child
+     */
+    public void add(Node child) {
+<span class="fc bfc" id="L515" title="All 2 branches covered.">        if (children == null) {</span>
+<span class="fc" id="L516">            children = new ArrayList&lt;Node&gt;();</span>
+        }
+<span class="fc" id="L518">        children.add(child);</span>
+<span class="fc" id="L519">        child.parent = this;</span>
+<span class="fc" id="L520">        child.setScene(getScene());</span>
+<span class="fc" id="L521">    }</span>
+
+    /**
+     * Removes a child node.
+     *
+     * @param child
+     */
+    public void remove(Node child) {
+<span class="pc bpc" id="L529" title="1 of 2 branches missed.">        if (child.parent != this) {</span>
+<span class="nc" id="L530">            return;</span>
+        }
+<span class="pc bpc" id="L532" title="1 of 2 branches missed.">        if (children != null) {</span>
+<span class="fc" id="L533">            children.remove(child);</span>
+<span class="fc" id="L534">            child.parent = null;</span>
+<span class="fc" id="L535">            child.setScene(null);</span>
+        }
+<span class="fc" id="L537">    }</span>
+
+    private void layoutChildrenInternal() {
+<span class="nc bnc" id="L540" title="All 2 branches missed.">        if (isNeedsLayout()) {</span>
+<span class="nc" id="L541">            setNeedsLayout(false);</span>
+<span class="nc" id="L542">            layoutChildren();</span>
+        }
+<span class="nc" id="L544">    }</span>
+
+    /**
+     * Can be overridden by subclasses to layout children.  Called before node is rendered.
+     */
+    protected void layoutChildren() {
+
+<span class="nc" id="L551">    }</span>
+
+    /**
+     * Gets the child nodes of this node.
+     *
+     * @return
+     */
+    public Iterable&lt;Node&gt; getChildNodes() {
+<span class="nc" id="L559">        return children;</span>
+    }
+
+    /**
+     * Gets number of children in this node.
+     *
+     * @return
+     */
+    public int getChildCount() {
+<span class="nc bnc" id="L568" title="All 2 branches missed.">        if (children == null) {</span>
+<span class="nc" id="L569">            return 0;</span>
+        }
+<span class="nc" id="L571">        return children.size();</span>
+    }
+
+    /**
+     * Gets child node at index.
+     *
+     * @param index
+     * @return
+     */
+    public Node getChildAt(int index) {
+<span class="nc bnc" id="L581" title="All 2 branches missed.">        if (children == null) {</span>
+<span class="nc" id="L582">            return null;</span>
+        }
+<span class="nc" id="L584">        return children.get(index);</span>
+    }
+
+    /**
+     * Checks if node has children.
+     *
+     * @return
+     */
+    public boolean hasChildren() {
+<span class="nc bnc" id="L593" title="All 4 branches missed.">        return children != null &amp;&amp; !children.isEmpty();</span>
+
+    }
+
+    /**
+     * Removes all child nodes.
+     */
+    public void removeAll() {
+<span class="fc bfc" id="L601" title="All 2 branches covered.">        if (children != null) {</span>
+<span class="fc" id="L602">            children.clear();</span>
+        }
+<span class="fc" id="L604">    }</span>
+
+    private class RenderableContainer extends Container {
+
+<span class="nc" id="L608">        public RenderableContainer() {</span>
+<span class="nc" id="L609">            super(new BorderLayout(), &quot;NodeWrapper&quot;);</span>
+<span class="nc" id="L610">            Style s = getAllStyles();</span>
+<span class="nc" id="L611">            s.setPadding(0, 0, 0, 0);</span>
+<span class="nc" id="L612">            s.setMargin(0, 0, 0, 0);</span>
+<span class="nc" id="L613">            s.setBgTransparency(0);</span>
+<span class="nc" id="L614">            s.setBorder(Border.createEmpty());</span>
+
+<span class="nc" id="L616">        }</span>
+
+
+        void render(Graphics g) {
+            try {
+<span class="nc" id="L621">                paintComponentBackground(g);</span>
+<span class="nc" id="L622">                paint(g);</span>
+<span class="nc" id="L623">                paintBorder(g);</span>
+<span class="nc" id="L624">                g.setColor(0xff0000);</span>
+<span class="nc" id="L625">                int alpha = g.concatenateAlpha(getStyle().getFgAlpha());</span>
+<span class="nc" id="L626">                g.drawRect(getX(), getY(), getWidth() - 1, getHeight() - 1);</span>
+<span class="nc" id="L627">                g.setAlpha(alpha);</span>
+<span class="nc" id="L628">            } catch (Throwable t) {</span>
+
+<span class="nc" id="L630">            }</span>
+<span class="nc" id="L631">        }</span>
+    }
+}
+    
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

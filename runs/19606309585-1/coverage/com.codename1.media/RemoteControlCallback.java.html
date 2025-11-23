@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RemoteControlCallback.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media</a> &gt; <span class="el_source">RemoteControlCallback.java</span></div><h1>RemoteControlCallback.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media;
+
+import com.codename1.ui.CN;
+
+/**
+ * @author shannah
+ * @deprecated for internal use only.
+ */
+<span class="nc" id="L31">class RemoteControlCallback {</span>
+<span class="nc" id="L32">    private static final RemoteControlListener nullListener = new RemoteControlListener();</span>
+
+    private static RemoteControlListener l() {
+<span class="nc" id="L35">        RemoteControlListener out = MediaManager.getRemoteControlListener();</span>
+<span class="nc bnc" id="L36" title="All 2 branches missed.">        if (out == null) {</span>
+<span class="nc" id="L37">            out = nullListener;</span>
+        }
+<span class="nc" id="L39">        return out;</span>
+    }
+
+    static void play() {
+<span class="nc" id="L43">        CN.callSerially(new Runnable() {</span>
+            public void run() {
+<span class="nc" id="L45">                l().play();</span>
+<span class="nc" id="L46">            }</span>
+        });
+
+<span class="nc" id="L49">    }</span>
+
+    public static void pause() {
+<span class="nc" id="L52">        CN.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L55">                l().pause();</span>
+<span class="nc" id="L56">            }</span>
+
+        });
+
+<span class="nc" id="L60">    }</span>
+
+    public static void togglePlayPause() {
+<span class="nc" id="L63">        CN.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L66">                l().togglePlayPause();</span>
+<span class="nc" id="L67">            }</span>
+
+        });
+
+<span class="nc" id="L71">    }</span>
+
+    public static void seekTo(final long pos) {
+<span class="nc" id="L74">        CN.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L77">                l().seekTo(pos);</span>
+<span class="nc" id="L78">            }</span>
+
+        });
+
+<span class="nc" id="L82">    }</span>
+
+    public static void skipToNext() {
+<span class="nc" id="L85">        CN.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L88">                l().skipToNext();</span>
+<span class="nc" id="L89">            }</span>
+
+        });
+<span class="nc" id="L92">    }</span>
+
+    public static void skipToPrevious() {
+<span class="nc" id="L95">        CN.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L98">                l().skipToPrevious();</span>
+<span class="nc" id="L99">            }</span>
+
+        });
+<span class="nc" id="L102">    }</span>
+
+    public static void stop() {
+<span class="nc" id="L105">        CN.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L108">                l().stop();</span>
+<span class="nc" id="L109">            }</span>
+
+        });
+<span class="nc" id="L112">    }</span>
+
+    public static void fastForward() {
+<span class="nc" id="L115">        CN.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L118">                l().fastForward();</span>
+<span class="nc" id="L119">            }</span>
+
+        });
+<span class="nc" id="L122">    }</span>
+
+    public static void rewind() {
+<span class="nc" id="L125">        CN.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L128">                l().rewind();</span>
+<span class="nc" id="L129">            }</span>
+
+        });
+<span class="nc" id="L132">    }</span>
+
+    public static boolean isPlaying() {
+<span class="nc" id="L135">        return l().isPlaying();</span>
+    }
+
+    public static void setVolume(final float leftVolume, final float rightVolume) {
+<span class="nc" id="L139">        CN.callSerially(new Runnable() {</span>
+            @Override
+            public void run() {
+<span class="nc" id="L142">                l().setVolume(leftVolume, rightVolume);</span>
+<span class="nc" id="L143">            }</span>
+
+        });
+
+<span class="nc" id="L147">    }</span>
+
+    public static MediaMetaData getMetaData() {
+<span class="nc" id="L150">        return l().getMetaData();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LineChart.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.views</a> &gt; <span class="el_source">LineChart.java</span></div><h1>LineChart.java</h1><pre class="source lang-java linenums">/**
+ * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.codename1.charts.views;
+
+import com.codename1.charts.compat.Canvas;
+import com.codename1.charts.compat.Paint;
+import com.codename1.charts.compat.Paint.Style;
+import com.codename1.charts.models.XYMultipleSeriesDataset;
+import com.codename1.charts.renderers.SimpleSeriesRenderer;
+import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
+import com.codename1.charts.renderers.XYSeriesRenderer;
+import com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine;
+
+import java.util.ArrayList;
+import java.util.List;
+
+
+/**
+ * Plots series of X/Y points using straight line segments.
+ * &lt;p&gt;
+ * Supply the chart with an {@link XYMultipleSeriesDataset} and configure its
+ * appearance via an {@link XYMultipleSeriesRenderer}. The chart is commonly
+ * wrapped in a {@link com.codename1.charts.ChartComponent} before being added
+ * to a Codename One form.
+ */
+public class LineChart extends XYChart {
+    /** The constant to identify this chart type. */
+    public static final String TYPE = &quot;Line&quot;;
+    /** The legend shape width. */
+    private static final int SHAPE_WIDTH = 30;
+    /** The scatter chart to be used to draw the data points. */
+    private ScatterChart pointsChart;
+
+<span class="nc" id="L47">    LineChart() {</span>
+<span class="nc" id="L48">    }</span>
+
+    /**
+     * Builds a new line chart instance.
+     *
+     * @param dataset the multiple series dataset
+     * @param renderer the multiple series renderer
+     */
+    public LineChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer) {
+<span class="fc" id="L57">        super(dataset, renderer);</span>
+<span class="fc" id="L58">        pointsChart = new ScatterChart(dataset, renderer);</span>
+<span class="fc" id="L59">    }</span>
+
+    /**
+     * Sets the series and the renderer.
+     *
+     * @param dataset the series dataset
+     * @param renderer the series renderer
+     */
+    protected void setDatasetRenderer(XYMultipleSeriesDataset dataset,
+                                      XYMultipleSeriesRenderer renderer) {
+<span class="nc" id="L69">        super.setDatasetRenderer(dataset, renderer);</span>
+<span class="nc" id="L70">        pointsChart = new ScatterChart(dataset, renderer);</span>
+<span class="nc" id="L71">    }</span>
+
+    /**
+     * The graphical representation of a series.
+     *
+     * @param canvas the canvas to paint to
+     * @param paint the paint to be used for drawing
+     * @param points the array of points to be used for drawing the series
+     * @param seriesRenderer the series renderer
+     * @param yAxisValue the minimum value of the y axis
+     * @param seriesIndex the index of the series currently being drawn
+     * @param startIndex the start index of the rendering points
+     */
+    @Override
+    public void drawSeries(Canvas canvas, Paint paint, List&lt;Float&gt; points, XYSeriesRenderer renderer,
+                           float yAxisValue, int seriesIndex, int startIndex) {
+<span class="fc" id="L87">        float lineWidth = paint.getStrokeWidth();</span>
+<span class="fc" id="L88">        paint.setStrokeWidth(renderer.getLineWidth());</span>
+<span class="fc" id="L89">        final FillOutsideLine[] fillOutsideLine = renderer.getFillOutsideLine();</span>
+
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        for (FillOutsideLine fill : fillOutsideLine) {</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">            if (fill.getType() != FillOutsideLine.Type.NONE) {</span>
+<span class="nc" id="L93">                paint.setColor(fill.getColor());</span>
+                // TODO: find a way to do area charts without duplicating data
+<span class="nc" id="L95">                List&lt;Float&gt; fillPoints = new ArrayList&lt;Float&gt;();</span>
+<span class="nc" id="L96">                int[] range = fill.getFillRange();</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">                if (range == null) {</span>
+<span class="nc" id="L98">                    fillPoints.addAll(points);</span>
+                } else {
+<span class="nc bnc" id="L100" title="All 4 branches missed.">                    if (points.size() &gt; range[0] * 2 &amp;&amp; points.size() &gt; range[1] * 2) {</span>
+<span class="nc" id="L101">                        fillPoints.addAll(points.subList(range[0] * 2, range[1] * 2));</span>
+                    }
+                }
+
+                final float referencePoint;
+
+                // switch on ENUM's generates reflection code that screws up J2ME
+<span class="nc" id="L108">                FillOutsideLine.Type tt = fill.getType();</span>
+<span class="nc bnc" id="L109" title="All 6 branches missed.">                if (tt == FillOutsideLine.Type.BOUNDS_ALL || tt == FillOutsideLine.Type.BOUNDS_BELOW || tt == FillOutsideLine.Type.BOUNDS_ABOVE) {</span>
+<span class="nc" id="L110">                    referencePoint = yAxisValue;</span>
+                } else {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">                    if (tt == FillOutsideLine.Type.BELOW) {</span>
+<span class="nc" id="L113">                        referencePoint = canvas.getHeight();</span>
+                    } else {
+<span class="nc bnc" id="L115" title="All 2 branches missed.">                        if (tt == FillOutsideLine.Type.ABOVE) {</span>
+<span class="nc" id="L116">                            referencePoint = 0;</span>
+                        } else {
+<span class="nc" id="L118">                            throw new RuntimeException(</span>
+                                    &quot;You have added a new type of filling but have not implemented.&quot;);
+                        }
+                    }
+                }
+        /*switch (fill.getType()) {
+        case BOUNDS_ALL:
+          referencePoint = yAxisValue;
+          break;
+        case BOUNDS_BELOW:
+          referencePoint = yAxisValue;
+          break;
+        case BOUNDS_ABOVE:
+          referencePoint = yAxisValue;
+          break;
+        case BELOW:
+          referencePoint = canvas.getHeight();
+          break;
+        case ABOVE:
+          referencePoint = 0;
+          break;
+        default:
+          throw new RuntimeException(
+              &quot;You have added a new type of filling but have not implemented.&quot;);
+        }*/
+<span class="nc bnc" id="L143" title="All 2 branches missed.">                if (fill.getType() == FillOutsideLine.Type.BOUNDS_ABOVE</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">                        || fill.getType() == FillOutsideLine.Type.BOUNDS_BELOW) {</span>
+<span class="nc" id="L145">                    List&lt;Float&gt; boundsPoints = new ArrayList&lt;Float&gt;();</span>
+<span class="nc" id="L146">                    boolean add = false;</span>
+<span class="nc" id="L147">                    int length = fillPoints.size();</span>
+<span class="nc bnc" id="L148" title="All 4 branches missed.">                    if (length &gt; 0 &amp;&amp; fill.getType() == FillOutsideLine.Type.BOUNDS_ABOVE</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                            &amp;&amp; fillPoints.get(1) &lt; referencePoint</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                            || fill.getType() == FillOutsideLine.Type.BOUNDS_BELOW</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                            &amp;&amp; fillPoints.get(1) &gt; referencePoint) {</span>
+<span class="nc" id="L152">                        boundsPoints.add(fillPoints.get(0));</span>
+<span class="nc" id="L153">                        boundsPoints.add(fillPoints.get(1));</span>
+<span class="nc" id="L154">                        add = true;</span>
+                    }
+
+<span class="nc bnc" id="L157" title="All 2 branches missed.">                    for (int i = 3; i &lt; length; i += 2) {</span>
+<span class="nc" id="L158">                        float prevValue = fillPoints.get(i - 2);</span>
+<span class="nc" id="L159">                        float value = fillPoints.get(i);</span>
+
+<span class="nc bnc" id="L161" title="All 8 branches missed.">                        if (prevValue &lt; referencePoint &amp;&amp; value &gt; referencePoint || prevValue &gt; referencePoint</span>
+                                &amp;&amp; value &lt; referencePoint) {
+<span class="nc" id="L163">                            float prevX = fillPoints.get(i - 3);</span>
+<span class="nc" id="L164">                            float x = fillPoints.get(i - 1);</span>
+<span class="nc" id="L165">                            boundsPoints.add(prevX + (x - prevX) * (referencePoint - prevValue)</span>
+                                    / (value - prevValue));
+<span class="nc" id="L167">                            boundsPoints.add(referencePoint);</span>
+<span class="nc bnc" id="L168" title="All 4 branches missed.">                            if (fill.getType() == FillOutsideLine.Type.BOUNDS_ABOVE &amp;&amp; value &gt; referencePoint</span>
+<span class="nc bnc" id="L169" title="All 4 branches missed.">                                    || fill.getType() == FillOutsideLine.Type.BOUNDS_BELOW &amp;&amp; value &lt; referencePoint) {</span>
+<span class="nc" id="L170">                                i += 2;</span>
+<span class="nc" id="L171">                                add = false;</span>
+                            } else {
+<span class="nc" id="L173">                                boundsPoints.add(x);</span>
+<span class="nc" id="L174">                                boundsPoints.add(value);</span>
+<span class="nc" id="L175">                                add = true;</span>
+                            }
+<span class="nc" id="L177">                        } else {</span>
+<span class="nc bnc" id="L178" title="All 6 branches missed.">                            if (add || fill.getType() == FillOutsideLine.Type.BOUNDS_ABOVE</span>
+<span class="nc bnc" id="L179" title="All 4 branches missed.">                                    &amp;&amp; value &lt; referencePoint || fill.getType() == FillOutsideLine.Type.BOUNDS_BELOW</span>
+                                    &amp;&amp; value &gt; referencePoint) {
+<span class="nc" id="L181">                                boundsPoints.add(fillPoints.get(i - 1));</span>
+<span class="nc" id="L182">                                boundsPoints.add(value);</span>
+                            }
+                        }
+                    }
+
+<span class="nc" id="L187">                    fillPoints.clear();</span>
+<span class="nc" id="L188">                    fillPoints.addAll(boundsPoints);</span>
+                }
+<span class="nc" id="L190">                int length = fillPoints.size();</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">                if (length &gt; 0) {</span>
+<span class="nc" id="L192">                    fillPoints.set(0, fillPoints.get(0) + 1);</span>
+<span class="nc" id="L193">                    fillPoints.add(fillPoints.get(length - 2));</span>
+<span class="nc" id="L194">                    fillPoints.add(referencePoint);</span>
+<span class="nc" id="L195">                    fillPoints.add(fillPoints.get(0));</span>
+<span class="nc" id="L196">                    fillPoints.add(fillPoints.get(length + 1));</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">                    for (int i = 0; i &lt; length + 4; i += 2) {</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">                        if (fillPoints.get(i + 1) &lt; 0) {</span>
+<span class="nc" id="L199">                            fillPoints.set(i + 1, 0f);</span>
+                        }
+                    }
+
+<span class="nc" id="L203">                    paint.setStyle(Style.FILL);</span>
+<span class="nc" id="L204">                    drawPath(canvas, fillPoints, paint, true);</span>
+                }
+            }
+        }
+<span class="fc" id="L208">        paint.setColor(renderer.getColor());</span>
+<span class="fc" id="L209">        paint.setStyle(Style.STROKE);</span>
+<span class="fc" id="L210">        drawPath(canvas, points, paint, false);</span>
+<span class="fc" id="L211">        paint.setStrokeWidth(lineWidth);</span>
+<span class="fc" id="L212">    }</span>
+
+    @Override
+    protected ClickableArea[] clickableAreasForPoints(List&lt;Float&gt; points, List&lt;Double&gt; values,
+                                                      float yAxisValue, int seriesIndex, int startIndex) {
+<span class="fc" id="L217">        int length = points.size();</span>
+<span class="fc" id="L218">        ClickableArea[] ret = new ClickableArea[length / 2];</span>
+<span class="fc bfc" id="L219" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i += 2) {</span>
+<span class="fc" id="L220">            int selectableBuffer = mRenderer.getSelectableBuffer();</span>
+<span class="fc" id="L221">            ret[i / 2] = new ClickableArea(PkgUtils.makeRect(points.get(i) - selectableBuffer, points.get(i + 1)</span>
+<span class="fc" id="L222">                    - selectableBuffer, points.get(i) + selectableBuffer, points.get(i + 1)</span>
+<span class="fc" id="L223">                    + selectableBuffer), values.get(i), values.get(i + 1));</span>
+        }
+<span class="fc" id="L225">        return ret;</span>
+    }
+
+    /**
+     * Returns the legend shape width.
+     *
+     * @param seriesIndex the series index
+     * @return the legend shape width
+     */
+    public int getLegendShapeWidth(int seriesIndex) {
+<span class="fc" id="L235">        return SHAPE_WIDTH;</span>
+    }
+
+    /**
+     * The graphical representation of the legend shape.
+     *
+     * @param canvas the canvas to paint to
+     * @param renderer the series renderer
+     * @param x the x value of the point the shape should be drawn at
+     * @param y the y value of the point the shape should be drawn at
+     * @param seriesIndex the series index
+     * @param paint the paint to be used for drawing
+     */
+    public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
+                                int seriesIndex, Paint paint) {
+<span class="fc" id="L250">        canvas.drawLine(x, y, x + SHAPE_WIDTH, y, paint);</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        if (isRenderPoints(renderer)) {</span>
+<span class="nc" id="L252">            pointsChart.drawLegendShape(canvas, renderer, x + 5, y, seriesIndex, paint);</span>
+        }
+<span class="fc" id="L254">    }</span>
+
+    /**
+     * Returns if the chart should display the points as a certain shape.
+     *
+     * @param renderer the series renderer
+     */
+    public boolean isRenderPoints(SimpleSeriesRenderer renderer) {
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        return ((XYSeriesRenderer) renderer).getPointStyle() != PointStyle.POINT;</span>
+    }
+
+    /**
+     * Returns the scatter chart to be used for drawing the data points.
+     *
+     * @return the data points scatter chart
+     */
+    public ScatterChart getPointsChart() {
+<span class="nc" id="L271">        return pointsChart;</span>
+    }
+
+    /**
+     * Returns the chart type identifier.
+     *
+     * @return the chart type
+     */
+    public String getChartType() {
+<span class="nc" id="L280">        return TYPE;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PluginSupport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.plugin</a> &gt; <span class="el_source">PluginSupport.java</span></div><h1>PluginSupport.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.plugin;
+
+import com.codename1.plugin.event.PluginEvent;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Support class for implementing plugins in codename one.
+ *
+ * @author Steve Hannah
+ * @since 8.0
+ */
+<span class="fc" id="L37">public class PluginSupport {</span>
+<span class="fc" id="L38">    private final List&lt;Plugin&gt; plugins = new ArrayList&lt;Plugin&gt;();</span>
+
+    /**
+     * Registers a plugin with the Codename One runtime.
+     *
+     * @param plugin The plugin to register.
+     * @since 8.0
+     */
+    public void registerPlugin(Plugin plugin) {
+<span class="fc" id="L47">        synchronized (this) {</span>
+<span class="fc" id="L48">            plugins.add(plugin);</span>
+<span class="fc" id="L49">        }</span>
+
+<span class="fc" id="L51">    }</span>
+
+    /**
+     * Deregisters a plugin from the Codename One runtime.
+     *
+     * @param plugin The plugin to deregister
+     * @since 8.0
+     */
+    public void deregisterPlugin(Plugin plugin) {
+<span class="fc" id="L60">        synchronized (this) {</span>
+<span class="fc" id="L61">            plugins.remove(plugin);</span>
+<span class="fc" id="L62">        }</span>
+<span class="fc" id="L63">    }</span>
+
+    /**
+     * Fires a plugin event to give plugins an opportunity to handle it before default behaviour
+     * is resumed.
+     *
+     * @param event The event to fire.
+     * @param &lt;T&gt;   The event class
+     * @return The event
+     */
+    public &lt;T extends PluginEvent&gt; T firePluginEvent(T event) {
+        List&lt;Plugin&gt; localListeners;
+
+<span class="fc" id="L76">        synchronized (this) {</span>
+<span class="fc" id="L77">            localListeners = new ArrayList&lt;Plugin&gt;(plugins);</span>
+<span class="fc" id="L78">        }</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        for (Plugin plugin : localListeners) {</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            if (event.isConsumed()) {</span>
+<span class="fc" id="L81">                return event;</span>
+            }
+<span class="fc" id="L83">            plugin.actionPerformed(event);</span>
+<span class="fc" id="L84">        }</span>
+
+<span class="fc" id="L86">        return event;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

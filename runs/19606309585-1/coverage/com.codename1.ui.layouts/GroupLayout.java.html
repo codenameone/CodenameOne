@@ -1,0 +1,3432 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GroupLayout.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts</a> &gt; <span class="el_source">GroupLayout.java</span></div><h1>GroupLayout.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.layouts;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Form;
+import com.codename1.ui.geom.Dimension;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+
+/**
+ * GroupLayout is a LayoutManager that hierarchically groups components to
+ * achieve common, and not so common, layouts.  Grouping is done by instances
+ * of the Group class.  GroupLayout supports two types of groups:
+ * &lt;table&gt;
+ *   &lt;tr&gt;&lt;td valign=top&gt;Sequential:&lt;td&gt;A sequential group positions its child
+ *           elements sequentially, one after another.
+ *   &lt;tr&gt;&lt;td valign=top&gt;Parallel:&lt;td&gt;A parallel group positions its child
+ *           elements in the same space on top of each other.  Parallel groups
+ *           can also align the child elements along their baseline.
+ * &lt;/table&gt;
+ * Each Group can contain any number of child groups, Components or gaps.
+ * GroupLayout treats each axis independently.  That is, there is a group
+ * representing the horizontal axis, and a separate group representing the
+ * vertical axis.  The horizontal group is responsible for setting the x
+ * and width of its contents, where as the vertical group is responsible for
+ * setting the y and height of its contents.
+ * &lt;p&gt;
+ * The following code builds a simple layout consisting of two labels in
+ * one column, followed by two textfields in the next column:
+ * &lt;pre&gt;
+ *   Container panel = ...;
+ *   GroupLayout layout = new GroupLayout(panel);
+ *   panel.setLayout(layout);
+ *   layout.setAutocreateGaps(true);
+ *   layout.setAutocreateContainerGaps(true);
+ *   GroupLayout.SequentialGroup hGroup = layout.createSequentialGroup();
+ *   hGroup.add(layout.createParallelGroup().add(label1).add(label2)).
+ *          add(layout.createParallelGroup().add(tf1).add(tf2));
+ *   layout.setHorizontalGroup(hGroup);
+ *   GroupLayout.SequentialGroup vGroup = layout.createSequentialGroup();
+ *   vGroup.add(layout.createParallelGroup(GroupLayout.BASELINE).add(label1).add(tf1)).
+ *          add(layout.createParallelGroup(GroupLayout.BASELINE).add(label2).add(tf2));
+ *   layout.setVerticalGroup(vGroup);
+ * &lt;/pre&gt;
+ * &lt;p&gt;
+ * This layout consists of the following:
+ * &lt;ul&gt;&lt;li&gt;The horizontal axis consists of a sequential group containing two
+ *         parallel groups.  The first parallel group consists of the labels,
+ *         with the second parallel group consisting of the text fields.
+ *     &lt;li&gt;The vertical axis similarly consists of a sequential group
+ *         containing two parallel groups.  The parallel groups align their
+ *         contents along the baseline.  The first parallel group consists
+ *         of the first label and text field, and the second group consists
+ *         of the second label and text field.
+ * &lt;/ul&gt;
+ * There are a couple of things to notice in this code:
+ * &lt;ul&gt;
+ *   &lt;li&gt;You need not explicitly add the components to the container, this
+ *       is indirectly done by using one of the &lt;code&gt;add&lt;/code&gt; methods.
+ *   &lt;li&gt;The various &lt;code&gt;add&lt;/code&gt; methods of &lt;code&gt;Groups&lt;/code&gt; return
+ *       themselves.  This allows for easy chaining of invocations.  For
+ *       example, &lt;code&gt;group.add(label1).add(label2);&lt;/code&gt; is equivalent to
+ *       &lt;code&gt;group.add(label1);group.add(label2);&lt;/code&gt;.
+ *   &lt;li&gt;There are no public constructors for the Groups, instead
+ *       use the create methods of &lt;code&gt;GroupLayout&lt;/code&gt;.
+ * &lt;/ul&gt;
+ * GroupLayout offer the ability to automatically insert the appropriate gap
+ * between components.  This can be turned on using the
+ * &lt;code&gt;setAutocreateGaps()&lt;/code&gt; method.  Similarly you can use
+ * the &lt;code&gt;setAutocreateContainerGaps()&lt;/code&gt; method to insert gaps
+ * between the components and the container.
+ *
+ * @author Tomas Pavek
+ * @author Jan Stola
+ * @author Scott Violet
+ * @author Shai Almog
+ * @version $Revision: 1.25 $
+ */
+public class GroupLayout extends Layout {
+    /**
+     * Compass-direction North (up).
+     */
+    public static final int NORTH = 1;
+
+    /**
+     * Compass-direction east (right).
+     */
+    public static final int EAST = 3;
+
+    /**
+     * Compass-direction south (down).
+     */
+    public static final int SOUTH = 5;
+
+    /**
+     * Compass-direction west (left).
+     */
+    public static final int WEST = 7;
+    /**
+     * Possible argument when linking sizes of components.  Specifies the
+     * the two component should share the same size along the horizontal
+     * axis.
+     *
+     * @see #linkSize(Component[], int)
+     */
+    public static final int HORIZONTAL = 1;
+    /**
+     * Possible argument when linking sizes of components.  Specifies the
+     * the two component should share the same size along the vertical
+     * axis.
+     *
+     * @see #linkSize(Component[], int)
+     */
+    public static final int VERTICAL = 2;
+    /**
+     * Possible alignment type.  Indicates the elements should be
+     * aligned to the origin.  For the horizontal axis with a left to
+     * right orientation this means aligned to the left.
+     *
+     * @see #createParallelGroup(int)
+     */
+    public static final int LEADING = 1;
+    /**
+     * Possible alignment type.  Indicates the elements should be
+     * aligned to the end.  For the horizontal axis with a left to
+     * right orientation this means aligned to the right.
+     *
+     * @see #createParallelGroup(int)
+     */
+    public static final int TRAILING = 2;
+    /**
+     * Possible alignment type.  Indicates the elements should centered in
+     * the spaced provided.
+     *
+     * @see #createParallelGroup(int)
+     */
+    public static final int CENTER = 4;
+    /**
+     * Possible alignment type.  Indicates the elements should aligned along
+     * their baseline.
+     *
+     * @see #createParallelGroup(int)
+     */
+    public static final int BASELINE = 3;
+    /**
+     * Possible value for the add methods that takes a Component.
+     * Indicates the size from the component should be used.
+     */
+    public static final int DEFAULT_SIZE = -1;
+    /**
+     * Possible value for the add methods that takes a Component.
+     * Indicates the preferred size should be used.
+     */
+    public static final int PREFERRED_SIZE = -2;
+    // Used in size calculations
+    private static final int MIN_SIZE = 0;
+    private static final int PREF_SIZE = 1;
+    private static final int MAX_SIZE = 2;
+    // Used by prepare, indicates min, pref or max isn't going to be used.
+    private static final int SPECIFIC_SIZE = 3;
+    private static final int UNSET = Integer.MIN_VALUE;
+    private static final int NO_ALIGNMENT = 0;
+    // Whether or not we automatically try and create the preferred
+    // padding between components.
+    private boolean autocreatePadding;
+
+    // Whether or not we automatically try and create the preferred
+    // padding between containers
+    private boolean autocreateContainerPadding;
+
+    /**
+     * Group responsible for layout along the horizontal axis.  This is NOT
+     * the user specified group, use getHorizontalGroup to dig that out.
+     */
+    private Group horizontalGroup;
+    /**
+     * Group responsible for layout along the vertical axis.  This is NOT
+     * the user specified group, use getVerticalGroup to dig that out.
+     */
+    private Group verticalGroup;
+
+    // Maps from Component to ComponentInfo.  This is used for tracking
+    // information specific to a Component.
+    private final HashMap componentInfos;
+
+    // Container we're doing layout for.
+    private final Container host;
+
+    // Used by areParallelSiblings, cached to avoid excessive garbage.
+    private final ArrayList tmpParallelSet;
+
+    // Indicates Springs have changed in some way since last change.
+    private boolean springsChanged;
+
+    // Indicates invalidateLayout has been invoked.
+    private boolean isValid;
+
+    // Whether or not any preferred padding (or container padding) springs exist
+    private boolean hasPreferredPaddingSprings;
+
+    /**
+     * The LayoutStyle instance to use, if null the sharedInstance is used.
+     */
+    private LayoutStyle layoutStyle;
+
+    /**
+     * If true, components that are not visible are treated as though they
+     * aren't there.
+     */
+    private boolean honorsVisibility;
+
+
+    /**
+     * Creates a GroupLayout for the specified Container.
+     *
+     * @param host the Container to layout
+     * @throws IllegalArgumentException if host is null
+     */
+<span class="fc" id="L244">    public GroupLayout(Container host) {</span>
+<span class="pc bpc" id="L245" title="1 of 2 branches missed.">        if (host == null) {</span>
+<span class="nc" id="L246">            throw new IllegalArgumentException(&quot;Container must be non-null&quot;);</span>
+        }
+<span class="pc bpc" id="L248" title="1 of 2 branches missed.">        if (host instanceof Form) {</span>
+<span class="nc" id="L249">            host = ((Form) host).getContentPane();</span>
+        }
+<span class="fc" id="L251">        honorsVisibility = true;</span>
+<span class="fc" id="L252">        this.host = host;</span>
+<span class="fc" id="L253">        setHorizontalGroup(createParallelGroup(LEADING, true));</span>
+<span class="fc" id="L254">        setVerticalGroup(createParallelGroup(LEADING, true));</span>
+<span class="fc" id="L255">        componentInfos = new HashMap();</span>
+<span class="fc" id="L256">        tmpParallelSet = new ArrayList();</span>
+<span class="fc" id="L257">    }</span>
+
+    private static void checkSize(int min, int pref, int max,
+                                  boolean isComponentSpring) {
+<span class="fc" id="L261">        checkResizeType(min, isComponentSpring);</span>
+<span class="pc bpc" id="L262" title="3 of 4 branches missed.">        if (!isComponentSpring &amp;&amp; pref &lt; 0) {</span>
+<span class="nc" id="L263">            throw new IllegalArgumentException(&quot;Pref must be &gt;= 0&quot;);</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">        } else if (isComponentSpring) {</span>
+<span class="fc" id="L265">            checkResizeType(pref, true);</span>
+        }
+<span class="fc" id="L267">        checkResizeType(max, isComponentSpring);</span>
+<span class="fc" id="L268">        checkLessThan(min, pref);</span>
+<span class="fc" id="L269">        checkLessThan(pref, max);</span>
+<span class="fc" id="L270">    }</span>
+
+    private static void checkResizeType(int type, boolean isComponentSpring) {
+<span class="pc bpc" id="L273" title="8 of 12 branches missed.">        if (type &lt; 0 &amp;&amp; ((isComponentSpring &amp;&amp; type != DEFAULT_SIZE &amp;&amp;</span>
+                type != PREFERRED_SIZE) ||
+                (!isComponentSpring &amp;&amp; type != PREFERRED_SIZE))) {
+<span class="nc" id="L276">            throw new IllegalArgumentException(&quot;Invalid size&quot;);</span>
+        }
+<span class="fc" id="L278">    }</span>
+
+    private static void checkLessThan(int min, int max) {
+<span class="pc bpc" id="L281" title="5 of 6 branches missed.">        if (min &gt;= 0 &amp;&amp; max &gt;= 0 &amp;&amp; min &gt; max) {</span>
+<span class="nc" id="L282">            throw new IllegalArgumentException(</span>
+                    &quot;Following is not met: min&lt;=pref&lt;=max&quot;);
+        }
+<span class="fc" id="L285">    }</span>
+
+    /**
+     * Simple copy constructor for ArrayList
+     */
+    private static ArrayList create(ArrayList v) {
+<span class="fc" id="L291">        int size = v.size();</span>
+<span class="fc" id="L292">        ArrayList vec = new ArrayList(size);</span>
+<span class="fc bfc" id="L293" title="All 2 branches covered.">        for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="fc" id="L294">            vec.add(v.get(iter));</span>
+        }
+<span class="fc" id="L296">        return vec;</span>
+    }
+
+    /**
+     * Adds all ArrayList elements from source to dest
+     */
+    private static void addAll(ArrayList dest, ArrayList source) {
+<span class="fc" id="L303">        int size = source.size();</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="fc" id="L305">            dest.add(source.get(iter));</span>
+        }
+<span class="fc" id="L307">    }</span>
+
+    /**
+     * Returns whether component visibility is considered when sizing and
+     * positioning components.
+     *
+     * @return whether component visibility is considered when sizing and
+     * positioning components
+     */
+    public boolean getHonorsVisibility() {
+<span class="fc" id="L317">        return honorsVisibility;</span>
+    }
+
+    /**
+     * Sets whether component visibility is considered when sizing and
+     * positioning components. A value of &lt;code&gt;true&lt;/code&gt; indicates that
+     * non-visible components should not be treated as part of the
+     * layout. A value of &lt;code&gt;false&lt;/code&gt; indicates that components should be
+     * positioned and sized regardless of visibility.
+     * &lt;p&gt;
+     * A value of &lt;code&gt;false&lt;/code&gt; is useful when the visibility of components
+     * is dynamically adjusted and you don't want surrounding components and
+     * the sizing to change.
+     * &lt;p&gt;
+     * The specified value is used for components that do not have an
+     * explicit visibility specified.
+     * &lt;p&gt;
+     * The default is &lt;code&gt;true&lt;/code&gt;.
+     *
+     * @param honorsVisibility whether component visibility is considered when
+     *                         sizing and positioning components
+     * @see #setHonorsVisibility(Component, Boolean)
+     */
+    public void setHonorsVisibility(boolean honorsVisibility) {
+<span class="nc bnc" id="L341" title="All 2 branches missed.">        if (this.honorsVisibility != honorsVisibility) {</span>
+<span class="nc" id="L342">            this.honorsVisibility = honorsVisibility;</span>
+<span class="nc" id="L343">            springsChanged = true;</span>
+<span class="nc" id="L344">            isValid = false;</span>
+<span class="nc" id="L345">            invalidateHost();</span>
+        }
+<span class="nc" id="L347">    }</span>
+
+    /**
+     * Sets whether the component's visibility is considered for
+     * sizing and positioning. A value of &lt;code&gt;Boolean.TRUE&lt;/code&gt;
+     * indicates that if &lt;code&gt;component&lt;/code&gt; is not visible it should
+     * not be treated as part of the layout. A value of &lt;code&gt;false&lt;/code&gt;
+     * indicates that &lt;code&gt;component&lt;/code&gt; is positioned and sized
+     * regardless of it's visibility.  A value of &lt;code&gt;null&lt;/code&gt;
+     * indicates the value specified by the single argument method &lt;code&gt;
+     * setHonorsVisibility&lt;/code&gt; should be used.
+     * &lt;p&gt;
+     * If &lt;code&gt;component&lt;/code&gt; is not a child of the &lt;code&gt;Container&lt;/code&gt; this
+     * &lt;code&gt;GroupLayout&lt;/code&gt; is managing, it will be added to the
+     * &lt;code&gt;Container&lt;/code&gt;.
+     *
+     * @param component        the component
+     * @param honorsVisibility whether &lt;code&gt;component&lt;/code&gt;'s visibility should be
+     *                         considered for sizing and positioning
+     * @throws IllegalArgumentException if &lt;code&gt;component&lt;/code&gt; is &lt;code&gt;null&lt;/code&gt;
+     * @see #setHonorsVisibility(boolean)
+     */
+    public void setHonorsVisibility(Component component,
+                                    Boolean honorsVisibility) {
+<span class="nc bnc" id="L371" title="All 2 branches missed.">        if (component == null) {</span>
+<span class="nc" id="L372">            throw new IllegalArgumentException(&quot;Component must be non-null&quot;);</span>
+        }
+<span class="nc" id="L374">        getComponentInfo(component).setHonorsVisibility(honorsVisibility);</span>
+<span class="nc" id="L375">        springsChanged = true;</span>
+<span class="nc" id="L376">        isValid = false;</span>
+<span class="nc" id="L377">        invalidateHost();</span>
+<span class="nc" id="L378">    }</span>
+
+    /**
+     * Returns a textual description of this GroupLayout.  The return value
+     * is intended for debugging purposes only.
+     *
+     * @return textual description of this GroupLayout
+     **/
+    public String toString() {
+<span class="nc bnc" id="L387" title="All 2 branches missed.">        if (springsChanged) {</span>
+<span class="nc" id="L388">            registerComponents(horizontalGroup, HORIZONTAL);</span>
+<span class="nc" id="L389">            registerComponents(verticalGroup, VERTICAL);</span>
+        }
+<span class="nc" id="L391">        StringBuffer buffer = new StringBuffer();</span>
+<span class="nc" id="L392">        buffer.append(&quot;HORIZONTAL\n&quot;);</span>
+<span class="nc" id="L393">        dump(buffer, horizontalGroup, &quot;  &quot;, HORIZONTAL);</span>
+<span class="nc" id="L394">        buffer.append(&quot;\nVERTICAL\n&quot;);</span>
+<span class="nc" id="L395">        dump(buffer, verticalGroup, &quot;  &quot;, VERTICAL);</span>
+<span class="nc" id="L396">        return buffer.toString();</span>
+    }
+
+    private void dump(StringBuffer buffer, Spring spring, String indent,
+                      int axis) {
+<span class="nc" id="L401">        String origin = &quot;&quot;;</span>
+<span class="nc" id="L402">        String padding = &quot;&quot;;</span>
+<span class="nc bnc" id="L403" title="All 2 branches missed.">        if (spring instanceof ComponentSpring) {</span>
+<span class="nc" id="L404">            ComponentSpring cSpring = (ComponentSpring) spring;</span>
+<span class="nc" id="L405">            origin = cSpring.getOrigin() + &quot; &quot;;</span>
+<span class="nc" id="L406">            String name = cSpring.getComponent().toString();</span>
+<span class="nc bnc" id="L407" title="All 2 branches missed.">            if (name != null) {</span>
+<span class="nc" id="L408">                origin = &quot;name=&quot; + name + &quot;, &quot;;</span>
+            }
+        }
+<span class="nc bnc" id="L411" title="All 2 branches missed.">        if (spring instanceof AutopaddingSpring) {</span>
+<span class="nc" id="L412">            AutopaddingSpring paddingSpring = (AutopaddingSpring) spring;</span>
+<span class="nc" id="L413">            padding = &quot;, userCreated=&quot; + paddingSpring.getUserCreated() +</span>
+<span class="nc" id="L414">                    &quot;, matches=&quot; + paddingSpring.getMatchDescription();</span>
+        }
+<span class="nc" id="L416">        buffer.append(indent + spring.getClass().getName() + &quot; &quot; +</span>
+<span class="nc" id="L417">                Integer.toHexString(spring.hashCode()) + &quot; &quot; +</span>
+                origin +
+<span class="nc" id="L419">                &quot;, size=&quot; + spring.getSize() +</span>
+<span class="nc" id="L420">                &quot;, alignment=&quot; + spring.getAlignment() +</span>
+<span class="nc" id="L421">                &quot; prefs=[&quot; + spring.getMinimumSize(axis) +</span>
+<span class="nc" id="L422">                &quot; &quot; + spring.getPreferredSize(axis) +</span>
+<span class="nc" id="L423">                &quot; &quot; + spring.getMaximumSize(axis) +</span>
+                padding + &quot;]\n&quot;);
+<span class="nc bnc" id="L425" title="All 2 branches missed.">        if (spring instanceof Group) {</span>
+<span class="nc" id="L426">            ArrayList springs = ((Group) spring).springs;</span>
+<span class="nc" id="L427">            indent += &quot;  &quot;;</span>
+<span class="nc bnc" id="L428" title="All 2 branches missed.">            for (int counter = 0; counter &lt; springs.size(); counter++) {</span>
+<span class="nc" id="L429">                dump(buffer, (Spring) springs.get(counter), indent, axis);</span>
+            }
+        }
+<span class="nc" id="L432">    }</span>
+
+    /**
+     * Returns true if gaps between components are automatically be created.
+     *
+     * @return true if gaps between components should automatically be created
+     */
+    public boolean getAutocreateGaps() {
+<span class="fc" id="L440">        return autocreatePadding;</span>
+    }
+
+    /**
+     * Sets whether or not a gap between components
+     * should automatically be created.  For example, if this is true
+     * and you add two components to a &lt;code&gt;SequentialGroup&lt;/code&gt; a
+     * gap between the two will automatically be created.  The default
+     * is false.
+     *
+     * @param autocreatePadding whether or not to automatically created a gap
+     *                          between components and the container
+     */
+    public void setAutocreateGaps(boolean autocreatePadding) {
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">        if (this.autocreatePadding != autocreatePadding) {</span>
+<span class="fc" id="L455">            this.autocreatePadding = autocreatePadding;</span>
+<span class="fc" id="L456">            invalidateHost();</span>
+        }
+<span class="fc" id="L458">    }</span>
+
+    /**
+     * Returns whether or not gaps between the container and the
+     * first/last components should automatically be created. The default
+     * is false.
+     *
+     * @return whether or not the gaps between the container and the
+     * first/last components should automatically be created
+     */
+    public boolean getAutocreateContainerGaps() {
+<span class="fc" id="L469">        return autocreateContainerPadding;</span>
+    }
+
+    /**
+     * Sets whether or not gaps between the container and the first/last
+     * components should automatically be created. The default
+     * is false.
+     *
+     * @param autocreatePadding whether or not to automatically create
+     *                          gaps between the container and first/last components.
+     */
+    public void setAutocreateContainerGaps(boolean autocreatePadding) {
+<span class="pc bpc" id="L481" title="1 of 2 branches missed.">        if (autocreatePadding != autocreateContainerPadding) {</span>
+<span class="fc" id="L482">            autocreateContainerPadding = autocreatePadding;</span>
+<span class="fc" id="L483">            horizontalGroup = createTopLevelGroup(getHorizontalGroup());</span>
+<span class="fc" id="L484">            verticalGroup = createTopLevelGroup(getVerticalGroup());</span>
+<span class="fc" id="L485">            invalidateHost();</span>
+        }
+<span class="fc" id="L487">    }</span>
+
+    /**
+     * Returns the &lt;code&gt;Group&lt;/code&gt; that is responsible for
+     * layout along the horizontal axis.
+     *
+     * @return &lt;code&gt;ParallelGroup&lt;/code&gt; responsible for layout along
+     * the horizontal axis.
+     */
+    public Group getHorizontalGroup() {
+<span class="fc" id="L497">        int index = 0;</span>
+<span class="pc bpc" id="L498" title="1 of 2 branches missed.">        if (horizontalGroup.springs.size() &gt; 1) {</span>
+<span class="nc" id="L499">            index = 1;</span>
+        }
+<span class="fc" id="L501">        return (Group) horizontalGroup.springs.get(index);</span>
+    }
+
+    /**
+     * Sets the &lt;code&gt;Group&lt;/code&gt; that is responsible for
+     * layout along the horizontal axis.
+     *
+     * @param group &lt;code&gt;Group&lt;/code&gt; responsible for layout along
+     *              the horizontal axis
+     * @throws IllegalArgumentException if group is null
+     */
+    public void setHorizontalGroup(Group group) {
+<span class="pc bpc" id="L513" title="1 of 2 branches missed.">        if (group == null) {</span>
+<span class="nc" id="L514">            throw new IllegalArgumentException(&quot;Group must be non-null&quot;);</span>
+        }
+<span class="fc" id="L516">        horizontalGroup = createTopLevelGroup(group);</span>
+<span class="fc" id="L517">        invalidateHost();</span>
+<span class="fc" id="L518">    }</span>
+
+    /**
+     * Returns the &lt;code&gt;ParallelGroup&lt;/code&gt; that is responsible for
+     * layout along the vertical axis.
+     *
+     * @return &lt;code&gt;ParallelGroup&lt;/code&gt; responsible for layout along
+     * the vertical axis.
+     */
+    public Group getVerticalGroup() {
+<span class="fc" id="L528">        int index = 0;</span>
+<span class="pc bpc" id="L529" title="1 of 2 branches missed.">        if (verticalGroup.springs.size() &gt; 1) {</span>
+<span class="nc" id="L530">            index = 1;</span>
+        }
+<span class="fc" id="L532">        return (Group) verticalGroup.springs.get(index);</span>
+    }
+
+    /**
+     * Sets the &lt;code&gt;Group&lt;/code&gt; that is responsible for
+     * layout along the vertical axis.
+     *
+     * @param group &lt;code&gt;Group&lt;/code&gt; responsible for layout along
+     *              the vertical axis.
+     * @throws IllegalArgumentException if group is null.
+     */
+    public void setVerticalGroup(Group group) {
+<span class="pc bpc" id="L544" title="1 of 2 branches missed.">        if (group == null) {</span>
+<span class="nc" id="L545">            throw new IllegalArgumentException(&quot;Group must be non-null&quot;);</span>
+        }
+<span class="fc" id="L547">        verticalGroup = createTopLevelGroup(group);</span>
+<span class="fc" id="L548">        invalidateHost();</span>
+<span class="fc" id="L549">    }</span>
+
+    /**
+     * Wraps the user specified group in a sequential group.  If
+     * container gaps should be generate the necessary springs are
+     * added.
+     */
+    private Group createTopLevelGroup(Group specifiedGroup) {
+<span class="fc" id="L557">        SequentialGroup group = createSequentialGroup();</span>
+<span class="fc bfc" id="L558" title="All 2 branches covered.">        if (getAutocreateContainerGaps()) {</span>
+<span class="fc" id="L559">            group.addSpring(new ContainerAutopaddingSpring());</span>
+<span class="fc" id="L560">            group.add(specifiedGroup);</span>
+<span class="fc" id="L561">            group.addSpring(new ContainerAutopaddingSpring());</span>
+        } else {
+<span class="fc" id="L563">            group.add(specifiedGroup);</span>
+        }
+<span class="fc" id="L565">        return group;</span>
+    }
+
+    /**
+     * Creates and returns a &lt;code&gt;SequentialGroup&lt;/code&gt;.
+     *
+     * @return a new &lt;code&gt;SequentialGroup&lt;/code&gt;
+     */
+    public SequentialGroup createSequentialGroup() {
+<span class="fc" id="L574">        return new SequentialGroup();</span>
+    }
+
+    /**
+     * Creates and returns a &lt;code&gt;ParallelGroup&lt;/code&gt; with a
+     * &lt;code&gt;LEADING&lt;/code&gt; alignment.  This is a cover method for the more
+     * general &lt;code&gt;createParallelGroup(int)&lt;/code&gt; method.
+     *
+     * @return a new ParallelGroup
+     * @see #createParallelGroup(int)
+     */
+    public ParallelGroup createParallelGroup() {
+<span class="nc" id="L586">        return createParallelGroup(LEADING);</span>
+    }
+
+    /**
+     * Creates and returns an &lt;code&gt;ParallelGroup&lt;/code&gt;.  The alignment
+     * specifies how children elements should be positioned when the
+     * the parallel group is given more space than necessary.  For example,
+     * if a ParallelGroup with an alignment of TRAILING is given 100 pixels
+     * and a child only needs 50 pixels, the child will be positioned at the
+     * position 50.
+     *
+     * @param alignment alignment for the elements of the Group, one
+     *                  of &lt;code&gt;LEADING&lt;/code&gt;, &lt;code&gt;TRAILING&lt;/code&gt;,
+     *                  &lt;code&gt;CENTER&lt;/code&gt; or &lt;code&gt;BASELINE&lt;/code&gt;.
+     * @return a new &lt;code&gt;ParallelGroup&lt;/code&gt;
+     * @throws IllegalArgumentException if alignment is not one of
+     *                                  &lt;code&gt;LEADING&lt;/code&gt;, &lt;code&gt;TRAILING&lt;/code&gt;,
+     *                                  &lt;code&gt;CENTER&lt;/code&gt; or &lt;code&gt;BASELINE&lt;/code&gt;
+     */
+    public ParallelGroup createParallelGroup(int alignment) {
+<span class="fc" id="L606">        return createParallelGroup(alignment, true);</span>
+    }
+
+    /**
+     * Creates and returns an &lt;code&gt;ParallelGroup&lt;/code&gt;.  The alignment
+     * specifies how children elements should be positioned when the
+     * the parallel group is given more space than necessary.  For example,
+     * if a ParallelGroup with an alignment of TRAILING is given 100 pixels
+     * and a child only needs 50 pixels, the child will be positioned at the
+     * position 50.
+     *
+     * @param alignment alignment for the elements of the Group, one
+     *                  of &lt;code&gt;LEADING&lt;/code&gt;, &lt;code&gt;TRAILING&lt;/code&gt;,
+     *                  &lt;code&gt;CENTER&lt;/code&gt; or &lt;code&gt;BASELINE&lt;/code&gt;.
+     * @param resizable whether or not the group is resizable.  If the group
+     *                  is not resizable the min/max size will be the same as the
+     *                  preferred.
+     * @return a new &lt;code&gt;ParallelGroup&lt;/code&gt;
+     * @throws IllegalArgumentException if alignment is not one of
+     *                                  &lt;code&gt;LEADING&lt;/code&gt;, &lt;code&gt;TRAILING&lt;/code&gt;,
+     *                                  &lt;code&gt;CENTER&lt;/code&gt; or &lt;code&gt;BASELINE&lt;/code&gt;
+     */
+    public ParallelGroup createParallelGroup(int alignment, boolean resizable) {
+<span class="fc bfc" id="L629" title="All 2 branches covered.">        if (alignment == BASELINE) {</span>
+<span class="fc" id="L630">            return new BaselineGroup(resizable);</span>
+        }
+<span class="fc" id="L632">        return new ParallelGroup(alignment, resizable);</span>
+    }
+
+    /**
+     * Creates and returns a &lt;code&gt;ParallelGroup&lt;/code&gt; that aligns it's
+     * elements along the baseline.
+     *
+     * @param resizable           whether the group is resizable
+     * @param anchorBaselineToTop whether the baseline is anchored to
+     *                            the top or bottom of the group
+     * @return parallel group
+     * @see #createBaselineGroup
+     * @see ParallelGroup
+     */
+    public ParallelGroup createBaselineGroup(boolean resizable,
+                                             boolean anchorBaselineToTop) {
+<span class="nc" id="L648">        return new BaselineGroup(resizable, anchorBaselineToTop);</span>
+    }
+
+    /**
+     * Forces the set of components to have the same size.
+     * This can be used multiple times to force
+     * any number of components to share the same size.
+     * &lt;p&gt;
+     * Linked Components are not be resizable.
+     *
+     * @param components Components to force to have same size.
+     * @throws IllegalArgumentException if &lt;code&gt;components&lt;/code&gt; is
+     *                                  null, or contains null.
+     */
+    public void linkSize(Component[] components) {
+<span class="nc" id="L663">        linkSize(components, HORIZONTAL | VERTICAL);</span>
+<span class="nc" id="L664">    }</span>
+
+    /**
+     * Forces the set of components to have the same size.
+     * This can be used multiple times to force
+     * any number of components to share the same size.
+     * &lt;p&gt;
+     * Linked Components are not be resizable.
+     *
+     * @param components Components to force to have same size.
+     * @param axis       Axis to bind size, one of HORIZONTAL, VERTICAL or
+     *                   HORIZONTAL | VERTICAL
+     * @throws IllegalArgumentException if &lt;code&gt;components&lt;/code&gt; is
+     *                                  null, or contains null.
+     * @throws IllegalArgumentException if &lt;code&gt;axis&lt;/code&gt; does not
+     *                                  contain &lt;code&gt;HORIZONTAL&lt;/code&gt; or &lt;code&gt;VERTICAL&lt;/code&gt;
+     */
+    public void linkSize(Component[] components, int axis) {
+<span class="pc bpc" id="L682" title="1 of 2 branches missed.">        if (components == null) {</span>
+<span class="nc" id="L683">            throw new IllegalArgumentException(&quot;Components must be non-null&quot;);</span>
+        }
+<span class="pc bpc" id="L685" title="1 of 2 branches missed.">        boolean horizontal = ((axis &amp; HORIZONTAL) == HORIZONTAL);</span>
+<span class="pc bpc" id="L686" title="1 of 2 branches missed.">        boolean vertical = ((axis &amp; VERTICAL) == VERTICAL);</span>
+<span class="pc bpc" id="L687" title="2 of 4 branches missed.">        if (!vertical &amp;&amp; !horizontal) {</span>
+<span class="nc" id="L688">            throw new IllegalArgumentException(</span>
+                    &quot;Axis must contain HORIZONTAL or VERTICAL&quot;);
+        }
+<span class="fc bfc" id="L691" title="All 2 branches covered.">        for (int counter = components.length - 1; counter &gt;= 0; counter--) {</span>
+<span class="fc" id="L692">            Component c = components[counter];</span>
+<span class="pc bpc" id="L693" title="1 of 2 branches missed.">            if (components[counter] == null) {</span>
+<span class="nc" id="L694">                throw new IllegalArgumentException(</span>
+                        &quot;Components must be non-null&quot;);
+            }
+            // Force the component to be added
+<span class="fc" id="L698">            getComponentInfo(c);</span>
+        }
+<span class="pc bpc" id="L700" title="1 of 2 branches missed.">        if (horizontal) {</span>
+<span class="fc" id="L701">            linkSize0(components, HORIZONTAL);</span>
+        }
+<span class="pc bpc" id="L703" title="1 of 2 branches missed.">        if (vertical) {</span>
+<span class="nc" id="L704">            linkSize0(components, VERTICAL);</span>
+        }
+<span class="fc" id="L706">        invalidateHost();</span>
+<span class="fc" id="L707">    }</span>
+
+    private void linkSize0(Component[] components, int axis) {
+<span class="fc" id="L710">        LinkInfo master = getComponentInfo(</span>
+<span class="fc" id="L711">                components[components.length - 1]).getLinkInfo(axis);</span>
+<span class="fc bfc" id="L712" title="All 2 branches covered.">        for (int counter = components.length - 2; counter &gt;= 0; counter--) {</span>
+<span class="fc" id="L713">            master.add(getComponentInfo(components[counter]));</span>
+        }
+<span class="fc" id="L715">    }</span>
+
+    /**
+     * Removes an existing component replacing it with the specified component.
+     *
+     * @param existingComponent the Component that should be removed and
+     *                          replaced with newComponent
+     * @param newComponent      the Component to put in existingComponents place
+     * @throws IllegalArgumentException is either of the Components are null or
+     *                                  if existingComponent is not being managed by this layout manager
+     */
+    public void replace(Component existingComponent, Component newComponent) {
+<span class="nc bnc" id="L727" title="All 4 branches missed.">        if (existingComponent == null || newComponent == null) {</span>
+<span class="nc" id="L728">            throw new IllegalArgumentException(&quot;Components must be non-null&quot;);</span>
+        }
+        // Make sure all the components have been registered, otherwise we may
+        // not update the correct Springs.
+<span class="nc bnc" id="L732" title="All 2 branches missed.">        if (springsChanged) {</span>
+<span class="nc" id="L733">            registerComponents(horizontalGroup, HORIZONTAL);</span>
+<span class="nc" id="L734">            registerComponents(verticalGroup, VERTICAL);</span>
+        }
+<span class="nc" id="L736">        ComponentInfo info = (ComponentInfo) componentInfos.</span>
+<span class="nc" id="L737">                remove(existingComponent);</span>
+<span class="nc bnc" id="L738" title="All 2 branches missed.">        if (info == null) {</span>
+<span class="nc" id="L739">            throw new IllegalArgumentException(&quot;Component must already exist&quot;);</span>
+        }
+<span class="nc" id="L741">        host.removeComponent(existingComponent);</span>
+<span class="nc bnc" id="L742" title="All 2 branches missed.">        if (newComponent.getParent() != host) {</span>
+<span class="nc" id="L743">            host.addComponent(newComponent);</span>
+        }
+<span class="nc" id="L745">        info.setComponent(newComponent);</span>
+<span class="nc" id="L746">        componentInfos.put(newComponent, info);</span>
+<span class="nc" id="L747">        invalidateHost();</span>
+<span class="nc" id="L748">    }</span>
+
+    /**
+     * Returns the LayoutStyle instance to use
+     *
+     * @return the LayoutStyle instance to use
+     */
+    public LayoutStyle getLayoutStyle() {
+<span class="fc" id="L756">        return layoutStyle;</span>
+    }
+
+    /**
+     * Sets the LayoutStyle this GroupLayout is to use. A value of null can
+     * be used to indicate the shared instance of LayoutStyle should be used.
+     *
+     * @param layoutStyle the LayoutStyle to use
+     */
+    public void setLayoutStyle(LayoutStyle layoutStyle) {
+<span class="nc" id="L766">        this.layoutStyle = layoutStyle;</span>
+<span class="nc" id="L767">        invalidateHost();</span>
+<span class="nc" id="L768">    }</span>
+
+    private LayoutStyle getLayoutStyle0() {
+<span class="fc" id="L771">        LayoutStyle layoutStyle = getLayoutStyle();</span>
+<span class="pc bpc" id="L772" title="1 of 2 branches missed.">        if (layoutStyle == null) {</span>
+<span class="fc" id="L773">            layoutStyle = LayoutStyle.getSharedInstance();</span>
+        }
+<span class="fc" id="L775">        return layoutStyle;</span>
+    }
+
+    private void invalidateHost() {
+<span class="fc" id="L779">        host.invalidate();</span>
+<span class="fc" id="L780">        host.repaint();</span>
+<span class="fc" id="L781">    }</span>
+
+
+    /**
+     * Returns the minimum size for the specified container.
+     *
+     * @param parent the container to return size for
+     * @throws IllegalArgumentException if &lt;code&gt;parent&lt;/code&gt; is not
+     *         the same &lt;code&gt;Container&lt;/code&gt; that this was created with
+     * @throws IllegalStateException if any of the components added to
+     *         this layout are not in both a horizontal and vertical group
+     * @see java.awt.Container#getMinimumSize
+     */
+    /*public Dimension minimumLayoutSize(Container parent) {
+        checkParent(parent);
+        prepare(MIN_SIZE);
+        return adjustSize(horizontalGroup.getMinimumSize(HORIZONTAL),
+                verticalGroup.getMinimumSize(VERTICAL));
+    }*/
+
+    /**
+     * Notification that a &lt;code&gt;Component&lt;/code&gt; has been removed from
+     * the parent container.  You should not invoke this method
+     * directly, instead invoke &lt;code&gt;removeComponent&lt;/code&gt; on the parent
+     * &lt;code&gt;Container&lt;/code&gt;.
+     *
+     * @param component the component to be removed
+     * @see Container#removeComponent
+     */
+    public void removeLayoutComponent(Component component) {
+<span class="nc" id="L811">        ComponentInfo info = (ComponentInfo) componentInfos.remove(component);</span>
+<span class="nc bnc" id="L812" title="All 2 branches missed.">        if (info != null) {</span>
+<span class="nc" id="L813">            info.dispose();</span>
+<span class="nc" id="L814">            springsChanged = true;</span>
+<span class="nc" id="L815">            isValid = false;</span>
+        }
+<span class="nc" id="L817">    }</span>
+
+    /**
+     * Returns the maximum size for the specified container.
+     *
+     * @param parent the container to return size for
+     * @throws IllegalArgumentException if &lt;code&gt;parent&lt;/code&gt; is not
+     *         the same &lt;code&gt;Container&lt;/code&gt; that this was created with
+     * @throws IllegalStateException if any of the components added to
+     *         this layout are not in both a horizontal and vertical group
+     * @see java.awt.Container#getMaximumSize
+     */
+    /*public Dimension maximumLayoutSize(Container parent) {
+        checkParent(parent);
+        prepare(MAX_SIZE);
+        return adjustSize(horizontalGroup.getMaximumSize(HORIZONTAL),
+                verticalGroup.getMaximumSize(VERTICAL));
+    }*/
+
+    /**
+     * Returns the alignment along the x axis.  This specifies how
+     * the component would like to be aligned relative to other
+     * components.  The value should be a number between 0 and 1
+     * where 0 represents alignment along the origin, 1 is aligned
+     * the furthest away from the origin, 0.5 is centered, etc.
+     *
+     * @param parent Container hosting this LayoutManager
+     * @throws IllegalArgumentException if &lt;code&gt;parent&lt;/code&gt; is not
+     *         the same &lt;code&gt;Container&lt;/code&gt; that this was created with
+     * @return alignment
+     */
+    /*public float getLayoutAlignmentX(Container parent) {
+        checkParent(parent);
+        return .5f;
+    }*
+    
+    /**
+     * Returns the alignment along the y axis.  This specifies how
+     * the component would like to be aligned relative to other
+     * components.  The value should be a number between 0 and 1
+     * where 0 represents alignment along the origin, 1 is aligned
+     * the furthest away from the origin, 0.5 is centered, etc.
+     *
+     * @param parent Container hosting this LayoutManager
+     * @throws IllegalArgumentException if &lt;code&gt;parent&lt;/code&gt; is not
+     *         the same &lt;code&gt;Container&lt;/code&gt; that this was created with
+     * @return alignment
+     */
+    /*public float getLayoutAlignmentY(Container parent) {
+        checkParent(parent);
+        return .5f;
+    }*/
+
+    /**
+     * Returns the preferred size for the specified container.
+     *
+     * @param parent the container to return size for
+     * @throws IllegalArgumentException if &lt;code&gt;parent&lt;/code&gt; is not
+     *                                  the same &lt;code&gt;Container&lt;/code&gt; that this was created with
+     * @throws IllegalStateException    if any of the components added to
+     *                                  this layout are not in both a horizontal and vertical group
+     * @see Container#getPreferredSize
+     */
+    public Dimension getPreferredSize(Container parent) {
+<span class="fc" id="L881">        checkParent(parent);</span>
+<span class="fc" id="L882">        prepare(PREF_SIZE);</span>
+<span class="fc" id="L883">        return adjustSize(horizontalGroup.getPreferredSize(HORIZONTAL),</span>
+<span class="fc" id="L884">                verticalGroup.getPreferredSize(VERTICAL));</span>
+    }
+
+    /**
+     * Lays out the specified container.
+     *
+     * @param parent the container to be laid out
+     * @throws IllegalStateException if any of the components added to
+     *                               this layout are not in both a horizontal and vertical group
+     */
+    public void layoutContainer(Container parent) {
+        // Step 1: Prepare for layout.
+<span class="fc" id="L896">        prepare(SPECIFIC_SIZE);</span>
+<span class="fc" id="L897">        int insetLeft = parent.getStyle().getMarginLeftNoRTL();</span>
+<span class="fc" id="L898">        int insetTop = parent.getStyle().getMarginTop();</span>
+<span class="fc" id="L899">        int insetRight = parent.getStyle().getMarginRightNoRTL();</span>
+<span class="fc" id="L900">        int insetBottom = parent.getStyle().getMarginBottom();</span>
+<span class="fc" id="L901">        int width = parent.getWidth() - insetLeft - insetRight;</span>
+<span class="fc" id="L902">        int height = parent.getHeight() - insetTop - insetBottom;</span>
+<span class="fc" id="L903">        boolean ltr = isLeftToRight();</span>
+<span class="pc bpc" id="L904" title="5 of 6 branches missed.">        if (getAutocreateGaps() || getAutocreateContainerGaps() ||</span>
+                hasPreferredPaddingSprings) {
+            // Step 2: Calculate autopadding springs
+<span class="fc" id="L907">            calculateAutopadding(horizontalGroup, HORIZONTAL, SPECIFIC_SIZE, 0,</span>
+                    width);
+<span class="fc" id="L909">            calculateAutopadding(verticalGroup, VERTICAL, SPECIFIC_SIZE, 0,</span>
+                    height);
+        }
+        // Step 3: set the size of the groups.
+<span class="fc" id="L913">        horizontalGroup.setSize(HORIZONTAL, 0, width);</span>
+<span class="fc" id="L914">        verticalGroup.setSize(VERTICAL, 0, height);</span>
+
+        // Step 4: apply the size to the components.
+<span class="fc" id="L917">        Iterator componentInfo = componentInfos.values().iterator();</span>
+<span class="fc bfc" id="L918" title="All 2 branches covered.">        while (componentInfo.hasNext()) {</span>
+<span class="fc" id="L919">            ComponentInfo info = (ComponentInfo) componentInfo.next();</span>
+<span class="fc" id="L920">            info.setBounds(insetLeft, insetTop, width, ltr);</span>
+<span class="fc" id="L921">        }</span>
+<span class="fc" id="L922">    }</span>
+
+    /**
+     * Invalidates the layout, indicating that if the layout manager
+     * has cached information it should be discarded.
+     *
+     * @param parent Container hosting this LayoutManager
+     * @throws IllegalArgumentException if &lt;code&gt;parent&lt;/code&gt; is not
+     *                                  the same &lt;code&gt;Container&lt;/code&gt; that this was created with
+     */
+    /*public void invalidateLayout(Container parent) {
+        checkParent(parent);
+        // invalidateLayout is called from Container.invalidate, which
+        // does NOT grab the treelock.  All other methods do.  To make sure
+        // there aren't any possible threading problems we grab the tree lock
+        // here.
+        //synchronized(parent.getTreeLock()) {
+            isValid = false;
+        //}
+    }*/
+    private void prepare(int sizeType) {
+<span class="fc" id="L943">        boolean visChanged = false;</span>
+        // Step 1: If not-valid, clear springs and update visibility.
+<span class="fc bfc" id="L945" title="All 2 branches covered.">        if (!isValid) {</span>
+<span class="fc" id="L946">            isValid = true;</span>
+<span class="fc" id="L947">            horizontalGroup.setSize(HORIZONTAL, UNSET, UNSET);</span>
+<span class="fc" id="L948">            verticalGroup.setSize(VERTICAL, UNSET, UNSET);</span>
+<span class="fc" id="L949">            for (Iterator cis = componentInfos.values().iterator();</span>
+<span class="fc bfc" id="L950" title="All 2 branches covered.">                 cis.hasNext(); ) {</span>
+<span class="fc" id="L951">                ComponentInfo ci = (ComponentInfo) cis.next();</span>
+<span class="pc bpc" id="L952" title="1 of 2 branches missed.">                if (ci.updateVisibility()) {</span>
+<span class="nc" id="L953">                    visChanged = true;</span>
+                }
+<span class="fc" id="L955">                ci.clearCachedSize();</span>
+<span class="fc" id="L956">            }</span>
+        }
+        // Step 2: Make sure components are bound to ComponentInfos
+<span class="fc bfc" id="L959" title="All 2 branches covered.">        if (springsChanged) {</span>
+<span class="fc" id="L960">            registerComponents(horizontalGroup, HORIZONTAL);</span>
+<span class="fc" id="L961">            registerComponents(verticalGroup, VERTICAL);</span>
+        }
+        // Step 3: Adjust the autopadding. This removes existing
+        // autopadding, then recalculates where it should go.
+<span class="pc bpc" id="L965" title="1 of 4 branches missed.">        if (springsChanged || visChanged) {</span>
+<span class="fc" id="L966">            checkComponents();</span>
+<span class="fc" id="L967">            horizontalGroup.removeAutopadding();</span>
+<span class="fc" id="L968">            verticalGroup.removeAutopadding();</span>
+<span class="pc bpc" id="L969" title="1 of 2 branches missed.">            if (getAutocreateGaps()) {</span>
+<span class="fc" id="L970">                insertAutopadding(true);</span>
+<span class="nc bnc" id="L971" title="All 2 branches missed.">            } else if (hasPreferredPaddingSprings ||</span>
+<span class="nc bnc" id="L972" title="All 2 branches missed.">                    getAutocreateContainerGaps()) {</span>
+<span class="nc" id="L973">                insertAutopadding(false);</span>
+            }
+<span class="fc" id="L975">            springsChanged = false;</span>
+        }
+        // Step 4: (for min/pref/max size calculations only) calculate the
+        // autopadding. This invokes for unsetting the calculated values, then
+        // recalculating them.
+        // If sizeType == SPECIFIC_SIZE, it indicates we're doing layout, this
+        // step will be done later on.
+<span class="pc bpc" id="L982" title="1 of 4 branches missed.">        if (sizeType != SPECIFIC_SIZE &amp;&amp; (getAutocreateGaps() ||</span>
+<span class="nc bnc" id="L983" title="All 4 branches missed.">                getAutocreateContainerGaps() || hasPreferredPaddingSprings)) {</span>
+<span class="fc" id="L984">            calculateAutopadding(horizontalGroup, HORIZONTAL, sizeType, 0, 0);</span>
+<span class="fc" id="L985">            calculateAutopadding(verticalGroup, VERTICAL, sizeType, 0, 0);</span>
+        }
+<span class="fc" id="L987">    }</span>
+
+    private void calculateAutopadding(Group group, int axis, int sizeType,
+                                      int origin, int size) {
+<span class="fc" id="L991">        group.unsetAutopadding();</span>
+<span class="pc bpc" id="L992" title="2 of 4 branches missed.">        switch (sizeType) {</span>
+            case MIN_SIZE:
+<span class="nc" id="L994">                size = group.getMinimumSize(axis);</span>
+<span class="nc" id="L995">                break;</span>
+            case PREF_SIZE:
+<span class="fc" id="L997">                size = group.getPreferredSize(axis);</span>
+<span class="fc" id="L998">                break;</span>
+            case MAX_SIZE:
+<span class="nc" id="L1000">                size = group.getMaximumSize(axis);</span>
+                break;
+        }
+<span class="fc" id="L1003">        group.setSize(axis, origin, size);</span>
+<span class="fc" id="L1004">        group.calculateAutopadding(axis);</span>
+<span class="fc" id="L1005">    }</span>
+
+    private void checkComponents() {
+<span class="fc" id="L1008">        Iterator infos = componentInfos.values().iterator();</span>
+<span class="fc bfc" id="L1009" title="All 2 branches covered.">        while (infos.hasNext()) {</span>
+<span class="fc" id="L1010">            ComponentInfo info = (ComponentInfo) infos.next();</span>
+<span class="pc bpc" id="L1011" title="1 of 2 branches missed.">            if (info.horizontalSpring == null) {</span>
+<span class="nc" id="L1012">                throw new IllegalStateException(info.component +</span>
+                        &quot; is not attached to a horizontal group&quot;);
+            }
+<span class="pc bpc" id="L1015" title="1 of 2 branches missed.">            if (info.verticalSpring == null) {</span>
+<span class="nc" id="L1016">                throw new IllegalStateException(info.component +</span>
+                        &quot; is not attached to a vertical group&quot;);
+            }
+<span class="fc" id="L1019">        }</span>
+<span class="fc" id="L1020">    }</span>
+
+    private void registerComponents(Group group, int axis) {
+<span class="fc" id="L1023">        ArrayList springs = group.springs;</span>
+<span class="fc bfc" id="L1024" title="All 2 branches covered.">        for (int counter = springs.size() - 1; counter &gt;= 0; counter--) {</span>
+<span class="fc" id="L1025">            Spring spring = (Spring) springs.get(counter);</span>
+<span class="fc bfc" id="L1026" title="All 2 branches covered.">            if (spring instanceof ComponentSpring) {</span>
+<span class="fc" id="L1027">                ((ComponentSpring) spring).installIfNecessary(axis);</span>
+<span class="fc bfc" id="L1028" title="All 2 branches covered.">            } else if (spring instanceof Group) {</span>
+<span class="fc" id="L1029">                registerComponents((Group) spring, axis);</span>
+            }
+        }
+<span class="fc" id="L1032">    }</span>
+
+    private Dimension adjustSize(int width, int height) {
+<span class="fc" id="L1035">        int insetLeft = host.getStyle().getMarginLeftNoRTL();</span>
+<span class="fc" id="L1036">        int insetTop = host.getStyle().getMarginTop();</span>
+<span class="fc" id="L1037">        int insetRight = host.getStyle().getMarginRightNoRTL();</span>
+<span class="fc" id="L1038">        int insetBottom = host.getStyle().getMarginBottom();</span>
+<span class="fc" id="L1039">        return new Dimension(width + insetLeft + insetRight,</span>
+                height + insetTop + insetBottom);
+    }
+
+    private void checkParent(Container parent) {
+<span class="pc bpc" id="L1044" title="1 of 2 branches missed.">        if (parent != host) {</span>
+<span class="nc" id="L1045">            throw new IllegalArgumentException(</span>
+                    &quot;GroupLayout can only be used with one Container at a time&quot;);
+        }
+<span class="fc" id="L1048">    }</span>
+
+    /**
+     * Returns the &lt;code&gt;ComponentInfo&lt;/code&gt; for the specified Component.
+     */
+    private ComponentInfo getComponentInfo(Component component) {
+<span class="fc" id="L1054">        ComponentInfo info = (ComponentInfo) componentInfos.get(component);</span>
+<span class="fc bfc" id="L1055" title="All 2 branches covered.">        if (info == null) {</span>
+<span class="fc" id="L1056">            info = new ComponentInfo(component);</span>
+<span class="fc" id="L1057">            componentInfos.put(component, info);</span>
+<span class="pc bpc" id="L1058" title="1 of 2 branches missed.">            if (component.getParent() != host) {</span>
+<span class="fc" id="L1059">                host.addComponent(component);</span>
+            }
+        }
+<span class="fc" id="L1062">        return info;</span>
+    }
+
+    /**
+     * Adjusts the autopadding springs for the horizontal and vertical
+     * groups.  If &lt;code&gt;insert&lt;/code&gt; is true this will insert auto padding
+     * springs, otherwise this will only adjust the springs that
+     * comprise auto preferred padding springs.
+     */
+    private void insertAutopadding(boolean insert) {
+<span class="fc" id="L1072">        horizontalGroup.insertAutopadding(HORIZONTAL, new ArrayList(1),</span>
+                new ArrayList(1), new ArrayList(1), new ArrayList(1), insert);
+<span class="fc" id="L1074">        verticalGroup.insertAutopadding(VERTICAL, new ArrayList(1),</span>
+                new ArrayList(1), new ArrayList(1), new ArrayList(1), insert);
+<span class="fc" id="L1076">    }</span>
+
+    /**
+     * Returns true if the two Components have a common ParallelGroup ancestor
+     * along the particular axis.
+     */
+    private boolean areParallelSiblings(Component source, Component target,
+                                        int axis) {
+<span class="fc" id="L1084">        ComponentInfo sourceInfo = getComponentInfo(source);</span>
+<span class="fc" id="L1085">        ComponentInfo targetInfo = getComponentInfo(target);</span>
+        Spring sourceSpring;
+        Spring targetSpring;
+<span class="pc bpc" id="L1088" title="1 of 2 branches missed.">        if (axis == HORIZONTAL) {</span>
+<span class="nc" id="L1089">            sourceSpring = sourceInfo.horizontalSpring;</span>
+<span class="nc" id="L1090">            targetSpring = targetInfo.horizontalSpring;</span>
+        } else {
+<span class="fc" id="L1092">            sourceSpring = sourceInfo.verticalSpring;</span>
+<span class="fc" id="L1093">            targetSpring = targetInfo.verticalSpring;</span>
+        }
+<span class="fc" id="L1095">        ArrayList sourcePath = tmpParallelSet;</span>
+<span class="fc" id="L1096">        sourcePath.clear();</span>
+<span class="fc" id="L1097">        Spring spring = sourceSpring.getParent();</span>
+<span class="fc bfc" id="L1098" title="All 2 branches covered.">        while (spring != null) {</span>
+<span class="fc" id="L1099">            sourcePath.add(spring);</span>
+<span class="fc" id="L1100">            spring = spring.getParent();</span>
+        }
+<span class="fc" id="L1102">        spring = targetSpring.getParent();</span>
+<span class="pc bpc" id="L1103" title="1 of 2 branches missed.">        while (spring != null) {</span>
+<span class="pc bpc" id="L1104" title="1 of 2 branches missed.">            if (sourcePath.contains(spring)) {</span>
+<span class="fc" id="L1105">                sourcePath.clear();</span>
+<span class="pc bpc" id="L1106" title="1 of 2 branches missed.">                while (spring != null) {</span>
+<span class="pc bpc" id="L1107" title="1 of 2 branches missed.">                    if (spring instanceof ParallelGroup) {</span>
+<span class="fc" id="L1108">                        return true;</span>
+                    }
+<span class="nc" id="L1110">                    spring = spring.getParent();</span>
+                }
+<span class="nc" id="L1112">                return false;</span>
+            }
+<span class="nc" id="L1114">            spring = spring.getParent();</span>
+        }
+<span class="nc" id="L1116">        sourcePath.clear();</span>
+<span class="nc" id="L1117">        return false;</span>
+    }
+
+    private boolean isLeftToRight() {
+        // Need bidi support...
+<span class="fc" id="L1122">        return true;</span>
+        //return host.getComponentOrientation().isLeftToRight();
+    }
+
+    /**
+     * Used in figuring out how much space to give resizable springs.
+     */
+    private static final class SpringDelta {
+        // Original index.
+        public final int index;
+        // Delta, one of pref - min or max - pref.
+        public int delta;
+
+<span class="nc" id="L1135">        public SpringDelta(int index, int delta) {</span>
+<span class="nc" id="L1136">            this.index = index;</span>
+<span class="nc" id="L1137">            this.delta = delta;</span>
+<span class="nc" id="L1138">        }</span>
+
+        public int compareTo(Object o) {
+<span class="nc" id="L1141">            return delta - ((SpringDelta) o).delta;</span>
+        }
+
+        public String toString() {
+<span class="nc" id="L1145">            return super.toString() + &quot;[index=&quot; + index + &quot;, delta=&quot; +</span>
+                    delta + &quot;]&quot;;
+        }
+    }
+
+    /**
+     * Represents two springs that should have autopadding inserted between
+     * them.
+     */
+    private final static class AutopaddingMatch {
+        public final ComponentSpring source;
+        public final ComponentSpring target;
+
+<span class="fc" id="L1158">        AutopaddingMatch(ComponentSpring source, ComponentSpring target) {</span>
+<span class="fc" id="L1159">            this.source = source;</span>
+<span class="fc" id="L1160">            this.target = target;</span>
+<span class="fc" id="L1161">        }</span>
+
+        private String toString(ComponentSpring spring) {
+<span class="nc" id="L1164">            return spring.getComponent().toString();</span>
+        }
+
+        public String toString() {
+<span class="nc" id="L1168">            return &quot;[&quot; + toString(source) + &quot;-&quot; + toString(target) + &quot;]&quot;;</span>
+        }
+    }
+
+    // LinkInfo contains the set of ComponentInfosthat are linked along a
+    // particular axis.
+    private static final class LinkInfo {
+        private final int axis;
+        private final ArrayList linked;
+        private int size;
+
+<span class="fc" id="L1179">        LinkInfo(int axis) {</span>
+<span class="fc" id="L1180">            linked = new ArrayList();</span>
+<span class="fc" id="L1181">            size = UNSET;</span>
+<span class="fc" id="L1182">            this.axis = axis;</span>
+<span class="fc" id="L1183">        }</span>
+
+        public void add(ComponentInfo child) {
+<span class="fc" id="L1186">            LinkInfo childMaster = child.getLinkInfo(axis, false);</span>
+<span class="pc bpc" id="L1187" title="1 of 2 branches missed.">            if (childMaster == null) {</span>
+<span class="fc" id="L1188">                linked.add(child);</span>
+<span class="fc" id="L1189">                child.setLinkInfo(axis, this);</span>
+<span class="nc bnc" id="L1190" title="All 2 branches missed.">            } else if (childMaster != this) {</span>
+<span class="nc" id="L1191">                addAll(linked, childMaster.linked);</span>
+<span class="nc bnc" id="L1192" title="All 2 branches missed.">                for (int i = 0; i &lt; childMaster.linked.size(); i++) {</span>
+<span class="nc" id="L1193">                    ComponentInfo childInfo = (ComponentInfo) childMaster.linked.get(i);</span>
+<span class="nc" id="L1194">                    childInfo.setLinkInfo(axis, this);</span>
+                }
+            }
+<span class="fc" id="L1197">            clearCachedSize();</span>
+<span class="fc" id="L1198">        }</span>
+
+        public void remove(ComponentInfo info) {
+<span class="nc" id="L1201">            linked.remove(info);</span>
+<span class="nc" id="L1202">            info.setLinkInfo(axis, null);</span>
+<span class="nc bnc" id="L1203" title="All 2 branches missed.">            if (linked.size() == 1) {</span>
+<span class="nc" id="L1204">                ((ComponentInfo) linked.get(0)).setLinkInfo(axis, null);</span>
+            }
+<span class="nc" id="L1206">            clearCachedSize();</span>
+<span class="nc" id="L1207">        }</span>
+
+        public void clearCachedSize() {
+<span class="fc" id="L1210">            size = UNSET;</span>
+<span class="fc" id="L1211">        }</span>
+
+        public int getSize(int axis) {
+<span class="fc bfc" id="L1214" title="All 2 branches covered.">            if (size == UNSET) {</span>
+<span class="fc" id="L1215">                size = calculateLinkedSize(axis);</span>
+            }
+<span class="fc" id="L1217">            return size;</span>
+        }
+
+        private int calculateLinkedSize(int axis) {
+<span class="fc" id="L1221">            int size = 0;</span>
+<span class="fc bfc" id="L1222" title="All 2 branches covered.">            for (int i = 0; i &lt; linked.size(); i++) {</span>
+<span class="fc" id="L1223">                ComponentInfo info = (ComponentInfo) linked.get(i);</span>
+                ComponentSpring spring;
+<span class="pc bpc" id="L1225" title="1 of 2 branches missed.">                if (axis == HORIZONTAL) {</span>
+<span class="fc" id="L1226">                    spring = info.horizontalSpring;</span>
+                } else {
+                    //assert (axis == VERTICAL);
+<span class="nc" id="L1229">                    spring = info.verticalSpring;</span>
+                }
+<span class="fc" id="L1231">                size = Math.max(size,</span>
+<span class="fc" id="L1232">                        spring.calculateNonlinkedPreferredSize(axis));</span>
+            }
+<span class="fc" id="L1234">            return size;</span>
+        }
+    }
+
+    /**
+     * Spring consists of a range: min, pref and max a value some where in
+     * the middle of that and a location.  Subclasses must override
+     * methods to get the min/max/pref and will likely want to override
+     * the &lt;code&gt;setSize&lt;/code&gt; method.  Spring automatically caches the
+     * min/max/pref.  If the min/pref/max has internally changes, or needs
+     * to be updated you must invoked clear.
+     */
+    abstract class Spring {
+        private int size;
+        private int min;
+        private int max;
+        private int pref;
+        private Spring parent;
+
+        private int alignment;
+
+<span class="fc" id="L1255">        Spring() {</span>
+<span class="fc" id="L1256">            min = pref = max = UNSET;</span>
+<span class="fc" id="L1257">        }</span>
+
+        /**
+         * Calculates and returns the minimum size.
+         *
+         * @param axis the axis of layout; one of HORIZONTAL or VERTICAL
+         * @return the minimum size
+         */
+        abstract int calculateMinimumSize(int axis);
+
+        /**
+         * Calculates and returns the preferred size.
+         *
+         * @param axis the axis of layout; one of HORIZONTAL or VERTICAL
+         * @return the preferred size
+         */
+        abstract int calculatePreferredSize(int axis);
+
+        /**
+         * Calculates and returns the minimum size.
+         *
+         * @param axis the axis of layout; one of HORIZONTAL or VERTICAL
+         * @return the minimum size
+         */
+        abstract int calculateMaximumSize(int axis);
+
+        /**
+         * Returns the parent of this spring.
+         */
+        Spring getParent() {
+<span class="fc" id="L1287">            return parent;</span>
+        }
+
+        /**
+         * Sets the parent of this Spring.
+         */
+        void setParent(Spring parent) {
+<span class="fc" id="L1294">            this.parent = parent;</span>
+<span class="fc" id="L1295">        }</span>
+
+        int getAlignment() {
+<span class="fc" id="L1298">            return alignment;</span>
+        }
+
+        // This is here purely as a conveniance for ParallelGroup to avoid
+        // having to track alignment separately.
+        void setAlignment(int alignment) {
+<span class="nc" id="L1304">            this.alignment = alignment;</span>
+<span class="nc" id="L1305">        }</span>
+
+        /**
+         * Returns the minimum size.
+         */
+        final int getMinimumSize(int axis) {
+<span class="fc bfc" id="L1311" title="All 2 branches covered.">            if (min == UNSET) {</span>
+<span class="fc" id="L1312">                min = constrain(calculateMinimumSize(axis));</span>
+            }
+<span class="fc" id="L1314">            return min;</span>
+        }
+
+        /**
+         * Returns the preferred size.
+         */
+        final int getPreferredSize(int axis) {
+<span class="fc bfc" id="L1321" title="All 2 branches covered.">            if (pref == UNSET) {</span>
+<span class="fc" id="L1322">                pref = constrain(calculatePreferredSize(axis));</span>
+            }
+<span class="fc" id="L1324">            return pref;</span>
+        }
+
+        /**
+         * Returns the maximum size.
+         */
+        final int getMaximumSize(int axis) {
+<span class="fc bfc" id="L1331" title="All 2 branches covered.">            if (max == UNSET) {</span>
+<span class="fc" id="L1332">                max = constrain(calculateMaximumSize(axis));</span>
+            }
+<span class="fc" id="L1334">            return max;</span>
+        }
+
+        /**
+         * Resets the cached min/max/pref.
+         */
+        void unset() {
+<span class="fc" id="L1341">            size = min = pref = max = UNSET;</span>
+<span class="fc" id="L1342">        }</span>
+
+        /**
+         * Sets the value and location of the spring.  Subclasses
+         * will want to invoke super, then do any additional sizing.
+         *
+         * @param axis   HORIZONTAL or VERTICAL
+         * @param origin of this Spring
+         * @param size   of the Spring.  If size is UNSET, this invokes
+         *               clear.
+         */
+        void setSize(int axis, int origin, int size) {
+<span class="fc" id="L1354">            this.size = size;</span>
+<span class="fc bfc" id="L1355" title="All 2 branches covered.">            if (size == UNSET) {</span>
+<span class="fc" id="L1356">                unset();</span>
+            }
+<span class="fc" id="L1358">        }</span>
+
+        /**
+         * Returns the current size.
+         */
+        int getSize() {
+<span class="fc" id="L1364">            return size;</span>
+        }
+
+        int constrain(int value) {
+<span class="fc" id="L1368">            return Math.min(value, Short.MAX_VALUE);</span>
+        }
+
+        int getBaseline() {
+<span class="nc" id="L1372">            return -1;</span>
+        }
+
+        int getBaselineResizeBehavior() {
+<span class="nc" id="L1376">            return Component.BRB_OTHER;</span>
+        }
+
+        final boolean isResizable(int axis) {
+<span class="fc" id="L1380">            int min = getMinimumSize(axis);</span>
+<span class="fc" id="L1381">            int pref = getPreferredSize(axis);</span>
+<span class="pc bpc" id="L1382" title="2 of 4 branches missed.">            return (min != pref || pref != getMaximumSize(axis));</span>
+        }
+
+        /**
+         * Returns true if this Spring will ALWAYS have a zero size. This should
+         * NOT check the current size, rather it's meant to
+         * quickly test if this Spring will always have a zero size.
+         */
+        abstract boolean willHaveZeroSize(boolean treatAutopaddingAsZeroSized);
+    }
+
+    /**
+     * Group provides for commonality between the two types of operations
+     * supported by &lt;code&gt;GroupLayout&lt;/code&gt;: laying out components one
+     * after another (&lt;code&gt;SequentialGroup&lt;/code&gt;) or layout on top
+     * of each other (&lt;code&gt;ParallelGroup&lt;/code&gt;). Use one of
+     * &lt;code&gt;createSequentialGroup&lt;/code&gt; or
+     * &lt;code&gt;createParallelGroup&lt;/code&gt; to create one.
+     */
+    public abstract class Group extends Spring {
+        // private int origin;
+        // private int size;
+        ArrayList springs;
+
+<span class="fc" id="L1406">        Group() {</span>
+<span class="fc" id="L1407">            springs = new ArrayList();</span>
+<span class="fc" id="L1408">        }</span>
+
+        int indexOf(Spring spring) {
+<span class="nc" id="L1411">            return springs.indexOf(spring);</span>
+        }
+
+        /**
+         * Adds the Spring to the list of &lt;code&gt;Spring&lt;/code&gt;s and returns
+         * the receiver.
+         */
+        Group addSpring(Spring spring) {
+<span class="fc" id="L1419">            springs.add(spring);</span>
+<span class="fc" id="L1420">            spring.setParent(this);</span>
+<span class="fc bfc" id="L1421" title="All 2 branches covered.">            if (!(spring instanceof AutopaddingSpring) ||</span>
+<span class="pc bpc" id="L1422" title="1 of 2 branches missed.">                    !((AutopaddingSpring) spring).getUserCreated()) {</span>
+<span class="fc" id="L1423">                springsChanged = true;</span>
+            }
+<span class="fc" id="L1425">            return this;</span>
+        }
+
+        //
+        // Spring methods
+        //
+
+        void setSize(int axis, int origin, int size) {
+<span class="fc" id="L1433">            super.setSize(axis, origin, size);</span>
+<span class="fc bfc" id="L1434" title="All 2 branches covered.">            if (size == UNSET) {</span>
+<span class="fc bfc" id="L1435" title="All 2 branches covered.">                for (int counter = springs.size() - 1; counter &gt;= 0;</span>
+<span class="fc" id="L1436">                     counter--) {</span>
+<span class="fc" id="L1437">                    getSpring(counter).setSize(axis, origin, size);</span>
+                }
+            } else {
+<span class="fc" id="L1440">                setValidSize(axis, origin, size);</span>
+            }
+<span class="fc" id="L1442">        }</span>
+
+        /**
+         * This is invoked from &lt;code&gt;setSize&lt;/code&gt; if passed a value
+         * other than UNSET.
+         */
+        abstract void setValidSize(int axis, int origin, int size);
+
+        int calculateMinimumSize(int axis) {
+<span class="nc" id="L1451">            return calculateSize(axis, MIN_SIZE);</span>
+        }
+
+        int calculatePreferredSize(int axis) {
+<span class="fc" id="L1455">            return calculateSize(axis, PREF_SIZE);</span>
+        }
+
+        int calculateMaximumSize(int axis) {
+<span class="fc" id="L1459">            return calculateSize(axis, MAX_SIZE);</span>
+        }
+
+        /**
+         * Used to compute how the two values representing two springs
+         * will be combined.  For example, a group that layed things out
+         * one after the next would return &lt;code&gt;a + b&lt;/code&gt;.
+         */
+        abstract int operator(int a, int b);
+
+        /**
+         * Calculates the specified size.  This is called from
+         * one of the &lt;code&gt;getMinimumSize0&lt;/code&gt;,
+         * &lt;code&gt;getPreferredSize0&lt;/code&gt; or
+         * &lt;code&gt;getMaximumSize0&lt;/code&gt; methods.  This will invoke
+         * to &lt;code&gt;operator&lt;/code&gt; to combine the values.
+         */
+        int calculateSize(int axis, int type) {
+<span class="fc" id="L1477">            int count = springs.size();</span>
+<span class="pc bpc" id="L1478" title="1 of 2 branches missed.">            if (count == 0) {</span>
+<span class="nc" id="L1479">                return 0;</span>
+            }
+<span class="fc bfc" id="L1481" title="All 2 branches covered.">            if (count == 1) {</span>
+<span class="fc" id="L1482">                return getSpringSize(getSpring(0), axis, type);</span>
+            }
+<span class="fc" id="L1484">            int size = constrain(operator(getSpringSize(getSpring(0), axis, type),</span>
+<span class="fc" id="L1485">                    getSpringSize(getSpring(1), axis, type)));</span>
+<span class="fc bfc" id="L1486" title="All 2 branches covered.">            for (int counter = 2; counter &lt; count; counter++) {</span>
+<span class="fc" id="L1487">                size = constrain(operator(size, getSpringSize(getSpring(counter),</span>
+                        axis, type)));
+            }
+<span class="fc" id="L1490">            return size;</span>
+        }
+
+        Spring getSpring(int index) {
+<span class="fc" id="L1494">            return (Spring) springs.get(index);</span>
+        }
+
+        int getSpringSize(Spring spring, int axis, int type) {
+<span class="pc bpc" id="L1498" title="2 of 4 branches missed.">            switch (type) {</span>
+                case MIN_SIZE:
+<span class="nc" id="L1500">                    return spring.getMinimumSize(axis);</span>
+                case PREF_SIZE:
+<span class="fc" id="L1502">                    return spring.getPreferredSize(axis);</span>
+                case MAX_SIZE:
+<span class="fc" id="L1504">                    return spring.getMaximumSize(axis);</span>
+            }
+            //assert false;
+<span class="nc" id="L1507">            return 0;</span>
+        }
+
+        // Padding
+
+        /**
+         * Adjusts the autopadding springs in this group and its children.
+         * If &lt;code&gt;insert&lt;/code&gt; is true this will insert auto padding
+         * springs, otherwise this will only adjust the springs that
+         * comprise auto preferred padding springs.
+         *
+         * @param axis            the axis of the springs; HORIZONTAL or VERTICAL
+         * @param leadingPadding  List of AutopaddingSprings that occur before
+         *                        this Group
+         * @param trailingPadding any trailing autopadding springs are added
+         *                        to this on exit
+         * @param leading         List of ComponentSprings that occur before this Group
+         * @param trailing        any trailing ComponentSpring are added to this
+         *                        List
+         * @param insert          Whether or not to insert AutopaddingSprings or just
+         *                        adjust any existing AutopaddingSprings.
+         */
+        abstract void insertAutopadding(int axis, ArrayList leadingPadding,
+                                        ArrayList trailingPadding, ArrayList leading, ArrayList trailing,
+                                        boolean insert);
+
+        /**
+         * Removes any AutopaddingSprings.
+         */
+        void removeAutopadding() {
+<span class="fc" id="L1537">            unset();</span>
+<span class="fc bfc" id="L1538" title="All 2 branches covered.">            for (int counter = springs.size() - 1; counter &gt;= 0; counter--) {</span>
+<span class="fc" id="L1539">                Spring spring = (Spring) springs.get(counter);</span>
+<span class="fc bfc" id="L1540" title="All 2 branches covered.">                if (spring instanceof AutopaddingSpring) {</span>
+<span class="pc bpc" id="L1541" title="1 of 2 branches missed.">                    if (((AutopaddingSpring) spring).getUserCreated()) {</span>
+<span class="fc" id="L1542">                        ((AutopaddingSpring) spring).reset();</span>
+                    } else {
+<span class="nc" id="L1544">                        springs.remove(counter);</span>
+                    }
+<span class="fc bfc" id="L1546" title="All 2 branches covered.">                } else if (spring instanceof Group) {</span>
+<span class="fc" id="L1547">                    ((Group) spring).removeAutopadding();</span>
+                }
+            }
+<span class="fc" id="L1550">        }</span>
+
+        void unsetAutopadding() {
+            // Clear cached pref/min/max.
+<span class="fc" id="L1554">            unset();</span>
+<span class="fc bfc" id="L1555" title="All 2 branches covered.">            for (int counter = springs.size() - 1; counter &gt;= 0; counter--) {</span>
+<span class="fc" id="L1556">                Spring spring = (Spring) springs.get(counter);</span>
+<span class="fc bfc" id="L1557" title="All 2 branches covered.">                if (spring instanceof AutopaddingSpring) {</span>
+<span class="fc" id="L1558">                    spring.unset();</span>
+<span class="fc bfc" id="L1559" title="All 2 branches covered.">                } else if (spring instanceof Group) {</span>
+<span class="fc" id="L1560">                    ((Group) spring).unsetAutopadding();</span>
+                }
+            }
+<span class="fc" id="L1563">        }</span>
+
+        void calculateAutopadding(int axis) {
+<span class="fc bfc" id="L1566" title="All 2 branches covered.">            for (int counter = springs.size() - 1; counter &gt;= 0; counter--) {</span>
+<span class="fc" id="L1567">                Spring spring = (Spring) springs.get(counter);</span>
+<span class="fc bfc" id="L1568" title="All 2 branches covered.">                if (spring instanceof AutopaddingSpring) {</span>
+                    // Force size to be reset.
+<span class="fc" id="L1570">                    spring.unset();</span>
+<span class="fc" id="L1571">                    ((AutopaddingSpring) spring).calculatePadding(axis);</span>
+<span class="fc bfc" id="L1572" title="All 2 branches covered.">                } else if (spring instanceof Group) {</span>
+<span class="fc" id="L1573">                    ((Group) spring).calculateAutopadding(axis);</span>
+                }
+            }
+            // Clear cached pref/min/max.
+<span class="fc" id="L1577">            unset();</span>
+<span class="fc" id="L1578">        }</span>
+
+        boolean willHaveZeroSize(boolean treatAutopaddingAsZeroSized) {
+<span class="pc bpc" id="L1581" title="1 of 2 branches missed.">            for (int i = springs.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L1582">                Spring spring = (Spring) springs.get(i);</span>
+<span class="pc bpc" id="L1583" title="1 of 2 branches missed.">                if (!spring.willHaveZeroSize(treatAutopaddingAsZeroSized)) {</span>
+<span class="fc" id="L1584">                    return false;</span>
+                }
+            }
+<span class="nc" id="L1587">            return true;</span>
+        }
+    }
+
+    /**
+     * A &lt;code&gt;Group&lt;/code&gt; that lays out its elements sequentially, one
+     * after another.  This class has no public constructor, use the
+     * &lt;code&gt;createSequentialGroup&lt;/code&gt; method to create one.
+     *
+     * @see #createSequentialGroup()
+     */
+    public class SequentialGroup extends Group {
+        private Spring baselineSpring;
+
+<span class="fc" id="L1601">        SequentialGroup() {</span>
+<span class="fc" id="L1602">        }</span>
+
+        /**
+         * Adds the specified &lt;code&gt;Group&lt;/code&gt; to this
+         * &lt;code&gt;SequentialGroup&lt;/code&gt;
+         *
+         * @param group the Group to add
+         * @return this Group
+         */
+        public SequentialGroup add(Group group) {
+<span class="fc" id="L1612">            return (SequentialGroup) addSpring(group);</span>
+        }
+
+        /**
+         * Adds a &lt;code&gt;Group&lt;/code&gt; to this &lt;code&gt;Group&lt;/code&gt;.
+         *
+         * @param group         the &lt;code&gt;Group&lt;/code&gt; to add
+         * @param useAsBaseline whether the specified &lt;code&gt;Group&lt;/code&gt; should
+         *                      be used to calculate the baseline for this &lt;code&gt;Group&lt;/code&gt;
+         * @return this &lt;code&gt;Group&lt;/code&gt;
+         */
+        public SequentialGroup add(boolean useAsBaseline, Group group) {
+<span class="nc" id="L1624">            add(group);</span>
+<span class="nc bnc" id="L1625" title="All 2 branches missed.">            if (useAsBaseline) {</span>
+<span class="nc" id="L1626">                baselineSpring = group;</span>
+            }
+<span class="nc" id="L1628">            return this;</span>
+        }
+
+        /**
+         * Adds the specified Component.  If the Component's min/max
+         * are different from its pref than the component will be resizable.
+         *
+         * @param component the Component to add
+         * @return this &lt;code&gt;SequentialGroup&lt;/code&gt;
+         */
+        public SequentialGroup add(Component component) {
+<span class="fc" id="L1639">            return add(component, DEFAULT_SIZE, DEFAULT_SIZE, DEFAULT_SIZE);</span>
+        }
+
+        /**
+         * Adds a &lt;code&gt;Component&lt;/code&gt; to this &lt;code&gt;Group&lt;/code&gt;.
+         *
+         * @param useAsBaseline whether the specified &lt;code&gt;Component&lt;/code&gt; should
+         *                      be used to calculate the baseline for this &lt;code&gt;Group&lt;/code&gt;
+         * @param component     the &lt;code&gt;Component&lt;/code&gt; to add
+         * @return this &lt;code&gt;Group&lt;/code&gt;
+         */
+        public SequentialGroup add(boolean useAsBaseline, Component component) {
+<span class="nc" id="L1651">            add(component);</span>
+<span class="nc bnc" id="L1652" title="All 2 branches missed.">            if (useAsBaseline) {</span>
+<span class="nc" id="L1653">                baselineSpring = getSpring(springs.size() - 1);</span>
+            }
+<span class="nc" id="L1655">            return this;</span>
+        }
+
+        /**
+         * Adds the specified &lt;code&gt;Component&lt;/code&gt;.  Min, pref and max
+         * can be absolute values, or they can be one of
+         * &lt;code&gt;DEFAULT_SIZE&lt;/code&gt; or &lt;code&gt;PREFERRED_SIZE&lt;/code&gt;.  For
+         * example, the following:
+         * &lt;pre&gt;
+         *   add(component, PREFERRED_SIZE, PREFERRED_SIZE, 1000);
+         * &lt;/pre&gt;
+         * Forces a max of 1000, with the min and preferred equalling that
+         * of the preferred size of &lt;code&gt;component&lt;/code&gt;.
+         *
+         * @param component the Component to add
+         * @param min       the minimum size
+         * @param pref      the preferred size
+         * @param max       the maximum size
+         * @return this &lt;code&gt;SequentialGroup&lt;/code&gt;
+         * @throws IllegalArgumentException if min, pref or max are
+         *                                  not positive and not one of PREFERRED_SIZE or DEFAULT_SIZE
+         */
+        public SequentialGroup add(Component component, int min, int pref,
+                                   int max) {
+<span class="fc" id="L1679">            return (SequentialGroup) addSpring(new ComponentSpring(</span>
+                    component, min, pref, max));
+        }
+
+        /**
+         * Adds a &lt;code&gt;Component&lt;/code&gt; to this &lt;code&gt;Group&lt;/code&gt;
+         * with the specified size.
+         *
+         * @param useAsBaseline whether the specified &lt;code&gt;Component&lt;/code&gt; should
+         *                      be used to calculate the baseline for this &lt;code&gt;Group&lt;/code&gt;
+         * @param component     the &lt;code&gt;Component&lt;/code&gt; to add
+         * @param min           the minimum size or one of &lt;code&gt;DEFAULT_SIZE&lt;/code&gt; or
+         *                      &lt;code&gt;PREFERRED_SIZE&lt;/code&gt;
+         * @param pref          the preferred size or one of &lt;code&gt;DEFAULT_SIZE&lt;/code&gt; or
+         *                      &lt;code&gt;PREFERRED_SIZE&lt;/code&gt;
+         * @param max           the maximum size or one of &lt;code&gt;DEFAULT_SIZE&lt;/code&gt; or
+         *                      &lt;code&gt;PREFERRED_SIZE&lt;/code&gt;
+         * @return this &lt;code&gt;Group&lt;/code&gt;
+         */
+        public SequentialGroup add(boolean useAsBaseline,
+                                   Component component, int min, int pref, int max) {
+<span class="nc" id="L1700">            add(component, min, pref, max);</span>
+<span class="nc bnc" id="L1701" title="All 2 branches missed.">            if (useAsBaseline) {</span>
+<span class="nc" id="L1702">                baselineSpring = getSpring(springs.size() - 1);</span>
+            }
+<span class="nc" id="L1704">            return this;</span>
+        }
+
+        /**
+         * Adds a rigid gap.
+         *
+         * @param pref the size of the gap
+         * @return this &lt;code&gt;SequentialGroup&lt;/code&gt;
+         * @throws IllegalArgumentException if min &lt; 0 or pref &lt; 0 or max &lt; 0
+         *                                  or the following is not meant min &lt;= pref &lt;= max
+         */
+        public SequentialGroup add(int pref) {
+<span class="nc" id="L1716">            return add(pref, pref, pref);</span>
+        }
+
+        /**
+         * Adds a gap with the specified size.
+         *
+         * @param min  the minimum size of the gap, or PREFERRED_SIZE
+         * @param pref the preferred size of the gap
+         * @param max  the maximum size of the gap, or PREFERRED_SIZE
+         * @return this &lt;code&gt;SequentialGroup&lt;/code&gt;
+         * @throws IllegalArgumentException if min &lt; 0 or pref &lt; 0 or max &lt; 0
+         *                                  or the following is not meant min &lt;= pref &lt;= max
+         */
+        public SequentialGroup add(int min, int pref, int max) {
+<span class="nc" id="L1730">            return (SequentialGroup) addSpring(new GapSpring(min, pref, max));</span>
+        }
+
+        /**
+         * Adds an element representing the preferred gap between the two
+         * components.
+         *
+         * @param comp1 the first component
+         * @param comp2 the second component
+         * @param type  the type of gap; one of the constants defined by
+         *              LayoutStyle
+         * @return this &lt;code&gt;SequentialGroup&lt;/code&gt;
+         * @throws IllegalArgumentException if &lt;code&gt;type&lt;/code&gt; is not a
+         *                                  valid LayoutStyle constant
+         * @see LayoutStyle
+         */
+        public SequentialGroup addPreferredGap(Component comp1,
+                                               Component comp2,
+                                               int type) {
+<span class="nc" id="L1749">            return addPreferredGap(comp1, comp2, type, false);</span>
+        }
+
+        /**
+         * Adds an element representing the preferred gap between the two
+         * components.
+         *
+         * @param comp1   the first component
+         * @param comp2   the second component
+         * @param type    the type of gap; one of the constants defined by
+         *                LayoutStyle
+         * @param canGrow true if the gap can grow if more
+         *                space is available
+         * @return this &lt;code&gt;SequentialGroup&lt;/code&gt;
+         * @throws IllegalArgumentException if &lt;code&gt;type&lt;/code&gt; is not a
+         *                                  valid LayoutStyle constant
+         * @see LayoutStyle
+         */
+        public SequentialGroup addPreferredGap(Component comp1,
+                                               Component comp2,
+                                               int type, boolean canGrow) {
+<span class="nc bnc" id="L1770" title="All 6 branches missed.">            if (type != LayoutStyle.RELATED &amp;&amp;</span>
+                    type != LayoutStyle.UNRELATED &amp;&amp;
+                    type != LayoutStyle.INDENT) {
+<span class="nc" id="L1773">                throw new IllegalArgumentException(&quot;Invalid type argument&quot;);</span>
+            }
+<span class="nc bnc" id="L1775" title="All 4 branches missed.">            if (comp1 == null || comp2 == null) {</span>
+<span class="nc" id="L1776">                throw new IllegalArgumentException(</span>
+                        &quot;Components must be non-null&quot;);
+            }
+<span class="nc" id="L1779">            return (SequentialGroup) addSpring(new PaddingSpring(</span>
+                    comp1, comp2, type, canGrow));
+        }
+
+        /**
+         * Adds an element representing the preferred gap between the
+         * nearest components.  That is, during layout the neighboring
+         * components are found, and the min, pref and max of this
+         * element is set based on the preferred gap between the
+         * components.  If no neighboring components are found the
+         * min, pref and max are set to 0.
+         *
+         * @param type the type of gap; one of the LayoutStyle constants
+         * @return this SequentialGroup
+         * @throws IllegalArgumentException if type is not one of
+         *                                  &lt;code&gt;LayoutStyle.RELATED&lt;/code&gt; or
+         *                                  &lt;code&gt;LayoutStyle.UNRELATED&lt;/code&gt;
+         * @see LayoutStyle
+         */
+        public SequentialGroup addPreferredGap(int type) {
+<span class="nc" id="L1799">            return addPreferredGap(type, DEFAULT_SIZE, DEFAULT_SIZE);</span>
+        }
+
+        /**
+         * Adds an element for the preferred gap between the
+         * nearest components.  That is, during layout the neighboring
+         * components are found, and the min of this
+         * element is set based on the preferred gap between the
+         * components.  If no neighboring components are found the
+         * min is set to 0.  This method allows you to specify the
+         * preferred and maximum size by way of the &lt;code&gt;pref&lt;/code&gt;
+         * and &lt;code&gt;max&lt;/code&gt; arguments.  These can either be a
+         * value &amp;gt;= 0, in which case the preferred or max is the max
+         * of the argument and the preferred gap, of DEFAULT_VALUE in
+         * which case the value is the same as the preferred gap.
+         *
+         * @param type the type of gap; one of LayoutStyle.RELATED or
+         *             LayoutStyle.UNRELATED
+         * @param pref the preferred size; one of DEFAULT_SIZE or a value &gt; 0
+         * @param max  the maximum size; one of DEFAULT_SIZE, PREFERRED_SIZE
+         *             or a value &gt; 0
+         * @return this SequentialGroup
+         * @throws IllegalArgumentException if type is not one of
+         *                                  &lt;code&gt;LayoutStyle.RELATED&lt;/code&gt; or
+         *                                  &lt;code&gt;LayoutStyle.UNRELATED&lt;/code&gt; or pref/max is
+         *                                  != DEFAULT_SIZE and &lt; 0, or pref &gt; max
+         * @see LayoutStyle
+         */
+        public SequentialGroup addPreferredGap(int type, int pref,
+                                               int max) {
+<span class="nc bnc" id="L1829" title="All 4 branches missed.">            if (type != LayoutStyle.RELATED &amp;&amp; type != LayoutStyle.UNRELATED) {</span>
+<span class="nc" id="L1830">                throw new IllegalArgumentException(</span>
+                        &quot;Padding type must be one of Padding.RELATED or Padding.UNRELATED&quot;);
+            }
+<span class="nc bnc" id="L1833" title="All 18 branches missed.">            if ((pref &lt; 0 &amp;&amp; pref != DEFAULT_SIZE &amp;&amp; pref != PREFERRED_SIZE) ||</span>
+                    (max &lt; 0 &amp;&amp; max != DEFAULT_SIZE &amp;&amp; max != PREFERRED_SIZE) ||
+                    (pref &gt;= 0 &amp;&amp; max &gt;= 0 &amp;&amp; pref &gt; max)) {
+<span class="nc" id="L1836">                throw new IllegalArgumentException(</span>
+                        &quot;Pref and max must be either DEFAULT_SIZE, &quot; +
+                                &quot;PREFERRED_SIZE, or &gt;= 0 and pref &lt;= max&quot;);
+            }
+<span class="nc" id="L1840">            hasPreferredPaddingSprings = true;</span>
+<span class="nc" id="L1841">            return (SequentialGroup) addSpring(new AutopaddingSpring(</span>
+                    type, pref, max));
+        }
+
+        /**
+         * Adds an element representing the preferred gap between one edge
+         * of the container and the next/previous Component.  This will have
+         * no effect if the next/previous element is not a Component and does
+         * not touch one edge of the parent container.
+         *
+         * @return this &lt;code&gt;SequentialGroup&lt;/code&gt;.
+         */
+        public SequentialGroup addContainerGap() {
+<span class="nc" id="L1854">            return addContainerGap(DEFAULT_SIZE, DEFAULT_SIZE);</span>
+        }
+
+        /**
+         * Adds an element representing the preferred gap between one edge
+         * of the container and the next/previous Component.  This will have
+         * no effect if the next/previous element is not a Component and does
+         * not touch one edge of the parent container.
+         *
+         * @param pref the preferred size; one of DEFAULT_SIZE or a value &gt; 0
+         * @param max  the maximum size; one of DEFAULT_SIZE, PREFERRED_SIZE
+         *             or a value &gt; 0.
+         * @return this &lt;code&gt;SequentialGroup&lt;/code&gt;
+         * @throws IllegalArgumentException if pref/max is
+         *                                  != DEFAULT_SIZE and &lt; 0, or pref &gt; max
+         */
+        public SequentialGroup addContainerGap(int pref, int max) {
+<span class="nc bnc" id="L1871" title="All 16 branches missed.">            if ((pref &lt; 0 &amp;&amp; pref != DEFAULT_SIZE) ||</span>
+                    (max &lt; 0 &amp;&amp; max != DEFAULT_SIZE &amp;&amp; max != PREFERRED_SIZE) ||
+                    (pref &gt;= 0 &amp;&amp; max &gt;= 0 &amp;&amp; pref &gt; max)) {
+<span class="nc" id="L1874">                throw new IllegalArgumentException(</span>
+                        &quot;Pref and max must be either DEFAULT_VALUE or &gt;= 0 and pref &lt;= max&quot;);
+            }
+<span class="nc" id="L1877">            hasPreferredPaddingSprings = true;</span>
+<span class="nc" id="L1878">            return (SequentialGroup) addSpring(</span>
+                    new ContainerAutopaddingSpring(pref, max));
+        }
+
+        int operator(int a, int b) {
+<span class="fc" id="L1883">            return constrain(a) + constrain(b);</span>
+        }
+
+        void setValidSize(int axis, int origin, int size) {
+<span class="fc" id="L1887">            int pref = getPreferredSize(axis);</span>
+<span class="fc bfc" id="L1888" title="All 2 branches covered.">            if (size == pref) {</span>
+<span class="fc bfc" id="L1889" title="All 2 branches covered.">                for (int counter = 0, max = springs.size(); counter &lt; max;</span>
+<span class="fc" id="L1890">                     counter++) {</span>
+<span class="fc" id="L1891">                    Spring spring = getSpring(counter);</span>
+<span class="fc" id="L1892">                    int springPref = spring.getPreferredSize(axis);</span>
+<span class="fc" id="L1893">                    spring.setSize(axis, origin, springPref);</span>
+<span class="fc" id="L1894">                    origin += springPref;</span>
+                }
+<span class="pc bpc" id="L1896" title="1 of 2 branches missed.">            } else if (springs.size() == 1) {</span>
+<span class="nc" id="L1897">                Spring spring = getSpring(0);</span>
+<span class="nc" id="L1898">                spring.setSize(axis, origin, Math.min(</span>
+<span class="nc" id="L1899">                        Math.max(size, spring.getMinimumSize(axis)),</span>
+<span class="nc" id="L1900">                        spring.getMaximumSize(axis)));</span>
+<span class="pc bpc" id="L1901" title="1 of 2 branches missed.">            } else if (springs.size() &gt; 1) {</span>
+                // Adjust between min/pref
+<span class="fc" id="L1903">                setValidSizeNotPreferred(axis, origin, size);</span>
+            }
+<span class="fc" id="L1905">        }</span>
+
+        private void setValidSizeNotPreferred(int axis, int origin, int size) {
+<span class="fc" id="L1908">            int delta = size - getPreferredSize(axis);</span>
+            //assert delta != 0;
+<span class="pc bpc" id="L1910" title="1 of 2 branches missed.">            boolean useMin = (delta &lt; 0);</span>
+<span class="fc" id="L1911">            int springCount = springs.size();</span>
+<span class="pc bpc" id="L1912" title="1 of 2 branches missed.">            if (useMin) {</span>
+<span class="nc" id="L1913">                delta *= -1;</span>
+            }
+
+            // The following algorithm if used for resizing springs:
+            // 1. Calculate the resizability of each spring (pref - min or
+            //    max - pref) into a list.
+            // 2. Sort the list in ascending order
+            // 3. Iterate through each of the resizable Springs, attempting
+            //    to give them (pref - size) / resizeCount
+            // 4. For any Springs that can not accommodate that much space
+            //    add the remainder back to the amount to distribute and
+            //    recalculate how must space the remaining springs will get.
+            // 5. Set the size of the springs.
+
+            // First pass, sort the resizable springs into resizable
+<span class="fc" id="L1928">            ArrayList resizable = buildResizableList(axis, useMin);</span>
+<span class="fc" id="L1929">            int resizableCount = resizable.size();</span>
+
+<span class="pc bpc" id="L1931" title="1 of 2 branches missed.">            if (resizableCount &gt; 0) {</span>
+                // How much we would like to give each Spring.
+<span class="nc" id="L1933">                int sDelta = delta / resizableCount;</span>
+                // Remaining space.
+<span class="nc" id="L1935">                int slop = delta - sDelta * resizableCount;</span>
+<span class="nc" id="L1936">                int[] sizes = new int[springCount];</span>
+<span class="nc bnc" id="L1937" title="All 2 branches missed.">                int sign = useMin ? -1 : 1;</span>
+                // Second pass, accumulate the resulting deltas (relative to
+                // preferred) into sizes.
+<span class="nc bnc" id="L1940" title="All 2 branches missed.">                for (int counter = 0; counter &lt; resizableCount; counter++) {</span>
+<span class="nc" id="L1941">                    SpringDelta springDelta = (SpringDelta) resizable.</span>
+<span class="nc" id="L1942">                            get(counter);</span>
+<span class="nc bnc" id="L1943" title="All 2 branches missed.">                    if ((counter + 1) == resizableCount) {</span>
+<span class="nc" id="L1944">                        sDelta += slop;</span>
+                    }
+<span class="nc" id="L1946">                    springDelta.delta = Math.min(sDelta, springDelta.delta);</span>
+<span class="nc" id="L1947">                    delta -= springDelta.delta;</span>
+<span class="nc bnc" id="L1948" title="All 4 branches missed.">                    if (springDelta.delta != sDelta &amp;&amp; counter + 1 &lt;</span>
+                            resizableCount) {
+                        // Spring didn't take all the space, reset how much
+                        // each spring will get.
+<span class="nc" id="L1952">                        sDelta = delta / (resizableCount - counter - 1);</span>
+<span class="nc" id="L1953">                        slop = delta - sDelta * (resizableCount - counter - 1);</span>
+                    }
+<span class="nc" id="L1955">                    sizes[springDelta.index] = sign * springDelta.delta;</span>
+                }
+
+                // And finally set the size of each spring
+<span class="nc bnc" id="L1959" title="All 2 branches missed.">                for (int counter = 0; counter &lt; springCount; counter++) {</span>
+<span class="nc" id="L1960">                    Spring spring = getSpring(counter);</span>
+<span class="nc" id="L1961">                    int sSize = spring.getPreferredSize(axis) + sizes[counter];</span>
+<span class="nc" id="L1962">                    spring.setSize(axis, origin, sSize);</span>
+<span class="nc" id="L1963">                    origin += sSize;</span>
+                }
+<span class="nc" id="L1965">            } else {</span>
+                // Nothing resizable, use the min or max of each of the
+                // springs.
+<span class="fc bfc" id="L1968" title="All 2 branches covered.">                for (int counter = 0; counter &lt; springCount; counter++) {</span>
+<span class="fc" id="L1969">                    Spring spring = getSpring(counter);</span>
+                    int sSize;
+<span class="pc bpc" id="L1971" title="1 of 2 branches missed.">                    if (useMin) {</span>
+<span class="nc" id="L1972">                        sSize = spring.getMinimumSize(axis);</span>
+                    } else {
+<span class="fc" id="L1974">                        sSize = spring.getMaximumSize(axis);</span>
+                    }
+<span class="fc" id="L1976">                    spring.setSize(axis, origin, sSize);</span>
+<span class="fc" id="L1977">                    origin += sSize;</span>
+                }
+            }
+<span class="fc" id="L1980">        }</span>
+
+        /**
+         * Returns the sorted list of SpringDelta's for the current set of
+         * Springs.
+         */
+        private ArrayList buildResizableList(int axis, boolean useMin) {
+            // First pass, figure out what is resizable
+<span class="fc" id="L1988">            int size = springs.size();</span>
+<span class="fc" id="L1989">            ArrayList sorted = new ArrayList(size);</span>
+<span class="fc bfc" id="L1990" title="All 2 branches covered.">            for (int counter = 0; counter &lt; size; counter++) {</span>
+<span class="fc" id="L1991">                Spring spring = getSpring(counter);</span>
+                int sDelta;
+<span class="pc bpc" id="L1993" title="1 of 2 branches missed.">                if (useMin) {</span>
+<span class="nc" id="L1994">                    sDelta = spring.getPreferredSize(axis) -</span>
+<span class="nc" id="L1995">                            spring.getMinimumSize(axis);</span>
+                } else {
+<span class="fc" id="L1997">                    sDelta = spring.getMaximumSize(axis) -</span>
+<span class="fc" id="L1998">                            spring.getPreferredSize(axis);</span>
+                }
+<span class="pc bpc" id="L2000" title="1 of 2 branches missed.">                if (sDelta &gt; 0) {</span>
+<span class="nc" id="L2001">                    sorted.add(new SpringDelta(counter, sDelta));</span>
+                }
+            }
+            //size = sorted.size();
+
+            // insertion sort for a relatively small ArrayList
+<span class="pc bpc" id="L2007" title="1 of 2 branches missed.">            for (int i = 0; i &lt; 0; i++) {</span>
+<span class="nc bnc" id="L2008" title="All 4 branches missed.">                for (int j = i; j &gt; 0 &amp;&amp; ((SpringDelta) sorted.get(j - 1)).compareTo(sorted.get(j)) &gt; 0; j--) {</span>
+<span class="nc" id="L2009">                    Object a = sorted.get(j - 1);</span>
+<span class="nc" id="L2010">                    Object b = sorted.get(j);</span>
+<span class="nc" id="L2011">                    sorted.set(j - 1, b);</span>
+<span class="nc" id="L2012">                    sorted.set(j, a);</span>
+                }
+            }
+<span class="fc" id="L2015">            return sorted;</span>
+        }
+
+        private int indexOfNextNonZeroSpring(int index, boolean treatAutopaddingAsZeroSized) {
+<span class="fc bfc" id="L2019" title="All 2 branches covered.">            while (index &lt; springs.size()) {</span>
+<span class="fc" id="L2020">                Spring spring = (Spring) springs.get(index);</span>
+<span class="pc bpc" id="L2021" title="1 of 2 branches missed.">                if (!spring.willHaveZeroSize(treatAutopaddingAsZeroSized)) {</span>
+<span class="fc" id="L2022">                    return index;</span>
+                }
+<span class="nc" id="L2024">                index++;</span>
+<span class="nc" id="L2025">            }</span>
+<span class="fc" id="L2026">            return index;</span>
+        }
+
+        void insertAutopadding(int axis, ArrayList leadingPadding,
+                               ArrayList trailingPadding, ArrayList leading, ArrayList trailing,
+                               boolean insert) {
+<span class="fc" id="L2032">            ArrayList newLeadingPadding = create(leadingPadding);</span>
+<span class="fc" id="L2033">            ArrayList newTrailingPadding = new ArrayList(1);</span>
+<span class="fc" id="L2034">            ArrayList newLeading = create(leading);</span>
+<span class="fc" id="L2035">            ArrayList newTrailing = null;</span>
+<span class="fc" id="L2036">            int counter = 0;</span>
+            // Warning, this must use springs.size, as it may change during the
+            // loop.
+<span class="fc bfc" id="L2039" title="All 2 branches covered.">            while (counter &lt; springs.size()) {</span>
+<span class="fc" id="L2040">                Spring spring = getSpring(counter);</span>
+<span class="fc bfc" id="L2041" title="All 2 branches covered.">                if (spring instanceof AutopaddingSpring) {</span>
+<span class="pc bpc" id="L2042" title="1 of 2 branches missed.">                    if (newLeadingPadding.size() == 0) {</span>
+<span class="fc" id="L2043">                        AutopaddingSpring padding = (AutopaddingSpring) spring;</span>
+<span class="fc" id="L2044">                        padding.setSources(newLeading);</span>
+<span class="fc" id="L2045">                        newLeading.clear();</span>
+<span class="fc" id="L2046">                        int nextCounter = indexOfNextNonZeroSpring(counter + 1, true);</span>
+<span class="fc bfc" id="L2047" title="All 2 branches covered.">                        if (nextCounter == springs.size()) {</span>
+                            // Last spring in the list, add it to trailingPadding.
+<span class="pc bpc" id="L2049" title="1 of 2 branches missed.">                            if (!(padding instanceof ContainerAutopaddingSpring)) {</span>
+<span class="nc" id="L2050">                                trailingPadding.add(padding);</span>
+                            }
+                        } else {
+<span class="fc" id="L2053">                            newLeadingPadding.clear();</span>
+<span class="fc" id="L2054">                            newLeadingPadding.add(padding);</span>
+                        }
+<span class="fc" id="L2056">                        counter = nextCounter;</span>
+<span class="fc" id="L2057">                    } else {</span>
+<span class="nc" id="L2058">                        counter = indexOfNextNonZeroSpring(counter + 1, true);</span>
+                    }
+                } else {
+                    // Not a padding spring
+<span class="pc bpc" id="L2062" title="1 of 4 branches missed.">                    if (newLeading.size() &gt; 0 &amp;&amp; insert) {</span>
+                        // There's leading ComponentSprings, create an
+                        // autopadding spring.
+<span class="fc" id="L2065">                        AutopaddingSpring padding = new AutopaddingSpring();</span>
+                        // Force the newly created spring to be considered
+                        // by NOT incrementing counter
+<span class="fc" id="L2068">                        springs.add(counter, padding);</span>
+<span class="fc" id="L2069">                        continue;</span>
+                    }
+<span class="fc bfc" id="L2071" title="All 2 branches covered.">                    if (spring instanceof ComponentSpring) {</span>
+                        // Spring is a Component, make it the target of any
+                        // leading AutopaddingSpring.
+<span class="fc" id="L2074">                        ComponentSpring cSpring = (ComponentSpring) spring;</span>
+<span class="pc bpc" id="L2075" title="1 of 2 branches missed.">                        if (!cSpring.isVisible()) {</span>
+<span class="nc" id="L2076">                            counter++;</span>
+<span class="nc" id="L2077">                            continue;</span>
+                        }
+<span class="fc bfc" id="L2079" title="All 2 branches covered.">                        for (int i = 0; i &lt; newLeadingPadding.size(); i++) {</span>
+<span class="fc" id="L2080">                            ((AutopaddingSpring) newLeadingPadding.get(i)).</span>
+<span class="fc" id="L2081">                                    addTarget(cSpring, axis);</span>
+                        }
+<span class="fc" id="L2083">                        newLeading.clear();</span>
+<span class="fc" id="L2084">                        newLeadingPadding.clear();</span>
+<span class="fc" id="L2085">                        int nextCounter = indexOfNextNonZeroSpring(counter + 1, false);</span>
+<span class="pc bpc" id="L2086" title="1 of 2 branches missed.">                        if (nextCounter == springs.size()) {</span>
+                            // Last Spring, add it to trailing
+<span class="nc" id="L2088">                            trailing.add(cSpring);</span>
+                        } else {
+                            // Not that last Spring, add it to leading
+<span class="fc" id="L2091">                            newLeading.add(cSpring);</span>
+                        }
+<span class="fc" id="L2093">                        counter = nextCounter;</span>
+<span class="pc bpc" id="L2094" title="1 of 2 branches missed.">                    } else if (spring instanceof Group) {</span>
+                        // Forward call to child Group
+<span class="pc bpc" id="L2096" title="1 of 2 branches missed.">                        if (newTrailing == null) {</span>
+<span class="fc" id="L2097">                            newTrailing = new ArrayList(1);</span>
+                        } else {
+<span class="nc" id="L2099">                            newTrailing.clear();</span>
+                        }
+<span class="fc" id="L2101">                        newTrailingPadding.clear();</span>
+<span class="fc" id="L2102">                        ((Group) spring).insertAutopadding(axis, newLeadingPadding,</span>
+                                newTrailingPadding, newLeading, newTrailing,
+                                insert);
+<span class="fc" id="L2105">                        newLeading.clear();</span>
+<span class="fc" id="L2106">                        newLeadingPadding.clear();</span>
+<span class="fc" id="L2107">                        int nextCounter = indexOfNextNonZeroSpring(counter + 1,</span>
+<span class="pc bpc" id="L2108" title="1 of 2 branches missed.">                                newTrailing.size() == 0);</span>
+<span class="fc bfc" id="L2109" title="All 2 branches covered.">                        if (nextCounter == springs.size()) {</span>
+<span class="fc" id="L2110">                            addAll(trailing, newTrailing);</span>
+<span class="fc" id="L2111">                            addAll(trailingPadding, newTrailingPadding);</span>
+                        } else {
+<span class="fc" id="L2113">                            addAll(newLeading, newTrailing);</span>
+<span class="fc" id="L2114">                            addAll(newLeadingPadding, newTrailingPadding);</span>
+                        }
+<span class="fc" id="L2116">                        counter = nextCounter;</span>
+<span class="fc" id="L2117">                    } else {</span>
+                        // Gap
+<span class="nc" id="L2119">                        newLeadingPadding.clear();</span>
+<span class="nc" id="L2120">                        newLeading.clear();</span>
+<span class="nc" id="L2121">                        counter++;</span>
+                    }
+                }
+<span class="fc" id="L2124">            }</span>
+<span class="fc" id="L2125">        }</span>
+
+        int getBaseline() {
+<span class="nc bnc" id="L2128" title="All 2 branches missed.">            if (baselineSpring != null) {</span>
+<span class="nc" id="L2129">                int baseline = baselineSpring.getBaseline();</span>
+<span class="nc bnc" id="L2130" title="All 2 branches missed.">                if (baseline &gt;= 0) {</span>
+<span class="nc" id="L2131">                    int size = 0;</span>
+<span class="nc bnc" id="L2132" title="All 2 branches missed.">                    for (int i = 0, max = springs.size(); i &lt; max; i++) {</span>
+<span class="nc" id="L2133">                        Spring spring = getSpring(i);</span>
+<span class="nc bnc" id="L2134" title="All 2 branches missed.">                        if (spring == baselineSpring) {</span>
+<span class="nc" id="L2135">                            return size + baseline;</span>
+                        } else {
+<span class="nc" id="L2137">                            size += spring.getPreferredSize(VERTICAL);</span>
+                        }
+                    }
+                }
+            }
+<span class="nc" id="L2142">            return -1;</span>
+        }
+
+        int getBaselineResizeBehavior() {
+<span class="nc bnc" id="L2146" title="All 2 branches missed.">            if (isResizable(VERTICAL)) {</span>
+<span class="nc bnc" id="L2147" title="All 2 branches missed.">                if (!baselineSpring.isResizable(VERTICAL)) {</span>
+                    // Spring to use for baseline isn't resizable. In this case
+                    // baseline resize behavior can be determined based on how
+                    // preceding springs resize.
+<span class="nc" id="L2151">                    boolean leadingResizable = false;</span>
+<span class="nc bnc" id="L2152" title="All 2 branches missed.">                    for (int i = 0, max = springs.size(); i &lt; max; i++) {</span>
+<span class="nc" id="L2153">                        Spring spring = getSpring(i);</span>
+<span class="nc bnc" id="L2154" title="All 2 branches missed.">                        if (spring == baselineSpring) {</span>
+<span class="nc" id="L2155">                            break;</span>
+<span class="nc bnc" id="L2156" title="All 2 branches missed.">                        } else if (spring.isResizable(VERTICAL)) {</span>
+<span class="nc" id="L2157">                            leadingResizable = true;</span>
+<span class="nc" id="L2158">                            break;</span>
+                        }
+                    }
+<span class="nc" id="L2161">                    boolean trailingResizable = false;</span>
+<span class="nc bnc" id="L2162" title="All 2 branches missed.">                    for (int i = springs.size() - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L2163">                        Spring spring = getSpring(i);</span>
+<span class="nc bnc" id="L2164" title="All 2 branches missed.">                        if (spring == baselineSpring) {</span>
+<span class="nc" id="L2165">                            break;</span>
+                        }
+<span class="nc bnc" id="L2167" title="All 2 branches missed.">                        if (spring.isResizable(VERTICAL)) {</span>
+<span class="nc" id="L2168">                            trailingResizable = true;</span>
+<span class="nc" id="L2169">                            break;</span>
+                        }
+                    }
+<span class="nc bnc" id="L2172" title="All 4 branches missed.">                    if (leadingResizable &amp;&amp; !trailingResizable) {</span>
+<span class="nc" id="L2173">                        return Component.BRB_CONSTANT_DESCENT;</span>
+<span class="nc bnc" id="L2174" title="All 4 branches missed.">                    } else if (!leadingResizable &amp;&amp; trailingResizable) {</span>
+<span class="nc" id="L2175">                        return Component.BRB_CONSTANT_ASCENT;</span>
+                    }
+                    // If we get here, both leading and trailing springs are
+                    // resizable. Fall through to OTHER.
+<span class="nc" id="L2179">                } else {</span>
+<span class="nc" id="L2180">                    int brb = baselineSpring.getBaselineResizeBehavior();</span>
+<span class="nc bnc" id="L2181" title="All 2 branches missed.">                    if (brb == Component.BRB_CONSTANT_ASCENT) {</span>
+<span class="nc bnc" id="L2182" title="All 2 branches missed.">                        for (int i = 0, max = springs.size(); i &lt; max; i++) {</span>
+<span class="nc" id="L2183">                            Spring spring = getSpring(i);</span>
+<span class="nc bnc" id="L2184" title="All 2 branches missed.">                            if (spring == baselineSpring) {</span>
+<span class="nc" id="L2185">                                return Component.BRB_CONSTANT_ASCENT;</span>
+                            }
+<span class="nc bnc" id="L2187" title="All 2 branches missed.">                            if (spring.isResizable(VERTICAL)) {</span>
+<span class="nc" id="L2188">                                return Component.BRB_OTHER;</span>
+                            }
+                        }
+<span class="nc bnc" id="L2191" title="All 2 branches missed.">                    } else if (brb == Component.BRB_CONSTANT_DESCENT) {</span>
+<span class="nc bnc" id="L2192" title="All 2 branches missed.">                        for (int i = springs.size() - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L2193">                            Spring spring = getSpring(i);</span>
+<span class="nc bnc" id="L2194" title="All 2 branches missed.">                            if (spring == baselineSpring) {</span>
+<span class="nc" id="L2195">                                return Component.BRB_CONSTANT_DESCENT;</span>
+                            }
+<span class="nc bnc" id="L2197" title="All 2 branches missed.">                            if (spring.isResizable(VERTICAL)) {</span>
+<span class="nc" id="L2198">                                return Component.BRB_OTHER;</span>
+                            }
+                        }
+                    }
+                }
+<span class="nc" id="L2203">                return Component.BRB_OTHER;</span>
+            }
+            // Not resizable, treat as constant_ascent
+<span class="nc" id="L2206">            return Component.BRB_CONSTANT_ASCENT;</span>
+        }
+    }
+
+    /**
+     * A &lt;code&gt;Group&lt;/code&gt; that lays out its elements on top of each
+     * other.  If a child element is smaller than the provided space it
+     * is aligned based on the alignment of the child (if specified) or
+     * on the alignment of the ParallelGroup.
+     *
+     * @see #createParallelGroup()
+     */
+    public class ParallelGroup extends Group {
+        // How children are layed out.
+        private final int childAlignment;
+        // Whether or not we're resizable.
+        private final boolean resizable;
+
+<span class="fc" id="L2224">        ParallelGroup(int childAlignment, boolean resizable) {</span>
+<span class="fc" id="L2225">            this.childAlignment = childAlignment;</span>
+<span class="fc" id="L2226">            this.resizable = resizable;</span>
+<span class="fc" id="L2227">        }</span>
+
+        /**
+         * Adds the specified &lt;code&gt;Group&lt;/code&gt;.
+         *
+         * @param group the Group to add
+         * @return this Group
+         */
+        public ParallelGroup add(Group group) {
+<span class="nc" id="L2236">            return (ParallelGroup) addSpring(group);</span>
+        }
+
+        /**
+         * Adds the specified Component.  If the Component's min/max
+         * are different from its pref than the component will be resizable.
+         *
+         * @param component the Component to add
+         * @return this &lt;code&gt;ParallelGroup&lt;/code&gt;
+         */
+        public ParallelGroup add(Component component) {
+<span class="fc" id="L2247">            return add(component, DEFAULT_SIZE, DEFAULT_SIZE, DEFAULT_SIZE);</span>
+        }
+
+        /**
+         * Adds the specified &lt;code&gt;Component&lt;/code&gt;.  Min, pref and max
+         * can be absolute values, or they can be one of
+         * &lt;code&gt;DEFAULT_SIZE&lt;/code&gt; or &lt;code&gt;PREFERRED_SIZE&lt;/code&gt;.  For
+         * example, the following:
+         * &lt;pre&gt;
+         *   add(component, PREFERRED_SIZE, PREFERRED_SIZE, 1000);
+         * &lt;/pre&gt;
+         * Forces a max of 1000, with the min and preferred equalling that
+         * of the preferred size of &lt;code&gt;component&lt;/code&gt;.
+         *
+         * @param component the Component to add
+         * @param min       the minimum size
+         * @param pref      the preferred size
+         * @param max       the maximum size
+         * @return this &lt;code&gt;SequentialGroup&lt;/code&gt;
+         * @throws IllegalArgumentException if min, pref or max are
+         *                                  not positive and not one of PREFERRED_SIZE or DEFAULT_SIZE.
+         */
+        public ParallelGroup add(Component component, int min, int pref,
+                                 int max) {
+<span class="fc" id="L2271">            return (ParallelGroup) addSpring(new ComponentSpring(</span>
+                    component, min, pref, max));
+        }
+
+        /**
+         * Adds a rigid gap.
+         *
+         * @param pref the size of the gap
+         * @return this &lt;code&gt;ParallelGroup&lt;/code&gt;
+         * @throws IllegalArgumentException if min &lt; 0 or pref &lt; 0 or max &lt; 0
+         *                                  or the following is not meant min &lt;= pref &lt;= max.
+         */
+        public ParallelGroup add(int pref) {
+<span class="nc" id="L2284">            return add(pref, pref, pref);</span>
+        }
+
+        /**
+         * Adds a gap with the specified size.
+         *
+         * @param min  the minimum size of the gap
+         * @param pref the preferred size of the gap
+         * @param max  the maximum size of the gap
+         * @return this &lt;code&gt;ParallelGroup&lt;/code&gt;
+         * @throws IllegalArgumentException if min &lt; 0 or pref &lt; 0 or max &lt; 0
+         *                                  or the following is not meant min &lt;= pref &lt;= max.
+         */
+        public ParallelGroup add(int min, int pref, int max) {
+<span class="nc" id="L2298">            return (ParallelGroup) addSpring(new GapSpring(min, pref, max));</span>
+        }
+
+        /**
+         * Adds the specified &lt;code&gt;Group&lt;/code&gt; as a child of this group.
+         *
+         * @param alignment the alignment of the Group.
+         * @param group     the Group to add
+         * @return this &lt;code&gt;ParallelGroup&lt;/code&gt;
+         * @throws IllegalArgumentException if alignment is not one of
+         *                                  &lt;code&gt;LEADING&lt;/code&gt;, &lt;code&gt;TRAILING&lt;/code&gt; or
+         *                                  &lt;code&gt;CENTER&lt;/code&gt;
+         */
+        public ParallelGroup add(int alignment, Group group) {
+<span class="nc" id="L2312">            checkChildAlignment(alignment);</span>
+<span class="nc" id="L2313">            group.setAlignment(alignment);</span>
+<span class="nc" id="L2314">            return (ParallelGroup) addSpring(group);</span>
+        }
+
+        /**
+         * Adds the specified Component.  If the Component's min/max
+         * are different from its pref than the component will be resizable.
+         *
+         * @param alignment the alignment for the component
+         * @param component the Component to add
+         * @return this &lt;code&gt;Group&lt;/code&gt;
+         * @throws IllegalArgumentException if alignment is not one of
+         *                                  &lt;code&gt;LEADING&lt;/code&gt;, &lt;code&gt;TRAILING&lt;/code&gt; or
+         *                                  &lt;code&gt;CENTER&lt;/code&gt;
+         */
+        public ParallelGroup add(int alignment, Component component) {
+<span class="nc" id="L2329">            return add(alignment, component, DEFAULT_SIZE, DEFAULT_SIZE,</span>
+                    DEFAULT_SIZE);
+        }
+
+        /**
+         * Adds the specified &lt;code&gt;Component&lt;/code&gt;.  Min, pref and max
+         * can be absolute values, or they can be one of
+         * &lt;code&gt;DEFAULT_SIZE&lt;/code&gt; or &lt;code&gt;PREFERRED_SIZE&lt;/code&gt;.  For
+         * example, the following:
+         * &lt;pre&gt;
+         *   add(component, PREFERRED_SIZE, PREFERRED_SIZE, 1000);
+         * &lt;/pre&gt;
+         * Forces a max of 1000, with the min and preferred equalling that
+         * of the preferred size of &lt;code&gt;component&lt;/code&gt;.
+         *
+         * @param alignment the alignment for the component.
+         * @param component the Component to add
+         * @param min       the minimum size
+         * @param pref      the preferred size
+         * @param max       the maximum size
+         * @return this &lt;code&gt;Group&lt;/code&gt;
+         * @throws IllegalArgumentException if min, pref or max are
+         *                                  not positive and not one of PREFERRED_SIZE or DEFAULT_SIZE.
+         */
+        public ParallelGroup add(int alignment, Component component, int min,
+                                 int pref, int max) {
+<span class="nc" id="L2355">            checkChildAlignment(alignment);</span>
+<span class="nc" id="L2356">            ComponentSpring spring = new ComponentSpring(component,</span>
+                    min, pref, max);
+<span class="nc" id="L2358">            spring.setAlignment(alignment);</span>
+<span class="nc" id="L2359">            return (ParallelGroup) addSpring(spring);</span>
+        }
+
+        boolean isResizable() {
+<span class="fc" id="L2363">            return resizable;</span>
+        }
+
+        int operator(int a, int b) {
+<span class="nc" id="L2367">            return Math.max(a, b);</span>
+        }
+
+        int calculateMinimumSize(int axis) {
+<span class="nc bnc" id="L2371" title="All 2 branches missed.">            if (!isResizable()) {</span>
+<span class="nc" id="L2372">                return getPreferredSize(axis);</span>
+            }
+<span class="nc" id="L2374">            return super.calculateMinimumSize(axis);</span>
+        }
+
+        int calculateMaximumSize(int axis) {
+<span class="pc bpc" id="L2378" title="1 of 2 branches missed.">            if (!isResizable()) {</span>
+<span class="nc" id="L2379">                return getPreferredSize(axis);</span>
+            }
+<span class="fc" id="L2381">            return super.calculateMaximumSize(axis);</span>
+        }
+
+        void setValidSize(int axis, int origin, int size) {
+<span class="fc bfc" id="L2385" title="All 2 branches covered.">            for (int i = 0, max = springs.size(); i &lt; max; i++) {</span>
+<span class="fc" id="L2386">                setChildSize(getSpring(i), axis, origin, size);</span>
+            }
+<span class="fc" id="L2388">        }</span>
+
+        void setChildSize(Spring spring, int axis, int origin, int size) {
+<span class="fc" id="L2391">            int alignment = spring.getAlignment();</span>
+<span class="fc" id="L2392">            int springSize = Math.min(</span>
+<span class="fc" id="L2393">                    Math.max(spring.getMinimumSize(axis), size),</span>
+<span class="fc" id="L2394">                    spring.getMaximumSize(axis));</span>
+<span class="pc bpc" id="L2395" title="1 of 2 branches missed.">            if (alignment == NO_ALIGNMENT) {</span>
+<span class="fc" id="L2396">                alignment = childAlignment;</span>
+            }
+<span class="pc bpc" id="L2398" title="2 of 3 branches missed.">            switch (alignment) {</span>
+                case TRAILING:
+<span class="nc" id="L2400">                    spring.setSize(axis, origin + size - springSize,</span>
+                            springSize);
+<span class="nc" id="L2402">                    break;</span>
+                case CENTER:
+<span class="nc" id="L2404">                    spring.setSize(axis, origin +</span>
+                            (size - springSize) / 2, springSize);
+<span class="nc" id="L2406">                    break;</span>
+                default: // LEADING, or BASELINE
+<span class="fc" id="L2408">                    spring.setSize(axis, origin, springSize);</span>
+                    break;
+            }
+<span class="fc" id="L2411">        }</span>
+
+        void insertAutopadding(int axis, ArrayList leadingPadding,
+                               ArrayList trailingPadding, ArrayList leading, ArrayList trailing,
+                               boolean insert) {
+<span class="fc bfc" id="L2416" title="All 2 branches covered.">            for (int counter = 0, max = springs.size(); counter &lt; max; counter++) {</span>
+<span class="fc" id="L2417">                Spring spring = getSpring(counter);</span>
+<span class="pc bpc" id="L2418" title="1 of 2 branches missed.">                if (spring instanceof ComponentSpring) {</span>
+<span class="pc bpc" id="L2419" title="1 of 2 branches missed.">                    if (((ComponentSpring) spring).isVisible()) {</span>
+<span class="fc bfc" id="L2420" title="All 2 branches covered.">                        for (int i = 0; i &lt; leadingPadding.size(); i++) {</span>
+<span class="fc" id="L2421">                            ((AutopaddingSpring) leadingPadding.get(i)).addTarget(</span>
+                                    (ComponentSpring) spring, axis);
+                        }
+<span class="fc" id="L2424">                        trailing.add(spring);</span>
+                    }
+<span class="nc bnc" id="L2426" title="All 2 branches missed.">                } else if (spring instanceof Group) {</span>
+<span class="nc" id="L2427">                    ((Group) spring).insertAutopadding(axis, leadingPadding,</span>
+                            trailingPadding, leading, trailing, insert);
+<span class="nc bnc" id="L2429" title="All 2 branches missed.">                } else if (spring instanceof AutopaddingSpring) {</span>
+<span class="nc" id="L2430">                    ((AutopaddingSpring) spring).setSources(leading);</span>
+<span class="nc" id="L2431">                    trailingPadding.add(spring);</span>
+                }
+            }
+<span class="fc" id="L2434">        }</span>
+
+        private void checkChildAlignment(int alignment) {
+<span class="nc" id="L2437">            boolean allowsBaseline = (this instanceof BaselineGroup);</span>
+<span class="nc bnc" id="L2438" title="All 4 branches missed.">            if (!allowsBaseline &amp;&amp; alignment == BASELINE) {</span>
+<span class="nc" id="L2439">                throw new IllegalArgumentException(&quot;Alignment must be one of:&quot; +</span>
+                        &quot;LEADING, TRAILING or CENTER&quot;);
+            }
+<span class="nc bnc" id="L2442" title="All 8 branches missed.">            if (alignment != CENTER &amp;&amp; alignment != BASELINE &amp;&amp;</span>
+                    alignment != LEADING &amp;&amp; alignment != TRAILING) {
+<span class="nc" id="L2444">                throw new IllegalArgumentException(&quot;Alignment must be one of:&quot; +</span>
+                        &quot;LEADING, TRAILING or CENTER&quot;);
+            }
+<span class="nc" id="L2447">        }</span>
+    }
+
+    /**
+     * An extension of &lt;code&gt;ParallelGroup&lt;/code&gt; that aligns its
+     * constituent &lt;code&gt;Spring&lt;/code&gt;s along the baseline.
+     */
+    private class BaselineGroup extends ParallelGroup {
+        // Whether or not all child springs have a baseline
+        private boolean allSpringsHaveBaseline;
+
+        // max(spring.getBaseline()) of all springs aligned along the baseline
+        // that have a baseline
+        private int prefAscent;
+
+        // max(spring.getPreferredSize().height - spring.getBaseline()) of all
+        // springs aligned along the baseline that have a baseline
+        private int prefDescent;
+
+        // Whether baselineAnchoredToTop was explicitly set
+        private boolean baselineAnchorSet;
+
+        // Whether the baseline is anchored to the top or the bottom.
+        // If anchored to the top the baseline is always at prefAscent,
+        // otherwise the baseline is at (height - prefDescent)
+        private boolean baselineAnchoredToTop;
+
+        // Whether or not the baseline has been calculated.
+        private boolean calcedBaseline;
+
+<span class="fc" id="L2477">        BaselineGroup(boolean resizable) {</span>
+<span class="fc" id="L2478">            super(LEADING, resizable);</span>
+<span class="fc" id="L2479">            prefAscent = prefDescent = -1;</span>
+<span class="fc" id="L2480">            calcedBaseline = false;</span>
+<span class="fc" id="L2481">        }</span>
+
+        BaselineGroup(boolean resizable, boolean baselineAnchoredToTop) {
+<span class="nc" id="L2484">            this(resizable);</span>
+<span class="nc" id="L2485">            this.baselineAnchoredToTop = baselineAnchoredToTop;</span>
+<span class="nc" id="L2486">            baselineAnchorSet = true;</span>
+<span class="nc" id="L2487">        }</span>
+
+        void unset() {
+<span class="fc" id="L2490">            super.unset();</span>
+<span class="fc" id="L2491">            prefAscent = prefDescent = -1;</span>
+<span class="fc" id="L2492">            calcedBaseline = false;</span>
+<span class="fc" id="L2493">        }</span>
+
+        void setValidSize(int axis, int origin, int size) {
+<span class="fc" id="L2496">            checkAxis(axis);</span>
+<span class="pc bpc" id="L2497" title="1 of 2 branches missed.">            if (prefAscent == -1) {</span>
+<span class="nc" id="L2498">                super.setValidSize(axis, origin, size);</span>
+            } else {
+                // do baseline layout
+<span class="fc" id="L2501">                baselineLayout(origin, size);</span>
+            }
+<span class="fc" id="L2503">        }</span>
+
+        int calculateSize(int axis, int type) {
+<span class="fc" id="L2506">            checkAxis(axis);</span>
+<span class="fc bfc" id="L2507" title="All 2 branches covered.">            if (!calcedBaseline) {</span>
+<span class="fc" id="L2508">                calculateBaselineAndResizeBehavior();</span>
+            }
+<span class="pc bpc" id="L2510" title="1 of 2 branches missed.">            if (type == MIN_SIZE) {</span>
+<span class="nc" id="L2511">                return calculateMinSize();</span>
+            }
+<span class="fc bfc" id="L2513" title="All 2 branches covered.">            if (type == MAX_SIZE) {</span>
+<span class="fc" id="L2514">                return calculateMaxSize();</span>
+            }
+<span class="pc bpc" id="L2516" title="1 of 2 branches missed.">            if (allSpringsHaveBaseline) {</span>
+<span class="fc" id="L2517">                return prefAscent + prefDescent;</span>
+            }
+<span class="nc" id="L2519">            return Math.max(prefAscent + prefDescent,</span>
+<span class="nc" id="L2520">                    super.calculateSize(axis, type));</span>
+        }
+
+        private void calculateBaselineAndResizeBehavior() {
+            // calculate baseline
+<span class="fc" id="L2525">            prefAscent = 0;</span>
+<span class="fc" id="L2526">            prefDescent = 0;</span>
+<span class="fc" id="L2527">            int baselineSpringCount = 0;</span>
+<span class="fc" id="L2528">            int resizeBehavior = 0;</span>
+<span class="fc bfc" id="L2529" title="All 2 branches covered.">            for (int counter = springs.size() - 1; counter &gt;= 0; counter--) {</span>
+<span class="fc" id="L2530">                Spring spring = getSpring(counter);</span>
+<span class="pc bpc" id="L2531" title="1 of 2 branches missed.">                if (spring.getAlignment() == NO_ALIGNMENT ||</span>
+<span class="nc bnc" id="L2532" title="All 2 branches missed.">                        spring.getAlignment() == BASELINE) {</span>
+<span class="fc" id="L2533">                    int baseline = spring.getBaseline();</span>
+<span class="pc bpc" id="L2534" title="1 of 2 branches missed.">                    if (baseline &gt;= 0) {</span>
+<span class="pc bpc" id="L2535" title="1 of 2 branches missed.">                        if (spring.isResizable(VERTICAL)) {</span>
+<span class="nc" id="L2536">                            int brb = spring.</span>
+<span class="nc" id="L2537">                                    getBaselineResizeBehavior();</span>
+<span class="nc bnc" id="L2538" title="All 2 branches missed.">                            if (resizeBehavior == 0) {</span>
+<span class="nc" id="L2539">                                resizeBehavior = brb;</span>
+<span class="nc bnc" id="L2540" title="All 2 branches missed.">                            } else if (brb != resizeBehavior) {</span>
+<span class="nc" id="L2541">                                resizeBehavior = Component.BRB_CONSTANT_ASCENT;</span>
+                            }
+                        }
+<span class="fc" id="L2544">                        prefAscent = Math.max(prefAscent, baseline);</span>
+<span class="fc" id="L2545">                        prefDescent = Math.max(prefDescent, spring.</span>
+<span class="fc" id="L2546">                                getPreferredSize(VERTICAL) - baseline);</span>
+<span class="fc" id="L2547">                        baselineSpringCount++;</span>
+                    }
+                }
+            }
+<span class="pc bpc" id="L2551" title="1 of 2 branches missed.">            if (!baselineAnchorSet) {</span>
+<span class="pc bpc" id="L2552" title="1 of 2 branches missed.">                this.baselineAnchoredToTop = resizeBehavior != Component.BRB_CONSTANT_DESCENT;</span>
+            }
+<span class="pc bpc" id="L2554" title="1 of 2 branches missed.">            allSpringsHaveBaseline = (baselineSpringCount == springs.size());</span>
+<span class="fc" id="L2555">            calcedBaseline = true;</span>
+<span class="fc" id="L2556">        }</span>
+
+        private int calculateMaxSize() {
+<span class="fc" id="L2559">            int maxAscent = prefAscent;</span>
+<span class="fc" id="L2560">            int maxDescent = prefDescent;</span>
+<span class="fc" id="L2561">            int nonBaselineMax = 0;</span>
+<span class="fc bfc" id="L2562" title="All 2 branches covered.">            for (int counter = springs.size() - 1; counter &gt;= 0; counter--) {</span>
+<span class="fc" id="L2563">                Spring spring = getSpring(counter);</span>
+                int baseline;
+<span class="fc" id="L2565">                int springMax = spring.getMaximumSize(VERTICAL);</span>
+<span class="pc bpc" id="L2566" title="1 of 2 branches missed.">                if ((spring.getAlignment() == NO_ALIGNMENT ||</span>
+<span class="pc bnc" id="L2567" title="All 2 branches missed.">                        spring.getAlignment() == BASELINE) &amp;&amp;</span>
+<span class="pc bpc" id="L2568" title="1 of 2 branches missed.">                        (baseline = spring.getBaseline()) &gt;= 0) {</span>
+<span class="fc" id="L2569">                    int springPref = spring.getPreferredSize(VERTICAL);</span>
+<span class="pc bpc" id="L2570" title="1 of 2 branches missed.">                    if (springPref != springMax) {</span>
+<span class="nc bnc" id="L2571" title="All 3 branches missed.">                        switch (spring.getBaselineResizeBehavior()) {</span>
+                            case Component.BRB_CONSTANT_ASCENT:
+<span class="nc bnc" id="L2573" title="All 2 branches missed.">                                if (baselineAnchoredToTop) {</span>
+<span class="nc" id="L2574">                                    maxDescent = Math.max(maxDescent,</span>
+                                            springMax - baseline);
+                                }
+                                break;
+                            case Component.BRB_CONSTANT_DESCENT:
+<span class="nc bnc" id="L2579" title="All 2 branches missed.">                                if (!baselineAnchoredToTop) {</span>
+<span class="nc" id="L2580">                                    maxAscent = Math.max(maxAscent,</span>
+                                            springMax - springPref + baseline);
+                                }
+                                break;
+                            default: // CENTER_OFFSET and OTHER, not resizable
+                                break;
+                        }
+                    }
+<span class="fc" id="L2588">                } else {</span>
+                    // Not aligned along the baseline, or no baseline.
+<span class="nc" id="L2590">                    nonBaselineMax = Math.max(nonBaselineMax, springMax);</span>
+                }
+            }
+<span class="fc" id="L2593">            return Math.max(nonBaselineMax, maxAscent + maxDescent);</span>
+        }
+
+        private int calculateMinSize() {
+<span class="nc" id="L2597">            int minAscent = 0;</span>
+<span class="nc" id="L2598">            int minDescent = 0;</span>
+<span class="nc" id="L2599">            int nonBaselineMin = 0;</span>
+<span class="nc bnc" id="L2600" title="All 2 branches missed.">            if (baselineAnchoredToTop) {</span>
+<span class="nc" id="L2601">                minAscent = prefAscent;</span>
+            } else {
+<span class="nc" id="L2603">                minDescent = prefDescent;</span>
+            }
+<span class="nc bnc" id="L2605" title="All 2 branches missed.">            for (int counter = springs.size() - 1; counter &gt;= 0; counter--) {</span>
+<span class="nc" id="L2606">                Spring spring = getSpring(counter);</span>
+<span class="nc" id="L2607">                int springMin = spring.getMinimumSize(VERTICAL);</span>
+                int baseline;
+<span class="nc bnc" id="L2609" title="All 2 branches missed.">                if ((spring.getAlignment() == NO_ALIGNMENT ||</span>
+<span class="nc bnc" id="L2610" title="All 2 branches missed.">                        spring.getAlignment() == BASELINE) &amp;&amp;</span>
+<span class="nc bnc" id="L2611" title="All 2 branches missed.">                        (baseline = spring.getBaseline()) &gt;= 0) {</span>
+<span class="nc" id="L2612">                    int springPref = spring.getPreferredSize(VERTICAL);</span>
+<span class="nc bnc" id="L2613" title="All 3 branches missed.">                    switch (spring.getBaselineResizeBehavior()) {</span>
+                        case Component.BRB_CONSTANT_ASCENT:
+<span class="nc bnc" id="L2615" title="All 2 branches missed.">                            if (baselineAnchoredToTop) {</span>
+<span class="nc" id="L2616">                                minDescent = Math.max(springMin - baseline,</span>
+                                        minDescent);
+                            } else {
+<span class="nc" id="L2619">                                minAscent = Math.max(baseline, minAscent);</span>
+                            }
+<span class="nc" id="L2621">                            break;</span>
+                        case Component.BRB_CONSTANT_DESCENT:
+<span class="nc bnc" id="L2623" title="All 2 branches missed.">                            if (!baselineAnchoredToTop) {</span>
+<span class="nc" id="L2624">                                minAscent = Math.max(</span>
+                                        baseline - (springPref - springMin),
+                                        minAscent);
+                            } else {
+<span class="nc" id="L2628">                                minDescent = Math.max(springPref - baseline,</span>
+                                        minDescent);
+                            }
+<span class="nc" id="L2631">                            break;</span>
+                        default:
+                            // CENTER_OFFSET and OTHER are !resizable, use
+                            // the preferred size.
+<span class="nc" id="L2635">                            minAscent = Math.max(baseline, minAscent);</span>
+<span class="nc" id="L2636">                            minDescent = Math.max(springPref - baseline,</span>
+                                    minDescent);
+                            break;
+                    }
+<span class="nc" id="L2640">                } else {</span>
+                    // Not aligned along the baseline, or no baseline.
+<span class="nc" id="L2642">                    nonBaselineMin = Math.max(nonBaselineMin, springMin);</span>
+                }
+            }
+<span class="nc" id="L2645">            return Math.max(nonBaselineMin, minAscent + minDescent);</span>
+        }
+
+        /**
+         * Lays out springs that have a baseline along the baseline.  All
+         * others are centered.
+         */
+        private void baselineLayout(int origin, int size) {
+            int ascent;
+            int descent;
+<span class="pc bpc" id="L2655" title="1 of 2 branches missed.">            if (baselineAnchoredToTop) {</span>
+<span class="fc" id="L2656">                ascent = prefAscent;</span>
+<span class="fc" id="L2657">                descent = size - ascent;</span>
+            } else {
+<span class="nc" id="L2659">                ascent = size - prefDescent;</span>
+<span class="nc" id="L2660">                descent = prefDescent;</span>
+            }
+<span class="fc bfc" id="L2662" title="All 2 branches covered.">            for (int counter = springs.size() - 1; counter &gt;= 0; counter--) {</span>
+<span class="fc" id="L2663">                Spring spring = getSpring(counter);</span>
+<span class="fc" id="L2664">                int alignment = spring.getAlignment();</span>
+<span class="pc bpc" id="L2665" title="3 of 4 branches missed.">                if (alignment == NO_ALIGNMENT || alignment == BASELINE) {</span>
+<span class="fc" id="L2666">                    int baseline = spring.getBaseline();</span>
+<span class="pc bpc" id="L2667" title="1 of 2 branches missed.">                    if (baseline &gt;= 0) {</span>
+<span class="fc" id="L2668">                        int springMax = spring.getMaximumSize(VERTICAL);</span>
+<span class="fc" id="L2669">                        int springPref = spring.getPreferredSize(VERTICAL);</span>
+<span class="fc" id="L2670">                        int height = springPref;</span>
+                        int y;
+<span class="pc bpc" id="L2672" title="2 of 3 branches missed.">                        switch (spring.getBaselineResizeBehavior()) {</span>
+                            case Component.BRB_CONSTANT_ASCENT:
+<span class="nc" id="L2674">                                y = origin + ascent - baseline;</span>
+<span class="nc" id="L2675">                                height = Math.min(descent, springMax -</span>
+                                        baseline) + baseline;
+<span class="nc" id="L2677">                                break;</span>
+                            case Component.BRB_CONSTANT_DESCENT:
+<span class="fc" id="L2679">                                height = Math.min(ascent, springMax -</span>
+                                        springPref + baseline) +
+                                        (springPref - baseline);
+<span class="fc" id="L2682">                                y = origin + ascent +</span>
+                                        (springPref - baseline) - height;
+<span class="fc" id="L2684">                                break;</span>
+                            default: // CENTER_OFFSET &amp; OTHER, not resizable
+<span class="nc" id="L2686">                                y = origin + ascent - baseline;</span>
+                                break;
+                        }
+<span class="fc" id="L2689">                        spring.setSize(VERTICAL, y, height);</span>
+<span class="fc" id="L2690">                    } else {</span>
+<span class="nc" id="L2691">                        setChildSize(spring, VERTICAL, origin, size);</span>
+                    }
+<span class="fc" id="L2693">                } else {</span>
+<span class="nc" id="L2694">                    setChildSize(spring, VERTICAL, origin, size);</span>
+                }
+            }
+<span class="fc" id="L2697">        }</span>
+
+        int getBaseline() {
+<span class="nc bnc" id="L2700" title="All 2 branches missed.">            if (springs.size() &gt; 1) {</span>
+                // Force the baseline to be calculated
+<span class="nc" id="L2702">                getPreferredSize(VERTICAL);</span>
+<span class="nc" id="L2703">                return prefAscent;</span>
+<span class="nc bnc" id="L2704" title="All 2 branches missed.">            } else if (springs.size() == 1) {</span>
+<span class="nc" id="L2705">                return getSpring(0).getBaseline();</span>
+            }
+<span class="nc" id="L2707">            return -1;</span>
+        }
+
+        int getBaselineResizeBehavior() {
+<span class="nc bnc" id="L2711" title="All 2 branches missed.">            if (springs.size() == 1) {</span>
+<span class="nc" id="L2712">                return getSpring(0).getBaselineResizeBehavior();</span>
+            }
+<span class="nc bnc" id="L2714" title="All 2 branches missed.">            if (baselineAnchoredToTop) {</span>
+<span class="nc" id="L2715">                return Component.BRB_CONSTANT_ASCENT;</span>
+            }
+<span class="nc" id="L2717">            return Component.BRB_CONSTANT_DESCENT;</span>
+        }
+
+        // If the axis is VERTICAL, throws an IllegalStateException
+        private void checkAxis(int axis) {
+<span class="pc bpc" id="L2722" title="1 of 2 branches missed.">            if (axis == HORIZONTAL) {</span>
+<span class="nc" id="L2723">                throw new IllegalStateException(</span>
+                        &quot;Baseline must be used along vertical axis&quot;);
+            }
+<span class="fc" id="L2726">        }</span>
+    }
+
+    /**
+     * A Spring representing one axis of a Component.
+     * There are three ways to configure this:
+     * &lt;ul&gt;
+     * &lt;li&gt;Use the pref/min/max from the component
+     * &lt;li&gt;Use the pref from the component and fix the min to 0 or max
+     *     to a big number.
+     * &lt;li&gt;Force the min/max/pref to be a certain value.
+     * If the Component's size is to be linked to another components than
+     * the min/max/pref all come from the ComponentInfo.
+     */
+    private final class ComponentSpring extends Spring {
+        // min/pref/max are either a value &gt;= 0 or one of
+        // DEFAULT_SIZE or PREFERRED_SIZE
+        private final int min;
+        private final int pref;
+        private final int max;
+        private Component component;
+        private int origin;
+        // Baseline for the component.
+<span class="fc" id="L2749">        private int baseline = -1;</span>
+
+        // Whether or not the size has been requested yet.
+        private boolean installed;
+
+        private ComponentSpring(Component component, int min, int pref,
+<span class="fc" id="L2755">                                int max) {</span>
+<span class="fc" id="L2756">            this.component = component;</span>
+<span class="pc bpc" id="L2757" title="1 of 2 branches missed.">            if (component == null) {</span>
+<span class="nc" id="L2758">                throw new IllegalArgumentException(</span>
+                        &quot;Component must be non-null&quot;);
+            }
+<span class="fc" id="L2761">            checkSize(min, pref, max, true);</span>
+
+<span class="fc" id="L2763">            this.min = min;</span>
+<span class="fc" id="L2764">            this.max = max;</span>
+<span class="fc" id="L2765">            this.pref = pref;</span>
+
+            // getComponentInfo makes sure component is a child of the
+            // Container GroupLayout is the LayoutManager for.
+<span class="fc" id="L2769">            getComponentInfo(component);</span>
+<span class="fc" id="L2770">        }</span>
+
+        int calculateMinimumSize(int axis) {
+<span class="pc bpc" id="L2773" title="1 of 2 branches missed.">            if (isLinked(axis)) {</span>
+<span class="nc" id="L2774">                return getLinkSize(axis, MIN_SIZE);</span>
+            }
+<span class="fc" id="L2776">            return calculateNonlinkedMinimumSize(axis);</span>
+        }
+
+        int calculatePreferredSize(int axis) {
+<span class="fc bfc" id="L2780" title="All 2 branches covered.">            if (isLinked(axis)) {</span>
+<span class="fc" id="L2781">                return getLinkSize(axis, PREF_SIZE);</span>
+            }
+<span class="fc" id="L2783">            int min = getMinimumSize(axis);</span>
+<span class="fc" id="L2784">            int pref = calculateNonlinkedPreferredSize(axis);</span>
+<span class="fc" id="L2785">            int max = getMaximumSize(axis);</span>
+<span class="fc" id="L2786">            return Math.min(max, Math.max(min, pref));</span>
+        }
+
+        int calculateMaximumSize(int axis) {
+<span class="fc bfc" id="L2790" title="All 2 branches covered.">            if (isLinked(axis)) {</span>
+<span class="fc" id="L2791">                return getLinkSize(axis, MAX_SIZE);</span>
+            }
+<span class="fc" id="L2793">            return Math.max(getMinimumSize(axis),</span>
+<span class="fc" id="L2794">                    calculateNonlinkedMaximumSize(axis));</span>
+        }
+
+        boolean isVisible() {
+<span class="fc" id="L2798">            return getComponentInfo(getComponent()).isVisible();</span>
+        }
+
+        int calculateNonlinkedMinimumSize(int axis) {
+<span class="pc bpc" id="L2802" title="1 of 2 branches missed.">            if (!isVisible()) {</span>
+<span class="nc" id="L2803">                return 0;</span>
+            }
+<span class="pc bpc" id="L2805" title="1 of 2 branches missed.">            if (min &gt;= 0) {</span>
+<span class="nc" id="L2806">                return min;</span>
+            }
+<span class="pc bpc" id="L2808" title="1 of 2 branches missed.">            if (min == PREFERRED_SIZE) {</span>
+<span class="nc" id="L2809">                return calculateNonlinkedPreferredSize(axis);</span>
+            }
+            //assert (min == DEFAULT_SIZE);
+            //return getSizeAlongAxis(axis, component.getMinimumSize());
+            // Do we need this if we don't support minimum size?
+<span class="fc" id="L2814">            return getSizeAlongAxis(axis, component.getPreferredSize());</span>
+        }
+
+        int calculateNonlinkedPreferredSize(int axis) {
+<span class="pc bpc" id="L2818" title="1 of 2 branches missed.">            if (!isVisible()) {</span>
+<span class="nc" id="L2819">                return 0;</span>
+            }
+<span class="pc bpc" id="L2821" title="1 of 2 branches missed.">            if (pref &gt;= 0) {</span>
+<span class="nc" id="L2822">                return pref;</span>
+            }
+            //assert (pref == DEFAULT_SIZE || pref == PREFERRED_SIZE);
+<span class="fc" id="L2825">            return getSizeAlongAxis(axis, component.getPreferredSize());</span>
+        }
+
+        int calculateNonlinkedMaximumSize(int axis) {
+<span class="pc bpc" id="L2829" title="1 of 2 branches missed.">            if (!isVisible()) {</span>
+<span class="nc" id="L2830">                return 0;</span>
+            }
+<span class="pc bpc" id="L2832" title="1 of 2 branches missed.">            if (max &gt;= 0) {</span>
+<span class="nc" id="L2833">                return max;</span>
+            }
+<span class="pc bpc" id="L2835" title="1 of 2 branches missed.">            if (max == PREFERRED_SIZE) {</span>
+<span class="nc" id="L2836">                return calculateNonlinkedPreferredSize(axis);</span>
+            }
+            //assert (max == DEFAULT_SIZE);
+            //return getSizeAlongAxis(axis, component.getMaximumSize());
+<span class="fc" id="L2840">            return getSizeAlongAxis(axis, component.getPreferredSize());</span>
+        }
+
+        private int getSizeAlongAxis(int axis, Dimension size) {
+<span class="fc bfc" id="L2844" title="All 2 branches covered.">            return (axis == HORIZONTAL) ? size.getWidth() : size.getHeight();</span>
+        }
+
+        private int getLinkSize(int axis, int type) {
+<span class="pc bpc" id="L2848" title="1 of 2 branches missed.">            if (!isVisible()) {</span>
+<span class="nc" id="L2849">                return 0;</span>
+            }
+<span class="fc" id="L2851">            ComponentInfo ci = getComponentInfo(component);</span>
+<span class="fc" id="L2852">            return ci.getLinkSize(axis, type);</span>
+        }
+
+        void setSize(int axis, int origin, int size) {
+<span class="fc" id="L2856">            super.setSize(axis, origin, size);</span>
+<span class="fc" id="L2857">            this.origin = origin;</span>
+<span class="fc bfc" id="L2858" title="All 2 branches covered.">            if (size == UNSET) {</span>
+<span class="fc" id="L2859">                baseline = -1;</span>
+            }
+<span class="fc" id="L2861">        }</span>
+
+        int getOrigin() {
+<span class="fc" id="L2864">            return origin;</span>
+        }
+
+        Component getComponent() {
+<span class="fc" id="L2868">            return component;</span>
+        }
+
+        void setComponent(Component component) {
+<span class="nc" id="L2872">            this.component = component;</span>
+<span class="nc" id="L2873">        }</span>
+
+        int getBaseline() {
+<span class="fc bfc" id="L2876" title="All 2 branches covered.">            if (baseline == -1) {</span>
+<span class="fc" id="L2877">                Spring horizontalSpring = getComponentInfo(component).</span>
+                        horizontalSpring;
+<span class="fc" id="L2879">                int width = horizontalSpring.getPreferredSize(HORIZONTAL);</span>
+<span class="fc" id="L2880">                int height = getPreferredSize(VERTICAL);</span>
+<span class="pc bpc" id="L2881" title="2 of 4 branches missed.">                if (width &gt; 0 &amp;&amp; height &gt; 0) {</span>
+<span class="fc" id="L2882">                    baseline = component.getBaseline(width, height);</span>
+                }
+            }
+<span class="fc" id="L2885">            return baseline;</span>
+        }
+
+        int getBaselineResizeBehavior() {
+<span class="fc" id="L2889">            return getComponent().getBaselineResizeBehavior();</span>
+        }
+
+        private boolean isLinked(int axis) {
+<span class="fc" id="L2893">            return getComponentInfo(component).isLinked(axis);</span>
+        }
+
+        void installIfNecessary(int axis) {
+<span class="pc bpc" id="L2897" title="1 of 2 branches missed.">            if (!installed) {</span>
+<span class="fc" id="L2898">                installed = true;</span>
+<span class="fc bfc" id="L2899" title="All 2 branches covered.">                if (axis == HORIZONTAL) {</span>
+<span class="fc" id="L2900">                    getComponentInfo(component).horizontalSpring = this;</span>
+                } else {
+<span class="fc" id="L2902">                    getComponentInfo(component).verticalSpring = this;</span>
+                }
+            }
+<span class="fc" id="L2905">        }</span>
+
+        boolean willHaveZeroSize(boolean treatAutopaddingAsZeroSized) {
+<span class="pc bpc" id="L2908" title="1 of 2 branches missed.">            return !isVisible();</span>
+        }
+    }
+
+    /**
+     * Spring representing the preferred distance between two components.
+     */
+    private final class PaddingSpring extends Spring {
+        private final Component source;
+        private final Component target;
+        private final int type;
+        private final boolean canGrow;
+
+        PaddingSpring(Component source, Component target, int type,
+<span class="nc" id="L2922">                      boolean canGrow) {</span>
+<span class="nc" id="L2923">            this.source = source;</span>
+<span class="nc" id="L2924">            this.target = target;</span>
+<span class="nc" id="L2925">            this.type = type;</span>
+<span class="nc" id="L2926">            this.canGrow = canGrow;</span>
+<span class="nc" id="L2927">        }</span>
+
+        int calculateMinimumSize(int axis) {
+<span class="nc" id="L2930">            return getPadding(axis);</span>
+        }
+
+        int calculatePreferredSize(int axis) {
+<span class="nc" id="L2934">            return getPadding(axis);</span>
+        }
+
+        int calculateMaximumSize(int axis) {
+<span class="nc bnc" id="L2938" title="All 2 branches missed.">            if (canGrow) {</span>
+<span class="nc" id="L2939">                return Short.MAX_VALUE;</span>
+            }
+<span class="nc" id="L2941">            return getPadding(axis);</span>
+        }
+
+        private int getPadding(int axis) {
+            int position;
+<span class="nc bnc" id="L2946" title="All 2 branches missed.">            if (axis == HORIZONTAL) {</span>
+<span class="nc" id="L2947">                position = EAST;</span>
+            } else {
+<span class="nc" id="L2949">                position = SOUTH;</span>
+            }
+<span class="nc" id="L2951">            return getLayoutStyle0().getPreferredGap(source,</span>
+<span class="nc" id="L2952">                    target, type, position, host);</span>
+        }
+
+        boolean willHaveZeroSize(boolean treatAutopaddingAsZeroSized) {
+<span class="nc" id="L2956">            return false;</span>
+        }
+    }
+
+    /**
+     * Spring represented a certain amount of space.
+     */
+    private final class GapSpring extends Spring {
+        private final int min;
+        private final int pref;
+        private final int max;
+
+<span class="nc" id="L2968">        GapSpring(int min, int pref, int max) {</span>
+<span class="nc" id="L2969">            checkSize(min, pref, max, false);</span>
+<span class="nc" id="L2970">            this.min = min;</span>
+<span class="nc" id="L2971">            this.pref = pref;</span>
+<span class="nc" id="L2972">            this.max = max;</span>
+<span class="nc" id="L2973">        }</span>
+
+        int calculateMinimumSize(int axis) {
+<span class="nc bnc" id="L2976" title="All 2 branches missed.">            if (min == PREFERRED_SIZE) {</span>
+<span class="nc" id="L2977">                return getPreferredSize(axis);</span>
+            }
+<span class="nc" id="L2979">            return min;</span>
+        }
+
+        int calculatePreferredSize(int axis) {
+<span class="nc" id="L2983">            return pref;</span>
+        }
+
+        int calculateMaximumSize(int axis) {
+<span class="nc bnc" id="L2987" title="All 2 branches missed.">            if (max == PREFERRED_SIZE) {</span>
+<span class="nc" id="L2988">                return getPreferredSize(axis);</span>
+            }
+<span class="nc" id="L2990">            return max;</span>
+        }
+
+        boolean willHaveZeroSize(boolean treatAutopaddingAsZeroSized) {
+<span class="nc" id="L2994">            return false;</span>
+        }
+    }
+
+    /**
+     * Spring reprensenting the distance between any number of sources and
+     * targets.  The targets and sources are computed during layout.  An
+     * instance of this can either be dynamically created when
+     * autocreatePadding is true, or explicitly created by the developer.
+     */
+    private class AutopaddingSpring extends Spring {
+        private final int pref;
+        private final int max;
+        ArrayList sources;
+        ComponentSpring source;
+        int size;
+        int lastSize;
+        private ArrayList matches;
+        private int type;
+        private boolean userCreated;
+
+<span class="fc" id="L3015">        private AutopaddingSpring() {</span>
+<span class="fc" id="L3016">            this.pref = PREFERRED_SIZE;</span>
+<span class="fc" id="L3017">            this.max = PREFERRED_SIZE;</span>
+<span class="fc" id="L3018">            this.type = LayoutStyle.RELATED;</span>
+<span class="fc" id="L3019">        }</span>
+
+<span class="nc" id="L3021">        AutopaddingSpring(int pref, int max) {</span>
+<span class="nc" id="L3022">            this.pref = pref;</span>
+<span class="nc" id="L3023">            this.max = max;</span>
+<span class="nc" id="L3024">        }</span>
+
+<span class="nc" id="L3026">        AutopaddingSpring(int type, int pref, int max) {</span>
+<span class="nc" id="L3027">            this.type = type;</span>
+<span class="nc" id="L3028">            this.pref = pref;</span>
+<span class="nc" id="L3029">            this.max = max;</span>
+<span class="nc" id="L3030">            this.userCreated = true;</span>
+<span class="nc" id="L3031">        }</span>
+
+        public void setSource(ComponentSpring source) {
+<span class="nc" id="L3034">            this.source = source;</span>
+<span class="nc" id="L3035">        }</span>
+
+        public void setSources(ArrayList sources) {
+<span class="fc" id="L3038">            this.sources = create(sources);</span>
+<span class="fc" id="L3039">        }</span>
+
+        public boolean getUserCreated() {
+<span class="fc" id="L3042">            return userCreated;</span>
+        }
+
+        public void setUserCreated(boolean userCreated) {
+<span class="fc" id="L3046">            this.userCreated = userCreated;</span>
+<span class="fc" id="L3047">        }</span>
+
+        void unset() {
+<span class="fc" id="L3050">            lastSize = getSize();</span>
+<span class="fc" id="L3051">            super.unset();</span>
+<span class="fc" id="L3052">            size = 0;</span>
+<span class="fc" id="L3053">        }</span>
+
+        public void reset() {
+<span class="fc" id="L3056">            size = 0;</span>
+<span class="fc" id="L3057">            sources = null;</span>
+<span class="fc" id="L3058">            source = null;</span>
+<span class="fc" id="L3059">            matches = null;</span>
+<span class="fc" id="L3060">        }</span>
+
+        public void calculatePadding(int axis) {
+<span class="fc" id="L3063">            size = UNSET;</span>
+<span class="fc" id="L3064">            int maxPadding = UNSET;</span>
+<span class="pc bpc" id="L3065" title="1 of 2 branches missed.">            if (matches != null) {</span>
+<span class="fc" id="L3066">                LayoutStyle p = getLayoutStyle0();</span>
+                int position;
+<span class="pc bpc" id="L3068" title="1 of 2 branches missed.">                if (axis == HORIZONTAL) {</span>
+<span class="pc bpc" id="L3069" title="1 of 2 branches missed.">                    if (isLeftToRight()) {</span>
+<span class="fc" id="L3070">                        position = EAST;</span>
+                    } else {
+<span class="nc" id="L3072">                        position = WEST;</span>
+                    }
+                } else {
+<span class="nc" id="L3075">                    position = SOUTH;</span>
+                }
+<span class="fc bfc" id="L3077" title="All 2 branches covered.">                for (int i = matches.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L3078">                    AutopaddingMatch match = (AutopaddingMatch) matches.get(i);</span>
+<span class="fc" id="L3079">                    maxPadding = Math.max(maxPadding,</span>
+<span class="fc" id="L3080">                            calculatePadding(p, position, match.source,</span>
+                                    match.target));
+                }
+            }
+<span class="pc bpc" id="L3084" title="1 of 2 branches missed.">            if (size == UNSET) {</span>
+<span class="nc" id="L3085">                size = 0;</span>
+            }
+<span class="pc bpc" id="L3087" title="1 of 2 branches missed.">            if (maxPadding == UNSET) {</span>
+<span class="nc" id="L3088">                maxPadding = 0;</span>
+            }
+<span class="pc bpc" id="L3090" title="1 of 2 branches missed.">            if (lastSize != UNSET) {</span>
+<span class="fc" id="L3091">                size += Math.min(maxPadding, lastSize);</span>
+            }
+<span class="fc" id="L3093">        }</span>
+
+        private int calculatePadding(LayoutStyle p, int position,
+                                     ComponentSpring source,
+                                     ComponentSpring target) {
+<span class="fc" id="L3098">            int delta = target.getOrigin() - (source.getOrigin() +</span>
+<span class="fc" id="L3099">                    source.getSize());</span>
+<span class="pc bpc" id="L3100" title="1 of 2 branches missed.">            if (delta &gt;= 0) {</span>
+<span class="fc" id="L3101">                int padding = p.getPreferredGap(source.getComponent(),</span>
+<span class="fc" id="L3102">                        target.getComponent(), type, position, host);</span>
+<span class="pc bpc" id="L3103" title="1 of 2 branches missed.">                if (padding &gt; delta) {</span>
+<span class="fc" id="L3104">                    size = Math.max(size, padding - delta);</span>
+                }
+<span class="fc" id="L3106">                return padding;</span>
+            }
+<span class="nc" id="L3108">            return 0;</span>
+        }
+
+        public void addTarget(ComponentSpring spring, int axis) {
+<span class="pc bpc" id="L3112" title="1 of 2 branches missed.">            int oAxis = (axis == HORIZONTAL) ? VERTICAL : HORIZONTAL;</span>
+<span class="pc bpc" id="L3113" title="1 of 2 branches missed.">            if (source != null) {</span>
+<span class="nc bnc" id="L3114" title="All 2 branches missed.">                if (areParallelSiblings(source.getComponent(),</span>
+<span class="nc" id="L3115">                        spring.getComponent(), oAxis)) {</span>
+<span class="nc" id="L3116">                    addValidTarget(source, spring);</span>
+                }
+            } else {
+<span class="fc" id="L3119">                Component component = spring.getComponent();</span>
+<span class="fc bfc" id="L3120" title="All 2 branches covered.">                for (int counter = sources.size() - 1; counter &gt;= 0; counter--) {</span>
+<span class="fc" id="L3121">                    ComponentSpring source = (ComponentSpring) sources.</span>
+<span class="fc" id="L3122">                            get(counter);</span>
+<span class="pc bpc" id="L3123" title="1 of 2 branches missed.">                    if (areParallelSiblings(source.getComponent(),</span>
+                            component, oAxis)) {
+<span class="fc" id="L3125">                        addValidTarget(source, spring);</span>
+                    }
+                }
+            }
+<span class="fc" id="L3129">        }</span>
+
+        private void addValidTarget(ComponentSpring source,
+                                    ComponentSpring target) {
+<span class="pc bpc" id="L3133" title="1 of 2 branches missed.">            if (matches == null) {</span>
+<span class="fc" id="L3134">                matches = new ArrayList(1);</span>
+            }
+<span class="fc" id="L3136">            matches.add(new AutopaddingMatch(source, target));</span>
+<span class="fc" id="L3137">        }</span>
+
+        int calculateMinimumSize(int axis) {
+<span class="nc" id="L3140">            return size;</span>
+        }
+
+        int calculatePreferredSize(int axis) {
+<span class="pc bpc" id="L3144" title="3 of 4 branches missed.">            if (pref == PREFERRED_SIZE || pref == DEFAULT_SIZE) {</span>
+<span class="fc" id="L3145">                return size;</span>
+            }
+<span class="nc" id="L3147">            return Math.max(size, pref);</span>
+        }
+
+        int calculateMaximumSize(int axis) {
+<span class="pc bpc" id="L3151" title="1 of 2 branches missed.">            if (max &gt;= 0) {</span>
+<span class="nc" id="L3152">                return Math.max(getPreferredSize(axis), max);</span>
+            }
+<span class="fc" id="L3154">            return size;</span>
+        }
+
+        String getMatchDescription() {
+<span class="nc bnc" id="L3158" title="All 2 branches missed.">            return (matches == null) ? &quot;&quot; : matches.toString();</span>
+        }
+
+        public String toString() {
+<span class="nc" id="L3162">            return super.toString() + getMatchDescription();</span>
+        }
+
+        boolean willHaveZeroSize(boolean treatAutopaddingAsZeroSized) {
+<span class="fc" id="L3166">            return treatAutopaddingAsZeroSized;</span>
+        }
+    }
+
+    /**
+     * An extension of AutopaddingSpring used for container level padding.
+     */
+    private class ContainerAutopaddingSpring extends AutopaddingSpring {
+        private ArrayList targets;
+
+<span class="fc" id="L3176">        ContainerAutopaddingSpring() {</span>
+<span class="fc" id="L3177">            super();</span>
+<span class="fc" id="L3178">            setUserCreated(true);</span>
+<span class="fc" id="L3179">        }</span>
+
+<span class="nc" id="L3181">        ContainerAutopaddingSpring(int pref, int max) {</span>
+<span class="nc" id="L3182">            super(pref, max);</span>
+<span class="nc" id="L3183">            setUserCreated(true);</span>
+<span class="nc" id="L3184">        }</span>
+
+        public void addTarget(ComponentSpring spring, int axis) {
+<span class="fc bfc" id="L3187" title="All 2 branches covered.">            if (targets == null) {</span>
+<span class="fc" id="L3188">                targets = new ArrayList(1);</span>
+            }
+<span class="fc" id="L3190">            targets.add(spring);</span>
+<span class="fc" id="L3191">        }</span>
+
+        public void calculatePadding(int axis) {
+<span class="fc" id="L3194">            LayoutStyle p = getLayoutStyle0();</span>
+<span class="fc" id="L3195">            int maxPadding = 0;</span>
+            int position;
+<span class="fc" id="L3197">            size = 0;</span>
+<span class="fc bfc" id="L3198" title="All 2 branches covered.">            if (targets != null) {</span>
+                // Leading
+<span class="fc bfc" id="L3200" title="All 2 branches covered.">                if (axis == HORIZONTAL) {</span>
+<span class="pc bpc" id="L3201" title="1 of 2 branches missed.">                    if (isLeftToRight()) {</span>
+<span class="fc" id="L3202">                        position = WEST;</span>
+                    } else {
+<span class="nc" id="L3204">                        position = EAST;</span>
+                    }
+                } else {
+<span class="fc" id="L3207">                    position = SOUTH;</span>
+                }
+<span class="fc bfc" id="L3209" title="All 2 branches covered.">                for (int i = targets.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L3210">                    ComponentSpring targetSpring = (ComponentSpring) targets.get(i);</span>
+<span class="fc" id="L3211">                    int padding = p.getContainerGap(</span>
+<span class="fc" id="L3212">                            targetSpring.getComponent(),</span>
+<span class="fc" id="L3213">                            position, host);</span>
+<span class="fc" id="L3214">                    maxPadding = Math.max(padding, maxPadding);</span>
+<span class="fc" id="L3215">                    padding -= targetSpring.getOrigin();</span>
+<span class="fc" id="L3216">                    size = Math.max(size, padding);</span>
+                }
+            } else {
+                // Trailing
+<span class="fc bfc" id="L3220" title="All 2 branches covered.">                if (axis == HORIZONTAL) {</span>
+<span class="pc bpc" id="L3221" title="1 of 2 branches missed.">                    if (isLeftToRight()) {</span>
+<span class="fc" id="L3222">                        position = EAST;</span>
+                    } else {
+<span class="nc" id="L3224">                        position = WEST;</span>
+                    }
+                } else {
+<span class="fc" id="L3227">                    position = SOUTH;</span>
+                }
+<span class="pc bpc" id="L3229" title="1 of 2 branches missed.">                if (sources != null) {</span>
+<span class="fc bfc" id="L3230" title="All 2 branches covered.">                    for (int i = sources.size() - 1; i &gt;= 0; i--) {</span>
+<span class="fc" id="L3231">                        ComponentSpring sourceSpring = (ComponentSpring) sources.</span>
+<span class="fc" id="L3232">                                get(i);</span>
+<span class="fc" id="L3233">                        maxPadding = Math.max(maxPadding,</span>
+<span class="fc" id="L3234">                                updateSize(p, sourceSpring, position));</span>
+                    }
+<span class="nc bnc" id="L3236" title="All 2 branches missed.">                } else if (source != null) {</span>
+<span class="nc" id="L3237">                    maxPadding = updateSize(p, source, position);</span>
+                }
+            }
+<span class="pc bpc" id="L3240" title="1 of 2 branches missed.">            if (lastSize != UNSET) {</span>
+<span class="fc" id="L3241">                size += Math.min(maxPadding, lastSize);</span>
+            }
+<span class="fc" id="L3243">        }</span>
+
+        private int updateSize(LayoutStyle p, ComponentSpring sourceSpring,
+                               int position) {
+<span class="fc" id="L3247">            int padding = p.getContainerGap(</span>
+<span class="fc" id="L3248">                    sourceSpring.getComponent(), position,</span>
+<span class="fc" id="L3249">                    host);</span>
+<span class="fc" id="L3250">            int delta = Math.max(0, getParent().getSize() -</span>
+<span class="fc" id="L3251">                    sourceSpring.getSize() - sourceSpring.getOrigin());</span>
+<span class="fc" id="L3252">            size = Math.max(size, padding - delta);</span>
+<span class="fc" id="L3253">            return padding;</span>
+        }
+
+        String getMatchDescription() {
+<span class="nc bnc" id="L3257" title="All 2 branches missed.">            if (targets != null) {</span>
+<span class="nc" id="L3258">                return &quot;leading: &quot; + targets;</span>
+            }
+<span class="nc bnc" id="L3260" title="All 2 branches missed.">            if (sources != null) {</span>
+<span class="nc" id="L3261">                return &quot;trailing: &quot; + sources;</span>
+            }
+<span class="nc" id="L3263">            return &quot;--&quot;;</span>
+        }
+    }
+
+    /**
+     * Tracks the horizontal/vertical Springs for a Component.
+     * This class is also used to handle Springs that have their sizes
+     * linked.
+     */
+    private final class ComponentInfo {
+        ComponentSpring horizontalSpring;
+        ComponentSpring verticalSpring;
+        // Component being layed out
+        private Component component;
+        // If the component's size is linked to other components, the
+        // horizontalMaster and/or verticalMaster reference the group of
+        // linked components.
+        private LinkInfo horizontalMaster;
+        private LinkInfo verticalMaster;
+
+        private boolean visible;
+        private Boolean honorsVisibility;
+
+<span class="fc" id="L3286">        ComponentInfo(Component component) {</span>
+<span class="fc" id="L3287">            this.component = component;</span>
+<span class="fc" id="L3288">            updateVisibility();</span>
+<span class="fc" id="L3289">        }</span>
+
+        public void dispose() {
+            // Remove horizontal/vertical springs
+<span class="nc" id="L3293">            removeSpring(horizontalSpring);</span>
+<span class="nc" id="L3294">            horizontalSpring = null;</span>
+<span class="nc" id="L3295">            removeSpring(verticalSpring);</span>
+<span class="nc" id="L3296">            verticalSpring = null;</span>
+            // Clean up links
+<span class="nc bnc" id="L3298" title="All 2 branches missed.">            if (horizontalMaster != null) {</span>
+<span class="nc" id="L3299">                horizontalMaster.remove(this);</span>
+            }
+<span class="nc bnc" id="L3301" title="All 2 branches missed.">            if (verticalMaster != null) {</span>
+<span class="nc" id="L3302">                verticalMaster.remove(this);</span>
+            }
+<span class="nc" id="L3304">        }</span>
+
+        void setHonorsVisibility(Boolean honorsVisibility) {
+<span class="nc" id="L3307">            this.honorsVisibility = honorsVisibility;</span>
+<span class="nc" id="L3308">        }</span>
+
+        private void removeSpring(Spring spring) {
+<span class="nc bnc" id="L3311" title="All 2 branches missed.">            if (spring != null) {</span>
+<span class="nc" id="L3312">                ((Group) spring.getParent()).springs.remove(spring);</span>
+            }
+<span class="nc" id="L3314">        }</span>
+
+        public boolean isVisible() {
+<span class="fc" id="L3317">            return visible;</span>
+        }
+
+        /**
+         * Updates the cached visibility.
+         *
+         * @return true if the visibility changed
+         */
+        boolean updateVisibility() {
+            boolean honorsVisibility;
+<span class="pc bpc" id="L3327" title="1 of 2 branches missed.">            if (this.honorsVisibility == null) {</span>
+<span class="fc" id="L3328">                honorsVisibility = GroupLayout.this.getHonorsVisibility();</span>
+            } else {
+<span class="nc" id="L3330">                honorsVisibility = this.honorsVisibility.booleanValue();</span>
+            }
+<span class="pc bpc" id="L3332" title="2 of 4 branches missed.">            boolean newVisible = !honorsVisibility || component.isVisible();</span>
+<span class="fc bfc" id="L3333" title="All 2 branches covered.">            if (visible != newVisible) {</span>
+<span class="fc" id="L3334">                visible = newVisible;</span>
+<span class="fc" id="L3335">                return true;</span>
+            }
+<span class="fc" id="L3337">            return false;</span>
+        }
+
+        public void setBounds(int insetX, int insetY, int parentWidth, boolean ltr) {
+<span class="fc" id="L3341">            int x = horizontalSpring.getOrigin();</span>
+<span class="fc" id="L3342">            int w = horizontalSpring.getSize();</span>
+<span class="fc" id="L3343">            int y = verticalSpring.getOrigin();</span>
+<span class="fc" id="L3344">            int h = verticalSpring.getSize();</span>
+
+<span class="pc bpc" id="L3346" title="1 of 2 branches missed.">            if (!ltr) {</span>
+<span class="nc" id="L3347">                x = parentWidth - x - w;</span>
+            }
+<span class="fc" id="L3349">            component.setX(x + insetX);</span>
+<span class="fc" id="L3350">            component.setY(y + insetY);</span>
+<span class="fc" id="L3351">            component.setWidth(w);</span>
+<span class="fc" id="L3352">            component.setHeight(h);</span>
+<span class="fc" id="L3353">        }</span>
+
+        public Component getComponent() {
+<span class="nc" id="L3356">            return component;</span>
+        }
+
+        public void setComponent(Component component) {
+<span class="nc" id="L3360">            this.component = component;</span>
+<span class="nc bnc" id="L3361" title="All 2 branches missed.">            if (horizontalSpring != null) {</span>
+<span class="nc" id="L3362">                horizontalSpring.setComponent(component);</span>
+            }
+<span class="nc bnc" id="L3364" title="All 2 branches missed.">            if (verticalSpring != null) {</span>
+<span class="nc" id="L3365">                verticalSpring.setComponent(component);</span>
+            }
+<span class="nc" id="L3367">        }</span>
+
+        /**
+         * Returns true if this component has its size linked to
+         * other components.
+         */
+        public boolean isLinked(int axis) {
+<span class="fc bfc" id="L3374" title="All 2 branches covered.">            if (axis == HORIZONTAL) {</span>
+<span class="fc bfc" id="L3375" title="All 2 branches covered.">                return horizontalMaster != null;</span>
+            }
+            //assert (axis == VERTICAL);
+<span class="pc bpc" id="L3378" title="1 of 2 branches missed.">            return (verticalMaster != null);</span>
+        }
+
+        private void setLinkInfo(int axis, LinkInfo linkInfo) {
+<span class="pc bpc" id="L3382" title="1 of 2 branches missed.">            if (axis == HORIZONTAL) {</span>
+<span class="fc" id="L3383">                horizontalMaster = linkInfo;</span>
+            } else {
+                //assert (axis == VERTICAL);
+<span class="nc" id="L3386">                verticalMaster = linkInfo;</span>
+            }
+<span class="fc" id="L3388">        }</span>
+
+        public LinkInfo getLinkInfo(int axis) {
+<span class="fc" id="L3391">            return getLinkInfo(axis, true);</span>
+        }
+
+        private LinkInfo getLinkInfo(int axis, boolean create) {
+<span class="pc bpc" id="L3395" title="1 of 2 branches missed.">            if (axis == HORIZONTAL) {</span>
+<span class="pc bpc" id="L3396" title="1 of 4 branches missed.">                if (horizontalMaster == null &amp;&amp; create) {</span>
+                    // horizontalMaster field is directly set by adding
+                    // us to the LinkInfo.
+<span class="fc" id="L3399">                    new LinkInfo(HORIZONTAL).add(this);</span>
+                }
+<span class="fc" id="L3401">                return horizontalMaster;</span>
+            } else {
+                //assert (axis == VERTICAL);
+<span class="nc bnc" id="L3404" title="All 4 branches missed.">                if (verticalMaster == null &amp;&amp; create) {</span>
+                    // verticalMaster field is directly set by adding
+                    // us to the LinkInfo.
+<span class="nc" id="L3407">                    new LinkInfo(VERTICAL).add(this);</span>
+                }
+<span class="nc" id="L3409">                return verticalMaster;</span>
+            }
+        }
+
+        public void clearCachedSize() {
+<span class="fc bfc" id="L3414" title="All 2 branches covered.">            if (horizontalMaster != null) {</span>
+<span class="fc" id="L3415">                horizontalMaster.clearCachedSize();</span>
+            }
+<span class="pc bpc" id="L3417" title="1 of 2 branches missed.">            if (verticalMaster != null) {</span>
+<span class="nc" id="L3418">                verticalMaster.clearCachedSize();</span>
+            }
+<span class="fc" id="L3420">        }</span>
+
+        int getLinkSize(int axis, int type) {
+<span class="pc bpc" id="L3423" title="1 of 2 branches missed.">            if (axis == HORIZONTAL) {</span>
+<span class="fc" id="L3424">                return horizontalMaster.getSize(axis);</span>
+            } else {
+                //assert (axis == VERTICAL);
+<span class="nc" id="L3427">                return verticalMaster.getSize(axis);</span>
+            }
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

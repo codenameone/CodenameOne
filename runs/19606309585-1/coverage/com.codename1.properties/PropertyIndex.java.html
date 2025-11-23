@@ -1,0 +1,995 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PropertyIndex.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.properties</a> &gt; <span class="el_source">PropertyIndex.java</span></div><h1>PropertyIndex.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.properties;
+
+import com.codename1.io.Externalizable;
+import com.codename1.io.JSONParser;
+import com.codename1.io.Log;
+import com.codename1.io.Storage;
+import com.codename1.io.Util;
+import com.codename1.processing.Result;
+import com.codename1.ui.CN;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Image;
+import com.codename1.util.Base64;
+import com.codename1.util.regex.StringReader;
+import com.codename1.xml.Element;
+import com.codename1.xml.XMLWriter;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Enumeration;
+
+/**
+ * Maps the properties that are in a class/object and provides access to them so tools such as ORM
+ * can implicitly access them for us. This class also holds the class level meta-data for a specific property
+ * or class. It also provides utility level tools e.g. toString implementation etc.
+ *
+ * @author Shai Almog
+ */
+public class PropertyIndex implements Iterable&lt;PropertyBase&gt; {
+<span class="fc" id="L67">    private static final Map&lt;String, HashMap&lt;String, Object&gt;&gt; metadata = new LinkedHashMap&lt;String, HashMap&lt;String, Object&gt;&gt;();</span>
+    private final PropertyBase[] properties;
+    private final String name;
+    PropertyBusinessObject parent;
+
+    /**
+     * The constructor is essential for a proper property business object
+     *
+     * @param parent     the parent object instance
+     * @param name       the name of the parent class
+     * @param properties the list of properties in the object
+     */
+<span class="fc" id="L79">    public PropertyIndex(PropertyBusinessObject parent, String name, PropertyBase... properties) {</span>
+<span class="fc" id="L80">        this.properties = properties;</span>
+<span class="fc" id="L81">        this.parent = parent;</span>
+<span class="fc" id="L82">        this.name = name;</span>
+<span class="fc bfc" id="L83" title="All 2 branches covered.">        for (PropertyBase p : properties) {</span>
+<span class="fc" id="L84">            p.parent = this;</span>
+        }
+<span class="fc" id="L86">    }</span>
+
+    /**
+     * Writes the JSON string to storage, it's a shortcut for writing/generating the JSON
+     *
+     * @param name the name of the storage file
+     * @param objs a list of business objects
+     */
+    public static void storeJSONList(String name, List&lt;? extends PropertyBusinessObject&gt; objs) {
+        try {
+<span class="nc" id="L96">            OutputStream os = Storage.getInstance().createOutputStream(name);</span>
+<span class="nc" id="L97">            os.write(toJSONList(objs).getBytes());</span>
+<span class="nc" id="L98">            os.close();</span>
+<span class="nc" id="L99">        } catch (IOException err) {</span>
+<span class="nc" id="L100">            Log.e(err);</span>
+<span class="nc" id="L101">            throw new RuntimeException(err.toString());</span>
+<span class="nc" id="L102">        }</span>
+<span class="nc" id="L103">    }</span>
+
+    /**
+     * Creates a JSON string, containing the list of property business objects
+     *
+     * @param objs a list of business objects
+     * @return the JSON string
+     */
+    public static String toJSONList(List&lt;? extends PropertyBusinessObject&gt; objs) {
+<span class="nc" id="L112">        StringBuilder b = new StringBuilder(&quot;[&quot;);</span>
+<span class="nc" id="L113">        boolean first = true;</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        for (PropertyBusinessObject pb : objs) {</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            if (first) {</span>
+<span class="nc" id="L116">                first = false;</span>
+            } else {
+<span class="nc" id="L118">                b.append(&quot;,\n&quot;);</span>
+            }
+<span class="nc" id="L120">            b.append(pb.getPropertyIndex().toJSON());</span>
+<span class="nc" id="L121">        }</span>
+<span class="nc" id="L122">        b.append(&quot;]&quot;);</span>
+<span class="nc" id="L123">        return b.toString();</span>
+    }
+
+    /**
+     * The name of the parent business object
+     *
+     * @return a unique name for the parent
+     */
+    public String getName() {
+<span class="fc" id="L132">        return name;</span>
+    }
+
+    /**
+     * Returns a property by its name
+     *
+     * @param name the name of the property (case sensitive)
+     * @return the property or null
+     */
+    public PropertyBase get(String name) {
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        for (PropertyBase p : properties) {</span>
+<span class="fc bfc" id="L143" title="All 2 branches covered.">            if (p.getName().equals(name)) {</span>
+<span class="fc" id="L144">                return p;</span>
+            }
+        }
+<span class="nc" id="L147">        return null;</span>
+    }
+
+    /**
+     * Returns a property by its name regardless of case sensitivity for the name
+     *
+     * @param name the name of the property (case insensitive)
+     * @return the property or null
+     */
+    public PropertyBase getIgnoreCase(String name) {
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        for (PropertyBase p : properties) {</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">            if (p.getName().equalsIgnoreCase(name)) {</span>
+<span class="nc" id="L159">                return p;</span>
+            }
+        }
+<span class="nc" id="L162">        return null;</span>
+    }
+
+    /**
+     * Allows us to get an individual property within the object instance
+     *
+     * @param i the index of the property
+     * @return the property instance
+     */
+    public PropertyBase get(int i) {
+<span class="nc" id="L172">        return properties[i];</span>
+    }
+
+    /**
+     * The number of properties in the class
+     *
+     * @return number of properties in the class
+     */
+    public int getSize() {
+<span class="nc" id="L181">        return properties.length;</span>
+    }
+
+    /**
+     * Allows us to traverse the properties with a for-each statement
+     *
+     * @return an iterator instance
+     */
+    public Iterator&lt;PropertyBase&gt; iterator() {
+<span class="fc" id="L190">        return new Iterator&lt;PropertyBase&gt;() {</span>
+<span class="fc" id="L191">            int off = 0;</span>
+
+            public boolean hasNext() {
+<span class="fc bfc" id="L194" title="All 2 branches covered.">                return off &lt; properties.length;</span>
+            }
+
+            public void remove() {
+<span class="nc" id="L198">            }</span>
+
+            public PropertyBase next() {
+<span class="fc" id="L201">                int i = off;</span>
+<span class="fc" id="L202">                off++;</span>
+<span class="fc" id="L203">                return properties[i];</span>
+            }
+        };
+    }
+
+    private HashMap&lt;String, Object&gt; getProps() {
+<span class="fc" id="L209">        HashMap&lt;String, Object&gt; m = metadata.get(parent.getClass().getName());</span>
+<span class="fc bfc" id="L210" title="All 2 branches covered.">        if (m == null) {</span>
+<span class="fc" id="L211">            m = new HashMap&lt;String, Object&gt;();</span>
+<span class="fc" id="L212">            metadata.put(parent.getClass().getName(), m);</span>
+        }
+<span class="fc" id="L214">        return m;</span>
+    }
+
+    /**
+     * Allows us to fetch class meta data not to be confused with standard properties
+     *
+     * @param meta the meta data unique name
+     * @return the object instance
+     */
+    public Object getMetaDataOfClass(String meta) {
+<span class="fc" id="L224">        return getProps().get(meta);</span>
+    }
+
+    /**
+     * Sets class specific metadata
+     *
+     * @param meta the name of the meta data
+     * @param o    object value for the meta data
+     */
+    public void putMetaDataOfClass(String meta, Object o) {
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        if (o == null) {</span>
+<span class="fc" id="L235">            getProps().remove(meta);</span>
+        } else {
+<span class="fc" id="L237">            getProps().put(meta, o);</span>
+        }
+<span class="fc" id="L239">    }</span>
+
+    /**
+     * Returns a user readable printout of the property values which is useful for debugging
+     *
+     * @return user readable printout of the property values which is useful for debugging
+     */
+    public String toString() {
+<span class="nc" id="L247">        return toString(true);</span>
+    }
+
+    /**
+     * Returns a user readable printout of the property values which is useful for debugging
+     *
+     * @param includeNewline true to indicate that newline characters should be included
+     * @return user readable printout of the property values which is useful for debugging
+     */
+    public String toString(boolean includeNewline) {
+<span class="nc" id="L257">        StringBuilder b = new StringBuilder(name);</span>
+<span class="nc" id="L258">        b.append(&quot; : {&quot;);</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        if (includeNewline) {</span>
+<span class="nc" id="L260">            b.append('\n');</span>
+        }
+<span class="nc bnc" id="L262" title="All 2 branches missed.">        for (PropertyBase p : this) {</span>
+<span class="nc" id="L263">            b.append(p.getName());</span>
+<span class="nc" id="L264">            b.append(&quot; = &quot;);</span>
+<span class="nc" id="L265">            b.append(p);</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">            if (includeNewline) {</span>
+<span class="nc" id="L267">                b.append('\n');</span>
+            }
+<span class="nc" id="L269">        }</span>
+<span class="nc" id="L270">        b.append(&quot;}&quot;);</span>
+<span class="nc" id="L271">        return b.toString();</span>
+    }
+
+    /**
+     * This is useful for JSON parsing, it allows converting JSON map data to objects
+     *
+     * @param m the map
+     */
+    public void populateFromMap(Map&lt;String, Object&gt; m) {
+<span class="fc" id="L280">        populateFromMap(m, null);</span>
+<span class="fc" id="L281">    }</span>
+
+    private Object listParse(List l, Class&lt;? extends PropertyBusinessObject&gt; recursiveType) throws InstantiationException, IllegalAccessException {
+<span class="nc" id="L284">        ArrayList al = new ArrayList();</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">        for (Object o : l) {</span>
+<span class="nc bnc" id="L286" title="All 2 branches missed.">            if (o instanceof Map) {</span>
+<span class="nc" id="L287">                PropertyBusinessObject po = (PropertyBusinessObject)recursiveType.newInstance();</span>
+<span class="nc" id="L288">                po.getPropertyIndex().populateFromMap((Map&lt;String, Object&gt;) o, recursiveType);</span>
+<span class="nc" id="L289">                al.add(po);</span>
+<span class="nc" id="L290">                continue;</span>
+            }
+<span class="nc bnc" id="L292" title="All 2 branches missed.">            if (o instanceof List) {</span>
+<span class="nc" id="L293">                al.add(listParse((List) o, recursiveType));</span>
+<span class="nc" id="L294">                continue;</span>
+            }
+<span class="nc" id="L296">            al.add(o);</span>
+<span class="nc" id="L297">        }</span>
+<span class="nc" id="L298">        return al;</span>
+    }
+
+    /**
+     * Sets one of the builtin simple objects into a property
+     *
+     * @param p   the property base
+     * @param val the object value
+     * @return true if successful
+     */
+    public boolean setSimpleObject(PropertyBase p, Object val) {
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">        if (val == null) {</span>
+<span class="nc" id="L310">            p.setImpl(null);</span>
+<span class="nc" id="L311">            return true;</span>
+        }
+<span class="pc bpc" id="L313" title="1 of 4 branches missed.">        if (p.getGenericType() == null || p.getGenericType() == String.class) {</span>
+<span class="fc" id="L314">            p.setImpl(val.toString());</span>
+<span class="fc" id="L315">            return true;</span>
+        }
+<span class="fc bfc" id="L317" title="All 2 branches covered.">        if (p instanceof IntProperty) {</span>
+<span class="fc" id="L318">            p.setImpl(Util.toIntValue(val));</span>
+<span class="fc" id="L319">            return true;</span>
+        }
+<span class="pc bpc" id="L321" title="1 of 2 branches missed.">        if (p instanceof BooleanProperty) {</span>
+<span class="nc" id="L322">            p.setImpl(Util.toBooleanValue(val));</span>
+<span class="nc" id="L323">            return true;</span>
+        }
+<span class="pc bpc" id="L325" title="1 of 2 branches missed.">        if (p instanceof LongProperty) {</span>
+<span class="nc" id="L326">            p.setImpl(Util.toLongValue(val));</span>
+<span class="nc" id="L327">            return true;</span>
+        }
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">        if (p instanceof FloatProperty) {</span>
+<span class="nc" id="L330">            p.setImpl(Util.toFloatValue(val));</span>
+<span class="nc" id="L331">            return true;</span>
+        }
+<span class="pc bpc" id="L333" title="1 of 2 branches missed.">        if (p instanceof DoubleProperty) {</span>
+<span class="nc" id="L334">            p.setImpl(Util.toDoubleValue(val));</span>
+<span class="nc" id="L335">            return true;</span>
+        }
+<span class="pc bpc" id="L337" title="2 of 4 branches missed.">        if (p.getGenericType() == Image.class || p.getGenericType() == EncodedImage.class) {</span>
+<span class="nc bnc" id="L338" title="All 2 branches missed.">            if (val instanceof Image) {</span>
+<span class="nc" id="L339">                p.setImpl(val);</span>
+            } else {
+<span class="nc bnc" id="L341" title="All 2 branches missed.">                if (val instanceof byte[]) {</span>
+<span class="nc" id="L342">                    p.setImpl(EncodedImage.create((byte[]) val));</span>
+                } else {
+<span class="nc" id="L344">                    p.setImpl(EncodedImage.create(Base64.decode(((String) val).getBytes())));</span>
+                }
+            }
+<span class="nc" id="L347">            return true;</span>
+        }
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">        if (p.getGenericType() == Date.class) {</span>
+<span class="fc" id="L350">            p.setImpl(Util.toDateValue(val));</span>
+<span class="fc" id="L351">            return true;</span>
+        }
+<span class="nc" id="L353">        return false;</span>
+    }
+
+    /**
+     * This is useful for JSON parsing, it allows converting JSON map data to objects
+     *
+     * @param m             the map
+     * @param recursiveType when running into map types we create this object type
+     */
+    public void populateFromMap(Map&lt;String, Object&gt; m, Class&lt;? extends PropertyBusinessObject&gt; recursiveType) {
+        try {
+<span class="fc bfc" id="L364" title="All 2 branches covered.">            for (PropertyBase p : this) {</span>
+<span class="fc" id="L365">                MapAdapter ma = MapAdapter.checkInstance(p);</span>
+<span class="pc bpc" id="L366" title="1 of 2 branches missed.">                if (ma != null) {</span>
+<span class="nc" id="L367">                    ma.setFromMap(p, m);</span>
+<span class="nc" id="L368">                    continue;</span>
+                }
+<span class="fc" id="L370">                Object val = m.get(p.getName());</span>
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">                if (val != null) {</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">                    if (val instanceof List) {</span>
+<span class="pc bpc" id="L373" title="1 of 2 branches missed.">                        if (p instanceof CollectionProperty) {</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">                            if (recursiveType != null) {</span>
+<span class="pc bpc" id="L375" title="1 of 2 branches missed.">                                if (p != null) {</span>
+<span class="fc" id="L376">                                    ((CollectionProperty) p).clear();</span>
+                                }
+<span class="fc bfc" id="L378" title="All 2 branches covered.">                                for (Object e : (Collection) val) {</span>
+<span class="fc bfc" id="L379" title="All 2 branches covered.">                                    if (e instanceof Map) {</span>
+<span class="fc" id="L380">                                        Class eType = p.getGenericType();</span>
+                                        // maybe don't use recursiveType here anymore???
+                                        // elementType is usually sufficient...
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">                                        Class type = (eType == null) ? recursiveType : eType;</span>
+<span class="fc" id="L384">                                        PropertyBusinessObject po = (PropertyBusinessObject) type.newInstance();</span>
+<span class="fc" id="L385">                                        po.getPropertyIndex().populateFromMap((Map&lt;String, Object&gt;) e, type);</span>
+<span class="fc" id="L386">                                        ((CollectionProperty) p).add(po);</span>
+<span class="fc" id="L387">                                        continue;</span>
+                                    }
+<span class="pc bpc" id="L389" title="1 of 2 branches missed.">                                    if (e instanceof List) {</span>
+<span class="nc" id="L390">                                        ((CollectionProperty) p).add(listParse((List) e, recursiveType));</span>
+<span class="nc" id="L391">                                        continue;</span>
+                                    }
+<span class="fc" id="L393">                                    ((CollectionProperty) p).add(e);</span>
+<span class="fc" id="L394">                                }</span>
+                            } else {
+<span class="fc" id="L396">                                List l = (List) val;</span>
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">                                if (!l.isEmpty()) {</span>
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">                                    if (l.get(0) instanceof PropertyBusinessObject</span>
+<span class="fc bfc" id="L399" title="All 2 branches covered.">                                            || l.get(0) instanceof String</span>
+<span class="pc bpc" id="L400" title="1 of 2 branches missed.">                                            || l.get(0) instanceof Character</span>
+<span class="pc bpc" id="L401" title="1 of 2 branches missed.">                                            || l.get(0) instanceof Boolean</span>
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">                                            || l.get(0) instanceof Integer</span>
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">                                            || l.get(0) instanceof Long</span>
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">                                            || l.get(0) instanceof Float</span>
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">                                            || l.get(0) instanceof Double</span>
+<span class="pc bpc" id="L406" title="1 of 2 branches missed.">                                            || l.get(0) instanceof Byte</span>
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">                                            || l.get(0) instanceof Short</span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">                                            || p.getGenericType() == null) {</span>
+<span class="fc" id="L409">                                        ((CollectionProperty) p).set((Collection) val);</span>
+                                    } else {
+<span class="fc" id="L411">                                        Class eType = p.getGenericType();</span>
+<span class="fc bfc" id="L412" title="All 2 branches covered.">                                        for (Object e : l) {</span>
+<span class="fc" id="L413">                                            PropertyBusinessObject po = (PropertyBusinessObject) eType.newInstance();</span>
+<span class="fc" id="L414">                                            po.getPropertyIndex().populateFromMap((Map&lt;String, Object&gt;) e, eType);</span>
+<span class="fc" id="L415">                                            ((CollectionProperty) p).add(po);</span>
+<span class="fc" id="L416">                                        }</span>
+<span class="fc" id="L417">                                    }</span>
+                                } else {
+<span class="nc" id="L419">                                    ((CollectionProperty) p).set((Collection) val);</span>
+                                }
+<span class="fc" id="L421">                            }</span>
+                        }
+                        continue;
+                    }
+
+<span class="fc bfc" id="L426" title="All 2 branches covered.">                    if (val instanceof Map) {</span>
+<span class="fc bfc" id="L427" title="All 2 branches covered.">                        if (p instanceof MapProperty) {</span>
+<span class="fc" id="L428">                            ((MapProperty) p).clear();</span>
+<span class="fc" id="L429">                            Map mapVal = (Map) val;</span>
+<span class="fc bfc" id="L430" title="All 2 branches covered.">                            for (Object entryObj : mapVal.entrySet()) {</span>
+<span class="fc" id="L431">                                Map.Entry entry = (Map.Entry) entryObj;</span>
+<span class="fc" id="L432">                                Object k = entry.getKey();</span>
+<span class="fc" id="L433">                                Object value = entry.getValue();</span>
+<span class="fc" id="L434">                                Class keyType = ((MapProperty) p).getKeyType();</span>
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">                                if (keyType != null &amp;&amp;</span>
+<span class="pc bpc" id="L436" title="1 of 2 branches missed.">                                        PropertyBusinessObject.class.isAssignableFrom(keyType)) {</span>
+<span class="nc" id="L437">                                    PropertyBusinessObject po = (PropertyBusinessObject) keyType.newInstance();</span>
+<span class="nc" id="L438">                                    po.getPropertyIndex().populateFromMap((Map&lt;String, Object&gt;) val, keyType);</span>
+<span class="nc" id="L439">                                    k = po;</span>
+                                }
+<span class="fc" id="L441">                                Class valueType = ((MapProperty) p).getValueType();</span>
+<span class="pc bpc" id="L442" title="1 of 2 branches missed.">                                if (valueType != null &amp;&amp;</span>
+<span class="pc bpc" id="L443" title="1 of 2 branches missed.">                                        PropertyBusinessObject.class.isAssignableFrom(valueType)) {</span>
+<span class="nc" id="L444">                                    Map&lt;String, Object&gt; contentMap = (Map&lt;String, Object&gt;) val;</span>
+<span class="nc bnc" id="L445" title="All 2 branches missed.">                                    for (Map.Entry&lt;String, Object&gt; contentEntry : contentMap.entrySet()) {</span>
+<span class="nc" id="L446">                                        String kk = contentEntry.getKey();</span>
+<span class="nc" id="L447">                                        PropertyBusinessObject po = (PropertyBusinessObject) valueType.newInstance();</span>
+<span class="nc" id="L448">                                        Map&lt;String, Object&gt; vv = (Map&lt;String, Object&gt;) contentEntry.getValue();</span>
+<span class="nc" id="L449">                                        po.getPropertyIndex().populateFromMap(vv, valueType);</span>
+<span class="nc" id="L450">                                        ((MapProperty) p).set(kk, po);</span>
+<span class="nc" id="L451">                                    }</span>
+<span class="nc" id="L452">                                    continue;</span>
+                                } else {
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">                                    if (value instanceof Map) {</span>
+<span class="nc" id="L455">                                        PropertyBusinessObject po = (PropertyBusinessObject) p.get();</span>
+<span class="nc" id="L456">                                        po.getPropertyIndex().populateFromMap((Map&lt;String, Object&gt;) value, recursiveType);</span>
+<span class="nc" id="L457">                                        ((MapProperty) p).set(k, po);</span>
+<span class="nc" id="L458">                                        continue;</span>
+                                    }
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">                                    if (value instanceof List) {</span>
+<span class="nc" id="L461">                                        ((MapProperty) p).set(k, listParse((List) value, recursiveType));</span>
+<span class="nc" id="L462">                                        continue;</span>
+                                    }
+                                }
+<span class="fc" id="L465">                                ((MapProperty) p).set(k, value);</span>
+<span class="fc" id="L466">                            }</span>
+<span class="fc" id="L467">                            continue;</span>
+                        } else {
+<span class="pc bpc" id="L469" title="1 of 2 branches missed.">                            if (p.get() instanceof PropertyBusinessObject) {</span>
+<span class="fc" id="L470">                                PropertyBusinessObject po = (PropertyBusinessObject) p.get();</span>
+<span class="fc" id="L471">                                po.getPropertyIndex().populateFromMap((Map&lt;String, Object&gt;) val, recursiveType);</span>
+<span class="fc" id="L472">                            } else {</span>
+<span class="nc bnc" id="L473" title="All 2 branches missed.">                                if (p.getGenericType() != null) {</span>
+<span class="nc" id="L474">                                    Object o = p.getGenericType().newInstance();</span>
+<span class="nc bnc" id="L475" title="All 2 branches missed.">                                    if (o instanceof PropertyBusinessObject) {</span>
+<span class="nc" id="L476">                                        ((PropertyBusinessObject) o).getPropertyIndex().populateFromMap((Map&lt;String, Object&gt;) val);</span>
+<span class="nc" id="L477">                                        p.setImpl(o);</span>
+                                    }
+<span class="nc" id="L479">                                } else {</span>
+<span class="nc bnc" id="L480" title="All 2 branches missed.">                                    if (recursiveType != null) {</span>
+<span class="nc" id="L481">                                        PropertyBusinessObject po = (PropertyBusinessObject) recursiveType.newInstance();</span>
+<span class="nc" id="L482">                                        po.getPropertyIndex().populateFromMap((Map&lt;String, Object&gt;) val, recursiveType);</span>
+<span class="nc" id="L483">                                        p.setImpl(po);</span>
+<span class="nc" id="L484">                                    }</span>
+                                }
+                            }
+                        }
+                        continue;
+                    }
+<span class="pc bpc" id="L490" title="1 of 2 branches missed.">                    if (setSimpleObject(p, val)) {</span>
+<span class="fc" id="L491">                        continue;</span>
+                    }
+<span class="nc" id="L493">                    p.setImpl(val);</span>
+                }
+<span class="nc" id="L495">            }</span>
+<span class="nc" id="L496">        } catch (InstantiationException err) {</span>
+<span class="nc" id="L497">            Log.e(err);</span>
+<span class="nc" id="L498">            throw new RuntimeException(&quot;Can't create instanceof class: &quot; + err);</span>
+<span class="nc" id="L499">        } catch (IllegalAccessException err) {</span>
+<span class="nc" id="L500">            Log.e(err);</span>
+<span class="nc" id="L501">            throw new RuntimeException(&quot;Can't create instanceof class: &quot; + err);</span>
+<span class="fc" id="L502">        }</span>
+<span class="fc" id="L503">    }</span>
+
+    /**
+     * This is useful in converting a property object to JSON
+     *
+     * @return a map representation of the properties
+     */
+    public Map&lt;String, Object&gt; toMapRepresentation() {
+<span class="fc" id="L511">        return toMapRepresentationImpl(&quot;mapExclude&quot;);</span>
+    }
+
+    /**
+     * This is useful in converting a property object to JSON
+     *
+     * @return a map representation of the properties
+     */
+    private Map&lt;String, Object&gt; toMapRepresentationImpl(String excludeFlag) {
+<span class="fc" id="L520">        Map&lt;String, Object&gt; m = new LinkedHashMap&lt;String, Object&gt;();</span>
+<span class="fc bfc" id="L521" title="All 2 branches covered.">        for (PropertyBase p : this) {</span>
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">            if (p.getClientProperty(excludeFlag) != null) {</span>
+<span class="nc" id="L523">                continue;</span>
+            }
+<span class="fc" id="L525">            MapAdapter ma = MapAdapter.checkInstance(p);</span>
+<span class="pc bpc" id="L526" title="1 of 2 branches missed.">            if (ma != null) {</span>
+<span class="nc" id="L527">                ma.placeInMap(p, m);</span>
+<span class="nc" id="L528">                continue;</span>
+            }
+<span class="fc bfc" id="L530" title="All 2 branches covered.">            if (p instanceof MapProperty) {</span>
+<span class="fc" id="L531">                MapProperty pp = (MapProperty) p;</span>
+<span class="fc" id="L532">                m.put(p.getName(), pp.asExplodedMap());</span>
+<span class="fc" id="L533">                continue;</span>
+            }
+<span class="fc bfc" id="L535" title="All 2 branches covered.">            if (p instanceof CollectionProperty) {</span>
+<span class="fc" id="L536">                CollectionProperty pp = (CollectionProperty) p;</span>
+<span class="fc" id="L537">                m.put(p.getName(), pp.asExplodedList());</span>
+<span class="fc" id="L538">                continue;</span>
+            }
+<span class="pc bpc" id="L540" title="1 of 2 branches missed.">            if (p instanceof Property) {</span>
+<span class="fc" id="L541">                Property pp = (Property) p;</span>
+<span class="pc bpc" id="L542" title="1 of 2 branches missed.">                if (pp.get() != null) {</span>
+<span class="fc bfc" id="L543" title="All 4 branches covered.">                    if (pp.getGenericType() != null &amp;&amp; PropertyBusinessObject.class.isAssignableFrom(pp.getGenericType())) {</span>
+<span class="fc" id="L544">                        m.put(p.getName(), ((PropertyBusinessObject) pp.get()).getPropertyIndex().toMapRepresentationImpl(excludeFlag));</span>
+                    } else {
+<span class="fc" id="L546">                        m.put(p.getName(), pp.get());</span>
+                    }
+                }
+            }
+<span class="fc" id="L550">        }</span>
+<span class="fc" id="L551">        return m;</span>
+    }
+
+    /**
+     * Converts the object to a JSON representation
+     *
+     * @return a JSON String
+     */
+    public String toJSON() {
+<span class="fc" id="L560">        return Result.fromContent(toMapRepresentationImpl(&quot;jsonExclude&quot;)).toString();</span>
+    }
+
+    /**
+     * Returns an element object mapping to the current object hierarchy similar
+     * to the map object
+     *
+     * @return an XML parser element
+     */
+    public Element asElement() {
+<span class="fc" id="L570">        return new PropertyXMLElement(this);</span>
+    }
+
+    /**
+     * Converts the object to an XML representation
+     *
+     * @return an XML String
+     */
+    public String toXML() {
+<span class="fc" id="L579">        XMLWriter w = new XMLWriter(true);</span>
+<span class="fc" id="L580">        return w.toXML(asElement());</span>
+    }
+
+    /**
+     * Toggles whether a given property should act as a text element for this
+     * object
+     *
+     * @param p the property that should act as a text element
+     * @param t true to activate the text element false to remove it
+     */
+    public void setXmlTextElement(PropertyBase p, boolean t) {
+<span class="fc bfc" id="L591" title="All 2 branches covered.">        if (t) {</span>
+<span class="fc" id="L592">            p.putClientProperty(&quot;xmlTextElement&quot;, Boolean.TRUE);</span>
+        } else {
+<span class="fc" id="L594">            p.putClientProperty(&quot;xmlTextElement&quot;, null);</span>
+        }
+<span class="fc" id="L596">    }</span>
+
+    /**
+     * Toggles whether a given property should act as a text element for this
+     * object
+     *
+     * @param p the property
+     * @return true if this is a text element
+     */
+    public boolean isXmlTextElement(PropertyBase p) {
+<span class="fc" id="L606">        Boolean b = (Boolean) p.getClientProperty(&quot;xmlTextElement&quot;);</span>
+<span class="pc bpc" id="L607" title="1 of 4 branches missed.">        return b != null &amp;&amp; b.booleanValue();</span>
+    }
+
+    /**
+     * Returns the property that contains the XML text e.g. {@code &lt;xmltag&gt;property value&lt;/xmltag&gt;}
+     *
+     * @return the property representing text XML or null if no such property was set
+     */
+    public PropertyBase getXmlTextElement() {
+<span class="fc bfc" id="L616" title="All 2 branches covered.">        for (PropertyBase b : this) {</span>
+<span class="fc bfc" id="L617" title="All 2 branches covered.">            if (isXmlTextElement(b)) {</span>
+<span class="fc" id="L618">                return b;</span>
+            }
+<span class="fc" id="L620">        }</span>
+<span class="fc" id="L621">        return null;</span>
+    }
+
+    /**
+     * Converts the XML element to this object hierarchy
+     *
+     * @param e the element
+     */
+    public void fromXml(Element e) {
+<span class="fc" id="L630">        Hashtable atts = e.getAttributes();</span>
+<span class="pc bpc" id="L631" title="1 of 2 branches missed.">        if (atts != null) {</span>
+<span class="fc bfc" id="L632" title="All 2 branches covered.">            for (Enumeration keys = atts.keys(); keys.hasMoreElements();) {</span>
+<span class="fc" id="L633">                Object a = keys.nextElement();</span>
+<span class="fc" id="L634">                PropertyBase pb = get((String) a);</span>
+<span class="pc bpc" id="L635" title="1 of 2 branches missed.">                if (pb != null) {</span>
+<span class="fc" id="L636">                    setSimpleObject(pb, atts.get(a));</span>
+                }
+<span class="fc" id="L638">            }</span>
+        }
+<span class="fc" id="L640">        int cc = e.getNumChildren();</span>
+<span class="pc bpc" id="L641" title="1 of 2 branches missed.">        for (int iter = 0; iter &lt; cc; iter++) {</span>
+<span class="nc" id="L642">            Element chld = e.getChildAt(iter);</span>
+<span class="nc bnc" id="L643" title="All 2 branches missed.">            if (chld.isTextElement()) {</span>
+<span class="nc" id="L644">                PropertyBase pt = getXmlTextElement();</span>
+<span class="nc bnc" id="L645" title="All 2 branches missed.">                if (pt != null) {</span>
+<span class="nc" id="L646">                    String t = chld.getText();</span>
+<span class="nc" id="L647">                    pt.setImpl(t);</span>
+<span class="nc" id="L648">                }</span>
+                continue;
+            }
+<span class="nc" id="L651">            PropertyBase pb = get(chld.getTagName());</span>
+<span class="nc" id="L652">            Class cls = pb.getGenericType();</span>
+<span class="nc bnc" id="L653" title="All 2 branches missed.">            if (cls.isAssignableFrom(PropertyBusinessObject.class)) {</span>
+                try {
+<span class="nc" id="L655">                    PropertyBusinessObject business = (PropertyBusinessObject) cls.newInstance();</span>
+<span class="nc" id="L656">                    business.getPropertyIndex().fromXml(chld);</span>
+<span class="nc bnc" id="L657" title="All 2 branches missed.">                    if (pb instanceof ListProperty) {</span>
+<span class="nc" id="L658">                        ((ListProperty) pb).add(business);</span>
+                    } else {
+<span class="nc" id="L660">                        pb.setImpl(business);</span>
+                    }
+<span class="nc" id="L662">                } catch (InstantiationException ex) {</span>
+<span class="nc" id="L663">                    Log.e(ex);</span>
+<span class="nc" id="L664">                } catch (IllegalAccessException ex) {</span>
+<span class="nc" id="L665">                    Log.e(ex);</span>
+<span class="nc" id="L666">                }</span>
+            }
+        }
+<span class="fc" id="L669">    }</span>
+
+    /**
+     * This method works similarly to a constructor, it accepts the values for the properties in the order
+     * they appear within the index
+     *
+     * @param values values of properties in the order they appear in the index
+     */
+    public void init(Object... values) {
+<span class="fc" id="L678">        int offset = 0;</span>
+<span class="fc bfc" id="L679" title="All 2 branches covered.">        for (PropertyBase pb : properties) {</span>
+<span class="fc bfc" id="L680" title="All 2 branches covered.">            if (pb instanceof CollectionProperty) {</span>
+<span class="pc bpc" id="L681" title="1 of 2 branches missed.">                if (values[offset] instanceof Object[]) {</span>
+<span class="nc" id="L682">                    ((CollectionProperty) pb).addAll(Arrays.asList((Object[]) values[offset]));</span>
+                } else {
+<span class="fc" id="L684">                    ((CollectionProperty) pb).addAll((Collection) values[offset]);</span>
+                }
+            } else {
+<span class="fc" id="L687">                pb.setImpl(values[offset]);</span>
+            }
+<span class="fc" id="L689">            offset++;</span>
+        }
+<span class="fc" id="L691">    }</span>
+
+    /**
+     * Writes the JSON string to storage, it's a shortcut for writing/generating the JSON
+     *
+     * @param name the name of the storage file
+     */
+    public void storeJSON(String name) {
+        try {
+<span class="nc" id="L700">            OutputStream os = Storage.getInstance().createOutputStream(name);</span>
+<span class="nc" id="L701">            os.write(toJSON().getBytes(&quot;UTF-8&quot;));</span>
+<span class="nc" id="L702">            os.close();</span>
+<span class="nc" id="L703">        } catch (IOException err) {</span>
+<span class="nc" id="L704">            Log.e(err);</span>
+<span class="nc" id="L705">            throw new RuntimeException(err.toString());</span>
+<span class="nc" id="L706">        }</span>
+<span class="nc" id="L707">    }</span>
+
+    /**
+     * Loads JSON containing a list of property objects of this type
+     *
+     * @param name the name of the storage
+     * @return list of property objects matching this type
+     */
+    public &lt;X extends PropertyBusinessObject&gt; List&lt;X&gt; loadJSONList(String name) {
+        try {
+<span class="nc bnc" id="L717" title="All 2 branches missed.">            if (Storage.getInstance().exists(name)) {</span>
+<span class="nc" id="L718">                return loadJSONList(Storage.getInstance().createInputStream(name));</span>
+            }
+<span class="nc" id="L720">            InputStream is = CN.getResourceAsStream(&quot;/&quot; + name);</span>
+<span class="nc" id="L721">            return loadJSONList(is);</span>
+<span class="nc" id="L722">        } catch (IOException err) {</span>
+<span class="nc" id="L723">            Log.e(err);</span>
+<span class="nc" id="L724">            throw new RuntimeException(err.toString());</span>
+        }
+    }
+
+    /**
+     * Loads JSON containing a list of property objects of this type
+     *
+     * @param stream the input stream
+     * @return list of property objects matching this type
+     */
+    public &lt;X extends PropertyBusinessObject&gt; List&lt;X&gt; loadJSONList(InputStream stream)
+            throws IOException {
+<span class="nc" id="L736">        JSONParser jp = new JSONParser();</span>
+<span class="nc" id="L737">        jp.setUseBooleanInstance(true);</span>
+<span class="nc" id="L738">        jp.setUseLongsInstance(true);</span>
+<span class="nc" id="L739">        List&lt;X&gt; response = new ArrayList&lt;X&gt;();</span>
+<span class="nc" id="L740">        Map&lt;String, Object&gt; result = jp.parseJSON(new InputStreamReader(stream, &quot;UTF-8&quot;));</span>
+<span class="nc" id="L741">        List&lt;Map&gt; entries = (List&lt;Map&gt;) result.get(&quot;root&quot;);</span>
+<span class="nc bnc" id="L742" title="All 2 branches missed.">        for (Map m : entries) {</span>
+<span class="nc" id="L743">            X pb = (X) newInstance();</span>
+<span class="nc" id="L744">            pb.getPropertyIndex().populateFromMap(m, parent.getClass());</span>
+<span class="nc" id="L745">            response.add(pb);</span>
+<span class="nc" id="L746">        }</span>
+<span class="nc" id="L747">        return response;</span>
+    }
+
+    /**
+     * Creates a new instance of the parent class
+     *
+     * @return an instance of the parent class or null if this failed
+     */
+    public PropertyBusinessObject newInstance() {
+        try {
+<span class="nc" id="L757">            return (PropertyBusinessObject) parent.getClass().newInstance();</span>
+<span class="nc" id="L758">        } catch (Exception err) {</span>
+<span class="nc" id="L759">            Log.e(err);</span>
+<span class="nc" id="L760">            return null;</span>
+        }
+    }
+
+    /**
+     * Populates the object from a JSON string
+     *
+     * @param jsonString the JSON String
+     */
+    public void fromJSON(String jsonString) {
+        try {
+<span class="fc" id="L771">            StringReader r = new StringReader(jsonString);</span>
+<span class="fc" id="L772">            JSONParser jp = new JSONParser();</span>
+<span class="fc" id="L773">            jp.setUseBooleanInstance(true);</span>
+<span class="fc" id="L774">            jp.setUseLongsInstance(true);</span>
+<span class="fc" id="L775">            populateFromMap(jp.parseJSON(r), parent.getClass());</span>
+<span class="nc" id="L776">        } catch (IOException err) {</span>
+<span class="nc" id="L777">            Log.e(err);</span>
+<span class="nc" id="L778">            throw new RuntimeException(err.toString());</span>
+<span class="fc" id="L779">        }</span>
+<span class="fc" id="L780">    }</span>
+
+    /**
+     * Loads JSON for the object from storage with the given name if it exists. If the storage
+     * file doesn't exist getResources() will be used to find a default JSON file in the root
+     * of the package
+     *
+     * @param name the name of the storage
+     */
+    public void loadJSON(String name) {
+        try {
+<span class="nc bnc" id="L791" title="All 2 branches missed.">            if (Storage.getInstance().exists(name)) {</span>
+<span class="nc" id="L792">                loadJSON(Storage.getInstance().createInputStream(name));</span>
+            } else {
+<span class="nc" id="L794">                InputStream is = CN.getResourceAsStream(&quot;/&quot; + name);</span>
+<span class="nc bnc" id="L795" title="All 2 branches missed.">                if (is != null) {</span>
+<span class="nc" id="L796">                    loadJSON(is);</span>
+                } else {
+<span class="nc" id="L798">                    throw new IOException(&quot;Storage file not found: &quot; + name);</span>
+                }
+            }
+<span class="nc" id="L801">        } catch (IOException err) {</span>
+<span class="nc" id="L802">            Log.e(err);</span>
+<span class="nc" id="L803">            throw new RuntimeException(err.toString());</span>
+<span class="nc" id="L804">        }</span>
+<span class="nc" id="L805">    }</span>
+
+    /**
+     * Loads JSON for the object from the given input stream
+     *
+     * @param stream the input stream containing the JSON file
+     */
+    public void loadJSON(InputStream stream) throws IOException {
+<span class="nc" id="L813">        JSONParser jp = new JSONParser();</span>
+<span class="nc" id="L814">        jp.setUseBooleanInstance(true);</span>
+<span class="nc" id="L815">        jp.setUseLongsInstance(true);</span>
+<span class="nc" id="L816">        populateFromMap(jp.parseJSON(new InputStreamReader(stream, &quot;UTF-8&quot;)), parent.getClass());</span>
+<span class="nc" id="L817">    }</span>
+
+    /**
+     * Returns true if the given object equals the property index
+     *
+     * @param o the object
+     * @return true if equals
+     */
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L826" title="All 2 branches missed.">        if (o instanceof PropertyIndex) {</span>
+<span class="nc" id="L827">            PropertyIndex other = (PropertyIndex) o;</span>
+<span class="nc bnc" id="L828" title="All 2 branches missed.">            if (parent == other.parent) {</span>
+<span class="nc" id="L829">                return true;</span>
+            }
+<span class="nc bnc" id="L831" title="All 2 branches missed.">            if (parent.getClass() != other.parent.getClass()) {</span>
+<span class="nc" id="L832">                return false;</span>
+            }
+<span class="nc bnc" id="L834" title="All 2 branches missed.">            if (properties.length == other.properties.length) {</span>
+<span class="nc bnc" id="L835" title="All 2 branches missed.">                for (int iter = 0; iter &lt; properties.length; iter++) {</span>
+<span class="nc bnc" id="L836" title="All 2 branches missed.">                    if (!properties[iter].equals(other.properties[iter])) {</span>
+<span class="nc" id="L837">                        return false;</span>
+                    }
+                }
+<span class="nc" id="L840">                return true;</span>
+            }
+        }
+<span class="nc bnc" id="L843" title="All 2 branches missed.">        if (o instanceof PropertyBusinessObject) {</span>
+<span class="nc" id="L844">            return equals(((PropertyBusinessObject) o).getPropertyIndex());</span>
+        }
+<span class="nc" id="L846">        return false;</span>
+    }
+
+    /**
+     * The hashcode of the object
+     *
+     * @return a composite of the hashcodes of the properties
+     */
+    @Override
+    public int hashCode() {
+<span class="nc" id="L856">        int value = 0;</span>
+<span class="nc bnc" id="L857" title="All 2 branches missed.">        for (int iter = 0; iter &lt; properties.length; iter++) {</span>
+<span class="nc bnc" id="L858" title="All 2 branches missed.">            if (properties[iter] instanceof Property) {</span>
+<span class="nc" id="L859">                Object v = properties[iter].get();</span>
+<span class="nc bnc" id="L860" title="All 2 branches missed.">                if (v != null) {</span>
+<span class="nc" id="L861">                    int b = v.hashCode();</span>
+<span class="nc" id="L862">                    value = 31 * value + (b ^ (b &gt;&gt;&gt; 32));</span>
+                }
+            }
+        }
+<span class="nc" id="L866">        return value;</span>
+    }
+
+    /**
+     * Allows us to exclude a specific property from the toJSON process
+     *
+     * @param pb      the property
+     * @param exclude true to exclude and false to reinclude
+     */
+    public void setExcludeFromJSON(PropertyBase pb, boolean exclude) {
+<span class="nc bnc" id="L876" title="All 2 branches missed.">        if (exclude) {</span>
+<span class="nc" id="L877">            pb.putClientProperty(&quot;jsonExclude&quot;, Boolean.TRUE);</span>
+        } else {
+<span class="nc" id="L879">            pb.putClientProperty(&quot;jsonExclude&quot;, null);</span>
+        }
+<span class="nc" id="L881">    }</span>
+
+    /**
+     * Indicates whether the given property is excluded from the {@link #toMapRepresentation()}
+     * method output
+     *
+     * @param pb the property
+     * @return true if the property is excluded and false otherwise
+     */
+    public boolean isExcludeFromMap(PropertyBase pb) {
+<span class="nc bnc" id="L891" title="All 2 branches missed.">        return pb.getClientProperty(&quot;mapExclude&quot;) != null;</span>
+    }
+
+    /**
+     * Allows us to exclude a specific property from the {@link #toMapRepresentation()} process
+     *
+     * @param pb      the property
+     * @param exclude true to exclude and false to reinclude
+     */
+    public void setExcludeFromMap(PropertyBase pb, boolean exclude) {
+<span class="nc bnc" id="L901" title="All 2 branches missed.">        if (exclude) {</span>
+<span class="nc" id="L902">            pb.putClientProperty(&quot;mapExclude&quot;, Boolean.TRUE);</span>
+        } else {
+<span class="nc" id="L904">            pb.putClientProperty(&quot;jsonExclude&quot;, null);</span>
+        }
+<span class="nc" id="L906">    }</span>
+
+    /**
+     * Indicates whether the given property is excluded from the {@link #toJSON()} method output
+     *
+     * @param pb the property
+     * @return true if the property is excluded and false otherwise
+     */
+    public boolean isExcludeFromJSON(PropertyBase pb) {
+<span class="nc bnc" id="L915" title="All 2 branches missed.">        return pb.getClientProperty(&quot;jsonExclude&quot;) != null;</span>
+    }
+
+    /**
+     * Invoking this method will allow a property object to be serialized seamlessly
+     */
+    public void registerExternalizable() {
+<span class="nc" id="L922">        Util.register(getName(), parent.getClass());</span>
+<span class="nc" id="L923">    }</span>
+
+    /**
+     * Returns an externalizable object for serialization of this business object, unlike regular
+     * externalizables this implementation is robust to changes, additions and removals of
+     * properties
+     *
+     * @return an externalizable instance
+     */
+    public Externalizable asExternalizable() {
+<span class="nc" id="L933">        return new Externalizable() {</span>
+            public int getVersion() {
+<span class="nc" id="L935">                return 1;</span>
+            }
+
+            public void externalize(DataOutputStream out) throws IOException {
+<span class="nc" id="L939">                out.writeInt(getSize());</span>
+<span class="nc bnc" id="L940" title="All 2 branches missed.">                for (PropertyBase b : PropertyIndex.this) {</span>
+<span class="nc" id="L941">                    out.writeUTF(b.getName());</span>
+<span class="nc bnc" id="L942" title="All 2 branches missed.">                    if (b instanceof CollectionProperty) {</span>
+<span class="nc" id="L943">                        out.writeByte(2);</span>
+<span class="nc" id="L944">                        Util.writeObject(((CollectionProperty) b).asList(), out);</span>
+<span class="nc" id="L945">                        continue;</span>
+                    }
+<span class="nc bnc" id="L947" title="All 2 branches missed.">                    if (b instanceof MapProperty) {</span>
+<span class="nc" id="L948">                        out.writeByte(3);</span>
+<span class="nc" id="L949">                        Util.writeObject(((MapProperty) b).asMap(), out);</span>
+<span class="nc" id="L950">                        continue;</span>
+                    }
+<span class="nc bnc" id="L952" title="All 2 branches missed.">                    if (b instanceof Property) {</span>
+<span class="nc" id="L953">                        out.writeByte(1);</span>
+<span class="nc" id="L954">                        Util.writeObject(b.get(), out);</span>
+<span class="nc" id="L955">                        continue;</span>
+                    }
+<span class="nc" id="L957">                }</span>
+<span class="nc" id="L958">            }</span>
+
+            public void internalize(int version, DataInputStream in) throws IOException {
+<span class="nc" id="L961">                int size = in.readInt();</span>
+<span class="nc bnc" id="L962" title="All 2 branches missed.">                for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc" id="L963">                    String pname = in.readUTF();</span>
+<span class="nc" id="L964">                    int type = in.readByte();</span>
+<span class="nc" id="L965">                    Object data = Util.readObject(in);</span>
+<span class="nc" id="L966">                    PropertyBase pb = get(pname);</span>
+<span class="nc bnc" id="L967" title="All 4 branches missed.">                    switch (type) {</span>
+                        case 1: // Property
+<span class="nc bnc" id="L969" title="All 2 branches missed.">                            if (pb instanceof Property) {</span>
+<span class="nc" id="L970">                                ((Property) pb).set(data);</span>
+                            }
+                            break;
+
+                        case 2: // CollectionProperty
+<span class="nc bnc" id="L975" title="All 2 branches missed.">                            if (pb instanceof CollectionProperty) {</span>
+<span class="nc" id="L976">                                ((CollectionProperty) pb).set((List) data);</span>
+                            }
+                            break;
+
+                        case 3: // MapProperty
+<span class="nc bnc" id="L981" title="All 2 branches missed.">                            if (pb instanceof MapProperty) {</span>
+<span class="nc" id="L982">                                ((MapProperty) pb).setMap((Map) data);</span>
+                            }
+                            break;
+                    }
+                }
+<span class="nc" id="L987">            }</span>
+
+            public String getObjectId() {
+<span class="nc" id="L990">                return getName();</span>
+            }
+        };
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

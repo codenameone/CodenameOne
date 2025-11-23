@@ -1,0 +1,398 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GenericSpinner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.spinner</a> &gt; <span class="el_source">GenericSpinner.java</span></div><h1>GenericSpinner.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.spinner;
+
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.list.DefaultListModel;
+import com.codename1.ui.list.ListCellRenderer;
+import com.codename1.ui.list.ListModel;
+
+/**
+ * A spinner class that allows arbitrary values, this is effectively a combo box replacement for platforms
+ * where a combo box is not available
+ *
+ * @author Shai Almog
+ * @deprecated use Picker instead
+ */
+public class GenericSpinner extends BaseSpinner {
+    private Spinner[] spin;
+<span class="fc" id="L40">    private ListModel[] model = new ListModel[]{new DefaultListModel(&quot;Value 1&quot;, &quot;Value 2&quot;, &quot;Value 3&quot;)};</span>
+<span class="fc" id="L41">    private ListCellRenderer[] renderer = new ListCellRenderer[]{new SpinnerRenderer&lt;Object&gt;()};</span>
+    private Object[] value;
+    private String[] renderingPrototype;
+
+    /**
+     * Default constructor
+     */
+<span class="fc" id="L48">    public GenericSpinner() {</span>
+<span class="fc" id="L49">        SpinnerRenderer&lt;Object&gt; render = (SpinnerRenderer&lt;Object&gt;) renderer[0];</span>
+<span class="fc" id="L50">        render.setShowNumbers(false);</span>
+<span class="fc" id="L51">        render.setUIID(&quot;SpinnerRenderer&quot;);</span>
+<span class="fc" id="L52">    }</span>
+
+    void initSpinner() {
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (spin == null) {</span>
+<span class="fc bfc" id="L56" title="All 2 branches covered.">            if (model.length == 1) {</span>
+<span class="fc" id="L57">                spin = new Spinner[]{createSpinner(0)};</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">                if (renderingPrototype != null) {</span>
+<span class="nc" id="L59">                    spin[0].setRenderingPrototype(renderingPrototype[0]);</span>
+                }
+<span class="fc" id="L61">                setLayout(new BorderLayout());</span>
+<span class="fc" id="L62">                addComponent(BorderLayout.CENTER, spin[0]);</span>
+            } else {
+<span class="fc" id="L64">                setLayout(new BoxLayout(BoxLayout.X_AXIS));</span>
+<span class="fc" id="L65">                spin = new Spinner[model.length];</span>
+<span class="fc" id="L66">                int slen = spin.length;</span>
+<span class="fc bfc" id="L67" title="All 2 branches covered.">                for (int iter = 0; iter &lt; slen; iter++) {</span>
+<span class="fc" id="L68">                    spin[iter] = createSpinner(iter);</span>
+<span class="fc" id="L69">                    addComponent(spin[iter]);</span>
+<span class="fc bfc" id="L70" title="All 2 branches covered.">                    if (iter &lt; slen - 1) {</span>
+<span class="fc" id="L71">                        addComponent(createSeparator());</span>
+                    }
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">                    if (renderingPrototype != null) {</span>
+<span class="fc" id="L74">                        spin[iter].setRenderingPrototype(renderingPrototype[iter]);</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L79">    }</span>
+
+    /**
+     * Returns the rendering prototype
+     *
+     * @return the prototype
+     */
+    public String getRenderingPrototype() {
+<span class="nc" id="L87">        return getRenderingPrototype(0);</span>
+    }
+
+    /**
+     * The rendering prototype
+     *
+     * @param pr the prototype
+     */
+    public void setRenderingPrototype(String pr) {
+<span class="nc" id="L96">        setRenderingPrototype(0, pr);</span>
+<span class="nc" id="L97">    }</span>
+
+    /**
+     * Returns the rendering prototype
+     *
+     * @return the prototype
+     */
+    public String getRenderingPrototype(int column) {
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        if (renderingPrototype == null) {</span>
+<span class="nc" id="L106">            return null;</span>
+        }
+<span class="nc" id="L108">        return renderingPrototype[column];</span>
+    }
+
+    /**
+     * The rendering prototype
+     *
+     * @param column the column
+     * @param pr     the prototype
+     */
+    public void setRenderingPrototype(int column, String pr) {
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        if (renderingPrototype == null) {</span>
+<span class="nc" id="L119">            renderingPrototype = new String[model.length];</span>
+        }
+<span class="fc" id="L121">        renderingPrototype[column] = pr;</span>
+<span class="fc" id="L122">    }</span>
+
+    /**
+     * Return the column count
+     *
+     * @return the number of columns in the spinner
+     */
+    public int getColumns() {
+<span class="fc" id="L130">        return model.length;</span>
+    }
+
+    /**
+     * Sets the column count
+     *
+     * @return the number of columns in the spinner
+     */
+    public void setColumns(int columns) {
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (model.length != columns) {</span>
+<span class="fc" id="L140">            ListModel[] lm = new ListModel[columns];</span>
+<span class="fc" id="L141">            ListCellRenderer[] lr = new ListCellRenderer[columns];</span>
+<span class="fc" id="L142">            Object[] values = new Object[columns];</span>
+<span class="fc" id="L143">            String[] rp = new String[columns];</span>
+<span class="fc bfc" id="L144" title="All 2 branches covered.">            if (spin != null) {</span>
+<span class="fc" id="L145">                spin = null;</span>
+<span class="fc" id="L146">                removeAll();</span>
+<span class="fc" id="L147">                initSpinner();</span>
+            }
+<span class="fc bfc" id="L149" title="All 2 branches covered.">            for (int iter = 0; iter &lt; columns; iter++) {</span>
+<span class="fc" id="L150">                lm[iter] = model[Math.min(iter, model.length - 1)];</span>
+<span class="fc" id="L151">                lr[iter] = renderer[Math.min(iter, model.length - 1)];</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">                if (value != null) {</span>
+<span class="fc" id="L153">                    values[iter] = value[Math.min(iter, model.length - 1)];</span>
+                }
+<span class="fc bfc" id="L155" title="All 2 branches covered.">                if (renderingPrototype != null) {</span>
+<span class="fc" id="L156">                    rp[iter] = renderingPrototype[Math.min(iter, model.length - 1)];</span>
+                }
+            }
+<span class="fc" id="L159">            model = lm;</span>
+<span class="fc" id="L160">            renderer = lr;</span>
+<span class="fc" id="L161">            value = values;</span>
+<span class="fc" id="L162">            renderingPrototype = rp;</span>
+        }
+<span class="fc" id="L164">    }</span>
+
+    /**
+     * The value for the spinner
+     *
+     * @return the value
+     */
+    public Object getValue() {
+<span class="fc" id="L172">        return getValue(0);</span>
+    }
+
+    /**
+     * The value for the spinner
+     *
+     * @param value the value to set
+     */
+    public void setValue(Object value) {
+<span class="fc" id="L181">        setValue(0, value);</span>
+<span class="fc" id="L182">    }</span>
+
+    /**
+     * The value for the spinner
+     *
+     * @return the value
+     */
+    public Object getValue(int offset) {
+<span class="pc bpc" id="L190" title="2 of 4 branches missed.">        if (spin != null &amp;&amp; spin[offset] != null) {</span>
+<span class="fc" id="L191">            return spin[offset].getModel().getItemAt(spin[offset].getModel().getSelectedIndex());</span>
+        }
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if (model[offset] != null) {</span>
+<span class="nc" id="L194">            return model[offset].getItemAt(model[offset].getSelectedIndex());</span>
+        }
+<span class="nc" id="L196">        return value;</span>
+    }
+
+    /**
+     * The value for the spinner
+     *
+     * @param value the value to set
+     */
+    public void setValue(int offset, Object value) {
+<span class="fc bfc" id="L205" title="All 2 branches covered.">        if (this.value == null) {</span>
+<span class="fc" id="L206">            this.value = new Object[model.length];</span>
+        }
+<span class="fc" id="L208">        this.value[offset] = value;</span>
+<span class="pc bpc" id="L209" title="1 of 4 branches missed.">        if (spin != null &amp;&amp; spin[offset] != null) {</span>
+<span class="fc" id="L210">            spin[offset].setValue(value);</span>
+        }
+<span class="fc" id="L212">    }</span>
+
+    Spinner createSpinner(int column) {
+<span class="fc" id="L215">        Spinner spin = new Spinner(model[column], renderer[column]);</span>
+<span class="fc" id="L216">        spin.setRenderingPrototype(null);</span>
+<span class="fc" id="L217">        spin.setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L218">        spin.setListSizeCalculationSampleCount(30);</span>
+<span class="fc" id="L219">        spin.initSpinnerRenderer();</span>
+<span class="fc" id="L220">        spin.updateToDefaultRTL();</span>
+<span class="pc bpc" id="L221" title="1 of 4 branches missed.">        if (value != null &amp;&amp; value[column] != null) {</span>
+<span class="fc" id="L222">            spin.setValue(value[column]);</span>
+        }
+<span class="fc" id="L224">        return spin;</span>
+    }
+
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+<span class="nc" id="L232">        return new String[]{&quot;model&quot;, &quot;renderer&quot;, &quot;items&quot;, &quot;columns&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L239">        return new Class[]{ListModel.class, ListCellRenderer.class, com.codename1.impl.CodenameOneImplementation.getStringArrayClass(), Integer.class};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyTypeNames() {
+<span class="nc" id="L246">        return new String[]{&quot;ListModel&quot;, &quot;ListCellRenderer&quot;, &quot;String[]&quot;, &quot;int&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+<span class="nc bnc" id="L253" title="All 2 branches missed.">        if (name.equals(&quot;items&quot;)) {</span>
+<span class="nc" id="L254">            ListModel m = getModel();</span>
+<span class="nc" id="L255">            String[] s = new String[m.getSize()];</span>
+<span class="nc" id="L256">            int slen = s.length;</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">            for (int iter = 0; iter &lt; slen; iter++) {</span>
+<span class="nc" id="L258">                Object o = m.getItemAt(iter);</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">                if (o != null) {</span>
+<span class="nc" id="L260">                    s[iter] = o.toString();</span>
+                }
+            }
+<span class="nc" id="L263">            return s;</span>
+        }
+<span class="nc bnc" id="L265" title="All 2 branches missed.">        if (name.equals(&quot;model&quot;)) {</span>
+<span class="nc" id="L266">            return getModel();</span>
+        }
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        if (name.equals(&quot;renderer&quot;)) {</span>
+<span class="nc" id="L269">            return getRenderer();</span>
+        }
+<span class="nc bnc" id="L271" title="All 2 branches missed.">        if (name.equals(&quot;columns&quot;)) {</span>
+<span class="nc" id="L272">            return Integer.valueOf(getColumns());</span>
+        }
+<span class="nc" id="L274">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L281" title="All 2 branches missed.">        if (name.equals(&quot;items&quot;)) {</span>
+<span class="nc" id="L282">            setModel(new DefaultListModel((Object[]) value));</span>
+<span class="nc" id="L283">            return null;</span>
+        }
+<span class="nc bnc" id="L285" title="All 2 branches missed.">        if (name.equals(&quot;model&quot;)) {</span>
+<span class="nc" id="L286">            setModel((ListModel) value);</span>
+<span class="nc" id="L287">            return null;</span>
+        }
+<span class="nc bnc" id="L289" title="All 2 branches missed.">        if (name.equals(&quot;renderer&quot;)) {</span>
+<span class="nc" id="L290">            setRenderer((ListCellRenderer) value);</span>
+<span class="nc" id="L291">            return null;</span>
+        }
+<span class="nc bnc" id="L293" title="All 2 branches missed.">        if (name.equals(&quot;columns&quot;)) {</span>
+<span class="nc" id="L294">            setColumns(((Integer) value).intValue());</span>
+<span class="nc" id="L295">            return null;</span>
+        }
+<span class="nc" id="L297">        return super.setPropertyValue(name, value);</span>
+    }
+
+    /**
+     * @return the model
+     */
+    public ListModel getModel() {
+<span class="fc" id="L304">        return model[0];</span>
+    }
+
+    /**
+     * @param model the model to set
+     */
+    public void setModel(ListModel model) {
+<span class="fc" id="L311">        setModel(0, model);</span>
+<span class="fc" id="L312">    }</span>
+
+    /**
+     * @return the model
+     */
+    public ListModel getModel(int offset) {
+<span class="nc" id="L318">        return model[offset];</span>
+    }
+
+    /**
+     * @param model the model to set
+     */
+    public void setModel(int offset, ListModel model) {
+<span class="fc" id="L325">        this.model[offset] = model;</span>
+<span class="pc bpc" id="L326" title="3 of 4 branches missed.">        if (spin != null &amp;&amp; spin[offset] != null) {</span>
+<span class="nc" id="L327">            spin[offset].setModel(model);</span>
+        }
+<span class="fc" id="L329">    }</span>
+
+    /**
+     * @return the renderer
+     */
+    public ListCellRenderer getRenderer(int offset) {
+<span class="nc" id="L335">        return renderer[offset];</span>
+    }
+
+    /**
+     * @param renderer the renderer to set
+     */
+    public void setRenderer(int offset, ListCellRenderer renderer) {
+<span class="fc" id="L342">        this.renderer[offset] = renderer;</span>
+<span class="pc bpc" id="L343" title="3 of 4 branches missed.">        if (spin != null &amp;&amp; spin[offset] != null) {</span>
+<span class="nc" id="L344">            spin[offset].setRenderer(renderer);</span>
+        }
+<span class="fc" id="L346">    }</span>
+
+    /**
+     * @return the renderer
+     */
+    public ListCellRenderer getRenderer() {
+<span class="nc" id="L352">        return getRenderer(0);</span>
+    }
+
+    /**
+     * @param renderer the renderer to set
+     */
+    public void setRenderer(ListCellRenderer renderer) {
+<span class="fc" id="L359">        setRenderer(0, renderer);</span>
+<span class="fc" id="L360">    }</span>
+
+    /**
+     * Some components may optionally generate a state which can then be restored
+     * using setCompnentState(). This method is used by the UIBuilder.
+     *
+     * @return the component state or null for undefined state.
+     */
+    public Object getComponentState() {
+<span class="nc bnc" id="L369" title="All 2 branches missed.">        if (getColumns() == 1) {</span>
+<span class="nc" id="L370">            return getValue();</span>
+        }
+<span class="nc" id="L372">        Object[] o = new Object[getColumns()];</span>
+<span class="nc" id="L373">        int olen = o.length;</span>
+<span class="nc bnc" id="L374" title="All 2 branches missed.">        for (int iter = 0; iter &lt; olen; iter++) {</span>
+<span class="nc" id="L375">            o[iter] = getValue(iter);</span>
+        }
+<span class="nc" id="L377">        return o;</span>
+    }
+
+    /**
+     * If getComponentState returned a value the setter can update the value and restore
+     * the prior state.
+     *
+     * @param state the non-null state
+     */
+    public void setComponentState(Object state) {
+<span class="nc bnc" id="L387" title="All 2 branches missed.">        if (getColumns() == 1) {</span>
+<span class="nc" id="L388">            setValue(state);</span>
+<span class="nc" id="L389">            return;</span>
+        }
+<span class="nc" id="L391">        Object[] o = (Object[]) state;</span>
+<span class="nc" id="L392">        int olen = o.length;</span>
+<span class="nc bnc" id="L393" title="All 2 branches missed.">        for (int iter = 0; iter &lt; olen; iter++) {</span>
+<span class="nc" id="L394">            setValue(iter, o[iter]);</span>
+        }
+<span class="nc" id="L396">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

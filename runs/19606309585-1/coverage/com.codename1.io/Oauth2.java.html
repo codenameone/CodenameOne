@@ -1,0 +1,668 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Oauth2.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">Oauth2.java</span></div><h1>Oauth2.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.io;
+
+import com.codename1.components.InfiniteProgress;
+import com.codename1.components.WebBrowser;
+import com.codename1.ui.BrowserWindow;
+import com.codename1.ui.CN;
+import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.html.DocumentInfo;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.regex.StringReader;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Map;
+
+/**
+ * This is a utility class that allows Oauth2 authentication This utility uses
+ * the Codename One XHTML Component to display the authentication pages.
+ * http://tools.ietf.org/pdf/draft-ietf-oauth-v2-12.pdf
+ *
+ * @author Chen Fishbein
+ */
+public class Oauth2 {
+    public static final String TOKEN = &quot;access_token&quot;;
+    private static String expires;
+<span class="nc" id="L60">    private static boolean backToParent = true;</span>
+<span class="nc" id="L61">    private boolean useRedirectForWeb = false;</span>
+<span class="nc" id="L62">    private boolean useBrowserWindow = &quot;true&quot;.equals(CN.getProperty(&quot;oauth2.useBrowserWindow&quot;, &quot;true&quot;));</span>
+    private String token;
+    private String refreshToken;
+    private String identityToken;
+    private final String clientId;
+    private String redirectURI;
+    private String scope;
+    private String clientSecret;
+    private final String oauth2URL;
+    private String tokenRequestURL;
+    private Hashtable additionalParams;
+    private Dialog login;
+    /**
+     * Simple constructor
+     *
+     * @param oauth2URL   the authentication url of the service
+     * @param clientId    the client id that would like to use the service
+     * @param redirectURI the redirect uri
+     */
+    public Oauth2(String oauth2URL, String clientId, String redirectURI) {
+<span class="nc" id="L82">        this(oauth2URL, clientId, redirectURI, null, null, null);</span>
+<span class="nc" id="L83">    }</span>
+    /**
+     * Simple constructor
+     *
+     * @param oauth2URL   the authentication url of the service
+     * @param clientId    the client id that would like to use the service
+     * @param redirectURI the redirect uri
+     * @param scope       the authentication scope
+     */
+    public Oauth2(String oauth2URL, String clientId, String redirectURI, String scope) {
+<span class="nc" id="L93">        this(oauth2URL, clientId, redirectURI, scope, null, null);</span>
+<span class="nc" id="L94">    }</span>
+
+    /**
+     * Simple constructor
+     *
+     * @param oauth2URL    the authentication url of the service
+     * @param clientId     the client id that would like to use the service
+     * @param redirectURI  the redirect uri
+     * @param scope        the authentication scope
+     * @param clientSecret the client secret
+     */
+    public Oauth2(String oauth2URL, String clientId, String redirectURI, String scope,
+                  String tokenRequestURL, String clientSecret) {
+<span class="nc" id="L107">        this(oauth2URL, clientId, redirectURI, scope, tokenRequestURL, clientSecret, null);</span>
+<span class="nc" id="L108">    }</span>
+
+
+    /**
+     * Simple constructor
+     *
+     * @param oauth2URL        the authentication url of the service
+     * @param clientId         the client id that would like to use the service
+     * @param redirectURI      the redirect uri
+     * @param scope            the authentication scope
+     * @param clientSecret     the client secret
+     * @param additionalParams hashtable of additional parameters to the
+     *                         authentication request
+     */
+<span class="nc" id="L122">    public Oauth2(String oauth2URL, String clientId, String redirectURI, String scope, String tokenRequestURL, String clientSecret, Hashtable additionalParams) {</span>
+<span class="nc" id="L123">        this.oauth2URL = oauth2URL;</span>
+<span class="nc" id="L124">        this.redirectURI = redirectURI;</span>
+<span class="nc" id="L125">        this.clientId = clientId;</span>
+<span class="nc" id="L126">        this.scope = scope;</span>
+<span class="nc" id="L127">        this.clientSecret = clientSecret;</span>
+<span class="nc" id="L128">        this.tokenRequestURL = tokenRequestURL;</span>
+<span class="nc" id="L129">        this.additionalParams = additionalParams;</span>
+<span class="nc" id="L130">    }</span>
+
+    /**
+     * Enables going back to the parent form after login is completed
+     *
+     * @return the backToParent
+     */
+    public static boolean isBackToParent() {
+<span class="nc" id="L138">        return backToParent;</span>
+    }
+
+    /**
+     * Enables going back to the parent form after login is completed
+     *
+     * @param aBackToParent the backToParent to set
+     */
+    public static void setBackToParent(boolean aBackToParent) {
+<span class="nc" id="L147">        backToParent = aBackToParent;</span>
+<span class="nc" id="L148">    }</span>
+
+    public static Oauth2 fetchSerializedOauth2Request() {
+<span class="nc" id="L151">        Storage s = Storage.getInstance();</span>
+<span class="nc" id="L152">        Map m = (Map) s.readObject(&quot;__oauth2Params&quot;);</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        if (m == null) {</span>
+<span class="nc" id="L154">            return null;</span>
+        }
+<span class="nc" id="L156">        Oauth2 out = new Oauth2((String) m.get(&quot;oauth2URL&quot;), (String) m.get(&quot;clientId&quot;), (String) m.get(&quot;redirectURI&quot;));</span>
+<span class="nc" id="L157">        out.token = (String) m.get(&quot;token&quot;);</span>
+<span class="nc" id="L158">        out.refreshToken = (String) m.get(&quot;refreshToken&quot;);</span>
+<span class="nc" id="L159">        out.identityToken = (String) m.get(&quot;identityToken&quot;);</span>
+<span class="nc" id="L160">        out.scope = (String) m.get(&quot;scope&quot;);</span>
+<span class="nc" id="L161">        out.clientSecret = (String) m.get(&quot;clientSecrete&quot;);</span>
+<span class="nc" id="L162">        out.tokenRequestURL = (String) m.get(&quot;tokenRequestURL&quot;);</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (m.get(&quot;additionalParams&quot;) != null) {</span>
+<span class="nc" id="L164">            out.additionalParams = new Hashtable();</span>
+<span class="nc" id="L165">            out.additionalParams.putAll((Map) m.get(&quot;additionalParams&quot;));</span>
+        }
+<span class="nc" id="L167">        backToParent = (Boolean) m.get(&quot;backToParent&quot;);</span>
+<span class="nc" id="L168">        s.deleteStorageFile(&quot;__oauth2Params&quot;);</span>
+<span class="nc" id="L169">        return out;</span>
+
+    }
+
+    /**
+     * Returns the expiry for the token received via oauth
+     *
+     * @return the expires argument for the token
+     */
+    public static String getExpires() {
+<span class="nc" id="L179">        return expires;</span>
+    }
+
+    /**
+     * When using the {@link #setUseRedirectForWeb(boolean) } option you should call this method at the beginning of your app's
+     * {@code start()} method.  If the app was loaded as a result of redirecting from an Oauth login, then this method will handle the login
+     * and will call the callback method on complete.
+     *
+     * @param callback a listener that will receive at its source either a token for
+     *                 the service or an exception in case of a failure
+     * @return True the redirect was handled.  False if it was not handled.  If this returns {@literal true}, then you should just return from the start() method, and instead
+     * handle control flow in your callback.
+     * @see #setUseRedirectForWeb(boolean)
+     * @see #isUseRedirectForWeb()
+     * @since 7.0
+     */
+    public static boolean handleRedirect(ActionListener callback) {
+<span class="nc" id="L196">        Oauth2 request = fetchSerializedOauth2Request();</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        if (request == null) {</span>
+<span class="nc" id="L198">            return false;</span>
+        }
+<span class="nc" id="L200">        String href = CN.getProperty(&quot;browser.window.location.href&quot;, null);</span>
+<span class="nc" id="L201">        request.handleURL(href, null, callback, null, null, null);</span>
+<span class="nc" id="L202">        return true;</span>
+    }
+
+    private void serializeAuth() {
+<span class="nc" id="L206">        Map params = new HashMap();</span>
+<span class="nc" id="L207">        params.put(&quot;token&quot;, token);</span>
+<span class="nc" id="L208">        params.put(&quot;refreshToken&quot;, refreshToken);</span>
+<span class="nc" id="L209">        params.put(&quot;identityToken&quot;, identityToken);</span>
+<span class="nc" id="L210">        params.put(&quot;clientId&quot;, clientId);</span>
+<span class="nc" id="L211">        params.put(&quot;redirectURI&quot;, redirectURI);</span>
+<span class="nc" id="L212">        params.put(&quot;scope&quot;, scope);</span>
+<span class="nc" id="L213">        params.put(&quot;clientSecret&quot;, clientSecret);</span>
+<span class="nc" id="L214">        params.put(&quot;oauth2URL&quot;, oauth2URL);</span>
+<span class="nc" id="L215">        params.put(&quot;tokenRequestURL&quot;, tokenRequestURL);</span>
+<span class="nc" id="L216">        params.put(&quot;additionalParams&quot;, additionalParams);</span>
+<span class="nc" id="L217">        params.put(&quot;backToParent&quot;, backToParent);</span>
+<span class="nc" id="L218">        Storage s = Storage.getInstance();</span>
+<span class="nc" id="L219">        s.writeObject(&quot;__oauth2Params&quot;, params);</span>
+<span class="nc" id="L220">    }</span>
+
+    /**
+     * This method preforms the actual authentication, this method is a blocking
+     * method that will display the user the html authentication pages.
+     *
+     * @return the method if passes authentication will return the access token
+     * or null if authentication failed.
+     * @throws IOException the method will throw an IOException if something
+     *                     went wrong in the communication.
+     * @deprecated use createAuthComponent or showAuthentication which work
+     * asynchronously and adapt better to different platforms
+     */
+    public String authenticate() {
+
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        if (token == null) {</span>
+<span class="nc" id="L236">            login = new Dialog();</span>
+<span class="nc" id="L237">            boolean i = Dialog.isAutoAdjustDialogSize();</span>
+<span class="nc" id="L238">            Dialog.setAutoAdjustDialogSize(false);</span>
+<span class="nc" id="L239">            login.setLayout(new BorderLayout());</span>
+<span class="nc" id="L240">            login.setScrollable(false);</span>
+
+<span class="nc" id="L242">            Component html = createLoginComponent(null, null, null, null);</span>
+<span class="nc" id="L243">            login.addComponent(BorderLayout.CENTER, html);</span>
+<span class="nc" id="L244">            login.setScrollable(false);</span>
+<span class="nc" id="L245">            login.setDialogUIID(&quot;Container&quot;);</span>
+<span class="nc" id="L246">            login.setTransitionInAnimator(CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, true, 300));</span>
+<span class="nc" id="L247">            login.setTransitionOutAnimator(CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, false, 300));</span>
+<span class="nc" id="L248">            login.show(0, 0, 0, 0, false, true);</span>
+<span class="nc" id="L249">            Dialog.setAutoAdjustDialogSize(i);</span>
+        }
+
+<span class="nc" id="L252">        return token;</span>
+    }
+
+    /**
+     * Checks if this component will use an external web browser window for the login process.
+     *
+     * @return True if this component will use an external web browser window.
+     * @since 7.0
+     */
+    public boolean isUseBrowserWindow() {
+<span class="nc" id="L262">        return useBrowserWindow;</span>
+    }
+
+    /**
+     * Set this OAuth2 object to use a {@link BrowserWindow} for the login process.  You can set the global default via the &quot;oauth2.useBrowserWindow&quot;
+     * display property with either a &quot;true&quot; or &quot;false&quot; value.
+     *
+     * &lt;p&gt;When this property is set, the login prompt will be displayed in a separate Window containing a web browser on the desktop.  Platforms that
+     * don't have windows (e.g. iOS/Android) will fall back to a separate Form with a webview).&lt;/p&gt;
+     *
+     * @param useBrowserWindow True to use a browser window for the login process.
+     * @since 7.0
+     */
+    public void setUseBrowserWindow(boolean useBrowserWindow) {
+<span class="nc" id="L276">        this.useBrowserWindow = useBrowserWindow;</span>
+<span class="nc" id="L277">    }</span>
+
+    /**
+     * Checks wither this Oauth component is configured to use a redirect for Oauth login when running on the web.
+     *
+     * @return True if this component will use a redirect for Oauth login.
+     * @see #setUseRedirectForWeb(boolean)
+     * @see #handleRedirect(com.codename1.ui.events.ActionListener)
+     * @since 7.0
+     */
+    public boolean isUseRedirectForWeb() {
+<span class="nc" id="L288">        return useRedirectForWeb;</span>
+    }
+
+    /**
+     * Sets thisOAuth2 object to use a redirect for login instead of an iframe when running on the Web (via the Javascript port).  Some
+     * Oauth providers won't work inside an iframe.
+     *
+     * &lt;p&gt;Using this option will cause the browser to navigate away from the app to go to the login page.  The Oauth
+     * login will redirect back to the app after login is complete.&lt;/p&gt;
+     *
+     * &lt;p&gt;&lt;strong&gt;Warning&lt;/strong&gt;: If the user has unsaved changes in the app, navigating away from the app may cause them to lose their changes.  You should provide
+     * a warning, or confirmation prompt for the user in such cases.  The usual onbeforeunload handler is disabled when using this action so the user
+     * won't receive any warnings other than what you explicitly prompt.&lt;/p&gt;
+     *
+     * @param redirect Set to true to use a redirect for Oauth login instead of an iframe when running on the web.
+     * @see #isUseRedirectForWeb()
+     * @see #handleRedirect(com.codename1.ui.events.ActionListener)
+     * @since 7.0
+     */
+    public void setUseRedirectForWeb(boolean redirect) {
+<span class="nc" id="L308">        this.useRedirectForWeb = redirect;</span>
+<span class="nc" id="L309">    }</span>
+
+    /**
+     * This method creates a component which can authenticate. You will receive
+     * either the authentication key or an Exception object within the
+     * ActionListener callback method.
+     *
+     * @param al a listener that will receive at its source either a token for
+     *           the service or an exception in case of a failure
+     * @return a component that should be displayed to the user in order to
+     * perform the authentication
+     */
+    public Component createAuthComponent(ActionListener al) {
+<span class="nc" id="L322">        return createLoginComponent(al, null, null, null);</span>
+    }
+
+    /**
+     * This method shows an authentication for login form
+     *
+     * @param al a listener that will receive at its source either a token for
+     *           the service or an exception in case of a failure
+     */
+    public void showAuthentication(final ActionListener al) {
+
+
+<span class="nc bnc" id="L334" title="All 4 branches missed.">        if (&quot;HTML5&quot;.equals(CN.getPlatformName()) &amp;&amp; useRedirectForWeb) {</span>
+<span class="nc" id="L335">            String href = CN.getProperty(&quot;browser.window.location.href&quot;, null);</span>
+<span class="nc" id="L336">            redirectURI = href;</span>
+<span class="nc" id="L337">            serializeAuth();</span>
+<span class="nc" id="L338">            CN.execute(&quot;javascript:(function(){window.onbeforeunload=function(){}; window.location.href='&quot; + buildURL() + &quot;';})();&quot;);</span>
+<span class="nc" id="L339">            return;</span>
+        }
+
+<span class="nc bnc" id="L342" title="All 2 branches missed.">        if (useBrowserWindow) {</span>
+<span class="nc" id="L343">            final BrowserWindow win = new BrowserWindow(buildURL());</span>
+<span class="nc" id="L344">            win.setTitle(&quot;Login&quot;);</span>
+<span class="nc" id="L345">            win.addLoadListener(new ActionListener() {</span>
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L347">                    String url = (String) evt.getSource();</span>
+<span class="nc bnc" id="L348" title="All 2 branches missed.">                    if (url.startsWith(redirectURI)) {</span>
+<span class="nc" id="L349">                        win.close();</span>
+<span class="nc" id="L350">                        handleURL((String) evt.getSource(), null, al, null, null, null);</span>
+                    }
+<span class="nc" id="L352">                }</span>
+            });
+
+<span class="nc" id="L355">            win.show();</span>
+<span class="nc" id="L356">            return;</span>
+
+        }
+
+<span class="nc" id="L360">        final Form old = Display.getInstance().getCurrent();</span>
+<span class="nc" id="L361">        InfiniteProgress inf = new InfiniteProgress();</span>
+<span class="nc" id="L362">        final Dialog progress = inf.showInifiniteBlocking();</span>
+<span class="nc" id="L363">        Form authenticationForm = new Form(&quot;Login&quot;);</span>
+<span class="nc" id="L364">        authenticationForm.setScrollable(false);</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">        if (old != null) {</span>
+<span class="nc" id="L366">            Command cancel = new Command(&quot;Cancel&quot;) {</span>
+                public void actionPerformed(ActionEvent ev) {
+<span class="nc bnc" id="L368" title="All 2 branches missed.">                    if (Display.getInstance().getCurrent() == progress) {</span>
+<span class="nc" id="L369">                        progress.dispose();</span>
+                    }
+<span class="nc" id="L371">                    old.showBack();</span>
+<span class="nc" id="L372">                }</span>
+            };
+<span class="nc bnc" id="L374" title="All 2 branches missed.">            if (authenticationForm.getToolbar() != null) {</span>
+<span class="nc" id="L375">                authenticationForm.getToolbar().addCommandToLeftBar(cancel);</span>
+            } else {
+<span class="nc" id="L377">                authenticationForm.addCommand(cancel);</span>
+            }
+<span class="nc" id="L379">            authenticationForm.setBackCommand(cancel);</span>
+        }
+<span class="nc" id="L381">        authenticationForm.setLayout(new BorderLayout());</span>
+<span class="nc" id="L382">        authenticationForm.addComponent(BorderLayout.CENTER, createLoginComponent(al, authenticationForm, old, progress));</span>
+<span class="nc" id="L383">        authenticationForm.show();</span>
+<span class="nc" id="L384">    }</span>
+
+    private String buildURL() {
+<span class="nc" id="L387">        String URL = oauth2URL + &quot;?client_id=&quot; + Util.encodeUrl(clientId)</span>
+<span class="nc" id="L388">                + &quot;&amp;redirect_uri=&quot; + Util.encodeUrl(redirectURI);</span>
+<span class="nc bnc" id="L389" title="All 2 branches missed.">        if (scope != null) {</span>
+<span class="nc" id="L390">            URL += &quot;&amp;scope=&quot; + Util.encodeUrl(scope);</span>
+        }
+<span class="nc bnc" id="L392" title="All 2 branches missed.">        if (clientSecret != null) {</span>
+<span class="nc" id="L393">            URL += &quot;&amp;response_type=code&quot;;</span>
+        } else {
+<span class="nc" id="L395">            URL += &quot;&amp;response_type=token&quot;;</span>
+        }
+
+<span class="nc bnc" id="L398" title="All 2 branches missed.">        if (additionalParams != null) {</span>
+<span class="nc" id="L399">            Enumeration e = additionalParams.keys();</span>
+<span class="nc bnc" id="L400" title="All 2 branches missed.">            while (e.hasMoreElements()) {</span>
+<span class="nc" id="L401">                String key = (String) e.nextElement();</span>
+<span class="nc" id="L402">                String val = additionalParams.get(key).toString();</span>
+<span class="nc" id="L403">                URL += &quot;&amp;&quot; + Util.encodeUrl(key) + &quot;=&quot; + Util.encodeUrl(val);</span>
+<span class="nc" id="L404">            }</span>
+        }
+<span class="nc" id="L406">        return URL;</span>
+    }
+
+    private Component createLoginComponent(final ActionListener al, final Form frm, final Form backToForm, final Dialog progress) {
+
+<span class="nc" id="L411">        String URL = buildURL();</span>
+
+<span class="nc" id="L413">        DocumentInfo.setDefaultEncoding(DocumentInfo.ENCODING_UTF8);</span>
+<span class="nc" id="L414">        final WebBrowser[] web = new WebBrowser[1];</span>
+<span class="nc" id="L415">        web[0] = new WebBrowser() {</span>
+
+            @Override
+            public void onLoad(String url) {
+<span class="nc" id="L419">                handleURL(url, this, al, frm, backToForm, progress);</span>
+<span class="nc" id="L420">            }</span>
+
+            public void onStart(String url) {
+<span class="nc" id="L423">            }</span>
+        };
+<span class="nc" id="L425">        web[0].setURL(URL);</span>
+
+<span class="nc" id="L427">        return web[0];</span>
+    }
+
+    /**
+     * Processes token request responses that are formatted as a JSON object.  May be overridden
+     * by subclasses, but subclass implementations should call super.handleTokenRequestResponse()
+     * so that the default implementation can parse out the token, expires, and refreshToken fields.
+     *
+     * @param map Parsed JSON object of response.
+     * @since 7.0
+     */
+    protected void handleTokenRequestResponse(Map map) {
+<span class="nc" id="L439">        token = (String) map.get(&quot;access_token&quot;);</span>
+<span class="nc" id="L440">        Object ex = map.get(&quot;expires_in&quot;);</span>
+<span class="nc bnc" id="L441" title="All 2 branches missed.">        if (ex == null) {</span>
+<span class="nc" id="L442">            ex = map.get(&quot;expires&quot;);</span>
+        }
+<span class="nc bnc" id="L444" title="All 2 branches missed.">        if (ex != null) {</span>
+<span class="nc" id="L445">            expires = ex.toString();</span>
+        }
+<span class="nc" id="L447">        refreshToken = (String) map.get(&quot;refresh_token&quot;);</span>
+<span class="nc" id="L448">        identityToken = (String) map.get(&quot;id_token&quot;);</span>
+
+<span class="nc" id="L450">    }</span>
+
+    /**
+     * Processes token request responses that are formatted as HTTP query strings.  May be
+     * overridden by subclass, but subclass implementations should call super.handleTokenRequestResponse()
+     * so that the default implementation can parse out the token, expires, and refreshToken fields.
+     *
+     * @param t The query string.
+     * @since 7.0
+     */
+    protected void handleTokenRequestResponse(String t) {
+<span class="nc" id="L461">        token = t.substring(t.indexOf(&quot;=&quot;) + 1, t.indexOf(&quot;&amp;&quot;));</span>
+<span class="nc" id="L462">        int off = t.indexOf(&quot;expires=&quot;);</span>
+<span class="nc" id="L463">        int start = 8;</span>
+<span class="nc bnc" id="L464" title="All 2 branches missed.">        if (off == -1) {</span>
+<span class="nc" id="L465">            off = t.indexOf(&quot;expires_in=&quot;);</span>
+<span class="nc" id="L466">            start = 11;</span>
+        }
+<span class="nc bnc" id="L468" title="All 2 branches missed.">        if (off &gt; -1) {</span>
+<span class="nc" id="L469">            int end = t.indexOf('&amp;', off);</span>
+<span class="nc bnc" id="L470" title="All 4 branches missed.">            if (end &lt; 0 || end &lt; off) {</span>
+<span class="nc" id="L471">                end = t.length();</span>
+            }
+<span class="nc" id="L473">            expires = t.substring(off + start, end);</span>
+
+        }
+<span class="nc" id="L476">        off = t.indexOf(&quot;refresh_token=&quot;);</span>
+<span class="nc" id="L477">        refreshToken = null;</span>
+<span class="nc" id="L478">        start = &quot;refresh_token=&quot;.length();</span>
+<span class="nc bnc" id="L479" title="All 2 branches missed.">        if (off &gt; -1) {</span>
+<span class="nc" id="L480">            int end = t.indexOf('&amp;', off);</span>
+<span class="nc bnc" id="L481" title="All 4 branches missed.">            if (end &lt; 0 || end &lt; off) {</span>
+<span class="nc" id="L482">                end = t.length();</span>
+            }
+<span class="nc" id="L484">            refreshToken = t.substring(off + start, end);</span>
+        }
+<span class="nc" id="L486">    }</span>
+
+    /**
+     * Method that can be overridden by subclasses to intercept parameters extracted from
+     * the redirect URL when the login flow reaches the redirect URL.  This will give subclasses
+     * an opportunity to parse out special information that the OAuth2 service provides in the callback.
+     *
+     * @param params Parsed query parameters passed to the redirect URL.
+     */
+    protected void handleRedirectURLParams(Map params) {
+
+<span class="nc" id="L497">    }</span>
+
+    public RefreshTokenRequest refreshToken(String refreshToken) {
+<span class="nc" id="L500">        final RefreshTokenRequest out = new RefreshTokenRequest();</span>
+<span class="nc" id="L501">        refreshToken(refreshToken, new ActionListener() {</span>
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L503" title="All 2 branches missed.">                if (out.isDone()) {</span>
+<span class="nc" id="L504">                    return;</span>
+                }
+<span class="nc bnc" id="L506" title="All 2 branches missed.">                if (evt.getSource() instanceof Throwable) {</span>
+<span class="nc" id="L507">                    out.error(new AsyncResource.AsyncExecutionException((Throwable) evt.getSource()));</span>
+                } else {
+<span class="nc" id="L509">                    out.complete((AccessToken) evt.getSource());</span>
+                }
+<span class="nc" id="L511">            }</span>
+        });
+<span class="nc" id="L513">        return out;</span>
+    }
+
+    private void refreshToken(String refreshToken, ActionListener al) {
+<span class="nc" id="L517">        handleURL(redirectURI + &quot;?code=&quot; + Util.encodeUrl(refreshToken) + &quot;&amp;cn1_refresh_token=1&quot;, null, al, null, null, null);</span>
+<span class="nc" id="L518">    }</span>
+
+    private void handleURL(String url, WebBrowser web, final ActionListener al, final Form frm, final Form backToForm, final Dialog progress) {
+<span class="nc bnc" id="L521" title="All 2 branches missed.">        if ((url.startsWith(redirectURI))) {</span>
+<span class="nc bnc" id="L522" title="All 4 branches missed.">            if (progress != null &amp;&amp; Display.getInstance().getCurrent() == progress) {</span>
+<span class="nc" id="L523">                progress.dispose();</span>
+            }
+
+<span class="nc bnc" id="L526" title="All 2 branches missed.">            if (web != null) {</span>
+<span class="nc" id="L527">                web.stop();</span>
+            }
+
+            //remove the browser component.
+<span class="nc bnc" id="L531" title="All 2 branches missed.">            if (login != null) {</span>
+<span class="nc" id="L532">                login.removeAll();</span>
+<span class="nc" id="L533">                login.revalidate();</span>
+            }
+
+<span class="nc bnc" id="L536" title="All 2 branches missed.">            if (url.indexOf(&quot;code=&quot;) &gt; -1) {</span>
+<span class="nc" id="L537">                Hashtable params = getParamsFromURL(url);</span>
+<span class="nc" id="L538">                handleRedirectURLParams(params);</span>
+<span class="nc" id="L539">                class TokenRequest extends ConnectionRequest {</span>
+                    boolean callbackCalled;
+
+                    protected void readResponse(InputStream input) throws IOException {
+<span class="nc" id="L543">                        byte[] tok = Util.readInputStream(input);</span>
+<span class="nc" id="L544">                        String t = new String(tok);</span>
+<span class="nc" id="L545">                        boolean expiresRelative = true;</span>
+<span class="nc bnc" id="L546" title="All 2 branches missed.">                        if (t.startsWith(&quot;{&quot;)) {</span>
+<span class="nc" id="L547">                            JSONParser p = new JSONParser();</span>
+<span class="nc" id="L548">                            Map map = p.parseJSON(new StringReader(t));</span>
+<span class="nc" id="L549">                            handleTokenRequestResponse(map);</span>
+<span class="nc" id="L550">                        } else {</span>
+<span class="nc" id="L551">                            handleTokenRequestResponse(t);</span>
+                        }
+<span class="nc bnc" id="L553" title="All 2 branches missed.">                        if (login != null) {</span>
+<span class="nc" id="L554">                            login.dispose();</span>
+                        }
+<span class="nc" id="L556">                    }</span>
+
+                    protected void handleException(Exception err) {
+<span class="nc bnc" id="L559" title="All 4 branches missed.">                        if (backToForm != null &amp;&amp; !callbackCalled) {</span>
+<span class="nc" id="L560">                            backToForm.showBack();</span>
+                        }
+<span class="nc bnc" id="L562" title="All 2 branches missed.">                        if (al != null) {</span>
+<span class="nc bnc" id="L563" title="All 2 branches missed.">                            if (!callbackCalled) {</span>
+<span class="nc" id="L564">                                callbackCalled = true;</span>
+<span class="nc" id="L565">                                al.actionPerformed(new ActionEvent(err, ActionEvent.Type.Exception));</span>
+                            }
+                        }
+<span class="nc" id="L568">                    }</span>
+
+                    protected void postResponse() {
+
+<span class="nc bnc" id="L572" title="All 6 branches missed.">                        if (backToParent &amp;&amp; backToForm != null &amp;&amp; !callbackCalled) {</span>
+<span class="nc" id="L573">                            backToForm.showBack();</span>
+                        }
+<span class="nc bnc" id="L575" title="All 2 branches missed.">                        if (al != null) {</span>
+<span class="nc bnc" id="L576" title="All 2 branches missed.">                            if (!callbackCalled) {</span>
+<span class="nc" id="L577">                                callbackCalled = true;</span>
+<span class="nc bnc" id="L578" title="All 4 branches missed.">                                if (getResponseCode() &gt;= 200 &amp;&amp; getResponseCode() &lt; 300) {</span>
+<span class="nc" id="L579">                                    al.actionPerformed(new ActionEvent(new AccessToken(token, expires, refreshToken, identityToken), ActionEvent.Type.Response));</span>
+                                } else {
+<span class="nc" id="L581">                                    al.actionPerformed(new ActionEvent(new IOException(getResponseErrorMessage()), ActionEvent.Type.Exception));</span>
+                                }
+                            }
+                        }
+<span class="nc" id="L585">                    }</span>
+                }
+<span class="nc" id="L587">                final TokenRequest req = new TokenRequest();</span>
+<span class="nc" id="L588">                req.setReadResponseForErrors(true);</span>
+
+<span class="nc" id="L590">                req.setUrl(tokenRequestURL);</span>
+<span class="nc" id="L591">                req.setPost(true);</span>
+<span class="nc" id="L592">                req.addRequestHeader(&quot;Content-Type&quot;, &quot;application/x-www-form-urlencoded&quot;);</span>
+<span class="nc" id="L593">                req.addArgument(&quot;client_id&quot;, clientId);</span>
+<span class="nc" id="L594">                req.addArgument(&quot;redirect_uri&quot;, redirectURI);</span>
+<span class="nc" id="L595">                req.addArgument(&quot;client_secret&quot;, clientSecret);</span>
+<span class="nc bnc" id="L596" title="All 2 branches missed.">                if (params.containsKey(&quot;cn1_refresh_token&quot;)) {</span>
+<span class="nc" id="L597">                    req.addArgument(&quot;grant_type&quot;, &quot;refresh_token&quot;);</span>
+<span class="nc" id="L598">                    req.addArgument(&quot;refresh_token&quot;, (String) params.get(&quot;code&quot;));</span>
+                } else {
+<span class="nc" id="L600">                    req.addArgument(&quot;code&quot;, (String) params.get(&quot;code&quot;));</span>
+<span class="nc" id="L601">                    req.addArgument(&quot;grant_type&quot;, &quot;authorization_code&quot;);</span>
+                }
+
+<span class="nc" id="L604">                NetworkManager.getInstance().addToQueue(req);</span>
+<span class="nc bnc" id="L605" title="All 2 branches missed.">            } else if (url.indexOf(&quot;error_reason=&quot;) &gt; -1) {</span>
+<span class="nc" id="L606">                Hashtable table = getParamsFromURL(url);</span>
+<span class="nc" id="L607">                String error = (String) table.get(&quot;error_reason&quot;);</span>
+<span class="nc bnc" id="L608" title="All 2 branches missed.">                if (login != null) {</span>
+<span class="nc" id="L609">                    login.dispose();</span>
+                }
+<span class="nc bnc" id="L611" title="All 2 branches missed.">                if (backToForm != null) {</span>
+<span class="nc" id="L612">                    backToForm.showBack();</span>
+                }
+<span class="nc bnc" id="L614" title="All 2 branches missed.">                if (al != null) {</span>
+<span class="nc" id="L615">                    al.actionPerformed(new ActionEvent(new IOException(error), ActionEvent.Type.Exception));</span>
+                }
+<span class="nc" id="L617">            } else {</span>
+<span class="nc bnc" id="L618" title="All 2 branches missed.">                boolean success = url.indexOf(&quot;#&quot;) &gt; -1;</span>
+<span class="nc bnc" id="L619" title="All 2 branches missed.">                if (success) {</span>
+<span class="nc" id="L620">                    String accessToken = url.substring(url.indexOf(&quot;#&quot;) + 1);</span>
+<span class="nc bnc" id="L621" title="All 2 branches missed.">                    if (accessToken.indexOf(&quot;&amp;&quot;) &gt; 0) {</span>
+<span class="nc" id="L622">                        token = accessToken.substring(accessToken.indexOf(&quot;=&quot;) + 1, accessToken.indexOf(&quot;&amp;&quot;));</span>
+                    } else {
+<span class="nc" id="L624">                        token = accessToken.substring(accessToken.indexOf(&quot;=&quot;) + 1);</span>
+                    }
+<span class="nc bnc" id="L626" title="All 2 branches missed.">                    if (login != null) {</span>
+<span class="nc" id="L627">                        login.dispose();</span>
+                    }
+<span class="nc bnc" id="L629" title="All 4 branches missed.">                    if (backToParent &amp;&amp; backToForm != null) {</span>
+<span class="nc" id="L630">                        backToForm.showBack();</span>
+                    }
+<span class="nc bnc" id="L632" title="All 2 branches missed.">                    if (al != null) {</span>
+<span class="nc" id="L633">                        al.actionPerformed(new ActionEvent(new AccessToken(token, expires), ActionEvent.Type.Response));</span>
+                    }
+                }
+<span class="nc" id="L636">            }</span>
+        } else {
+<span class="nc bnc" id="L638" title="All 4 branches missed.">            if (frm != null &amp;&amp; Display.getInstance().getCurrent() != frm) {</span>
+<span class="nc" id="L639">                progress.dispose();</span>
+<span class="nc" id="L640">                frm.show();</span>
+            }
+        }
+
+<span class="nc" id="L644">    }</span>
+
+    private Hashtable getParamsFromURL(String url) {
+<span class="nc" id="L647">        int paramsStarts = url.indexOf('?');</span>
+<span class="nc bnc" id="L648" title="All 2 branches missed.">        if (paramsStarts &gt; -1) {</span>
+<span class="nc" id="L649">            url = url.substring(paramsStarts + 1);</span>
+        }
+<span class="nc" id="L651">        Hashtable retVal = new Hashtable();</span>
+
+<span class="nc" id="L653">        String[] params = Util.split(url, &quot;&amp;&quot;);</span>
+<span class="nc" id="L654">        int plen = params.length;</span>
+<span class="nc bnc" id="L655" title="All 2 branches missed.">        for (int i = 0; i &lt; plen; i++) {</span>
+<span class="nc bnc" id="L656" title="All 2 branches missed.">            if (params[i].indexOf(&quot;=&quot;) &gt; 0) {</span>
+<span class="nc" id="L657">                String[] keyVal = Util.split(params[i], &quot;=&quot;);</span>
+<span class="nc" id="L658">                retVal.put(keyVal[0], keyVal[1]);</span>
+            }
+        }
+<span class="nc" id="L661">        return retVal;</span>
+    }
+
+<span class="nc" id="L664">    public class RefreshTokenRequest extends AsyncResource&lt;AccessToken&gt; {</span>
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

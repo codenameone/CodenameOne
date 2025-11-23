@@ -1,0 +1,2094 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TestUtils.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.testing</a> &gt; <span class="el_source">TestUtils.java</span></div><h1>TestUtils.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.testing;
+
+import com.codename1.compat.java.util.Objects;
+import com.codename1.io.Storage;
+import com.codename1.ui.Button;
+import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.List;
+import com.codename1.ui.SideMenuBar;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.Toolbar;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.list.ContainerList;
+import com.codename1.ui.spinner.GenericSpinner;
+import com.codename1.ui.util.ImageIO;
+
+import java.io.IOException;
+import java.util.ArrayList;
+
+/**
+ * Various utility classes to automate UI testing
+ *
+ * @author Shai Almog
+ */
+public class TestUtils {
+    private static boolean verbose;
+
+    private TestUtils() {
+    }
+
+    /**
+     * Activates/deactivates the verbose test mode
+     *
+     * @param v true for verbosity
+     */
+    public static void setVerboseMode(boolean v) {
+<span class="nc" id="L64">        verbose = v;</span>
+<span class="nc" id="L65">    }</span>
+
+    /**
+     * Waits for the given number of milliseconds even if the waiting is on the EDT thread
+     *
+     * @param millis the number of milliseconds to wait
+     */
+    public static void waitFor(final int millis) {
+<span class="pc bpc" id="L73" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L74">            log(&quot;waitFor(&quot; + millis + &quot;)&quot;);</span>
+        }
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (Display.getInstance().isEdt()) {</span>
+<span class="fc" id="L77">            Display.getInstance().invokeAndBlock(new Runnable() {</span>
+                public void run() {
+                    try {
+<span class="fc" id="L80">                        Thread.sleep(millis);</span>
+<span class="nc" id="L81">                    } catch (InterruptedException ex) {</span>
+<span class="fc" id="L82">                    }</span>
+<span class="fc" id="L83">                }</span>
+            });
+        } else {
+            try {
+<span class="nc" id="L87">                Thread.sleep(millis);</span>
+<span class="nc" id="L88">            } catch (InterruptedException ex) {</span>
+<span class="nc" id="L89">            }</span>
+        }
+<span class="fc" id="L91">    }</span>
+
+    /**
+     * Finds a component with the given name, works even with UI's that weren't created with the GUI builder
+     *
+     * @param componentName the name of the component to find
+     * @return the component with the given name within the tree
+     */
+    public static Component findByName(String componentName) {
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L101">            log(&quot;findByName(&quot; + componentName + &quot;)&quot;);</span>
+        }
+<span class="fc" id="L103">        Component c = findByName(Display.getInstance().getCurrent(), componentName);</span>
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (c == null) {</span>
+<span class="nc" id="L105">            waitFor(30);</span>
+<span class="nc" id="L106">            return findByName(Display.getInstance().getCurrent(), componentName);</span>
+        }
+<span class="fc" id="L108">        return c;</span>
+    }
+
+    /**
+     * Selects the given offset in a list
+     *
+     * @param listName the name of the list component
+     * @param offset   the offset to select
+     */
+    public static void selectInList(String listName, int offset) {
+<span class="fc" id="L118">        selectListOffset(findByName(listName), offset);</span>
+<span class="fc" id="L119">    }</span>
+
+    private static void selectListOffset(Component c, int offset) {
+<span class="pc bpc" id="L122" title="1 of 2 branches missed.">        assertBool(c != null, &quot;List not found&quot;);</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (c instanceof List) {</span>
+<span class="fc" id="L124">            ((List) c).setSelectedIndex(offset);</span>
+<span class="fc" id="L125">            return;</span>
+        }
+<span class="nc bnc" id="L127" title="All 2 branches missed.">        if (c instanceof ContainerList) {</span>
+<span class="nc" id="L128">            ((ContainerList) c).setSelectedIndex(offset);</span>
+<span class="nc" id="L129">            return;</span>
+        }
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        if (c instanceof GenericSpinner) {</span>
+<span class="nc" id="L132">            ((GenericSpinner) c).getModel().setSelectedIndex(offset);</span>
+<span class="nc" id="L133">            return;</span>
+        }
+<span class="nc" id="L135">        assertBool(false, &quot;Unsupported list type: &quot; + c.getName());</span>
+<span class="nc" id="L136">    }</span>
+
+    /**
+     * Selects the given offset in a list
+     *
+     * @param offset the offset to select
+     */
+    public static void selectInList(int[] path, int offset) {
+<span class="fc" id="L144">        selectListOffset(getComponentByPath(path), offset);</span>
+<span class="fc" id="L145">    }</span>
+
+    /**
+     * Finds a component with the given name, works even with UI's that weren't created with the GUI builder
+     *
+     * @param componentName the name of the component to find
+     * @return the component with the given name within the tree
+     */
+    private static Component findByName(Container root, String componentName) {
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L155">            log(&quot;findByName(&quot; + root + &quot;, &quot; + componentName + &quot;)&quot;);</span>
+        }
+<span class="fc" id="L157">        int count = root.getComponentCount();</span>
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="fc" id="L159">            Component c = root.getComponentAt(iter);</span>
+<span class="fc" id="L160">            String n = c.getName();</span>
+<span class="fc bfc" id="L161" title="All 4 branches covered.">            if (n != null &amp;&amp; n.equals(componentName)) {</span>
+<span class="fc" id="L162">                return c;</span>
+            }
+<span class="fc bfc" id="L164" title="All 2 branches covered.">            if (c instanceof Container) {</span>
+<span class="fc" id="L165">                c = findByName((Container) c, componentName);</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">                if (c != null) {</span>
+<span class="fc" id="L167">                    return c;</span>
+                }
+            }
+        }
+<span class="fc" id="L171">        return null;</span>
+    }
+
+    /**
+     * Finds a component with the given name, works even with UI's that weren't created with the GUI builder
+     *
+     * @param text the text of the label/button
+     * @return the component with the given label text within the tree
+     */
+    public static Label findLabelText(String text) {
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L182">            log(&quot;findLabelText(&quot; + text + &quot;)&quot;);</span>
+        }
+<span class="fc" id="L184">        return findLabelText(Display.getInstance().getCurrent(), text);</span>
+    }
+
+
+    /**
+     * Finds a component with the given name, works even with UI's that weren't created with the GUI builder
+     *
+     * @param text the text of the label/button
+     * @return the component with the given label text within the tree
+     */
+    private static Label findLabelText(Container root, String text) {
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L196">            log(&quot;findLabelText(&quot; + root + &quot;, &quot; + text + &quot;)&quot;);</span>
+        }
+<span class="fc" id="L198">        int count = root.getComponentCount();</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="fc" id="L200">            Component c = root.getComponentAt(iter);</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">            if (c instanceof Label) {</span>
+<span class="fc" id="L202">                String n = ((Label) c).getText();</span>
+<span class="pc bpc" id="L203" title="1 of 4 branches missed.">                if (n != null &amp;&amp; n.equals(text)) {</span>
+<span class="fc" id="L204">                    return (Label) c;</span>
+                }
+
+                // will work for cases of upcase due to Android theme upcasing of buttons
+<span class="fc" id="L208">                n = (String) c.getClientProperty(&quot;cn1$origText&quot;);</span>
+<span class="pc bpc" id="L209" title="3 of 4 branches missed.">                if (n != null &amp;&amp; n.equals(text)) {</span>
+<span class="nc" id="L210">                    return (Label) c;</span>
+                }
+                continue;
+            }
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">            if (c instanceof Container) {</span>
+<span class="fc" id="L215">                Label l = findLabelText((Container) c, text);</span>
+<span class="fc bfc" id="L216" title="All 2 branches covered.">                if (l != null) {</span>
+<span class="fc" id="L217">                    return l;</span>
+                }
+            }
+        }
+<span class="fc" id="L221">        return null;</span>
+    }
+
+    /**
+     * Clicks the button with the given label
+     *
+     * @param text the text on the button
+     */
+    public static void clickButtonByLabel(String text) {
+<span class="pc bpc" id="L230" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L231">            log(&quot;clickButtonByLabel(&quot; + text + &quot;)&quot;);</span>
+        }
+<span class="fc" id="L233">        Button b = (Button) findLabelText(text);</span>
+<span class="fc" id="L234">        waitFor(20);</span>
+<span class="fc" id="L235">        b.pressed();</span>
+<span class="fc" id="L236">        waitFor(20);</span>
+<span class="fc" id="L237">        b.released();</span>
+<span class="fc" id="L238">        waitFor(20);</span>
+<span class="fc" id="L239">    }</span>
+
+    /**
+     * Clicks the button with the given label
+     *
+     * @param name the name of the button
+     */
+    public static void clickButtonByName(String name) {
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L248">            log(&quot;clickButtonByName(&quot; + name + &quot;)&quot;);</span>
+        }
+<span class="fc" id="L250">        Button b = (Button) findByName(name);</span>
+<span class="fc" id="L251">        waitFor(20);</span>
+<span class="fc" id="L252">        b.pressed();</span>
+<span class="fc" id="L253">        waitFor(20);</span>
+<span class="fc" id="L254">        b.released();</span>
+<span class="fc" id="L255">        waitFor(20);</span>
+<span class="fc" id="L256">    }</span>
+
+    private static String toString(int[] p) {
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        if (p == null) {</span>
+<span class="nc" id="L260">            return &quot;null&quot;;</span>
+        }
+<span class="nc bnc" id="L262" title="All 2 branches missed.">        if (p.length == 0) {</span>
+<span class="nc" id="L263">            return &quot;{}&quot;;</span>
+        }
+<span class="nc" id="L265">        String s = &quot;{&quot; + p[0];</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">        for (int iter = 1; iter &lt; p.length; iter++) {</span>
+<span class="nc" id="L267">            s += &quot;, &quot; + p[iter];</span>
+
+        }
+<span class="nc" id="L270">        return s + &quot;}&quot;;</span>
+    }
+
+    /**
+     * Clicks the button with the given component path
+     *
+     * @param path the path
+     */
+    public static void clickButtonByPath(int[] path) {
+<span class="nc bnc" id="L279" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L280">            log(&quot;clickButtonByPath(&quot; + toString(path) + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L282">        Button b = (Button) getComponentByPath(path);</span>
+<span class="nc" id="L283">        b.pressed();</span>
+<span class="nc" id="L284">        waitFor(10);</span>
+<span class="nc" id="L285">        b.released();</span>
+<span class="nc" id="L286">        waitFor(10);</span>
+<span class="nc" id="L287">    }</span>
+
+    /**
+     * Executes the back command for the current form, similarly to pressing the back button
+     */
+    public static void goBack() {
+<span class="nc bnc" id="L293" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L294">            log(&quot;goBack()&quot;);</span>
+        }
+<span class="nc" id="L296">        Form f = Display.getInstance().getCurrent();</span>
+<span class="nc" id="L297">        Command c = f.getBackCommand();</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">        assertBool(c != null, &quot;The current form doesn't have a back command at this moment! for form name &quot; + f.getName());</span>
+<span class="nc" id="L299">        f.dispatchCommand(c, new ActionEvent(c, ActionEvent.Type.Command));</span>
+<span class="nc" id="L300">        waitFor(20);</span>
+<span class="nc" id="L301">    }</span>
+
+    /**
+     * Executes a menu command with the given name
+     *
+     * @param name the name of the command
+     */
+    public static void clickMenuItem(String name) {
+<span class="nc bnc" id="L309" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L310">            log(&quot;clickMenuItem(&quot; + name + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L312">        Form f = Display.getInstance().getCurrent();</span>
+<span class="nc bnc" id="L313" title="All 2 branches missed.">        for (int iter = 0; iter &lt; f.getCommandCount(); iter++) {</span>
+<span class="nc" id="L314">            Command c = f.getCommand(iter);</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">            if (name.equals(c.getCommandName())) {</span>
+<span class="nc" id="L316">                f.dispatchCommand(c, new ActionEvent(c, ActionEvent.Type.Command));</span>
+<span class="nc" id="L317">                return;</span>
+            }
+        }
+<span class="nc" id="L320">        throw new RuntimeException(&quot;Command not found: &quot; + name);</span>
+    }
+
+    /**
+     * Returns all the command objects from the toolbar in the order of left, right, overflow &amp;amp; sidemenu
+     *
+     * @return the set of commands
+     */
+    public static Command[] getToolbarCommands() {
+<span class="nc" id="L329">        Form f = Display.getInstance().getCurrent();</span>
+<span class="nc" id="L330">        Toolbar tb = f.getToolbar();</span>
+<span class="nc" id="L331">        ArrayList&lt;Command&gt; result = new ArrayList&lt;Command&gt;();</span>
+<span class="nc" id="L332">        addAllCommands(tb.getLeftBarCommands(), result);</span>
+<span class="nc" id="L333">        addAllCommands(tb.getRightBarCommands(), result);</span>
+<span class="nc" id="L334">        addAllCommands(tb.getOverflowCommands(), result);</span>
+<span class="nc" id="L335">        addAllCommands(tb.getSideMenuCommands(), result);</span>
+<span class="nc" id="L336">        Command[] carr = new Command[result.size()];</span>
+<span class="nc" id="L337">        result.toArray(carr);</span>
+<span class="nc" id="L338">        return carr;</span>
+    }
+
+    private static void addAllCommands(Iterable&lt;Command&gt; cs, ArrayList&lt;Command&gt; result) {
+<span class="nc bnc" id="L342" title="All 2 branches missed.">        if (cs != null) {</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">            for (Command c : cs) {</span>
+<span class="nc" id="L344">                result.add(c);</span>
+<span class="nc" id="L345">            }</span>
+        }
+<span class="nc" id="L347">    }</span>
+
+    /**
+     * Shows the sidemenu UI
+     */
+    public static void showSidemenu() {
+<span class="nc" id="L353">        Form f = Display.getInstance().getCurrent();</span>
+<span class="nc" id="L354">        Toolbar tb = f.getToolbar();</span>
+<span class="nc bnc" id="L355" title="All 2 branches missed.">        if (tb != null) {</span>
+<span class="nc" id="L356">            tb.openSideMenu();</span>
+        } else {
+<span class="nc" id="L358">            ((SideMenuBar) f.getMenuBar()).openMenu(null);</span>
+        }
+<span class="nc" id="L360">    }</span>
+
+    /**
+     * Executes a command from the offset returned by {@link #getToolbarCommands()}
+     *
+     * @param offset the offset of the command we want to execute
+     */
+    public static void executeToolbarCommandAtOffset(final int offset) {
+<span class="nc" id="L368">        Form f = Display.getInstance().getCurrent();</span>
+<span class="nc bnc" id="L369" title="All 2 branches missed.">        if (!Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L370">            Display.getInstance().callSerially(new Runnable() {</span>
+                public void run() {
+<span class="nc" id="L372">                    executeToolbarCommandAtOffset(offset);</span>
+<span class="nc" id="L373">                }</span>
+            });
+<span class="nc" id="L375">            return;</span>
+        }
+<span class="nc" id="L377">        Command cmd = getToolbarCommands()[offset];</span>
+<span class="nc" id="L378">        f.dispatchCommand(cmd, new ActionEvent(cmd));</span>
+<span class="nc" id="L379">    }</span>
+
+    /**
+     * Scrolls to show the component in case it is invisible currently
+     *
+     * @param c the component
+     */
+    public static void ensureVisible(Component c) {
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L388">            log(&quot;ensureVisible(&quot; + c + &quot;)&quot;);</span>
+        }
+<span class="fc" id="L390">        Form f = Display.getInstance().getCurrent();</span>
+<span class="fc" id="L391">        f.scrollComponentToVisible(c);</span>
+<span class="fc" id="L392">    }</span>
+
+    /**
+     * Scrolls to show the component in case it is invisible currently
+     *
+     * @param componentName the component
+     */
+    public static void ensureVisible(String componentName) {
+<span class="pc bpc" id="L400" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L401">            log(&quot;ensureVisible(&quot; + componentName + &quot;)&quot;);</span>
+        }
+<span class="fc" id="L403">        ensureVisible(findByName(componentName));</span>
+<span class="fc" id="L404">    }</span>
+
+    /**
+     * Scrolls to show the component in case it is invisible currently
+     *
+     * @param path the path to the component
+     */
+    public static void ensureVisible(int[] path) {
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L413">            log(&quot;ensureVisible(&quot; + toString(path) + &quot;)&quot;);</span>
+        }
+<span class="fc" id="L415">        ensureVisible(getComponentByPath(path));</span>
+<span class="fc" id="L416">    }</span>
+
+    /**
+     * Waits for a form change and if no form change occurred after a given timeout then fail the test
+     *
+     * @param title   the title of the form to wait for
+     * @param timeout Timeout in ms.
+     */
+    public static void waitForFormTitle(final String title, final long timeout) {
+<span class="nc bnc" id="L425" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L426">            log(&quot;waitForFormTitle(&quot; + title + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L428" title="All 2 branches missed.">        if (Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L429">            Display.getInstance().invokeAndBlock(new Runnable() {</span>
+                public void run() {
+<span class="nc" id="L431">                    waitForFormTitleImpl(title, timeout);</span>
+<span class="nc" id="L432">                }</span>
+            });
+        } else {
+<span class="nc" id="L435">            waitForFormTitleImpl(title, timeout);</span>
+        }
+<span class="nc" id="L437">        waitFor(50);</span>
+<span class="nc" id="L438">    }</span>
+
+    /**
+     * Waits for a form change and if no form change occurred after a given timeout then fail the test.  Timeout is 90 seconds.
+     *
+     * @param title the title of the form to wait for
+     */
+    public static void waitForFormTitle(final String title) {
+<span class="nc" id="L446">        waitForFormTitle(title, 90000);</span>
+<span class="nc" id="L447">    }</span>
+
+    private static String getFormTitle(Form f) {
+<span class="nc bnc" id="L450" title="All 2 branches missed.">        if (f.getToolbar() != null) {</span>
+<span class="nc" id="L451">            Component c = f.getToolbar().getTitleComponent();</span>
+<span class="nc bnc" id="L452" title="All 2 branches missed.">            if (c instanceof Label) {</span>
+<span class="nc" id="L453">                return ((Label) c).getText();</span>
+            }
+<span class="nc" id="L455">            return null;</span>
+        } else {
+<span class="nc" id="L457">            return f.getTitle();</span>
+        }
+    }
+
+    private static void waitForFormTitleImpl(String title, long timeout) {
+<span class="nc" id="L462">        long t = System.currentTimeMillis() + timeout;</span>
+<span class="nc bnc" id="L463" title="All 2 branches missed.">        while (!title.equals(getFormTitle(Display.getInstance().getCurrent()))) {</span>
+            try {
+<span class="nc" id="L465">                Thread.sleep(50);</span>
+<span class="nc bnc" id="L466" title="All 2 branches missed.">                if (System.currentTimeMillis() &gt; t) {</span>
+<span class="nc" id="L467">                    assertBool(false, &quot;Waiting for form &quot; + title + &quot; timed out! Current form title is: &quot; + Display.getInstance().getCurrent().getTitle());</span>
+                }
+<span class="nc" id="L469">            } catch (InterruptedException ex) {</span>
+<span class="nc" id="L470">            }</span>
+        }
+<span class="nc" id="L472">    }</span>
+
+    /**
+     * Waits for a form change and if no form change occurred after a given timeout then fail the test
+     *
+     * @param name    the name of the form to wait for
+     * @param timeout Timeout in ms
+     */
+    public static void waitForFormName(final String name, final long timeout) {
+<span class="nc bnc" id="L481" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L482">            log(&quot;waitForFormName(&quot; + name + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L484" title="All 2 branches missed.">        if (Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L485">            Display.getInstance().invokeAndBlock(new Runnable() {</span>
+                public void run() {
+<span class="nc" id="L487">                    waitForFormNameImpl(name, timeout);</span>
+<span class="nc" id="L488">                }</span>
+            });
+        } else {
+<span class="nc" id="L491">            waitForFormNameImpl(name, timeout);</span>
+        }
+<span class="nc" id="L493">        waitFor(50);</span>
+<span class="nc" id="L494">    }</span>
+
+    /**
+     * Waits for a form change and if no form change occurred after a given timeout then fail the test.  Timeout is 90 seconds.
+     *
+     * @param name the name of the form to wait for
+     */
+    public static void waitForFormName(final String name) {
+<span class="nc" id="L502">        waitForFormName(name, 90000);</span>
+<span class="nc" id="L503">    }</span>
+
+    private static void waitForFormNameImpl(String title, long timeout) {
+<span class="nc" id="L506">        long t = System.currentTimeMillis() + timeout;</span>
+<span class="nc bnc" id="L507" title="All 2 branches missed.">        while (!title.equals(Display.getInstance().getCurrent().getName())) {</span>
+            try {
+<span class="nc" id="L509">                Thread.sleep(50);</span>
+<span class="nc" id="L510">            } catch (InterruptedException ex) {</span>
+<span class="nc" id="L511">            }</span>
+<span class="nc bnc" id="L512" title="All 2 branches missed.">            if (System.currentTimeMillis() &gt; t) {</span>
+<span class="nc" id="L513">                assertBool(false, &quot;Waiting for form &quot; + title + &quot; timed out! Current form name is: &quot; + Display.getInstance().getCurrent().getName());</span>
+            }
+        }
+<span class="nc" id="L516">    }</span>
+
+    /**
+     * Waits for a form change and if no form change occurred after a given timeout then fail the test
+     *
+     * @param timeout Timeout in milliseconds.
+     */
+    public static void waitForUnnamedForm(final long timeout) {
+<span class="nc bnc" id="L524" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L525">            log(&quot;waitForUnnamedForm()&quot;);</span>
+        }
+<span class="nc bnc" id="L527" title="All 2 branches missed.">        if (Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L528">            Display.getInstance().invokeAndBlock(new Runnable() {</span>
+                public void run() {
+<span class="nc" id="L530">                    waitForUnnamedFormImpl(timeout);</span>
+<span class="nc" id="L531">                }</span>
+            });
+        } else {
+<span class="nc" id="L534">            waitForUnnamedFormImpl(timeout);</span>
+        }
+<span class="nc" id="L536">        waitFor(50);</span>
+<span class="nc" id="L537">    }</span>
+
+    /**
+     * Waits for a form change and if no form change occurred after a given timeout then fail the test
+     */
+    public static void waitForUnnamedForm() {
+<span class="nc" id="L543">        waitForUnnamedForm(90000);</span>
+<span class="nc" id="L544">    }</span>
+
+
+    private static void waitForUnnamedFormImpl(long timeout) {
+<span class="nc" id="L548">        long t = System.currentTimeMillis() + timeout;</span>
+<span class="nc bnc" id="L549" title="All 2 branches missed.">        while (Display.getInstance().getCurrent().getName() != null) {</span>
+            try {
+<span class="nc" id="L551">                Thread.sleep(50);</span>
+<span class="nc" id="L552">            } catch (InterruptedException ex) {</span>
+<span class="nc" id="L553">            }</span>
+<span class="nc bnc" id="L554" title="All 2 branches missed.">            if (System.currentTimeMillis() &gt; t) {</span>
+<span class="nc" id="L555">                assertBool(false, &quot;Waiting for form unnamed form timed out! Current form name is: &quot; + Display.getInstance().getCurrent().getName());</span>
+            }
+        }
+<span class="nc" id="L558">    }</span>
+
+    /**
+     * The screenshot test takes a screenshot of the screen and compares it to
+     * a prior screenshot, if both are 100% identical the test passes. If not
+     * the test fails.&lt;br&gt;
+     * If this is the first time the test is run then the screenshot is taken
+     * and saved under the given name in the devices storage. The test passes
+     * for this case but a warning is printed to the console. The name will have
+     * .png appended to it so it will be identified.&lt;br&gt;
+     * This test will only work on devices that support the ImageIO API with PNG
+     * file format.
+     *
+     * @param screenshotName the name to use for the storage, must be unique!
+     * @return true if the screenshots are identical or no prior screenshot exists
+     * or if the test can't be run on this device. False if a screenshot exists and
+     * it isn't 100% identical.
+     */
+    public static boolean screenshotTest(String screenshotName) {
+<span class="nc bnc" id="L577" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L578">            log(&quot;screenshotTest(&quot; + screenshotName + &quot;)&quot;);</span>
+        }
+        try {
+<span class="nc" id="L581">            ImageIO io = ImageIO.getImageIO();</span>
+<span class="nc bnc" id="L582" title="All 4 branches missed.">            if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {</span>
+<span class="nc" id="L583">                log(&quot;screenshot test skipped due to no image IO support for PNG format&quot;);</span>
+<span class="nc" id="L584">                return true;</span>
+            }
+
+
+<span class="nc" id="L588">            Image mute = Display.getInstance().captureScreen();</span>
+<span class="nc" id="L589">            Display.getInstance().getCurrent().paintComponent(mute.getGraphics(), true);</span>
+<span class="nc" id="L590">            screenshotName = screenshotName + &quot;.png&quot;;</span>
+<span class="nc bnc" id="L591" title="All 2 branches missed.">            if (Storage.getInstance().exists(screenshotName)) {</span>
+<span class="nc" id="L592">                int[] rgba = mute.getRGBCached();</span>
+<span class="nc" id="L593">                Image orig = Image.createImage(Storage.getInstance().createInputStream(screenshotName));</span>
+<span class="nc" id="L594">                int[] origRgba = orig.getRGBCached();</span>
+<span class="nc bnc" id="L595" title="All 2 branches missed.">                for (int iter = 0; iter &lt; rgba.length; iter++) {</span>
+<span class="nc bnc" id="L596" title="All 2 branches missed.">                    if (rgba[iter] != origRgba[iter]) {</span>
+<span class="nc" id="L597">                        log(&quot;screenshots do not match at offset &quot; + iter + &quot; saving additional image under &quot; + screenshotName + &quot;.fail&quot;);</span>
+<span class="nc" id="L598">                        io.save(mute, Storage.getInstance().createOutputStream(screenshotName + &quot;.fail&quot;), ImageIO.FORMAT_PNG, 1);</span>
+<span class="nc" id="L599">                        return false;</span>
+                    }
+                }
+<span class="nc" id="L602">            } else {</span>
+<span class="nc" id="L603">                io.save(mute, Storage.getInstance().createOutputStream(screenshotName), ImageIO.FORMAT_PNG, 1);</span>
+            }
+<span class="nc" id="L605">            return true;</span>
+<span class="nc" id="L606">        } catch (IOException err) {</span>
+<span class="nc" id="L607">            log(err);</span>
+<span class="nc" id="L608">            return false;</span>
+        }
+    }
+
+    /**
+     * Log to the test log
+     *
+     * @param t the string to log
+     */
+    public static void log(String t) {
+<span class="fc" id="L618">        TestReporting.getInstance().logMessage(t);</span>
+<span class="fc" id="L619">    }</span>
+
+    /**
+     * Log to the test log
+     *
+     * @param t exception to log
+     */
+    public static void log(Throwable t) {
+<span class="nc" id="L627">        TestReporting.getInstance().logException(t);</span>
+<span class="nc" id="L628">    }</span>
+
+
+    /**
+     * Simulates a device key press
+     *
+     * @param keyCode the keycode
+     */
+    public static void keyPress(int keyCode) {
+<span class="nc bnc" id="L637" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L638">            log(&quot;keyPress(&quot; + keyCode + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L640">        Display.getInstance().getCurrent().keyPressed(keyCode);</span>
+<span class="nc" id="L641">        waitFor(10);</span>
+<span class="nc" id="L642">    }</span>
+
+    /**
+     * Simulates a device key release
+     *
+     * @param keyCode the keycode
+     */
+    public static void keyRelease(int keyCode) {
+<span class="nc bnc" id="L650" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L651">            log(&quot;keyRelease(&quot; + keyCode + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L653">        Display.getInstance().getCurrent().keyReleased(keyCode);</span>
+<span class="nc" id="L654">        waitFor(10);</span>
+<span class="nc" id="L655">    }</span>
+
+    /**
+     * Simulates a game key press
+     *
+     * @param gameKey the game key (arrows etc.)
+     */
+    public static void gameKeyPress(int gameKey) {
+<span class="nc bnc" id="L663" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L664">            log(&quot;gameKeyPress(&quot; + gameKey + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L666">        Display.getInstance().getCurrent().keyPressed(Display.getInstance().getKeyCode(gameKey));</span>
+<span class="nc" id="L667">        waitFor(10);</span>
+<span class="nc" id="L668">    }</span>
+
+    /**
+     * Simulates a game key release
+     *
+     * @param gameKey the game key (arrows etc.)
+     */
+    public static void gameKeyRelease(int gameKey) {
+<span class="nc bnc" id="L676" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L677">            log(&quot;gameKeyRelease(&quot; + gameKey + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L679">        Display.getInstance().getCurrent().keyReleased(Display.getInstance().getKeyCode(gameKey));</span>
+<span class="nc" id="L680">        waitFor(10);</span>
+<span class="nc" id="L681">    }</span>
+
+    /**
+     * A component press on a given named component at x/y where x and y are &lt;b&gt;NOT pixels&lt;/b&gt;
+     * but rather a number between 0 to 1 representing the percentage within the component where the
+     * event took place. E.g. For a 100x100 component a press within 10,5 would be 0.1f, 0.05f.
+     *
+     * @param x             the offset within the component as a number between 0 and 1
+     * @param y             the offset within the component as a number between 0 and 1
+     * @param componentName the name of the component
+     */
+    public static void pointerPress(float x, float y, String componentName) {
+<span class="nc bnc" id="L693" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc bnc" id="L694" title="All 2 branches missed.">            if (componentName == null) {</span>
+<span class="nc" id="L695">                log(&quot;pointerPress(&quot; + x + &quot;, &quot; + y + &quot;, null)&quot;);</span>
+            } else {
+<span class="nc" id="L697">                log(&quot;pointerPress(&quot; + x + &quot;, &quot; + y + &quot;, &quot; + componentName + &quot;)&quot;);</span>
+            }
+        }
+<span class="nc" id="L700">        waitFor(20);</span>
+<span class="nc bnc" id="L701" title="All 2 branches missed.">        if (componentName != null) {</span>
+<span class="nc" id="L702">            Component c = findByName(componentName);</span>
+<span class="nc" id="L703">            int actualX = c.getAbsoluteX() + (int) (x * c.getWidth());</span>
+<span class="nc" id="L704">            int actualY = c.getAbsoluteY() + (int) (y * c.getHeight());</span>
+<span class="nc" id="L705">            Display.getInstance().getCurrent().pointerPressed(actualX, actualY);</span>
+<span class="nc" id="L706">        } else {</span>
+<span class="nc" id="L707">            Display.getInstance().getCurrent().pointerPressed((int) (x * Display.getInstance().getDisplayWidth()),</span>
+<span class="nc" id="L708">                    (int) (y * Display.getInstance().getDisplayHeight()));</span>
+        }
+<span class="nc" id="L710">        waitFor(10);</span>
+<span class="nc" id="L711">    }</span>
+
+    /**
+     * A component release on a given named component at x/y where x and y are &lt;b&gt;NOT pixels&lt;/b&gt;
+     * but rather a number between 0 to 1 representing the percentage within the component where the
+     * event took place. E.g. For a 100x100 component a press within 10,5 would be 0.1f, 0.05f.
+     *
+     * @param x             the offset within the component as a number between 0 and 1
+     * @param y             the offset within the component as a number between 0 and 1
+     * @param componentName the name of the component
+     */
+    public static void pointerRelease(float x, float y, String componentName) {
+<span class="nc bnc" id="L723" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L724">            log(&quot;pointerRelease(&quot; + x + &quot;, &quot; + y + &quot;, &quot; + componentName + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L726">        Component c = findByName(componentName);</span>
+<span class="nc" id="L727">        int actualX = c.getAbsoluteX() + (int) (x * c.getWidth());</span>
+<span class="nc" id="L728">        int actualY = c.getAbsoluteY() + (int) (y * c.getHeight());</span>
+<span class="nc" id="L729">        Display.getInstance().getCurrent().pointerReleased(actualX, actualY);</span>
+<span class="nc" id="L730">        waitFor(30);</span>
+<span class="nc" id="L731">    }</span>
+
+    /**
+     * A component drag on a given named component at x/y where x and y are &lt;b&gt;NOT pixels&lt;/b&gt;
+     * but rather a number between 0 to 1 representing the percentage within the component where the
+     * event took place. E.g. For a 100x100 component a press within 10,5 would be 0.1f, 0.05f.
+     *
+     * @param x             the offset within the component as a number between 0 and 1
+     * @param y             the offset within the component as a number between 0 and 1
+     * @param componentName the name of the component
+     */
+    public static void pointerDrag(float x, float y, String componentName) {
+<span class="nc bnc" id="L743" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L744">            log(&quot;pointerDrag(&quot; + x + &quot;, &quot; + y + &quot;, &quot; + componentName + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L746">        Component c = findByName(componentName);</span>
+<span class="nc" id="L747">        int actualX = c.getAbsoluteX() + (int) (x * c.getWidth());</span>
+<span class="nc" id="L748">        int actualY = c.getAbsoluteY() + (int) (y * c.getHeight());</span>
+<span class="nc" id="L749">        Display.getInstance().getCurrent().pointerDragged(actualX, actualY);</span>
+<span class="nc" id="L750">    }</span>
+
+    /**
+     * A component press on a given named component at x/y where x and y are &lt;b&gt;NOT pixels&lt;/b&gt;
+     * but rather a number between 0 to 1 representing the percentage within the component where the
+     * event took place. E.g. For a 100x100 component a press within 10,5 would be 0.1f, 0.05f.
+     *
+     * @param x    the offset within the component as a number between 0 and 1
+     * @param y    the offset within the component as a number between 0 and 1
+     * @param path the path to the component
+     */
+    public static void pointerPress(float x, float y, int[] path) {
+<span class="nc bnc" id="L762" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L763">            log(&quot;pointerPress(&quot; + x + &quot;, &quot; + y + &quot;, &quot; + toString(path) + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L765">        Component c = getComponentByPath(path);</span>
+<span class="nc" id="L766">        int actualX = c.getAbsoluteX() + (int) (x * c.getWidth());</span>
+<span class="nc" id="L767">        int actualY = c.getAbsoluteY() + (int) (y * c.getHeight());</span>
+<span class="nc" id="L768">        Display.getInstance().getCurrent().pointerPressed(actualX, actualY);</span>
+<span class="nc" id="L769">        waitFor(10);</span>
+<span class="nc" id="L770">    }</span>
+
+    /**
+     * A component release on a given named component at x/y where x and y are &lt;b&gt;NOT pixels&lt;/b&gt;
+     * but rather a number between 0 to 1 representing the percentage within the component where the
+     * event took place. E.g. For a 100x100 component a press within 10,5 would be 0.1f, 0.05f.
+     *
+     * @param x    the offset within the component as a number between 0 and 1
+     * @param y    the offset within the component as a number between 0 and 1
+     * @param path the path to the component
+     */
+    public static void pointerRelease(float x, float y, int[] path) {
+<span class="nc bnc" id="L782" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L783">            log(&quot;pointerRelease(&quot; + x + &quot;, &quot; + y + &quot;, &quot; + toString(path) + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L785">        Component c = getComponentByPath(path);</span>
+<span class="nc" id="L786">        int actualX = c.getAbsoluteX() + (int) (x * c.getWidth());</span>
+<span class="nc" id="L787">        int actualY = c.getAbsoluteY() + (int) (y * c.getHeight());</span>
+<span class="nc" id="L788">        Display.getInstance().getCurrent().pointerReleased(actualX, actualY);</span>
+<span class="nc" id="L789">        waitFor(10);</span>
+<span class="nc" id="L790">    }</span>
+
+    /**
+     * A component drag on a given named component at x/y where x and y are &lt;b&gt;NOT pixels&lt;/b&gt;
+     * but rather a number between 0 to 1 representing the percentage within the component where the
+     * event took place. E.g. For a 100x100 component a press within 10,5 would be 0.1f, 0.05f.
+     *
+     * @param x    the offset within the component as a number between 0 and 1
+     * @param y    the offset within the component as a number between 0 and 1
+     * @param path the path to the component
+     */
+    public static void pointerDrag(float x, float y, int[] path) {
+<span class="nc bnc" id="L802" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L803">            log(&quot;pointerDrag(&quot; + x + &quot;, &quot; + y + &quot;, &quot; + toString(path) + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L805">        Component c = getComponentByPath(path);</span>
+<span class="nc" id="L806">        int actualX = c.getAbsoluteX() + (int) (x * c.getWidth());</span>
+<span class="nc" id="L807">        int actualY = c.getAbsoluteY() + (int) (y * c.getHeight());</span>
+<span class="nc" id="L808">        Display.getInstance().getCurrent().pointerDragged(actualX, actualY);</span>
+<span class="nc" id="L809">    }</span>
+
+    /**
+     * Gets the component from the current form based on its path. A path is a
+     * set of offsets starting from the content pane and moving inwards so a path
+     * of { 0, 3 } would mean that the first component within the Content pane (by
+     * index) is a Container whose 3rd component (again by index) is the component we
+     * want.
+     *
+     * @param path an array
+     * @return a component
+     */
+    public static Component getComponentByPath(int[] path) {
+<span class="fc" id="L822">        Component current = Display.getInstance().getCurrent().getContentPane();</span>
+<span class="fc bfc" id="L823" title="All 2 branches covered.">        for (int iter = 0; iter &lt; path.length; iter++) {</span>
+<span class="fc" id="L824">            current = ((Container) current).getComponentAt(path[iter]);</span>
+        }
+<span class="fc" id="L826">        return current;</span>
+    }
+
+
+    /**
+     * Sets the text for the given component
+     *
+     * @param name the name of the component
+     * @param text the text to set
+     */
+    public static void setText(String name, String text) {
+<span class="pc bpc" id="L837" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L838">            log(&quot;setText(&quot; + name + &quot;, &quot; + text + &quot;)&quot;);</span>
+        }
+<span class="fc" id="L840">        Component c = findByName(name);</span>
+<span class="fc bfc" id="L841" title="All 2 branches covered.">        if (c instanceof Label) {</span>
+<span class="fc" id="L842">            ((Label) c).setText(text);</span>
+<span class="fc" id="L843">            return;</span>
+        }
+<span class="fc" id="L845">        ((TextArea) c).setText(text);</span>
+<span class="fc" id="L846">        Display.getInstance().onEditingComplete(c, text);</span>
+
+<span class="fc" id="L848">    }</span>
+
+    /**
+     * Sets the text for the given component
+     *
+     * @param path the path to the component
+     * @param text the text to set
+     */
+    public static void setText(int[] path, String text) {
+<span class="pc bpc" id="L857" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L858">            log(&quot;setText(&quot; + toString(path) + &quot;, &quot; + text + &quot;)&quot;);</span>
+        }
+<span class="fc" id="L860">        Component c = getComponentByPath(path);</span>
+<span class="fc bfc" id="L861" title="All 2 branches covered.">        if (c instanceof Label) {</span>
+<span class="fc" id="L862">            ((Label) c).setText(text);</span>
+<span class="fc" id="L863">            return;</span>
+        }
+<span class="fc" id="L865">        ((TextArea) c).setText(text);</span>
+<span class="fc" id="L866">    }</span>
+
+    /**
+     * Assertions allow for simpler test code
+     *
+     * @param b must be true, otherwise an exception is thrown thus failing the test
+     */
+    public static void assertBool(boolean b) {
+<span class="pc bpc" id="L874" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L875">            log(&quot;assertBool(&quot; + b + &quot;)&quot;);</span>
+        }
+<span class="fc bfc" id="L877" title="All 2 branches covered.">        if (!b) {</span>
+<span class="fc" id="L878">            throw new RuntimeException();</span>
+        }
+<span class="fc" id="L880">    }</span>
+
+    /**
+     * Assertions allow for simpler test code
+     *
+     * @param b must be true, otherwise an exception is thrown thus failing the test
+     */
+    public static void assertBool(boolean b, String errorMessage) {
+<span class="pc bpc" id="L888" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L889">            log(&quot;assertBool(&quot; + b + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="fc bfc" id="L891" title="All 2 branches covered.">        if (!b) {</span>
+<span class="fc" id="L892">            log(&quot;Assert failed on: &quot; + errorMessage);</span>
+<span class="fc" id="L893">            throw new RuntimeException(errorMessage);</span>
+        }
+<span class="fc" id="L895">    }</span>
+
+    /**
+     * An assertion that always fails a test.
+     */
+    public static void fail() {
+<span class="nc bnc" id="L901" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L902">            log(&quot;fail()&quot;);</span>
+        }
+<span class="nc" id="L904">        assertBool(false);</span>
+<span class="nc" id="L905">    }</span>
+
+    /**
+     * An assertion that always fails a test.
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void fail(String errorMessage) {
+<span class="pc bpc" id="L913" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L914">            log(&quot;fail(&quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L916">        assertBool(false, errorMessage);</span>
+<span class="nc" id="L917">    }</span>
+
+    /**
+     * Asserts that the given expression evaluates to true
+     */
+    public static void assertTrue(boolean value) {
+<span class="pc bpc" id="L923" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L924">            log(&quot;assertTrue(&quot; + value + &quot;)&quot;);</span>
+        }
+<span class="fc" id="L926">        assertBool(value);</span>
+<span class="fc" id="L927">    }</span>
+
+    /**
+     * Asserts that the given expression evaluates to true
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertTrue(boolean value, String errorMessage) {
+<span class="nc bnc" id="L935" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L936">            log(&quot;assertTrue(&quot; + value + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L938">        assertBool(value, errorMessage);</span>
+<span class="nc" id="L939">    }</span>
+
+    /**
+     * Asserts that the given expression evaluates to false
+     */
+    public static void assertFalse(boolean value) {
+<span class="pc bpc" id="L945" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L946">            log(&quot;assertFalse(&quot; + value + &quot;)&quot;);</span>
+        }
+<span class="fc bfc" id="L948" title="All 2 branches covered.">        assertBool(!value);</span>
+<span class="fc" id="L949">    }</span>
+
+    /**
+     * Asserts that the given expression evaluates to false
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertFalse(boolean value, String errorMessage) {
+<span class="nc bnc" id="L957" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L958">            log(&quot;assertFalse(&quot; + value + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L960" title="All 2 branches missed.">        assertBool(!value, errorMessage);</span>
+<span class="nc" id="L961">    }</span>
+
+    /**
+     * Asserts that the given expression evaluates to null
+     */
+    public static void assertNull(Object object) {
+<span class="pc bpc" id="L967" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L968">            log(&quot;assertNull(&quot; + object + &quot;)&quot;);</span>
+        }
+<span class="fc bfc" id="L970" title="All 2 branches covered.">        assertBool(object == null);</span>
+<span class="fc" id="L971">    }</span>
+
+    /**
+     * Asserts that the given expression evaluates to null
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertNull(Object object, String errorMessage) {
+<span class="nc bnc" id="L979" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L980">            log(&quot;assertNull(&quot; + object + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L982" title="All 2 branches missed.">        assertBool(object == null, errorMessage);</span>
+<span class="nc" id="L983">    }</span>
+
+    /**
+     * Asserts that the given expression does not evaluate to null
+     */
+    public static void assertNotNull(Object object) {
+<span class="pc bpc" id="L989" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L990">            log(&quot;assertNotNull(&quot; + object + &quot;)&quot;);</span>
+        }
+<span class="fc bfc" id="L992" title="All 2 branches covered.">        assertBool(object != null);</span>
+<span class="fc" id="L993">    }</span>
+
+    /**
+     * Asserts that the given expression does not evaluate to null
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertNotNull(Object object, String errorMessage) {
+<span class="nc bnc" id="L1001" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1002">            log(&quot;assertNotNull(&quot; + object + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1004" title="All 2 branches missed.">        assertBool(object != null, errorMessage);</span>
+<span class="nc" id="L1005">    }</span>
+
+    /**
+     * Asserts that the given parameters reference the same object
+     */
+    public static void assertSame(Object expected, Object actual) {
+<span class="nc bnc" id="L1011" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1012">            log(&quot;assertSame(&quot; + expected + &quot;, &quot; + actual + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1014" title="All 2 branches missed.">        assertBool(expected == actual);</span>
+<span class="nc" id="L1015">    }</span>
+
+    /**
+     * Asserts that the given parameters reference the same object
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertSame(Object expected, Object actual, String errorMessage) {
+<span class="nc bnc" id="L1023" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1024">            log(&quot;assertSame(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1026" title="All 2 branches missed.">        assertBool(expected == actual, errorMessage);</span>
+<span class="nc" id="L1027">    }</span>
+
+    /**
+     * Asserts that the given parameters do not reference the same object
+     */
+    public static void assertNotSame(Object expected, Object actual) {
+<span class="nc bnc" id="L1033" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1034">            log(&quot;assertNotSame(&quot; + expected + &quot;, &quot; + actual + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1036" title="All 2 branches missed.">        assertBool(expected != actual);</span>
+<span class="nc" id="L1037">    }</span>
+
+    /**
+     * Asserts that the given parameters do not reference the same object
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertNotSame(Object expected, Object actual, String errorMessage) {
+<span class="nc bnc" id="L1045" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1046">            log(&quot;assertNotSame(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1048" title="All 2 branches missed.">        assertBool(expected != actual, errorMessage);</span>
+<span class="nc" id="L1049">    }</span>
+
+    private static void assertRelativeErrorExceeded(float expected, float actual, double minRelativeError) {
+<span class="nc bnc" id="L1052" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1053">            log(&quot;assertRelativeErrorExceeded(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + minRelativeError + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L1055">        double relative_error = Math.abs((expected - actual) / actual) * 100;</span>
+<span class="nc bnc" id="L1056" title="All 2 branches missed.">        if (relative_error &lt; minRelativeError) {</span>
+<span class="nc" id="L1057">            assertBool(false);</span>
+        }
+<span class="nc" id="L1059">    }</span>
+
+    private static void assertRelativeErrorExceeded(double expected, double actual, double minRelativeError) {
+<span class="nc bnc" id="L1062" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1063">            log(&quot;assertRelativeErrorExceeded(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + minRelativeError + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L1065">        double relative_error = Math.abs((expected - actual) / actual) * 100;</span>
+<span class="nc bnc" id="L1066" title="All 2 branches missed.">        if (relative_error &lt; minRelativeError) {</span>
+<span class="nc" id="L1067">            assertBool(false);</span>
+        }
+<span class="nc" id="L1069">    }</span>
+
+    private static void assertRelativeErrorExceeded(float expected, float actual, double minRelativeError, String errorMessage) {
+<span class="nc bnc" id="L1072" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1073">            log(&quot;assertRelativeErrorExceeded(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + minRelativeError + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L1075">        double relative_error = Math.abs((expected - actual) / actual) * 100;</span>
+<span class="nc bnc" id="L1076" title="All 2 branches missed.">        if (relative_error &lt; minRelativeError) {</span>
+<span class="nc" id="L1077">            assertBool(false, errorMessage);</span>
+        }
+<span class="nc" id="L1079">    }</span>
+
+    private static void assertRelativeErrorExceeded(double expected, double actual, double minRelativeError, String errorMessage) {
+<span class="nc bnc" id="L1082" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1083">            log(&quot;assertRelativeErrorExceeded(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + minRelativeError + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L1085">        double relative_error = Math.abs((expected - actual) / actual) * 100;</span>
+<span class="nc bnc" id="L1086" title="All 2 branches missed.">        if (relative_error &lt; minRelativeError) {</span>
+<span class="nc" id="L1087">            assertBool(false, errorMessage);</span>
+        }
+<span class="nc" id="L1089">    }</span>
+
+    private static void assertRelativeErrorNotExceeded(float expected, float actual, double maxRelativeError) {
+<span class="nc bnc" id="L1092" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1093">            log(&quot;assertRelativeErrorNotExceeded(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + maxRelativeError + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L1095">        double relative_error = Math.abs((expected - actual) / actual) * 100;</span>
+<span class="nc bnc" id="L1096" title="All 2 branches missed.">        if (relative_error &gt; maxRelativeError) {</span>
+<span class="nc" id="L1097">            assertBool(false);</span>
+        }
+<span class="nc" id="L1099">    }</span>
+
+    private static void assertRelativeErrorNotExceeded(double expected, double actual, double maxRelativeError) {
+<span class="nc bnc" id="L1102" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1103">            log(&quot;assertRelativeErrorNotExceeded(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + maxRelativeError + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L1105">        double relative_error = Math.abs((expected - actual) / actual) * 100;</span>
+<span class="nc bnc" id="L1106" title="All 2 branches missed.">        if (relative_error &gt; maxRelativeError) {</span>
+<span class="nc" id="L1107">            assertBool(false);</span>
+        }
+<span class="nc" id="L1109">    }</span>
+
+    private static void assertRelativeErrorNotExceeded(float expected, float actual, double maxRelativeError, String errorMessage) {
+<span class="nc bnc" id="L1112" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1113">            log(&quot;assertRelativeErrorNotExceeded(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + maxRelativeError + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L1115">        double relative_error = Math.abs((expected - actual) / actual) * 100;</span>
+<span class="nc bnc" id="L1116" title="All 2 branches missed.">        if (relative_error &gt; maxRelativeError) {</span>
+<span class="nc" id="L1117">            assertBool(false, errorMessage);</span>
+        }
+<span class="nc" id="L1119">    }</span>
+
+    private static void assertRelativeErrorNotExceeded(double expected, double actual, double maxRelativeError, String errorMessage) {
+<span class="nc bnc" id="L1122" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1123">            log(&quot;assertRelativeErrorNotExceeded(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + maxRelativeError + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L1125">        double relative_error = Math.abs((expected - actual) / actual) * 100;</span>
+<span class="nc bnc" id="L1126" title="All 2 branches missed.">        if (relative_error &gt; maxRelativeError) {</span>
+<span class="nc" id="L1127">            assertBool(false, errorMessage);</span>
+        }
+<span class="nc" id="L1129">    }</span>
+
+    private static void assertErrorNotExceeded(double expected, double actual, double maxError, String errorMessage) {
+<span class="nc bnc" id="L1132" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1133">            log(&quot;assertErrorNotExceeded(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + maxError + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L1135">        double error = Math.abs((expected - actual));</span>
+<span class="nc bnc" id="L1136" title="All 2 branches missed.">        if (error &gt; maxError) {</span>
+<span class="nc" id="L1137">            assertBool(false, errorMessage);</span>
+        }
+<span class="nc" id="L1139">    }</span>
+
+    /**
+     * Asserts that the given bytes are equal
+     */
+    public static void assertEqual(byte expected, byte actual) {
+<span class="nc bnc" id="L1145" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1146">            log(&quot;assertEqual(&quot; + expected + &quot;, &quot; + actual + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1148" title="All 2 branches missed.">        assertBool(expected == actual);</span>
+<span class="nc" id="L1149">    }</span>
+
+    /**
+     * Asserts that the given bytes are equal
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertEqual(byte expected, byte actual, String errorMessage) {
+<span class="nc bnc" id="L1157" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1158">            log(&quot;assertEqual(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1160" title="All 2 branches missed.">        assertBool(expected == actual, errorMessage);</span>
+<span class="nc" id="L1161">    }</span>
+
+    /**
+     * Asserts that the given shorts are equal
+     */
+    public static void assertEqual(short expected, short actual) {
+<span class="nc bnc" id="L1167" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1168">            log(&quot;assertEqual(&quot; + expected + &quot;, &quot; + actual + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1170" title="All 2 branches missed.">        assertBool(expected == actual);</span>
+<span class="nc" id="L1171">    }</span>
+
+    /**
+     * Asserts that the given shorts are equal
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertEqual(short expected, short actual, String errorMessage) {
+<span class="nc bnc" id="L1179" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1180">            log(&quot;assertEqual(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1182" title="All 2 branches missed.">        assertBool(expected == actual, errorMessage);</span>
+<span class="nc" id="L1183">    }</span>
+
+    /**
+     * Asserts that the given ints are equal
+     */
+    public static void assertEqual(int expected, int actual) {
+<span class="pc bpc" id="L1189" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1190">            log(&quot;assertEqual(&quot; + expected + &quot;, &quot; + actual + &quot;)&quot;);</span>
+        }
+<span class="fc bfc" id="L1192" title="All 2 branches covered.">        assertBool(expected == actual, &quot;Expected [&quot; + expected + &quot;], Actual [&quot; + actual + &quot;]&quot;);</span>
+<span class="fc" id="L1193">    }</span>
+
+    /**
+     * Asserts that the given ints are equal
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertEqual(int expected, int actual, String errorMessage) {
+<span class="nc bnc" id="L1201" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1202">            log(&quot;assertEqual(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1204" title="All 2 branches missed.">        assertBool(expected == actual, errorMessage + &quot;;&quot; + &quot;Expected [&quot; + expected + &quot;], Actual [&quot; + actual + &quot;]&quot;);</span>
+<span class="nc" id="L1205">    }</span>
+
+    /**
+     * Asserts that the given longs are equal
+     */
+    public static void assertEqual(long expected, long actual) {
+<span class="nc bnc" id="L1211" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1212">            log(&quot;assertEqual(&quot; + expected + &quot;, &quot; + actual + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1214" title="All 2 branches missed.">        assertBool(expected == actual, &quot;Expected [&quot; + expected + &quot;], Actual [&quot; + actual + &quot;]&quot;);</span>
+<span class="nc" id="L1215">    }</span>
+
+    /**
+     * Asserts that the given longs are equal
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertEqual(long expected, long actual, String errorMessage) {
+<span class="nc bnc" id="L1223" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1224">            log(&quot;assertEqual(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1226" title="All 2 branches missed.">        assertBool(expected == actual, errorMessage + &quot;; &quot; + &quot;Expected [&quot; + expected + &quot;], Actual [&quot; + actual + &quot;]&quot;);</span>
+<span class="nc" id="L1227">    }</span>
+
+    /**
+     * Asserts that the given floats are equal
+     *
+     * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
+     */
+    public static void assertEqual(float expected, float actual, double maxRelativeError) {
+<span class="nc bnc" id="L1235" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1236">            log(&quot;assertEqual(&quot; + expected + &quot;, &quot; + actual + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1238" title="All 2 branches missed.">        if (expected != actual) {</span>
+<span class="nc" id="L1239">            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError, &quot;Expected [&quot; + expected + &quot;], Actual [&quot; + actual + &quot;]&quot;);</span>
+        }
+<span class="nc" id="L1241">    }</span>
+
+    /**
+     * Asserts that the given floats are equal
+     *
+     * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
+     * @param errorMessage     is a string describing the failure
+     */
+    public static void assertEqual(float expected, float actual, double maxRelativeError, String errorMessage) {
+<span class="nc bnc" id="L1250" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1251">            log(&quot;assertEqual(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1253" title="All 2 branches missed.">        if (expected != actual) {</span>
+<span class="nc" id="L1254">            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError, errorMessage + &quot;; &quot; + &quot;Expected [&quot; + expected + &quot;], Actual [&quot; + actual + &quot;]&quot;);</span>
+        }
+<span class="nc" id="L1256">    }</span>
+
+    /**
+     * Asserts that the given doubles are equal
+     *
+     * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
+     */
+    public static void assertEqual(double expected, double actual, double maxRelativeError) {
+<span class="nc bnc" id="L1264" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1265">            log(&quot;assertEqual(&quot; + expected + &quot;, &quot; + actual + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1267" title="All 2 branches missed.">        if (expected != actual) {</span>
+<span class="nc" id="L1268">            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError, &quot;Expected [&quot; + expected + &quot;], Actual [&quot; + actual + &quot;]&quot;);</span>
+        }
+<span class="nc" id="L1270">    }</span>
+
+    /**
+     * Asserts that the given doubles are equal
+     *
+     * @param expected      Expected value
+     * @param actual        Actual value
+     * @param absoluteError is the maximum allowed error, a value of 1 represents a 1% error.
+     * @since 8.0
+     */
+    public static void assertRange(double expected, double actual, double absoluteError) {
+<span class="nc bnc" id="L1281" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1282">            log(&quot;assertRange(&quot; + expected + &quot;, &quot; + actual + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1284" title="All 2 branches missed.">        if (expected != actual) {</span>
+<span class="nc" id="L1285">            assertErrorNotExceeded(expected, actual, absoluteError, &quot;Expected [&quot; + expected + &quot;], Actual [&quot; + actual + &quot;]&quot;);</span>
+        }
+<span class="nc" id="L1287">    }</span>
+
+
+    /**
+     * Asserts that the given doubles are equal
+     *
+     * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
+     * @param errorMessage     is a string describing the failure
+     */
+    public static void assertEqual(double expected, double actual, double maxRelativeError, String errorMessage) {
+<span class="nc bnc" id="L1297" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1298">            log(&quot;assertEqual(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1300" title="All 2 branches missed.">        if (expected != actual) {</span>
+<span class="nc" id="L1301">            assertRelativeErrorNotExceeded(expected, actual, maxRelativeError, errorMessage + &quot;; &quot; + &quot;Expected [&quot; + expected + &quot;], Actual [&quot; + actual + &quot;]&quot;);</span>
+        }
+<span class="nc" id="L1303">    }</span>
+
+    /**
+     * Asserts that the given doubles are equal
+     *
+     * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
+     * @param errorMessage     is a string describing the failure
+     */
+    public static void assertRange(double expected, double actual, double maxAbsoluteError, String errorMessage) {
+<span class="nc bnc" id="L1312" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1313">            log(&quot;assertRange(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1315" title="All 2 branches missed.">        if (expected != actual) {</span>
+<span class="nc" id="L1316">            assertErrorNotExceeded(expected, actual, maxAbsoluteError, errorMessage + &quot;; &quot; + &quot;Expected [&quot; + expected + &quot;], Actual [&quot; + actual + &quot;]&quot;);</span>
+        }
+<span class="nc" id="L1318">    }</span>
+
+    /**
+     * Asserts that the given objects are equal using the first object's .equal() method
+     */
+    public static void assertEqual(Object expected, Object actual) {
+<span class="nc bnc" id="L1324" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1325">            log(&quot;assertEqual(&quot; + expected + &quot;, &quot; + actual + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L1327">        assertBool(Objects.equals(expected, actual), &quot;Expected [&quot; + expected + &quot;], Actual [&quot; + actual + &quot;]&quot;);</span>
+<span class="nc" id="L1328">    }</span>
+
+    /**
+     * Asserts that the given objects are equal using the first object's .equal() method
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertEqual(Object expected, Object actual, String errorMessage) {
+<span class="nc bnc" id="L1336" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1337">            log(&quot;assertEqual(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L1339">        assertBool(Objects.equals(expected, actual), errorMessage + &quot;; &quot; + &quot;Expected [&quot; + expected + &quot;], Actual [&quot; + actual + &quot;]&quot;);</span>
+<span class="nc" id="L1340">    }</span>
+
+    /**
+     * Asserts that the given bytes are not equal
+     */
+    public static void assertNotEqual(byte expected, byte actual) {
+<span class="nc bnc" id="L1346" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1347">            log(&quot;assertNotEqual(&quot; + expected + &quot;, &quot; + actual + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1349" title="All 2 branches missed.">        assertBool(expected != actual);</span>
+<span class="nc" id="L1350">    }</span>
+
+    /**
+     * Asserts that the given bytes are not equal
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertNotEqual(byte expected, byte actual, String errorMessage) {
+<span class="nc bnc" id="L1358" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1359">            log(&quot;assertNotEqual(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1361" title="All 2 branches missed.">        assertBool(expected != actual, errorMessage);</span>
+<span class="nc" id="L1362">    }</span>
+
+    /**
+     * Asserts that the given shorts are not equal
+     */
+    public static void assertNotEqual(short expected, short actual) {
+<span class="nc bnc" id="L1368" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1369">            log(&quot;assertNotEqual(&quot; + expected + &quot;, &quot; + actual + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1371" title="All 2 branches missed.">        assertBool(expected != actual);</span>
+<span class="nc" id="L1372">    }</span>
+
+    /**
+     * Asserts that the given shorts are not equal
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertNotEqual(short expected, short actual, String errorMessage) {
+<span class="nc bnc" id="L1380" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1381">            log(&quot;assertNotEqual(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1383" title="All 2 branches missed.">        assertBool(expected != actual, errorMessage);</span>
+<span class="nc" id="L1384">    }</span>
+
+    /**
+     * Asserts that the given ints are not equal
+     */
+    public static void assertNotEqual(int expected, int actual) {
+<span class="nc bnc" id="L1390" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1391">            log(&quot;assertNotEqual(&quot; + expected + &quot;, &quot; + actual + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1393" title="All 2 branches missed.">        assertBool(expected != actual);</span>
+<span class="nc" id="L1394">    }</span>
+
+    /**
+     * Asserts that the given ints are not equal
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertNotEqual(int expected, int actual, String errorMessage) {
+<span class="nc bnc" id="L1402" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1403">            log(&quot;assertNotEqual(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1405" title="All 2 branches missed.">        assertBool(expected != actual, errorMessage);</span>
+<span class="nc" id="L1406">    }</span>
+
+    /**
+     * Asserts that the given longs are not equal
+     */
+    public static void assertNotEqual(long expected, long actual, double minRelativeError) {
+<span class="nc bnc" id="L1412" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1413">            log(&quot;assertNotEqual(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + minRelativeError + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1415" title="All 2 branches missed.">        if (expected == actual) {</span>
+<span class="nc" id="L1416">            assertBool(false);</span>
+        } else {
+<span class="nc" id="L1418">            assertRelativeErrorExceeded(expected, actual, minRelativeError);</span>
+        }
+<span class="nc" id="L1420">    }</span>
+
+    /**
+     * Asserts that the given longs are not equal
+     *
+     * @param minRelativeError is the minimum allowed error, a value of 1 represents a 1% error.
+     * @param errorMessage     is a string describing the failure
+     */
+    public static void assertNotEqual(long expected, long actual, double minRelativeError, String errorMessage) {
+<span class="nc bnc" id="L1429" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1430">            log(&quot;assertNotEqual(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + minRelativeError + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1432" title="All 2 branches missed.">        if (expected == actual) {</span>
+<span class="nc" id="L1433">            TestUtils.assertBool(false, errorMessage);</span>
+        } else {
+<span class="nc" id="L1435">            assertRelativeErrorExceeded(expected, actual, minRelativeError, errorMessage);</span>
+        }
+<span class="nc" id="L1437">    }</span>
+
+    /**
+     * Asserts that the given doubles are not equal
+     *
+     * @param minRelativeError is the minimum allowed error, a value of 1 represents a 1% error.
+     */
+    public static void assertNotEqual(double expected, double actual, double minRelativeError) {
+<span class="nc bnc" id="L1445" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1446">            log(&quot;assertNotEqual(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + minRelativeError + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1448" title="All 2 branches missed.">        if (expected == actual) {</span>
+<span class="nc" id="L1449">            TestUtils.assertBool(false);</span>
+        } else {
+<span class="nc" id="L1451">            assertRelativeErrorExceeded(expected, actual, minRelativeError);</span>
+        }
+<span class="nc" id="L1453">    }</span>
+
+    /**
+     * Asserts that the given doubles are not equal
+     *
+     * @param minRelativeError is the minimum allowed error, a value of 1 represents a 1% error.
+     * @param errorMessage     is a string describing the failure
+     */
+    public static void assertNotEqual(double expected, double actual, double minRelativeError, String errorMessage) {
+<span class="nc bnc" id="L1462" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1463">            log(&quot;assertNotEqual(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + minRelativeError + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1465" title="All 2 branches missed.">        if (expected == actual) {</span>
+<span class="nc" id="L1466">            TestUtils.assertBool(false, errorMessage);</span>
+        } else {
+<span class="nc" id="L1468">            assertRelativeErrorExceeded(expected, actual, minRelativeError, errorMessage);</span>
+        }
+<span class="nc" id="L1470">    }</span>
+
+    /**
+     * Asserts that the given objects are not equal using the first object's .equal() method
+     */
+    public static void assertNotEqual(Object expected, Object actual) {
+<span class="pc bpc" id="L1476" title="1 of 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1477">            log(&quot;assertNotEqual(&quot; + expected + &quot;, &quot; + actual + &quot;)&quot;);</span>
+        }
+<span class="fc bfc" id="L1479" title="All 2 branches covered.">        if (Objects.equals(expected, actual)) {</span>
+<span class="nc" id="L1480">            TestUtils.fail(&quot;Assertion failed.  Expected not equal, but found that &quot; + expected + &quot; equals &quot; + actual);</span>
+        }
+
+<span class="fc" id="L1483">    }</span>
+
+    /**
+     * Asserts that the given objects are not equal using the first object's .equal() method
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertNotEqual(Object expected, Object actual, String errorMessage) {
+<span class="nc bnc" id="L1491" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1492">            log(&quot;assertNotEqual(&quot; + expected + &quot;, &quot; + actual + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1494" title="All 2 branches missed.">        if (Objects.equals(expected, actual)) {</span>
+<span class="nc" id="L1495">            TestUtils.fail(&quot;Assertion failed.  Expected not equal, but found that &quot; + expected + &quot; equals &quot; + actual + &quot;.  &quot; + errorMessage);</span>
+        }
+<span class="nc" id="L1497">    }</span>
+
+    /**
+     * Pretty-prints a byte array
+     */
+    private static String arrayToString(byte[] array) {
+<span class="nc" id="L1503">        StringBuilder result = new StringBuilder(&quot;[&quot;);</span>
+<span class="nc bnc" id="L1504" title="All 2 branches missed.">        for (int index = 0; index &lt; array.length - 1; ++index) {</span>
+<span class="nc" id="L1505">            result.append(array[index]).append(&quot;,&quot;);</span>
+        }
+<span class="nc bnc" id="L1507" title="All 2 branches missed.">        if (array.length &gt; 0) {</span>
+<span class="nc" id="L1508">            result.append(array[array.length - 1]);</span>
+        }
+<span class="nc" id="L1510">        result.append(&quot;]&quot;);</span>
+<span class="nc" id="L1511">        return result.toString();</span>
+    }
+
+    /**
+     * Pretty-prints a short array
+     */
+    private static String arrayToString(short[] array) {
+<span class="nc" id="L1518">        StringBuilder result = new StringBuilder(&quot;[&quot;);</span>
+<span class="nc bnc" id="L1519" title="All 2 branches missed.">        for (int index = 0; index &lt; array.length - 1; ++index) {</span>
+<span class="nc" id="L1520">            result.append(array[index]).append(&quot;,&quot;);</span>
+        }
+<span class="nc bnc" id="L1522" title="All 2 branches missed.">        if (array.length &gt; 0) {</span>
+<span class="nc" id="L1523">            result.append(array[array.length - 1]);</span>
+        }
+<span class="nc" id="L1525">        result.append(&quot;]&quot;);</span>
+<span class="nc" id="L1526">        return result.toString();</span>
+    }
+
+    /**
+     * Pretty-prints a int array
+     */
+    private static String arrayToString(int[] array) {
+<span class="nc" id="L1533">        StringBuilder result = new StringBuilder(&quot;[&quot;);</span>
+<span class="nc bnc" id="L1534" title="All 2 branches missed.">        for (int index = 0; index &lt; array.length - 1; ++index) {</span>
+<span class="nc" id="L1535">            result.append(array[index]).append(&quot;,&quot;);</span>
+        }
+<span class="nc bnc" id="L1537" title="All 2 branches missed.">        if (array.length &gt; 0) {</span>
+<span class="nc" id="L1538">            result.append(array[array.length - 1]);</span>
+        }
+<span class="nc" id="L1540">        result.append(&quot;]&quot;);</span>
+<span class="nc" id="L1541">        return result.toString();</span>
+    }
+
+    /**
+     * Pretty-prints a long array
+     */
+    private static String arrayToString(long[] array) {
+<span class="nc" id="L1548">        StringBuilder result = new StringBuilder(&quot;[&quot;);</span>
+<span class="nc bnc" id="L1549" title="All 2 branches missed.">        for (int index = 0; index &lt; array.length - 1; ++index) {</span>
+<span class="nc" id="L1550">            result.append(array[index]).append(&quot;,&quot;);</span>
+        }
+<span class="nc bnc" id="L1552" title="All 2 branches missed.">        if (array.length &gt; 0) {</span>
+<span class="nc" id="L1553">            result.append(array[array.length - 1]);</span>
+        }
+<span class="nc" id="L1555">        result.append(&quot;]&quot;);</span>
+<span class="nc" id="L1556">        return result.toString();</span>
+    }
+
+    /**
+     * Pretty-prints a float array
+     */
+    private static String arrayToString(float[] array) {
+<span class="nc" id="L1563">        StringBuilder result = new StringBuilder(&quot;[&quot;);</span>
+<span class="nc bnc" id="L1564" title="All 2 branches missed.">        for (int index = 0; index &lt; array.length - 1; ++index) {</span>
+<span class="nc" id="L1565">            result.append(array[index]).append(&quot;,&quot;);</span>
+        }
+<span class="nc bnc" id="L1567" title="All 2 branches missed.">        if (array.length &gt; 0) {</span>
+<span class="nc" id="L1568">            result.append(array[array.length - 1]);</span>
+        }
+<span class="nc" id="L1570">        result.append(&quot;]&quot;);</span>
+<span class="nc" id="L1571">        return result.toString();</span>
+    }
+
+    /**
+     * Pretty-prints a double array
+     */
+    private static String arrayToString(double[] array) {
+<span class="nc" id="L1578">        StringBuilder result = new StringBuilder(&quot;[&quot;);</span>
+<span class="nc bnc" id="L1579" title="All 2 branches missed.">        for (int index = 0; index &lt; array.length - 1; ++index) {</span>
+<span class="nc" id="L1580">            result.append(array[index]).append(&quot;,&quot;);</span>
+        }
+<span class="nc bnc" id="L1582" title="All 2 branches missed.">        if (array.length &gt; 0) {</span>
+<span class="nc" id="L1583">            result.append(array[array.length - 1]);</span>
+        }
+<span class="nc" id="L1585">        result.append(&quot;]&quot;);</span>
+<span class="nc" id="L1586">        return result.toString();</span>
+    }
+
+    /**
+     * Pretty-prints an object array
+     */
+    private static String arrayToString(Object[] array) {
+<span class="nc" id="L1593">        StringBuilder result = new StringBuilder(&quot;[&quot;);</span>
+<span class="nc bnc" id="L1594" title="All 2 branches missed.">        for (int index = 0; index &lt; array.length - 1; ++index) {</span>
+<span class="nc" id="L1595">            result.append(array[index]).append(&quot;,&quot;);</span>
+        }
+<span class="nc bnc" id="L1597" title="All 2 branches missed.">        if (array.length &gt; 0) {</span>
+<span class="nc" id="L1598">            result.append(array[array.length - 1]);</span>
+        }
+<span class="nc" id="L1600">        result.append(&quot;]&quot;);</span>
+<span class="nc" id="L1601">        return result.toString();</span>
+    }
+
+    /**
+     * Asserts that the given byte arrays are equal
+     */
+    public static void assertArrayEqual(byte[] expected, byte[] actual) {
+<span class="nc bnc" id="L1608" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1609">            log(&quot;assertArrayEqual(&quot; + arrayToString(expected) + &quot;, &quot; + arrayToString(actual) + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1611" title="All 2 branches missed.">        if (expected.length != actual.length) {</span>
+<span class="nc" id="L1612">            TestUtils.assertBool(false);</span>
+        }
+<span class="nc bnc" id="L1614" title="All 2 branches missed.">        for (int index = 0; index &lt; expected.length; ++index) {</span>
+<span class="nc" id="L1615">            assertEqual(expected[index], actual[index]);</span>
+        }
+<span class="nc" id="L1617">    }</span>
+
+    /**
+     * Asserts that the given byte arrays are equal
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertArrayEqual(byte[] expected, byte[] actual, String errorMessage) {
+<span class="nc bnc" id="L1625" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1626">            log(&quot;assertArrayEqual(&quot; + arrayToString(expected) + &quot;, &quot; + arrayToString(actual) + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1628" title="All 2 branches missed.">        if (expected.length != actual.length) {</span>
+<span class="nc" id="L1629">            TestUtils.assertBool(false);</span>
+        }
+<span class="nc bnc" id="L1631" title="All 2 branches missed.">        for (int index = 0; index &lt; expected.length; ++index) {</span>
+<span class="nc" id="L1632">            assertEqual(expected[index], actual[index], errorMessage);</span>
+        }
+<span class="nc" id="L1634">    }</span>
+
+    /**
+     * Asserts that the given short arrays are equal
+     */
+    public static void assertArrayEqual(short[] expected, short[] actual) {
+<span class="nc bnc" id="L1640" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1641">            log(&quot;assertArrayEqual(&quot; + arrayToString(expected) + &quot;, &quot; + arrayToString(actual) + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1643" title="All 2 branches missed.">        if (expected.length != actual.length) {</span>
+<span class="nc" id="L1644">            TestUtils.assertBool(false);</span>
+        }
+<span class="nc bnc" id="L1646" title="All 2 branches missed.">        for (int index = 0; index &lt; expected.length; ++index) {</span>
+<span class="nc" id="L1647">            assertEqual(expected[index], actual[index]);</span>
+        }
+<span class="nc" id="L1649">    }</span>
+
+    /**
+     * Asserts that the given short arrays are equal
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertArrayEqual(short[] expected, short[] actual, String errorMessage) {
+<span class="nc bnc" id="L1657" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1658">            log(&quot;assertArrayEqual(&quot; + arrayToString(expected) + &quot;, &quot; + arrayToString(actual) + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1660" title="All 2 branches missed.">        if (expected.length != actual.length) {</span>
+<span class="nc" id="L1661">            TestUtils.assertBool(false);</span>
+        }
+<span class="nc bnc" id="L1663" title="All 2 branches missed.">        for (int index = 0; index &lt; expected.length; ++index) {</span>
+<span class="nc" id="L1664">            assertEqual(expected[index], actual[index], errorMessage);</span>
+        }
+<span class="nc" id="L1666">    }</span>
+
+    /**
+     * Asserts that the given int arrays are equal
+     */
+    public static void assertArrayEqual(int[] expected, int[] actual) {
+<span class="nc bnc" id="L1672" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1673">            log(&quot;assertArrayEqual(&quot; + arrayToString(expected) + &quot;, &quot; + arrayToString(actual) + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1675" title="All 2 branches missed.">        if (expected.length != actual.length) {</span>
+<span class="nc" id="L1676">            TestUtils.assertBool(false);</span>
+        }
+<span class="nc bnc" id="L1678" title="All 2 branches missed.">        for (int index = 0; index &lt; expected.length; ++index) {</span>
+<span class="nc" id="L1679">            assertEqual(expected[index], actual[index]);</span>
+        }
+<span class="nc" id="L1681">    }</span>
+
+    /**
+     * Asserts that the given int arrays are equal
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertArrayEqual(int[] expected, int[] actual, String errorMessage) {
+<span class="nc bnc" id="L1689" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1690">            log(&quot;assertArrayEqual(&quot; + arrayToString(expected) + &quot;, &quot; + arrayToString(actual) + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1692" title="All 2 branches missed.">        if (expected.length != actual.length) {</span>
+<span class="nc" id="L1693">            TestUtils.assertBool(false);</span>
+        }
+<span class="nc bnc" id="L1695" title="All 2 branches missed.">        for (int index = 0; index &lt; expected.length; ++index) {</span>
+<span class="nc" id="L1696">            assertEqual(expected[index], actual[index], errorMessage);</span>
+        }
+<span class="nc" id="L1698">    }</span>
+
+    /**
+     * Asserts that the given long arrays are equal
+     *
+     * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
+     */
+    public static void assertArrayEqual(long[] expected, long[] actual, double maxRelativeError) {
+<span class="nc bnc" id="L1706" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1707">            log(&quot;assertArrayEqual(&quot; + arrayToString(expected) + &quot;, &quot; + arrayToString(actual) + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1709" title="All 2 branches missed.">        if (expected.length != actual.length) {</span>
+<span class="nc" id="L1710">            TestUtils.assertBool(false);</span>
+        }
+<span class="nc bnc" id="L1712" title="All 2 branches missed.">        for (int index = 0; index &lt; expected.length; ++index) {</span>
+<span class="nc" id="L1713">            assertEqual(expected[index], actual[index], maxRelativeError);</span>
+        }
+<span class="nc" id="L1715">    }</span>
+
+    /**
+     * Asserts that the given long arrays are equal
+     *
+     * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
+     * @param errorMessage     is a string describing the failure
+     */
+    public static void assertArrayEqual(long[] expected, long[] actual, double maxRelativeError, String errorMessage) {
+<span class="nc bnc" id="L1724" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1725">            log(&quot;assertArrayEqual(&quot; + arrayToString(expected) + &quot;, &quot; + arrayToString(actual) + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1727" title="All 2 branches missed.">        if (expected.length != actual.length) {</span>
+<span class="nc" id="L1728">            TestUtils.assertBool(false);</span>
+        }
+<span class="nc bnc" id="L1730" title="All 2 branches missed.">        for (int index = 0; index &lt; expected.length; ++index) {</span>
+<span class="nc" id="L1731">            assertEqual(expected[index], actual[index], maxRelativeError, errorMessage);</span>
+        }
+<span class="nc" id="L1733">    }</span>
+
+    /**
+     * Asserts that the given float arrays are equal
+     *
+     * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
+     */
+    public static void assertArrayEqual(float[] expected, float[] actual, double maxRelativeError) {
+<span class="nc bnc" id="L1741" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1742">            log(&quot;assertArrayEqual(&quot; + arrayToString(expected) + &quot;, &quot; + arrayToString(actual) + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1744" title="All 2 branches missed.">        if (expected.length != actual.length) {</span>
+<span class="nc" id="L1745">            TestUtils.assertBool(false);</span>
+        }
+<span class="nc bnc" id="L1747" title="All 2 branches missed.">        for (int index = 0; index &lt; expected.length; ++index) {</span>
+<span class="nc" id="L1748">            assertEqual(expected[index], actual[index], maxRelativeError);</span>
+        }
+<span class="nc" id="L1750">    }</span>
+
+    /**
+     * Asserts that the given double arrays are equal
+     *
+     * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
+     * @param errorMessage     is a string describing the failure
+     */
+    public static void assertArrayEqual(float[] expected, float[] actual, double maxRelativeError, String errorMessage) {
+<span class="nc bnc" id="L1759" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1760">            log(&quot;assertArrayEqual(&quot; + arrayToString(expected) + &quot;, &quot; + arrayToString(actual) + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1762" title="All 2 branches missed.">        if (expected.length != actual.length) {</span>
+<span class="nc" id="L1763">            TestUtils.assertBool(false);</span>
+        }
+<span class="nc bnc" id="L1765" title="All 2 branches missed.">        for (int index = 0; index &lt; expected.length; ++index) {</span>
+<span class="nc" id="L1766">            assertEqual(expected[index], actual[index], maxRelativeError, errorMessage);</span>
+        }
+<span class="nc" id="L1768">    }</span>
+
+    /**
+     * Asserts that the given double arrays are equal
+     *
+     * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
+     */
+    public static void assertArrayEqual(double[] expected, double[] actual, double maxRelativeError) {
+<span class="nc bnc" id="L1776" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1777">            log(&quot;assertArrayEqual(&quot; + arrayToString(expected) + &quot;, &quot; + arrayToString(actual) + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1779" title="All 2 branches missed.">        if (expected.length != actual.length) {</span>
+<span class="nc" id="L1780">            TestUtils.assertBool(false);</span>
+        }
+<span class="nc bnc" id="L1782" title="All 2 branches missed.">        for (int index = 0; index &lt; expected.length; ++index) {</span>
+<span class="nc" id="L1783">            assertEqual(expected[index], actual[index], maxRelativeError);</span>
+        }
+<span class="nc" id="L1785">    }</span>
+
+    /**
+     * Asserts that the given double arrays are equal
+     *
+     * @param maxRelativeError is the maximum allowed error, a value of 1 represents a 1% error.
+     * @param errorMessage     is a string describing the failure
+     */
+    public static void assertArrayEqual(double[] expected, double[] actual, double maxRelativeError, String errorMessage) {
+<span class="nc bnc" id="L1794" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1795">            log(&quot;assertArrayEqual(&quot; + arrayToString(expected) + &quot;, &quot; + arrayToString(actual) + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1797" title="All 2 branches missed.">        if (expected.length != actual.length) {</span>
+<span class="nc" id="L1798">            TestUtils.assertBool(false);</span>
+        }
+<span class="nc bnc" id="L1800" title="All 2 branches missed.">        for (int index = 0; index &lt; expected.length; ++index) {</span>
+<span class="nc" id="L1801">            assertEqual(expected[index], actual[index], maxRelativeError, errorMessage);</span>
+        }
+<span class="nc" id="L1803">    }</span>
+
+    /**
+     * Asserts that the given object arrays are equal
+     */
+    public static void assertArrayEqual(Object[] expected, Object[] actual) {
+<span class="nc bnc" id="L1809" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1810">            log(&quot;assertArrayEqual(&quot; + arrayToString(expected) + &quot;, &quot; + arrayToString(actual) + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1812" title="All 2 branches missed.">        if (expected.length != actual.length) {</span>
+<span class="nc" id="L1813">            TestUtils.assertBool(false);</span>
+        }
+<span class="nc bnc" id="L1815" title="All 2 branches missed.">        for (int index = 0; index &lt; expected.length; ++index) {</span>
+<span class="nc" id="L1816">            assertEqual(expected[index], actual[index]);</span>
+        }
+<span class="nc" id="L1818">    }</span>
+
+    /**
+     * Asserts that the given object arrays are equal
+     *
+     * @param errorMessage is a string describing the failure
+     */
+    public static void assertArrayEqual(Object[] expected, Object[] actual, String errorMessage) {
+<span class="nc bnc" id="L1826" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1827">            log(&quot;assertArrayEqual(&quot; + arrayToString(expected) + &quot;, &quot; + arrayToString(actual) + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+<span class="nc bnc" id="L1829" title="All 2 branches missed.">        if (expected.length != actual.length) {</span>
+<span class="nc" id="L1830">            TestUtils.assertBool(false);</span>
+        }
+<span class="nc bnc" id="L1832" title="All 2 branches missed.">        for (int index = 0; index &lt; expected.length; ++index) {</span>
+<span class="nc" id="L1833">            assertEqual(expected[index], actual[index], errorMessage);</span>
+        }
+<span class="nc" id="L1835">    }</span>
+
+    /**
+     * Asserts that a certain exception is raised
+     *
+     * @param exception
+     * @param expression
+     */
+    public static void assertException(RuntimeException exception, Runnable expression) {
+<span class="nc bnc" id="L1844" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1845">            log(&quot;assertException(&quot; + exception + &quot;, &quot; + expression + &quot;)&quot;);</span>
+        }
+        try {
+<span class="nc" id="L1848">            expression.run();</span>
+<span class="nc" id="L1849">        } catch (RuntimeException failure) {</span>
+<span class="nc bnc" id="L1850" title="All 2 branches missed.">            if (exception.getClass() != failure.getClass()) {</span>
+<span class="nc" id="L1851">                TestUtils.fail();</span>
+            }
+<span class="nc" id="L1853">            return;</span>
+<span class="nc" id="L1854">        }</span>
+<span class="nc" id="L1855">        TestUtils.fail();</span>
+<span class="nc" id="L1856">    }</span>
+
+    /**
+     * Asserts that a certain exception is raised
+     *
+     * @param exception
+     * @param expression
+     * @param errorMessage
+     */
+    public static void assertException(RuntimeException exception, Runnable expression, String errorMessage) {
+<span class="nc bnc" id="L1866" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1867">            log(&quot;assertException(&quot; + exception + &quot;, &quot; + expression + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+        try {
+<span class="nc" id="L1870">            expression.run();</span>
+<span class="nc" id="L1871">        } catch (RuntimeException failure) {</span>
+<span class="nc bnc" id="L1872" title="All 2 branches missed.">            if (exception.getClass() != failure.getClass()) {</span>
+<span class="nc" id="L1873">                TestUtils.fail(errorMessage);</span>
+            }
+<span class="nc" id="L1875">            return;</span>
+<span class="nc" id="L1876">        }</span>
+<span class="nc" id="L1877">        TestUtils.fail(errorMessage);</span>
+<span class="nc" id="L1878">    }</span>
+
+    /**
+     * Asserts that no exception is raised
+     *
+     * @param expression
+     */
+    public static void assertNoException(Runnable expression) {
+<span class="nc bnc" id="L1886" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1887">            log(&quot;assertNoException(&quot; + expression + &quot;)&quot;);</span>
+        }
+        try {
+<span class="nc" id="L1890">            expression.run();</span>
+<span class="nc" id="L1891">        } catch (RuntimeException failure) {</span>
+<span class="nc" id="L1892">            TestUtils.fail();</span>
+<span class="nc" id="L1893">        }</span>
+<span class="nc" id="L1894">    }</span>
+
+    /**
+     * Asserts that no exception is raised
+     *
+     * @param expression
+     * @param errorMessage
+     */
+    public static void assertNoException(Runnable expression, String errorMessage) {
+<span class="nc bnc" id="L1903" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1904">            log(&quot;assertNoException(&quot; + expression + &quot;, &quot; + errorMessage + &quot;)&quot;);</span>
+        }
+        try {
+<span class="nc" id="L1907">            expression.run();</span>
+<span class="nc" id="L1908">        } catch (RuntimeException failure) {</span>
+<span class="nc" id="L1909">            TestUtils.fail(errorMessage);</span>
+<span class="nc" id="L1910">        }</span>
+<span class="nc" id="L1911">    }</span>
+
+    /**
+     * Verifies the current title is the same otherwise throws an exception
+     *
+     * @param title the tile to verify
+     */
+    public static void assertTitle(String title) {
+<span class="nc bnc" id="L1919" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1920">            log(&quot;assertTitle(&quot; + title + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L1922">        assertBool(Display.getInstance().getCurrent().getTitle().equals(title), title);</span>
+<span class="nc" id="L1923">    }</span>
+
+    /**
+     * Asserts that we have a label with the given text baring the given name
+     *
+     * @param name the name of the label
+     * @param text the text of the label
+     */
+    public static void assertLabel(String name, String text) {
+<span class="nc bnc" id="L1932" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1933">            log(&quot;assertLabel(&quot; + name + &quot;, &quot; + text + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L1935">        Label l = (Label) findByName(name);</span>
+<span class="nc bnc" id="L1936" title="All 2 branches missed.">        assertBool(l != null, &quot;Null label&quot; + text);</span>
+<span class="nc bnc" id="L1937" title="All 4 branches missed.">        assertBool(text == l.getText() || text.equals(l.getText()), name + &quot; != &quot; + text);</span>
+<span class="nc" id="L1938">    }</span>
+
+    /**
+     * Asserts that we have a label with the given text baring the given name
+     *
+     * @param path the path of the label
+     * @param text the text of the label
+     */
+    public static void assertLabel(int[] path, String text) {
+<span class="nc bnc" id="L1947" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1948">            log(&quot;assertLabel(&quot; + toString(path) + &quot;, &quot; + text + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L1950">        Label l = (Label) getComponentByPath(path);</span>
+<span class="nc bnc" id="L1951" title="All 2 branches missed.">        assertBool(l != null, &quot;Null label&quot; + text);</span>
+<span class="nc bnc" id="L1952" title="All 4 branches missed.">        assertBool(text == l.getText() || text.equals(l.getText()), (l.getText()) + &quot; != &quot; + text);</span>
+<span class="nc" id="L1953">    }</span>
+
+    /**
+     * Asserts that we have a label with the given text baring the given name
+     *
+     * @param text the text of the label
+     */
+    public static void assertLabel(String text) {
+<span class="nc bnc" id="L1961" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1962">            log(&quot;assertLabel(&quot; + text + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L1964">        Label l = findLabelText(text);</span>
+<span class="nc bnc" id="L1965" title="All 2 branches missed.">        assertBool(l != null, &quot;Null label &quot; + text);</span>
+<span class="nc" id="L1966">    }</span>
+
+    /**
+     * Asserts that we have a TextArea with the given text and the given name
+     *
+     * @param name the name of the TextArea
+     * @param text the text of the TextArea
+     */
+    public static void assertTextArea(String name, String text) {
+<span class="nc bnc" id="L1975" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1976">            log(&quot;assertTextArea(&quot; + name + &quot;, &quot; + text + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L1978">        TextArea l = (TextArea) findByName(name);</span>
+<span class="nc bnc" id="L1979" title="All 2 branches missed.">        assertBool(l != null, &quot;Null area &quot; + text);</span>
+<span class="nc" id="L1980">        assertBool(l.getText().equals(text), &quot;assertTextArea: &quot; + l.getText() + &quot; != &quot; + text);</span>
+<span class="nc" id="L1981">    }</span>
+
+    /**
+     * Asserts that we have a TextArea with the a text contains the given text and with the given name
+     *
+     * @param name the name of the TextArea
+     * @param text the sequence to search for in the TextArea
+     */
+    public static void assertTextAreaContaining(String name, String text) {
+<span class="nc bnc" id="L1990" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L1991">            log(&quot;assertTextAreaContaining(&quot; + name + &quot;, &quot; + text + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L1993">        TextArea l = (TextArea) findByName(name);</span>
+<span class="nc bnc" id="L1994" title="All 2 branches missed.">        assertBool(l != null, &quot;Null area &quot; + text);</span>
+<span class="nc bnc" id="L1995" title="All 2 branches missed.">        assertBool(l.getText().indexOf(text) &gt; -1, &quot;assertTextArea: \&quot;&quot; + l.getText() + &quot;\&quot; is not containing: \&quot;&quot; + text + &quot;\&quot;&quot;);</span>
+<span class="nc" id="L1996">    }</span>
+
+
+    /**
+     * Asserts that we have a TextArea with the a text starting with the given text and with the given name
+     *
+     * @param name the name of the TextArea
+     * @param text the prefix to search for in the TextArea
+     */
+    public static void assertTextAreaStartingWith(String name, String text) {
+<span class="nc bnc" id="L2006" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L2007">            log(&quot;assertTextAreaStartingWith(&quot; + name + &quot;, &quot; + text + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L2009">        TextArea l = (TextArea) findByName(name);</span>
+<span class="nc bnc" id="L2010" title="All 2 branches missed.">        assertBool(l != null, &quot;Null area &quot; + text);</span>
+<span class="nc" id="L2011">        assertBool(l.getText().startsWith(text), &quot;assertTextArea: \&quot;&quot; + l.getText() + &quot;\&quot; is not starting with: \&quot;&quot; + text + &quot;\&quot;&quot;);</span>
+<span class="nc" id="L2012">    }</span>
+
+    /**
+     * Asserts that we have a TextArea with the a text ending with the given text and with the given name
+     *
+     * @param name the name of the TextArea
+     * @param text the suffix to search for in the TextArea
+     */
+    public static void assertTextAreaEndingWith(String name, String text) {
+<span class="nc bnc" id="L2021" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L2022">            log(&quot;assertTextAreaEndingWith(&quot; + name + &quot;, &quot; + text + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L2024">        TextArea l = (TextArea) findByName(name);</span>
+<span class="nc bnc" id="L2025" title="All 2 branches missed.">        assertBool(l != null, &quot;Null area &quot; + text);</span>
+<span class="nc" id="L2026">        assertBool(l.getText().endsWith(text), &quot;assertTextArea: \&quot;&quot; + l.getText() + &quot;\&quot; is not ending with: \&quot;&quot; + text + &quot;\&quot;&quot;);</span>
+<span class="nc" id="L2027">    }</span>
+
+    /**
+     * Asserts that we have a label with the given text baring the given name
+     *
+     * @param path the path to the text area
+     * @param text the text of the label
+     */
+    public static void assertTextArea(int[] path, String text) {
+<span class="nc bnc" id="L2036" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L2037">            log(&quot;assertTextArea(&quot; + toString(path) + &quot;, &quot; + text + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L2039">        TextArea l = (TextArea) getComponentByPath(path);</span>
+<span class="nc bnc" id="L2040" title="All 2 branches missed.">        assertBool(l != null, &quot;Null area &quot; + text);</span>
+<span class="nc" id="L2041">        assertBool(l.getText().equals(text), &quot;assertTextArea: &quot; + l.getText() + &quot; != &quot; + text);</span>
+<span class="nc" id="L2042">    }</span>
+
+    /**
+     * Asserts that we have a label with the given text baring the given name
+     *
+     * @param text the text of the label
+     */
+    public static void assertTextArea(String text) {
+<span class="nc bnc" id="L2050" title="All 2 branches missed.">        if (verbose) {</span>
+<span class="nc" id="L2051">            log(&quot;assertTextArea(&quot; + text + &quot;)&quot;);</span>
+        }
+<span class="nc" id="L2053">        TextArea l = findTextAreaText(text);</span>
+<span class="nc bnc" id="L2054" title="All 2 branches missed.">        assertBool(l != null, &quot;Null text &quot; + text);</span>
+<span class="nc" id="L2055">    }</span>
+
+    /**
+     * Finds a component with the given name, works even with UI's that weren't created with the GUI builder
+     *
+     * @param text the text of the label/button
+     * @return the component with the given TextArea text within the tree
+     */
+    public static TextArea findTextAreaText(String text) {
+<span class="nc" id="L2064">        return findTextAreaText(Display.getInstance().getCurrent(), text);</span>
+    }
+
+    /**
+     * Finds a component with the given name, works even with UI's that weren't created with the GUI builder
+     *
+     * @param text the text of the label/button
+     * @return the component with the given label text within the tree
+     */
+    private static TextArea findTextAreaText(Container root, String text) {
+<span class="nc" id="L2074">        int count = root.getComponentCount();</span>
+<span class="nc bnc" id="L2075" title="All 2 branches missed.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="nc" id="L2076">            Component c = root.getComponentAt(iter);</span>
+<span class="nc bnc" id="L2077" title="All 2 branches missed.">            if (c instanceof TextArea) {</span>
+<span class="nc" id="L2078">                String n = ((TextArea) c).getText();</span>
+<span class="nc bnc" id="L2079" title="All 4 branches missed.">                if (n != null &amp;&amp; n.equals(text)) {</span>
+<span class="nc" id="L2080">                    return (TextArea) c;</span>
+                }
+                continue;
+            }
+<span class="nc bnc" id="L2084" title="All 2 branches missed.">            if (c instanceof Container) {</span>
+<span class="nc" id="L2085">                TextArea l = findTextAreaText((Container) c, text);</span>
+<span class="nc bnc" id="L2086" title="All 2 branches missed.">                if (l != null) {</span>
+<span class="nc" id="L2087">                    return l;</span>
+                }
+            }
+        }
+<span class="nc" id="L2091">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

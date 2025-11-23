@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Stroke.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">Stroke.java</span></div><h1>Stroke.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+/**
+ * Encapsulates the stroke used for drawing paths.
+ *
+ * @author Steve Hannah
+ * @see Graphics#setStroke
+ * @see Graphics#getStroke
+ */
+public class Stroke {
+
+    // Constants for the type of join to use for the stroke
+
+    /**
+     * Join style constant to join strokes MITER (i.e. pointy)
+     * Examples can be seen at &lt;a target=&quot;_blank&quot; href=&quot;http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/LineJoinStyleJOINBEVELJOINMITERJOINROUND.htm&quot;&gt;here&lt;/a&gt;.
+     *
+     * @see #setJoinStyle
+     * @see #getJoinStyle
+     */
+    public static final int JOIN_MITER = 0;
+
+    /**
+     * Join style constant to join strokes rounded.
+     * Examples can be seen &lt;a target=&quot;_blank&quot; href=&quot;http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/LineJoinStyleJOINBEVELJOINMITERJOINROUND.htm&quot;&gt;here&lt;/a&gt;.
+     *
+     * @see #setJoinStyle
+     * @see #getJoinStyle
+     */
+    public static final int JOIN_ROUND = 1;
+
+    /**
+     * Join style constant to join strokes bevel.
+     * Examples can be seen &lt;a target=&quot;_blank&quot; href=&quot;http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/LineJoinStyleJOINBEVELJOINMITERJOINROUND.htm&quot;&gt;here&lt;/a&gt;.
+     *
+     * @see #setJoinStyle
+     * @see #getJoinStyle
+     */
+    public static final int JOIN_BEVEL = 2;
+
+    /**
+     * Cap style constant to cap strokes with a butt (or flat).
+     * Examples can be seen &lt;a target=&quot;_blank&quot; href=&quot;http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/SettingLinecaps.htm&quot;&gt;here&lt;/a&gt;.
+     *
+     * @see #setCapStyle
+     * @see #getCapStyle
+     */
+    public static final int CAP_BUTT = 0;
+
+    /**
+     * Cap style constant to cap strokes with a round end.
+     * Examples can be seen &lt;a target=&quot;_blank&quot; href=&quot;http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/SettingLinecaps.htm&quot;&gt;here&lt;/a&gt;
+     *
+     * @see #setCapStyle
+     * @see #getCapStyle
+     */
+    public static final int CAP_ROUND = 1;
+
+    /**
+     * Cap style constant to cap strokes with a square end.
+     * Examples can be seen &lt;a target=&quot;_blank&quot; href=&quot;http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/SettingLinecaps.htm&quot;&gt;here&lt;/a&gt;
+     *
+     * @see #setCapStyle
+     * @see #getCapStyle
+     */
+    public static final int CAP_SQUARE = 2;
+
+
+<span class="fc" id="L91">    private int joinStyle = 0;</span>
+<span class="fc" id="L92">    private int capStyle = 0;</span>
+<span class="fc" id="L93">    private float lineWidth = 1f;</span>
+<span class="fc" id="L94">    private float miterLimit = 4f;</span>
+
+    /**
+     * Creates a stroke with the specified characteristics.
+     *
+     * @param lineWidth  The width of the stroke pixels.
+     * @param capStyle   The cap style of the stroke.  Should be one of {@link #CAP_BUTT}, {@link #CAP_ROUND}, or {@link #CAP_SQUARE}.
+     * @param joinStyle  The join style of the strokes.  Should be one of {@link #JOIN_MITER}, {@link #JOIN_ROUND}, or {@link #JOIN_BEVEL}.
+     * @param miterLimit The Miter limit controls the point at which a Miter join automatically is converted to a Bevel join. If the distance from the inner intersection point to the tip of the triangle measured in stroke widths is more than the Miter limit, the join will be drawn in the Bevel style.
+     */
+<span class="fc" id="L104">    public Stroke(float lineWidth, int capStyle, int joinStyle, float miterLimit) {</span>
+<span class="fc" id="L105">        this.lineWidth = lineWidth;</span>
+<span class="fc" id="L106">        this.capStyle = capStyle;</span>
+<span class="fc" id="L107">        this.joinStyle = joinStyle;</span>
+<span class="fc" id="L108">        this.miterLimit = miterLimit;</span>
+<span class="fc" id="L109">    }</span>
+
+    /**
+     * Creates a stroke with default settings.  Default settings are:
+     * &lt;table&gt;
+     *  &lt;tr&gt;&lt;td&gt;Join style&lt;/td&gt;&lt;td&gt;{@link #JOIN_MITER}&lt;/td&gt;&lt;/tr&gt;
+     *  &lt;tr&gt;&lt;td&gt;Cap style&lt;/td&gt;&lt;td&gt;{@link #CAP_BUTT}&lt;/td&gt;&lt;/tr&gt;
+     *  &lt;tr&gt;&lt;td&gt;Line Width&lt;/td&gt;&lt;td&gt;1.0&lt;/td&gt;&lt;/tr&gt;
+     *  &lt;tr&gt;&lt;td&gt;Miter Limit&lt;/td&gt;&lt;td&gt;4.0&lt;/td&gt;&lt;/tr&gt;
+     * &lt;/table&gt;
+     */
+<span class="fc" id="L120">    public Stroke() {</span>
+
+<span class="fc" id="L122">    }</span>
+
+    /**
+     * Copies the properties of {@code stroke} into this stroke.
+     *
+     * @param stroke The stroke whose properties we wish to copy into the current stroke.
+     */
+    public void setStroke(Stroke stroke) {
+<span class="nc" id="L130">        this.lineWidth = stroke.lineWidth;</span>
+<span class="nc" id="L131">        this.capStyle = stroke.capStyle;</span>
+<span class="nc" id="L132">        this.joinStyle = stroke.joinStyle;</span>
+<span class="nc" id="L133">        this.miterLimit = stroke.miterLimit;</span>
+<span class="nc" id="L134">    }</span>
+
+    /**
+     * Returns the join style used for this stroke.
+     * See visual examples of join styles &lt;a target=&quot;_blank&quot; href=&quot;http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/LineJoinStyleJOINBEVELJOINMITERJOINROUND.htm&quot;&gt;here&lt;/a&gt;.
+     *
+     * @return the joinStyle This will be one of {@link #JOIN_MITER},
+     * {@link #JOIN_ROUND}, and {@link #JOIN_BEVEL}.
+     * @see #JOIN_MITER
+     * @see #JOIN_BEVEL
+     * @see #JOIN_ROUND
+     */
+    public int getJoinStyle() {
+<span class="fc" id="L147">        return joinStyle;</span>
+    }
+
+    /**
+     * Sets the join style of the stroke.
+     * See visual examples of join styles &lt;a target=&quot;_blank&quot; href=&quot;http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/LineJoinStyleJOINBEVELJOINMITERJOINROUND.htm&quot;&gt;here&lt;/a&gt;.
+     *
+     * @param joinStyle the joinStyle to set.  This should be one of {@link #JOIN_MITER},
+     *                  {@link #JOIN_ROUND}, and {@link #JOIN_BEVEL}.
+     * @see #JOIN_MITER
+     * @see #JOIN_BEVEL
+     * @see #JOIN_ROUND
+     */
+    public void setJoinStyle(int joinStyle) {
+<span class="nc" id="L161">        this.joinStyle = joinStyle;</span>
+<span class="nc" id="L162">    }</span>
+
+    /**
+     * Gets the cap style of the stroke.
+     * See visual examples of cap styles &lt;a target=&quot;_blank&quot; href=&quot;http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/SettingLinecaps.htm&quot;&gt;here&lt;/a&gt;.
+     *
+     * @return the capStyle.  This will be one of {@link #CAP_BUTT}, {@link #CAP_ROUND}, and {@link #CAP_SQUARE}.
+     * @see #CAP_BUTT
+     * @see #CAP_SQUARE
+     * @see #CAP_ROUND
+     */
+    public int getCapStyle() {
+<span class="fc" id="L174">        return capStyle;</span>
+    }
+
+    /**
+     * Gets the cap style of the stroke.
+     * See visual examples of cap styles &lt;a target=&quot;_blank&quot; href=&quot;http://www.java2s.com/Tutorial/Java/0300__SWT-2D-Graphics/SettingLinecaps.htm&quot;&gt;here&lt;/a&gt;.
+     *
+     * @param capStyle the capStyle to set. This will be one of {@link #CAP_BUTT}, {@link #CAP_ROUND}, and {@link #CAP_SQUARE}.
+     * @see #CAP_BUTT
+     * @see #CAP_SQUARE
+     * @see #CAP_ROUND
+     */
+    public void setCapStyle(int capStyle) {
+<span class="nc" id="L187">        this.capStyle = capStyle;</span>
+<span class="nc" id="L188">    }</span>
+
+    /**
+     * Returns the line width of the stroke.
+     *
+     * @return the lineWidth
+     */
+    public float getLineWidth() {
+<span class="fc" id="L196">        return lineWidth;</span>
+    }
+
+    /**
+     * Sets the line width of the stroke.
+     *
+     * @param lineWidth the lineWidth to set
+     */
+    public void setLineWidth(float lineWidth) {
+<span class="fc" id="L205">        this.lineWidth = lineWidth;</span>
+<span class="fc" id="L206">    }</span>
+
+    /**
+     * Gets the miter limit of the stroke. The Miter limit controls the point at which a Miter join automatically is converted to a Bevel join. If the distance from the inner intersection point to the tip of the triangle measured in stroke widths is more than the Miter limit, the join will be drawn in the Bevel style.
+     *
+     * @return the miterLimit
+     */
+    public float getMiterLimit() {
+<span class="fc" id="L214">        return miterLimit;</span>
+    }
+
+    /**
+     * Sets the miter limit of the stroke. The Miter limit controls the point at which a Miter join automatically is converted to a Bevel join. If the distance from the inner intersection point to the tip of the triangle measured in stroke widths is more than the Miter limit, the join will be drawn in the Bevel style.
+     *
+     * @param miterLimit the miterLimit to set
+     */
+    public void setMiterLimit(float miterLimit) {
+<span class="nc" id="L223">        this.miterLimit = miterLimit;</span>
+<span class="nc" id="L224">    }</span>
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (obj instanceof Stroke) {</span>
+<span class="fc" id="L229">            Stroke s = (Stroke) obj;</span>
+<span class="pc bpc" id="L230" title="3 of 8 branches missed.">            return (s.miterLimit == miterLimit &amp;&amp; s.capStyle == capStyle &amp;&amp; s.joinStyle == joinStyle &amp;&amp; s.lineWidth == lineWidth);</span>
+        }
+<span class="fc" id="L232">        return false;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L237">        return &quot;Stroke{lineWidth=&quot; + lineWidth + &quot;;capStyle=&quot; + capStyle + &quot;;joinStyle=&quot; + joinStyle + &quot;;miterLimit:&quot; + miterLimit + &quot;}&quot;;</span>
+    }
+
+
+    @Override
+    public int hashCode() {
+<span class="fc" id="L243">        int hash = 7;</span>
+<span class="fc" id="L244">        hash = 59 * hash + this.joinStyle;</span>
+<span class="fc" id="L245">        hash = 59 * hash + this.capStyle;</span>
+<span class="fc" id="L246">        hash = 59 * hash + Float.floatToIntBits(this.lineWidth);</span>
+<span class="fc" id="L247">        hash = 59 * hash + Float.floatToIntBits(this.miterLimit);</span>
+<span class="fc" id="L248">        return hash;</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

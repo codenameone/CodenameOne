@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BubbleChart.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.views</a> &gt; <span class="el_source">BubbleChart.java</span></div><h1>BubbleChart.java</h1><pre class="source lang-java linenums">/**
+ * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.codename1.charts.views;
+
+import com.codename1.charts.compat.Canvas;
+import com.codename1.charts.compat.Paint;
+import com.codename1.charts.compat.Paint.Style;
+import com.codename1.charts.models.XYMultipleSeriesDataset;
+import com.codename1.charts.models.XYValueSeries;
+import com.codename1.charts.renderers.SimpleSeriesRenderer;
+import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
+import com.codename1.charts.renderers.XYSeriesRenderer;
+
+import java.util.List;
+
+
+/**
+ * Displays series of {@link XYValueSeries} entries as proportional bubbles on
+ * top of an {@link XYChart} plot.
+ * &lt;p&gt;
+ * Combine the chart with an {@link XYMultipleSeriesDataset} that contains one
+ * or more {@link XYValueSeries} instances and supply an
+ * {@link XYMultipleSeriesRenderer}. The resulting {@code BubbleChart} can be
+ * wrapped in a {@link com.codename1.charts.ChartComponent} to embed it inside a
+ * Codename One UI.
+ */
+public class BubbleChart extends XYChart {
+    /** The constant to identify this chart type. */
+    public static final String TYPE = &quot;Bubble&quot;;
+    /** The legend shape width. */
+    private static final int SHAPE_WIDTH = 10;
+    /** The minimum bubble size. */
+    private static final int MIN_BUBBLE_SIZE = 2;
+    /** The maximum bubble size. */
+    private static final int MAX_BUBBLE_SIZE = 20;
+
+<span class="nc" id="L50">    BubbleChart() {</span>
+<span class="nc" id="L51">    }</span>
+
+    /**
+     * Builds a new bubble chart instance.
+     *
+     * @param dataset the multiple series dataset
+     * @param renderer the multiple series renderer
+     */
+    public BubbleChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer) {
+<span class="nc" id="L60">        super(dataset, renderer);</span>
+<span class="nc" id="L61">    }</span>
+
+    /**
+     * The graphical representation of a series.
+     *
+     * @param canvas the canvas to paint to
+     * @param paint the paint to be used for drawing
+     * @param points the array of points to be used for drawing the series
+     * @param seriesRenderer the series renderer
+     * @param yAxisValue the minimum value of the y axis
+     * @param seriesIndex the index of the series currently being drawn
+     * @param startIndex the start index of the rendering points
+     */
+    @Override
+    public void drawSeries(Canvas canvas, Paint paint, List&lt;Float&gt; points,
+                           XYSeriesRenderer renderer, float yAxisValue, int seriesIndex, int startIndex) {
+<span class="nc" id="L77">        paint.setColor(renderer.getColor());</span>
+<span class="nc" id="L78">        paint.setStyle(Style.FILL);</span>
+<span class="nc" id="L79">        int length = points.size();</span>
+<span class="nc" id="L80">        XYValueSeries series = (XYValueSeries) mDataset.getSeriesAt(seriesIndex);</span>
+<span class="nc" id="L81">        double max = series.getMaxValue();</span>
+<span class="nc" id="L82">        double coef = MAX_BUBBLE_SIZE / max;</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i += 2) {</span>
+<span class="nc" id="L84">            double size = series.getValue(startIndex + i / 2) * coef + MIN_BUBBLE_SIZE;</span>
+<span class="nc" id="L85">            drawCircle(canvas, paint, points.get(i), points.get(i + 1), (float) size);</span>
+        }
+<span class="nc" id="L87">    }</span>
+
+    @Override
+    protected ClickableArea[] clickableAreasForPoints(List&lt;Float&gt; points, List&lt;Double&gt; values,
+                                                      float yAxisValue, int seriesIndex, int startIndex) {
+<span class="nc" id="L92">        int length = points.size();</span>
+<span class="nc" id="L93">        XYValueSeries series = (XYValueSeries) mDataset.getSeriesAt(seriesIndex);</span>
+<span class="nc" id="L94">        double max = series.getMaxValue();</span>
+<span class="nc" id="L95">        double coef = MAX_BUBBLE_SIZE / max;</span>
+<span class="nc" id="L96">        ClickableArea[] ret = new ClickableArea[length / 2];</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i += 2) {</span>
+<span class="nc" id="L98">            double size = series.getValue(startIndex + i / 2) * coef + MIN_BUBBLE_SIZE;</span>
+<span class="nc" id="L99">            ret[i / 2] = new ClickableArea(PkgUtils.makeRect(points.get(i) - (float) size, points.get(i + 1)</span>
+<span class="nc" id="L100">                    - (float) size, points.get(i) + (float) size, points.get(i + 1) + (float) size),</span>
+<span class="nc" id="L101">                    values.get(i), values.get(i + 1));</span>
+        }
+<span class="nc" id="L103">        return ret;</span>
+    }
+
+    /**
+     * Returns the legend shape width.
+     *
+     * @param seriesIndex the series index
+     * @return the legend shape width
+     */
+    public int getLegendShapeWidth(int seriesIndex) {
+<span class="nc" id="L113">        return SHAPE_WIDTH;</span>
+    }
+
+    /**
+     * The graphical representation of the legend shape.
+     *
+     * @param canvas the canvas to paint to
+     * @param renderer the series renderer
+     * @param x the x value of the point the shape should be drawn at
+     * @param y the y value of the point the shape should be drawn at
+     * @param seriesIndex the series index
+     * @param paint the paint to be used for drawing
+     */
+    public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
+                                int seriesIndex, Paint paint) {
+<span class="nc" id="L128">        paint.setStyle(Style.FILL);</span>
+<span class="nc" id="L129">        drawCircle(canvas, paint, x + SHAPE_WIDTH, y, 3);</span>
+<span class="nc" id="L130">    }</span>
+
+    /**
+     * The graphical representation of a circle point shape.
+     *
+     * @param canvas the canvas to paint to
+     * @param paint the paint to be used for drawing
+     * @param x the x value of the point the shape should be drawn at
+     * @param y the y value of the point the shape should be drawn at
+     * @param radius the bubble radius
+     */
+    private void drawCircle(Canvas canvas, Paint paint, float x, float y, float radius) {
+<span class="nc" id="L142">        canvas.drawCircle(x, y, radius, paint);</span>
+<span class="nc" id="L143">    }</span>
+
+    /**
+     * Returns the chart type identifier.
+     *
+     * @return the chart type
+     */
+    public String getChartType() {
+<span class="nc" id="L151">        return TYPE;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

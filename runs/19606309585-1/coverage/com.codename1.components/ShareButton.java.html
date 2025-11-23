@@ -1,0 +1,223 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ShareButton.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">ShareButton.java</span></div><h1>ShareButton.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.share.EmailShare;
+import com.codename1.share.FacebookShare;
+import com.codename1.share.SMSShare;
+import com.codename1.share.ShareService;
+import com.codename1.ui.Button;
+import com.codename1.ui.Command;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.List;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.BorderLayout;
+
+import java.util.Vector;
+
+/**
+ * &lt;p&gt;The share button allows sharing a String or an image either thru the defined
+ * sharing services or thru the native OS sharing support. On Android &amp;amp; iOS the native
+ * sharing API is invoked for this class.&lt;br&gt;
+ * The code below demonstrates image sharing, notice that an image must be stored using
+ * the {@link com.codename1.io.FileSystemStorage} API and shouldn't use a different API
+ * like {@link com.codename1.io.Storage}!&lt;/p&gt;
+ *
+ * &lt;script src=&quot;https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-sharebutton.png&quot; alt=&quot;Share on the simulator&quot; /&gt;
+ *
+ * &lt;h4&gt;Notice that share looks different on a device&lt;/h4&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-sharebutton-android.png&quot; alt=&quot;Share on the device&quot; /&gt;
+ *
+ * @author Chen Fishbein
+ */
+public class ShareButton extends Button implements ActionListener {
+
+    private String textToShare;
+
+    private String imageToShare;
+
+    private String imageMimeType;
+
+<span class="fc" id="L66">    private final Vector shareServices = new Vector();</span>
+
+    /**
+     * Default constructor
+     */
+<span class="fc" id="L71">    public ShareButton() {</span>
+<span class="fc" id="L72">        setUIID(&quot;ShareButton&quot;);</span>
+        //Image shareIcon =  Resources.getSystemResource().getImage(&quot;share.png&quot;);
+        //setIcon(shareIcon);
+<span class="fc" id="L75">        FontImage.setMaterialIcon(this, FontImage.MATERIAL_SHARE);</span>
+<span class="fc" id="L76">        addActionListener(this);</span>
+<span class="fc" id="L77">        shareServices.addElement(new SMSShare());</span>
+<span class="fc" id="L78">        shareServices.addElement(new EmailShare());</span>
+<span class="fc" id="L79">        shareServices.addElement(new FacebookShare());</span>
+<span class="fc" id="L80">    }</span>
+
+    /**
+     * Gets the text to share
+     *
+     * @return
+     */
+    public String getTextToShare() {
+<span class="fc" id="L88">        return textToShare;</span>
+    }
+
+    /**
+     * Sets the information to share
+     *
+     * @param textToShare
+     */
+    public void setTextToShare(String textToShare) {
+<span class="fc" id="L97">        this.textToShare = textToShare;</span>
+<span class="fc" id="L98">    }</span>
+
+    /**
+     * Sets the image to share.
+     * Notice some sharing services cannot share image and a text, therefore if
+     * setTextToShare(...) is also used, the sharing service gives image sharing
+     * higher priority.
+     *
+     * @param imagePath     the full file path
+     * @param imageMimeType the image mime type e.g. image/png, image/jpeg
+     */
+    public void setImageToShare(String imagePath, String imageMimeType) {
+<span class="fc" id="L110">        this.imageToShare = imagePath;</span>
+<span class="fc" id="L111">        this.imageMimeType = imageMimeType;</span>
+<span class="fc" id="L112">    }</span>
+
+    /**
+     * Gets the image path to share
+     *
+     * @return
+     */
+    public String getImagePathToShare() {
+<span class="fc" id="L120">        return imageToShare;</span>
+    }
+
+
+    /**
+     * Adds a sharing service.
+     *
+     * @param share ShareService
+     */
+    public void addShareService(ShareService share) {
+<span class="fc" id="L130">        shareServices.addElement(share);</span>
+<span class="fc" id="L131">    }</span>
+
+    /**
+     * invoked when the button is pressed
+     *
+     * @param evt
+     */
+    public void actionPerformed(ActionEvent evt) {
+        // postpone the share button action to the next EDT cycle to allow action listeners on the button to 
+        // process first
+<span class="nc" id="L141">        Display.getInstance().callSerially(new Runnable() {</span>
+            public void run() {
+<span class="nc bnc" id="L143" title="All 2 branches missed.">                if (Display.getInstance().isNativeShareSupported()) {</span>
+<span class="nc" id="L144">                    Display.getInstance().share(textToShare, imageToShare, imageMimeType, new Rectangle(</span>
+<span class="nc" id="L145">                            ShareButton.this.getAbsoluteX(),</span>
+<span class="nc" id="L146">                            ShareButton.this.getAbsoluteY(),</span>
+<span class="nc" id="L147">                            ShareButton.this.getWidth(),</span>
+<span class="nc" id="L148">                            ShareButton.this.getHeight()</span>
+                    ));
+<span class="nc" id="L150">                    return;</span>
+                }
+                Vector sharing;
+<span class="nc bnc" id="L153" title="All 2 branches missed.">                if (imageToShare != null) {</span>
+<span class="nc" id="L154">                    sharing = new Vector();</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                    for (int i = 0; i &lt; shareServices.size(); i++) {</span>
+<span class="nc" id="L156">                        ShareService share = (ShareService) shareServices.elementAt(i);</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">                        if (share.canShareImage()) {</span>
+<span class="nc" id="L158">                            sharing.add(share);</span>
+                        }
+                    }
+                } else {
+<span class="nc" id="L162">                    sharing = shareServices;</span>
+                }
+<span class="nc bnc" id="L164" title="All 2 branches missed.">                for (int i = 0; i &lt; sharing.size(); i++) {</span>
+<span class="nc" id="L165">                    ShareService share = (ShareService) sharing.elementAt(i);</span>
+<span class="nc" id="L166">                    share.setMessage(textToShare);</span>
+<span class="nc" id="L167">                    share.setImage(imageToShare, imageMimeType);</span>
+<span class="nc" id="L168">                    share.setOriginalForm(getComponentForm());</span>
+                }
+<span class="nc" id="L170">                List l = new List(sharing);</span>
+<span class="nc" id="L171">                l.setCommandList(true);</span>
+<span class="nc" id="L172">                final Dialog dialog = new Dialog(&quot;Share&quot;);</span>
+<span class="nc" id="L173">                dialog.setLayout(new BorderLayout());</span>
+<span class="nc" id="L174">                dialog.addComponent(BorderLayout.CENTER, l);</span>
+<span class="nc" id="L175">                dialog.placeButtonCommands(new Command[]{new Command(&quot;Cancel&quot;)});</span>
+<span class="nc" id="L176">                l.addActionListener(new ActionListener() {</span>
+
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L179">                        dialog.dispose();</span>
+<span class="nc" id="L180">                    }</span>
+                });
+<span class="nc" id="L182">                dialog.show();</span>
+<span class="nc" id="L183">            }</span>
+        });
+<span class="nc" id="L185">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+<span class="nc" id="L191">        return new String[]{&quot;textToShare&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L198">        return new Class[]{String.class};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        if (name.equals(&quot;textToShare&quot;)) {</span>
+<span class="nc" id="L206">            return getTextToShare();</span>
+        }
+<span class="nc" id="L208">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L215" title="All 2 branches missed.">        if (name.equals(&quot;textToShare&quot;)) {</span>
+<span class="nc" id="L216">            setTextToShare((String) value);</span>
+<span class="nc" id="L217">            return null;</span>
+        }
+<span class="nc" id="L219">        return super.setPropertyValue(name, value);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

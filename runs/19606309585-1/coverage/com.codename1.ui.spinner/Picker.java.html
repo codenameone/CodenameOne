@@ -1,0 +1,1577 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Picker.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.spinner</a> &gt; <span class="el_source">Picker.java</span></div><h1>Picker.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.spinner;
+
+import com.codename1.components.InteractionDialog;
+import com.codename1.io.Log;
+import com.codename1.io.Util;
+import com.codename1.l10n.L10NManager;
+import com.codename1.l10n.SimpleDateFormat;
+import com.codename1.ui.Button;
+import com.codename1.ui.CN;
+import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import com.codename1.ui.ComponentSelector;
+import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Label;
+import com.codename1.ui.VirtualInputDevice;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.list.DefaultListModel;
+import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.RoundRectBorder;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+import java.util.Calendar;
+import java.util.Date;
+import java.util.ListIterator;
+
+import static com.codename1.ui.ComponentSelector.$;
+
+/**
+ * &lt;p&gt;{@code Picker} is a component and API that allows either popping up a spinner or
+ * using the native picker API when applicable. This is quite important for some
+ * platforms where the native spinner behavior is very hard to replicate.&lt;/p&gt;
+ *
+ * &lt;script src=&quot;https://gist.github.com/codenameone/5e437d82812dfcbdf092.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-picker.png&quot; alt=&quot;Picker UI&quot; /&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-picker-date-time-on-simulator.png&quot; alt=&quot;Date And Time Picker On the simulator&quot; /&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-picker-date-android.png&quot; alt=&quot;Android native date picker&quot; /&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-picker-strings-android.png&quot; alt=&quot;Android native String picker&quot; /&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-picker-time-android.png&quot; alt=&quot;Android native time picker&quot; /&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-picker-duration-android.png&quot; alt=&quot;Android duration picker&quot; /&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-picker-duration-hours-android.png&quot; alt=&quot;Android duration hours picker&quot; /&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-picker-time-android.png&quot; alt=&quot;Android duration minutes picker&quot; /&gt;
+ *
+ * @author Shai Almog
+ */
+public class Picker extends Button {
+
+    /**
+     * Whether useLightweightPopup should default to true, this can be set via
+     * the theme constant {@code lightweightPickerBool}
+     */
+    private static boolean defaultUseLightweightPopup;
+    private static boolean defaultLightweightModeSet;
+<span class="fc" id="L86">    private int type = Display.PICKER_TYPE_DATE;</span>
+<span class="fc" id="L87">    private Object value = new Date();</span>
+    private boolean showMeridiem;
+    private Object metaData;
+<span class="fc" id="L90">    private Object renderingPrototype = &quot;XXXXXXXXXXXXXX&quot;;</span>
+    private SimpleDateFormat formatter;
+    private int preferredPopupWidth;
+    private int preferredPopupHeight;
+<span class="fc" id="L94">    private int minuteStep = 5;</span>
+<span class="fc" id="L95">    private int minHour = -1;</span>
+<span class="fc" id="L96">    private int maxHour = -1;</span>
+    private Date startDate, endDate;
+    private VirtualInputDevice currentInput;
+
+    // Variables to store the form's previous margins before showing
+    // the popup dialog so that we can restore them when the popup is disposed.
+    private byte[] tmpContentPaneMarginUnit;
+    private float tmpContentPaneBottomMargin;
+    /**
+     * Flag to indicate that the picker should prefer lightweight components
+     * rather than native components.
+     */
+    private boolean useLightweightPopup;
+    private Runnable stopEditingCallback;
+    private Label focusedOverlay;
+    private boolean suppressPaint;
+
+    /**
+     * Default constructor
+     */
+<span class="fc" id="L116">    public Picker() {</span>
+<span class="fc" id="L117">        setUIID(&quot;Picker&quot;);</span>
+<span class="fc" id="L118">        setPreferredTabIndex(0);</span>
+
+        // Fixes iOS picker issue https://github.com/codenameone/CodenameOne/issues/3283
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (!defaultLightweightModeSet) {</span>
+<span class="fc" id="L122">            defaultLightweightModeSet = true;</span>
+<span class="fc" id="L123">            defaultUseLightweightPopup = CN.getPlatformName().equals(&quot;ios&quot;);</span>
+        }
+
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (!Display.getInstance().isNativePickerTypeSupported(Display.PICKER_TYPE_STRINGS)) {</span>
+            // For platforms that don't support native pickers, we'll make lightweight mode
+            // the default.  This will result in these platforms using the new Spinner3D classes
+            // instead of the old Spinner classes
+<span class="fc" id="L130">            useLightweightPopup = true;</span>
+        } else {
+<span class="nc" id="L132">            defaultUseLightweightPopup = getUIManager().isThemeConstant(&quot;lightweightPickerBool&quot;, defaultUseLightweightPopup);</span>
+<span class="nc" id="L133">            useLightweightPopup = defaultUseLightweightPopup;</span>
+        }
+<span class="fc" id="L135">        addActionListener(new ActionListener() {</span>
+            private static final int COMMAND_DONE = 1;
+            private static final int COMMAND_NEXT = 2;
+            private static final int COMMAND_PREV = 3;
+            private static final int COMMAND_CANCEL = 4;
+
+            public void actionPerformed(ActionEvent evt) {
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">                if (ignoreActionEvent(evt)) {</span>
+                    // This was fired from the interaction dialog in lightweight mode
+                    // we don't want to re-handle it here.
+<span class="nc" id="L145">                    return;</span>
+                }
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">                if (isEditing()) {</span>
+<span class="nc" id="L148">                    evt.consume();</span>
+<span class="nc" id="L149">                    return;</span>
+                }
+<span class="pc bpc" id="L151" title="4 of 6 branches missed.">                if ((useLightweightPopup || !Display.getInstance().isNativePickerTypeSupported(type)) &amp;&amp; isLightweightModeSupportedForType(type)) {</span>
+<span class="fc" id="L152">                    showInteractionDialog();</span>
+<span class="fc" id="L153">                    evt.consume();</span>
+<span class="fc" id="L154">                    return;</span>
+                }
+
+<span class="nc bnc" id="L157" title="All 2 branches missed.">                if (Display.getInstance().isNativePickerTypeSupported(type)) {</span>
+
+<span class="nc bnc" id="L159" title="All 2 branches missed.">                    switch (type) {</span>
+                        case Display.PICKER_TYPE_DURATION:
+                        case Display.PICKER_TYPE_DURATION_HOURS:
+                        case Display.PICKER_TYPE_DURATION_MINUTES: {
+<span class="nc" id="L163">                            metaData = &quot;minuteStep=&quot; + minuteStep;</span>
+                            break;
+                        }
+                    }
+
+<span class="nc" id="L168">                    setEnabled(false);</span>
+<span class="nc" id="L169">                    Object val = Display.getInstance().showNativePicker(type, Picker.this, value, metaData);</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">                    if (val != null) {</span>
+<span class="nc" id="L171">                        value = val;</span>
+<span class="nc" id="L172">                        updateValue();</span>
+                    } else {
+                        // cancel pressed.   Don't send the rest of the events.
+<span class="nc" id="L175">                        evt.consume();</span>
+                    }
+<span class="nc" id="L177">                    setEnabled(true);</span>
+<span class="nc" id="L178">                } else {</span>
+<span class="nc" id="L179">                    Dialog pickerDlg = new Dialog();</span>
+<span class="nc" id="L180">                    pickerDlg.setDisposeWhenPointerOutOfBounds(true);</span>
+<span class="nc" id="L181">                    pickerDlg.setLayout(new BorderLayout());</span>
+<span class="nc" id="L182">                    Calendar cld = Calendar.getInstance();</span>
+<span class="nc bnc" id="L183" title="All 7 branches missed.">                    switch (type) {</span>
+                        case Display.PICKER_TYPE_STRINGS: {
+<span class="nc" id="L185">                            GenericSpinner gs = new GenericSpinner();</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">                            if (renderingPrototype != null) {</span>
+<span class="nc" id="L187">                                gs.setRenderingPrototype((String) renderingPrototype);</span>
+                            }
+<span class="nc" id="L189">                            String[] strArr = (String[]) metaData;</span>
+<span class="nc" id="L190">                            gs.setModel(new DefaultListModel((Object[]) strArr));</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">                            if (value != null) {</span>
+<span class="nc" id="L192">                                int slen = strArr.length;</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">                                for (int iter = 0; iter &lt; slen; iter++) {</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">                                    if (strArr[iter].equals(value)) {</span>
+<span class="nc" id="L195">                                        gs.getModel().setSelectedIndex(iter);</span>
+<span class="nc" id="L196">                                        break;</span>
+                                    }
+                                }
+                            }
+<span class="nc bnc" id="L200" title="All 2 branches missed.">                            if (showDialog(pickerDlg, gs)) {</span>
+<span class="nc" id="L201">                                value = gs.getValue();</span>
+                            } else {
+<span class="nc" id="L203">                                evt.consume();</span>
+                            }
+<span class="nc" id="L205">                            break;</span>
+                        }
+                        case Display.PICKER_TYPE_CALENDAR:
+<span class="nc" id="L208">                            showInteractionDialog();</span>
+<span class="nc" id="L209">                            evt.consume();</span>
+<span class="nc" id="L210">                            break;</span>
+
+                        case Display.PICKER_TYPE_DATE: {
+<span class="nc" id="L213">                            DateSpinner ds = new DateSpinner();</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">                            if (value == null) {</span>
+<span class="nc" id="L215">                                cld.setTime(new Date());</span>
+                            } else {
+<span class="nc" id="L217">                                cld.setTime((Date) value);</span>
+                            }
+<span class="nc" id="L219">                            ds.setStartYear(UIManager.getInstance().getThemeConstant(&quot;pickerStartingDate&quot;, 1900));</span>
+<span class="nc" id="L220">                            ds.setCurrentDay(cld.get(Calendar.DAY_OF_MONTH));</span>
+<span class="nc" id="L221">                            ds.setCurrentMonth(cld.get(Calendar.MONTH) + 1);</span>
+<span class="nc" id="L222">                            ds.setCurrentYear(cld.get(Calendar.YEAR));</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">                            if (showDialog(pickerDlg, ds)) {</span>
+
+<span class="nc" id="L225">                                cld.set(Calendar.DAY_OF_MONTH, ds.getCurrentDay());</span>
+<span class="nc" id="L226">                                cld.set(Calendar.MONTH, ds.getCurrentMonth() - 1);</span>
+<span class="nc" id="L227">                                cld.set(Calendar.YEAR, ds.getCurrentYear());</span>
+<span class="nc" id="L228">                                value = cld.getTime();</span>
+                            } else {
+<span class="nc" id="L230">                                evt.consume();</span>
+                            }
+<span class="nc" id="L232">                            break;</span>
+                        }
+                        case Display.PICKER_TYPE_TIME: {
+<span class="nc" id="L235">                            int v = ((Integer) value).intValue();</span>
+<span class="nc" id="L236">                            int hour = v / 60;</span>
+<span class="nc" id="L237">                            int minute = v % 60;</span>
+<span class="nc" id="L238">                            TimeSpinner ts = new TimeSpinner();</span>
+<span class="nc" id="L239">                            ts.setShowMeridiem(isShowMeridiem());</span>
+<span class="nc bnc" id="L240" title="All 4 branches missed.">                            if (showMeridiem &amp;&amp; hour &gt; 12) {</span>
+<span class="nc" id="L241">                                ts.setCurrentMeridiem(true);</span>
+<span class="nc" id="L242">                                ts.setCurrentHour(hour - 12);</span>
+                            } else {
+<span class="nc" id="L244">                                ts.setCurrentHour(hour);</span>
+                            }
+<span class="nc" id="L246">                            ts.setCurrentMinute(minute);</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">                            if (showDialog(pickerDlg, ts)) {</span>
+
+<span class="nc bnc" id="L249" title="All 2 branches missed.">                                if (isShowMeridiem()) {</span>
+<span class="nc" id="L250">                                    int offset = 0;</span>
+<span class="nc bnc" id="L251" title="All 2 branches missed.">                                    if (ts.getCurrentHour() == 12) {</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">                                        if (!ts.isCurrentMeridiem()) {</span>
+<span class="nc" id="L253">                                            offset = 12;</span>
+                                        }
+                                    } else {
+<span class="nc bnc" id="L256" title="All 2 branches missed.">                                        if (ts.isCurrentMeridiem()) {</span>
+<span class="nc" id="L257">                                            offset = 12;</span>
+                                        }
+                                    }
+<span class="nc" id="L260">                                    hour = ts.getCurrentHour() + offset;</span>
+<span class="nc" id="L261">                                } else {</span>
+<span class="nc" id="L262">                                    hour = ts.getCurrentHour();</span>
+                                }
+<span class="nc" id="L264">                                value = Integer.valueOf(hour * 60 + ts.getCurrentMinute());</span>
+                            } else {
+<span class="nc" id="L266">                                evt.consume();</span>
+                            }
+<span class="nc" id="L268">                            break;</span>
+                        }
+                        case Display.PICKER_TYPE_DATE_AND_TIME: {
+<span class="nc" id="L271">                            DateTimeSpinner dts = new DateTimeSpinner();</span>
+<span class="nc" id="L272">                            cld.setTime((Date) value);</span>
+<span class="nc" id="L273">                            dts.setCurrentDate((Date) value);</span>
+<span class="nc" id="L274">                            dts.setShowMeridiem(isShowMeridiem());</span>
+<span class="nc bnc" id="L275" title="All 4 branches missed.">                            if (isShowMeridiem() &amp;&amp; dts.isCurrentMeridiem()) {</span>
+<span class="nc" id="L276">                                dts.setCurrentHour(cld.get(Calendar.HOUR));</span>
+                            } else {
+<span class="nc" id="L278">                                dts.setCurrentHour(cld.get(Calendar.HOUR_OF_DAY));</span>
+                            }
+<span class="nc" id="L280">                            dts.setCurrentMinute(cld.get(Calendar.MINUTE));</span>
+<span class="nc bnc" id="L281" title="All 2 branches missed.">                            if (showDialog(pickerDlg, dts)) {</span>
+<span class="nc" id="L282">                                cld.setTime(dts.getCurrentDate());</span>
+<span class="nc bnc" id="L283" title="All 4 branches missed.">                                if (isShowMeridiem() &amp;&amp; dts.isCurrentMeridiem()) {</span>
+<span class="nc" id="L284">                                    cld.set(Calendar.AM_PM, Calendar.PM);</span>
+<span class="nc" id="L285">                                    cld.set(Calendar.HOUR, dts.getCurrentHour());</span>
+                                } else {
+<span class="nc" id="L287">                                    cld.set(Calendar.HOUR_OF_DAY, dts.getCurrentHour());</span>
+                                }
+<span class="nc" id="L289">                                cld.set(Calendar.MINUTE, dts.getCurrentMinute());</span>
+<span class="nc" id="L290">                                value = cld.getTime();</span>
+                            } else {
+<span class="nc" id="L292">                                evt.consume();</span>
+                            }
+<span class="nc" id="L294">                            break;</span>
+                        }
+                        case Display.PICKER_TYPE_DURATION_HOURS:
+                        case Display.PICKER_TYPE_DURATION_MINUTES:
+                        case Display.PICKER_TYPE_DURATION: {
+<span class="nc" id="L299">                            long v = ((Long) value).longValue();</span>
+<span class="nc" id="L300">                            int hour = (int) (v / 1000 / 60 / 60);</span>
+<span class="nc" id="L301">                            int minute = (int) ((v / 1000 / 60) % 60);</span>
+<span class="nc" id="L302">                            TimeSpinner ts = new TimeSpinner();</span>
+<span class="nc" id="L303">                            ts.setDurationMode(true);</span>
+<span class="nc bnc" id="L304" title="All 2 branches missed.">                            if (type == Display.PICKER_TYPE_DURATION_HOURS) {</span>
+<span class="nc" id="L305">                                ts.setMinutesVisible(false);</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">                            } else if (type == Display.PICKER_TYPE_DURATION_MINUTES) {</span>
+<span class="nc" id="L307">                                ts.setHoursVisible(false);</span>
+                            }
+<span class="nc" id="L309">                            ts.setCurrentHour(hour);</span>
+<span class="nc" id="L310">                            ts.setCurrentMinute(minute);</span>
+<span class="nc" id="L311">                            ts.setMinuteStep(minuteStep);</span>
+<span class="nc bnc" id="L312" title="All 2 branches missed.">                            if (showDialog(pickerDlg, ts)) {</span>
+
+<span class="nc" id="L314">                                value = Long.valueOf(ts.getCurrentHour() * 60L * 60 * 1000L +</span>
+<span class="nc" id="L315">                                        ts.getCurrentMinute() * 60L * 1000L);</span>
+                            } else {
+<span class="nc" id="L317">                                evt.consume();</span>
+                            }
+<span class="nc" id="L319">                            break;</span>
+                        }
+
+                    }
+<span class="nc" id="L323">                    updateValue();</span>
+                }
+<span class="nc" id="L325">            }</span>
+
+            private Spinner3D createStringPicker3D() {
+<span class="nc" id="L328">                Spinner3D out = new Spinner3D(new DefaultListModel&lt;String&gt;((String[]) metaData));</span>
+<span class="nc bnc" id="L329" title="All 2 branches missed.">                if (value != null) {</span>
+<span class="nc" id="L330">                    out.setValue(value);</span>
+                }
+                //out.refreshStyles();
+<span class="nc" id="L333">                return out;</span>
+            }
+
+            private DateSpinner3D createDatePicker3D() {
+<span class="nc" id="L337">                DateSpinner3D out = new DateSpinner3D();</span>
+<span class="nc bnc" id="L338" title="All 2 branches missed.">                Date defaultValue = value == null ? new Date() : (Date) value;</span>
+<span class="nc bnc" id="L339" title="All 4 branches missed.">                if (startDate != null &amp;&amp; endDate != null) {</span>
+<span class="nc" id="L340">                    out.setDateRange(startDate, endDate);</span>
+<span class="nc bnc" id="L341" title="All 2 branches missed.">                    if (defaultValue.getTime() &lt; startDate.getTime()) {</span>
+<span class="nc" id="L342">                        defaultValue = startDate;</span>
+                    }
+<span class="nc bnc" id="L344" title="All 2 branches missed.">                    if (defaultValue.getTime() &gt; endDate.getTime()) {</span>
+<span class="nc" id="L345">                        defaultValue = startDate;</span>
+                    }
+<span class="nc bnc" id="L347" title="All 2 branches missed.">                } else if (startDate != null) {</span>
+<span class="nc" id="L348">                    out.setDateRange(startDate, null);</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">                    if (defaultValue.getTime() &lt; startDate.getTime()) {</span>
+<span class="nc" id="L350">                        defaultValue = startDate;</span>
+                    }
+<span class="nc bnc" id="L352" title="All 2 branches missed.">                } else if (endDate != null) {</span>
+<span class="nc" id="L353">                    out.setDateRange(null, endDate);</span>
+<span class="nc bnc" id="L354" title="All 2 branches missed.">                    if (defaultValue.getTime() &gt; endDate.getTime()) {</span>
+<span class="nc" id="L355">                        defaultValue = endDate;</span>
+                    }
+                }
+<span class="nc bnc" id="L358" title="All 2 branches missed.">                if (value != null) {</span>
+<span class="nc" id="L359">                    out.setValue(value);</span>
+                } else {
+<span class="nc" id="L361">                    out.setValue(defaultValue);</span>
+                }
+<span class="nc" id="L363">                return out;</span>
+            }
+
+            private CalendarPicker createCalendarPicker() {
+
+<span class="nc" id="L368">                CalendarPicker out = new CalendarPicker();</span>
+<span class="nc bnc" id="L369" title="All 2 branches missed.">                if (value != null) {</span>
+<span class="nc" id="L370">                    out.setValue(value);</span>
+                } else {
+<span class="nc" id="L372">                    out.setValue(new Date());</span>
+                }
+
+<span class="nc" id="L375">                return out;</span>
+            }
+
+            private TimeSpinner3D createTimePicker3D() {
+<span class="nc" id="L379">                TimeSpinner3D out = new TimeSpinner3D(minuteStep);</span>
+<span class="nc" id="L380">                out.setShowMeridiem(showMeridiem);</span>
+<span class="nc bnc" id="L381" title="All 6 branches missed.">                if (minHour &gt;= 0 &amp;&amp; minHour &lt; 24 &amp;&amp; maxHour &gt; minHour) {</span>
+<span class="nc" id="L382">                    out.setHourRange(minHour, maxHour);</span>
+                }
+<span class="nc bnc" id="L384" title="All 2 branches missed.">                if (value != null) {</span>
+<span class="nc" id="L385">                    out.setValue(value);</span>
+                } else {
+<span class="nc" id="L387">                    out.setValue(0);</span>
+                }
+<span class="nc" id="L389">                return out;</span>
+            }
+
+            private DateTimeSpinner3D createDateTimePicker3D() {
+<span class="fc" id="L393">                DateTimeSpinner3D out = new DateTimeSpinner3D(minuteStep);</span>
+<span class="fc" id="L394">                out.setShowMeridiem(showMeridiem);</span>
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">                if (startDate != null) {</span>
+<span class="nc" id="L396">                    out.setStartDate(startDate);</span>
+                }
+<span class="pc bpc" id="L398" title="1 of 2 branches missed.">                if (endDate != null) {</span>
+<span class="nc" id="L399">                    out.setEndDate(endDate);</span>
+                }
+<span class="pc bpc" id="L401" title="5 of 6 branches missed.">                if (minHour &gt;= 0 &amp;&amp; minHour &lt; 24 &amp;&amp; maxHour &gt; minHour) {</span>
+<span class="nc" id="L402">                    out.setHourRange(minHour, maxHour);</span>
+                }
+<span class="pc bpc" id="L404" title="1 of 2 branches missed.">                if (value != null) {</span>
+<span class="fc" id="L405">                    out.setValue(value);</span>
+                } else {
+<span class="nc" id="L407">                    out.setValue(new Date());</span>
+                }
+<span class="fc" id="L409">                return out;</span>
+            }
+
+            private DurationSpinner3D createDurationPicker3D() {
+<span class="nc" id="L413">                DurationSpinner3D out = new DurationSpinner3D(</span>
+<span class="nc bnc" id="L414" title="All 2 branches missed.">                        type == Display.PICKER_TYPE_DURATION_MINUTES ? DurationSpinner3D.FIELD_MINUTE :</span>
+<span class="nc bnc" id="L415" title="All 2 branches missed.">                                type == Display.PICKER_TYPE_DURATION_HOURS ? DurationSpinner3D.FIELD_HOUR :</span>
+                                        DurationSpinner3D.FIELD_HOUR | DurationSpinner3D.FIELD_MINUTE,
+<span class="nc" id="L417">                        minuteStep</span>
+                );
+<span class="nc bnc" id="L419" title="All 2 branches missed.">                if (value != null) {</span>
+<span class="nc" id="L420">                    out.setValue(value);</span>
+                } else {
+<span class="nc" id="L422">                    out.setValue(0);</span>
+                }
+<span class="nc" id="L424">                return out;</span>
+            }
+
+            private void endEditing(int command, InteractionDialog dlg, InternalPickerWidget spinner) {
+<span class="nc" id="L428">                currentInput = null;</span>
+<span class="nc" id="L429">                restoreContentPane();</span>
+<span class="nc" id="L430">                dlg.disposeToTheBottom();</span>
+<span class="nc bnc" id="L431" title="All 2 branches missed.">                if (command != COMMAND_CANCEL) {</span>
+<span class="nc" id="L432">                    value = spinner.getValue();</span>
+<span class="nc" id="L433">                    updateValue();</span>
+                    // (x, y) = (-99, -99) signals the built-in action listner
+                    // to ignore this event and just propagage it to external
+                    // listeners.  See ignoreActionEvent(ActionEvent)
+<span class="nc" id="L437">                    fireActionEvent(-99, -99);</span>
+
+<span class="nc" id="L439">                    Component next = null;</span>
+<span class="nc" id="L440">                    Form f = getComponentForm();</span>
+<span class="nc bnc" id="L441" title="All 2 branches missed.">                    if (f != null) {</span>
+<span class="nc bnc" id="L442" title="All 2 branches missed.">                        if (command == COMMAND_NEXT) {</span>
+<span class="nc" id="L443">                            next = f.getNextComponent(Picker.this);</span>
+<span class="nc bnc" id="L444" title="All 2 branches missed.">                        } else if (command == COMMAND_PREV) {</span>
+<span class="nc" id="L445">                            next = f.getPreviousComponent(Picker.this);</span>
+                        }
+                    }
+<span class="nc bnc" id="L448" title="All 2 branches missed.">                    if (next != null) {</span>
+<span class="nc" id="L449">                        next.requestFocus();</span>
+<span class="nc" id="L450">                        next.startEditingAsync();</span>
+                    }
+                }
+<span class="nc" id="L453">            }</span>
+
+            private void showInteractionDialog() {
+<span class="fc" id="L456">                boolean isTablet = Display.getInstance().isTablet();</span>
+                final InternalPickerWidget spinner;
+<span class="pc bpc" id="L458" title="6 of 7 branches missed.">                switch (type) {</span>
+                    case Display.PICKER_TYPE_STRINGS:
+<span class="nc" id="L460">                        spinner = createStringPicker3D();</span>
+<span class="nc" id="L461">                        break;</span>
+                    case Display.PICKER_TYPE_CALENDAR:
+<span class="nc" id="L463">                        spinner = createCalendarPicker();</span>
+<span class="nc" id="L464">                        break;</span>
+                    case Display.PICKER_TYPE_DATE:
+<span class="nc" id="L466">                        spinner = createDatePicker3D();</span>
+<span class="nc" id="L467">                        break;</span>
+                    case Display.PICKER_TYPE_TIME:
+<span class="nc" id="L469">                        spinner = createTimePicker3D();</span>
+<span class="nc" id="L470">                        break;</span>
+                    case Display.PICKER_TYPE_DATE_AND_TIME:
+<span class="fc" id="L472">                        spinner = createDateTimePicker3D();</span>
+<span class="fc" id="L473">                        break;</span>
+                    case Display.PICKER_TYPE_DURATION:
+                    case Display.PICKER_TYPE_DURATION_HOURS:
+                    case Display.PICKER_TYPE_DURATION_MINUTES:
+<span class="nc" id="L477">                        spinner = createDurationPicker3D();</span>
+<span class="nc" id="L478">                        break;</span>
+                    default:
+<span class="nc" id="L480">                        throw new IllegalArgumentException(&quot;Unsupported picker type &quot; + type);</span>
+                }
+<span class="fc" id="L482">                final InteractionDialog dlg = new InteractionDialog() {</span>
+
+                    ActionListener keyListener;
+
+                    @Override
+                    protected void initComponent() {
+<span class="fc" id="L488">                        final InteractionDialog self = this;</span>
+<span class="fc" id="L489">                        super.initComponent();</span>
+<span class="pc bpc" id="L490" title="1 of 2 branches missed.">                        if (keyListener == null) {</span>
+<span class="fc" id="L491">                            keyListener = new ActionListener() {</span>
+
+                                @Override
+                                public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L495" title="All 2 branches missed.">                                    if (Display.getInstance().isShiftKeyDown()) {</span>
+<span class="nc" id="L496">                                        endEditing(COMMAND_PREV, self, spinner);</span>
+                                    } else {
+<span class="nc" id="L498">                                        endEditing(COMMAND_NEXT, self, spinner);</span>
+                                    }
+
+<span class="nc" id="L501">                                }</span>
+
+                            };
+                        }
+<span class="fc" id="L505">                        getComponentForm().addKeyListener(9, keyListener);</span>
+<span class="fc" id="L506">                    }</span>
+
+                    @Override
+                    protected void deinitialize() {
+<span class="nc" id="L510">                        Form f = getComponentForm();</span>
+<span class="nc bnc" id="L511" title="All 2 branches missed.">                        if (f == null) {</span>
+<span class="nc" id="L512">                            f = Display.getInstance().getCurrent();</span>
+                        }
+<span class="nc bnc" id="L514" title="All 4 branches missed.">                        if (f != null &amp;&amp; keyListener != null) {</span>
+<span class="nc" id="L515">                            f.removeKeyListener(9, keyListener);</span>
+                        }
+<span class="nc" id="L517">                        super.deinitialize();</span>
+<span class="nc" id="L518">                    }</span>
+
+
+                };
+<span class="fc" id="L522">                dlg.setOwner(Picker.this);</span>
+                //dlg.setFormMode(!isTablet);
+<span class="fc" id="L524">                ComponentSelector.select(&quot;DialogTitle&quot;, dlg).getParent().setPadding(0).setMargin(0).setBorder(Border.createEmpty());</span>
+<span class="fc" id="L525">                dlg.getTitleComponent().setVisible(false);</span>
+<span class="fc" id="L526">                ComponentSelector.select(dlg.getTitleComponent()).setPadding(0).setMargin(0);</span>
+<span class="pc bpc" id="L527" title="1 of 2 branches missed.">                dlg.setUIID(isTablet ? &quot;PickerDialogTablet&quot; : &quot;PickerDialog&quot;);</span>
+<span class="fc" id="L528">                dlg.getUnselectedStyle().setBgColor(new Label(&quot;&quot;, &quot;Spinner3DOverlay&quot;).getUnselectedStyle().getBgColor());</span>
+<span class="fc" id="L529">                dlg.getUnselectedStyle().setBgTransparency(255);</span>
+<span class="pc bpc" id="L530" title="1 of 2 branches missed.">                if (isTablet) {</span>
+
+<span class="nc" id="L532">                    dlg.getUnselectedStyle().setBorder(RoundRectBorder.create().cornerRadius(2f));</span>
+
+                }
+
+<span class="fc" id="L536">                dlg.getContentPane().setLayout(new BorderLayout());</span>
+
+<span class="pc bpc" id="L538" title="1 of 2 branches missed.">                String dlgUiid = isTablet ? &quot;PickerDialogContentTablet&quot; : &quot;PickerDialogContent&quot;;</span>
+<span class="fc" id="L539">                dlg.getContentPane().setUIID(dlgUiid);</span>
+<span class="fc" id="L540">                dlg.getContentPane().getUnselectedStyle().setBgColor(new Label(&quot;&quot;, &quot;Spinner3DOverlay&quot;).getUnselectedStyle().getBgColor());</span>
+
+
+                final Component spinnerC;
+
+
+<span class="fc" id="L546">                spinnerC = (Component) spinner;</span>
+<span class="fc" id="L547">                Container wrapper = BorderLayout.center(spinnerC);</span>
+<span class="fc" id="L548">                ComponentSelector.select(wrapper).addTags(&quot;SpinnerWrapper&quot;);</span>
+<span class="fc" id="L549">                ComponentSelector.select(wrapper).selectAllStyles()</span>
+<span class="fc" id="L550">                        .setBorder(Border.createEmpty())</span>
+<span class="fc" id="L551">                        .setBgTransparency(0)</span>
+<span class="fc" id="L552">                        .setMargin(0)</span>
+<span class="fc" id="L553">                        .setPaddingMillimeters(3f, 0);</span>
+                //wrapper.add(BorderLayout.CENTER, spinnerC);
+<span class="fc" id="L555">                dlg.getContentPane().add(BorderLayout.CENTER, wrapper);</span>
+
+
+<span class="pc bpc" id="L558" title="1 of 2 branches missed.">                Button doneButton = new Button(&quot;Done&quot;, isTablet ? &quot;PickerButtonTablet&quot; : &quot;PickerButton&quot;);</span>
+<span class="fc" id="L559">                doneButton.addActionListener(new ActionListener() {</span>
+
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L563">                        endEditing(COMMAND_DONE, dlg, spinner);</span>
+
+
+<span class="nc" id="L566">                    }</span>
+
+                });
+<span class="pc bpc" id="L569" title="1 of 2 branches missed.">                Button cancelButton = new Button(&quot;Cancel&quot;, isTablet ? &quot;PickerButtonTablet&quot; : &quot;PickerButton&quot;);</span>
+<span class="fc" id="L570">                cancelButton.addActionListener(new ActionListener() {</span>
+
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L574">                        endEditing(COMMAND_CANCEL, dlg, spinner);</span>
+
+
+<span class="nc" id="L577">                    }</span>
+
+                });
+
+<span class="fc" id="L581">                Button nextButton = null;</span>
+                //final Component nextComponent = getNextFocusRight() != null ? getNextFocusRight() :
+                //        getNextFocusDown() != null ? getNextFocusDown() :
+                //        null;
+<span class="fc" id="L585">                ListIterator&lt;Component&gt; traversalIt = getComponentForm().getTabIterator(Picker.this);</span>
+<span class="pc bpc" id="L586" title="1 of 2 branches missed.">                if (traversalIt.hasNext()) {</span>
+<span class="nc bnc" id="L587" title="All 2 branches missed.">                    nextButton = new Button(&quot;&quot;, isTablet ? &quot;PickerButtonTablet&quot; : &quot;PickerButton&quot;);</span>
+                    // Javascript port needs to know that this button is going to try to
+                    // focus a text field (possibly) so that it can prepare the text field
+                    // in the native event handler.  We use this client property to let it know... it
+                    // will handle the rest.
+<span class="nc" id="L592">                    nextButton.putClientProperty(&quot;$$focus&quot;, ((Form.TabIterator) traversalIt).getNext());</span>
+<span class="nc" id="L593">                    FontImage.setMaterialIcon(nextButton, FontImage.MATERIAL_KEYBOARD_ARROW_DOWN);</span>
+<span class="nc" id="L594">                    nextButton.addActionListener(new ActionListener() {</span>
+
+                        @Override
+                        public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L598">                            endEditing(COMMAND_NEXT, dlg, spinner);</span>
+
+<span class="nc" id="L600">                        }</span>
+
+                    });
+                }
+
+<span class="fc" id="L605">                Button prevButton = null;</span>
+
+<span class="pc bpc" id="L607" title="1 of 2 branches missed.">                if (traversalIt.hasPrevious()) {</span>
+<span class="nc bnc" id="L608" title="All 2 branches missed.">                    prevButton = new Button(&quot;&quot;, isTablet ? &quot;PickerButtonTablet&quot; : &quot;PickerButton&quot;);</span>
+
+                    // Javascript port needs to know that this button is going to try to
+                    // focus a text field (possibly) so that it can prepare the text field
+                    // in the native event handler.  We use this client property to let it know... it
+                    // will handle the rest.
+<span class="nc" id="L614">                    prevButton.putClientProperty(&quot;$$focus&quot;, ((Form.TabIterator) traversalIt).getPrevious());</span>
+<span class="nc" id="L615">                    FontImage.setMaterialIcon(prevButton, FontImage.MATERIAL_KEYBOARD_ARROW_UP);</span>
+<span class="nc" id="L616">                    prevButton.addActionListener(new ActionListener() {</span>
+
+                        @Override
+                        public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L620">                            endEditing(COMMAND_PREV, dlg, spinner);</span>
+
+<span class="nc" id="L622">                        }</span>
+
+                    });
+                }
+
+
+<span class="fc" id="L628">                Container west = new Container(BoxLayout.x());</span>
+<span class="fc" id="L629">                $(west).selectAllStyles().setMargin(0).setPadding(0).setBorder(Border.createEmpty()).setBgTransparency(0);</span>
+<span class="fc" id="L630">                west.add(cancelButton);</span>
+<span class="pc bpc" id="L631" title="1 of 2 branches missed.">                if (prevButton != null) {</span>
+<span class="nc" id="L632">                    west.add(prevButton);</span>
+                }
+<span class="pc bpc" id="L634" title="1 of 2 branches missed.">                if (nextButton != null) {</span>
+<span class="nc" id="L635">                    west.add(nextButton);</span>
+                }
+
+<span class="fc" id="L638">                Container buttonBar = BorderLayout.centerEastWest(null, doneButton, west);</span>
+<span class="pc bpc" id="L639" title="1 of 2 branches missed.">                buttonBar.setUIID(isTablet ? &quot;PickerButtonBarTablet&quot; : &quot;PickerButtonBar&quot;);</span>
+<span class="fc" id="L640">                dlg.getContentPane().add(BorderLayout.NORTH, buttonBar);</span>
+
+<span class="fc" id="L642">                Form form = getComponentForm();</span>
+<span class="pc bpc" id="L643" title="1 of 2 branches missed.">                if (form == null) {</span>
+<span class="nc" id="L644">                    throw new RuntimeException(&quot;Attempt to show interaction dialog while button is not on form.  Illegal state&quot;);</span>
+                }
+
+<span class="fc" id="L647">                final int top = Math.max(0, form.getContentPane().getHeight() - dlg.getPreferredH());</span>
+<span class="pc bpc" id="L648" title="1 of 2 branches missed.">                if (top == 0) {</span>
+<span class="nc" id="L649">                    wrapper.getUnselectedStyle().setPaddingTop(0);</span>
+<span class="nc" id="L650">                    wrapper.getUnselectedStyle().setPaddingBottom(0);</span>
+                }
+<span class="fc" id="L652">                final int left = 0;</span>
+<span class="fc" id="L653">                final int right = 0;</span>
+<span class="fc" id="L654">                final int bottom = 0;</span>
+<span class="fc" id="L655">                dlg.setWidth(Display.getInstance().getDisplayWidth());</span>
+<span class="fc" id="L656">                dlg.setHeight(dlg.getPreferredH());</span>
+<span class="fc" id="L657">                dlg.setY(Display.getInstance().getDisplayHeight());</span>
+<span class="fc" id="L658">                dlg.setX(0);</span>
+<span class="fc" id="L659">                dlg.setRepositionAnimation(false);</span>
+<span class="fc" id="L660">                registerAsInputDevice(dlg);</span>
+<span class="pc bpc" id="L661" title="1 of 2 branches missed.">                if (Display.getInstance().isTablet()) {</span>
+<span class="nc" id="L662">                    getComponentForm().getAnimationManager().flushAnimation(new Runnable() {</span>
+
+                        @Override
+                        public void run() {
+<span class="nc" id="L666">                            dlg.showPopupDialog(Picker.this);</span>
+<span class="nc" id="L667">                        }</span>
+
+                    });
+
+                } else {
+<span class="fc" id="L672">                    getComponentForm().getAnimationManager().flushAnimation(new Runnable() {</span>
+
+                        @Override
+                        public void run() {
+<span class="fc" id="L676">                            dlg.show(top, bottom, left, right);</span>
+<span class="fc" id="L677">                            padContentPane(top, bottom, left, right);</span>
+<span class="fc" id="L678">                        }</span>
+
+                    });
+
+                }
+
+<span class="fc" id="L684">            }</span>
+
+
+            private boolean showDialog(Dialog pickerDlg, Component c) {
+<span class="nc" id="L688">                pickerDlg.addComponent(BorderLayout.CENTER, c);</span>
+<span class="nc" id="L689">                Button ok = new Button(new Command(&quot;OK&quot;));</span>
+<span class="nc" id="L690">                final boolean[] userCanceled = new boolean[1];</span>
+<span class="nc" id="L691">                Button cancel = new Button(new Command(&quot;Cancel&quot;) {</span>
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L694">                        userCanceled[0] = true;</span>
+<span class="nc" id="L695">                        super.actionPerformed(evt);</span>
+<span class="nc" id="L696">                    }</span>
+                });
+<span class="nc" id="L698">                Container buttons = GridLayout.encloseIn(2, cancel, ok);</span>
+<span class="nc" id="L699">                pickerDlg.addComponent(BorderLayout.SOUTH, buttons);</span>
+<span class="nc bnc" id="L700" title="All 2 branches missed.">                if (Display.getInstance().isTablet()) {</span>
+<span class="nc" id="L701">                    pickerDlg.showPopupDialog(Picker.this);</span>
+                } else {
+<span class="nc" id="L703">                    pickerDlg.show();</span>
+                }
+<span class="nc bnc" id="L705" title="All 2 branches missed.">                return !userCanceled[0];</span>
+            }
+        });
+<span class="fc" id="L708">        updateValue();</span>
+<span class="fc" id="L709">    }</span>
+
+    /**
+     * Whether useLightweightPopup should default to true, this can be set via
+     * the theme constant {@code lightweightPickerBool}
+     *
+     * @return the defaultUseLightweightPopup
+     */
+    public static boolean isDefaultUseLightweightPopup() {
+<span class="nc" id="L718">        return defaultUseLightweightPopup;</span>
+    }
+
+    /**
+     * Whether useLightweightPopup should default to true, this can be set via
+     * the theme constant {@code lightweightPickerBool}
+     *
+     * @param aDefaultUseLightweightPopup the defaultUseLightweightPopup to set
+     */
+    public static void setDefaultUseLightweightPopup(
+            boolean aDefaultUseLightweightPopup) {
+<span class="nc" id="L729">        defaultLightweightModeSet = true;</span>
+<span class="nc" id="L730">        defaultUseLightweightPopup = aDefaultUseLightweightPopup;</span>
+<span class="nc" id="L731">    }</span>
+
+    /**
+     * Checks if the given type is supported in LightWeight mode.
+     *
+     * @param type The type.  Expects one of the Display.PICKER_XXX constants.
+     * @return True if the given type is supported in lightweight mode.
+     */
+    private static boolean isLightweightModeSupportedForType(int type) {
+<span class="pc bpc" id="L740" title="1 of 2 branches missed.">        switch (type) {</span>
+            case Display.PICKER_TYPE_STRINGS:
+            case Display.PICKER_TYPE_DATE:
+            case Display.PICKER_TYPE_TIME:
+            case Display.PICKER_TYPE_DATE_AND_TIME:
+            case Display.PICKER_TYPE_DURATION:
+            case Display.PICKER_TYPE_DURATION_HOURS:
+            case Display.PICKER_TYPE_DURATION_MINUTES:
+            case Display.PICKER_TYPE_CALENDAR:
+<span class="fc" id="L749">                return true;</span>
+        }
+<span class="nc" id="L751">        return false;</span>
+    }
+
+    /**
+     * Sets the hour range for this picker.  Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_TIME}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     *
+     * @param min The minimum hour to display (0-24) or -1 for no limit.
+     * @param max The maximum hour to display (0-24) or -1 for no limit
+     * @see #getMinHour()
+     * @see #getMaxHour()
+     * @since 6.0
+     */
+    public void setHourRange(int min, int max) {
+<span class="nc bnc" id="L765" title="All 8 branches missed.">        if (showMeridiem &amp;&amp; min &gt;= 0 &amp;&amp; min &lt;= 24 &amp;&amp; max &gt; min) {</span>
+<span class="nc" id="L766">            setShowMeridiem(false);</span>
+        }
+<span class="nc" id="L768">        minHour = min;</span>
+<span class="nc" id="L769">        maxHour = max;</span>
+<span class="nc" id="L770">    }</span>
+
+    /**
+     * Gets the minimum hour to show for time and datetime pickers.  Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_TIME}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     *
+     * @return The minimum hour.  0-24, or -1 for no limit.
+     * @see #getMaxHour()
+     * @see #setHourRange(int, int)
+     * @since 6.0
+     */
+    public int getMinHour() {
+<span class="nc" id="L782">        return minHour;</span>
+    }
+
+    /**
+     * Gets the minimum hour to show for time and datetime pickers.  Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_TIME}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     *
+     * @return The minimum hour.  0-24, or -1 for no limit.
+     * @see #getMinHour()
+     * @see #setHourRange(int, int)
+     * @since 6.0
+     */
+    public int getMaxHour() {
+<span class="nc" id="L795">        return maxHour;</span>
+    }
+
+    /**
+     * Gets the start date of the picker. Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_DATE}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     *
+     * @return The start date or null if there is none set.
+     *
+     * &lt;p&gt;This does not apply to the time.  Only the date.  You can set the hour range using {@link #setHourRange(int, int) }.&lt;/p&gt;
+     * @see #getEndDate()
+     * @see #setStartDate(java.util.Date)
+     * @see #getMinHour()
+     * @since 6.0
+     */
+    public Date getStartDate() {
+<span class="nc" id="L811">        return this.startDate;</span>
+    }
+
+    /**
+     * Sets the start date of the picker. Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_DATE}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     *
+     * &lt;p&gt;This does not affect the time.  Only the date.  You can set the hour range using {@link #setHourRange(int, int) }.&lt;/p&gt;
+     *
+     * @param start The start date.
+     * @see #getStartDate()
+     * @see #setEndDate(java.util.Date)
+     * @since 6.0
+     */
+    public void setStartDate(Date start) {
+<span class="nc" id="L826">        this.startDate = start;</span>
+<span class="nc" id="L827">    }</span>
+
+    /**
+     * Gets the end date of the picker. Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_DATE}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     *
+     * @return The end date or null if there is none set.
+     *
+     * &lt;p&gt;This does not apply to the time.  Only the date.  You can set the hour range using {@link #setHourRange(int, int) }.&lt;/p&gt;
+     * @see #getStartDate()
+     * @see #setEndDate(java.util.Date)
+     * @see #getMaxHour()
+     * @since 6.0
+     */
+    public Date getEndDate() {
+<span class="nc" id="L842">        return this.endDate;</span>
+    }
+
+    /**
+     * Sets the end date of the picker. Only applicable for types {@link Display#PICKER_TYPE_DATE_AND_TIME} and {@link Display#PICKER_TYPE_DATE}.
+     * Also, only applicable to lightweight picker (i.e. {@link #isUseLightweightPopup() } == {@literal true}.
+     *
+     * &lt;p&gt;This does not affect the time.  Only the date.  You can set the hour range using {@link #setHourRange(int, int) }.&lt;/p&gt;
+     *
+     * @param end The end date.
+     * @see #setStartDate(java.util.Date)
+     * @see #getEndDate()
+     * @since 6.0
+     */
+    public void setEndDate(Date end) {
+<span class="nc" id="L857">        this.endDate = end;</span>
+<span class="nc" id="L858">    }</span>
+
+    /**
+     * Checks if this picker is in lightweight mode.  If this returns true, then the
+     * picker will use cross-platform lightweight widgets instead of native widgets.
+     */
+    public boolean isUseLightweightPopup() {
+<span class="nc" id="L865">        return useLightweightPopup;</span>
+    }
+
+    /**
+     * Sets the picker to use lightweight mode for its widgets.  With this mode enabled
+     * the picker will use cross-platform lightweight widgets instead of native widgets.
+     *
+     * @param useLightweightPopup
+     */
+    public void setUseLightweightPopup(boolean useLightweightPopup) {
+<span class="fc" id="L875">        this.useLightweightPopup = useLightweightPopup;</span>
+<span class="fc" id="L876">    }</span>
+
+    /**
+     * Check to see if the built-in action listener should ignore a given
+     * action event.  This allows us to propagate action events
+     * out of the Picker as opposed to detecting clicks on the picker button.
+     *
+     * @param evt
+     * @return
+     */
+    private boolean ignoreActionEvent(ActionEvent evt) {
+<span class="pc bpc" id="L887" title="3 of 4 branches missed.">        return evt.getX() == -99 &amp;&amp; evt.getY() == -99;</span>
+    }
+
+    @Override
+    public void startEditingAsync() {
+<span class="nc" id="L892">        fireActionEvent(-1, -1);</span>
+<span class="nc" id="L893">    }</span>
+
+    @Override
+    public void stopEditing(Runnable onFinish) {
+<span class="nc" id="L897">        stopEditingCallback = onFinish;</span>
+<span class="nc" id="L898">        Form f = this.getComponentForm();</span>
+<span class="nc bnc" id="L899" title="All 2 branches missed.">        if (f != null) {</span>
+<span class="nc bnc" id="L900" title="All 2 branches missed.">            if (f.getCurrentInputDevice() == currentInput) {</span>
+                try {
+<span class="nc" id="L902">                    f.setCurrentInputDevice(null);</span>
+<span class="nc" id="L903">                } catch (Throwable t) {</span>
+<span class="nc" id="L904">                    Log.e(t);</span>
+<span class="nc" id="L905">                }</span>
+            }
+        }
+<span class="nc" id="L908">    }</span>
+
+    @Override
+    public boolean isEditing() {
+<span class="fc" id="L912">        Form f = this.getComponentForm();</span>
+<span class="pc bpc" id="L913" title="2 of 6 branches missed.">        boolean out = currentInput != null &amp;&amp; f != null &amp;&amp; f.getCurrentInputDevice() == currentInput;</span>
+
+<span class="fc" id="L915">        return out;</span>
+    }
+
+    @Override
+    public boolean isEditable() {
+<span class="nc" id="L920">        return isUseLightweightPopup();</span>
+    }
+
+    /**
+     * Returns the type of the picker
+     *
+     * @return one of Display.PICKER_TYPE_DATE, Display.PICKER_TYPE_DATE_AND_TIME, Display.PICKER_TYPE_STRINGS,
+     * Display.PICKER_TYPE_DURATION, Display.PICKER_TYPE_DURATION_HOURS, Display.PICKER_TYPE_DURATION_MINUTES, or
+     * Display.PICKER_TYPE_TIME
+     */
+    public int getType() {
+<span class="fc" id="L931">        return type;</span>
+    }
+
+    /**
+     * Sets the type of the picker to one of Display.PICKER_TYPE_DATE, Display.PICKER_TYPE_DATE_AND_TIME, Display.PICKER_TYPE_STRINGS,
+     * Display.PICKER_TYPE_DURATION, Display.PICKER_TYPE_DURATION_HOURS, Display.PICKER_TYPE_DURATION_MINUTES or
+     * Display.PICKER_TYPE_TIME
+     *
+     * @param type the type
+     */
+    public void setType(int type) {
+<span class="fc" id="L942">        this.type = type;</span>
+<span class="pc bpc" id="L943" title="1 of 5 branches missed.">        switch (type) {</span>
+            case Display.PICKER_TYPE_DATE:
+            case Display.PICKER_TYPE_DATE_AND_TIME:
+<span class="pc bpc" id="L946" title="1 of 2 branches missed.">                if (!(value instanceof Date)) {</span>
+<span class="nc" id="L947">                    value = new Date();</span>
+                }
+                break;
+            case Display.PICKER_TYPE_STRINGS:
+<span class="pc bpc" id="L951" title="1 of 2 branches missed.">                if (value == null ||</span>
+<span class="pc bpc" id="L952" title="2 of 4 branches missed.">                        (!Util.instanceofObjArray(value) &amp;&amp; !(value instanceof String[]))) {</span>
+<span class="fc" id="L953">                    setStrings(&quot; &quot;);</span>
+                }
+                break;
+            case Display.PICKER_TYPE_TIME:
+<span class="pc bpc" id="L957" title="1 of 2 branches missed.">                if (!(value instanceof Integer)) {</span>
+<span class="fc" id="L958">                    setTime(0);</span>
+                }
+                break;
+            case Display.PICKER_TYPE_DURATION:
+            case Display.PICKER_TYPE_DURATION_HOURS:
+            case Display.PICKER_TYPE_DURATION_MINUTES:
+
+<span class="pc bpc" id="L965" title="1 of 2 branches missed.">                if (!(value instanceof Long)) {</span>
+<span class="fc" id="L966">                    setDuration(0L);</span>
+                }
+                break;
+        }
+<span class="fc" id="L970">    }</span>
+
+    /**
+     * Returns the date, this value is used both for type date/date and time. Notice that this
+     * value isn't used for time
+     *
+     * @return the date object
+     */
+    public Date getDate() {
+<span class="fc" id="L979">        return (Date) value;</span>
+    }
+
+    /**
+     * Sets the date, this value is used both for type date/date and time. Notice that this
+     * value isn't used for time. Notice that this value will have no effect if the picker
+     * is currently showing.
+     *
+     * @param d the new date
+     */
+    public void setDate(Date d) {
+<span class="fc" id="L990">        value = d;</span>
+<span class="fc" id="L991">        updateValue();</span>
+<span class="fc" id="L992">    }</span>
+
+    private String twoDigits(int i) {
+<span class="fc bfc" id="L995" title="All 2 branches covered.">        if (i &lt; 10) {</span>
+<span class="fc" id="L996">            return &quot;0&quot; + i;</span>
+        }
+<span class="fc" id="L998">        return &quot;&quot; + i;</span>
+    }
+
+    private void restoreContentPane() {
+<span class="nc" id="L1002">        Form f = getComponentForm();</span>
+
+<span class="nc bnc" id="L1004" title="All 4 branches missed.">        if (tmpContentPaneMarginUnit != null &amp;&amp; f != null) {</span>
+<span class="nc" id="L1005">            Container contentPane = f.getContentPane();</span>
+<span class="nc bnc" id="L1006" title="All 2 branches missed.">            if (f.isFormBottomPaddingEditingMode()) {</span>
+<span class="nc" id="L1007">                Style style = contentPane.getStyle();</span>
+<span class="nc" id="L1008">                style.setMarginUnit(tmpContentPaneMarginUnit);</span>
+<span class="nc" id="L1009">                style.setMarginBottom(tmpContentPaneBottomMargin);</span>
+<span class="nc" id="L1010">                tmpContentPaneMarginUnit = null;</span>
+<span class="nc" id="L1011">                f.revalidate();</span>
+                // If we remove the margin, it sometimes leaves the content pane
+                // in a negative scroll position - which leaves a gap at the top.
+                // Simulating a drag will trigger tensile drag to push the content
+                // back up to the top.
+                // See https://github.com/codenameone/CodenameOne/issues/2476
+<span class="nc bnc" id="L1017" title="All 6 branches missed.">                if (f != null &amp;&amp; f.getContentPane() != null &amp;&amp; f.getContentPane().getScrollY() &lt; 0) {</span>
+<span class="nc" id="L1018">                    f.getContentPane().pointerPressed(100, 100);</span>
+<span class="nc" id="L1019">                    f.getContentPane().pointerDragged(100, 100);</span>
+<span class="nc" id="L1020">                    f.getContentPane().pointerReleased(100, 100);</span>
+                }
+<span class="nc" id="L1022">            } else {</span>
+<span class="nc" id="L1023">                f.setOverrideInvisibleAreaUnderVKB(-1);</span>
+            }
+        }
+<span class="nc" id="L1026">    }</span>
+
+    private void padContentPane(final int top, final int bottom, final int left, final int right) {
+<span class="fc" id="L1029">        final Form f = getComponentForm();</span>
+<span class="pc bpc" id="L1030" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="fc" id="L1031">            f.getAnimationManager().flushAnimation(new Runnable() {</span>
+                public void run() {
+<span class="nc" id="L1033">                    Container contentPane = f.getContentPane();</span>
+<span class="nc bnc" id="L1034" title="All 2 branches missed.">                    if (f.isFormBottomPaddingEditingMode()) {</span>
+
+<span class="nc" id="L1036">                        Style style = contentPane.getStyle();</span>
+<span class="nc" id="L1037">                        byte[] marginUnits = style.getMarginUnit();</span>
+<span class="nc bnc" id="L1038" title="All 2 branches missed.">                        if (marginUnits == null) {</span>
+<span class="nc" id="L1039">                            marginUnits = new byte[]{</span>
+                                    Style.UNIT_TYPE_PIXELS,
+                                    Style.UNIT_TYPE_PIXELS,
+                                    Style.UNIT_TYPE_PIXELS,
+                                    Style.UNIT_TYPE_PIXELS
+                            };
+                        }
+<span class="nc bnc" id="L1046" title="All 2 branches missed.">                        if (tmpContentPaneMarginUnit == null) {</span>
+<span class="nc" id="L1047">                            tmpContentPaneMarginUnit = new byte[4];</span>
+<span class="nc" id="L1048">                            System.arraycopy(marginUnits, 0, tmpContentPaneMarginUnit, 0, 4);</span>
+<span class="nc" id="L1049">                            tmpContentPaneBottomMargin = style.getMarginBottom();</span>
+                        }
+
+
+<span class="nc" id="L1053">                        marginUnits[Component.BOTTOM] = Style.UNIT_TYPE_PIXELS;</span>
+<span class="nc" id="L1054">                        style.setMarginUnit(marginUnits);</span>
+<span class="nc" id="L1055">                        style.setMarginBottom(Math.max(0, contentPane.getHeight() - top));</span>
+<span class="nc" id="L1056">                        f.revalidate();</span>
+<span class="nc" id="L1057">                    } else {</span>
+<span class="nc" id="L1058">                        f.setOverrideInvisibleAreaUnderVKB(Math.max(0, contentPane.getHeight() - top));</span>
+                    }
+<span class="nc" id="L1060">                    f.scrollComponentToVisible(Picker.this);</span>
+<span class="nc" id="L1061">                }</span>
+
+            });
+
+
+        }
+<span class="fc" id="L1067">    }</span>
+
+    private void registerAsInputDevice(final InteractionDialog dlg) {
+
+<span class="fc" id="L1071">        final Form f = this.getComponentForm();</span>
+<span class="pc bpc" id="L1072" title="1 of 2 branches missed.">        if (f != null) {</span>
+            final ActionListener sizeChanged;
+<span class="pc bpc" id="L1074" title="1 of 2 branches missed.">            if (!Display.getInstance().isTablet()) {</span>
+<span class="fc" id="L1075">                sizeChanged = new ActionListener() {</span>
+
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L1079">                        final int top = f.getContentPane().getHeight() - dlg.getPreferredH();</span>
+<span class="nc bnc" id="L1080" title="All 2 branches missed.">                        if (top &lt;= 0) {</span>
+<span class="nc" id="L1081">                            ComponentSelector.select(&quot;.SpinnerWrapper&quot;, dlg).setPadding(0);</span>
+                        }
+<span class="nc" id="L1083">                        final int left = 0;</span>
+<span class="nc" id="L1084">                        final int right = 0;</span>
+<span class="nc" id="L1085">                        final int bottom = 0;</span>
+<span class="nc" id="L1086">                        dlg.setWidth(Display.getInstance().getDisplayWidth());</span>
+<span class="nc" id="L1087">                        dlg.setHeight(dlg.getPreferredH());</span>
+<span class="nc" id="L1088">                        dlg.setY(Display.getInstance().getDisplayHeight());</span>
+<span class="nc" id="L1089">                        dlg.setX(0);</span>
+<span class="nc" id="L1090">                        f.getAnimationManager().flushAnimation(new Runnable() {</span>
+
+                            @Override
+                            public void run() {
+<span class="nc" id="L1094">                                dlg.resize(top, bottom, left, right);</span>
+<span class="nc" id="L1095">                                padContentPane(top, bottom, left, right);</span>
+
+
+<span class="nc" id="L1098">                            }</span>
+
+                        });
+<span class="nc" id="L1101">                    }</span>
+
+                };
+<span class="fc" id="L1104">                f.addSizeChangedListener(sizeChanged);</span>
+            } else {
+<span class="nc" id="L1106">                sizeChanged = null;</span>
+            }
+
+            try {
+<span class="fc" id="L1110">                VirtualInputDevice nextInput = new VirtualInputDevice() {</span>
+
+                    @Override
+                    public void close() throws Exception {
+<span class="nc" id="L1114">                        currentInput = null;</span>
+<span class="nc bnc" id="L1115" title="All 2 branches missed.">                        if (sizeChanged != null) {</span>
+<span class="nc" id="L1116">                            f.removeSizeChangedListener(sizeChanged);</span>
+                        }
+<span class="nc bnc" id="L1118" title="All 2 branches missed.">                        if (dlg.isShowing()) {</span>
+<span class="nc" id="L1119">                            restoreContentPane();</span>
+<span class="nc" id="L1120">                            dlg.disposeToTheBottom(new Runnable() {</span>
+                                public void run() {
+<span class="nc bnc" id="L1122" title="All 2 branches missed.">                                    if (stopEditingCallback != null) {</span>
+<span class="nc" id="L1123">                                        Runnable r = stopEditingCallback;</span>
+<span class="nc" id="L1124">                                        stopEditingCallback = null;</span>
+<span class="nc" id="L1125">                                        r.run();</span>
+                                    }
+<span class="nc" id="L1127">                                }</span>
+                            });
+                        } else {
+<span class="nc" id="L1130">                            stopEditingCallback = null;</span>
+                        }
+<span class="nc" id="L1132">                    }</span>
+                };
+<span class="fc" id="L1134">                f.setCurrentInputDevice(nextInput);</span>
+<span class="fc" id="L1135">                currentInput = nextInput;</span>
+<span class="nc" id="L1136">            } catch (Exception ex) {</span>
+<span class="nc" id="L1137">                Log.e(ex);</span>
+                // Failed to edit string because the previous input device would not
+                // give up control
+<span class="fc" id="L1140">            }</span>
+        }
+<span class="fc" id="L1142">    }</span>
+
+    /**
+     * Returns the String array matching the metadata
+     *
+     * @return a string array
+     */
+    public String[] getStrings() {
+<span class="fc" id="L1150">        return (String[]) metaData;</span>
+    }
+
+    /**
+     * &lt;p&gt;Sets the string entries for the string picker. &lt;br&gt;
+     * sample usage for this method below:&lt;/p&gt;
+     *
+     * &lt;script src=&quot;https://gist.github.com/codenameone/47602e679f61712693bd.js&quot;&gt;&lt;/script&gt;
+     *
+     * @param strs string array
+     */
+    public void setStrings(String... strs) {
+<span class="fc" id="L1162">        this.type = Display.PICKER_TYPE_STRINGS;</span>
+<span class="fc" id="L1163">        int slen = strs.length;</span>
+<span class="fc bfc" id="L1164" title="All 2 branches covered.">        for (int i = 0; i &lt; slen; i++) {</span>
+<span class="fc" id="L1165">            String str = strs[i];</span>
+<span class="fc" id="L1166">            strs[i] = getUIManager().localize(str, str);</span>
+        }
+<span class="fc" id="L1168">        metaData = strs;</span>
+
+<span class="pc bpc" id="L1170" title="1 of 2 branches missed.">        if (!(value instanceof String)) {</span>
+<span class="fc" id="L1171">            value = null;</span>
+        }
+<span class="fc" id="L1173">        updateValue();</span>
+<span class="fc" id="L1174">    }</span>
+
+    /**
+     * Returns the current string
+     *
+     * @return the selected string
+     */
+    public String getSelectedString() {
+<span class="fc" id="L1182">        return (String) value;</span>
+    }
+
+    /**
+     * Sets the current value in a string array picker
+     *
+     * @param str the current value
+     */
+    public void setSelectedString(String str) {
+<span class="fc" id="L1191">        value = str;</span>
+<span class="fc" id="L1192">        updateValue();</span>
+<span class="fc" id="L1193">    }</span>
+
+    /**
+     * Returns the index of the selected string
+     *
+     * @return the selected string offset or -1
+     */
+    public int getSelectedStringIndex() {
+<span class="nc" id="L1201">        int offset = 0;</span>
+<span class="nc bnc" id="L1202" title="All 2 branches missed.">        for (String s : (String[]) metaData) {</span>
+<span class="nc bnc" id="L1203" title="All 2 branches missed.">            if (s == value) {</span>
+<span class="nc" id="L1204">                return offset;</span>
+            }
+<span class="nc" id="L1206">            offset++;</span>
+        }
+<span class="nc" id="L1208">        return -1;</span>
+    }
+
+    /**
+     * Returns the index of the selected string
+     *
+     * @param index sets the index of the selected string
+     */
+    public void setSelectedStringIndex(int index) {
+<span class="nc" id="L1217">        value = ((String[]) metaData)[index];</span>
+<span class="nc" id="L1218">        updateValue();</span>
+<span class="nc" id="L1219">    }</span>
+
+    /**
+     * Updates the display value of the picker, subclasses can override this to invoke
+     * set text with the right value
+     */
+    protected void updateValue() {
+<span class="fc bfc" id="L1226" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L1227">            setText(&quot;...&quot;);</span>
+<span class="fc" id="L1228">            return;</span>
+        }
+
+<span class="pc bpc" id="L1231" title="1 of 2 branches missed.">        if (getFormatter() != null) {</span>
+<span class="nc" id="L1232">            setText(formatter.format(value));</span>
+<span class="nc" id="L1233">            return;</span>
+        }
+
+<span class="pc bpc" id="L1236" title="1 of 6 branches missed.">        switch (type) {</span>
+            case Display.PICKER_TYPE_STRINGS: {
+<span class="fc" id="L1238">                value = getUIManager().localize(value.toString(), value.toString());</span>
+<span class="fc" id="L1239">                setText(value.toString());</span>
+<span class="fc" id="L1240">                break;</span>
+            }
+            case Display.PICKER_TYPE_CALENDAR:
+            case Display.PICKER_TYPE_DATE: {
+<span class="fc" id="L1244">                setText(L10NManager.getInstance().formatDateShortStyle((Date) value));</span>
+<span class="fc" id="L1245">                break;</span>
+            }
+            case Display.PICKER_TYPE_TIME: {
+<span class="fc" id="L1248">                int v = ((Integer) value).intValue();</span>
+<span class="fc" id="L1249">                int hour = v / 60;</span>
+<span class="fc" id="L1250">                int minute = v % 60;</span>
+<span class="pc bpc" id="L1251" title="1 of 2 branches missed.">                if (showMeridiem) {</span>
+                    String text;
+<span class="nc bnc" id="L1253" title="All 2 branches missed.">                    if (hour &gt;= 12) {</span>
+<span class="nc" id="L1254">                        text = &quot;pm&quot;;</span>
+                    } else {
+<span class="nc" id="L1256">                        text = &quot;am&quot;;</span>
+                    }
+<span class="nc bnc" id="L1258" title="All 2 branches missed.">                    int cookedHour = hour &lt;= 12 ? hour : hour - 12;</span>
+<span class="nc bnc" id="L1259" title="All 2 branches missed.">                    if (cookedHour == 0) {</span>
+<span class="nc" id="L1260">                        cookedHour = 12;</span>
+                    }
+<span class="nc" id="L1262">                    setText(twoDigits(cookedHour) + &quot;:&quot; + twoDigits(minute) + text);</span>
+<span class="nc" id="L1263">                } else {</span>
+<span class="fc" id="L1264">                    setText(twoDigits(hour) + &quot;:&quot; + twoDigits(minute));</span>
+                }
+<span class="fc" id="L1266">                break;</span>
+            }
+            case Display.PICKER_TYPE_DATE_AND_TIME: {
+<span class="fc" id="L1269">                setText(L10NManager.getInstance().formatDateTimeShort((Date) value));</span>
+<span class="fc" id="L1270">                break;</span>
+            }
+            case Display.PICKER_TYPE_DURATION_HOURS:
+            case Display.PICKER_TYPE_DURATION_MINUTES:
+            case Display.PICKER_TYPE_DURATION: {
+<span class="fc" id="L1275">                long v = ((Long) value).longValue();</span>
+<span class="fc" id="L1276">                int hour = (int) (v / 60 / 60 / 1000);</span>
+<span class="fc" id="L1277">                int minute = (int) (v / 1000 / 60) % 60;</span>
+<span class="fc" id="L1278">                StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L1279">                UIManager uim = getUIManager();</span>
+<span class="fc bfc" id="L1280" title="All 2 branches covered.">                if (hour &gt; 0) {</span>
+<span class="pc bpc" id="L1281" title="1 of 2 branches missed.">                    sb.append(hour).append(&quot; &quot;)</span>
+<span class="pc" id="L1282">                            .append(hour &gt; 1 ? uim.localize(&quot;hours&quot;, &quot;hours&quot;) : uim.localize(&quot;hour&quot;, &quot;hour&quot;))</span>
+<span class="fc" id="L1283">                            .append(&quot; &quot;);</span>
+                }
+<span class="fc bfc" id="L1285" title="All 2 branches covered.">                if (minute &gt; 0) {</span>
+<span class="fc bfc" id="L1286" title="All 2 branches covered.">                    sb.append(minute).append(&quot; &quot;)</span>
+<span class="fc" id="L1287">                            .append(minute &gt; 1 ? uim.localize(&quot;minutes&quot;, &quot;minutes&quot;) : uim.localize(&quot;minute&quot;, &quot;minute&quot;));</span>
+
+                }
+<span class="fc" id="L1290">                setText(sb.toString().trim());</span>
+<span class="fc bfc" id="L1291" title="All 2 branches covered.">                if (&quot;&quot;.equals(getText())) {</span>
+<span class="fc" id="L1292">                    setText(&quot;...&quot;);</span>
+                }
+                break;
+            }
+
+        }
+<span class="fc" id="L1298">    }</span>
+
+    /**
+     * Convenience method equivalent to invoking setTime(hour * 60 + minute);
+     *
+     * @param hour   the hour in 24hr format
+     * @param minute the minute within the hour
+     */
+    public void setTime(int hour, int minute) {
+<span class="nc" id="L1307">        setTime(hour * 60 + minute);</span>
+<span class="nc" id="L1308">    }</span>
+
+    /**
+     * This value is only used for time type and is ignored in the case of date and time where
+     * both are embedded within the date.
+     *
+     * @return the time value as minutes since midnight e.g. 630 is 10:30am
+     */
+    public int getTime() {
+<span class="fc" id="L1317">        return ((Integer) value).intValue();</span>
+    }
+
+    /**
+     * This value is only used for time type and is ignored in the case of date and time where
+     * both are embedded within the date.
+     *
+     * @param time the time value as minutes since midnight e.g. 630 is 10:30am
+     */
+    public void setTime(int time) {
+<span class="fc" id="L1327">        value = Integer.valueOf(time);</span>
+<span class="fc" id="L1328">        updateValue();</span>
+<span class="fc" id="L1329">    }</span>
+
+    /**
+     * Sets the minute step size for PICKER_TYPE_DURATION, and PICKER_TYPE_DURATION_TIME types.
+     *
+     * @param step The step size in minutes.
+     */
+    public void setMinuteStep(int step) {
+<span class="nc" id="L1337">        this.minuteStep = step;</span>
+<span class="nc" id="L1338">    }</span>
+
+    /**
+     * Convenience method for setting duration in hours and minutes.
+     *
+     * @param hour   The hours for duration.
+     * @param minute The minutes for duration.
+     * @see #setDuration(long)
+     * @see #getDuration()
+     * @see #getDurationHours()
+     * @see #getDurationMinutes()
+     */
+    public void setDuration(int hour, int minute) {
+<span class="fc" id="L1351">        setDuration(hour * 60L * 60 * 1000L + minute * 60L * 1000L);</span>
+<span class="fc" id="L1352">    }</span>
+
+    /**
+     * This value is used for the duration type.
+     *
+     * @return The duration in milliseconds.
+     * @see #getDurationHours()
+     * @see #getDurationMinutes()
+     */
+    public long getDuration() {
+<span class="nc" id="L1362">        return (Long) value;</span>
+    }
+
+    /**
+     * This value is only used for duration type.
+     *
+     * @param duration The duration value in milliseconds.
+     * @see #setDuration(int, int)
+     * @see #getDuration()
+     * @see #getDurationHours()
+     * @see #getDurationMinutes()
+     */
+    public void setDuration(long duration) {
+<span class="fc" id="L1375">        value = Long.valueOf(duration);</span>
+<span class="fc" id="L1376">        updateValue();</span>
+<span class="fc" id="L1377">    }</span>
+
+    /**
+     * Gets the duration hours.  Used only for duration type.
+     *
+     * @return The duration hours.
+     * @see #getDurationMinutes()
+     * @see #getDuration()
+     */
+    public int getDurationHours() {
+<span class="nc" id="L1387">        return (int) (getDuration() / 60 / 60 / 1000L);</span>
+    }
+
+    /**
+     * Gets the duration minutes.  Used only for duration type.
+     *
+     * @return The duration minutes.
+     * @see #getDurationHours()
+     * @see #getDuration()
+     */
+    public int getDurationMinutes() {
+<span class="nc" id="L1398">        return (int) (getDuration() / 1000 / 60) % 60;</span>
+    }
+
+    /**
+     * Indicates whether hours should be rendered as AM/PM or 24hr format
+     *
+     * @return the showMeridiem
+     */
+    public boolean isShowMeridiem() {
+<span class="nc" id="L1407">        return showMeridiem;</span>
+    }
+
+    /**
+     * Indicates whether hours should be rendered as AM/PM or 24hr format
+     *
+     * @param showMeridiem the showMeridiem to set
+     */
+    public void setShowMeridiem(boolean showMeridiem) {
+<span class="nc" id="L1416">        this.showMeridiem = showMeridiem;</span>
+<span class="nc" id="L1417">        updateValue();</span>
+<span class="nc" id="L1418">    }</span>
+
+    /**
+     * When using a lightweight spinner this will be used as the rendering prototype
+     *
+     * @return the renderingPrototype
+     */
+    public Object getRenderingPrototype() {
+<span class="nc" id="L1426">        return renderingPrototype;</span>
+    }
+
+    /**
+     * When using a lightweight spinner this will be used as the rendering prototype
+     *
+     * @param renderingPrototype the renderingPrototype to set
+     */
+    public void setRenderingPrototype(Object renderingPrototype) {
+<span class="nc" id="L1435">        this.renderingPrototype = renderingPrototype;</span>
+<span class="nc" id="L1436">    }</span>
+
+    /**
+     * Allows us to define a date format for the display of dates/times
+     *
+     * @return the defined formatter
+     */
+    public SimpleDateFormat getFormatter() {
+<span class="fc" id="L1444">        return formatter;</span>
+    }
+
+    /**
+     * Allows us to define a date format for the display of dates/times
+     *
+     * @param formatter the new formatter
+     */
+    public void setFormatter(SimpleDateFormat formatter) {
+<span class="nc" id="L1453">        this.formatter = formatter;</span>
+<span class="nc" id="L1454">        updateValue();</span>
+<span class="nc" id="L1455">    }</span>
+
+    /**
+     * The preferred width of the popup dialog. This will only
+     * be used on devices where the popup width and height are configurable, such
+     * as the iPad or tablets.  On iPhone, the picker always spans the width of the
+     * screen along the bottom.
+     *
+     * @return
+     */
+    public int getPreferredPopupWidth() {
+<span class="nc" id="L1466">        return preferredPopupWidth;</span>
+    }
+
+    /**
+     * The preferred width of the popup dialog for the picker.  This will only
+     * be used on devices where the popup width and height are configurable, such
+     * as the iPad or tablets.  On iPhone, the picker always spans the width of the
+     * screen along the bottom.
+     *
+     * @param width The preferred width of the popup.
+     */
+    public void setPreferredPopupWidth(int width) {
+<span class="nc" id="L1478">        this.preferredPopupWidth = width;</span>
+<span class="nc" id="L1479">    }</span>
+
+    /**
+     * The preferred height of the popup dialog.  This will only
+     * be used on devices where the popup width and height are configurable, such
+     * as the iPad or tablets.  On iPhone, the picker always spans the width of the
+     * screen along the bottom.
+     *
+     * @return
+     */
+    public int getPreferredPopupHeight() {
+<span class="nc" id="L1490">        return preferredPopupHeight;</span>
+    }
+
+    /**
+     * The preferred height of the popup dialog for the picker.  This will only
+     * be used on devices where the popup width and height are configurable, such
+     * as the iPad or tablets.  On iPhone, the picker always spans the width of the
+     * screen along the bottom.
+     *
+     * @param height The preferred height of the popup.
+     */
+    public void setPreferredPopupHeight(int height) {
+<span class="nc" id="L1502">        this.preferredPopupHeight = height;</span>
+<span class="nc" id="L1503">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+<span class="nc" id="L1509">        return new String[]{&quot;Strings&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L1516">        return new Class[]{String[].class};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyTypeNames() {
+<span class="nc" id="L1523">        return new String[]{&quot;String []&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+<span class="nc bnc" id="L1530" title="All 2 branches missed.">        if (name.equals(&quot;Strings&quot;)) {</span>
+<span class="nc" id="L1531">            return getStrings();</span>
+        }
+<span class="nc" id="L1533">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L1540" title="All 2 branches missed.">        if (name.equals(&quot;Strings&quot;)) {</span>
+<span class="nc" id="L1541">            setStrings((String[]) value);</span>
+<span class="nc" id="L1542">            return null;</span>
+        }
+<span class="nc" id="L1544">        return super.setPropertyValue(name, value);</span>
+    }
+
+    /**
+     * Returns the value which works for all picker types
+     *
+     * @return the value object
+     */
+    public Object getValue() {
+<span class="nc" id="L1553">        return value;</span>
+    }
+
+    @Override
+    public void paint(Graphics g) {
+<span class="pc bpc" id="L1558" title="1 of 2 branches missed.">        if (!suppressPaint) {</span>
+<span class="fc" id="L1559">            super.paint(g);</span>
+        }
+<span class="fc" id="L1561">    }</span>
+
+    @Override
+    public Style getStyle() {
+<span class="fc bfc" id="L1565" title="All 2 branches covered.">        if (isEditing()) {</span>
+<span class="fc" id="L1566">            return getSelectedStyle();</span>
+        }
+<span class="fc" id="L1568">        return super.getStyle();</span>
+    }
+
+    void setSuppressPaint(boolean suppress) {
+<span class="nc" id="L1572">        suppressPaint = suppress;</span>
+<span class="nc" id="L1573">    }</span>
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

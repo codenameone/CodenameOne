@@ -1,0 +1,608 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SignatureComponent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">SignatureComponent.java</span></div><h1>SignatureComponent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.ImageFactory;
+import com.codename1.ui.Stroke;
+import com.codename1.ui.animations.Animation;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.GridLayout;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.EventDispatcher;
+
+
+/**
+ * A component to allow a user to enter their signature.  This is just a button that, when pressed,
+ * will pop up a dialog where the user can draw their signature with their finger.  The user
+ * is given the option to save/reset/cancel the signature.  On save, the {@link #signatureImage} property
+ * will be set with a full-size image of the signature, and the &quot;icon&quot; on the button will show a thumbnail of
+ * the image.
+ *
+ * &lt;h3&gt;Example Usage&lt;/h3&gt;
+ *
+ * &lt;script src=&quot;https://gist.github.com/shannah/d118e34e2cf390acf93d.js&quot;&gt;&lt;/script&gt;
+ *
+ * &lt;h3&gt;Screenshots&lt;/h3&gt;
+ *
+ * &lt;p&gt;&lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-signature1.png&quot; alt=&quot;Signature Component button&quot;/&gt;&lt;/p&gt;
+ * &lt;p&gt;&lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-signature2.png&quot; alt=&quot;Signature Component dialog&quot;/&gt;&lt;/p&gt;
+ *
+ * &lt;h3&gt;Video Demo&lt;/h3&gt;
+ *
+ * &lt;iframe width=&quot;640&quot; height=&quot;480&quot; src=&quot;https://www.youtube.com/embed/6PXKLyeeFb8&quot; frameborder=&quot;0&quot; allowfullscreen&gt;&lt;/iframe&gt;
+ *
+ * &lt;p&gt;Source available &lt;a href=&quot;https://github.com/codenameone/codenameone-demos/SignatureComponentDemo&quot;&gt;here&lt;/a&gt;&lt;/p&gt;.
+ *
+ *
+ * &lt;h2&gt;Styles&lt;/h2&gt;
+ *
+ * &lt;p&gt;You can customize the styles of various aspects of the Signature component using the following Styles (UIIDs) in
+ * the theme:&lt;/p&gt;
+ *
+ * &lt;ul&gt;
+ *    &lt;li&gt;{@literal SignatureButton}  - The style for the main signature component button.&lt;/li&gt;
+ *    &lt;li&gt;{@literal SignatureButtonBox} - A style to specify the &quot;X&quot; and &quot;Box&quot; that is drawn around the signature in the button.&lt;/li&gt;
+ *    &lt;li&gt;{@literal SignaturePanel} - The panel that the user actually draws the signature in.&lt;/li&gt;
+ *    &lt;li&gt;{@literal SignaturePanelBox} - The box and &quot;X&quot; in the SignaturePanel.  Uses only the {@link Style#getFgColor() } property.&lt;/li&gt;
+ *    &lt;li&gt;{@literal SignaturePanelSignature} - The signature that is drawn by the user.  Uses only the {@link Style#getFgColor()} property.&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * @author shannah
+ * @since 3.4
+ */
+public class SignatureComponent extends Container implements ActionSource {
+
+<span class="fc" id="L90">    private final SignaturePanel signaturePanel = new SignaturePanel();</span>
+    private final Button lead;
+<span class="fc" id="L92">    private final EventDispatcher eventDispatcher = new EventDispatcher();</span>
+    private final Font xFont;
+    private Image signatureImage;
+    /**
+     * We need to use a animation on this field to detect when the signature image changes
+     * so that the icon can be correctly scaled to be shown on the button.
+     */
+<span class="fc" id="L99">    private final Animation iconAnimation = new Animation() {</span>
+
+        @Override
+        public boolean animate() {
+<span class="nc bnc" id="L103" title="All 4 branches missed.">            if (signatureImage != null &amp;&amp; signatureImage.animate()) {</span>
+<span class="nc" id="L104">                Style s = getStyle();</span>
+<span class="nc" id="L105">                Image icon = signatureImage;</span>
+<span class="nc bnc" id="L106" title="All 4 branches missed.">                if (icon.getWidth() &gt; getWidth() - s.getHorizontalPadding() || icon.getHeight() &gt; getHeight() - s.getVerticalPadding()) {</span>
+<span class="nc" id="L107">                    icon = signatureImage.scaledSmallerRatio(</span>
+<span class="nc" id="L108">                            getWidth() - s.getHorizontalPadding(),</span>
+<span class="nc" id="L109">                            getHeight() - s.getVerticalPadding()</span>
+                    );
+                }
+<span class="nc" id="L112">                lead.setIcon(icon);</span>
+<span class="nc" id="L113">                repaint();</span>
+<span class="nc" id="L114">                return true;</span>
+            }
+<span class="nc" id="L116">            return false;</span>
+        }
+
+        @Override
+        public void paint(Graphics g) {
+
+<span class="nc" id="L122">        }</span>
+    };
+
+    /**
+     * Creates a new signature component.
+     */
+<span class="fc" id="L128">    public SignatureComponent() {</span>
+<span class="fc" id="L129">        setLayout(new BorderLayout());</span>
+<span class="fc" id="L130">        xFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_LARGE);</span>
+<span class="fc" id="L131">        final Style signatureButtonBoxStyle = getUIManager().getComponentStyle(&quot;SignatureButtonBox&quot;);</span>
+<span class="fc" id="L132">        lead = new Button() {</span>
+
+            @Override
+            protected void paintBackground(Graphics g) {
+<span class="nc" id="L136">                super.paintBackground(g);</span>
+
+<span class="nc" id="L138">                g.setColor(signatureButtonBoxStyle.getFgColor());</span>
+<span class="nc" id="L139">                int alpha = g.concatenateAlpha(signatureButtonBoxStyle.getFgAlpha());</span>
+<span class="nc" id="L140">                Style s = getStyle();</span>
+<span class="nc" id="L141">                g.drawRect(</span>
+<span class="nc" id="L142">                        getX() + s.getPaddingLeftNoRTL(),</span>
+<span class="nc" id="L143">                        getY() + s.getPaddingTop(),</span>
+<span class="nc" id="L144">                        getWidth() - s.getPaddingRightNoRTL() - s.getPaddingLeftNoRTL(),</span>
+<span class="nc" id="L145">                        getHeight() - s.getPaddingBottom() - s.getPaddingTop()</span>
+                );
+
+<span class="nc" id="L148">                g.setFont(xFont);</span>
+<span class="nc" id="L149">                g.drawString(&quot;X&quot;, getX() + getStyle().getPaddingLeftNoRTL() + Display.getInstance().convertToPixels(3, true), getY() + getHeight() / 2);</span>
+<span class="nc" id="L150">                g.setAlpha(alpha);</span>
+<span class="nc" id="L151">            }</span>
+        };
+<span class="fc" id="L153">        lead.setText(localize(&quot;SignatureComponent.LeadText&quot;, &quot;Press to sign&quot;));</span>
+<span class="fc" id="L154">        lead.setUIID(&quot;SignatureButton&quot;);</span>
+<span class="fc" id="L155">        lead.addActionListener(new ActionListener() {</span>
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L157">                final Dialog dialog = new Dialog(localize(&quot;SignatureComponent.DialogTitle&quot;, &quot;Sign Here&quot;));</span>
+<span class="nc" id="L158">                final SignatureDialogBody sigBody = new SignatureDialogBody() {</span>
+                    @Override
+                    protected void onCancel() {
+<span class="nc" id="L161">                        super.onCancel();</span>
+<span class="nc" id="L162">                        dialog.dispose();</span>
+<span class="nc" id="L163">                    }</span>
+                };
+<span class="nc" id="L165">                signaturePanel.clear();</span>
+
+<span class="nc" id="L167">                sigBody.addActionListener(new ActionListener() {</span>
+                    public void actionPerformed(ActionEvent sigDoneEvent) {
+<span class="nc" id="L169">                        dialog.dispose();</span>
+<span class="nc" id="L170">                        setSignatureImage(sigBody.getValue());</span>
+<span class="nc" id="L171">                        fireActionEvent();</span>
+<span class="nc" id="L172">                    }</span>
+                });
+
+<span class="nc" id="L175">                dialog.setLayout(new BorderLayout());</span>
+<span class="nc" id="L176">                dialog.addComponent(BorderLayout.CENTER, sigBody);</span>
+<span class="nc" id="L177">                dialog.setScrollable(false);</span>
+<span class="nc" id="L178">                dialog.setFocusable(false);</span>
+<span class="nc" id="L179">                dialog.show();</span>
+<span class="nc" id="L180">            }</span>
+        });
+<span class="fc" id="L182">        addComponent(BorderLayout.CENTER, lead);</span>
+<span class="fc" id="L183">    }</span>
+
+    /**
+     * A hook that can be overridden by subclasses to be notified when the user
+     * resets the signature in the signature dialog.
+     *
+     * &lt;p&gt;&lt;strong&gt;NOTE: Use of this hook to clear the current image in the signature
+     * component is discouraged.&lt;/strong&gt;  The intention of the signature component's internal
+     * dialog is to provide a staging area for the user to draw their signature.  Changes
+     * should only take effect in the app when the user commits their changes by pressing
+     * &quot;OK&quot; or &quot;Cancel&quot;.  The &quot;Reset&quot; button in the signature dialog is intended to only
+     * allow the user to fix a mistake and start over.  Using this hook to cause
+     * a change in application state (by, for example, calling {@link #setSignatureImage(com.codename1.ui.Image) } with
+     * a {@literal null} argument}) may confuse the user.&lt;/p&gt;
+     *
+     * &lt;p&gt;If you want to provide the user with a mechanism to &quot;clear&quot; the signature
+     * from the signature component, you should add a button to your form which, when
+     * pressed, will remove the image by calling {@link #setSignatureImage(com.codename1.ui.Image) }.&lt;/p&gt;
+     */
+    protected void onSignatureReset() {
+
+<span class="nc" id="L204">    }</span>
+
+    /**
+     * Adds a listener to be notified when the signature image is changed.
+     *
+     * @param l
+     */
+    public void addActionListener(ActionListener l) {
+<span class="fc" id="L212">        eventDispatcher.addListener(l);</span>
+<span class="fc" id="L213">    }</span>
+
+    /**
+     * Removes a listener from being notified when signature image is changed.
+     *
+     * @param l
+     */
+    public void removeActionListener(ActionListener l) {
+<span class="fc" id="L221">        eventDispatcher.removeListener(l);</span>
+<span class="fc" id="L222">    }</span>
+
+    /**
+     * Fires an event to all listeners to notify them that the signature image has
+     * been changed.
+     */
+    protected void fireActionEvent() {
+<span class="fc" id="L229">        eventDispatcher.fireActionEvent(new ActionEvent(this));</span>
+<span class="fc" id="L230">    }</span>
+
+    /**
+     * Overridden to register the icon animation when the field is added to the form.
+     */
+    @Override
+    protected void initComponent() {
+<span class="nc" id="L237">        super.initComponent();</span>
+<span class="nc" id="L238">        getComponentForm().registerAnimated(iconAnimation);</span>
+<span class="nc" id="L239">    }</span>
+
+    /**
+     * Overridden to deregister the icon animation when the field is removed from the form.
+     */
+    @Override
+    protected void deinitialize() {
+<span class="nc" id="L246">        getComponentForm().deregisterAnimated(iconAnimation);</span>
+<span class="nc" id="L247">        super.deinitialize();</span>
+<span class="nc" id="L248">    }</span>
+
+    private String localize(String key, String defaultVal) {
+<span class="fc" id="L251">        return UIManager.getInstance().localize(key, defaultVal);</span>
+    }
+
+    /**
+     * Calculates the preferred size of the button itself (not the signature canvas... but the button you press to show the signature panel).
+     *
+     * @return
+     */
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L261">        int w = Display.getInstance().convertToPixels(75, true);</span>
+<span class="fc" id="L262">        int h = Display.getInstance().convertToPixels(40, true);</span>
+<span class="fc" id="L263">        return new Dimension(w, h);</span>
+    }
+
+    /**
+     * Gets the image of the signature - or null if no signature has been drawn.
+     *
+     * @return
+     */
+    public Image getSignatureImage() {
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (signatureImage != null) {</span>
+<span class="fc" id="L273">            return signatureImage;</span>
+        } else {
+<span class="fc" id="L275">            return signaturePanel.getImage();</span>
+        }
+    }
+
+    /**
+     * Sets the signature image for this field.  This will also scale the image and
+     * show it as the icon for the button.
+     *
+     * @param img The image to set as the signature image.
+     */
+    public void setSignatureImage(Image img) {
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">        if (img != signatureImage) {</span>
+<span class="fc" id="L287">            signatureImage = img;</span>
+<span class="fc" id="L288">            lead.setText(&quot;&quot;);</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">            if (img != null) {</span>
+<span class="fc" id="L290">                int maxW = lead.getWidth() - lead.getStyle().getPaddingLeftNoRTL() - lead.getStyle().getPaddingRightNoRTL();</span>
+<span class="fc" id="L291">                int maxH = lead.getHeight() - lead.getStyle().getPaddingTop() - lead.getStyle().getPaddingBottom();</span>
+
+<span class="fc" id="L293">                Image icon = img;</span>
+<span class="pc bpc" id="L294" title="2 of 8 branches missed.">                if ((icon.getWidth() &gt; maxW || icon.getHeight() &gt; maxH) &amp;&amp; maxW &gt; 1 &amp;&amp; maxH &gt; 1) {</span>
+<span class="fc" id="L295">                    icon = icon.scaledSmallerRatio(maxW, maxH);</span>
+                }
+
+<span class="fc" id="L298">                lead.setIcon(icon);</span>
+<span class="fc" id="L299">            } else {</span>
+<span class="fc" id="L300">                lead.setText(localize(&quot;SignatureComponent.LeadText&quot;, &quot;Press to sign&quot;));</span>
+<span class="fc" id="L301">                lead.setIcon(null);</span>
+            }
+        }
+<span class="fc" id="L304">    }</span>
+
+    /**
+     * Get the component that is the actual panel for drawing a signature.
+     * The component can be used instead of the SignatureComponent if an embedded signature is needed.
+     * &lt;p&gt;
+     * Use the clearSignaturePanel() and the getSignatureImage() functions to work with this component.
+     *
+     * @return
+     */
+    public Component getSignaturePanel() {
+<span class="nc" id="L315">        return signaturePanel;</span>
+    }
+
+    /**
+     * Clear the signature image and allow it to draw a new one.
+     * Use only if you use the signature panel component from the getSignaturePanel() method.
+     */
+    public void clearSignaturePanel() {
+<span class="nc" id="L323">        signaturePanel.clear();</span>
+<span class="nc" id="L324">    }</span>
+
+    /**
+     * Inner class with the actual body of the dialog for drawing the signature.  This dialog
+     * is shown when the user clicks on the main button.
+     *
+     * @author shannah
+     */
+    private class SignatureDialogBody extends Container {
+<span class="nc" id="L333">        private final EventDispatcher eventDispatcher = new EventDispatcher();</span>
+        private final Button doneButton;
+        private final Button resetButton;
+        private final Button cancelButton;
+        private Image value;
+
+<span class="nc" id="L339">        public SignatureDialogBody() {</span>
+<span class="nc" id="L340">            setLayout(new BorderLayout());</span>
+<span class="nc" id="L341">            addComponent(BorderLayout.CENTER, signaturePanel);</span>
+<span class="nc" id="L342">            doneButton = new Button(</span>
+<span class="nc" id="L343">                    localize(&quot;SignatureComponent.SaveButtonLabel&quot;, &quot;Save&quot;),</span>
+<span class="nc" id="L344">                    getUIManager().getThemeConstant(&quot;sigButtonOKUIID&quot;, &quot;Button&quot;));</span>
+<span class="nc" id="L345">            resetButton = new Button(</span>
+<span class="nc" id="L346">                    localize(&quot;SignatureComponent.ResetButtonLabel&quot;, &quot;Reset&quot;),</span>
+<span class="nc" id="L347">                    getUIManager().getThemeConstant(&quot;sigButtonResetUIID&quot;, &quot;Button&quot;));</span>
+<span class="nc" id="L348">            cancelButton = new Button(</span>
+<span class="nc" id="L349">                    localize(&quot;SignatureComponent.CancelButtonLabel&quot;, &quot;Cancel&quot;),</span>
+<span class="nc" id="L350">                    getUIManager().getThemeConstant(&quot;sigButtonCancelUIID&quot;, &quot;Button&quot;));</span>
+
+<span class="nc" id="L352">            doneButton.addActionListener(new ActionListener() {</span>
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L354">                    value = signaturePanel.getImage();</span>
+<span class="nc bnc" id="L355" title="All 2 branches missed.">                    if (value == null) {</span>
+<span class="nc" id="L356">                        Dialog.show(</span>
+<span class="nc" id="L357">                                localize(&quot;SignatureComponent.ErrorDialog.SignatureRequired.Title&quot;, &quot;Signature Required&quot;),</span>
+<span class="nc" id="L358">                                localize(&quot;SignatureComponent.ErrorDialog.SignatureRequired.Body&quot;, &quot;Please draw your signature in the space provided.&quot;),</span>
+<span class="nc" id="L359">                                localize(&quot;SignatureComponent.ErrorDialog.OK&quot;, &quot;OK&quot;),</span>
+                                null
+                        );
+<span class="nc" id="L362">                        return;</span>
+                    }
+<span class="nc" id="L364">                    eventDispatcher.fireActionEvent(new ActionEvent(this));</span>
+<span class="nc" id="L365">                    removeComponent(signaturePanel);</span>
+<span class="nc" id="L366">                }</span>
+            });
+
+<span class="nc" id="L369">            resetButton.addActionListener(new ActionListener() {</span>
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L371">                    signaturePanel.clear();</span>
+<span class="nc" id="L372">                    onSignatureReset();</span>
+<span class="nc" id="L373">                    repaint();</span>
+<span class="nc" id="L374">                }</span>
+            });
+
+<span class="nc" id="L377">            cancelButton.addActionListener(new ActionListener() {</span>
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L379">                    removeComponent(signaturePanel);</span>
+<span class="nc" id="L380">                    onCancel();</span>
+<span class="nc" id="L381">                }</span>
+            });
+
+<span class="nc" id="L384">            addComponent(BorderLayout.SOUTH, GridLayout.encloseIn(3, cancelButton, resetButton, doneButton));</span>
+<span class="nc" id="L385">        }</span>
+
+        /**
+         * Called when the cancel button is pressed.  Should be overridden by subclasses to
+         * actually do something (like close the dialog).
+         */
+        protected void onCancel() {
+
+<span class="nc" id="L393">        }</span>
+
+        /**
+         * Adds a listener to be informed when the &quot;done&quot; button is pressed and a new
+         * signature has been saved as an image.
+         *
+         * @param l
+         */
+        public void addActionListener(ActionListener l) {
+<span class="nc" id="L402">            eventDispatcher.addListener(l);</span>
+<span class="nc" id="L403">        }</span>
+
+
+        /**
+         * @param l
+         * @see #addActionListener(com.codename1.ui.events.ActionListener)
+         */
+        public void removeActionListener(ActionListener l) {
+<span class="nc" id="L411">            eventDispatcher.removeListener(l);</span>
+<span class="nc" id="L412">        }</span>
+
+        /**
+         * Overridden to automatically save the image of the current SignaturePanel
+         * when the dialog is disposed.
+         */
+        @Override
+        protected void deinitialize() {
+<span class="nc bnc" id="L420" title="All 2 branches missed.">            if (value == null) {</span>
+                // We want to cache the value when this field is being hidden.
+<span class="nc" id="L422">                value = signaturePanel.getImage();</span>
+            }
+<span class="nc" id="L424">            super.deinitialize();</span>
+<span class="nc" id="L425">        }</span>
+
+        /**
+         * Gets the signature that was drawn, as an Image.
+         *
+         * @return
+         */
+        public Image getValue() {
+<span class="nc bnc" id="L433" title="All 2 branches missed.">            if (value == null) {</span>
+<span class="nc" id="L434">                value = signaturePanel.getImage();</span>
+            }
+<span class="nc" id="L436">            return value;</span>
+        }
+    }
+
+    /**
+     * The actual panel for drawing a signature.  This doesn't include any buttons (like done, reset, or cancel),
+     * it merely provides the functionality to record the drawing of a signature.
+     */
+    private class SignaturePanel extends Component {
+
+<span class="fc" id="L446">        private final GeneralPath path = new GeneralPath();</span>
+<span class="fc" id="L447">        private final Stroke stroke = new Stroke();</span>
+<span class="fc" id="L448">        private final Rectangle signatureRect = new Rectangle();</span>
+        private boolean initialized;
+        private final Style signatureBoxStyle;
+        private final Style signatureStyle;
+
+<span class="fc" id="L453">        SignaturePanel() {</span>
+<span class="fc" id="L454">            setUIID(&quot;SignaturePanel&quot;);</span>
+<span class="fc" id="L455">            signatureBoxStyle = getUIManager().getComponentStyle(&quot;SignaturePanelBox&quot;);</span>
+<span class="fc" id="L456">            signatureStyle = getUIManager().getComponentStyle(&quot;SignaturePanelSignature&quot;);</span>
+<span class="fc" id="L457">            stroke.setLineWidth(Math.max(1, Display.getInstance().convertToPixels(1, true) / 2));</span>
+<span class="fc" id="L458">        }</span>
+
+        /**
+         * Overridden to try to make this component as sensitive as possible to
+         * drag events.  If we don't do this, it requires a longer drag before the &quot;drag&quot;
+         * events will kick in.
+         *
+         * @param x
+         * @param y
+         * @return
+         */
+        @Override
+        protected int getDragRegionStatus(int x, int y) {
+<span class="nc" id="L471">            return Component.DRAG_REGION_LIKELY_DRAG_XY;</span>
+        }
+
+        /**
+         * @param g
+         */
+        @Override
+        public void paint(Graphics g) {
+<span class="nc" id="L479">            super.paint(g);</span>
+
+<span class="nc" id="L481">            g.setColor(signatureBoxStyle.getFgColor());</span>
+<span class="nc" id="L482">            int alpha = g.concatenateAlpha(signatureBoxStyle.getFgAlpha());</span>
+<span class="nc" id="L483">            calcSignatureRect(signatureRect);</span>
+<span class="nc" id="L484">            g.drawRect(signatureRect.getX(), signatureRect.getY(), signatureRect.getWidth(), signatureRect.getHeight());</span>
+<span class="nc" id="L485">            g.drawString(&quot;X&quot;, signatureRect.getX() + Display.getInstance().convertToPixels(1, true), signatureRect.getY() + signatureRect.getHeight() / 2);</span>
+<span class="nc" id="L486">            g.pushClip();</span>
+<span class="nc" id="L487">            g.clipRect(signatureRect.getX(), signatureRect.getY(), signatureRect.getWidth(), signatureRect.getHeight());</span>
+<span class="nc" id="L488">            paintSignature(g);</span>
+<span class="nc" id="L489">            g.popClip();</span>
+<span class="nc" id="L490">            g.setAlpha(alpha);</span>
+
+<span class="nc" id="L492">        }</span>
+
+        /**
+         * Paints just the signature portion of the panel.  This is is reuised to
+         * also create the image of the signature.
+         *
+         * @param g
+         */
+        private void paintSignature(Graphics g) {
+<span class="nc" id="L501">            g.setColor(signatureStyle.getFgColor());</span>
+<span class="nc" id="L502">            int alpha = g.concatenateAlpha(signatureStyle.getFgAlpha());</span>
+<span class="nc" id="L503">            boolean oldAA = g.isAntiAliased();</span>
+<span class="nc" id="L504">            g.setAntiAliased(true);</span>
+<span class="nc" id="L505">            g.drawShape(path, stroke);</span>
+<span class="nc" id="L506">            g.setAntiAliased(oldAA);</span>
+<span class="nc" id="L507">            g.setAlpha(alpha);</span>
+<span class="nc" id="L508">        }</span>
+
+        /**
+         * Calculates a rectangle (in parent component space) used for the drawn &quot;rectangle&quot; inside
+         * which the user should draw their signature.  It tries to create a 16x9 rectangle that
+         * fits inside the component with a bit of padding (3mm on each edge).
+         *
+         * @param r Output variable.
+         */
+        private void calcSignatureRect(Rectangle r) {
+<span class="nc" id="L518">            int w = getWidth() - Display.getInstance().convertToPixels(6, true);</span>
+<span class="nc" id="L519">            int h = (int) (w * 9.0 / 16.0);</span>
+<span class="nc bnc" id="L520" title="All 2 branches missed.">            if (h &gt; getHeight()) {</span>
+<span class="nc" id="L521">                h = getHeight() - Display.getInstance().convertToPixels(6, false);</span>
+<span class="nc" id="L522">                w = (int) (h * 16.0 / 9.0);</span>
+            }
+<span class="nc" id="L524">            r.setX(getX() + (getWidth() - w) / 2);</span>
+<span class="nc" id="L525">            r.setY(getY() + (getHeight() - h) / 2);</span>
+<span class="nc" id="L526">            r.setWidth(w);</span>
+<span class="nc" id="L527">            r.setHeight(h);</span>
+<span class="nc" id="L528">        }</span>
+
+        @Override
+        protected Dimension calcPreferredSize() {
+<span class="nc" id="L532">            Display d = Display.getInstance();</span>
+<span class="nc" id="L533">            return new Dimension(d.convertToPixels(80, true), d.convertToPixels(40, false));</span>
+        }
+
+        @Override
+        public void pointerPressed(int x, int y) {
+<span class="nc" id="L538">            path.moveTo(x(x), y(y));</span>
+<span class="nc" id="L539">            initialized = true;</span>
+
+<span class="nc" id="L541">            repaint();</span>
+<span class="nc" id="L542">        }</span>
+
+        @Override
+        public void pointerDragged(int x, int y) {
+<span class="nc bnc" id="L546" title="All 2 branches missed.">            if (!initialized) {</span>
+<span class="nc" id="L547">                initialized = true;</span>
+<span class="nc" id="L548">                path.moveTo(x(x), y(y));</span>
+            } else {
+<span class="nc" id="L550">                path.lineTo(x(x), y(y));</span>
+            }
+<span class="nc" id="L552">            repaint();</span>
+<span class="nc" id="L553">        }</span>
+
+        @Override
+        public void pointerReleased(int x, int y) {
+<span class="nc" id="L557">            path.lineTo(x(x), y(y));</span>
+<span class="nc" id="L558">            repaint();</span>
+<span class="nc" id="L559">        }</span>
+
+        /**
+         * Converts an x coordinate from screen space, to parent component space.
+         *
+         * @param x
+         * @return
+         */
+        private int x(int x) {
+<span class="nc" id="L568">            return x - getParent().getAbsoluteX();</span>
+        }
+
+        /**
+         * Converts a y coordinate from screen space to parent component space.
+         *
+         * @param y
+         * @return
+         */
+        private int y(int y) {
+<span class="nc" id="L578">            return y - getParent().getAbsoluteY();</span>
+        }
+
+        /**
+         * Gets the currently drawn signature as an image.  This only includes the
+         * areas inside the {@link #signatureRect}
+         *
+         * @return
+         */
+        public Image getImage() {
+<span class="pc bpc" id="L588" title="1 of 2 branches missed.">            if (path.getPointsSize() &lt; 2) {</span>
+<span class="fc" id="L589">                return null;</span>
+            }
+<span class="nc" id="L591">            calcSignatureRect(signatureRect);</span>
+
+<span class="nc" id="L593">            Image img = ImageFactory.createImage(this, signatureRect.getWidth(), signatureRect.getHeight(), 0xffffff);</span>
+<span class="nc" id="L594">            Graphics g = img.getGraphics();</span>
+<span class="nc" id="L595">            g.translate(-signatureRect.getX(), -signatureRect.getY());</span>
+<span class="nc" id="L596">            paintSignature(g);</span>
+<span class="nc" id="L597">            return img;</span>
+        }
+
+        /**
+         * Resets the signature as a blank path.
+         */
+        public void clear() {
+<span class="nc" id="L604">            path.reset();</span>
+<span class="nc" id="L605">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
