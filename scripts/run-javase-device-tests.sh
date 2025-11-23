@@ -143,7 +143,16 @@ jd_log "Configuring Java SE port preferences for desktop mode"
 
 SIM_TIMEOUT_SECONDS=${SIM_TIMEOUT_SECONDS:-420}
 SIM_KILL_GRACE_SECONDS=${SIM_KILL_GRACE_SECONDS:-30}
-JAVA_CMD=(xvfb-run -a "$JAVA_BIN" \
+JAVA_CMD=(xvfb-run -a "$JAVA_BIN")
+
+if [ -n "${JACOCO_AGENT_ARGLINE:-}" ]; then
+  jd_log "Applying JaCoCo agent to Java SE simulator"
+  # shellcheck disable=SC2206
+  JACOCO_AGENT_ARGS=(${JACOCO_AGENT_ARGLINE})
+  JAVA_CMD+=("${JACOCO_AGENT_ARGS[@]}")
+fi
+
+JAVA_CMD+=(
   -cp "$CN1_CLASSPATH:$BUILD_DIR/classes" \
   com.codename1.impl.javase.Simulator com.codenameone.examples.hellocodenameone.HelloCodenameOne)
 
