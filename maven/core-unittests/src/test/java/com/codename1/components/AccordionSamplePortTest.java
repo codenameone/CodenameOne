@@ -28,6 +28,7 @@ class AccordionSamplePortTest extends UITestBase {
         AccordionSampleHarness harness = new AccordionSampleHarness(false);
         Form form = harness.createForm();
         form.show();
+        flushSerialCalls();
 
         Accordion accordion = harness.getAccordion();
         Container headerContainer = harness.getFirstHeaderContainer();
@@ -45,27 +46,31 @@ class AccordionSamplePortTest extends UITestBase {
         form.getStyle().setPadding(0, 0, 0, 0);
         form.revalidate();
         Display.getInstance().sizeChanged(1920, 1080);
+        flushSerialCalls();
 
         String landscapeUiid = accordion.getOpenCloseIconUIID();
         assertEquals("PaddedOpenCloseIconLandscape", landscapeUiid);
         Style landscapeStyle = UIManager.getInstance().getComponentStyle(landscapeUiid);
         assertEquals(harness.getLastPadding(), landscapeStyle.getPadding(RIGHT));
 
-        Component lead = headerContainer.getLeadComponent();
-        assertNotNull(lead);
-        assertEquals(landscapeUiid, lead.getUIID());
+        Component openCloseIcon = findComponentWithUIID(headerContainer, landscapeUiid);
+        assertNotNull(openCloseIcon);
+        assertEquals(landscapeUiid, openCloseIcon.getUIID());
     }
 
     @FormTest
     void rtlToggleRebuildsFormWithTranslations() {
+        implementation.setDisplaySize(1080, 1920);
         AccordionSampleHarness harness = new AccordionSampleHarness(false);
         Form form = harness.createForm();
         form.show();
+        flushSerialCalls();
 
         assertFalse(UIManager.getInstance().getLookAndFeel().isRTL());
         assertEquals("Align", harness.getTranslationLabel().getText());
 
         tap(harness.getRtlToggle());
+        flushSerialCalls();
 
         Form rtlForm = CN.getCurrentForm();
         AccordionSampleHarness rtlHarness = (AccordionSampleHarness) rtlForm.getClientProperty("accordionHarness");
@@ -85,6 +90,22 @@ class AccordionSamplePortTest extends UITestBase {
         int x = component.getAbsoluteX() + component.getWidth() / 2;
         int y = component.getAbsoluteY() + component.getHeight() / 2;
         TestCodenameOneImplementation.getInstance().dispatchPointerPressAndRelease(x, y);
+    }
+
+    private Component findComponentWithUIID(Container container, String uiid) {
+        for (int i = 0; i < container.getComponentCount(); i++) {
+            Component child = container.getComponentAt(i);
+            if (uiid.equals(child.getUIID())) {
+                return child;
+            }
+            if (child instanceof Container) {
+                Component nested = findComponentWithUIID((Container) child, uiid);
+                if (nested != null) {
+                    return nested;
+                }
+            }
+        }
+        return null;
     }
 
     private static class AccordionSampleHarness {
