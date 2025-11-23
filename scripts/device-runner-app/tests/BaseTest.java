@@ -58,4 +58,16 @@ public abstract class BaseTest extends AbstractTest {
         }
         return true;
     }
+
+    String getCurrentScreenshotName() {
+        return currentScreenshotName;
+    }
+
+    void ensureLogsFlushedOnExit() {
+        if (!logEmitted) {
+            Log.p("CN1SS: forcing log emission on exit for " + currentScreenshotName);
+            Cn1ssDeviceRunnerHelper.emitLogChannel(currentScreenshotName);
+            logEmitted = true;
+        }
+    }
 }

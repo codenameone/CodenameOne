@@ -26,12 +26,22 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 Log.p("CN1SS: preparing test " + testClass);
                 testClass.prepare();
                 testClass.runTest();
-                testClass.cleanup();
                 Log.p("CN1SS: finished test " + testClass);
                 log("CN1SS:INFO:suite finished test=" + testClass);
             } catch (Throwable t) {
                 log("CN1SS:ERR:suite test=" + testClass + " failed=" + t);
                 t.printStackTrace();
+            } finally {
+                if (testClass instanceof BaseTest) {
+                    BaseTest base = (BaseTest) testClass;
+                    base.ensureLogsFlushedOnExit();
+                }
+                try {
+                    testClass.cleanup();
+                } catch (Throwable t) {
+                    log("CN1SS:ERR:suite cleanup failed for test=" + testClass + " err=" + t);
+                    t.printStackTrace();
+                }
             }
         }
         Log.p("CN1SS: device runner suite complete");
