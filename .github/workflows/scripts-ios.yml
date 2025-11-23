@@ -79,7 +79,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ../cn1-binaries
-          key: cn1-binaries-${{ runner.os }}-${{ hashFiles('scripts/setup-workspace.sh') }}
+          key: cn1-binaries-${{ runner.os }}-${{ hashFiles('**/scripts/setup-workspace.sh') }}
           restore-keys: |
             cn1-binaries-${{ runner.os }}-
 

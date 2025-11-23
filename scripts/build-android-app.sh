@@ -11,7 +11,6 @@ cd "$REPO_ROOT"
 TMPDIR="${TMPDIR:-/tmp}"; TMPDIR="${TMPDIR%/}"
 DOWNLOAD_DIR="${TMPDIR%/}/codenameone-tools"
 ENV_DIR="$DOWNLOAD_DIR/tools"
-EXTRA_MVN_ARGS=("$@")
 
 ENV_FILE="$ENV_DIR/env.sh"
 ba_log "Loading workspace environment from $ENV_FILE"
@@ -166,20 +165,18 @@ while IFS= read -r -d '' P; do
   done
 done < <(find "$APP_DIR" -type f -name pom.xml -print0)
 
-# 5) Build with the property set so any lingering refs resolve to the local snapshot
-EXTRA_MVN_ARGS+=("-Dcodenameone.version=${CN1_VERSION}")
-
 [ -d "$APP_DIR" ] || { ba_log "Failed to create Codename One application project" >&2; exit 1; }
 [ -f "$APP_DIR/build.sh" ] && chmod +x "$APP_DIR/build.sh"
 
 # --- Build Android gradle project ---
 ba_log "Building Android gradle project using Codename One port"
-xvfb-run -a "${MAVEN_CMD[@]}" -q -f "$APP_DIR/pom.xml" package \
+xvfb-run -a "${MAVEN_CMD[@]}" -f "$APP_DIR/pom.xml" package \
   -DskipTests \
   -Dcodename1.platform=android \
   -Dcodename1.buildTarget=android-source \
   -Dopen=false \
-  "${EXTRA_MVN_ARGS[@]}"
+  -U -e \
+  -Dcodenameone.version=${CN1_VERSION}
 
 GRADLE_PROJECT_DIR=$(find "$APP_DIR/android/target" -maxdepth 2 -type d -name "*-android-source" | head -n 1 || true)
 if [ -z "$GRADLE_PROJECT_DIR" ]; then
