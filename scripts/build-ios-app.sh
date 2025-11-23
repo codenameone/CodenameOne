@@ -57,16 +57,9 @@ bia_log "Using JAVA17_HOME at $JAVA17_HOME"
 bia_log "Using Maven installation at $MAVEN_HOME"
 bia_log "Using CocoaPods version $(pod --version 2>/dev/null || echo '<unknown>')"
 
-CN1_VERSION=$(awk -F'[<>]' '/<version>/{print $3; exit}' maven/pom.xml)
-bia_log "Detected Codename One version $CN1_VERSION"
-
-WORK_DIR="$TMPDIR/cn1-hello-ios"
+CN1_VERSION="8.0-SNAPSHOT"
+WORK_DIR="scripts/hellocodenameone"
 rm -rf "$WORK_DIR"; mkdir -p "$WORK_DIR"
-
-GROUP_ID="com.codenameone.examples"
-ARTIFACT_ID="hello-codenameone-ios"
-MAIN_NAME="HelloCodenameOne"
-PACKAGE_NAME="com.codenameone.examples.hellocodenameone"
 
 SOURCE_PROJECT="$REPO_ROOT/Samples/SampleProjectTemplate"
 if [ ! -d "$SOURCE_PROJECT" ]; then
@@ -87,22 +80,7 @@ MAVEN_CMD=(
 )
 
 # --- Generate app skeleton ---
-bia_log "Generating Codename One application skeleton via codenameone-maven-plugin"
-(
-  cd "$WORK_DIR"
-  "${MAVEN_CMD[@]}" -q \
-    com.codenameone:codenameone-maven-plugin:7.0.204:generate-app-project \
-    -DgroupId="$GROUP_ID" \
-    -DartifactId="$ARTIFACT_ID" \
-    -Dversion=1.0-SNAPSHOT \
-    -DsourceProject="$SOURCE_PROJECT" \
-    -Dcn1Version="$CN1_VERSION" \
-    "${EXTRA_MVN_ARGS[@]}"
-)
-
-APP_DIR="$WORK_DIR/$ARTIFACT_ID"
-[ -d "$APP_DIR" ] || { bia_log "Failed to create Codename One application project" >&2; exit 1; }
-[ -f "$APP_DIR/build.sh" ] && chmod +x "$APP_DIR/build.sh"
+APP_DIR="scripts/hellocodenameone"
 
 # --- Normalize Codename One versions in generated iOS project POMs ---
 ROOT_POM="$APP_DIR/pom.xml"
@@ -138,90 +116,10 @@ while IFS= read -r -d '' P; do
   x -u "/mvn:project[mvn:parent/mvn:groupId='com.codenameone' and mvn:parent/mvn:artifactId='codenameone-maven-parent']/mvn:parent/mvn:version" -v "$CN1_VERSION" "$P" || true
 done < <(find "$APP_DIR" -type f -name pom.xml -print0)
 
-# 3) Point all com.codenameone deps/plugins to ${codenameone.version}
-while IFS= read -r -d '' P; do
-  x -u "/mvn:project//mvn:dependencies/mvn:dependency[starts-with(mvn:groupId,'com.codenameone')]/mvn:version" -v '${codenameone.version}' "$P" 2>/dev/null || true
-  x -u "/mvn:project//mvn:build/mvn:plugins/mvn:plugin[starts-with(mvn:groupId,'com.codenameone')]/mvn:version" -v '${codenameone.version}' "$P" 2>/dev/null || true
-  x -u "/mvn:project//mvn:build/mvn:pluginManagement/mvn:plugins/mvn:plugin[starts-with(mvn:groupId,'com.codenameone')]/mvn:version" -v '${codenameone.version}' "$P" 2>/dev/null || true
-done < <(find "$APP_DIR" -type f -name pom.xml -print0)
-
-# 4) Ensure common Maven plugins have versions (helps before parent resolves)
-declare -A PIN=(
-  [org.apache.maven.plugins:maven-compiler-plugin]=3.11.0
-  [org.apache.maven.plugins:maven-resources-plugin]=3.3.1
-  [org.apache.maven.plugins:maven-surefire-plugin]=3.2.5
-  [org.apache.maven.plugins:maven-failsafe-plugin]=3.2.5
-  [org.apache.maven.plugins:maven-jar-plugin]=3.3.0
-  [org.apache.maven.plugins:maven-clean-plugin]=3.3.2
-  [org.apache.maven.plugins:maven-deploy-plugin]=3.1.2
-  [org.apache.maven.plugins:maven-install-plugin]=3.1.2
-  [org.apache.maven.plugins:maven-assembly-plugin]=3.6.0
-  [org.apache.maven.plugins:maven-site-plugin]=4.0.0-M15
-  [com.codenameone:codenameone-maven-plugin]='${codenameone.version}'
-)
-add_version_if_missing() {
-  local pom="$1" g="$2" a="$3" v="$4"
-  if [ "$(q -t -v "count(/mvn:project/mvn:build/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a']/mvn:version)" "$pom" 2>/dev/null || echo 0)" = "0" ] &&
-     [ "$(q -t -v "count(/mvn:project/mvn:build/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a'])" "$pom" 2>/dev/null || echo 0)" != "0" ]; then
-    x -s "/mvn:project/mvn:build/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a']" -t elem -n version -v "$v" "$pom" || true
-  fi
-  if [ "$(q -t -v "count(/mvn:project/mvn:build/mvn:pluginManagement/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a']/mvn:version)" "$pom" 2>/dev/null || echo 0)" = "0" ] &&
-     [ "$(q -t -v "count(/mvn:project/mvn:build/mvn:pluginManagement/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a'])" "$pom" 2>/dev/null || echo 0)" != "0" ]; then
-    x -s "/mvn:project/mvn:build/mvn:pluginManagement/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a']" -t elem -n version -v "$v" "$pom" || true
-  fi
-}
-while IFS= read -r -d '' P; do
-  for ga in "${!PIN[@]}"; do add_version_if_missing "$P" "${ga%%:*}" "${ga##*:}" "${PIN[$ga]}"; done
-done < <(find "$APP_DIR" -type f -name pom.xml -print0)
-
-# 5) Also pass the property when building (already present below)
 EXTRA_MVN_ARGS+=("-Dcodenameone.version=${CN1_VERSION}")
-
-SETTINGS_FILE="$APP_DIR/common/codenameone_settings.properties"
-if [ ! -f "$SETTINGS_FILE" ]; then
-  bia_log "codenameone_settings.properties not found at $SETTINGS_FILE" >&2
-  exit 1
-fi
-
-set_property() {
-  local key="$1" value="$2"
-  if grep -q "^${key}=" "$SETTINGS_FILE"; then
-    if sed --version >/dev/null 2>&1; then
-      sed -i -E "s|^${key}=.*$|${key}=${value}|" "$SETTINGS_FILE"
-    else
-      sed -i '' -E "s|^${key}=.*$|${key}=${value}|" "$SETTINGS_FILE"
-    fi
-  else
-    printf '\n%s=%s\n' "$key" "$value" >> "$SETTINGS_FILE"
-  fi
-}
-
-set_property "codename1.packageName" "$PACKAGE_NAME"
-set_property "codename1.mainName" "$MAIN_NAME"
 
 # Ensure trailing newline
 tail -c1 "$SETTINGS_FILE" | read -r _ || echo >> "$SETTINGS_FILE"
-
-PACKAGE_PATH="${PACKAGE_NAME//.//}"
-JAVA_DIR="$APP_DIR/common/src/main/java/${PACKAGE_PATH}"
-mkdir -p "$JAVA_DIR"
-MAIN_FILE_SOURCE="$SCRIPT_DIR/device-runner-app/main/${MAIN_NAME}.java"
-if [ ! -f "$MAIN_FILE_SOURCE" ]; then
-  bia_log "Sample application source not found: $MAIN_FILE_SOURCE" >&2
-  exit 1
-fi
-cp "$MAIN_FILE_SOURCE" "$JAVA_DIR/${MAIN_NAME}.java"
-bia_log "Wrote main application class to $JAVA_DIR/${MAIN_NAME}.java"
-
-TEST_SOURCE_DIR="$SCRIPT_DIR/device-runner-app/tests"
-TEST_JAVA_DIR="$APP_DIR/common/src/main/java/${PACKAGE_PATH}/tests"
-mkdir -p "$TEST_JAVA_DIR"
-if [ ! -d "$TEST_SOURCE_DIR" ]; then
-  bia_log "DeviceRunner test sources not found: $TEST_SOURCE_DIR" >&2
-  exit 1
-fi
-cp "$TEST_SOURCE_DIR"/*.java "$TEST_JAVA_DIR"/
-bia_log "Installed DeviceRunner UI tests in $TEST_JAVA_DIR"
 
 # --- Build iOS project (ios-source) ---
 DERIVED_DATA_DIR="${TMPDIR}/codenameone-ios-derived"
@@ -287,17 +185,16 @@ if [ -z "$WORKSPACE" ]; then
 fi
 bia_log "Found xcworkspace: $WORKSPACE"
 
-SCHEME="$MAIN_NAME"
 
 # Make these visible to the next GH Actions step
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
   {
     echo "workspace=$WORKSPACE"
-    echo "scheme=$SCHEME"
+    echo "scheme=HelloCodenameOne"
   } >> "$GITHUB_OUTPUT"
 fi
 
-bia_log "Emitted outputs -> workspace=$WORKSPACE, scheme=$SCHEME"
+bia_log "Emitted outputs -> workspace=$WORKSPACE, scheme=HelloCodenameOne"
 
 # (Optional) dump xcodebuild -list for debugging
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-$REPO_ROOT/artifacts}"

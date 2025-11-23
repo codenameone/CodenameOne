@@ -74,16 +74,7 @@ fi
 export ANDROID_SDK_ROOT ANDROID_HOME="$ANDROID_SDK_ROOT"
 ba_log "Using Android SDK at $ANDROID_SDK_ROOT"
 
-CN1_VERSION=$(awk -F'[<>]' '/<version>/{print $3; exit}' maven/pom.xml)
-ba_log "Detected Codename One version $CN1_VERSION"
-
-WORK_DIR="$TMPDIR/cn1-hello-android"
-rm -rf "$WORK_DIR"; mkdir -p "$WORK_DIR"
-
-GROUP_ID="com.codenameone.examples"
-ARTIFACT_ID="hello-codenameone"
-PACKAGE_NAME="com.codenameone.examples.hellocodenameone"
-MAIN_NAME="HelloCodenameOne"
+CN1_VERSION="8.0-SNAPSHOT"
 
 SOURCE_PROJECT="$REPO_ROOT/Samples/SampleProjectTemplate"
 if [ ! -d "$SOURCE_PROJECT" ]; then
@@ -101,21 +92,7 @@ MAVEN_CMD=(
   -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
 )
 
-# --- Generate app skeleton ---
-ba_log "Generating Codename One application skeleton via codenameone-maven-plugin"
-(
-  cd "$WORK_DIR"
-  xvfb-run -a "${MAVEN_CMD[@]}" -q \
-    com.codenameone:codenameone-maven-plugin:7.0.204:generate-app-project \
-    -DgroupId="$GROUP_ID" \
-    -DartifactId="$ARTIFACT_ID" \
-    -Dversion=1.0-SNAPSHOT \
-    -DsourceProject="$SOURCE_PROJECT" \
-    -Dcn1Version="7.0.204" \
-    "${EXTRA_MVN_ARGS[@]}"
-)
-
-APP_DIR="$WORK_DIR/$ARTIFACT_ID"
+APP_DIR="scripts/hellocodenameone"
 
 # --- Namespace-aware CN1 normalization (xmlstarlet) ---
 ROOT_POM="$APP_DIR/pom.xml"
@@ -192,64 +169,8 @@ done < <(find "$APP_DIR" -type f -name pom.xml -print0)
 # 5) Build with the property set so any lingering refs resolve to the local snapshot
 EXTRA_MVN_ARGS+=("-Dcodenameone.version=${CN1_VERSION}")
 
-# (Optional) quick non-fatal checks
-xmlstarlet sel -N "$NS" -t -v "/mvn:project/mvn:properties/mvn:codenameone.version" -n "$ROOT_POM" || true
-xmlstarlet sel -N "$NS" -t -c "/mvn:project/mvn:build/mvn:plugins" -n "$ROOT_POM" | head -n 60 || true
-
-
-
 [ -d "$APP_DIR" ] || { ba_log "Failed to create Codename One application project" >&2; exit 1; }
 [ -f "$APP_DIR/build.sh" ] && chmod +x "$APP_DIR/build.sh"
-
-SETTINGS_FILE="$APP_DIR/common/codenameone_settings.properties"
-echo "codename1.arg.android.useAndroidX=true" >> "$SETTINGS_FILE"
-[ -f "$SETTINGS_FILE" ] || { ba_log "codenameone_settings.properties not found at $SETTINGS_FILE" >&2; exit 1; }
-
-set_prop() {
-  local key="$1" value="$2"
-  if grep -q "^${key}=" "$SETTINGS_FILE"; then
-    if sed --version >/dev/null 2>&1; then
-      sed -i -E "s|^${key}=.*$|${key}=${value}|" "$SETTINGS_FILE"
-    else
-      sed -i '' -E "s|^${key}=.*$|${key}=${value}|" "$SETTINGS_FILE"
-    fi
-  else
-    printf '\n%s=%s\n' "$key" "$value" >> "$SETTINGS_FILE"
-  fi
-}
-
-# --- Install Codename One application sources ---
-PACKAGE_PATH="${PACKAGE_NAME//.//}"
-JAVA_DIR="$APP_DIR/common/src/main/java/${PACKAGE_PATH}"
-mkdir -p "$JAVA_DIR"
-MAIN_FILE_SOURCE="$SCRIPT_DIR/device-runner-app/main/${MAIN_NAME}.java"
-if [ ! -f "$MAIN_FILE_SOURCE" ]; then
-  ba_log "Sample application source not found: $MAIN_FILE_SOURCE" >&2
-  exit 1
-fi
-cp "$MAIN_FILE_SOURCE" "$JAVA_DIR/${MAIN_NAME}.java"
-
-ba_log "Setting Codename One application metadata"
-set_prop "codename1.packageName" "$PACKAGE_NAME"
-set_prop "codename1.mainName" "$MAIN_NAME"
-# DeviceRunner integration is handled inside the copied sources, so unit test
-# build mode is not required (and is unsupported for local Android builds).
-# Ensure trailing newline
-tail -c1 "$SETTINGS_FILE" | read -r _ || echo >> "$SETTINGS_FILE"
-
-# --- Install DeviceRunner UI tests ---
-TEST_SOURCE_DIR="$SCRIPT_DIR/device-runner-app/tests"
-TEST_JAVA_DIR="$APP_DIR/common/src/main/java/${PACKAGE_PATH}/tests"
-mkdir -p "$TEST_JAVA_DIR"
-if [ ! -d "$TEST_SOURCE_DIR" ]; then
-  ba_log "DeviceRunner test sources not found: $TEST_SOURCE_DIR" >&2
-  exit 1
-fi
-cp "$TEST_SOURCE_DIR"/*.java "$TEST_JAVA_DIR"/
-ba_log "Installed DeviceRunner UI tests in $TEST_JAVA_DIR"
-
-# --- Normalize Codename One versions (use Maven Versions Plugin) ---
-ba_log "Normalizing Codename One Maven coordinates to $CN1_VERSION"
 
 # --- Build Android gradle project ---
 ba_log "Building Android gradle project using Codename One port"
@@ -342,7 +263,6 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
   {
     echo "gradle_project_dir=$GRADLE_PROJECT_DIR"
     echo "apk_path=$APK_PATH"
-    echo "package_name=$PACKAGE_NAME"
   } >> "$GITHUB_OUTPUT"
   ba_log "Published GitHub Actions outputs for downstream steps"
 fi
