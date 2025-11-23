@@ -28,11 +28,11 @@ class AccordionSamplePortTest extends UITestBase {
         AccordionSampleHarness harness = new AccordionSampleHarness(false);
         Form form = harness.createForm();
         form.show();
-        flushSerialCalls();
+        prepareForInteraction(form);
 
         Accordion accordion = harness.getAccordion();
-        Container headerContainer = harness.getFirstHeaderContainer();
-        tap(headerContainer);
+        Component headerLead = harness.getFirstHeaderLeadComponent();
+        tap(headerLead);
         assertNotNull(accordion.getCurrentlyExpanded());
 
         String portraitUiid = accordion.getOpenCloseIconUIID();
@@ -46,14 +46,14 @@ class AccordionSamplePortTest extends UITestBase {
         form.getStyle().setPadding(0, 0, 0, 0);
         form.revalidate();
         Display.getInstance().sizeChanged(1920, 1080);
-        flushSerialCalls();
+        prepareForInteraction(form);
 
         String landscapeUiid = accordion.getOpenCloseIconUIID();
         assertEquals("PaddedOpenCloseIconLandscape", landscapeUiid);
         Style landscapeStyle = UIManager.getInstance().getComponentStyle(landscapeUiid);
         assertEquals(harness.getLastPadding(), landscapeStyle.getPadding(RIGHT));
 
-        Component openCloseIcon = findComponentWithUIID(headerContainer, landscapeUiid);
+        Component openCloseIcon = findComponentWithUIID(harness.getFirstHeaderContainer(), landscapeUiid);
         assertNotNull(openCloseIcon);
         assertEquals(landscapeUiid, openCloseIcon.getUIID());
     }
@@ -64,7 +64,7 @@ class AccordionSamplePortTest extends UITestBase {
         AccordionSampleHarness harness = new AccordionSampleHarness(false);
         Form form = harness.createForm();
         form.show();
-        flushSerialCalls();
+        prepareForInteraction(form);
 
         assertFalse(UIManager.getInstance().getLookAndFeel().isRTL());
         assertEquals("Align", harness.getTranslationLabel().getText());
@@ -90,6 +90,11 @@ class AccordionSamplePortTest extends UITestBase {
         int x = component.getAbsoluteX() + component.getWidth() / 2;
         int y = component.getAbsoluteY() + component.getHeight() / 2;
         TestCodenameOneImplementation.getInstance().dispatchPointerPressAndRelease(x, y);
+    }
+
+    private void prepareForInteraction(Form form) {
+        form.revalidate();
+        flushSerialCalls();
     }
 
     private Component findComponentWithUIID(Container container, String uiid) {
@@ -163,6 +168,12 @@ class AccordionSamplePortTest extends UITestBase {
             return (Container) content.getComponentAt(0);
         }
 
+        Component getFirstHeaderLeadComponent() {
+            Container header = getFirstHeaderContainer();
+            Component lead = header.getLeadComponent();
+            return lead != null ? lead : header;
+        }
+
         CheckBox getRtlToggle() {
             return rtlToggle;
         }
@@ -177,6 +188,10 @@ class AccordionSamplePortTest extends UITestBase {
 
         private void setupOpenCloseArrowStyles(Accordion acc) {
             Style openCloseIconStyle = UIManager.getInstance().getComponentStyle(acc.getOpenCloseIconUIID());
+            if (openCloseIconStyle == null) {
+                openCloseIconStyle = new Style();
+                UIManager.getInstance().setComponentStyle(acc.getOpenCloseIconUIID(), openCloseIconStyle);
+            }
             openCloseIconStyle.setMarginUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
 
             String[] labels = new String[]{"Section 1", "Section 2", "Section 3 (Custom)"};
