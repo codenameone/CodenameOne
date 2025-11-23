@@ -5,6 +5,7 @@ import com.codename1.media.Media;
 import com.codename1.media.MediaManager;
 import com.codename1.testing.AbstractTest;
 import com.codename1.testing.TestUtils;
+import com.codename1.io.Log;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
@@ -28,9 +29,11 @@ public class MediaPlaybackScreenshotTest extends BaseTest {
         if (tonePath == null) {
             updateStatus(statusLabel, form, "Failed to generate tone file");
         } else {
+            Log.p("CN1SS: attempting media playback from " + tonePath);
             Media media = MediaManager.createMedia(tonePath, false);
             if (media == null) {
                 updateStatus(statusLabel, form, "Media creation returned null");
+                Log.p("CN1SS: media creation returned null for " + tonePath);
             }
             media.setTime(0);
             media.play();
@@ -68,6 +71,7 @@ public class MediaPlaybackScreenshotTest extends BaseTest {
     private static String writeToneWav() {
         byte[] wav = buildToneWav();
         if (wav == null || wav.length == 0) {
+            Log.p("CN1SS: generated tone WAV is empty");
             return null;
         }
         String path = FileSystemStorage.getInstance().getAppHomePath() + "media-playback-test.wav";
@@ -76,9 +80,11 @@ public class MediaPlaybackScreenshotTest extends BaseTest {
         try {
             out = FileSystemStorage.getInstance().openOutputStream(path);
             out.write(wav);
+            Log.p("CN1SS: wrote tone WAV to " + path + " (" + wav.length + " bytes)");
             return path;
         } catch (IOException ex) {
             TestUtils.log("Unable to write tone wav: " + ex.getMessage());
+            Log.e(ex);
             return null;
         } finally {
             if (out != null) {

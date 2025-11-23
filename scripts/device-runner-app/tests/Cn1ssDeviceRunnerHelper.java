@@ -1,5 +1,6 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
+import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Util;
 import com.codename1.io.Log;
 import com.codename1.ui.Display;
@@ -10,14 +11,50 @@ import com.codename1.util.Base64;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 
 final class Cn1ssDeviceRunnerHelper {
     private static final int CHUNK_SIZE = 900;
     private static final int MAX_PREVIEW_BYTES = 20 * 1024;
     private static final String PREVIEW_CHANNEL = "PREVIEW";
+    private static final String LOG_CHANNEL = "LOG";
+    private static final String START_CHANNEL = "START";
+    private static final String LOG_FILE_NAME_PREFIX = "cn1ss-device-runner-";
     private static final int[] PREVIEW_QUALITIES = new int[] {60, 50, 40, 35, 30, 25, 20, 18, 16, 14, 12, 10, 8, 6, 5, 4, 3, 2, 1};
+    private static final String LOG_FILE_BASE = initializeLogBasePath();
+    private static String currentLogPath = initializeLogFile();
+    private static boolean globalErrorHooksInstalled;
 
     private Cn1ssDeviceRunnerHelper() {
+    }
+
+    private static String initializeLogBasePath() {
+        FileSystemStorage storage = FileSystemStorage.getInstance();
+        String base = storage.getAppHomePath() + LOG_FILE_NAME_PREFIX;
+        return base;
+    }
+
+    private static String initializeLogFile() {
+        String path = LOG_FILE_BASE + "session.log";
+        setupLogFile(path);
+        return path;
+    }
+
+    static void resetLogCapture(String testName) {
+        if (LOG_FILE_BASE == null || LOG_FILE_BASE.length() == 0) {
+            return;
+        }
+        String safeName = sanitizeTestName(testName);
+        String path = LOG_FILE_BASE + safeName + ".log";
+        setupLogFile(path);
+        currentLogPath = path;
+        println("CN1SS:INFO:test=" + safeName + " log_reset=true path=" + path);
+    }
+
+    static void emitTestStartMarker(String testName) {
+        String safeName = sanitizeTestName(testName);
+        emitChannel(toUtf8Bytes("start:" + safeName), safeName, START_CHANNEL);
     }
 
     static void runOnEdtSync(Runnable runnable) {
@@ -27,6 +64,25 @@ final class Cn1ssDeviceRunnerHelper {
         } else {
             display.callSeriallyAndWait(runnable);
         }
+    }
+
+    static void ensureGlobalErrorTaps() {
+        if (globalErrorHooksInstalled) {
+            return;
+        }
+        globalErrorHooksInstalled = true;
+        Log.bindCrashProtection(true);
+        Display.getInstance().addEdtErrorHandler(evt -> {
+            Object source = evt.getSource();
+            if (source instanceof Throwable) {
+                Throwable t = (Throwable) source;
+                Log.e(t);
+                println("CN1SS:ERR:edt thread throwable=" + t);
+            } else {
+                println("CN1SS:ERR:edt event=" + source);
+            }
+        });
+        println("CN1SS:INFO:global error taps installed");
     }
 
     static void waitForMillis(long millis) {
@@ -39,6 +95,7 @@ final class Cn1ssDeviceRunnerHelper {
         Form current = Display.getInstance().getCurrent();
         if (current == null) {
             println("CN1SS:ERR:test=" + safeName + " message=Current form is null");
+            emitLogOutput(safeName);
             println("CN1SS:END:" + safeName);
             return false;
         }
@@ -52,12 +109,14 @@ final class Cn1ssDeviceRunnerHelper {
                 Util.sleep(50);
                 // timeout
                 if (System.currentTimeMillis() - time > 2000) {
+                    emitLogOutput(safeName);
                     return;
                 }
             }
         });
         if (img[0] == null) {
             println("CN1SS:ERR:test=" + safeName + " message=Screenshot process timed out");
+            emitLogOutput(safeName);
             println("CN1SS:END:" + safeName);
             return false;
         }
@@ -66,6 +125,7 @@ final class Cn1ssDeviceRunnerHelper {
             ImageIO io = ImageIO.getImageIO();
             if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
                 println("CN1SS:ERR:test=" + safeName + " message=PNG encoding unavailable");
+                emitLogOutput(safeName);
                 println("CN1SS:END:" + safeName);
                 return false;
             }
@@ -81,15 +141,23 @@ final class Cn1ssDeviceRunnerHelper {
             } else {
                 println("CN1SS:INFO:test=" + safeName + " preview_jpeg_bytes=0 preview_quality=0");
             }
+            emitLogOutput(safeName);
             return true;
         } catch (IOException ex) {
             println("CN1SS:ERR:test=" + safeName + " message=" + ex);
             Log.e(ex);
+            emitLogOutput(safeName);
             println("CN1SS:END:" + safeName);
             return false;
         } finally {
             screenshot.dispose();
         }
+    }
+
+    static void emitLogChannel(String testName) {
+        String safeName = sanitizeTestName(testName);
+        emitLogOutput(safeName);
+        println("CN1SS:END:" + safeName);
     }
 
     private static byte[] encodePreview(ImageIO io, Image screenshot, String safeName) throws IOException {
@@ -157,6 +225,22 @@ final class Cn1ssDeviceRunnerHelper {
         return sanitized.toString();
     }
 
+    private static byte[] toUtf8Bytes(String value) {
+        if (value == null) {
+            return new byte[0];
+        }
+        try {
+            return value.getBytes("UTF-8");
+        } catch (UnsupportedEncodingException ex) {
+            // UTF-8 should always be present, but fall back to ASCII-safe encoding for CN1
+            byte[] bytes = new byte[value.length()];
+            for (int i = 0; i < value.length(); i++) {
+                bytes[i] = (byte) (value.charAt(i) & 0x7F);
+            }
+            return bytes;
+        }
+    }
+
     private static boolean isSafeChar(char ch) {
         if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')) {
             return true;
@@ -180,7 +264,48 @@ final class Cn1ssDeviceRunnerHelper {
         return builder.toString();
     }
 
+    private static void emitLogOutput(String safeName) {
+        byte[] logBytes = readLogBytes();
+        if (logBytes == null || logBytes.length == 0) {
+            println("CN1SS:INFO:test=" + safeName + " log_bytes=0");
+            emitChannel("(no log entries captured)".getBytes(), safeName, LOG_CHANNEL);
+            return;
+        }
+        println("CN1SS:INFO:test=" + safeName + " log_bytes=" + logBytes.length);
+        emitChannel(logBytes, safeName, LOG_CHANNEL);
+    }
+
+    private static byte[] readLogBytes() {
+        if (currentLogPath == null || currentLogPath.length() == 0) {
+            return null;
+        }
+        FileSystemStorage storage = FileSystemStorage.getInstance();
+        if (!storage.exists(currentLogPath)) {
+            return null;
+        }
+        InputStream input = null;
+        try {
+            input = storage.openInputStream(currentLogPath);
+            return Util.readInputStream(input);
+        } catch (IOException ex) {
+            Log.e(ex);
+            return null;
+        } finally {
+            Util.cleanup(input);
+        }
+    }
+
     private static void println(String line) {
         System.out.println(line);
+    }
+
+    private static void setupLogFile(String path) {
+        FileSystemStorage storage = FileSystemStorage.getInstance();
+        if (storage.exists(path)) {
+            storage.delete(path);
+        }
+        Log.getInstance().setFileURL(path);
+        Log.getInstance().setFileWriteEnabled(true);
+        Log.p("CN1SS logging initialized at " + path);
     }
 }
