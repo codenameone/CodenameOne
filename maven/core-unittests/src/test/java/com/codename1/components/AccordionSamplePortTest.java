@@ -9,6 +9,7 @@ import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
+import com.codename1.ui.Display;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
@@ -40,10 +41,10 @@ class AccordionSamplePortTest extends UITestBase {
 
         implementation.setPortrait(false);
         implementation.setDisplaySize(1920, 1080);
-        form.getStyle().setMargin(0); // Avoid layout adjustments interfering with size change
-        form.getStyle().setPadding(0);
+        form.getStyle().setMargin(0, 0, 0, 0); // Avoid layout adjustments interfering with size change
+        form.getStyle().setPadding(0, 0, 0, 0);
         form.revalidate();
-        form.getDisplay().sizeChanged(1920, 1080);
+        Display.getInstance().sizeChanged(1920, 1080);
 
         String landscapeUiid = accordion.getOpenCloseIconUIID();
         assertEquals("PaddedOpenCloseIconLandscape", landscapeUiid);
