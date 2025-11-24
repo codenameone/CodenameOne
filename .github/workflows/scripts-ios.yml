@@ -75,13 +75,28 @@ jobs:
           gem install cocoapods xcodeproj --no-document --user-install
           pod --version
 
+      - name: Compute setup-workspace hash
+        id: setup_hash
+        run: |
+          set -euo pipefail
+          echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
       - name: Restore cn1-binaries cache
         uses: actions/cache@v4
         with:
           path: ../cn1-binaries
-          key: cn1-binaries-${{ runner.os }}-${{ hashFiles('**/scripts/setup-workspace.sh') }}
+          key: cn1-binaries-${{ runner.os }}-${{ steps.setup_hash.outputs.hash }}
           restore-keys: |
             cn1-binaries-${{ runner.os }}-
+
+# Temporary disabled due to github issue: https://github.com/actions/runner/issues/4134
+#      - name: Restore cn1-binaries cache
+#        uses: actions/cache@v4
+#        with:
+#          path: ../cn1-binaries
+#          key: cn1-binaries-${{ runner.os }}-${{ hashFiles('scripts/setup-workspace.sh') }}
+#          restore-keys: |
+#            cn1-binaries-${{ runner.os }}-
 
       - name: Setup workspace
         run: ./scripts/setup-workspace.sh -q -DskipTests

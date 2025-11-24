@@ -15,7 +15,6 @@ cd "$REPO_ROOT"
 TMPDIR="${TMPDIR:-/tmp}"; TMPDIR="${TMPDIR%/}"
 DOWNLOAD_DIR="${TMPDIR}/codenameone-tools"
 ENV_DIR="$DOWNLOAD_DIR/tools"
-EXTRA_MVN_ARGS=("$@")
 
 ENV_FILE="$ENV_DIR/env.sh"
 bia_log "Loading workspace environment from $ENV_FILE"
@@ -57,84 +56,17 @@ bia_log "Using JAVA17_HOME at $JAVA17_HOME"
 bia_log "Using Maven installation at $MAVEN_HOME"
 bia_log "Using CocoaPods version $(pod --version 2>/dev/null || echo '<unknown>')"
 
-CN1_VERSION="8.0-SNAPSHOT"
-WORK_DIR="scripts/hellocodenameone"
-rm -rf "$WORK_DIR"; mkdir -p "$WORK_DIR"
-
-SOURCE_PROJECT="$REPO_ROOT/Samples/SampleProjectTemplate"
-if [ ! -d "$SOURCE_PROJECT" ]; then
-  bia_log "Source project template not found at $SOURCE_PROJECT" >&2
-  exit 1
-fi
-bia_log "Using source project template at $SOURCE_PROJECT"
-
-# Local Maven repo + command wrapper (define BEFORE using it)
-LOCAL_MAVEN_REPO="${LOCAL_MAVEN_REPO:-$HOME/.m2/repository}"
-bia_log "Using local Maven repository at $LOCAL_MAVEN_REPO"
-mkdir -p "$LOCAL_MAVEN_REPO"
-
-MAVEN_CMD=(
-  "$MAVEN_HOME/bin/mvn" -B -ntp
-  -Dmaven.repo.local="$LOCAL_MAVEN_REPO"
-  -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
-)
-
-# --- Generate app skeleton ---
 APP_DIR="scripts/hellocodenameone"
-
-# --- Normalize Codename One versions in generated iOS project POMs ---
-ROOT_POM="$APP_DIR/pom.xml"
-NS="mvn=http://maven.apache.org/POM/4.0.0"
-
-# Ensure xmlstarlet is available (macOS runners use Homebrew)
-if ! command -v xmlstarlet >/dev/null 2>&1; then
-  if command -v brew >/dev/null 2>&1; then
-    brew install xmlstarlet
-  elif command -v apt-get >/dev/null 2>&1; then
-    sudo apt-get update -y && sudo apt-get install -y xmlstarlet
-  else
-    bia_log "xmlstarlet not found and no installer available"; exit 1
-  fi
-fi
-
-# Helpers
-x() { xmlstarlet ed -L -N "$NS" "$@"; }
-q() { xmlstarlet sel -N "$NS" "$@"; }
-
-# 1) Ensure <properties><codenameone.version>${CN1_VERSION}</codenameone.version>
-if [ "$(q -t -v 'count(/mvn:project/mvn:properties)' "$ROOT_POM" 2>/dev/null || echo 0)" = "0" ]; then
-  x -s "/mvn:project" -t elem -n properties -v "" "$ROOT_POM"
-fi
-if [ "$(q -t -v 'count(/mvn:project/mvn:properties/mvn:codenameone.version)' "$ROOT_POM" 2>/dev/null || echo 0)" = "0" ]; then
-  x -s "/mvn:project/mvn:properties" -t elem -n codenameone.version -v "$CN1_VERSION" "$ROOT_POM"
-else
-  x -u "/mvn:project/mvn:properties/mvn:codenameone.version" -v "$CN1_VERSION" "$ROOT_POM"
-fi
-
-# 2) Force the com.codenameone parent to a literal version (no property)
-while IFS= read -r -d '' P; do
-  x -u "/mvn:project[mvn:parent/mvn:groupId='com.codenameone' and mvn:parent/mvn:artifactId='codenameone-maven-parent']/mvn:parent/mvn:version" -v "$CN1_VERSION" "$P" || true
-done < <(find "$APP_DIR" -type f -name pom.xml -print0)
-
-EXTRA_MVN_ARGS+=("-Dcodenameone.version=${CN1_VERSION}")
-
-# Ensure trailing newline
-tail -c1 "$SETTINGS_FILE" | read -r _ || echo >> "$SETTINGS_FILE"
-
-# --- Build iOS project (ios-source) ---
-DERIVED_DATA_DIR="${TMPDIR}/codenameone-ios-derived"
-rm -rf "$DERIVED_DATA_DIR"; mkdir -p "$DERIVED_DATA_DIR"
 
 xcodebuild -version
 
 bia_log "Building iOS Xcode project using Codename One port"
-"${MAVEN_CMD[@]}" -q -f "$APP_DIR/pom.xml" package \
+"$MAVEN_HOME/bin/mvn" -f "$APP_DIR/pom.xml" package \
   -DskipTests \
   -Dcodename1.platform=ios \
   -Dcodename1.buildTarget=ios-source \
   -Dopen=false \
-  -Dcodenameone.version="$CN1_VERSION" \
-  "${EXTRA_MVN_ARGS[@]}"
+  -U -e
 
 IOS_TARGET_DIR="$APP_DIR/ios/target"
 if [ ! -d "$IOS_TARGET_DIR" ]; then
