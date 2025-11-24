@@ -32,9 +32,9 @@ class AccordionSamplePortTest extends UITestBase {
         prepareForInteraction(form);
 
         Accordion accordion = harness.getAccordion();
-        Component openCloseArrow = findComponentWithUIID(accordion.getComponentAt(0), accordion.getOpenCloseIconUIID());
-        assertNotNull(openCloseArrow);
+        Component openCloseArrow = harness.getFirstHeaderLeadComponent();
         ensureSized(openCloseArrow, form);
+        assertNotNull(openCloseArrow);
         tap(openCloseArrow);
         assertNotNull(accordion.getCurrentlyExpanded());
 
@@ -56,7 +56,7 @@ class AccordionSamplePortTest extends UITestBase {
         Style landscapeStyle = UIManager.getInstance().getComponentStyle(landscapeUiid);
         assertEquals(harness.getLastPadding(), landscapeStyle.getPadding(RIGHT));
 
-        Component openCloseIcon = findComponentWithUIID(harness.getFirstHeaderContainer(), landscapeUiid);
+        Component openCloseIcon = harness.getFirstHeaderLeadComponent();
         assertNotNull(openCloseIcon);
         assertEquals(landscapeUiid, openCloseIcon.getUIID());
     }
@@ -95,12 +95,12 @@ class AccordionSamplePortTest extends UITestBase {
     private void tap(Component component) {
         int x = component.getAbsoluteX() + component.getWidth() / 2;
         int y = component.getAbsoluteY() + component.getHeight() / 2;
-        TestCodenameOneImplementation.getInstance().dispatchPointerPressAndRelease(x, y);
+        implementation.dispatchPointerPressAndRelease(x, y);
         flushSerialCalls();
     }
 
     private void ensureSized(Component component, Form form) {
-        for (int i = 0; i < 3 && (component.getWidth() <= 0 || component.getHeight() <= 0); i++) {
+        for (int i = 0; i < 5 && (component.getWidth() <= 0 || component.getHeight() <= 0); i++) {
             form.revalidate();
             flushSerialCalls();
         }
@@ -109,23 +109,6 @@ class AccordionSamplePortTest extends UITestBase {
     private void prepareForInteraction(Form form) {
         form.revalidate();
         flushSerialCalls();
-    }
-
-    private Component findComponentWithUIID(Component component, String uiid) {
-        if (uiid.equals(component.getUIID())) {
-            return component;
-        }
-        if (component instanceof Container) {
-            Container container = (Container) component;
-            for (int i = 0; i < container.getComponentCount(); i++) {
-                Component child = container.getComponentAt(i);
-                Component nested = findComponentWithUIID(child, uiid);
-                if (nested != null) {
-                    return nested;
-                }
-            }
-        }
-        return null;
     }
 
     private static class AccordionSampleHarness {
