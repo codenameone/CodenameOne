@@ -7,7 +7,6 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.Slider;
-import com.codename1.ui.SpanLabel;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.MessageEvent;
 import com.codename1.ui.layouts.BorderLayout;
@@ -75,7 +74,7 @@ class AsyncMediaSampleTest extends UITestBase {
     private static class AsyncMediaSampleHarness {
         private final Slider slider = new Slider();
         private final Label status = new Label();
-        private final SpanLabel instructions = new SpanLabel();
+        private final Label instructions = new Label();
         private final Button pause = new Button("Pause");
         private final Button play = new Button("Play");
         private final boolean promptResponse;
@@ -185,7 +184,7 @@ class AsyncMediaSampleTest extends UITestBase {
             return status;
         }
 
-        SpanLabel getInstructions() {
+        Label getInstructions() {
             return instructions;
         }
 
