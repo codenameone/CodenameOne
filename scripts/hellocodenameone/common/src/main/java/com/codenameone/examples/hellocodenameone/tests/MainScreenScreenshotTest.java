@@ -30,6 +30,6 @@ public class MainScreenScreenshotTest extends BaseTest {
         form.add(BorderLayout.CENTER, content);
         form.show();
 
-        return waitForDone();
+        return true;
     }
 }

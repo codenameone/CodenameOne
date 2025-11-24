@@ -14,6 +14,6 @@ abstract class AbstractGraphicsScreenshotTest extends BaseTest {
         Form form = createForm("Graphics", new BorderLayout(), screenshotName());
         form.add(BorderLayout.CENTER, createContent());
         form.show();
-        return waitForDone();
+        return true;
     }
 }

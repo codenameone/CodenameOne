@@ -45,8 +45,7 @@ public class MediaPlaybackScreenshotTest extends BaseTest {
 
         form.show();
 
-        Cn1ssDeviceRunnerHelper.waitForMillis(800);
-        return waitForDone();
+        return true;
     }
 
     private static void updateStatus(Label label, Form form, String message) {
@@ -67,26 +66,17 @@ public class MediaPlaybackScreenshotTest extends BaseTest {
 
     private static String writeToneWav() {
         byte[] wav = buildToneWav();
-        if (wav == null || wav.length == 0) {
+        if (wav.length == 0) {
             return null;
         }
         String path = FileSystemStorage.getInstance().getAppHomePath() + "media-playback-test.wav";
         FileSystemStorage.getInstance().delete(path);
-        OutputStream out = null;
-        try {
-            out = FileSystemStorage.getInstance().openOutputStream(path);
+        try (OutputStream out = FileSystemStorage.getInstance().openOutputStream(path)) {
             out.write(wav);
             return path;
         } catch (IOException ex) {
             TestUtils.log("Unable to write tone wav: " + ex.getMessage());
             return null;
-        } finally {
-            if (out != null) {
-                try {
-                    out.close();
-                } catch (IOException ignored) {
-                }
-            }
         }
     }
 

@@ -31,7 +31,7 @@ public class HelloCodenameOne {
         Form c = CN.getCurrentForm();
         if (!deviceRunnerExecuted || c == null) {
             deviceRunnerExecuted = true;
-            CN.callSerially(() -> new Cn1ssDeviceRunner().runSuite());
+            new Thread(() -> new Cn1ssDeviceRunner().runSuite()).start();
             return;
         }
         c.show();

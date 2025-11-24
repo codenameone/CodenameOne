@@ -29,18 +29,12 @@ final class Cn1ssDeviceRunnerHelper {
         }
     }
 
-    static void waitForMillis(long millis) {
-        int duration = (int) Math.max(1, Math.min(Integer.MAX_VALUE, millis));
-        Util.sleep(duration);
-    }
-
-    static boolean emitCurrentFormScreenshot(String testName) {
+    static void emitCurrentFormScreenshot(String testName) {
         String safeName = sanitizeTestName(testName);
         Form current = Display.getInstance().getCurrent();
         if (current == null) {
             println("CN1SS:ERR:test=" + safeName + " message=Current form is null");
             println("CN1SS:END:" + safeName);
-            return false;
         }
         int width = Math.max(1, current.getWidth());
         int height = Math.max(1, current.getHeight());
@@ -59,7 +53,6 @@ final class Cn1ssDeviceRunnerHelper {
         if (img[0] == null) {
             println("CN1SS:ERR:test=" + safeName + " message=Screenshot process timed out");
             println("CN1SS:END:" + safeName);
-            return false;
         }
         Image screenshot = img[0];
         try {
@@ -67,7 +60,6 @@ final class Cn1ssDeviceRunnerHelper {
             if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
                 println("CN1SS:ERR:test=" + safeName + " message=PNG encoding unavailable");
                 println("CN1SS:END:" + safeName);
-                return false;
             }
             ByteArrayOutputStream pngOut = new ByteArrayOutputStream(Math.max(1024, width * height / 2));
             io.save(screenshot, pngOut, ImageIO.FORMAT_PNG, 1f);
@@ -81,12 +73,10 @@ final class Cn1ssDeviceRunnerHelper {
             } else {
                 println("CN1SS:INFO:test=" + safeName + " preview_jpeg_bytes=0 preview_quality=0");
             }
-            return true;
         } catch (IOException ex) {
             println("CN1SS:ERR:test=" + safeName + " message=" + ex);
             Log.e(ex);
             println("CN1SS:END:" + safeName);
-            return false;
         } finally {
             screenshot.dispose();
         }

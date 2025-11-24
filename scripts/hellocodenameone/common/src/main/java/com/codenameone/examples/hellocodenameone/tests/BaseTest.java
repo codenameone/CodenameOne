@@ -26,17 +26,11 @@ public abstract class BaseTest extends AbstractTest {
         UITimer.timer(1500, false, parent, run);
     }
 
-    protected boolean waitForDone() {
-        int timeout = 100;
-        while(!done) {
-            TestUtils.waitFor(20);
-            timeout--;
-            if(timeout == 0) {
-                return false;
-            }
-        }
-        // give the test a few additional milliseconds for the screenshot emission
-        TestUtils.waitFor(100);
-        return true;
+    protected void done() {
+        this.done = true;
+    }
+
+    public boolean isDone() {
+        return done;
     }
 }
