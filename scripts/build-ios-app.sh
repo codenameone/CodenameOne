@@ -61,12 +61,14 @@ APP_DIR="scripts/hellocodenameone"
 xcodebuild -version
 
 bia_log "Building iOS Xcode project using Codename One port"
-"$MAVEN_HOME/bin/mvn" -f "$APP_DIR/pom.xml" package \
+cd $APP_DIR
+./mvnw package \
   -DskipTests \
   -Dcodename1.platform=ios \
   -Dcodename1.buildTarget=ios-source \
   -Dopen=false \
   -U -e
+cd ../..
 
 IOS_TARGET_DIR="$APP_DIR/ios/target"
 if [ ! -d "$IOS_TARGET_DIR" ]; then
