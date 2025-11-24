@@ -90,6 +90,7 @@ class AccordionSamplePortTest extends UITestBase {
         int x = component.getAbsoluteX() + component.getWidth() / 2;
         int y = component.getAbsoluteY() + component.getHeight() / 2;
         TestCodenameOneImplementation.getInstance().dispatchPointerPressAndRelease(x, y);
+        flushSerialCalls();
     }
 
     private void prepareForInteraction(Form form) {
