@@ -30,6 +30,7 @@ import com.codename1.ui.TextField;
 import com.codename1.ui.TextSelection;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.MessageEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.util.ImageIO;
 import com.codename1.ui.geom.Rectangle;
@@ -2185,6 +2186,22 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public Message getLastSentMessage() {
         return lastSentMessage;
+    }
+
+    /**
+     * Dispatches a {@link MessageEvent} through the current display.  This mirrors how
+     * native ports forward messages into the Codename One runtime so that tests can
+     * exercise message listeners without bypassing the platform entry point.
+     *
+     * @param source  event source
+     * @param message message payload
+     * @param code    event code
+     * @return the dispatched event
+     */
+    public MessageEvent fireMessageEvent(Object source, String message, int code) {
+        MessageEvent evt = new MessageEvent(source, message, code);
+        Display.getInstance().dispatchMessage(evt);
+        return evt;
     }
 
     @Override
