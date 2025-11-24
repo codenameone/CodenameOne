@@ -118,7 +118,6 @@ GRADLE_CMD=("$GRADLEW" --no-daemon connectedDebugAndroidTest)
 
 ra_log "Executing connectedDebugAndroidTest via Gradle"
 if ! (
-  cd "$GRADLE_PROJECT_DIR"
   JAVA_HOME="$JAVA17_HOME" "${GRADLE_CMD[@]}"
 ); then
   ra_log "FATAL: connectedDebugAndroidTest failed"
