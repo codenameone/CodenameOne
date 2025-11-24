@@ -113,7 +113,6 @@ LOGCAT_PID=$!
 sleep 2
 
 GRADLEW="./gradlew"
-[ -x "$GRADLEW" ] || chmod +x "$GRADLEW"
 GRADLE_CMD=("$GRADLEW" --no-daemon connectedDebugAndroidTest)
 
 ra_log "Executing connectedDebugAndroidTest via Gradle"
