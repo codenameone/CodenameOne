@@ -1115,6 +1115,15 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         display.pointerReleased(xs, ys);
     }
 
+    public void tapComponent(Component component) {
+        if (component == null) {
+            return;
+        }
+        int x = component.getAbsoluteX() + component.getWidth() / 2;
+        int y = component.getAbsoluteY() + component.getHeight() / 2;
+        dispatchPointerPressAndRelease(x, y);
+    }
+
     private boolean beginAllowingEditDuringKey(int keyCode) {
         Component editing = getEditingText();
         if (!(editing instanceof TextArea)) {
