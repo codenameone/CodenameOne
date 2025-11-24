@@ -7,6 +7,7 @@ import com.codename1.ui.CN;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.Display;
@@ -36,6 +37,7 @@ class AccordionSamplePortTest extends UITestBase {
         ensureSized(openCloseArrow, form);
         assertNotNull(openCloseArrow);
         tap(openCloseArrow);
+        DisplayTest.flushEdt();
         assertNotNull(accordion.getCurrentlyExpanded());
 
         String portraitUiid = accordion.getOpenCloseIconUIID();
@@ -64,6 +66,7 @@ class AccordionSamplePortTest extends UITestBase {
     @FormTest
     void rtlToggleRebuildsFormWithTranslations() {
         implementation.setDisplaySize(1080, 1920);
+        UIManager.getInstance().getLookAndFeel().setRTL(true);
         AccordionSampleHarness harness = new AccordionSampleHarness(false);
         Form form = harness.createForm();
         form.show();
