@@ -102,7 +102,7 @@ ba_log "Normalizing Android Gradle project in $GRADLE_PROJECT_DIR"
 # --- Install Android instrumentation harness for coverage ---
 ANDROID_TEST_SOURCE_DIR="$SCRIPT_DIR/device-runner-app/androidTest"
 ANDROID_TEST_ROOT="$GRADLE_PROJECT_DIR/app/src/androidTest"
-ANDROID_TEST_JAVA_DIR="$ANDROID_TEST_ROOT/java/${PACKAGE_PATH}"
+ANDROID_TEST_JAVA_DIR="$ANDROID_TEST_ROOT/java/com/codenameone/examples/hellocodenameone"
 if [ -d "$ANDROID_TEST_ROOT" ]; then
   ba_log "Removing template Android instrumentation tests from $ANDROID_TEST_ROOT"
   rm -rf "$ANDROID_TEST_ROOT"
