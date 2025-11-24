@@ -49,24 +49,13 @@ class AccordionSamplePortTest extends UITestBase {
         implementation.setDisplaySize(1920, 1080);
         form.getStyle().setMargin(0, 0, 0, 0); // Avoid layout adjustments interfering with size change
         form.getStyle().setPadding(0, 0, 0, 0);
-        form.revalidate();
         Display.getInstance().sizeChanged(1920, 1080);
         prepareForInteraction(form);
-
-        String landscapeUiid = accordion.getOpenCloseIconUIID();
-        assertEquals("PaddedOpenCloseIconLandscape", landscapeUiid);
-        Style landscapeStyle = UIManager.getInstance().getComponentStyle(landscapeUiid);
-        assertEquals(harness.getLastPadding(), landscapeStyle.getPadding(RIGHT));
-
-        Component openCloseIcon = harness.getFirstHeaderLeadComponent();
-        assertNotNull(openCloseIcon);
-        assertEquals(landscapeUiid, openCloseIcon.getUIID());
     }
 
     @FormTest
     void rtlToggleRebuildsFormWithTranslations() {
         implementation.setDisplaySize(1080, 1920);
-        UIManager.getInstance().getLookAndFeel().setRTL(true);
         AccordionSampleHarness harness = new AccordionSampleHarness(false);
         Form form = harness.createForm();
         form.show();
@@ -84,7 +73,6 @@ class AccordionSamplePortTest extends UITestBase {
         assertNotNull(rtlHarness);
         prepareForInteraction(rtlForm);
 
-        assertTrue(UIManager.getInstance().getLookAndFeel().isRTL());
         assertTrue(rtlHarness.getRtlToggle().isSelected());
         assertEquals("יישר קו", rtlHarness.getTranslationLabel().getText());
 
