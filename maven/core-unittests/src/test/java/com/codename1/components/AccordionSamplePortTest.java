@@ -31,8 +31,10 @@ class AccordionSamplePortTest extends UITestBase {
         prepareForInteraction(form);
 
         Accordion accordion = harness.getAccordion();
-        Component headerLead = harness.getFirstHeaderLeadComponent();
-        tap(headerLead);
+        Component openCloseArrow = findComponentWithUIID(harness.getFirstHeaderContainer(), accordion.getOpenCloseIconUIID());
+        assertNotNull(openCloseArrow);
+        ensureSized(openCloseArrow, form);
+        tap(openCloseArrow);
         assertNotNull(accordion.getCurrentlyExpanded());
 
         String portraitUiid = accordion.getOpenCloseIconUIID();
@@ -69,6 +71,7 @@ class AccordionSamplePortTest extends UITestBase {
         assertFalse(UIManager.getInstance().getLookAndFeel().isRTL());
         assertEquals("Align", harness.getTranslationLabel().getText());
 
+        ensureSized(harness.getRtlToggle(), form);
         tap(harness.getRtlToggle());
         flushSerialCalls();
 
@@ -91,6 +94,13 @@ class AccordionSamplePortTest extends UITestBase {
         int y = component.getAbsoluteY() + component.getHeight() / 2;
         TestCodenameOneImplementation.getInstance().dispatchPointerPressAndRelease(x, y);
         flushSerialCalls();
+    }
+
+    private void ensureSized(Component component, Form form) {
+        for (int i = 0; i < 3 && (component.getWidth() <= 0 || component.getHeight() <= 0); i++) {
+            form.revalidate();
+            flushSerialCalls();
+        }
     }
 
     private void prepareForInteraction(Form form) {
@@ -188,10 +198,13 @@ class AccordionSamplePortTest extends UITestBase {
         }
 
         private void setupOpenCloseArrowStyles(Accordion acc) {
-            Style openCloseIconStyle = UIManager.getInstance().getComponentStyle(acc.getOpenCloseIconUIID());
+            String customUIID = "PaddedOpenCloseIcon" + (CN.isPortrait() ? "Portrait" : "Landscape");
+            String oldCustomUIID = "PaddedOpenCloseIcon" + (CN.isPortrait() ? "Landscape" : "Portrait");
+
+            Style openCloseIconStyle = UIManager.getInstance().getComponentStyle(customUIID);
             if (openCloseIconStyle == null) {
                 openCloseIconStyle = new Style();
-                UIManager.getInstance().setComponentStyle(acc.getOpenCloseIconUIID(), openCloseIconStyle);
+                UIManager.getInstance().setComponentStyle(customUIID, openCloseIconStyle);
             }
             openCloseIconStyle.setMarginUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
 
@@ -209,9 +222,6 @@ class AccordionSamplePortTest extends UITestBase {
             lastPadding = padding;
             openCloseIconStyle.setPadding(RIGHT, padding);
             openCloseIconStyle.setFgColor(0x0);
-
-            String customUIID = "PaddedOpenCloseIcon" + (CN.isPortrait() ? "Portrait" : "Landscape");
-            String oldCustomUIID = "PaddedOpenCloseIcon" + (CN.isPortrait() ? "Landscape" : "Portrait");
 
             UIManager.getInstance().setComponentStyle(customUIID, openCloseIconStyle);
             acc.setOpenCloseIconUIID(customUIID);
