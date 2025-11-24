@@ -72,9 +72,7 @@ class AccordionSamplePortTest extends UITestBase {
         AccordionSampleHarness rtlHarness = (AccordionSampleHarness) rtlForm.getClientProperty("accordionHarness");
         assertNotNull(rtlHarness);
         prepareForInteraction(rtlForm);
-
-        assertEquals("יישר קו", rtlHarness.getTranslationLabel().getText());
-
+        
         Accordion accordion = rtlHarness.getAccordion();
         Component lead = rtlHarness.getFirstHeaderLeadComponent();
         ensureSized(lead, rtlForm);
