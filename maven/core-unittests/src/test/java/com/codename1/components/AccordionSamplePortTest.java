@@ -10,6 +10,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
@@ -31,7 +32,7 @@ class AccordionSamplePortTest extends UITestBase {
         prepareForInteraction(form);
 
         Accordion accordion = harness.getAccordion();
-        Component openCloseArrow = findComponentWithUIID(harness.getFirstHeaderContainer(), accordion.getOpenCloseIconUIID());
+        Component openCloseArrow = findComponentWithUIID(accordion.getComponentAt(0), accordion.getOpenCloseIconUIID());
         assertNotNull(openCloseArrow);
         ensureSized(openCloseArrow, form);
         tap(openCloseArrow);
@@ -78,14 +79,16 @@ class AccordionSamplePortTest extends UITestBase {
         Form rtlForm = CN.getCurrentForm();
         AccordionSampleHarness rtlHarness = (AccordionSampleHarness) rtlForm.getClientProperty("accordionHarness");
         assertNotNull(rtlHarness);
+        prepareForInteraction(rtlForm);
 
         assertTrue(UIManager.getInstance().getLookAndFeel().isRTL());
         assertTrue(rtlHarness.getRtlToggle().isSelected());
         assertEquals("יישר קו", rtlHarness.getTranslationLabel().getText());
 
         Accordion accordion = rtlHarness.getAccordion();
-        Container headerContainer = rtlHarness.getFirstHeaderContainer();
-        tap(headerContainer);
+        Component lead = rtlHarness.getFirstHeaderLeadComponent();
+        ensureSized(lead, rtlForm);
+        tap(lead);
         assertNotNull(accordion.getCurrentlyExpanded());
     }
 
@@ -108,14 +111,15 @@ class AccordionSamplePortTest extends UITestBase {
         flushSerialCalls();
     }
 
-    private Component findComponentWithUIID(Container container, String uiid) {
-        for (int i = 0; i < container.getComponentCount(); i++) {
-            Component child = container.getComponentAt(i);
-            if (uiid.equals(child.getUIID())) {
-                return child;
-            }
-            if (child instanceof Container) {
-                Component nested = findComponentWithUIID((Container) child, uiid);
+    private Component findComponentWithUIID(Component component, String uiid) {
+        if (uiid.equals(component.getUIID())) {
+            return component;
+        }
+        if (component instanceof Container) {
+            Container container = (Container) component;
+            for (int i = 0; i < container.getComponentCount(); i++) {
+                Component child = container.getComponentAt(i);
+                Component nested = findComponentWithUIID(child, uiid);
                 if (nested != null) {
                     return nested;
                 }
@@ -138,7 +142,8 @@ class AccordionSamplePortTest extends UITestBase {
         Form createForm() {
             Form form = new Form("Hi world", BoxLayout.y());
             form.putClientProperty("accordionHarness", this);
-            accordion = new Accordion();
+            String initialUIID = "PaddedOpenCloseIcon" + (CN.isPortrait() ? "Portrait" : "Landscape");
+            accordion = new Accordion(FontImage.MATERIAL_KEYBOARD_ARROW_DOWN, FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT, initialUIID);
             accordion.setScrollableY(false);
 
             setupOpenCloseArrowStyles(accordion);
@@ -227,6 +232,7 @@ class AccordionSamplePortTest extends UITestBase {
             acc.setOpenCloseIconUIID(customUIID);
 
             $(oldCustomUIID, acc).setUIID(customUIID);
+            $("AccordionArrow", acc).setUIID(customUIID);
             if (acc.getComponentForm() != null) {
                 acc.revalidateWithAnimationSafety();
             }
