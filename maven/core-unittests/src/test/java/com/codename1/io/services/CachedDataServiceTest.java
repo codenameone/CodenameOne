@@ -55,7 +55,10 @@ class CachedDataServiceTest extends UITestBase {
         request.readHeaders(connection);
 
         byte[] payload = "fresh".getBytes();
-        request.readResponse(new ByteArrayInputStream(payload));
+        connection.inputData = payload;
+        connection.contentLength = payload.length;
+
+        request.readResponse(connection.openInputStream());
         assertTrue(callbackInvoked[0]);
         assertEquals("Sun, 02 Jan 2000 00:00:00 GMT", data.getModified());
         assertEquals("etag-2", data.getEtag());
