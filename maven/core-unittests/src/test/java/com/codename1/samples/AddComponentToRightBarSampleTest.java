@@ -6,6 +6,7 @@ import com.codename1.ui.Button;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
+import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.Toolbar;
@@ -31,12 +32,16 @@ class AddComponentToRightBarSampleTest extends UITestBase {
             form.show();
             form.revalidate();
             flushSerialCalls();
+            DisplayTest.flushEdt();
+            flushSerialCalls();
 
             Component commandComponent = toolbar.findCommandComponent(command);
             assertNotNull(commandComponent);
             ensureSized(commandComponent, form);
 
             implementation.tapComponent(commandComponent);
+            flushSerialCalls();
+            DisplayTest.flushEdt();
             flushSerialCalls();
 
             assertEquals(1, invocations[0]);
@@ -60,6 +65,8 @@ class AddComponentToRightBarSampleTest extends UITestBase {
             form.show();
             form.revalidate();
             flushSerialCalls();
+            DisplayTest.flushEdt();
+            flushSerialCalls();
 
             Component commandComponent = toolbar.findCommandComponent(command);
             assertNotNull(commandComponent);
@@ -80,6 +87,8 @@ class AddComponentToRightBarSampleTest extends UITestBase {
 
             ensureSized(replacement, form);
             implementation.tapComponent(replacement);
+            flushSerialCalls();
+            DisplayTest.flushEdt();
             flushSerialCalls();
 
             assertTrue(replacementInvoked[0]);
