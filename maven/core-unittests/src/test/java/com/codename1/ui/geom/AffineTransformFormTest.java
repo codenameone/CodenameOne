@@ -20,19 +20,24 @@ class AffineTransformFormTest extends UITestBase {
 
         Transform rotation = Transform.makeRotation((float) angle, (float) centerX, (float) centerY);
 
-        assertTrue(implementation.transformNativeEqualsImpl(
-                fromAffine.getNativeTransform(),
-                rotation.getNativeTransform()),
-                "AffineTransform rotation should match Transform.makeRotation");
+        float[][] points = new float[][]{
+                new float[]{100f, 140f},
+                new float[]{(float) centerX, (float) centerY},
+                new float[]{0f, 0f},
+                new float[]{(float) (centerX + 50), (float) (centerY - 30)}
+        };
 
-        float[] point = new float[]{100f, 140f};
-        float[] affineResult = new float[3];
-        float[] rotationResult = new float[3];
-        fromAffine.transformPoint(point, affineResult);
-        rotation.transformPoint(point, rotationResult);
+        for (float[] point : points) {
+            float[] affineResult = new float[3];
+            float[] rotationResult = new float[3];
+            fromAffine.transformPoint(point, affineResult);
+            rotation.transformPoint(point, rotationResult);
 
-        assertEquals(rotationResult[0], affineResult[0], 0.0001f);
-        assertEquals(rotationResult[1], affineResult[1], 0.0001f);
+            assertEquals(rotationResult[0], affineResult[0], 0.0001f,
+                    "X should match for point " + point[0] + "," + point[1]);
+            assertEquals(rotationResult[1], affineResult[1], 0.0001f,
+                    "Y should match for point " + point[0] + "," + point[1]);
+        }
     }
 
     @FormTest
