@@ -1,5 +1,6 @@
 package com.codename1.ui;
 
+import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListModel;
@@ -23,7 +24,7 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         suggestionModel = new DefaultListModel<String>(new String[]{"alpha", "beta", "gamma"});
     }
 
-    @Test
+    @FormTest
     void constructorAppliesCustomFilterAndProvidesEditorAccess() throws Exception {
         final List<String> filtered = new ArrayList<String>();
         AutoCompleteTextComponent.AutoCompleteFilter filter = new AutoCompleteTextComponent.AutoCompleteFilter() {
@@ -44,7 +45,7 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         assertSame(field, component.getEditor(), "getEditor should return the AutoCompleteTextField instance");
     }
 
-    @Test
+    @FormTest
     void focusAnimationFollowsThemeAndManualOverrides() {
         Hashtable theme = new Hashtable();
         theme.put("@textComponentAnimBool", "true");
@@ -60,7 +61,7 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         assertTrue(component.isFocusAnimation(), "Explicit true should override theme");
     }
 
-    @Test
+    @FormTest
     void fluentSettersUpdateUnderlyingField() {
         AutoCompleteTextComponent component = new AutoCompleteTextComponent(suggestionModel, AcceptAllFilter.INSTANCE);
         Image hintIcon = Image.createImage(2, 2);
@@ -84,7 +85,7 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         assertSame(hintIcon, field.getHintIcon());
     }
 
-    @Test
+    @FormTest
     void propertyMetadataAndValuesReflectFieldState() {
         AutoCompleteTextComponent component = new AutoCompleteTextComponent(suggestionModel, AcceptAllFilter.INSTANCE);
         component

@@ -112,13 +112,12 @@ ra_log "Capturing device logcat to $TEST_LOG"
 LOGCAT_PID=$!
 sleep 2
 
-GRADLEW="$GRADLE_PROJECT_DIR/gradlew"
-[ -x "$GRADLEW" ] || chmod +x "$GRADLEW"
+GRADLEW="./gradlew"
 GRADLE_CMD=("$GRADLEW" --no-daemon connectedDebugAndroidTest)
 
 ra_log "Executing connectedDebugAndroidTest via Gradle"
 if ! (
-  cd "$GRADLE_PROJECT_DIR"
+  cd "scripts/hellocodenameone/android/target/hellocodenameone-android-1.0-SNAPSHOT-android-source"
   JAVA_HOME="$JAVA17_HOME" "${GRADLE_CMD[@]}"
 ); then
   ra_log "FATAL: connectedDebugAndroidTest failed"
