@@ -19,61 +19,73 @@ class AddComponentToRightBarSampleTest extends UITestBase {
     void rightBarCommandCanBeTriggeredThroughToolbarComponent() {
         implementation.setDisplaySize(1080, 1920);
 
+        boolean originalGlobalToolbar = Toolbar.isGlobalToolbar();
+        Toolbar.setGlobalToolbar(true);
         Form form = new Form("Hi World", BoxLayout.y());
         Toolbar toolbar = form.getToolbar();
-        final int[] invocations = {0};
-        Command command = toolbar.addCommandToRightBar("Test", null, evt -> invocations[0]++);
+        try {
+            final int[] invocations = {0};
+            Command command = toolbar.addCommandToRightBar("Test", null, evt -> invocations[0]++);
 
-        form.add(new Label("Hi World"));
-        form.show();
-        form.revalidate();
-        flushSerialCalls();
+            form.add(new Label("Hi World"));
+            form.show();
+            form.revalidate();
+            flushSerialCalls();
 
-        Component commandComponent = toolbar.findCommandComponent(command);
-        assertNotNull(commandComponent);
-        ensureSized(commandComponent, form);
+            Component commandComponent = toolbar.findCommandComponent(command);
+            assertNotNull(commandComponent);
+            ensureSized(commandComponent, form);
 
-        implementation.tapComponent(commandComponent);
-        flushSerialCalls();
+            implementation.tapComponent(commandComponent);
+            flushSerialCalls();
 
-        assertEquals(1, invocations[0]);
+            assertEquals(1, invocations[0]);
+        } finally {
+            Toolbar.setGlobalToolbar(originalGlobalToolbar);
+        }
     }
 
     @FormTest
     void commandComponentCanBeReplacedWithCustomButton() {
         implementation.setDisplaySize(1080, 1920);
 
+        boolean originalGlobalToolbar = Toolbar.isGlobalToolbar();
+        Toolbar.setGlobalToolbar(true);
         Form form = new Form("Hi World", BoxLayout.y());
         Toolbar toolbar = form.getToolbar();
-        Command command = toolbar.addCommandToRightBar("Test", null, evt -> { });
+        try {
+            Command command = toolbar.addCommandToRightBar("Test", null, evt -> { });
 
-        form.add(new Label("Hi World"));
-        form.show();
-        form.revalidate();
-        flushSerialCalls();
+            form.add(new Label("Hi World"));
+            form.show();
+            form.revalidate();
+            flushSerialCalls();
 
-        Component commandComponent = toolbar.findCommandComponent(command);
-        assertNotNull(commandComponent);
-        ensureSized(commandComponent, form);
+            Component commandComponent = toolbar.findCommandComponent(command);
+            assertNotNull(commandComponent);
+            ensureSized(commandComponent, form);
 
-        Button replacement = new Button("Replaced cmp");
-        final boolean[] replacementInvoked = {false};
-        replacement.addActionListener(evt -> replacementInvoked[0] = true);
+            Button replacement = new Button("Replaced cmp");
+            final boolean[] replacementInvoked = {false};
+            replacement.addActionListener(evt -> replacementInvoked[0] = true);
 
-        Container rightBarContainer = commandComponent.getParent();
-        assertNotNull(rightBarContainer);
-        rightBarContainer.replace(commandComponent, replacement, null);
-        form.revalidate();
-        flushSerialCalls();
+            Container rightBarContainer = commandComponent.getParent();
+            assertNotNull(rightBarContainer);
+            rightBarContainer.replace(commandComponent, replacement, null);
+            form.revalidate();
+            flushSerialCalls();
 
-        assertSame(rightBarContainer, replacement.getParent());
-        assertFalse(rightBarContainer.contains(commandComponent));
+            assertSame(rightBarContainer, replacement.getParent());
+            assertFalse(rightBarContainer.contains(commandComponent));
 
-        ensureSized(replacement, form);
-        implementation.tapComponent(replacement);
-        flushSerialCalls();
+            ensureSized(replacement, form);
+            implementation.tapComponent(replacement);
+            flushSerialCalls();
 
-        assertTrue(replacementInvoked[0]);
+            assertTrue(replacementInvoked[0]);
+        } finally {
+            Toolbar.setGlobalToolbar(originalGlobalToolbar);
+        }
     }
 
     private void ensureSized(Component component, Form form) {
