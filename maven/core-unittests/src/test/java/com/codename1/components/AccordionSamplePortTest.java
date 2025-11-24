@@ -168,6 +168,12 @@ class AccordionSamplePortTest extends UITestBase {
         }
 
         Component getFirstHeaderLeadComponent() {
+            String uiid = accordion.getOpenCloseIconUIID();
+            Component found = findByUIID(accordion, uiid);
+            if (found != null) {
+                return found;
+            }
+
             Container header = getFirstHeaderContainer();
             Component lead = header.getLeadComponent();
             return lead != null ? lead : header;
@@ -244,6 +250,22 @@ class AccordionSamplePortTest extends UITestBase {
                 return "בתחתית";
             }
             return value;
+        }
+
+        private Component findByUIID(Container root, String uiid) {
+            for (int i = 0; i < root.getComponentCount(); i++) {
+                Component child = root.getComponentAt(i);
+                if (uiid.equals(child.getUIID())) {
+                    return child;
+                }
+                if (child instanceof Container) {
+                    Component nested = findByUIID((Container) child, uiid);
+                    if (nested != null) {
+                        return nested;
+                    }
+                }
+            }
+            return null;
         }
     }
 }
