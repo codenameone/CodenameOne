@@ -65,7 +65,7 @@ class AudioBufferSampleTest extends UITestBase {
             assertTrue(lastSize[0] > 0);
             assertSame(options, implementation.getLastMediaRecorderBuilder());
             assertTrue(fs.exists(copyPath));
-            assertTrue(fs.getFileLength(copyPath) > 44);
+            assertTrue(fs.getLength(copyPath) > 44);
         } finally {
             MediaManager.releaseAudioBuffer(bufferPath);
             try {
