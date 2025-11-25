@@ -63,6 +63,7 @@ public class AudioRecorderComponentSample {
 
     AsyncResource<String> recordAudio() {
         AsyncResource<String> out = new AsyncResource<String>();
+        final boolean[] completed = new boolean[1];
         String mime = MediaManager.getAvailableRecordingMimeTypes()[0];
         String ext = mime.indexOf("mp3") != -1 ? "mp3" : mime.indexOf("wav") != -1 ? "wav" : mime.indexOf("aiff") != -1 ? "aiff" : "aac";
         MediaRecorderBuilder builder = new MediaRecorderBuilder()
@@ -79,17 +80,22 @@ public class AudioRecorderComponentSample {
             public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
                 switch (cmp.getState()) {
                     case Accepted:
+                        final ActionListener acceptListener = new ActionListener() {
+                            @Override
+                            public void actionPerformed(ActionEvent evt) {
+                                sheet.removeCloseListener(this);
+                                if (completed[0]) {
+                                    return;
+                                }
+                                completed[0] = true;
+                                out.complete(builder.getPath());
+                            }
+
+                        };
+                        sheet.addCloseListener(acceptListener);
                         CN.getCurrentForm().getAnimationManager().flushAnimation(new Runnable() {
                             public void run() {
                                 sheet.back();
-                                sheet.addCloseListener(new ActionListener() {
-                                    @Override
-                                    public void actionPerformed(ActionEvent evt) {
-                                        sheet.removeCloseListener(this);
-                                        out.complete(builder.getPath());
-                                    }
-
-                                });
                             }
                         });
 
@@ -101,17 +107,22 @@ public class AudioRecorderComponentSample {
                         if (fs.exists(builder.getPath())) {
                             FileSystemStorage.getInstance().delete(builder.getPath());
                         }
+                        final ActionListener cancelListener = new ActionListener() {
+                            @Override
+                            public void actionPerformed(ActionEvent evt) {
+                                sheet.removeCloseListener(this);
+                                if (completed[0]) {
+                                    return;
+                                }
+                                completed[0] = true;
+                                out.complete(null);
+                            }
+
+                        };
+                        sheet.addCloseListener(cancelListener);
                         CN.getCurrentForm().getAnimationManager().flushAnimation(new Runnable() {
                             public void run() {
                                 sheet.back();
-                                sheet.addCloseListener(new ActionListener() {
-                                    @Override
-                                    public void actionPerformed(ActionEvent evt) {
-                                        sheet.removeCloseListener(this);
-                                        out.complete(null);
-                                    }
-
-                                });
                             }
                         });
 
@@ -129,11 +140,14 @@ public class AudioRecorderComponentSample {
                     if (fs.exists(builder.getPath())) {
                         FileSystemStorage.getInstance().delete(builder.getPath());
                     }
-                    CN.getCurrentForm().getAnimationManager().flushAnimation(new Runnable() {
-                        public void run() {
-                            out.complete(null);
-                        }
-                    });
+                    if (!completed[0]) {
+                        completed[0] = true;
+                        CN.getCurrentForm().getAnimationManager().flushAnimation(new Runnable() {
+                            public void run() {
+                                out.complete(null);
+                            }
+                        });
+                    }
                 }
             }
 

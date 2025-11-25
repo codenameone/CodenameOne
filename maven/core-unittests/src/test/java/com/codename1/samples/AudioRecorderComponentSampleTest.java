@@ -41,7 +41,7 @@ class AudioRecorderComponentSampleTest extends UITestBase {
             }
         });
 
-        flushSerialCalls();
+        flushUi();
         AudioRecorderComponent recorderComponent = findRecorderComponent();
         assertNotNull(recorderComponent);
         assertEquals(AudioRecorderComponent.RecorderState.Paused, recorderComponent.getState());
@@ -49,7 +49,7 @@ class AudioRecorderComponentSampleTest extends UITestBase {
         Button recordButton = findVisibleButton(recorderComponent);
         assertNotNull(recordButton);
         implementation.tapComponent(recordButton);
-        flushSerialCalls();
+        flushUi();
 
         assertTrue(recorder.playInvoked);
         assertEquals(AudioRecorderComponent.RecorderState.Recording, recorderComponent.getState());
@@ -57,7 +57,7 @@ class AudioRecorderComponentSampleTest extends UITestBase {
         Button doneButton = findButtonWithText(Display.getInstance().getCurrent(), "Done");
         assertNotNull(doneButton);
         implementation.tapComponent(doneButton);
-        flushSerialCalls();
+        flushUi();
 
         Button acceptButton = findButtonWithText(Display.getInstance().getCurrent(), "Accept");
         assertNotNull(acceptButton);
@@ -88,7 +88,7 @@ class AudioRecorderComponentSampleTest extends UITestBase {
             }
         });
 
-        flushSerialCalls();
+        flushUi();
         String path = sample.getLastRecordingPath();
         createPlaceholderFile(path);
 
@@ -177,6 +177,11 @@ class AudioRecorderComponentSampleTest extends UITestBase {
         } finally {
             os.close();
         }
+    }
+
+    private void flushUi() {
+        flushSerialCalls();
+        com.codename1.ui.DisplayTest.flushEdt();
     }
 
     private void waitForResult(ResultHolder<?> result) {
