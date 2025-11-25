@@ -1117,7 +1117,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             sb.append(current.substring(cursor));
         }
         area.setText(sb.toString());
-        area.setCursorPosition(cursor + 1);
+        if (area instanceof TextField) {
+            ((TextField) area).setCursorPosition(cursor + 1);
+        }
     }
 
     private char applyAutoCapitalization(TextArea area, char character, String currentText, int cursorPosition) {
