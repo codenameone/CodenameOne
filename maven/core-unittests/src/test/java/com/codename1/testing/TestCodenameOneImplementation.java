@@ -1122,6 +1122,26 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
     }
 
+    private TextArea getActiveEditingArea() {
+        Component editing = getEditingText();
+        if (editing instanceof TextArea) {
+            return (TextArea) editing;
+        }
+        Display display = Display.getInstance();
+        if (display == null) {
+            return null;
+        }
+        Form current = display.getCurrent();
+        if (current == null) {
+            return null;
+        }
+        Component focused = current.getFocused();
+        if (focused instanceof TextArea) {
+            return (TextArea) focused;
+        }
+        return null;
+    }
+
     private char applyAutoCapitalization(TextArea area, char character, String currentText, int cursorPosition) {
         if (!Character.isLetter(character)) {
             return character;
@@ -1164,15 +1184,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         if (display == null) {
             return;
         }
+        final TextArea editing = getActiveEditingArea();
         final boolean reenter = beginAllowingEditDuringKey(keyCode);
-        if (reenter) {
-            Component editing = getEditingText();
-            if (editing instanceof TextArea) {
-                TextArea area = (TextArea) editing;
-                if (shouldInsertCharacter(area.isEditable(), keyCode)) {
-                    insertCharacter(area, (char) keyCode, area.getMaxSize());
-                }
-            }
+        if (reenter && editing != null && shouldInsertCharacter(editing.isEditable(), keyCode)) {
+            insertCharacter(editing, (char) keyCode, editing.getMaxSize());
         }
         display.keyPressed(keyCode);
         display.keyReleased(keyCode);
@@ -1206,16 +1221,15 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     private boolean beginAllowingEditDuringKey(int keyCode) {
-        Component editing = getEditingText();
-        if (!(editing instanceof TextArea)) {
+        TextArea area = getActiveEditingArea();
+        if (area == null) {
             return false;
         }
-        TextArea area = (TextArea) editing;
         if (!shouldInsertCharacter(area.isEditable(), keyCode)) {
             return false;
         }
-        if (editing instanceof TextField) {
-            TextField tf = (TextField) editing;
+        if (area instanceof TextField) {
+            TextField tf = (TextField) area;
             if (!tf.isQwertyInput()) {
                 return false;
             }
