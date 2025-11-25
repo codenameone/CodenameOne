@@ -13,7 +13,9 @@ import com.codename1.io.Util;
 import com.codename1.payment.Purchase;
 import com.codename1.l10n.L10NManager;
 import com.codename1.location.LocationManager;
+import com.codename1.media.AudioBuffer;
 import com.codename1.media.Media;
+import com.codename1.media.MediaManager;
 import com.codename1.media.MediaRecorderBuilder;
 import com.codename1.messaging.Message;
 import com.codename1.notifications.LocalNotification;
@@ -174,6 +176,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private String nextCaptureAudioPath = "file://test-audio.wav";
     private MediaRecorderBuilder lastMediaRecorderBuilder;
     private VideoCaptureConstraints lastVideoConstraints;
+    private final List<AudioCaptureFrame> audioCaptureFrames = new ArrayList<AudioCaptureFrame>();
 
 
     public TestCodenameOneImplementation() {
@@ -3408,6 +3411,15 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             recordingOptions = new MediaRecorderBuilder();
         }
         lastMediaRecorderBuilder = recordingOptions;
+        if (recordingOptions.isRedirectToAudioBuffer()) {
+            AudioBuffer buffer = MediaManager.getAudioBuffer(recordingOptions.getPath());
+            if (buffer != null) {
+                for (AudioCaptureFrame frame : audioCaptureFrames) {
+                    buffer.copyFrom(frame.getSampleRate(), frame.getNumChannels(), frame.getSamples());
+                }
+            }
+            audioCaptureFrames.clear();
+        }
         response.actionPerformed(new ActionEvent(nextCaptureAudioPath));
     }
 
@@ -3438,8 +3450,40 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return lastMediaRecorderBuilder;
     }
 
+    public void addAudioCaptureFrame(int sampleRate, int numChannels, float[] samples) {
+        audioCaptureFrames.add(new AudioCaptureFrame(sampleRate, numChannels, samples));
+    }
+
+    public void clearAudioCaptureFrames() {
+        audioCaptureFrames.clear();
+    }
+
     public VideoCaptureConstraints getLastVideoConstraints() {
         return lastVideoConstraints;
+    }
+
+    private static final class AudioCaptureFrame {
+        private final int sampleRate;
+        private final int numChannels;
+        private final float[] samples;
+
+        private AudioCaptureFrame(int sampleRate, int numChannels, float[] samples) {
+            this.sampleRate = sampleRate;
+            this.numChannels = numChannels;
+            this.samples = Arrays.copyOf(samples, samples.length);
+        }
+
+        private int getSampleRate() {
+            return sampleRate;
+        }
+
+        private int getNumChannels() {
+            return numChannels;
+        }
+
+        private float[] getSamples() {
+            return Arrays.copyOf(samples, samples.length);
+        }
     }
 
     public static final class TestFile {
