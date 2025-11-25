@@ -10,10 +10,11 @@ import com.codename1.ui.Container;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Sheet;
+import com.codename1.io.FileSystemStorage;
 import com.codename1.util.AsyncResource;
 import com.codename1.util.AsyncResult;
-import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -91,15 +92,15 @@ class AudioRecorderComponentSampleTest extends UITestBase {
         String path = sample.getLastRecordingPath();
         createPlaceholderFile(path);
 
-        Form current = Display.getInstance().getCurrent();
-        assertTrue(current instanceof Sheet);
-        ((Sheet) current).back();
+        Sheet sheet = Sheet.getCurrentSheet();
+        assertNotNull(sheet);
+        sheet.back();
         flushSerialCalls();
 
         assertTrue(result.completed.get());
         assertNull(result.error.get());
         assertNull(result.value.get());
-        assertFalse(new java.io.File(path).exists());
+        assertFalse(FileSystemStorage.getInstance().exists(path));
     }
 
     private AudioRecorderComponent findRecorderComponent() {
@@ -170,11 +171,11 @@ class AudioRecorderComponentSampleTest extends UITestBase {
     }
 
     private void createPlaceholderFile(String path) throws IOException {
-        FileWriter writer = new FileWriter(path);
+        OutputStream os = FileSystemStorage.getInstance().openOutputStream(path);
         try {
-            writer.write("recording");
+            os.write("recording".getBytes("UTF-8"));
         } finally {
-            writer.close();
+            os.close();
         }
     }
 
