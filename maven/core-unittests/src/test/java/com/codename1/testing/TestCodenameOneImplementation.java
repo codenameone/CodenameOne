@@ -1053,7 +1053,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         if (cmp instanceof TextField) {
             TextField field = (TextField) cmp;
             if (shouldInsertCharacter(field.isEditable(), initiatingKeycode)) {
-                field.insertChars(String.valueOf((char) initiatingKeycode));
+                insertCharacter(field, (char) initiatingKeycode, maxSize);
                 return;
             }
             field.setText(text);
