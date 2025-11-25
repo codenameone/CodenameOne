@@ -112,20 +112,24 @@ public class AudioRecorderComponentSample {
         sheet.addCloseListener(new com.codename1.ui.events.ActionListener() {
             @Override
             public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
-                if (cmp.getState() != AudioRecorderComponent.RecorderState.Accepted && cmp.getState() != AudioRecorderComponent.RecorderState.Canceled) {
-                    FileSystemStorage fs = FileSystemStorage.getInstance();
-                    if (fs.exists(builder.getPath())) {
-                        FileSystemStorage.getInstance().delete(builder.getPath());
-                    }
-                    if (!completed[0]) {
-                        completed[0] = true;
-                        CN.getCurrentForm().getAnimationManager().flushAnimation(new Runnable() {
-                            public void run() {
-                                out.complete(null);
+                CN.callSerially(new Runnable() {
+                    public void run() {
+                        if (cmp.getState() != AudioRecorderComponent.RecorderState.Accepted && cmp.getState() != AudioRecorderComponent.RecorderState.Canceled) {
+                            FileSystemStorage fs = FileSystemStorage.getInstance();
+                            if (fs.exists(builder.getPath())) {
+                                FileSystemStorage.getInstance().delete(builder.getPath());
                             }
-                        });
+                            if (!completed[0]) {
+                                completed[0] = true;
+                                CN.getCurrentForm().getAnimationManager().flushAnimation(new Runnable() {
+                                    public void run() {
+                                        out.complete(null);
+                                    }
+                                });
+                            }
+                        }
                     }
-                }
+                });
             }
 
         });
