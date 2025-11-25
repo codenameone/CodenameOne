@@ -38,6 +38,7 @@ import com.codename1.ui.util.ImageIO;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.geom.Shape;
 import com.codename1.util.AsyncResource;
+import java.io.Closeable;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -2140,6 +2141,17 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public void cleanup(Object obj) {
         cleanupCalls.add(obj);
+        if (obj instanceof Closeable) {
+            try {
+                ((Closeable) obj).close();
+            } catch (IOException ignored) {
+            }
+        } else if (obj instanceof AutoCloseable) {
+            try {
+                ((AutoCloseable) obj).close();
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     @Override
