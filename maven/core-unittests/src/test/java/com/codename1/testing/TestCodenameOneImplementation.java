@@ -125,6 +125,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private Media backgroundMedia;
     private Media media;
     private AsyncResource<Media> mediaAsync;
+    private final Map<String, AsyncResource<Media>> mediaAsyncByUri = new ConcurrentHashMap<String, AsyncResource<Media>>();
     private Purchase inAppPurchase;
     private int startRemoteControlInvocations;
     private int stopRemoteControlInvocations;
@@ -339,6 +340,13 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return nativeImageCacheSupported;
     }
 
+    private AsyncResource<Media> resolveMediaAsync(String uri) {
+        if (uri != null && mediaAsyncByUri.containsKey(uri)) {
+            return mediaAsyncByUri.get(uri);
+        }
+        return mediaAsync;
+    }
+
     @Override
     public AsyncResource<Media> createBackgroundMediaAsync(String uri) {
         return backgroundMediaAsync;
@@ -359,7 +367,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public AsyncResource<Media> createMediaAsync(String uri, boolean video, Runnable onCompletion) {
-        return mediaAsync;
+        return resolveMediaAsync(uri);
     }
 
     @Override
@@ -378,6 +386,34 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void setMediaAsync(AsyncResource<Media> mediaAsync) {
         this.mediaAsync = mediaAsync;
+    }
+
+    public void setMediaAsync(String uri, AsyncResource<Media> asyncResource) {
+        if (uri == null) {
+            mediaAsync = asyncResource;
+        } else if (asyncResource == null) {
+            mediaAsyncByUri.remove(uri);
+        } else {
+            mediaAsyncByUri.put(uri, asyncResource);
+        }
+    }
+
+    public void clearMediaAsyncMappings() {
+        mediaAsyncByUri.clear();
+    }
+
+    public void completeMediaAsync(String uri, Media value) {
+        AsyncResource<Media> async = resolveMediaAsync(uri);
+        if (async != null) {
+            async.complete(value);
+        }
+    }
+
+    public void failMediaAsync(String uri, Throwable error) {
+        AsyncResource<Media> async = resolveMediaAsync(uri);
+        if (async != null) {
+            async.error(error);
+        }
     }
 
     @Override
