@@ -1109,13 +1109,41 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         if (cursor < 0 || cursor > current.length()) {
             cursor = current.length();
         }
+        char adjustedCharacter = applyAutoCapitalization(area, character, current, cursor);
         StringBuilder sb = new StringBuilder(current.length() + 1);
         sb.append(current, 0, cursor);
-        sb.append(character);
+        sb.append(adjustedCharacter);
         if (cursor < current.length()) {
             sb.append(current.substring(cursor));
         }
         area.setText(sb.toString());
+    }
+
+    private char applyAutoCapitalization(TextArea area, char character, String currentText, int cursorPosition) {
+        if (!Character.isLetter(character)) {
+            return character;
+        }
+        int constraint = area.getConstraint();
+        boolean initialCapsSentence = (constraint & TextArea.INITIAL_CAPS_SENTENCE) == TextArea.INITIAL_CAPS_SENTENCE;
+        boolean initialCapsWord = (constraint & TextArea.INITIAL_CAPS_WORD) == TextArea.INITIAL_CAPS_WORD;
+        if (!initialCapsSentence && !initialCapsWord) {
+            return character;
+        }
+        int index = cursorPosition - 1;
+        if (initialCapsSentence) {
+            while (index >= 0 && Character.isWhitespace(currentText.charAt(index))) {
+                index--;
+            }
+            if (index < 0 || currentText.charAt(index) == '.' || currentText.charAt(index) == '!' || currentText.charAt(index) == '?') {
+                return Character.toUpperCase(character);
+            }
+        }
+        if (initialCapsWord) {
+            if (index < 0 || Character.isWhitespace(currentText.charAt(index))) {
+                return Character.toUpperCase(character);
+            }
+        }
+        return character;
     }
 
     @Override
