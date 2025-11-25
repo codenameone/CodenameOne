@@ -1961,7 +1961,14 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     public void rename(String file, String newName) {
         TestFile f = fileSystem.remove(file);
         if (f != null) {
-            fileSystem.put(newName, f);
+            String target = newName;
+            if (newName != null && !newName.contains("://") && !newName.startsWith("/")) {
+                int lastSlash = file.lastIndexOf('/');
+                if (lastSlash >= 0) {
+                    target = file.substring(0, lastSlash + 1) + newName;
+                }
+            }
+            fileSystem.put(target, f);
         }
     }
 
