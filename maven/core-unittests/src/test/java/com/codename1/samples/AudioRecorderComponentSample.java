@@ -75,58 +75,35 @@ public class AudioRecorderComponentSample {
         final Sheet sheet = new Sheet(null, "Record Audio");
         sheet.getContentPane().setLayout(new com.codename1.ui.layouts.BorderLayout());
         sheet.getContentPane().add(com.codename1.ui.layouts.BorderLayout.CENTER, cmp);
-        cmp.addActionListener(new com.codename1.ui.events.ActionListener() {
+                cmp.addActionListener(new com.codename1.ui.events.ActionListener() {
             @Override
             public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
                 switch (cmp.getState()) {
                     case Accepted:
-                        final ActionListener acceptListener = new ActionListener() {
-                            @Override
-                            public void actionPerformed(ActionEvent evt) {
-                                sheet.removeCloseListener(this);
-                                if (completed[0]) {
-                                    return;
-                                }
-                                completed[0] = true;
-                                out.complete(builder.getPath());
-                            }
-
-                        };
-                        sheet.addCloseListener(acceptListener);
+                        if (!completed[0]) {
+                            completed[0] = true;
+                            out.complete(builder.getPath());
+                        }
                         CN.getCurrentForm().getAnimationManager().flushAnimation(new Runnable() {
                             public void run() {
                                 sheet.back();
                             }
                         });
-
-
-
                         break;
                     case Canceled:
                         FileSystemStorage fs = FileSystemStorage.getInstance();
                         if (fs.exists(builder.getPath())) {
                             FileSystemStorage.getInstance().delete(builder.getPath());
                         }
-                        final ActionListener cancelListener = new ActionListener() {
-                            @Override
-                            public void actionPerformed(ActionEvent evt) {
-                                sheet.removeCloseListener(this);
-                                if (completed[0]) {
-                                    return;
-                                }
-                                completed[0] = true;
-                                out.complete(null);
-                            }
-
-                        };
-                        sheet.addCloseListener(cancelListener);
+                        if (!completed[0]) {
+                            completed[0] = true;
+                            out.complete(null);
+                        }
                         CN.getCurrentForm().getAnimationManager().flushAnimation(new Runnable() {
                             public void run() {
                                 sheet.back();
                             }
                         });
-
-
                         break;
                 }
             }
