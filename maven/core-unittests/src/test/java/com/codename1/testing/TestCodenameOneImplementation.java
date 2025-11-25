@@ -179,6 +179,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private MediaRecorderBuilder lastMediaRecorderBuilder;
     private VideoCaptureConstraints lastVideoConstraints;
     private final List<AudioCaptureFrame> audioCaptureFrames = new ArrayList<AudioCaptureFrame>();
+    private TextArea activeTextEditor;
 
 
     public TestCodenameOneImplementation() {
@@ -1050,17 +1051,18 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void editString(com.codename1.ui.Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
-        if (cmp instanceof TextField) {
-            TextField field = (TextField) cmp;
-            if (shouldInsertCharacter(field.isEditable(), initiatingKeycode)) {
-                insertCharacter(field, (char) initiatingKeycode, maxSize);
-                return;
-            }
-            field.setText(text);
-            return;
-        }
         if (cmp instanceof TextArea) {
             TextArea area = (TextArea) cmp;
+            activeTextEditor = area;
+            if (cmp instanceof TextField) {
+                TextField field = (TextField) cmp;
+                if (shouldInsertCharacter(field.isEditable(), initiatingKeycode)) {
+                    insertCharacter(field, (char) initiatingKeycode, maxSize);
+                    return;
+                }
+                field.setText(text);
+                return;
+            }
             if (shouldInsertCharacter(area.isEditable(), initiatingKeycode)) {
                 insertCharacter(area, (char) initiatingKeycode, maxSize);
                 return;
@@ -1139,6 +1141,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         if (focused instanceof TextArea) {
             return (TextArea) focused;
         }
+        if (activeTextEditor != null) {
+            return activeTextEditor;
+        }
         return null;
     }
 
@@ -1176,6 +1181,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void stopTextEditing() {
+        activeTextEditor = null;
         hideTextEditor();
     }
 
