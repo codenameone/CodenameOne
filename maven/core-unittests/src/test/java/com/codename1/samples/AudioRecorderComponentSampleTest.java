@@ -62,7 +62,7 @@ class AudioRecorderComponentSampleTest extends UITestBase {
         Button acceptButton = findButtonWithText(Display.getInstance().getCurrent(), "Accept");
         assertNotNull(acceptButton);
         implementation.tapComponent(acceptButton);
-        flushSerialCalls();
+        waitForResult(result);
 
         assertTrue(result.completed.get());
         assertNull(result.error.get());
@@ -95,7 +95,7 @@ class AudioRecorderComponentSampleTest extends UITestBase {
         Sheet sheet = Sheet.getCurrentSheet();
         assertNotNull(sheet);
         sheet.back();
-        flushSerialCalls();
+        waitForResult(result);
 
         assertTrue(result.completed.get());
         assertNull(result.error.get());
@@ -176,6 +176,16 @@ class AudioRecorderComponentSampleTest extends UITestBase {
             os.write("recording".getBytes("UTF-8"));
         } finally {
             os.close();
+        }
+    }
+
+    private void waitForResult(ResultHolder<?> result) {
+        for (int i = 0; i < 5; i++) {
+            if (result.completed.get()) {
+                return;
+            }
+            flushSerialCalls();
+            com.codename1.ui.DisplayTest.flushEdt();
         }
     }
 
