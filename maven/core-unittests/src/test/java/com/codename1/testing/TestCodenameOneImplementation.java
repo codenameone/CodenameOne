@@ -1162,6 +1162,15 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             return;
         }
         final boolean reenter = beginAllowingEditDuringKey(keyCode);
+        if (reenter) {
+            Component editing = getEditingText();
+            if (editing instanceof TextArea) {
+                TextArea area = (TextArea) editing;
+                if (shouldInsertCharacter(area.isEditable(), keyCode)) {
+                    insertCharacter(area, (char) keyCode, area.getMaxSize());
+                }
+            }
+        }
         display.keyPressed(keyCode);
         display.keyReleased(keyCode);
         if (reenter) {
