@@ -1,6 +1,7 @@
 package com.codename1.samples;
 
 import com.codename1.junit.FormTest;
+import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
 import com.codename1.media.Media;
 import com.codename1.ui.Button;
@@ -40,23 +41,30 @@ class AsyncResourceSampleTest extends UITestBase {
 
     @FormTest
     void playAsyncHandlesErrors() {
-        AsyncResource<Media> asyncMedia = new AsyncResource<Media>();
-        implementation.setMediaAsync(ERROR_URI, asyncMedia);
+        TestLogger.install();
+        try {
+            AsyncResource<Media> asyncMedia = new AsyncResource<Media>();
+            implementation.setMediaAsync(ERROR_URI, asyncMedia);
 
-        AsyncResourceSample sample = new AsyncResourceSample();
-        sample.start();
+            AsyncResourceSample sample = new AsyncResourceSample();
+            sample.start();
 
-        Button errorButton = findButton(Display.getInstance().getCurrent(), "Play Async (Not Found)");
-        assertNotNull(errorButton);
+            Button errorButton = findButton(Display.getInstance().getCurrent(), "Play Async (Not Found)");
+            assertNotNull(errorButton);
 
-        errorButton.released();
-        assertFalse(errorButton.isEnabled());
+            errorButton.released();
+            assertFalse(errorButton.isEnabled());
 
-        RuntimeException failure = new RuntimeException("Resource missing");
-        implementation.failMediaAsync(ERROR_URI, failure);
-        flushSerialCalls();
+            RuntimeException failure = new RuntimeException("Resource missing");
+            implementation.failMediaAsync(ERROR_URI, failure);
+            flushSerialCalls();
 
-        assertTrue(errorButton.isEnabled());
+            assertTrue(errorButton.isEnabled());
+            assertEquals(1, TestLogger.getThrowables().size());
+            assertSame(failure, TestLogger.getThrowables().get(0));
+        } finally {
+            TestLogger.remove();
+        }
     }
 
     private Button findButton(Form form, String text) {
