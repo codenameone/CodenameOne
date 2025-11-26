@@ -3447,11 +3447,12 @@ public final class Display extends CN1Constants {
         if (isEdt()) {
             windowListeners.fireActionEvent(evt);
         } else {
+            final WindowEvent windowEvent = evt;
             callSerially(new Runnable() {
                 @Override
                 public void run() {
                     if (windowListeners != null && windowListeners.hasListeners()) {
-                        windowListeners.fireActionEvent(evt);
+                        windowListeners.fireActionEvent(windowEvent);
                     }
                 }
             });
