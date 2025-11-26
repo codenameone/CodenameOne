@@ -227,12 +227,12 @@ public class JavaSEPort extends CodenameOneImplementation {
         */
     }
 
-    private void fireDesktopWindowEvent(WindowEvent.Type type) {
+    private void fireDesktopWindowEvent(com.codename1.ui.events.WindowEvent.Type type) {
         if (!isDesktop() || !Display.isInitialized()) {
             return;
         }
         Display display = Display.getInstance();
-        display.fireWindowEvent(new WindowEvent(display, type, getWindowBounds()));
+        display.fireWindowEvent(new com.codename1.ui.events.WindowEvent(display, type, getWindowBounds()));
     }
 
     @Override

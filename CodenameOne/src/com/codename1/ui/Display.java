@@ -301,6 +301,10 @@ public final class Display extends CN1Constants {
     private Runnable bookmark;
     private EventDispatcher messageListeners;
     private EventDispatcher windowListeners;
+    /**
+     * Tracks whether the initial window size hint has already been consumed for the first shown form.
+     */
+    private boolean initialWindowSizeApplied;
     private boolean disableInvokeAndBlock;
     /**
      * Enable Async stack traces.  This is disabled by default, but will cause
@@ -438,6 +442,7 @@ public final class Display extends CN1Constants {
     public static void init(Object m) {
         if (!INSTANCE.codenameOneRunning) {
             INSTANCE.codenameOneRunning = true;
+            INSTANCE.initialWindowSizeApplied = false;
             INSTANCE.pluginSupport = new PluginSupport();
             INSTANCE.displayInitTime = System.currentTimeMillis();
 
@@ -1656,8 +1661,9 @@ public final class Display extends CN1Constants {
         } else {
             forceShow = true;
         }
-        if (forceShow) {
+        if (!initialWindowSizeApplied) {
             applyInitialWindowSize(newForm);
+            initialWindowSizeApplied = true;
         }
         keyRepeatCharged = false;
         longPressCharged = false;
