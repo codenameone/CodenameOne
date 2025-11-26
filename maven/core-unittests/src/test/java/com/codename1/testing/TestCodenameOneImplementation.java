@@ -1141,8 +1141,35 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         if (focused instanceof TextArea) {
             return (TextArea) focused;
         }
+        if (current != null) {
+            TextArea firstTextArea = findFirstTextArea(current.getContentPane());
+            if (firstTextArea != null) {
+                activeTextEditor = firstTextArea;
+                return firstTextArea;
+            }
+        }
         if (activeTextEditor != null) {
             return activeTextEditor;
+        }
+        return null;
+    }
+
+    private TextArea findFirstTextArea(Container container) {
+        if (container == null) {
+            return null;
+        }
+        int componentCount = container.getComponentCount();
+        for (int i = 0; i < componentCount; i++) {
+            Component child = container.getComponentAt(i);
+            if (child instanceof TextArea) {
+                return (TextArea) child;
+            }
+            if (child instanceof Container) {
+                TextArea nested = findFirstTextArea((Container) child);
+                if (nested != null) {
+                    return nested;
+                }
+            }
         }
         return null;
     }
