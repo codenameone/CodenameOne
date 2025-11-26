@@ -80,7 +80,7 @@ public class AudioRecorderComponentSample {
             host.show();
         }
         final AudioRecorderComponent cmp = new AudioRecorderComponent(builder);
-        final Sheet sheet = new Sheet(host, "Record Audio");
+        final Sheet sheet = new Sheet(Sheet.getCurrentSheet(), "Record Audio");
         sheet.getContentPane().setLayout(new com.codename1.ui.layouts.BorderLayout());
         sheet.getContentPane().add(com.codename1.ui.layouts.BorderLayout.CENTER, cmp);
         final com.codename1.ui.events.ActionListener stateHandler = new com.codename1.ui.events.ActionListener() {
