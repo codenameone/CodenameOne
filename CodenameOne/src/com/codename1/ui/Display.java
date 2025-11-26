@@ -1662,8 +1662,7 @@ public final class Display extends CN1Constants {
             forceShow = true;
         }
         if (!initialWindowSizeApplied) {
-            applyInitialWindowSize(newForm);
-            initialWindowSizeApplied = true;
+            initialWindowSizeApplied = applyInitialWindowSize(newForm);
         }
         keyRepeatCharged = false;
         longPressCharged = false;
@@ -1686,15 +1685,16 @@ public final class Display extends CN1Constants {
         newForm.onShowCompletedImpl();
     }
 
-    private void applyInitialWindowSize(Form form) {
+    private boolean applyInitialWindowSize(Form form) {
         if (form == null) {
-            return;
+            return false;
         }
         Dimension percent = parseWindowSizePercent(form.getClientProperty(WINDOW_SIZE_HINT_PERCENT));
         if (percent == null) {
-            return;
+            return false;
         }
         impl.setInitialWindowSizeHintPercent(percent);
+        return true;
     }
 
     private Dimension parseWindowSizePercent(Object hint) {
