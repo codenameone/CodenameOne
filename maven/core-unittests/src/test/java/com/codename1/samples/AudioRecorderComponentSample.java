@@ -78,7 +78,7 @@ public class AudioRecorderComponentSample {
         final Sheet sheet = new Sheet(null, "Record Audio");
         sheet.getContentPane().setLayout(new com.codename1.ui.layouts.BorderLayout());
         sheet.getContentPane().add(com.codename1.ui.layouts.BorderLayout.CENTER, cmp);
-                cmp.addActionListener(new com.codename1.ui.events.ActionListener() {
+        final com.codename1.ui.events.ActionListener stateHandler = new com.codename1.ui.events.ActionListener() {
             @Override
             public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
                 switch (cmp.getState()) {
@@ -108,61 +108,34 @@ public class AudioRecorderComponentSample {
                             }
                         });
                         break;
+                    default:
+                        break;
                 }
             }
 
-        });
-        sheet.addCloseListener(new com.codename1.ui.events.ActionListener() {
-            @Override
+        };
+        cmp.addActionListener(stateHandler);
+        com.codename1.ui.events.ActionListener closingHandler = new com.codename1.ui.events.ActionListener() {
             public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
-                final int[] attempts = new int[]{0};
-                final Runnable[] handler = new Runnable[1];
-                handler[0] = new Runnable() {
-                    public void run() {
-                        if (completed[0]) {
-                            return;
-                        }
-                        AudioRecorderComponent.RecorderState state = cmp.getState();
-                        if (state == AudioRecorderComponent.RecorderState.Pending) {
-                            if (!completed[0]) {
-                                completed[0] = true;
-                                out.complete(builder.getPath());
-                            }
-                            return;
-                        }
-                        if (state == AudioRecorderComponent.RecorderState.Accepted) {
-                            return;
-                        }
-                        if (state == AudioRecorderComponent.RecorderState.Canceled) {
-                            FileSystemStorage fs = FileSystemStorage.getInstance();
-                            if (fs.exists(builder.getPath())) {
-                                FileSystemStorage.getInstance().delete(builder.getPath());
-                            }
-                            if (!completed[0]) {
-                                completed[0] = true;
-                                out.complete(null);
-                            }
-                            return;
-                        }
-                        if (attempts[0] < 5) {
-                            attempts[0] = attempts[0] + 1;
-                            CN.callSerially(handler[0]);
-                            return;
-                        }
-                        FileSystemStorage fs = FileSystemStorage.getInstance();
-                        if (fs.exists(builder.getPath())) {
-                            FileSystemStorage.getInstance().delete(builder.getPath());
-                        }
-                        if (!completed[0]) {
-                            completed[0] = true;
-                            out.complete(null);
-                        }
-                    }
-                };
-                CN.callSerially(handler[0]);
+                if (completed[0]) {
+                    return;
+                }
+                AudioRecorderComponent.RecorderState state = cmp.getState();
+                if (state == AudioRecorderComponent.RecorderState.Accepted || state == AudioRecorderComponent.RecorderState.Pending) {
+                    completed[0] = true;
+                    out.complete(builder.getPath());
+                    return;
+                }
+                FileSystemStorage fs = FileSystemStorage.getInstance();
+                if (fs.exists(builder.getPath())) {
+                    FileSystemStorage.getInstance().delete(builder.getPath());
+                }
+                completed[0] = true;
+                out.complete(null);
             }
-
-        });
+        };
+        sheet.addCloseListener(closingHandler);
+        sheet.addBackListener(closingHandler);
         sheet.show();
         return out;
     }
