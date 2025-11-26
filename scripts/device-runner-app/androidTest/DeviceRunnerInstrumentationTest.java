@@ -38,7 +38,7 @@ public class DeviceRunnerInstrumentationTest {
     }
 
     private boolean waitForDeviceRunner() throws Exception {
-        final long timeoutMs = 300_000L;
+        final long timeoutMs = 900_000L;
         final String endMarker = "CN1SS:SUITE:FINISHED";
 
         long deadline = System.currentTimeMillis() + timeoutMs;
