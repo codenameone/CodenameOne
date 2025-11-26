@@ -123,6 +123,13 @@ public class AudioRecorderComponentSample {
                             return;
                         }
                         AudioRecorderComponent.RecorderState state = cmp.getState();
+                        if (state == AudioRecorderComponent.RecorderState.Pending) {
+                            if (!completed[0]) {
+                                completed[0] = true;
+                                out.complete(builder.getPath());
+                            }
+                            return;
+                        }
                         if (state == AudioRecorderComponent.RecorderState.Accepted) {
                             return;
                         }
