@@ -1075,7 +1075,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public void setInitialWindowSizeHintPercent(Dimension hint) {
         super.setInitialWindowSizeHintPercent(hint);
-        if (hint != null && desktopSize != null && lastWindowSize == null) {
+        if (hint != null && desktopSize != null) {
             int width = Math.min(desktopSize.getWidth(), Math.max(1, Math.round(desktopSize.getWidth() * (hint.getWidth() / 100f))));
             int height = Math.min(desktopSize.getHeight(), Math.max(1, Math.round(desktopSize.getHeight() * (hint.getHeight() / 100f))));
             setWindowSize(width, height);

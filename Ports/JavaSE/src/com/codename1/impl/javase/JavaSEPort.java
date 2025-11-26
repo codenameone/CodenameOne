@@ -5814,9 +5814,9 @@ public class JavaSEPort extends CodenameOneImplementation {
         if (!isDesktop()) {
             return;
         }
-        JFrame frame = findTopFrame();
+        final JFrame frame = findTopFrame();
         if (frame != null) {
-            java.awt.Dimension size = new java.awt.Dimension(width, height);
+            final java.awt.Dimension size = new java.awt.Dimension(width, height);
             SwingUtilities.invokeLater(new Runnable() {
                 @Override
                 public void run() {
