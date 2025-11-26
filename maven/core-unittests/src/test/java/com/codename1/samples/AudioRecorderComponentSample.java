@@ -112,27 +112,44 @@ public class AudioRecorderComponentSample {
         sheet.addCloseListener(new com.codename1.ui.events.ActionListener() {
             @Override
             public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
-                CN.callSerially(new Runnable() {
+                final int[] attempts = new int[]{0};
+                final Runnable[] handler = new Runnable[1];
+                handler[0] = new Runnable() {
                     public void run() {
                         if (completed[0]) {
                             return;
                         }
-                        if (cmp.getState() != AudioRecorderComponent.RecorderState.Accepted && cmp.getState() != AudioRecorderComponent.RecorderState.Canceled) {
+                        AudioRecorderComponent.RecorderState state = cmp.getState();
+                        if (state == AudioRecorderComponent.RecorderState.Accepted) {
+                            return;
+                        }
+                        if (state == AudioRecorderComponent.RecorderState.Canceled) {
                             FileSystemStorage fs = FileSystemStorage.getInstance();
                             if (fs.exists(builder.getPath())) {
                                 FileSystemStorage.getInstance().delete(builder.getPath());
                             }
                             if (!completed[0]) {
                                 completed[0] = true;
-                                CN.getCurrentForm().getAnimationManager().flushAnimation(new Runnable() {
-                                    public void run() {
-                                        out.complete(null);
-                                    }
-                                });
+                                out.complete(null);
                             }
+                            return;
+                        }
+                        if (attempts[0] < 5) {
+                            attempts[0] = attempts[0] + 1;
+                            CN.callSerially(handler[0]);
+                            return;
+                        }
+                        FileSystemStorage fs = FileSystemStorage.getInstance();
+                        if (fs.exists(builder.getPath())) {
+                            FileSystemStorage.getInstance().delete(builder.getPath());
+                        }
+                        if (!completed[0]) {
+                            completed[0] = true;
+                            out.complete(null);
                         }
                     }
-                });
+                };
+                CN.callSerially(handler[0]);
             }
 
         });
