@@ -179,6 +179,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private MediaRecorderBuilder lastMediaRecorderBuilder;
     private VideoCaptureConstraints lastVideoConstraints;
     private final List<AudioCaptureFrame> audioCaptureFrames = new ArrayList<AudioCaptureFrame>();
+    private TextArea activeTextEditor;
 
 
     public TestCodenameOneImplementation() {
@@ -1050,17 +1051,18 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void editString(com.codename1.ui.Component cmp, int maxSize, int constraint, String text, int initiatingKeycode) {
-        if (cmp instanceof TextField) {
-            TextField field = (TextField) cmp;
-            if (shouldInsertCharacter(field.isEditable(), initiatingKeycode)) {
-                field.insertChars(String.valueOf((char) initiatingKeycode));
-                return;
-            }
-            field.setText(text);
-            return;
-        }
         if (cmp instanceof TextArea) {
             TextArea area = (TextArea) cmp;
+            activeTextEditor = area;
+            if (cmp instanceof TextField) {
+                TextField field = (TextField) cmp;
+                if (shouldInsertCharacter(field.isEditable(), initiatingKeycode)) {
+                    insertCharacter(field, (char) initiatingKeycode, maxSize);
+                    return;
+                }
+                field.setText(text);
+                return;
+            }
             if (shouldInsertCharacter(area.isEditable(), initiatingKeycode)) {
                 insertCharacter(area, (char) initiatingKeycode, maxSize);
                 return;
@@ -1109,13 +1111,94 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         if (cursor < 0 || cursor > current.length()) {
             cursor = current.length();
         }
+        char adjustedCharacter = applyAutoCapitalization(area, character, current, cursor);
         StringBuilder sb = new StringBuilder(current.length() + 1);
         sb.append(current, 0, cursor);
-        sb.append(character);
+        sb.append(adjustedCharacter);
         if (cursor < current.length()) {
             sb.append(current.substring(cursor));
         }
         area.setText(sb.toString());
+        if (area instanceof TextField) {
+            ((TextField) area).setCursorPosition(cursor + 1);
+        }
+    }
+
+    private TextArea getActiveEditingArea() {
+        Component editing = getEditingText();
+        if (editing instanceof TextArea) {
+            return (TextArea) editing;
+        }
+        Display display = Display.getInstance();
+        if (display == null) {
+            return null;
+        }
+        Form current = display.getCurrent();
+        if (current == null) {
+            return null;
+        }
+        Component focused = current.getFocused();
+        if (focused instanceof TextArea) {
+            return (TextArea) focused;
+        }
+        if (current != null) {
+            TextArea firstTextArea = findFirstTextArea(current.getContentPane());
+            if (firstTextArea != null) {
+                activeTextEditor = firstTextArea;
+                return firstTextArea;
+            }
+        }
+        if (activeTextEditor != null) {
+            return activeTextEditor;
+        }
+        return null;
+    }
+
+    private TextArea findFirstTextArea(Container container) {
+        if (container == null) {
+            return null;
+        }
+        int componentCount = container.getComponentCount();
+        for (int i = 0; i < componentCount; i++) {
+            Component child = container.getComponentAt(i);
+            if (child instanceof TextArea) {
+                return (TextArea) child;
+            }
+            if (child instanceof Container) {
+                TextArea nested = findFirstTextArea((Container) child);
+                if (nested != null) {
+                    return nested;
+                }
+            }
+        }
+        return null;
+    }
+
+    private char applyAutoCapitalization(TextArea area, char character, String currentText, int cursorPosition) {
+        if (!Character.isLetter(character)) {
+            return character;
+        }
+        int constraint = area.getConstraint();
+        boolean initialCapsSentence = (constraint & TextArea.INITIAL_CAPS_SENTENCE) == TextArea.INITIAL_CAPS_SENTENCE;
+        boolean initialCapsWord = (constraint & TextArea.INITIAL_CAPS_WORD) == TextArea.INITIAL_CAPS_WORD;
+        if (!initialCapsSentence && !initialCapsWord) {
+            return character;
+        }
+        int index = cursorPosition - 1;
+        if (initialCapsSentence) {
+            while (index >= 0 && Character.isWhitespace(currentText.charAt(index))) {
+                index--;
+            }
+            if (index < 0 || currentText.charAt(index) == '.' || currentText.charAt(index) == '!' || currentText.charAt(index) == '?') {
+                return Character.toUpperCase(character);
+            }
+        }
+        if (initialCapsWord) {
+            if (index < 0 || Character.isWhitespace(currentText.charAt(index))) {
+                return Character.toUpperCase(character);
+            }
+        }
+        return character;
     }
 
     @Override
@@ -1125,6 +1208,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public void stopTextEditing() {
+        activeTextEditor = null;
         hideTextEditor();
     }
 
@@ -1133,7 +1217,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         if (display == null) {
             return;
         }
+        final TextArea editing = getActiveEditingArea();
         final boolean reenter = beginAllowingEditDuringKey(keyCode);
+        if (editing != null && shouldInsertCharacter(editing.isEditable(), keyCode)) {
+            insertCharacter(editing, (char) keyCode, editing.getMaxSize());
+        }
         display.keyPressed(keyCode);
         display.keyReleased(keyCode);
         if (reenter) {
@@ -1166,16 +1254,15 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     private boolean beginAllowingEditDuringKey(int keyCode) {
-        Component editing = getEditingText();
-        if (!(editing instanceof TextArea)) {
+        TextArea area = getActiveEditingArea();
+        if (area == null) {
             return false;
         }
-        TextArea area = (TextArea) editing;
         if (!shouldInsertCharacter(area.isEditable(), keyCode)) {
             return false;
         }
-        if (editing instanceof TextField) {
-            TextField tf = (TextField) editing;
+        if (area instanceof TextField) {
+            TextField tf = (TextField) area;
             if (!tf.isQwertyInput()) {
                 return false;
             }
