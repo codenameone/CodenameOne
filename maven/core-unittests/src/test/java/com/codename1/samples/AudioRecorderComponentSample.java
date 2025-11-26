@@ -2,7 +2,6 @@ package com.codename1.samples;
 
 import com.codename1.components.AudioRecorderComponent;
 import com.codename1.components.ToastBar;
-import com.codename1.io.File;
 import com.codename1.io.FileSystemStorage;
 import com.codename1.io.Log;
 import com.codename1.media.MediaManager;
@@ -66,8 +65,12 @@ public class AudioRecorderComponentSample {
         final boolean[] completed = new boolean[1];
         String mime = MediaManager.getAvailableRecordingMimeTypes()[0];
         String ext = mime.indexOf("mp3") != -1 ? "mp3" : mime.indexOf("wav") != -1 ? "wav" : mime.indexOf("aiff") != -1 ? "aiff" : "aac";
+        String appHome = FileSystemStorage.getInstance().getAppHomePath();
+        if (appHome == null) {
+            appHome = "file://app/";
+        }
         MediaRecorderBuilder builder = new MediaRecorderBuilder()
-                .path(new File("myaudio." + ext).getAbsolutePath())
+                .path(appHome + "myaudio." + ext)
                 .mimeType(mime);
         lastRecordingPath = builder.getPath();
 
