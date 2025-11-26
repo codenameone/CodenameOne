@@ -31,14 +31,20 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                     t.printStackTrace();
                 }
             });
-            while (!testClass.isDone()) {
+            int timeout = 9000;
+            while (!testClass.isDone() && timeout > 0) {
                 Util.sleep(3);
+                timeout--;
             }
             testClass.cleanup();
+            if(timeout == 0) {
+                log("CN1SS:ERR:suite test=" + testClass + " failed due to timeout waiting for DONE");
+            }
             log("CN1SS:INFO:suite finished test=" + testClass);
         }
         log("CN1SS:SUITE:FINISHED");
         TestReporting.getInstance().testExecutionFinished(getClass().getName());
+        Display.getInstance().exitApplication();
     }
 
     private static void log(String msg) {

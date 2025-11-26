@@ -10,7 +10,6 @@ ensure_dir() { mkdir -p "$1" 2>/dev/null || true; }
 
 # CN1SS helpers are implemented in Java for easier maintenance
 CN1SS_MAIN_CLASS="Cn1ssChunkTools"
-POST_COMMENT_CLASS="PostPrComment"
 PROCESS_SCREENSHOTS_CLASS="ProcessScreenshots"
 RENDER_SCREENSHOT_REPORT_CLASS="RenderScreenshotReport"
 
@@ -190,6 +189,8 @@ declare -A TEST_SOURCES=()
 declare -A PREVIEW_OUTPUTS=()
 
 ensure_dir "$SCREENSHOT_PREVIEW_DIR"
+
+cn1ss_print_log
 
 for test in "${TEST_NAMES[@]}"; do
   dest="$SCREENSHOT_TMP_DIR/${test}.png"

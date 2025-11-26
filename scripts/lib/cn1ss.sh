@@ -135,7 +135,7 @@ cn1ss_count_chunks() {
   if [ -n "$channel" ]; then
     args+=("--channel" "$channel")
   fi
-  cn1ss_java_run "$CN1SS_MAIN_CLASS" "${args[@]}" 2>/dev/null || echo 0
+  cn1ss_java_run "$CN1SS_MAIN_CLASS" "${args[@]}"
 }
 
 cn1ss_extract_base64() {
@@ -178,6 +178,14 @@ cn1ss_list_tests() {
     return 1
   fi
   cn1ss_java_run "$CN1SS_MAIN_CLASS" tests "$file"
+}
+
+cn1ss_print_log() {
+  local file="$1"
+  if [ -z "$file" ] || [ ! -r "$file" ]; then
+    return 1
+  fi
+  cn1ss_java_run "$CN1SS_MAIN_CLASS" check "$file"
 }
 
 cn1ss_verify_png() {

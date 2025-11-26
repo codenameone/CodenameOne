@@ -26,10 +26,28 @@ public class Cn1ssChunkTools {
             case "count" -> runCount(slice(args, 1));
             case "extract" -> runExtract(slice(args, 1));
             case "tests" -> runTests(slice(args, 1));
+            case "check" -> runCheck(slice(args, 1));
             default -> {
                 usage();
                 System.exit(2);
             }
+        }
+    }
+
+    private static void runCheck(String[] args) throws IOException {
+        boolean error = false;
+        Path path = Path.of(args[0]);
+        String text = Files.readString(path, StandardCharsets.UTF_8);
+        String[] lines = text.split("\r?\n");
+        for(String line : lines) {
+            Matcher matcher = CHUNK_PATTERN.matcher(line);
+            if(line.startsWith("CN1SS:") && !matcher.find()) {
+                error = error || line.indexOf(":ERR:") > -1;
+                System.out.println(line);
+            }
+        }
+        if(error) {
+            System.exit(1);
         }
     }
 
@@ -168,7 +186,7 @@ public class Cn1ssChunkTools {
 
     private static void usage() {
         System.err.println("Usage: java Cn1ssChunkTools.java <command> [options]");
-        System.err.println("Commands: count, extract, tests");
+        System.err.println("Commands: count, extract, tests, check");
     }
 
     private static String[] slice(String[] args, int from) {
