@@ -114,6 +114,9 @@ public class AudioRecorderComponentSample {
             public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
                 CN.callSerially(new Runnable() {
                     public void run() {
+                        if (completed[0]) {
+                            return;
+                        }
                         if (cmp.getState() != AudioRecorderComponent.RecorderState.Accepted && cmp.getState() != AudioRecorderComponent.RecorderState.Canceled) {
                             FileSystemStorage fs = FileSystemStorage.getInstance();
                             if (fs.exists(builder.getPath())) {

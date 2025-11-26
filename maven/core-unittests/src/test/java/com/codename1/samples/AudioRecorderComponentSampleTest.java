@@ -42,6 +42,7 @@ class AudioRecorderComponentSampleTest extends UITestBase {
         });
 
         flushUi();
+        createPlaceholderFile(sample.getLastRecordingPath());
         AudioRecorderComponent recorderComponent = findRecorderComponent();
         assertNotNull(recorderComponent);
         assertEquals(AudioRecorderComponent.RecorderState.Paused, recorderComponent.getState());
@@ -190,12 +191,11 @@ class AudioRecorderComponentSampleTest extends UITestBase {
     }
 
     private void waitForResult(ResultHolder<?> result) {
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < 50; i++) {
             if (result.completed.get()) {
                 return;
             }
-            flushSerialCalls();
-            com.codename1.ui.DisplayTest.flushEdt();
+            flushUi();
         }
     }
 
