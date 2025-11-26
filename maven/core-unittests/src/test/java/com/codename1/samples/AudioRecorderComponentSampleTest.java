@@ -63,10 +63,7 @@ class AudioRecorderComponentSampleTest extends UITestBase {
         Button acceptButton = findButtonWithText(Display.getInstance().getCurrent(), "Accept");
         assertNotNull(acceptButton);
         implementation.tapComponent(acceptButton);
-        Sheet current = Sheet.getCurrentSheet();
-        if (current != null) {
-            current.back();
-        }
+        flushUi();
         waitForResult(result);
 
         assertTrue(result.completed.get());
