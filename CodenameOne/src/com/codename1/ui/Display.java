@@ -1719,11 +1719,37 @@ public final class Display extends CN1Constants {
                 return new Dimension((int) Math.round(arr[0]), (int) Math.round(arr[1]));
             }
         }
-        if (hint instanceof Number[]) {
-            Number[] arr = (Number[]) hint;
+        if (hint instanceof Object[]) {
+            Object[] arr = (Object[]) hint;
             if (arr.length >= 2) {
-                return new Dimension(arr[0].intValue(), arr[1].intValue());
+                Integer w = parseNumericObject(arr[0]);
+                Integer h = parseNumericObject(arr[1]);
+                if (w != null && h != null) {
+                    return new Dimension(w.intValue(), h.intValue());
+                }
             }
+        }
+        return null;
+    }
+
+    private Integer parseNumericObject(Object value) {
+        if (value instanceof Integer) {
+            return (Integer) value;
+        }
+        if (value instanceof Float) {
+            return Integer.valueOf(Math.round(((Float) value).floatValue()));
+        }
+        if (value instanceof Double) {
+            return Integer.valueOf((int) Math.round(((Double) value).doubleValue()));
+        }
+        if (value instanceof Long) {
+            return Integer.valueOf((int) ((Long) value).longValue());
+        }
+        if (value instanceof Short) {
+            return Integer.valueOf(((Short) value).shortValue());
+        }
+        if (value instanceof Byte) {
+            return Integer.valueOf(((Byte) value).byteValue());
         }
         return null;
     }
