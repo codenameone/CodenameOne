@@ -112,7 +112,7 @@ LOGCAT_PID=$!
 sleep 2
 
 GRADLEW="./gradlew"
-GRADLE_CMD=("$GRADLEW" --stacktrace --debug --no-daemon connectedDebugAndroidTest)
+GRADLE_CMD=("$GRADLEW" --stacktrace --info --no-daemon connectedDebugAndroidTest)
 
 ra_log "Executing connectedDebugAndroidTest via Gradle"
 if ! (
