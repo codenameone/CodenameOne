@@ -44,7 +44,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         }
         log("CN1SS:SUITE:FINISHED");
         TestReporting.getInstance().testExecutionFinished(getClass().getName());
-        Display.getInstance().exitApplication();
     }
 
     private static void log(String msg) {
