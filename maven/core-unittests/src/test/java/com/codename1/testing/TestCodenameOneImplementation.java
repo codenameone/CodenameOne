@@ -1219,7 +1219,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
         final TextArea editing = getActiveEditingArea();
         final boolean reenter = beginAllowingEditDuringKey(keyCode);
-        if (reenter && editing != null && shouldInsertCharacter(editing.isEditable(), keyCode)) {
+        if (editing != null && shouldInsertCharacter(editing.isEditable(), keyCode)) {
             insertCharacter(editing, (char) keyCode, editing.getMaxSize());
         }
         display.keyPressed(keyCode);
