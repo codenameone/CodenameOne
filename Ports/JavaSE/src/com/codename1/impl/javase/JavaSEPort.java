@@ -114,7 +114,6 @@ import com.codename1.ui.Sheet;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextSelection;
 import com.codename1.ui.Transform;
-import com.codename1.ui.events.WindowEvent;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.util.UITimer;
 import com.codename1.util.AsyncResource;

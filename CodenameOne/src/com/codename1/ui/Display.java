@@ -1688,9 +1688,7 @@ public final class Display extends CN1Constants {
         if (percent == null) {
             return;
         }
-        if (impl.getInitialWindowSizeHintPercent() == null) {
-            impl.setInitialWindowSizeHintPercent(percent);
-        }
+        impl.setInitialWindowSizeHintPercent(percent);
     }
 
     private Dimension parseWindowSizePercent(Object hint) {
