@@ -83,15 +83,36 @@ public class AudioRecorderComponentSample {
         final Sheet sheet = new Sheet(Sheet.getCurrentSheet(), "Record Audio");
         sheet.getContentPane().setLayout(new com.codename1.ui.layouts.BorderLayout());
         sheet.getContentPane().add(com.codename1.ui.layouts.BorderLayout.CENTER, cmp);
+
+        final com.codename1.ui.events.ActionListener finalizeWithPath = new com.codename1.ui.events.ActionListener() {
+            public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
+                if (!completed[0]) {
+                    completed[0] = true;
+                    out.complete(builder.getPath());
+                }
+            }
+        };
+
+        final com.codename1.ui.events.ActionListener finalizeWithNull = new com.codename1.ui.events.ActionListener() {
+            public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
+                if (completed[0]) {
+                    return;
+                }
+                completed[0] = true;
+                FileSystemStorage fs = FileSystemStorage.getInstance();
+                if (fs.exists(builder.getPath())) {
+                    fs.delete(builder.getPath());
+                }
+                out.complete(null);
+            }
+        };
+
         final com.codename1.ui.events.ActionListener stateHandler = new com.codename1.ui.events.ActionListener() {
             @Override
             public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
                 switch (cmp.getState()) {
                     case Accepted:
-                        if (!completed[0]) {
-                            completed[0] = true;
-                            out.complete(builder.getPath());
-                        }
+                        sheet.addCloseListener(finalizeWithPath);
                         CN.getCurrentForm().getAnimationManager().flushAnimation(new Runnable() {
                             public void run() {
                                 sheet.back();
@@ -99,14 +120,7 @@ public class AudioRecorderComponentSample {
                         });
                         break;
                     case Canceled:
-                        FileSystemStorage fs = FileSystemStorage.getInstance();
-                        if (fs.exists(builder.getPath())) {
-                            FileSystemStorage.getInstance().delete(builder.getPath());
-                        }
-                        if (!completed[0]) {
-                            completed[0] = true;
-                            out.complete(null);
-                        }
+                        sheet.addCloseListener(finalizeWithNull);
                         CN.getCurrentForm().getAnimationManager().flushAnimation(new Runnable() {
                             public void run() {
                                 sheet.back();
@@ -120,27 +134,28 @@ public class AudioRecorderComponentSample {
 
         };
         cmp.addActionListener(stateHandler);
-        com.codename1.ui.events.ActionListener closingHandler = new com.codename1.ui.events.ActionListener() {
+
+        sheet.addCloseListener(new com.codename1.ui.events.ActionListener() {
             public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
-                if (completed[0]) {
-                    return;
-                }
                 AudioRecorderComponent.RecorderState state = cmp.getState();
                 if (state == AudioRecorderComponent.RecorderState.Accepted || state == AudioRecorderComponent.RecorderState.Pending) {
-                    completed[0] = true;
-                    out.complete(builder.getPath());
-                    return;
+                    finalizeWithPath.actionPerformed(e);
+                } else {
+                    finalizeWithNull.actionPerformed(e);
                 }
-                FileSystemStorage fs = FileSystemStorage.getInstance();
-                if (fs.exists(builder.getPath())) {
-                    FileSystemStorage.getInstance().delete(builder.getPath());
-                }
-                completed[0] = true;
-                out.complete(null);
             }
-        };
-        sheet.addCloseListener(closingHandler);
-        sheet.addBackListener(closingHandler);
+        });
+        sheet.addBackListener(new com.codename1.ui.events.ActionListener() {
+            public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
+                AudioRecorderComponent.RecorderState state = cmp.getState();
+                if (state == AudioRecorderComponent.RecorderState.Accepted || state == AudioRecorderComponent.RecorderState.Pending) {
+                    finalizeWithPath.actionPerformed(e);
+                } else {
+                    finalizeWithNull.actionPerformed(e);
+                }
+            }
+        });
+
         sheet.show();
         return out;
     }
