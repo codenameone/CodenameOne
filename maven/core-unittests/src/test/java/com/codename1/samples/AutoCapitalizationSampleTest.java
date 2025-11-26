@@ -100,6 +100,20 @@ class AutoCapitalizationSampleTest extends UITestBase {
         flushSerialCalls();
         DisplayTest.flushEdt();
         flushSerialCalls();
+
+        if (!implementation.isEditingText(textField)) {
+            textField.requestFocus();
+            flushSerialCalls();
+            DisplayTest.flushEdt();
+            flushSerialCalls();
+        }
+
+        if (!implementation.isEditingText(textField)) {
+            textField.startEditingAsync();
+            flushSerialCalls();
+            DisplayTest.flushEdt();
+            flushSerialCalls();
+        }
     }
 
     private TextField createSampleField(int constraint) {
