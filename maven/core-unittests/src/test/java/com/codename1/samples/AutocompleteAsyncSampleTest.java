@@ -13,7 +13,6 @@ import com.codename1.ui.CN;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Timer;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -141,7 +140,6 @@ class AutocompleteAsyncSampleTest extends UITestBase {
         private final DefaultListModel<String> options;
         private final String[] database;
         private final AtomicReference<String> pendingText = new AtomicReference<String>();
-        private volatile Timer pendingHandle;
         private final int delayMs;
 
         AsyncAutoCompleteField(DefaultListModel<String> options, String[] database, int delay) {
@@ -170,12 +168,11 @@ class AutocompleteAsyncSampleTest extends UITestBase {
             cancelPending();
             final String filterText = text;
             pendingText.set(filterText);
-            pendingHandle = CN.setTimeout(delayMs, new Runnable() {
+            CN.callSerially(new Runnable() {
                 public void run() {
                     if (!filterText.equals(pendingText.get())) {
                         return;
                     }
-                    pendingHandle = null;
                     options.removeAll();
                     for (int i = 0; i < database.length; i++) {
                         String city = database[i];
@@ -191,11 +188,6 @@ class AutocompleteAsyncSampleTest extends UITestBase {
         }
 
         private void cancelPending() {
-            Timer handle = pendingHandle;
-            if (handle != null) {
-                handle.cancel();
-            }
-            pendingHandle = null;
             pendingText.set(null);
         }
 
