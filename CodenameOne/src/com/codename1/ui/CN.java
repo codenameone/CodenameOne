@@ -849,6 +849,15 @@ public class CN extends CN1Constants {
     }
 
     /**
+     * Returns the initial desktop window size hint provided by the first shown form, when available.
+     *
+     * @return the stored hint or {@code null}
+     */
+    public static Dimension getInitialWindowSizeHintPercent() {
+        return Display.getInstance().getInitialWindowSizeHintPercent();
+    }
+
+    /**
      * Adds a listener for window events such as resize or move.
      *
      * @param l the listener to add
