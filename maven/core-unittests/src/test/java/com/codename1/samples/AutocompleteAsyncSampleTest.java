@@ -4,13 +4,13 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.AutoCompleteTextField;
 import com.codename1.ui.CN;
-import com.codename1.ui.DataChangedListener;
 import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListModel;
+import com.codename1.ui.events.DataChangedListener;
 
 import java.util.ArrayList;
 import java.util.List;
