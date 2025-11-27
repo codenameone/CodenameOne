@@ -13,7 +13,7 @@ import com.codename1.ui.CN;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Timer;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -139,15 +139,12 @@ class AutocompleteAsyncSampleTest extends UITestBase {
 
         private final DefaultListModel<String> options;
         private final String[] database;
-        private final int delay;
-        private Timer handle;
-        private String pendingText;
+        private final AtomicReference<String> pendingText = new AtomicReference<String>();
 
         AsyncAutoCompleteField(DefaultListModel<String> options, String[] database, int delay) {
             super(options);
             this.options = options;
             this.database = database;
-            this.delay = delay;
         }
 
         @Override
@@ -157,16 +154,16 @@ class AutocompleteAsyncSampleTest extends UITestBase {
                 cancelPending();
                 return true;
             }
-            if (text.equals(pendingText)) {
+            if (text.equals(pendingText.get())) {
                 return false;
             }
-            cancelPending();
-            pendingText = text;
             final String filterText = text;
-            handle = CN.setTimeout(delay, new Runnable() {
+            pendingText.set(filterText);
+            CN.callSerially(new Runnable() {
                 public void run() {
-                    handle = null;
-                    pendingText = null;
+                    if (!filterText.equals(pendingText.get())) {
+                        return;
+                    }
                     options.removeAll();
                     for (int i = 0; i < database.length; i++) {
                         String city = database[i];
@@ -174,6 +171,7 @@ class AutocompleteAsyncSampleTest extends UITestBase {
                             options.addItem(city);
                         }
                     }
+                    pendingText.set(null);
                     updateFilterList();
                 }
             });
@@ -181,11 +179,7 @@ class AutocompleteAsyncSampleTest extends UITestBase {
         }
 
         private void cancelPending() {
-            if (handle != null) {
-                handle.cancel();
-            }
-            handle = null;
-            pendingText = null;
+            pendingText.set(null);
         }
 
         List<String> copySuggestions() {
@@ -198,7 +192,7 @@ class AutocompleteAsyncSampleTest extends UITestBase {
         }
 
         boolean hasPendingQuery() {
-            return handle != null;
+            return pendingText.get() != null;
         }
     }
 }
