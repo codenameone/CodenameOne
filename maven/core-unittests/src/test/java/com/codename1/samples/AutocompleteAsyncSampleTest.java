@@ -3,13 +3,14 @@ package com.codename1.samples;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.AutoCompleteTextField;
+import com.codename1.ui.CN;
+import com.codename1.ui.DataChangedListener;
 import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListModel;
-import com.codename1.ui.CN;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -147,11 +148,22 @@ class AutocompleteAsyncSampleTest extends UITestBase {
             this.options = options;
             this.database = database;
             this.delayMs = delay;
+            addDataChangeListener(new DataChangedListener() {
+                public void dataChanged(int type, int index) {
+                    processFilter();
+                }
+            });
         }
 
         @Override
         public void keyReleased(int keyCode) {
             super.keyReleased(keyCode);
+            processFilter();
+        }
+
+        @Override
+        public void setText(String text) {
+            super.setText(text);
             processFilter();
         }
 
