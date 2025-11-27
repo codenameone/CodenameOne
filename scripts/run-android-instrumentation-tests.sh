@@ -190,7 +190,7 @@ declare -A PREVIEW_OUTPUTS=()
 
 ensure_dir "$SCREENSHOT_PREVIEW_DIR"
 
-cn1ss_print_log
+cn1ss_print_log "$TEST_LOG"
 
 for test in "${TEST_NAMES[@]}"; do
   dest="$SCREENSHOT_TMP_DIR/${test}.png"
