@@ -7,7 +7,7 @@ import com.codename1.ui.layouts.Layout;
 import com.codename1.testing.TestUtils;
 
 public abstract class BaseTest extends AbstractTest {
-    private boolean done;
+    private volatile boolean done;
 
     protected Form createForm(String title, Layout layout, final String imageName) {
         return new Form(title, layout) {
@@ -15,7 +15,7 @@ public abstract class BaseTest extends AbstractTest {
             protected void onShowCompleted() {
                 registerReadyCallback(this, () -> {
                     Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot(imageName);
-                    done = true;
+                    done();
                 });
             }
         };
@@ -26,11 +26,11 @@ public abstract class BaseTest extends AbstractTest {
         UITimer.timer(1500, false, parent, run);
     }
 
-    protected void done() {
+    protected synchronized void done() {
         this.done = true;
     }
 
-    public boolean isDone() {
+    public synchronized boolean isDone() {
         return done;
     }
 }
