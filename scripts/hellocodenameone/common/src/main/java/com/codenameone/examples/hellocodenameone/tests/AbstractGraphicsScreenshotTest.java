@@ -10,7 +10,7 @@ abstract class AbstractGraphicsScreenshotTest extends BaseTest {
     protected abstract String screenshotName();
 
     @Override
-    public boolean runTest() throws Exception {
+    public boolean runTest() {
         Form form = createForm("Graphics", new BorderLayout(), screenshotName());
         form.add(BorderLayout.CENTER, createContent());
         form.show();

@@ -1,5 +1,6 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
+import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.testing.DeviceRunner;
 import com.codename1.testing.TestReporting;
@@ -20,6 +21,12 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     };
 
     public void runSuite() {
+        CN.callSerially(() -> {
+            Display.getInstance().addEdtErrorHandler(e -> {
+                log("CN1SS:ERR:exception caught in EDT " + e.getSource());
+                Log.e((Throwable)e.getSource());
+            });
+        });
         for (BaseTest testClass : TEST_CLASSES) {
             CN.callSerially(() -> {
                 log("CN1SS:INFO:suite starting test=" + testClass);
