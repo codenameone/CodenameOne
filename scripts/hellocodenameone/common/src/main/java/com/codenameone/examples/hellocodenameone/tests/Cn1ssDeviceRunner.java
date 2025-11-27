@@ -1,5 +1,6 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
+import com.codename1.impl.CodenameOneThread;
 import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.testing.DeviceRunner;
@@ -24,6 +25,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         CN.callSerially(() -> {
             Display.getInstance().addEdtErrorHandler(e -> {
                 log("CN1SS:ERR:exception caught in EDT " + e.getSource());
+                Thread thr = Thread.currentThread();
+                if(thr instanceof CodenameOneThread && ((CodenameOneThread)thr).hasStackFrame()) {
+                    log("CN1SS:ERR:exception stack: " + ((CodenameOneThread)thr).getStack((Throwable) e.getSource()));
+                }
                 Log.e((Throwable)e.getSource());
             });
         });
