@@ -33,6 +33,8 @@ import com.codename1.messaging.Message;
 import com.codename1.plugin.PluginSupport;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.MessageEvent;
+import com.codename1.ui.events.WindowEvent;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.Style;
 import com.codename1.util.RunnableWithResultSync;
@@ -811,6 +813,78 @@ public class CN extends CN1Constants {
      */
     public static boolean isDesktop() {
         return Display.impl.isDesktop();
+    }
+
+    /**
+     * Returns the size of the desktop hosting the application window when running on a desktop platform.
+     *
+     * @return the desktop size
+     */
+    public static Dimension getDesktopSize() {
+        return Display.getInstance().getDesktopSize();
+    }
+
+    /**
+     * Returns the number of monitors attached to the desktop environment when available.
+     *
+     * @return the number of monitors
+     */
+    /**
+     * Returns the current bounds of the application window when supported by the platform.
+     *
+     * @return the window bounds
+     */
+    public static Rectangle getWindowBounds() {
+        return Display.getInstance().getWindowBounds();
+    }
+
+    /**
+     * Requests a resize of the application window when supported by the platform.
+     *
+     * @param width  the desired window width
+     * @param height the desired window height
+     */
+    public static void setWindowSize(int width, int height) {
+        Display.getInstance().setWindowSize(width, height);
+    }
+
+    /**
+     * Returns the initial desktop window size hint provided by the first shown form, when available.
+     *
+     * @return the stored hint or {@code null}
+     */
+    public static Dimension getInitialWindowSizeHintPercent() {
+        return Display.getInstance().getInitialWindowSizeHintPercent();
+    }
+
+    /**
+     * Sets the initial desktop window size hint (percent of the desktop) that should be used when the
+     * first form is shown. This is primarily useful for desktop environments where the Codename One
+     * application is hosted in a window rather than full-screen.
+     *
+     * @param hint a {@link Dimension} whose width/height represent percentages of the desktop to use for
+     *             the initial window size, or {@code null} to clear a previously stored hint
+     */
+    public static void setInitialWindowSizeHintPercent(Dimension hint) {
+        Display.getInstance().setInitialWindowSizeHintPercent(hint);
+    }
+
+    /**
+     * Adds a listener for window events such as resize or move.
+     *
+     * @param l the listener to add
+     */
+    public static void addWindowListener(ActionListener<WindowEvent> l) {
+        Display.getInstance().addWindowListener(l);
+    }
+
+    /**
+     * Removes a previously registered window listener.
+     *
+     * @param l the listener to remove
+     */
+    public static void removeWindowListener(ActionListener<WindowEvent> l) {
+        Display.getInstance().removeWindowListener(l);
     }
 
     /**

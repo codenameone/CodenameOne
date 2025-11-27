@@ -87,6 +87,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private final TestFont defaultFont = new TestFont(8, 16);
     private int displayWidth = 1080;
     private int displayHeight = 1920;
+    private Dimension desktopSize = new Dimension(displayWidth, displayHeight);
+    private Dimension lastWindowSize;
+    private Rectangle windowBounds = new Rectangle(0, 0, displayWidth, displayHeight);
     private int deviceDensity = Display.DENSITY_MEDIUM;
     private boolean portrait = true;
     private boolean touchDevice = true;
@@ -1047,6 +1050,49 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public int getDisplayHeight() {
         return displayHeight;
+    }
+
+    @Override
+    public Dimension getDesktopSize() {
+        return desktopSize;
+    }
+
+    public void setDesktopSize(Dimension desktopSize) {
+        this.desktopSize = desktopSize;
+    }
+
+    @Override
+    public Rectangle getWindowBounds() {
+        if (windowBounds == null) {
+            return new Rectangle(0, 0, displayWidth, displayHeight);
+        }
+        return new Rectangle(windowBounds);
+    }
+
+    public void setWindowBounds(Rectangle windowBounds) {
+        this.windowBounds = windowBounds;
+    }
+
+    @Override
+    public void setInitialWindowSizeHintPercent(Dimension hint) {
+        super.setInitialWindowSizeHintPercent(hint);
+        if (hint != null && desktopSize != null) {
+            int width = Math.min(desktopSize.getWidth(), Math.max(1, Math.round(desktopSize.getWidth() * (hint.getWidth() / 100f))));
+            int height = Math.min(desktopSize.getHeight(), Math.max(1, Math.round(desktopSize.getHeight() * (hint.getHeight() / 100f))));
+            setWindowSize(width, height);
+        }
+    }
+
+    @Override
+    public void setWindowSize(int width, int height) {
+        lastWindowSize = new Dimension(width, height);
+        displayWidth = width;
+        displayHeight = height;
+        windowBounds = new Rectangle(windowBounds == null ? 0 : windowBounds.getX(), windowBounds == null ? 0 : windowBounds.getY(), width, height);
+    }
+
+    public Dimension getLastWindowSize() {
+        return lastWindowSize == null ? null : new Dimension(lastWindowSize);
     }
 
     @Override

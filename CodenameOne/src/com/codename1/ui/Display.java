@@ -55,6 +55,7 @@ import com.codename1.ui.animations.Transition;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.MessageEvent;
+import com.codename1.ui.events.WindowEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.Style;
@@ -261,6 +262,12 @@ public final class Display extends CN1Constants {
      * Indicates that commands should try to add themselves to the native menus
      */
     public static final int COMMAND_BEHAVIOR_NATIVE = 10;
+    /**
+     * Client property key used on the first shown {@link Form} to indicate the desired initial
+     * window size as a percentage of the available desktop. The value should be a {@link com.codename1.ui.geom.Dimension}
+     * whose width and height represent percentages.
+     */
+    public static final String WINDOW_SIZE_HINT_PERCENT = "cn1.windowSizePercent";
     static final Display INSTANCE = new Display();
     static final Object lock = new Object();
     private static final int POINTER_PRESSED = 1;
@@ -293,6 +300,11 @@ public final class Display extends CN1Constants {
     private boolean inNativeUI;
     private Runnable bookmark;
     private EventDispatcher messageListeners;
+    private EventDispatcher windowListeners;
+    /**
+     * Tracks whether the initial window size hint has already been consumed for the first shown form.
+     */
+    private boolean initialWindowSizeApplied;
     private boolean disableInvokeAndBlock;
     /**
      * Enable Async stack traces.  This is disabled by default, but will cause
@@ -430,6 +442,7 @@ public final class Display extends CN1Constants {
     public static void init(Object m) {
         if (!INSTANCE.codenameOneRunning) {
             INSTANCE.codenameOneRunning = true;
+            INSTANCE.initialWindowSizeApplied = false;
             INSTANCE.pluginSupport = new PluginSupport();
             INSTANCE.displayInitTime = System.currentTimeMillis();
 
@@ -1648,6 +1661,9 @@ public final class Display extends CN1Constants {
         } else {
             forceShow = true;
         }
+        if (!initialWindowSizeApplied) {
+            initialWindowSizeApplied = applyInitialWindowSize(newForm);
+        }
         keyRepeatCharged = false;
         longPressCharged = false;
         longPointerCharged = false;
@@ -1667,6 +1683,18 @@ public final class Display extends CN1Constants {
         lastKeyPressed = 0;
         previousKeyPressed = 0;
         newForm.onShowCompletedImpl();
+    }
+
+    private boolean applyInitialWindowSize(Form form) {
+        if (form == null) {
+            return false;
+        }
+        Object hint = form.getClientProperty(WINDOW_SIZE_HINT_PERCENT);
+        if (!(hint instanceof Dimension)) {
+            return false;
+        }
+        impl.setInitialWindowSizeHintPercent((Dimension) hint);
+        return true;
     }
 
     /**
@@ -2553,6 +2581,63 @@ public final class Display extends CN1Constants {
     }
 
     /**
+     * Returns the size of the desktop hosting the application window when running on a desktop platform.
+     *
+     * @return the desktop size or the current display size if not supported
+     */
+    public Dimension getDesktopSize() {
+        Dimension desktopSize = impl.getDesktopSize();
+        if (desktopSize != null) {
+            return desktopSize;
+        }
+        return new Dimension(getDisplayWidth(), getDisplayHeight());
+    }
+
+    /**
+     * Returns the current window bounds when running on a desktop platform.
+     *
+     * @return the bounds of the application window
+     */
+    public Rectangle getWindowBounds() {
+        Rectangle bounds = impl.getWindowBounds();
+        if (bounds == null) {
+            return new Rectangle(0, 0, getDisplayWidth(), getDisplayHeight());
+        }
+        return bounds;
+    }
+
+    /**
+     * Requests a resize of the application window when supported by the platform.
+     *
+     * @param width  the desired window width
+     * @param height the desired window height
+     */
+    public void setWindowSize(int width, int height) {
+        impl.setWindowSize(width, height);
+    }
+
+    /**
+     * Returns the initial desktop window size hint provided by the first shown form, when available.
+     *
+     * @return the stored hint or {@code null}
+     */
+    public Dimension getInitialWindowSizeHintPercent() {
+        return impl.getInitialWindowSizeHintPercent();
+    }
+
+    /**
+     * Sets the initial desktop window size hint (percent of the desktop) that should be used when the
+     * first form is shown. This is primarily useful for desktop environments where the Codename One
+     * application is hosted in a window rather than full-screen.
+     *
+     * @param hint a {@link Dimension} whose width/height represent percentages of the desktop to use for
+     *             the initial window size, or {@code null} to clear a previously stored hint
+     */
+    public void setInitialWindowSizeHintPercent(Dimension hint) {
+        impl.setInitialWindowSizeHintPercent(hint);
+    }
+
+    /**
      * Causes the given component to repaint, used internally by Form
      *
      * @param cmp the given component to repaint
@@ -3317,6 +3402,54 @@ public final class Display extends CN1Constants {
     public void dispatchMessage(MessageEvent evt) {
         if (messageListeners != null && messageListeners.hasListeners()) {
             messageListeners.fireActionEvent(evt);
+        }
+    }
+
+    /**
+     * Adds a listener to receive notifications about native window changes such as resize or movement.
+     *
+     * @param l the listener to add
+     */
+    public synchronized void addWindowListener(ActionListener<WindowEvent> l) {
+        if (windowListeners == null) {
+            windowListeners = new EventDispatcher();
+        }
+        windowListeners.addListener(l);
+    }
+
+    /**
+     * Removes a previously registered window listener.
+     *
+     * @param l the listener to remove
+     */
+    public synchronized void removeWindowListener(ActionListener<WindowEvent> l) {
+        if (windowListeners != null) {
+            windowListeners.removeListener(l);
+        }
+    }
+
+    /**
+     * Dispatches a window change event to registered listeners. This method is intended to be invoked by
+     * platform implementations.
+     *
+     * @param evt the window event to dispatch
+     */
+    public void fireWindowEvent(WindowEvent evt) {
+        if (evt == null || windowListeners == null || !windowListeners.hasListeners()) {
+            return;
+        }
+        if (isEdt()) {
+            windowListeners.fireActionEvent(evt);
+        } else {
+            final WindowEvent windowEvent = evt;
+            callSerially(new Runnable() {
+                @Override
+                public void run() {
+                    if (windowListeners != null && windowListeners.hasListeners()) {
+                        windowListeners.fireActionEvent(windowEvent);
+                    }
+                }
+            });
         }
     }
 

@@ -227,6 +227,14 @@ public class JavaSEPort extends CodenameOneImplementation {
         */
     }
 
+    private void fireDesktopWindowEvent(com.codename1.ui.events.WindowEvent.Type type) {
+        if (!isDesktop() || !Display.isInitialized()) {
+            return;
+        }
+        Display display = Display.getInstance();
+        display.fireWindowEvent(new com.codename1.ui.events.WindowEvent(display, type, getWindowBounds()));
+    }
+
     @Override
     public boolean isFullScreenSupported() {
         Preferences pref = Preferences.userNodeForPackage(JavaSEPort.class);
@@ -5532,6 +5540,7 @@ public class JavaSEPort extends CodenameOneImplementation {
             window.addWindowListener(new WindowListener() {
 
                 public void windowOpened(WindowEvent e) {
+                    fireDesktopWindowEvent(com.codename1.ui.events.WindowEvent.Type.Shown);
                 }
 
                 public void windowClosing(WindowEvent e) {
@@ -5539,12 +5548,15 @@ public class JavaSEPort extends CodenameOneImplementation {
                 }
 
                 public void windowClosed(WindowEvent e) {
+                    fireDesktopWindowEvent(com.codename1.ui.events.WindowEvent.Type.Hidden);
                 }
 
                 public void windowIconified(WindowEvent e) {
+                    fireDesktopWindowEvent(com.codename1.ui.events.WindowEvent.Type.Minimized);
                 }
 
                 public void windowDeiconified(WindowEvent e) {
+                    fireDesktopWindowEvent(com.codename1.ui.events.WindowEvent.Type.Restored);
                 }
 
                 public void windowActivated(WindowEvent e) {
@@ -5569,15 +5581,27 @@ public class JavaSEPort extends CodenameOneImplementation {
                 @Override
                 public void componentResized(ComponentEvent e) {
                     saveBounds(e);
+                    fireDesktopWindowEvent(com.codename1.ui.events.WindowEvent.Type.Resized);
                 }
 
                 @Override
                 public void componentMoved(ComponentEvent e) {
                     saveBounds(e);
+                    fireDesktopWindowEvent(com.codename1.ui.events.WindowEvent.Type.Moved);
                 }
-                
-                
-                
+
+                @Override
+                public void componentShown(ComponentEvent e) {
+                    fireDesktopWindowEvent(com.codename1.ui.events.WindowEvent.Type.Shown);
+                }
+
+                @Override
+                public void componentHidden(ComponentEvent e) {
+                    fireDesktopWindowEvent(com.codename1.ui.events.WindowEvent.Type.Hidden);
+                }
+
+
+
             });
             window.setLocationByPlatform(true);
 
@@ -5616,7 +5640,13 @@ public class JavaSEPort extends CodenameOneImplementation {
                 window.setUndecorated(true);
                 window.setExtendedState(JFrame.MAXIMIZED_BOTH);
             }
-            window.pack();
+            java.awt.Dimension initialSize = resolveInitialWindowSizeFromHint();
+            if (initialSize != null) {
+                window.setSize(initialSize);
+                window.validate();
+            } else {
+                window.pack();
+            }
             if (getSkin() != null && !scrollableSkin) {
                 zoomLevel = zoomLevel();
             }
@@ -5743,6 +5773,58 @@ public class JavaSEPort extends CodenameOneImplementation {
             return (int)(canvas.getParent().getHeight() * retinaScale);
         }
         return Math.max(h, 100);
+    }
+
+    @Override
+    public com.codename1.ui.geom.Dimension getDesktopSize() {
+        if (!isDesktop()) {
+            return super.getDesktopSize();
+        }
+        java.awt.Dimension size = Toolkit.getDefaultToolkit().getScreenSize();
+        return new com.codename1.ui.geom.Dimension(size.width, size.height);
+    }
+
+    private java.awt.Dimension resolveInitialWindowSizeFromHint() {
+        com.codename1.ui.geom.Dimension percent = getInitialWindowSizeHintPercent();
+        com.codename1.ui.geom.Dimension desktopSize = getDesktopSize();
+        if (percent == null || desktopSize == null) {
+            return null;
+        }
+        int width = Math.min(desktopSize.getWidth(), Math.max(1, Math.round(desktopSize.getWidth() * (percent.getWidth() / 100f))));
+        int height = Math.min(desktopSize.getHeight(), Math.max(1, Math.round(desktopSize.getHeight() * (percent.getHeight() / 100f))));
+        setInitialWindowSizeHintPercent(null);
+        return new java.awt.Dimension(width, height);
+    }
+
+    @Override
+    public com.codename1.ui.geom.Rectangle getWindowBounds() {
+        if (!isDesktop()) {
+            return super.getWindowBounds();
+        }
+        JFrame frame = findTopFrame();
+        if (frame == null) {
+            return super.getWindowBounds();
+        }
+        java.awt.Rectangle bounds = frame.getBounds();
+        return new com.codename1.ui.geom.Rectangle(bounds.x, bounds.y, bounds.width, bounds.height);
+    }
+
+    @Override
+    public void setWindowSize(int width, int height) {
+        if (!isDesktop()) {
+            return;
+        }
+        final JFrame frame = findTopFrame();
+        if (frame != null) {
+            final java.awt.Dimension size = new java.awt.Dimension(width, height);
+            SwingUtilities.invokeLater(new Runnable() {
+                @Override
+                public void run() {
+                    frame.setSize(size);
+                    frame.validate();
+                }
+            });
+        }
     }
 
     /**

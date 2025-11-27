@@ -174,6 +174,7 @@ public abstract class CodenameOneImplementation {
      */
     private final Rectangle paintDirtyTmpRect = new Rectangle();
     private BrowserComponent sharedJavascriptContext;
+    private Dimension initialWindowSizeHintPercent;
 
     static void setOnCurrentFormChange(Runnable on) {
         onCurrentFormChange = on;
@@ -465,6 +466,54 @@ public abstract class CodenameOneImplementation {
      */
     public int getActualDisplayHeight() {
         return getDisplayHeight();
+    }
+
+    /**
+     * Returns the size of the desktop area hosting the application window when running on a desktop
+     * platform. Implementations that do not support windows may return {@code null}.
+     *
+     * @return the desktop size or {@code null}
+     */
+    public Dimension getDesktopSize() {
+        return null;
+    }
+
+    /**
+     * Returns the bounds of the application window when running on a desktop platform.
+     *
+     * @return the window bounds, defaults to the current display size
+     */
+    public Rectangle getWindowBounds() {
+        return new Rectangle(0, 0, getDisplayWidth(), getDisplayHeight());
+    }
+
+    /**
+     * Requests a resize of the application window when supported by the platform.
+     *
+     * @param width  the desired window width in pixels
+     * @param height the desired window height in pixels
+     */
+    public void setWindowSize(int width, int height) {
+    }
+
+    /**
+     * Stores an optional window size hint (in percent values) for desktop environments. Implementations
+     * that do not support windows may ignore this value.
+     *
+     * @param hint a {@link Dimension} whose width/height represent percentages of the desktop to use for
+     *             the initial window size, or {@code null} to clear a previously stored hint
+     */
+    public void setInitialWindowSizeHintPercent(Dimension hint) {
+        initialWindowSizeHintPercent = hint;
+    }
+
+    /**
+     * Returns the optional desktop window size hint provided by the first form.
+     *
+     * @return the stored hint or {@code null}
+     */
+    public Dimension getInitialWindowSizeHintPercent() {
+        return initialWindowSizeHintPercent;
     }
 
     /**

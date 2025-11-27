@@ -25,12 +25,16 @@ public abstract class UITestBase {
 
     @BeforeEach
     protected void setUpDisplay() throws Exception {
-        if(!Display.isInitialized() && TestCodenameOneImplementation.getInstance() == null) {
-            implementation = new TestCodenameOneImplementation();
+        if (!Display.isInitialized()) {
+            implementation = TestCodenameOneImplementation.getInstance();
+            if (implementation == null) {
+                implementation = new TestCodenameOneImplementation();
+            }
+            final TestCodenameOneImplementation implRef = implementation;
             ImplementationFactory.setInstance(new ImplementationFactory() {
                 @Override
                 public Object createImplementation() {
-                    return implementation;
+                    return implRef;
                 }
             });
             Display.init(null);
