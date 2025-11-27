@@ -2626,6 +2626,18 @@ public final class Display extends CN1Constants {
     }
 
     /**
+     * Sets the initial desktop window size hint (percent of the desktop) that should be used when the
+     * first form is shown. This is primarily useful for desktop environments where the Codename One
+     * application is hosted in a window rather than full-screen.
+     *
+     * @param hint a {@link Dimension} whose width/height represent percentages of the desktop to use for
+     *             the initial window size, or {@code null} to clear a previously stored hint
+     */
+    public void setInitialWindowSizeHintPercent(Dimension hint) {
+        impl.setInitialWindowSizeHintPercent(hint);
+    }
+
+    /**
      * Causes the given component to repaint, used internally by Form
      *
      * @param cmp the given component to repaint

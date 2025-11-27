@@ -62,6 +62,11 @@ class WindowApiTest extends UITestBase {
         assertEquals(50, initialHint.getWidth());
         assertEquals(25, initialHint.getHeight());
 
+        Dimension initialHintFromCN = CN.getInitialWindowSizeHintPercent();
+        assertNotNull(initialHintFromCN);
+        assertEquals(50, initialHintFromCN.getWidth());
+        assertEquals(25, initialHintFromCN.getHeight());
+
         Dimension lastWindowSize = implementation.getLastWindowSize();
         assertNotNull(lastWindowSize);
         assertEquals(1000, lastWindowSize.getWidth());
