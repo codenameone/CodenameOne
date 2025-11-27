@@ -169,6 +169,9 @@ class AutocompleteAsyncSampleTest extends UITestBase {
 
         @Override
         protected boolean filter(String text) {
+            if (text == null) {
+                text = "";
+            }
             if (text.length() == 0) {
                 options.removeAll();
                 cancelPending();
