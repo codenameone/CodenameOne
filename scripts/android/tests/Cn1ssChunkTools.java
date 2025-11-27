@@ -41,7 +41,7 @@ public class Cn1ssChunkTools {
         String[] lines = text.split("\r?\n");
         for(String line : lines) {
             Matcher matcher = CHUNK_PATTERN.matcher(line);
-            if(line.startsWith("CN1SS:") && !matcher.find()) {
+            if(line.contains("CN1SS:") && !matcher.find()) {
                 error = error || line.indexOf(":ERR:") > -1;
                 System.out.println(line);
             }
