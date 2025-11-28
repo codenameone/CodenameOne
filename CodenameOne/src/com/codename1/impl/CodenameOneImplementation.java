@@ -8734,6 +8734,7 @@ public abstract class CodenameOneImplementation {
      * @return a stack trace string that might be blank
      */
     public String getStackTrace(Thread parentThread, Throwable t) {
+        System.out.println("CN1SS:ERR:Invoking getStackTrace in CodenameOneImplementation");
         if (parentThread instanceof CodenameOneThread && ((CodenameOneThread) parentThread).hasStackFrame()) {
             return ((CodenameOneThread) parentThread).getStack(t);
         }

@@ -1128,6 +1128,7 @@ public final class Display extends CN1Constants {
      * @return a stack trace string that might be blank
      */
     public String getStackTrace(Thread parentThread, Throwable t) {
+        System.out.println("CN1SS:ERR:Invoking getStackTrace in Display");
         return impl.getStackTrace(parentThread, t);
     }
 
