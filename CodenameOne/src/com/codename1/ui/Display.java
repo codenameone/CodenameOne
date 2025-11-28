@@ -1119,6 +1119,19 @@ public final class Display extends CN1Constants {
     }
 
     /**
+     * Returns the stack trace from the exception on the given
+     * thread. This API isn't supported on all platforms and may
+     * return a blank string when unavailable.
+     *
+     * @param parentThread the thread in which the exception was thrown
+     * @param t the exception
+     * @return a stack trace string that might be blank
+     */
+    public String getStackTrace(Thread parentThread, Throwable t) {
+        return impl.getStackTrace(parentThread, t);
+    }
+
+    /**
      * Implementation of the event dispatch loop content
      */
     void edtLoopImpl() {

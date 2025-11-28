@@ -544,7 +544,13 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return out;
     }
 
-
+    public String getStackTrace(Thread parentThread, Throwable t) {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        PrintWriter w = new PrintWriter(bos);
+        t.printStackTrace(w);
+        w.close();
+        return bos.toString();
+    }
 
     public static void initPushContent(String message, String image, String messageType, String category, Context context) {
         com.codename1.push.PushContent.reset();

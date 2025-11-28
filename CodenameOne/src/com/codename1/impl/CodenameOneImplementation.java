@@ -8724,6 +8724,22 @@ public abstract class CodenameOneImplementation {
         // should override this method.
     }
 
+    /**
+     * Returns the stack trace from the exception on the given
+     * thread. This API isn't supported on all platforms and may
+     * return a blank string when unavailable.
+     *
+     * @param parentThread the thread in which the exception was thrown
+     * @param t the exception
+     * @return a stack trace string that might be blank
+     */
+    public String getStackTrace(Thread parentThread, Throwable t) {
+        if (parentThread instanceof CodenameOneThread && ((CodenameOneThread) parentThread).hasStackFrame()) {
+            return ((CodenameOneThread) parentThread).getStack(t);
+        }
+        return "";
+    }
+
     class RPush implements Runnable {
         public void run() {
             final long pushId = Preferences.get("push_id", (long) -1);

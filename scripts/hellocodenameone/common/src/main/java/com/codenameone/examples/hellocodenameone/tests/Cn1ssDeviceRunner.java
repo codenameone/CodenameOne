@@ -9,6 +9,7 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.testing.AbstractTest;
+import com.codename1.util.StringUtil;
 
 public final class Cn1ssDeviceRunner extends DeviceRunner {
     private static final BaseTest[] TEST_CLASSES = new BaseTest[] {
@@ -25,11 +26,9 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         CN.callSerially(() -> {
             Display.getInstance().addEdtErrorHandler(e -> {
                 log("CN1SS:ERR:exception caught in EDT " + e.getSource());
-                Thread thr = Thread.currentThread();
-                if(thr instanceof CodenameOneThread && ((CodenameOneThread)thr).hasStackFrame()) {
-                    log("CN1SS:ERR:exception stack: " + ((CodenameOneThread)thr).getStack((Throwable) e.getSource()));
-                }
-                Log.e((Throwable)e.getSource());
+                String stack = "CN1SS:ERR:exception stack: " + Display.getInstance().getStackTrace(Thread.currentThread(), (Throwable)e.getSource());
+                stack = StringUtil.replaceAll(stack,"\n", "\nCN1SS:ERR:exception stack: ");
+                log(stack);
             });
         });
         for (BaseTest testClass : TEST_CLASSES) {
