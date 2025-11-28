@@ -205,7 +205,7 @@ class AutocompleteAsyncSampleTest extends UITestBase {
                             options.addItem(city);
                         }
                     }
-                    super.filter(filterText);
+                    AsyncAutoCompleteField.super.filter(filterText);
                     pendingText.set(null);
                     updateFilterList();
                 }
