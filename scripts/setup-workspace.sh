@@ -228,6 +228,12 @@ fi
 log "Building Codename One core modules"
 "$MAVEN_HOME/bin/mvn" -f maven/pom.xml -DskipTests -Djava.awt.headless=true -Dcn1.binaries="$CN1_BINARIES" -Dcodename1.platform=javase -P local-dev-javase,compile-android install "$@"
 
+log "Building Codename One Maven plugin"
+"$MAVEN_HOME/bin/mvn" -f maven/pom.xml \
+  -pl codenameone-maven-plugin -am \
+  -DskipTests -Djava.awt.headless=true \
+  install "$@"
+
 BUILD_CLIENT="$HOME/.codenameone/CodeNameOneBuildClient.jar"
 log "Ensuring CodeNameOneBuildClient.jar is installed"
 if [ ! -f "$BUILD_CLIENT" ]; then
