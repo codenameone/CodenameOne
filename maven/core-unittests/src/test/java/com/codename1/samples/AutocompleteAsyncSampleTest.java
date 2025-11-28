@@ -3,7 +3,6 @@ package com.codename1.samples;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.AutoCompleteTextField;
-import com.codename1.ui.CN;
 import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
@@ -141,14 +140,12 @@ class AutocompleteAsyncSampleTest extends UITestBase {
         private final DefaultListModel<String> options;
         private final String[] database;
         private final AtomicReference<String> pendingText = new AtomicReference<String>();
-        private final int delayMs;
         private boolean ready;
 
         AsyncAutoCompleteField(DefaultListModel<String> options, String[] database, int delay) {
             super(options);
             this.options = options;
             this.database = database;
-            this.delayMs = delay;
             this.ready = true;
             addDataChangeListener(new DataChangedListener() {
                 public void dataChanged(int type, int index) {
@@ -187,40 +184,20 @@ class AutocompleteAsyncSampleTest extends UITestBase {
             if (text == null) {
                 text = "";
             }
-            if (text.length() == 0) {
-                options.removeAll();
-                super.filter(text);
-                cancelPending();
-                return true;
-            }
-            if (text.equals(pendingText.get())) {
-                return false;
-            }
-            cancelPending();
-            final String filterText = text;
-            pendingText.set(filterText);
-            CN.callSerially(new Runnable() {
-                public void run() {
-                    if (!filterText.equals(pendingText.get())) {
-                        return;
+            pendingText.set(text);
+            options.removeAll();
+            if (text.length() > 0) {
+                for (int i = 0; i < database.length; i++) {
+                    String city = database[i];
+                    if (city.toLowerCase().startsWith(text.toLowerCase())) {
+                        options.addItem(city);
                     }
-                    options.removeAll();
-                    for (int i = 0; i < database.length; i++) {
-                        String city = database[i];
-                        if (city.toLowerCase().startsWith(filterText.toLowerCase())) {
-                            options.addItem(city);
-                        }
-                    }
-                    AsyncAutoCompleteField.super.filter(filterText);
-                    pendingText.set(null);
-                    updateFilterList();
                 }
-            });
-            return false;
-        }
-
-        private void cancelPending() {
+            }
+            AsyncAutoCompleteField.super.filter(text);
             pendingText.set(null);
+            updateFilterList();
+            return true;
         }
 
         private void processFilter() {
