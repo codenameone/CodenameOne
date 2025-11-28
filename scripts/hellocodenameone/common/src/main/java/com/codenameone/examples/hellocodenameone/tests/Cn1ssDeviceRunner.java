@@ -1,13 +1,20 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
+import com.codename1.impl.CodenameOneThread;
+import com.codename1.io.Log;
+import com.codename1.io.Util;
 import com.codename1.testing.DeviceRunner;
 import com.codename1.testing.TestReporting;
+import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.testing.AbstractTest;
+import com.codename1.util.StringUtil;
+
+import java.util.List;
 
 public final class Cn1ssDeviceRunner extends DeviceRunner {
-    private static final AbstractTest[] TEST_CLASSES = new AbstractTest[] {
+    private static final BaseTest[] TEST_CLASSES = new BaseTest[] {
             new MainScreenScreenshotTest(),
             new GraphicsPipelineScreenshotTest(),
             new GraphicsShapesAndGradientsScreenshotTest(),
@@ -18,17 +25,40 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
     };
 
     public void runSuite() {
-        for (AbstractTest testClass : TEST_CLASSES) {
-            log("CN1SS:INFO:suite starting test=" + testClass);
-            try {
-                testClass.prepare();
-                testClass.runTest();
-                testClass.cleanup();
-                log("CN1SS:INFO:suite finished test=" + testClass);
-            } catch (Throwable t) {
-                log("CN1SS:ERR:suite test=" + testClass + " failed=" + t);
-                t.printStackTrace();
+        CN.callSerially(() -> {
+            Display.getInstance().addEdtErrorHandler(e -> {
+                log("CN1SS:ERR:exception caught in EDT " + e.getSource());
+                String stack = Display.getInstance().getStackTrace(Thread.currentThread(), (Throwable)e.getSource());
+                log("CN1SS:ERR:exception stack of length: " + stack.length());
+                for(String s : StringUtil.tokenize(stack, '\n')) {
+                    if(s.length() > 200) {
+                        s = s.substring(0, 200);
+                    }
+                    log("CN1SS:ERR:Stack:" + s);
+                }
+            });
+        });
+        for (BaseTest testClass : TEST_CLASSES) {
+            CN.callSerially(() -> {
+                log("CN1SS:INFO:suite starting test=" + testClass);
+                try {
+                    testClass.prepare();
+                    testClass.runTest();
+                } catch (Throwable t) {
+                    log("CN1SS:ERR:suite test=" + testClass + " failed=" + t);
+                    t.printStackTrace();
+                }
+            });
+            int timeout = 9000;
+            while (!testClass.isDone() && timeout > 0) {
+                Util.sleep(3);
+                timeout--;
             }
+            testClass.cleanup();
+            if(timeout == 0) {
+                log("CN1SS:ERR:suite test=" + testClass + " failed due to timeout waiting for DONE");
+            }
+            log("CN1SS:INFO:suite finished test=" + testClass);
         }
         log("CN1SS:SUITE:FINISHED");
         TestReporting.getInstance().testExecutionFinished(getClass().getName());
@@ -48,7 +78,6 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 new Form().show();
             }
         });
-        Cn1ssDeviceRunnerHelper.waitForMillis(200);
     }
 
     @Override
@@ -60,6 +89,5 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                 current.revalidate();
             }
         });
-        Cn1ssDeviceRunnerHelper.waitForMillis(200);
     }
 }

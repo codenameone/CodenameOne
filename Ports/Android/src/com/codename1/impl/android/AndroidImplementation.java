@@ -544,7 +544,15 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         return out;
     }
 
-
+    public String getStackTrace(Thread parentThread, Throwable t) {
+        System.out.println("CN1SS:ERR:Invoking getStackTrace in AndroidImplementation");
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        PrintWriter w = new PrintWriter(bos);
+        t.printStackTrace(w);
+        w.close();
+        System.out.println("CN1SS:ERR:AndroidImplementation getStackTrace completed");
+        return bos.toString();
+    }
 
     public static void initPushContent(String message, String image, String messageType, String category, Context context) {
         com.codename1.push.PushContent.reset();

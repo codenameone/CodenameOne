@@ -1,17 +1,17 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
-import com.codename1.testing.AbstractTest;
-import com.codename1.testing.TestUtils;
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Form;
 import com.codename1.ui.CN;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.util.UITimer;
 
 public class BrowserComponentScreenshotTest extends BaseTest {
     private BrowserComponent browser;
     @Override
     public boolean runTest() throws Exception {
         if (!BrowserComponent.isNativeBrowserSupported()) {
+            done();
             return true;
         }
         Form form = createForm("Browser Test", new BorderLayout(), "BrowserComponent");
@@ -19,11 +19,12 @@ public class BrowserComponentScreenshotTest extends BaseTest {
         browser.setPage(buildHtml(), null);
         form.add(BorderLayout.CENTER, browser);
         form.show();
-        return waitForDone();
+        return true;
     }
 
     protected void registerReadyCallback(Form parent, final Runnable run) {
-        browser.addWebEventListener(BrowserComponent.onLoad, evt -> CN.callSerially(run));
+        browser.addWebEventListener(BrowserComponent.onLoad, evt ->
+                UITimer.timer(200, false, parent, run));
     }
 
     private static String buildHtml() {

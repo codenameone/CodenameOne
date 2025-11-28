@@ -155,11 +155,11 @@ public class GraphicsStateAndTextScreenshotTest extends AbstractGraphicsScreensh
             g.setColor(0x475569);
             g.drawRect(x, y, w - 1, h - 1);
 
-            Font original = g.getFont();
-            g.setFont(original.derive(Font.STYLE_BOLD, original.getHeight() + 2));
+            Font nativeFont = Font.createTrueTypeFont("native:MainLight");
+            g.setFont(nativeFont.derive(Font.STYLE_BOLD, Font.getDefaultFont().getHeight() + 2));
             g.setColor(0x22c55e);
             g.drawString("drawString", x + 10, y + 10, Style.TEXT_DECORATION_UNDERLINE);
-            g.setFont(original);
+            g.setFont(nativeFont);
 
             g.setColor(0xf97316);
             g.drawStringBaseline("baseline", x + 10, y + 42);
