@@ -3,8 +3,8 @@ package com.codename1.samples;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.AutoCompleteTextField;
+import com.codename1.ui.CN;
 import com.codename1.ui.Component;
-import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BoxLayout;
@@ -98,7 +98,7 @@ class AutocompleteAsyncSampleTest extends UITestBase {
     }
 
     private void fieldSetTextDirectly(char ch) {
-        Form current = DisplayTest.getCurrentForm();
+        Form current = CN.getCurrentForm();
         if (current == null) {
             return;
         }
