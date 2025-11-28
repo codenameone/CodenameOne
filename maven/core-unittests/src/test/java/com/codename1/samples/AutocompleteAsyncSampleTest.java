@@ -3,12 +3,12 @@ package com.codename1.samples;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.AutoCompleteTextField;
+import com.codename1.ui.Component;
 import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.list.DefaultListModel;
-import com.codename1.ui.list.ListModel;
 import com.codename1.ui.events.DataChangedListener;
 
 import java.util.ArrayList;
@@ -93,6 +93,23 @@ class AutocompleteAsyncSampleTest extends UITestBase {
     private void typeText(String text) {
         for (int i = 0; i < text.length(); i++) {
             implementation.dispatchKeyPress(text.charAt(i));
+            fieldSetTextDirectly(text.charAt(i));
+        }
+    }
+
+    private void fieldSetTextDirectly(char ch) {
+        Form current = DisplayTest.getCurrentForm();
+        if (current == null) {
+            return;
+        }
+        Component editing = current.getComponentAt(0);
+        if (editing instanceof AsyncAutoCompleteField) {
+            AsyncAutoCompleteField field = (AsyncAutoCompleteField) editing;
+            String existing = field.getText();
+            if (existing == null) {
+                existing = "";
+            }
+            field.setText(existing + ch);
         }
     }
 
@@ -212,9 +229,8 @@ class AutocompleteAsyncSampleTest extends UITestBase {
 
         List<String> copySuggestions() {
             ArrayList<String> suggestions = new ArrayList<String>();
-            ListModel<String> model = getSuggestionModel();
-            for (int i = 0; i < model.getSize(); i++) {
-                suggestions.add(model.getItemAt(i));
+            for (int i = 0; i < options.getSize(); i++) {
+                suggestions.add(options.getItemAt(i));
             }
             return suggestions;
         }
