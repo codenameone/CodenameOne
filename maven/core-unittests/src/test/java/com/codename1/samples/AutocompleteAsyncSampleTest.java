@@ -94,23 +94,6 @@ class AutocompleteAsyncSampleTest extends UITestBase {
     private void typeText(String text) {
         for (int i = 0; i < text.length(); i++) {
             implementation.dispatchKeyPress(text.charAt(i));
-            fieldSetTextDirectly(text.charAt(i));
-        }
-    }
-
-    private void fieldSetTextDirectly(char ch) {
-        Form current = CN.getCurrentForm();
-        if (current == null) {
-            return;
-        }
-        Component editing = current.getComponentAt(0);
-        if (editing instanceof AsyncAutoCompleteField) {
-            AsyncAutoCompleteField field = (AsyncAutoCompleteField) editing;
-            String existing = field.getText();
-            if (existing == null) {
-                existing = "";
-            }
-            field.setText(existing + ch);
         }
     }
 
