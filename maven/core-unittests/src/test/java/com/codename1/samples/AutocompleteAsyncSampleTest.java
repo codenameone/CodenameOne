@@ -164,6 +164,12 @@ class AutocompleteAsyncSampleTest extends UITestBase {
         }
 
         @Override
+        public void keyPressed(int keyCode) {
+            super.keyPressed(keyCode);
+            processFilter();
+        }
+
+        @Override
         public void setText(String text) {
             if (!ready) {
                 super.setText(text);
