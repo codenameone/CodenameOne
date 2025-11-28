@@ -11,6 +11,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -23,15 +24,11 @@ public class MediaPlaybackScreenshotTest extends BaseTest {
     @Override
     public boolean runTest() throws Exception {
         Form form = createForm("Media Playback", new BorderLayout(), "MediaPlayback");
-        String tonePath = writeToneWav();
         final Label statusLabel = new Label("Preparing media sample…");
-        if (tonePath == null) {
-            updateStatus(statusLabel, form, "Failed to generate tone file");
+        Media media = MediaManager.createMedia(new ByteArrayInputStream(buildToneWav()), "audio/wav");
+        if (media == null) {
+            updateStatus(statusLabel, form, "Media creation returned null");
         } else {
-            Media media = MediaManager.createMedia(tonePath, false);
-            if (media == null) {
-                updateStatus(statusLabel, form, "Media creation returned null");
-            }
             media.setTime(0);
             media.play();
             statusLabel.setText("Starting playback…");
@@ -56,30 +53,7 @@ public class MediaPlaybackScreenshotTest extends BaseTest {
             }
         });
     }
-
-    private static void cleanupMedia(Media media) {
-        if (media == null) {
-            return;
-        }
-        Cn1ssDeviceRunnerHelper.runOnEdtSync(media::cleanup);
-    }
-
-    private static String writeToneWav() {
-        byte[] wav = buildToneWav();
-        if (wav.length == 0) {
-            return null;
-        }
-        String path = FileSystemStorage.getInstance().getAppHomePath() + "media-playback-test.wav";
-        FileSystemStorage.getInstance().delete(path);
-        try (OutputStream out = FileSystemStorage.getInstance().openOutputStream(path)) {
-            out.write(wav);
-            return path;
-        } catch (IOException ex) {
-            TestUtils.log("Unable to write tone wav: " + ex.getMessage());
-            return null;
-        }
-    }
-
+    
     private static byte[] buildToneWav() {
         int totalSamples = (int) (SAMPLE_RATE * TONE_DURATION_SECONDS);
         int bytesPerSample = 2;
