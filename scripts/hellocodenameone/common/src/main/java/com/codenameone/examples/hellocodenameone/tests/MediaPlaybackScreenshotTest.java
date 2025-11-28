@@ -53,7 +53,7 @@ public class MediaPlaybackScreenshotTest extends BaseTest {
             }
         });
     }
-    
+
     private static byte[] buildToneWav() {
         int totalSamples = (int) (SAMPLE_RATE * TONE_DURATION_SECONDS);
         int bytesPerSample = 2;

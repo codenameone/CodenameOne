@@ -4,6 +4,7 @@ import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Form;
 import com.codename1.ui.CN;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.util.UITimer;
 
 public class BrowserComponentScreenshotTest extends BaseTest {
     private BrowserComponent browser;
@@ -22,7 +23,8 @@ public class BrowserComponentScreenshotTest extends BaseTest {
     }
 
     protected void registerReadyCallback(Form parent, final Runnable run) {
-        browser.addWebEventListener(BrowserComponent.onLoad, evt -> CN.callSerially(run));
+        browser.addWebEventListener(BrowserComponent.onLoad, evt ->
+                UITimer.timer(200, false, parent, run));
     }
 
     private static String buildHtml() {
