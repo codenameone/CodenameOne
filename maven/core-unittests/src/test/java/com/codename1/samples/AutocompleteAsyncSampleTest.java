@@ -142,12 +142,14 @@ class AutocompleteAsyncSampleTest extends UITestBase {
         private final String[] database;
         private final AtomicReference<String> pendingText = new AtomicReference<String>();
         private final int delayMs;
+        private boolean ready;
 
         AsyncAutoCompleteField(DefaultListModel<String> options, String[] database, int delay) {
             super(options);
             this.options = options;
             this.database = database;
             this.delayMs = delay;
+            this.ready = true;
             addDataChangeListener(new DataChangedListener() {
                 public void dataChanged(int type, int index) {
                     processFilter();
@@ -163,12 +165,19 @@ class AutocompleteAsyncSampleTest extends UITestBase {
 
         @Override
         public void setText(String text) {
+            if (!ready) {
+                super.setText(text);
+                return;
+            }
             super.setText(text);
             processFilter();
         }
 
         @Override
         protected boolean filter(String text) {
+            if (!ready) {
+                return false;
+            }
             if (text == null) {
                 text = "";
             }
@@ -207,6 +216,9 @@ class AutocompleteAsyncSampleTest extends UITestBase {
         }
 
         private void processFilter() {
+            if (!ready) {
+                return;
+            }
             boolean changed = filter(getText());
             if (changed) {
                 updateFilterList();
