@@ -183,6 +183,7 @@ class AutocompleteAsyncSampleTest extends UITestBase {
             }
             if (text.length() == 0) {
                 options.removeAll();
+                super.filter(text);
                 cancelPending();
                 return true;
             }
@@ -204,6 +205,7 @@ class AutocompleteAsyncSampleTest extends UITestBase {
                             options.addItem(city);
                         }
                     }
+                    super.filter(filterText);
                     pendingText.set(null);
                     updateFilterList();
                 }
