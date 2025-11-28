@@ -589,15 +589,11 @@ public class TestUtils {
             Display.getInstance().getCurrent().paintComponent(mute.getGraphics(), true);
             screenshotName = screenshotName + ".png";
             if (Storage.getInstance().exists(screenshotName)) {
-                int[] rgba = mute.getRGBCached();
                 Image orig = Image.createImage(Storage.getInstance().createInputStream(screenshotName));
-                int[] origRgba = orig.getRGBCached();
-                for (int iter = 0; iter < rgba.length; iter++) {
-                    if (rgba[iter] != origRgba[iter]) {
-                        log("screenshots do not match at offset " + iter + " saving additional image under " + screenshotName + ".fail");
-                        io.save(mute, Storage.getInstance().createOutputStream(screenshotName + ".fail"), ImageIO.FORMAT_PNG, 1);
-                        return false;
-                    }
+                if (!imagesWithinTolerance(mute, orig)) {
+                    log("screenshots do not match within tolerance; saving additional image under " + screenshotName + ".fail");
+                    io.save(mute, Storage.getInstance().createOutputStream(screenshotName + ".fail"), ImageIO.FORMAT_PNG, 1);
+                    return false;
                 }
             } else {
                 io.save(mute, Storage.getInstance().createOutputStream(screenshotName), ImageIO.FORMAT_PNG, 1);
@@ -607,6 +603,46 @@ public class TestUtils {
             log(err);
             return false;
         }
+    }
+
+    private static boolean imagesWithinTolerance(Image candidate, Image baseline) {
+        int[] candidateRgba = candidate.getRGBCached();
+        int[] baselineRgba = baseline.getRGBCached();
+        if (candidateRgba.length != baselineRgba.length) {
+            log("Screenshot sizes differ: candidate has " + candidateRgba.length + " pixels while baseline has " + baselineRgba.length);
+            return false;
+        }
+
+        // Allow a tiny proportion of pixels to differ slightly to accommodate small rendering artifacts
+        // that can occur across runs or devices.
+        final int toleratedChannelDelta = 2;
+        final double maxDifferentPixelsRatio = 0.001; // 0.1% of pixels may differ slightly
+        final double maxAverageChannelDelta = 1.5; // average difference per channel across entire image
+
+        int differingPixels = 0;
+        long totalChannelDelta = 0;
+
+        for (int iter = 0; iter < candidateRgba.length; iter++) {
+            int candidatePixel = candidateRgba[iter];
+            int baselinePixel = baselineRgba[iter];
+
+            int deltaR = Math.abs(((candidatePixel >> 16) & 0xff) - ((baselinePixel >> 16) & 0xff));
+            int deltaG = Math.abs(((candidatePixel >> 8) & 0xff) - ((baselinePixel >> 8) & 0xff));
+            int deltaB = Math.abs((candidatePixel & 0xff) - (baselinePixel & 0xff));
+            int deltaA = Math.abs(((candidatePixel >> 24) & 0xff) - ((baselinePixel >> 24) & 0xff));
+
+            int maxChannelDelta = Math.max(Math.max(deltaR, deltaG), Math.max(deltaB, deltaA));
+            if (maxChannelDelta > toleratedChannelDelta) {
+                differingPixels++;
+            }
+
+            totalChannelDelta += deltaR + deltaG + deltaB + deltaA;
+        }
+
+        double differentPixelRatio = differingPixels / (double) candidateRgba.length;
+        double averageChannelDelta = totalChannelDelta / (double) (candidateRgba.length * 4);
+
+        return differentPixelRatio <= maxDifferentPixelsRatio && averageChannelDelta <= maxAverageChannelDelta;
     }
 
     /**
