@@ -5,16 +5,15 @@ import com.codename1.junit.UITestBase;
 import com.codename1.ui.AutoCompleteTextField;
 import com.codename1.ui.CN;
 import com.codename1.ui.Component;
+import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
-import com.codename1.ui.DisplayTest;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.list.DefaultListModel;
-import com.codename1.ui.events.DataChangedListener;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.Timer;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -140,75 +139,71 @@ class AutocompleteAsyncSampleTest extends UITestBase {
 
         private final DefaultListModel<String> options;
         private final String[] database;
-        private final AtomicReference<String> pendingText = new AtomicReference<String>();
-        private boolean ready;
+        private final int delayMs;
+        private Timer pendingTimer;
+        private String pendingText;
 
         AsyncAutoCompleteField(DefaultListModel<String> options, String[] database, int delay) {
             super(options);
             this.options = options;
             this.database = database;
-            this.ready = true;
-            addDataChangeListener(new DataChangedListener() {
-                public void dataChanged(int type, int index) {
-                    processFilter();
-                }
-            });
+            this.delayMs = delay;
         }
 
         @Override
-        public void keyReleased(int keyCode) {
-            super.keyReleased(keyCode);
-            processFilter();
-        }
-
-        @Override
-        public void keyPressed(int keyCode) {
-            super.keyPressed(keyCode);
-            processFilter();
-        }
-
-        @Override
-        public void setText(String text) {
-            if (!ready) {
-                super.setText(text);
-                return;
-            }
-            super.setText(text);
-            processFilter();
-        }
-
-        @Override
-        protected boolean filter(String text) {
-            if (!ready) {
-                return false;
-            }
+        protected boolean filter(final String textParam) {
+            String text = textParam;
             if (text == null) {
                 text = "";
             }
-            pendingText.set(text);
-            options.removeAll();
-            if (text.length() > 0) {
-                for (int i = 0; i < database.length; i++) {
-                    String city = database[i];
-                    if (city.toLowerCase().startsWith(text.toLowerCase())) {
-                        options.addItem(city);
+
+            if (text.length() == 0) {
+                cancelPending();
+                options.removeAll();
+                updateFilterList();
+                return true;
+            }
+
+            if (text.equals(pendingText)) {
+                return false;
+            }
+
+            cancelPending();
+            pendingText = text;
+
+            final String query = text;
+            pendingTimer = CN.setTimeout(delayMs, new Runnable() {
+                public void run() {
+                    Timer current = pendingTimer;
+                    pendingTimer = null;
+                    pendingText = null;
+
+                    options.removeAll();
+                    String lower = query.toLowerCase();
+                    for (int i = 0; i < database.length; i++) {
+                        String city = database[i];
+                        if (city.toLowerCase().startsWith(lower)) {
+                            options.addItem(city);
+                        }
+                    }
+                    AsyncAutoCompleteField.super.filter(query);
+                    updateFilterList();
+
+                    if (current != null) {
+                        current.cancel();
                     }
                 }
-            }
-            AsyncAutoCompleteField.super.filter(text);
-            pendingText.set(null);
-            updateFilterList();
-            return true;
+            });
+
+            return false;
         }
 
-        private void processFilter() {
-            if (!ready) {
-                return;
+        private void cancelPending() {
+            if (pendingTimer != null) {
+                pendingTimer.cancel();
+                pendingTimer = null;
             }
-            boolean changed = filter(getText());
-            if (changed) {
-                updateFilterList();
-            }
+            pendingText = null;
         }
 
         List<String> copySuggestions() {
@@ -220,7 +215,7 @@ class AutocompleteAsyncSampleTest extends UITestBase {
         }
 
         boolean hasPendingQuery() {
-            return pendingText.get() != null;
+            return pendingTimer != null || pendingText != null;
         }
     }
 }
