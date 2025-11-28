@@ -383,6 +383,9 @@ public final class Graphics {
         impl.fillRect(nativeGraphics, xTranslate + x, yTranslate + y, width, height);
     }
 
+    /**
+     * @deprecated this method should have been internals
+     */
     public void drawShadow(Image img, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
         impl.drawShadow(nativeGraphics, img.getImage(), xTranslate + x, yTranslate + y, offsetX, offsetY, blurRadius, spreadRadius, color, opacity);
     }

@@ -144,18 +144,18 @@ class AndroidGraphics {
     }
 
     public void drawShadow(Object image, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
-        if (image == null) return;
+        if (image == null || canvas == null) {
+            return;
+        }
         Bitmap bmp = (Bitmap)image;
         float bmpW = bmp.getWidth();
         float bmpH = bmp.getHeight();
-        if (bmpW == 0 || bmpH == 0) return;
-
-
+        if (bmpW == 0 || bmpH == 0) {
+            return;
+        }
 
         Bitmap scaledBmp = Bitmap.createScaledBitmap(bmp, bmp.getWidth() + 2 * spreadRadius, bmp.getHeight() + 2 * spreadRadius, false);
-
         Paint alphaPaint = new Paint();
-
         alphaPaint.setMaskFilter(new BlurMaskFilter(blurRadius, BlurMaskFilter.Blur.NORMAL));
         int[] offsetXY = new int[2];
         Bitmap bmAlpha = scaledBmp.extractAlpha(alphaPaint, offsetXY);
@@ -164,12 +164,10 @@ class AndroidGraphics {
         applyTransform();
         Paint shadowPaint = new Paint();
         int alpha = (int)Math.floor(opacity * 255);
-        shadowPaint.setColor((0xff000000 | color));
-        shadowPaint.setAlpha((int)Math.floor(opacity * 255));
-
+        shadowPaint.setColor(0xff000000 | color);
+        shadowPaint.setAlpha(alpha);
         canvas.drawBitmap(bmAlpha, x + offsetXY[0] - spreadRadius + offsetX, y + offsetXY[1] - spreadRadius + offsetY, shadowPaint);
         bmAlpha.recycle();
-
 
         unapplyTransform();
         canvas.restore();
