@@ -11,6 +11,8 @@ import com.codename1.ui.Form;
 import com.codename1.testing.AbstractTest;
 import com.codename1.util.StringUtil;
 
+import java.util.List;
+
 public final class Cn1ssDeviceRunner extends DeviceRunner {
     private static final BaseTest[] TEST_CLASSES = new BaseTest[] {
             new MainScreenScreenshotTest(),
@@ -26,9 +28,14 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
         CN.callSerially(() -> {
             Display.getInstance().addEdtErrorHandler(e -> {
                 log("CN1SS:ERR:exception caught in EDT " + e.getSource());
-                String stack = "CN1SS:ERR:exception stack: " + Display.getInstance().getStackTrace(Thread.currentThread(), (Throwable)e.getSource());
-                stack = StringUtil.replaceAll(stack,"\n", "\nCN1SS:ERR:exception stack: ");
-                log(stack);
+                String stack = Display.getInstance().getStackTrace(Thread.currentThread(), (Throwable)e.getSource());
+                log("CN1SS:ERR:exception stack of length: " + stack.length());
+                for(String s : StringUtil.tokenize(stack, '\n')) {
+                    if(s.length() > 200) {
+                        s = s.substring(0, 200);
+                    }
+                    log("CN1SS:ERR:Stack:" + s);
+                }
             });
         });
         for (BaseTest testClass : TEST_CLASSES) {
