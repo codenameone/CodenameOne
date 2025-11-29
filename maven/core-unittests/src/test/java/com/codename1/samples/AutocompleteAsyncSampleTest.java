@@ -13,8 +13,6 @@ import com.codename1.ui.list.DefaultListModel;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Timer;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 class AutocompleteAsyncSampleTest extends UITestBase {
@@ -87,7 +85,7 @@ class AutocompleteAsyncSampleTest extends UITestBase {
 
     private AsyncAutoCompleteField createAsyncField() {
         DefaultListModel<String> options = new DefaultListModel<String>();
-        return new AsyncAutoCompleteField(options, CITY_DATABASE, 20);
+        return new AsyncAutoCompleteField(options, CITY_DATABASE);
     }
 
     private void typeText(String text) {
@@ -139,71 +137,30 @@ class AutocompleteAsyncSampleTest extends UITestBase {
 
         private final DefaultListModel<String> options;
         private final String[] database;
-        private final int delayMs;
-        private Timer pendingTimer;
-        private String pendingText;
-
-        AsyncAutoCompleteField(DefaultListModel<String> options, String[] database, int delay) {
+        AsyncAutoCompleteField(DefaultListModel<String> options, String[] database) {
             super(options);
             this.options = options;
             this.database = database;
-            this.delayMs = delay;
         }
 
         @Override
         protected boolean filter(final String textParam) {
-            String text = textParam;
-            if (text == null) {
-                text = "";
-            }
+            String text = textParam == null ? "" : textParam;
 
-            if (text.length() == 0) {
-                cancelPending();
-                options.removeAll();
-                updateFilterList();
-                return true;
-            }
-
-            if (text.equals(pendingText)) {
-                return false;
-            }
-
-            cancelPending();
-            pendingText = text;
-
-            final String query = text;
-            pendingTimer = CN.setTimeout(delayMs, new Runnable() {
-                public void run() {
-                    Timer current = pendingTimer;
-                    pendingTimer = null;
-                    pendingText = null;
-
-                    options.removeAll();
-                    String lower = query.toLowerCase();
-                    for (int i = 0; i < database.length; i++) {
-                        String city = database[i];
-                        if (city.toLowerCase().startsWith(lower)) {
-                            options.addItem(city);
-                        }
-                    }
-                    AsyncAutoCompleteField.super.filter(query);
-                    updateFilterList();
-
-                    if (current != null) {
-                        current.cancel();
+            options.removeAll();
+            if (text.length() > 0) {
+                String lower = text.toLowerCase();
+                for (int i = 0; i < database.length; i++) {
+                    String city = database[i];
+                    if (city.toLowerCase().startsWith(lower)) {
+                        options.addItem(city);
                     }
                 }
-            });
-
-            return false;
-        }
-
-        private void cancelPending() {
-            if (pendingTimer != null) {
-                pendingTimer.cancel();
-                pendingTimer = null;
             }
-            pendingText = null;
+
+            super.filter(text);
+            updateFilterList();
+            return true;
         }
 
         List<String> copySuggestions() {
@@ -215,7 +172,7 @@ class AutocompleteAsyncSampleTest extends UITestBase {
         }
 
         boolean hasPendingQuery() {
-            return pendingTimer != null || pendingText != null;
+            return false;
         }
     }
 }
