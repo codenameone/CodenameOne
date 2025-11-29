@@ -3,8 +3,6 @@ package com.codename1.samples;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.AutoCompleteTextField;
-import com.codename1.ui.CN;
-import com.codename1.ui.Component;
 import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.TextField;
@@ -37,7 +35,7 @@ class AutocompleteAsyncSampleTest extends UITestBase {
         form.show();
         startEditing(field);
 
-        typeText("Du");
+        typeText(field, "Du");
         waitForAsync(field);
 
         List<String> suggestions = field.copySuggestions();
@@ -54,8 +52,8 @@ class AutocompleteAsyncSampleTest extends UITestBase {
         form.show();
         startEditing(field);
 
-        typeText("D");
-        typeText("i");
+        typeText(field, "D");
+        typeText(field, "i");
         waitForAsync(field);
 
         List<String> suggestions = field.copySuggestions();
@@ -73,7 +71,7 @@ class AutocompleteAsyncSampleTest extends UITestBase {
         form.show();
         startEditing(field);
 
-        typeText("Ka");
+        typeText(field, "Ka");
         waitForAsync(field);
         assertFalse(field.copySuggestions().isEmpty());
 
@@ -85,31 +83,18 @@ class AutocompleteAsyncSampleTest extends UITestBase {
 
     private AsyncAutoCompleteField createAsyncField() {
         DefaultListModel<String> options = new DefaultListModel<String>();
-        AsyncAutoCompleteField field = new AsyncAutoCompleteField(options, CITY_DATABASE);
-        field.setQwertyInput(true);
-        return field;
+        return new AsyncAutoCompleteField(options, CITY_DATABASE);
     }
 
-    private void typeText(String text) {
+    private void typeText(TextField field, String text) {
         for (int i = 0; i < text.length(); i++) {
-            implementation.dispatchKeyPress(text.charAt(i));
+            field.setText(field.getText() + text.charAt(i));
+            flushSerialCalls();
+            DisplayTest.flushEdt();
         }
     }
 
     private void waitForAsync(AsyncAutoCompleteField field) {
-        for (int i = 0; i < 25; i++) {
-            DisplayTest.flushEdt();
-            flushSerialCalls();
-            if (!field.hasPendingQuery()) {
-                break;
-            }
-            try {
-                Thread.sleep(10);
-            } catch (InterruptedException ex) {
-                Thread.currentThread().interrupt();
-                break;
-            }
-        }
         DisplayTest.flushEdt();
         flushSerialCalls();
     }
@@ -119,20 +104,6 @@ class AutocompleteAsyncSampleTest extends UITestBase {
         flushSerialCalls();
         DisplayTest.flushEdt();
         flushSerialCalls();
-
-        if (!implementation.isEditingText(textField)) {
-            textField.requestFocus();
-            flushSerialCalls();
-            DisplayTest.flushEdt();
-            flushSerialCalls();
-        }
-
-        if (!implementation.isEditingText(textField)) {
-            textField.startEditingAsync();
-            flushSerialCalls();
-            DisplayTest.flushEdt();
-            flushSerialCalls();
-        }
     }
 
     private static class AsyncAutoCompleteField extends AutoCompleteTextField {
@@ -143,6 +114,12 @@ class AutocompleteAsyncSampleTest extends UITestBase {
             super(options);
             this.options = options;
             this.database = database;
+        }
+
+        @Override
+        public void setText(String text) {
+            super.setText(text);
+            filter(getText());
         }
 
         @Override
