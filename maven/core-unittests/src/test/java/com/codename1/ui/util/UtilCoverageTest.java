@@ -66,13 +66,39 @@ class UtilCoverageTest extends UITestBase {
         tutorial.addHint(east, destination, BorderLayout.EAST);
         tutorial.addHint(west, destination, BorderLayout.WEST);
 
-        CN.callSerially(() -> tutorial.showOn(CN.getCurrentForm()));
-        new Thread(() -> {
-            while (!(CN.getCurrentForm() instanceof Dialog)) {
-                Util.sleep(10);
+        CountDownLatch shown = new CountDownLatch(1);
+        CountDownLatch disposed = new CountDownLatch(1);
+
+        CN.callSerially(new Runnable() {
+            public void run() {
+                tutorial.showOn(CN.getCurrentForm());
+                shown.countDown();
             }
-            CN.callSerially(() -> ((Dialog)CN.getCurrentForm()).dispose());
-        }).start();
+        });
+
+        try {
+            shown.await(2, TimeUnit.SECONDS);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
+
+        implementation.dispatchPointerPressAndRelease(Display.getInstance().getDisplayWidth() + 10, Display.getInstance().getDisplayHeight() + 10);
+
+        CN.callSerially(new Runnable() {
+            public void run() {
+                Form current = Display.getInstance().getCurrent();
+                if (current instanceof Dialog) {
+                    ((Dialog) current).dispose();
+                }
+                disposed.countDown();
+            }
+        });
+
+        try {
+            disposed.await(2, TimeUnit.SECONDS);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @FormTest
