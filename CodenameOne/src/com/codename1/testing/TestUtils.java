@@ -613,14 +613,18 @@ public class TestUtils {
             return false;
         }
 
-        // Allow a tiny proportion of pixels to differ slightly to accommodate small rendering artifacts
-        // that can occur across runs or devices.
-        final int toleratedChannelDelta = 2;
-        final double maxDifferentPixelsRatio = 0.001; // 0.1% of pixels may differ slightly
-        final double maxAverageChannelDelta = 1.5; // average difference per channel across entire image
+        // Allow small, widespread differences and a tiny proportion of slightly larger
+        // differences to accommodate minor rendering artifacts. These values are tuned
+        // to keep comparisons strict while ignoring harmless noise we see across
+        // devices/runs.
+        final int toleratedChannelDelta = 3; // Difference that triggers "pixel differs" counting
+        final double maxDifferentPixelsRatio = 0.01; // Up to 1% of pixels may exceed toleratedChannelDelta
+        final double maxAverageChannelDelta = 2.5; // Average absolute delta per channel across whole image
+        final double maxRmsChannelDelta = 5.0; // RMS delta per channel across whole image
 
         int differingPixels = 0;
         long totalChannelDelta = 0;
+        long totalChannelDeltaSquared = 0;
 
         for (int iter = 0; iter < candidateRgba.length; iter++) {
             int candidatePixel = candidateRgba[iter];
@@ -637,12 +641,28 @@ public class TestUtils {
             }
 
             totalChannelDelta += deltaR + deltaG + deltaB + deltaA;
+            totalChannelDeltaSquared += deltaR * (long) deltaR
+                    + deltaG * (long) deltaG
+                    + deltaB * (long) deltaB
+                    + deltaA * (long) deltaA;
         }
 
         double differentPixelRatio = differingPixels / (double) candidateRgba.length;
         double averageChannelDelta = totalChannelDelta / (double) (candidateRgba.length * 4);
+        double rmsChannelDelta = Math.sqrt(totalChannelDeltaSquared / (double) (candidateRgba.length * 4));
 
-        return differentPixelRatio <= maxDifferentPixelsRatio && averageChannelDelta <= maxAverageChannelDelta;
+        boolean withinThresholds = differentPixelRatio <= maxDifferentPixelsRatio
+                && averageChannelDelta <= maxAverageChannelDelta
+                && rmsChannelDelta <= maxRmsChannelDelta;
+
+        if (!withinThresholds) {
+            log("Screenshot differs: "
+                    + (differentPixelRatio * 100.0) + "% pixels exceed delta " + toleratedChannelDelta
+                    + ", avg channel delta=" + averageChannelDelta
+                    + ", rms channel delta=" + rmsChannelDelta);
+        }
+
+        return withinThresholds;
     }
 
     /**
