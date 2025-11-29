@@ -85,7 +85,9 @@ class AutocompleteAsyncSampleTest extends UITestBase {
 
     private AsyncAutoCompleteField createAsyncField() {
         DefaultListModel<String> options = new DefaultListModel<String>();
-        return new AsyncAutoCompleteField(options, CITY_DATABASE);
+        AsyncAutoCompleteField field = new AsyncAutoCompleteField(options, CITY_DATABASE);
+        field.setQwertyInput(true);
+        return field;
     }
 
     private void typeText(String text) {
