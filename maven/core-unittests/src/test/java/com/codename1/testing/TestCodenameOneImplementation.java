@@ -1267,9 +1267,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         final boolean reenter = beginAllowingEditDuringKey(keyCode);
         if (editing != null && shouldInsertCharacter(editing.isEditable(), keyCode)) {
             insertCharacter(editing, (char) keyCode, editing.getMaxSize());
+        } else {
+            display.keyPressed(keyCode);
+            display.keyReleased(keyCode);
         }
-        display.keyPressed(keyCode);
-        display.keyReleased(keyCode);
         if (reenter) {
             display.callSerially(new Runnable() {
                 public void run() {
