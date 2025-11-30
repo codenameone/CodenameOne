@@ -188,7 +188,10 @@ extern int nextPowerOf2(int val);
 #endif
 #ifdef CN1_USE_METAL
     if(metalTexture != nil) {
-        metalTexture = nil; // ARC or manual release will handle cleanup
+#ifndef CN1_USE_ARC
+        [metalTexture release];
+#endif
+        metalTexture = nil;
     }
 #else
     if(textureName != 0) {
@@ -225,7 +228,10 @@ extern int nextPowerOf2(int val);
     }
 #ifdef CN1_USE_METAL
     if(metalTexture != nil) {
-        metalTexture = nil; // ARC or manual cleanup
+#ifndef CN1_USE_ARC
+        [metalTexture release];
+#endif
+        metalTexture = nil;
     }
 #else
     if(textureName != 0) {

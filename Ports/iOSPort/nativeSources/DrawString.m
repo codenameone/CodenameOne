@@ -29,6 +29,7 @@
 #import <Metal/Metal.h>
 #import <simd/simd.h>
 #import "CN1METALTransform.h"
+#import "DrawStringMetalTextureCache.h"
 #endif
 
 extern float scaleValue;
@@ -196,41 +197,59 @@ static GLuint getOGLProgram(){
 
     [encoder setRenderPipelineState:pipelineState];
 
-    // Calculate text dimensions
-    int w = (int)[str sizeWithAttributes:@{NSFontAttributeName: font}].width;
+    // Check cache first
+    DrawStringMetalTextureCache *cachedTex = [DrawStringMetalTextureCache checkCache:str f:font c:color a:255];
+    id<MTLTexture> texture = nil;
+    int w = -1;
+
+    if (cachedTex != nil) {
+        texture = [cachedTex texture];
+        w = [cachedTex stringWidth];
+    } else {
+        // Calculate text dimensions
+        w = (int)[str sizeWithAttributes:@{NSFontAttributeName: font}].width;
+        int h = (int)ceil([font lineHeight] + 1.0 * scaleValue);
+        int p2w = nextPowerOf2(w);
+        int p2h = nextPowerOf2(h);
+
+        // Create text texture - same as ES2 version
+        CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+        void* imageData = malloc(p2h * p2w * 4);
+        CGContextRef context = CGBitmapContextCreate(imageData, p2w, p2h, 8, 4 * p2w, colorSpace, kCGImageAlphaPremultipliedLast);
+        // Note: ES2 version has flip commented out, so we don't flip either
+        CGColorSpaceRelease(colorSpace);
+        CGContextClearRect(context, CGRectMake(0, 0, p2w, p2h));
+
+        UIGraphicsPushContext(context);
+        UIColor *textColor = UIColorFromRGB(color, 255);
+        [str drawAtPoint:CGPointZero withAttributes:@{
+            NSFontAttributeName: font,
+            NSForegroundColorAttributeName: textColor
+        }];
+        UIGraphicsPopContext();
+
+        // Create Metal texture
+        MTLTextureDescriptor *textureDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
+                                                                                                      width:p2w
+                                                                                                     height:p2h
+                                                                                                  mipmapped:NO];
+        textureDescriptor.usage = MTLTextureUsageShaderRead;
+
+        texture = [[self device] newTextureWithDescriptor:textureDescriptor];
+        MTLRegion region = MTLRegionMake2D(0, 0, p2w, p2h);
+        [texture replaceRegion:region mipmapLevel:0 withBytes:imageData bytesPerRow:4 * p2w];
+
+        CGContextRelease(context);
+        free(imageData);
+
+        // Cache the texture for future use
+        [DrawStringMetalTextureCache cache:str f:font t:texture c:color a:255];
+    }
+
+    // Calculate height for vertex positioning
     int h = (int)ceil([font lineHeight] + 1.0 * scaleValue);
     int p2w = nextPowerOf2(w);
     int p2h = nextPowerOf2(h);
-
-    // Create text texture - same as ES2 version
-    CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
-    void* imageData = malloc(p2h * p2w * 4);
-    CGContextRef context = CGBitmapContextCreate(imageData, p2w, p2h, 8, 4 * p2w, colorSpace, kCGImageAlphaPremultipliedLast);
-    // Note: ES2 version has flip commented out, so we don't flip either
-    CGColorSpaceRelease(colorSpace);
-    CGContextClearRect(context, CGRectMake(0, 0, p2w, p2h));
-
-    UIGraphicsPushContext(context);
-    UIColor *textColor = UIColorFromRGB(color, 255);
-    [str drawAtPoint:CGPointZero withAttributes:@{
-        NSFontAttributeName: font,
-        NSForegroundColorAttributeName: textColor
-    }];
-    UIGraphicsPopContext();
-
-    // Create Metal texture
-    MTLTextureDescriptor *textureDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
-                                                                                                  width:p2w
-                                                                                                 height:p2h
-                                                                                              mipmapped:NO];
-    textureDescriptor.usage = MTLTextureUsageShaderRead;
-
-    id<MTLTexture> texture = [[self device] newTextureWithDescriptor:textureDescriptor];
-    MTLRegion region = MTLRegionMake2D(0, 0, p2w, p2h);
-    [texture replaceRegion:region mipmapLevel:0 withBytes:imageData bytesPerRow:4 * p2w];
-
-    CGContextRelease(context);
-    free(imageData);
 
     // Create vertex data (position + texCoord interleaved)
     typedef struct {
