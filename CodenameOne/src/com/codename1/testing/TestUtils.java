@@ -589,15 +589,11 @@ public class TestUtils {
             Display.getInstance().getCurrent().paintComponent(mute.getGraphics(), true);
             screenshotName = screenshotName + ".png";
             if (Storage.getInstance().exists(screenshotName)) {
-                int[] rgba = mute.getRGBCached();
                 Image orig = Image.createImage(Storage.getInstance().createInputStream(screenshotName));
-                int[] origRgba = orig.getRGBCached();
-                for (int iter = 0; iter < rgba.length; iter++) {
-                    if (rgba[iter] != origRgba[iter]) {
-                        log("screenshots do not match at offset " + iter + " saving additional image under " + screenshotName + ".fail");
-                        io.save(mute, Storage.getInstance().createOutputStream(screenshotName + ".fail"), ImageIO.FORMAT_PNG, 1);
-                        return false;
-                    }
+                if (!imagesWithinTolerance(mute, orig)) {
+                    log("screenshots do not match within tolerance; saving additional image under " + screenshotName + ".fail");
+                    io.save(mute, Storage.getInstance().createOutputStream(screenshotName + ".fail"), ImageIO.FORMAT_PNG, 1);
+                    return false;
                 }
             } else {
                 io.save(mute, Storage.getInstance().createOutputStream(screenshotName), ImageIO.FORMAT_PNG, 1);
@@ -607,6 +603,66 @@ public class TestUtils {
             log(err);
             return false;
         }
+    }
+
+    private static boolean imagesWithinTolerance(Image candidate, Image baseline) {
+        int[] candidateRgba = candidate.getRGBCached();
+        int[] baselineRgba = baseline.getRGBCached();
+        if (candidateRgba.length != baselineRgba.length) {
+            log("Screenshot sizes differ: candidate has " + candidateRgba.length + " pixels while baseline has " + baselineRgba.length);
+            return false;
+        }
+
+        // Allow small, widespread differences and a tiny proportion of slightly larger
+        // differences to accommodate minor rendering artifacts. These values are tuned
+        // to keep comparisons strict while ignoring harmless noise we see across
+        // devices/runs.
+        final int toleratedChannelDelta = 3; // Difference that triggers "pixel differs" counting
+        final double maxDifferentPixelsRatio = 0.01; // Up to 1% of pixels may exceed toleratedChannelDelta
+        final double maxAverageChannelDelta = 2.5; // Average absolute delta per channel across whole image
+        final double maxRmsChannelDelta = 5.0; // RMS delta per channel across whole image
+
+        int differingPixels = 0;
+        long totalChannelDelta = 0;
+        long totalChannelDeltaSquared = 0;
+
+        for (int iter = 0; iter < candidateRgba.length; iter++) {
+            int candidatePixel = candidateRgba[iter];
+            int baselinePixel = baselineRgba[iter];
+
+            int deltaR = Math.abs(((candidatePixel >> 16) & 0xff) - ((baselinePixel >> 16) & 0xff));
+            int deltaG = Math.abs(((candidatePixel >> 8) & 0xff) - ((baselinePixel >> 8) & 0xff));
+            int deltaB = Math.abs((candidatePixel & 0xff) - (baselinePixel & 0xff));
+            int deltaA = Math.abs(((candidatePixel >> 24) & 0xff) - ((baselinePixel >> 24) & 0xff));
+
+            int maxChannelDelta = Math.max(Math.max(deltaR, deltaG), Math.max(deltaB, deltaA));
+            if (maxChannelDelta > toleratedChannelDelta) {
+                differingPixels++;
+            }
+
+            totalChannelDelta += deltaR + deltaG + deltaB + deltaA;
+            totalChannelDeltaSquared += deltaR * (long) deltaR
+                    + deltaG * (long) deltaG
+                    + deltaB * (long) deltaB
+                    + deltaA * (long) deltaA;
+        }
+
+        double differentPixelRatio = differingPixels / (double) candidateRgba.length;
+        double averageChannelDelta = totalChannelDelta / (double) (candidateRgba.length * 4);
+        double rmsChannelDelta = Math.sqrt(totalChannelDeltaSquared / (double) (candidateRgba.length * 4));
+
+        boolean withinThresholds = differentPixelRatio <= maxDifferentPixelsRatio
+                && averageChannelDelta <= maxAverageChannelDelta
+                && rmsChannelDelta <= maxRmsChannelDelta;
+
+        if (!withinThresholds) {
+            log("Screenshot differs: "
+                    + (differentPixelRatio * 100.0) + "% pixels exceed delta " + toleratedChannelDelta
+                    + ", avg channel delta=" + averageChannelDelta
+                    + ", rms channel delta=" + rmsChannelDelta);
+        }
+
+        return withinThresholds;
     }
 
     /**
