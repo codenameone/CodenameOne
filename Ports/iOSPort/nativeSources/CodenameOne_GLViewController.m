@@ -2925,8 +2925,9 @@ BOOL prefersStatusBarHidden = NO;
         return;
     }
 #ifdef CN1_USE_METAL
-    // Metal rendering path
+    // Metal rendering path - use autorelease pool to ensure cleanup each frame
     METALView *metalView = [self metalView];
+    @autoreleasepool {
     [metalView beginFrame];
 
     if(currentTarget != nil) {
@@ -2947,6 +2948,7 @@ BOOL prefersStatusBarHidden = NO;
 #ifndef CN1_USE_ARC
             [cp release];
 #endif
+    } // end @autoreleasepool for Metal
 #else
     // OpenGL ES rendering path
     [[self eaglView] setFramebuffer];
@@ -3048,7 +3050,9 @@ BOOL prefersStatusBarHidden = NO;
         }
     }
 #ifdef CN1_USE_METAL
-    [metalView presentFramebuffer];
+    @autoreleasepool {
+        [metalView presentFramebuffer];
+    }
 #else
     GLErrorLog;
 
