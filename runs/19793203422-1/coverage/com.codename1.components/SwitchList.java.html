@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SwitchList.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">SwitchList.java</span></div><h1>SwitchList.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.ComponentSelector;
+import com.codename1.ui.Label;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.list.MultipleSelectionListModel;
+
+import static com.codename1.ui.ComponentSelector.$;
+
+/**
+ * A list of switches.
+ *
+ * @author shannah
+ * @see ButtonList for code samples;
+ * @since 6.0
+ */
+public class SwitchList extends ButtonList {
+
+
+<span class="fc" id="L45">    private final ActionListener changeListener = new ActionListener() {</span>
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+<span class="pc bpc" id="L48" title="2 of 4 branches missed.">            if (evt.getSource() instanceof Switch &amp;&amp; contains((Switch) evt.getSource())) {</span>
+<span class="fc" id="L49">                Switch src = (Switch) evt.getSource();</span>
+<span class="fc" id="L50">                int index = SwitchList.this.getComponentIndex(src.getParent());</span>
+<span class="fc bfc" id="L51" title="All 2 branches covered.">                if (src.isOn()) {</span>
+<span class="fc" id="L52">                    getMultiListModel().addSelectedIndices(index);</span>
+                } else {
+<span class="fc" id="L54">                    getMultiListModel().removeSelectedIndices(index);</span>
+                }
+            }
+<span class="fc" id="L57">        }</span>
+
+    };
+
+    public SwitchList(MultipleSelectionListModel model) {
+<span class="fc" id="L62">        super(model);</span>
+
+<span class="fc" id="L64">        fireReady();</span>
+
+<span class="fc" id="L66">    }</span>
+
+    @Override
+    public boolean isAllowMultipleSelection() {
+<span class="fc" id="L70">        return true;</span>
+    }
+
+    @Override
+    protected Component createButton(Object model) {
+<span class="fc" id="L75">        Switch sw = new Switch();</span>
+<span class="fc" id="L76">        $(sw).addTags(&quot;switch&quot;);</span>
+<span class="fc" id="L77">        return BorderLayout.center(new Label(String.valueOf(model))).add(BorderLayout.EAST, sw);</span>
+
+    }
+
+    @Override
+    protected void setSelected(Component button, final boolean selected) {
+<span class="fc" id="L83">        $(&quot;.switch&quot;, button).each(new ComponentSelector.ComponentClosure() {</span>
+            @Override
+            public void call(Component c) {
+<span class="fc bfc" id="L86" title="All 2 branches covered.">                if (selected) {</span>
+<span class="fc" id="L87">                    ((Switch) c).setOn();</span>
+                } else {
+<span class="fc" id="L89">                    ((Switch) c).setOff();</span>
+                }
+<span class="fc" id="L91">            }</span>
+        });
+<span class="fc" id="L93">    }</span>
+
+
+    @Override
+    protected Component decorateComponent(Object modelItem, Component b) {
+<span class="fc" id="L98">        b = super.decorateComponent(modelItem, b);</span>
+<span class="fc" id="L99">        Switch sw = $(&quot;.switch&quot;, b).asComponent(Switch.class);</span>
+<span class="fc" id="L100">        sw.addActionListener(this);</span>
+<span class="fc" id="L101">        sw.addChangeListener(changeListener);</span>
+<span class="fc" id="L102">        return b;</span>
+    }
+
+    @Override
+    protected Component undecorateComponent(Component b) {
+<span class="fc" id="L107">        Switch sw = $(&quot;.switch&quot;, b).asComponent(Switch.class);</span>
+<span class="fc" id="L108">        sw.removeActionListener(this);</span>
+<span class="fc" id="L109">        sw.removeChangeListener(changeListener);</span>
+<span class="fc" id="L110">        return super.undecorateComponent(b);</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

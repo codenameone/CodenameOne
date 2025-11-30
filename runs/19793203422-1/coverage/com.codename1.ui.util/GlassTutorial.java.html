@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GlassTutorial.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.util</a> &gt; <span class="el_source">GlassTutorial.java</span></div><h1>GlassTutorial.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.util;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Label;
+import com.codename1.ui.Painter;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.BorderLayout;
+
+import java.util.Vector;
+
+/**
+ * A Glass Tutorial appears on top of the UI especially on a touch device
+ * but could be on any device and points to/circles components within the UI
+ * coupled with explanation of what they do and a tint of the screen.
+ * It is implemented as a GlassPane on top of a Form which is automatically
+ * removed when a user touches the screen or presses a button.&lt;br&gt;
+ * To position elements within the glass tutorial the elements must be
+ * associated with a component instance of the underlying UI and positioned
+ * relatively to said component.&lt;br&gt;
+ * The GlassTutorial uses the &quot;GlassTutorial&quot; UIID to paint itself it then paints
+ * the hint components in their proper places.
+ *
+ * @author Shai Almog
+ * @deprecated interaction dialog is a superior way for displaying these types of tutorials
+ */
+<span class="fc" id="L53">public class GlassTutorial implements Painter {</span>
+    private static final String DEST = &quot;$$GLSDESTHINT$$&quot;;
+    private static final String POS = &quot;$$GLSDESTPOS$$&quot;;
+<span class="fc" id="L56">    private final Vector vec = new Vector();</span>
+    private Component internal;
+
+    /**
+     * Places a hint within the glass in a position relative to the destinationComponent, the position
+     * is indicated with border layout attributes. Notice you can place multiple components on a single
+     * element and they will be rendered in order e.g. a component with a border can be used to &quot;circle&quot;
+     * the destination by placing it in the CENTER position and another arrow with text can be places in
+     * the south position below.
+     *
+     * @param hintComponent        The component that would be renderered in the given position
+     * @param destinationComponent the &quot;hinted&quot; component over which the hint will show
+     * @param position             the position relative to the destinationComponent in BorderLayout values e.g. to place the hint
+     *                             above the component just place it in BorderLayout.NORTH. The center will stretch the component but the
+     *                             other sides will give the component its exact preferred size.
+     */
+    public void addHint(Component hintComponent, Component destinationComponent, String position) {
+<span class="fc" id="L73">        hintComponent.putClientProperty(POS, position);</span>
+<span class="fc" id="L74">        hintComponent.putClientProperty(DEST, destinationComponent);</span>
+<span class="fc" id="L75">        vec.addElement(hintComponent);</span>
+<span class="fc" id="L76">    }</span>
+
+    /**
+     * Install the glass tutorial on a form and seamlessly dismiss it when no longer necessary
+     *
+     * @param f the form
+     */
+    public void showOn(Form f) {
+<span class="fc" id="L84">        Painter oldPane = f.getGlassPane();</span>
+<span class="fc" id="L85">        f.setGlassPane(this);</span>
+<span class="fc" id="L86">        Dialog dummy = new Dialog() {</span>
+            public void keyReleased(int i) {
+<span class="nc" id="L88">                dispose();</span>
+<span class="nc" id="L89">            }</span>
+        };
+<span class="fc" id="L91">        int oldTint = f.getTintColor();</span>
+<span class="fc" id="L92">        f.setTintColor(0);</span>
+
+<span class="fc" id="L94">        dummy.getDialogStyle().setBgTransparency(0);</span>
+<span class="fc" id="L95">        dummy.setDisposeWhenPointerOutOfBounds(true);</span>
+<span class="fc" id="L96">        dummy.show(0, Display.getInstance().getDisplayHeight() - 2, 0, Display.getInstance().getDisplayWidth() - 2, true, true);</span>
+
+<span class="fc" id="L98">        f.setTintColor(oldTint);</span>
+<span class="fc" id="L99">        f.setGlassPane(oldPane);</span>
+<span class="fc" id="L100">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void paint(Graphics g, Rectangle rect) {
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (internal == null) {</span>
+<span class="nc" id="L107">            internal = new Label(&quot; &quot;);</span>
+<span class="nc" id="L108">            internal.setUIID(&quot;GlassTutorial&quot;);</span>
+        }
+<span class="nc" id="L110">        internal.setSize(rect.getSize());</span>
+<span class="nc" id="L111">        internal.paintComponent(g);</span>
+
+<span class="nc" id="L113">        int componentCount = vec.size();</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        for (int iter = 0; iter &lt; componentCount; iter++) {</span>
+<span class="nc" id="L115">            Component current = (Component) vec.elementAt(iter);</span>
+<span class="nc" id="L116">            String pos = (String) current.getClientProperty(POS);</span>
+<span class="nc" id="L117">            Component dest = (Component) current.getClientProperty(DEST);</span>
+<span class="nc" id="L118">            int xpos = dest.getAbsoluteX();</span>
+<span class="nc" id="L119">            int ypos = dest.getAbsoluteY();</span>
+<span class="nc" id="L120">            int w = dest.getWidth();</span>
+<span class="nc" id="L121">            int h = dest.getHeight();</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">            if (pos.equals(BorderLayout.CENTER)) {</span>
+<span class="nc" id="L123">                current.setX(xpos);</span>
+<span class="nc" id="L124">                current.setY(ypos);</span>
+<span class="nc" id="L125">                current.setWidth(w);</span>
+<span class="nc" id="L126">                current.setHeight(h);</span>
+<span class="nc" id="L127">                current.paintComponent(g);</span>
+<span class="nc" id="L128">                continue;</span>
+            }
+<span class="nc" id="L130">            Dimension d = current.getPreferredSize();</span>
+<span class="nc" id="L131">            current.setWidth(d.getWidth());</span>
+<span class="nc" id="L132">            current.setHeight(d.getHeight());</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">            if (pos.equals(BorderLayout.SOUTH)) {</span>
+<span class="nc" id="L134">                current.setX(xpos + w / 2 - d.getWidth() / 2);</span>
+<span class="nc" id="L135">                current.setY(ypos + h);</span>
+<span class="nc" id="L136">                current.paintComponent(g);</span>
+<span class="nc" id="L137">                continue;</span>
+            }
+<span class="nc bnc" id="L139" title="All 2 branches missed.">            if (pos.equals(BorderLayout.NORTH)) {</span>
+<span class="nc" id="L140">                current.setX(xpos + w / 2 - d.getWidth() / 2);</span>
+<span class="nc" id="L141">                current.setY(ypos - d.getHeight());</span>
+<span class="nc" id="L142">                current.paintComponent(g);</span>
+<span class="nc" id="L143">                continue;</span>
+            }
+<span class="nc bnc" id="L145" title="All 2 branches missed.">            if (pos.equals(BorderLayout.EAST)) {</span>
+<span class="nc" id="L146">                current.setX(xpos + w);</span>
+<span class="nc" id="L147">                current.setY(ypos + h / 2 - d.getHeight() / 2);</span>
+<span class="nc" id="L148">                current.paintComponent(g);</span>
+<span class="nc" id="L149">                continue;</span>
+            }
+<span class="nc bnc" id="L151" title="All 2 branches missed.">            if (pos.equals(BorderLayout.WEST)) {</span>
+<span class="nc" id="L152">                current.setX(xpos - d.getWidth());</span>
+<span class="nc" id="L153">                current.setY(ypos + h / 2 - d.getHeight() / 2);</span>
+<span class="nc" id="L154">                current.paintComponent(g);</span>
+<span class="nc" id="L155">                continue;</span>
+            }
+        }
+<span class="nc" id="L158">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TarEntry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.tar</a> &gt; <span class="el_source">TarEntry.java</span></div><h1>TarEntry.java</h1><pre class="source lang-java linenums">/**
+ * Copyright 2012 Kamran Zafar
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * The original source has been modified by Paul Williams.
+ */
+
+package com.codename1.io.tar;
+
+import com.codename1.io.FileSystemStorage;
+
+import java.util.Date;
+
+/**
+ * @author Kamran Zafar
+ *
+ */
+public class TarEntry {
+    protected String file;
+    protected TarHeader header;
+
+<span class="fc" id="L35">    private TarEntry() {</span>
+<span class="fc" id="L36">        this.file = null;</span>
+<span class="fc" id="L37">        this.header = new TarHeader();</span>
+<span class="fc" id="L38">    }</span>
+
+    public TarEntry(String file, String entryName) {
+<span class="nc" id="L41">        this();</span>
+<span class="nc" id="L42">        this.file = file;</span>
+<span class="nc" id="L43">        this.extractTarHeader(entryName);</span>
+<span class="nc" id="L44">    }</span>
+
+    public TarEntry(byte[] headerBuf) {
+<span class="fc" id="L47">        this();</span>
+<span class="fc" id="L48">        this.parseTarHeader(headerBuf);</span>
+<span class="fc" id="L49">    }</span>
+
+    public boolean equals(TarEntry it) {
+<span class="nc" id="L52">        return this.header.name.toString().equals( it.header.name.toString() );</span>
+    }
+
+    public boolean isDescendent(TarEntry desc) {
+<span class="nc" id="L56">        return desc.header.name.toString().startsWith(this.header.name.toString());</span>
+    }
+
+    public TarHeader getHeader() {
+<span class="fc" id="L60">        return this.header;</span>
+    }
+
+    public String getName() {
+<span class="fc" id="L64">        return this.header.name.toString();</span>
+    }
+
+    public void setName(String name) {
+<span class="fc" id="L68">        this.header.name = new StringBuffer(name);</span>
+<span class="fc" id="L69">    }</span>
+
+    public int getUserId() {
+<span class="nc" id="L72">        return this.header.userId;</span>
+    }
+
+    public void setUserId(int userId) {
+<span class="nc" id="L76">        this.header.userId = userId;</span>
+<span class="nc" id="L77">    }</span>
+
+    public int getGroupId() {
+<span class="nc" id="L80">        return this.header.groupId;</span>
+    }
+
+    public void setGroupId(int groupId) {
+<span class="nc" id="L84">        this.header.groupId = groupId;</span>
+<span class="nc" id="L85">    }</span>
+
+    public String getUserName() {
+<span class="nc" id="L88">        return this.header.userName.toString();</span>
+    }
+
+    public void setUserName(String userName) {
+<span class="nc" id="L92">        this.header.userName = new StringBuffer(userName);</span>
+<span class="nc" id="L93">    }</span>
+
+    public String getGroupName() {
+<span class="nc" id="L96">        return this.header.groupName.toString();</span>
+    }
+
+    public void setGroupName(String groupName) {
+<span class="nc" id="L100">        this.header.groupName = new StringBuffer(groupName);</span>
+<span class="nc" id="L101">    }</span>
+
+    public void setIds(int userId, int groupId) {
+<span class="nc" id="L104">        this.setUserId(userId);</span>
+<span class="nc" id="L105">        this.setGroupId(groupId);</span>
+<span class="nc" id="L106">    }</span>
+
+    public Date getModTime() {
+<span class="nc" id="L109">        return new Date(this.header.modTime * 1000);</span>
+    }
+
+    public void setModTime(long time) {
+<span class="nc" id="L113">        this.header.modTime = time / 1000;</span>
+<span class="nc" id="L114">    }</span>
+
+    public void setModTime(Date time) {
+<span class="nc" id="L117">        this.header.modTime = time.getTime() / 1000;</span>
+<span class="nc" id="L118">    }</span>
+
+    public String getFile() {
+<span class="nc" id="L121">        return this.file;</span>
+    }
+
+    public long getSize() {
+<span class="fc" id="L125">        return this.header.size;</span>
+    }
+
+    public void setSize(long size) {
+<span class="fc" id="L129">        this.header.size = size;</span>
+<span class="fc" id="L130">    }</span>
+
+    /**
+     * Checks if the org.xeustechnologies.jtar entry is a directory
+     *
+     * @return
+     */
+    public boolean isDirectory() {
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (this.file != null)</span>
+<span class="nc" id="L139">            return FileSystemStorage.getInstance().isDirectory(this.file);</span>
+
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (this.header != null) {</span>
+<span class="fc bfc" id="L142" title="All 2 branches covered.">            if (this.header.linkFlag == TarHeader.LF_DIR)</span>
+<span class="fc" id="L143">                return true;</span>
+
+<span class="fc" id="L145">            return this.header.name.toString().endsWith(&quot;/&quot;);</span>
+        }
+
+<span class="nc" id="L148">        return false;</span>
+    }
+
+    /**
+     * Extract header from File
+     *
+     * @param entryName
+     */
+    public void extractTarHeader(String entryName) {
+<span class="nc" id="L157">        String name = entryName;</span>
+
+<span class="nc" id="L159">        FileSystemStorage fileSystem = FileSystemStorage.getInstance();</span>
+
+<span class="nc" id="L161">        name = name.replace(fileSystem.getFileSystemSeparator(), '/');</span>
+
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (name.startsWith(&quot;/&quot;))</span>
+<span class="nc" id="L164">            name = name.substring(1);</span>
+
+<span class="nc" id="L166">        header.linkName = new StringBuffer();</span>
+
+<span class="nc" id="L168">        header.name = new StringBuffer(name);</span>
+
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        if (fileSystem.isDirectory(file)) {</span>
+<span class="nc" id="L171">            header.mode = 040755;</span>
+<span class="nc" id="L172">            header.linkFlag = TarHeader.LF_DIR;</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            if (header.name.charAt(header.name.length() - 1) != '/') {</span>
+<span class="nc" id="L174">                header.name.append(&quot;/&quot;);</span>
+            }
+<span class="nc" id="L176">            header.size = 0;</span>
+        } else {
+<span class="nc" id="L178">            header.size = fileSystem.getLength(file);</span>
+<span class="nc" id="L179">            header.mode = 0100644;</span>
+<span class="nc" id="L180">            header.linkFlag = TarHeader.LF_NORMAL;</span>
+        }
+
+        //header.modTime = file.lastModified() / 1000;
+<span class="nc" id="L184">        header.modTime = 0;</span>
+<span class="nc" id="L185">        header.checkSum = 0;</span>
+<span class="nc" id="L186">        header.devMajor = 0;</span>
+<span class="nc" id="L187">        header.devMinor = 0;</span>
+<span class="nc" id="L188">    }</span>
+
+    /**
+     * Calculate checksum
+     *
+     * @param buf
+     * @return
+     */
+    public long computeCheckSum(byte[] buf) {
+<span class="fc" id="L197">        long sum = 0;</span>
+<span class="fc" id="L198">        int blen = buf.length;</span>
+<span class="fc bfc" id="L199" title="All 2 branches covered.">        for (int i = 0; i &lt; blen; ++i) {</span>
+<span class="fc" id="L200">            sum += 255 &amp; buf[i];</span>
+        }
+
+<span class="fc" id="L203">        return sum;</span>
+    }
+
+    /**
+     * Writes the header to the byte buffer
+     *
+     * @param outbuf
+     */
+    public void writeEntryHeader(byte[] outbuf) {
+<span class="fc" id="L212">        int offset = 0;</span>
+
+<span class="fc" id="L214">        offset = TarHeader.getNameBytes(this.header.name, outbuf, offset, TarHeader.NAMELEN);</span>
+<span class="fc" id="L215">        offset = Octal.getOctalBytes(this.header.mode, outbuf, offset, TarHeader.MODELEN);</span>
+<span class="fc" id="L216">        offset = Octal.getOctalBytes(this.header.userId, outbuf, offset, TarHeader.UIDLEN);</span>
+<span class="fc" id="L217">        offset = Octal.getOctalBytes(this.header.groupId, outbuf, offset, TarHeader.GIDLEN);</span>
+
+<span class="fc" id="L219">        long size = this.header.size;</span>
+
+<span class="fc" id="L221">        offset = Octal.getLongOctalBytes(size, outbuf, offset, TarHeader.SIZELEN);</span>
+<span class="fc" id="L222">        offset = Octal.getLongOctalBytes(this.header.modTime, outbuf, offset, TarHeader.MODTIMELEN);</span>
+
+<span class="fc" id="L224">        int csOffset = offset;</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">        for (int c = 0; c &lt; TarHeader.CHKSUMLEN; ++c)</span>
+<span class="fc" id="L226">            outbuf[offset++] = (byte) ' ';</span>
+
+<span class="fc" id="L228">        outbuf[offset++] = this.header.linkFlag;</span>
+
+<span class="fc" id="L230">        offset = TarHeader.getNameBytes(this.header.linkName, outbuf, offset, TarHeader.NAMELEN);</span>
+<span class="fc" id="L231">        offset = TarHeader.getNameBytes(this.header.magic, outbuf, offset, TarHeader.MAGICLEN);</span>
+<span class="fc" id="L232">        offset = TarHeader.getNameBytes(this.header.userName, outbuf, offset, TarHeader.UNAMELEN);</span>
+<span class="fc" id="L233">        offset = TarHeader.getNameBytes(this.header.groupName, outbuf, offset, TarHeader.GNAMELEN);</span>
+<span class="fc" id="L234">        offset = Octal.getOctalBytes(this.header.devMajor, outbuf, offset, TarHeader.DEVLEN);</span>
+<span class="fc" id="L235">        offset = Octal.getOctalBytes(this.header.devMinor, outbuf, offset, TarHeader.DEVLEN);</span>
+
+<span class="fc" id="L237">        int oblen = outbuf.length;</span>
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        while (offset &lt; oblen) {</span>
+<span class="fc" id="L239">            outbuf[offset++] = 0;</span>
+        }
+
+<span class="fc" id="L242">        long checkSum = this.computeCheckSum(outbuf);</span>
+
+<span class="fc" id="L244">        Octal.getCheckSumOctalBytes(checkSum, outbuf, csOffset, TarHeader.CHKSUMLEN);</span>
+<span class="fc" id="L245">    }</span>
+
+    /**
+     * Parses the tar header to the byte buffer
+     *
+     * @param header
+     * @param bh
+     */
+    public void parseTarHeader(byte[] bh) {
+<span class="fc" id="L254">        int offset = 0;</span>
+
+<span class="fc" id="L256">        header.name = TarHeader.parseName(bh, offset, TarHeader.NAMELEN);</span>
+<span class="fc" id="L257">        offset += TarHeader.NAMELEN;</span>
+
+<span class="fc" id="L259">        header.mode = (int) Octal.parseOctal(bh, offset, TarHeader.MODELEN);</span>
+<span class="fc" id="L260">        offset += TarHeader.MODELEN;</span>
+
+<span class="fc" id="L262">        header.userId = (int) Octal.parseOctal(bh, offset, TarHeader.UIDLEN);</span>
+<span class="fc" id="L263">        offset += TarHeader.UIDLEN;</span>
+
+<span class="fc" id="L265">        header.groupId = (int) Octal.parseOctal(bh, offset, TarHeader.GIDLEN);</span>
+<span class="fc" id="L266">        offset += TarHeader.GIDLEN;</span>
+
+<span class="fc" id="L268">        header.size = Octal.parseOctal(bh, offset, TarHeader.SIZELEN);</span>
+<span class="fc" id="L269">        offset += TarHeader.SIZELEN;</span>
+
+<span class="fc" id="L271">        header.modTime = Octal.parseOctal(bh, offset, TarHeader.MODTIMELEN);</span>
+<span class="fc" id="L272">        offset += TarHeader.MODTIMELEN;</span>
+
+<span class="fc" id="L274">        header.checkSum = (int) Octal.parseOctal(bh, offset, TarHeader.CHKSUMLEN);</span>
+<span class="fc" id="L275">        offset += TarHeader.CHKSUMLEN;</span>
+
+<span class="fc" id="L277">        header.linkFlag = bh[offset++];</span>
+
+<span class="fc" id="L279">        header.linkName = TarHeader.parseName(bh, offset, TarHeader.NAMELEN);</span>
+<span class="fc" id="L280">        offset += TarHeader.NAMELEN;</span>
+
+<span class="fc" id="L282">        header.magic = TarHeader.parseName(bh, offset, TarHeader.MAGICLEN);</span>
+<span class="fc" id="L283">        offset += TarHeader.MAGICLEN;</span>
+
+<span class="fc" id="L285">        header.userName = TarHeader.parseName(bh, offset, TarHeader.UNAMELEN);</span>
+<span class="fc" id="L286">        offset += TarHeader.UNAMELEN;</span>
+
+<span class="fc" id="L288">        header.groupName = TarHeader.parseName(bh, offset, TarHeader.GNAMELEN);</span>
+<span class="fc" id="L289">        offset += TarHeader.GNAMELEN;</span>
+
+<span class="fc" id="L291">        header.devMajor = (int) Octal.parseOctal(bh, offset, TarHeader.DEVLEN);</span>
+<span class="fc" id="L292">        offset += TarHeader.DEVLEN;</span>
+
+<span class="fc" id="L294">        header.devMinor = (int) Octal.parseOctal(bh, offset, TarHeader.DEVLEN);</span>
+<span class="fc" id="L295">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

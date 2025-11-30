@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Progress.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">Progress.java</span></div><h1>Progress.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkEvent;
+import com.codename1.io.NetworkManager;
+import com.codename1.ui.Button;
+import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.plaf.UIManager;
+
+/**
+ * Displays a progress dialog with the ability to cancel an ongoing operation
+ *
+ * @author Shai Almog
+ */
+public class Progress extends Dialog implements ActionListener {
+    private final ConnectionRequest request;
+    private boolean disposeOnCompletion;
+    private boolean autoShow;
+    private boolean showing;
+
+    /**
+     * Binds the progress UI to the completion of this request
+     *
+     * @param title   the title of the progress dialog
+     * @param request the network request pending
+     */
+    public Progress(String title, ConnectionRequest request) {
+<span class="fc" id="L59">        this(title, request, false);</span>
+<span class="fc" id="L60">    }</span>
+
+    /**
+     * Binds the progress UI to the completion of this request
+     *
+     * @param title          the title of the progress dialog
+     * @param request        the network request pending
+     * @param showPercentage shows percentage on the progress bar
+     */
+    public Progress(String title, ConnectionRequest request, boolean showPercentage) {
+<span class="fc" id="L70">        super(title);</span>
+<span class="fc" id="L71">        this.request = request;</span>
+<span class="fc" id="L72">        SliderBridge b = new SliderBridge(request);</span>
+<span class="fc" id="L73">        b.setRenderPercentageOnTop(showPercentage);</span>
+<span class="fc" id="L74">        b.setRenderValueOnTop(true);</span>
+<span class="fc" id="L75">        setLayout(new BoxLayout(BoxLayout.Y_AXIS));</span>
+<span class="fc" id="L76">        addComponent(b);</span>
+<span class="fc" id="L77">        Command cancel = new Command(UIManager.getInstance().localize(&quot;cancel&quot;, &quot;Cancel&quot;));</span>
+<span class="pc bpc" id="L78" title="3 of 4 branches missed.">        if (Display.getInstance().isTouchScreenDevice() || getSoftButtonCount() &lt; 2) {</span>
+            // if this is a touch screen device or a blackberry use a centered button
+<span class="fc" id="L80">            Button btn = new Button(cancel);</span>
+<span class="fc" id="L81">            Container cnt = new Container(new FlowLayout(CENTER));</span>
+<span class="fc" id="L82">            cnt.addComponent(btn);</span>
+<span class="fc" id="L83">            addComponent(cnt);</span>
+<span class="fc" id="L84">        } else {</span>
+            // otherwise use a command
+<span class="nc" id="L86">            addCommand(cancel);</span>
+        }
+<span class="fc" id="L88">        setDisposeWhenPointerOutOfBounds(false);</span>
+<span class="fc" id="L89">        setAutoDispose(false);</span>
+<span class="fc" id="L90">        NetworkManager.getInstance().addProgressListener(this);</span>
+<span class="fc" id="L91">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void actionCommand(Command cmd) {
+<span class="nc bnc" id="L97" title="All 4 branches missed.">        if (Display.getInstance().isTouchScreenDevice() || getSoftButtonCount() &lt; 2) {</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            for (int iter = 0; iter &lt; getComponentCount(); iter++) {</span>
+<span class="nc" id="L99">                Component c = getComponentAt(iter);</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">                if (c instanceof Button) {</span>
+<span class="nc" id="L101">                    c.setEnabled(false);</span>
+                }
+            }
+        } else {
+<span class="nc" id="L105">            removeAllCommands();</span>
+        }
+        // cancel was pressed
+<span class="nc" id="L108">        request.kill();</span>
+<span class="nc" id="L109">        dispose();</span>
+<span class="nc" id="L110">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void dispose() {
+<span class="fc" id="L116">        NetworkManager.getInstance().removeProgressListener(this);</span>
+<span class="fc" id="L117">        super.dispose();</span>
+<span class="fc" id="L118">        showing = false;</span>
+<span class="fc" id="L119">        autoShow = false;</span>
+<span class="fc" id="L120">    }</span>
+
+    /**
+     * @return the disposeOnCompletion
+     */
+    public boolean isDisposeOnCompletion() {
+<span class="fc" id="L126">        return disposeOnCompletion;</span>
+    }
+
+    /**
+     * @param disposeOnCompletion the disposeOnCompletion to set
+     */
+    public void setDisposeOnCompletion(boolean disposeOnCompletion) {
+<span class="fc" id="L133">        this.disposeOnCompletion = disposeOnCompletion;</span>
+<span class="fc" id="L134">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L140">        NetworkEvent ev = (NetworkEvent) evt;</span>
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (ev.getConnectionRequest() == request) {</span>
+<span class="nc bnc" id="L142" title="All 4 branches missed.">            if (disposeOnCompletion &amp;&amp; ev.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {</span>
+<span class="nc" id="L143">                dispose();</span>
+<span class="nc" id="L144">                return;</span>
+            }
+<span class="nc bnc" id="L146" title="All 4 branches missed.">            if (autoShow &amp;&amp; !showing) {</span>
+<span class="nc" id="L147">                showing = true;</span>
+<span class="nc" id="L148">                showModeless();</span>
+            }
+        }
+<span class="nc" id="L151">    }</span>
+
+    /**
+     * Shows the progress automatically when the request processing is started
+     *
+     * @return the autoShow
+     */
+    public boolean isAutoShow() {
+<span class="fc" id="L159">        return autoShow;</span>
+    }
+
+    /**
+     * Shows the progress automatically when the request processing is started
+     *
+     * @param autoShow the autoShow to set
+     */
+    public void setAutoShow(boolean autoShow) {
+<span class="fc" id="L168">        this.autoShow = autoShow;</span>
+<span class="fc" id="L169">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

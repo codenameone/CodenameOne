@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Location.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.location</a> &gt; <span class="el_source">Location.java</span></div><h1>Location.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.location;
+
+import com.codename1.util.MathUtil;
+
+import java.util.Comparator;
+
+/**
+ * &lt;p&gt;
+ * Represents a position and possible velocity returned from positioning API's. This class is used both by
+ * foreground and background location for the purposes of both conveying the users location and conveying a
+ * desired location e.g. in the case of geofencing where we can define a location that would trigger the callback.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * Trivial one time usage of location data can look like this sample:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/5c2f411e1687793409d5.js&quot;&gt;&lt;/script&gt;
+ *
+ * &lt;p&gt;
+ * You can also track location in the foreground using API calls like this:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/9dc822cf80cc8bf3a6cc.js&quot;&gt;&lt;/script&gt;
+ *
+ * &lt;p&gt;The sample below demonstrates the usage of the background geofencing API:&lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/shannah/a5592313da97e085822120af16518874.js&quot;&gt;&lt;/script&gt;
+ */
+public class Location {
+
+    private int status;
+
+    private double latitude;
+    private double longitude;
+    private double altitude;
+    private float accuracy;
+    private float direction;
+    private float velocity;
+    private long timeStamp;
+
+<span class="fc" id="L60">    public Location() {</span>
+<span class="fc" id="L61">    }</span>
+
+<span class="nc" id="L63">    public Location(double latitude, double longitude, double altitude, float direction) {</span>
+<span class="nc" id="L64">        this.latitude = latitude;</span>
+<span class="nc" id="L65">        this.longitude = longitude;</span>
+<span class="nc" id="L66">        this.altitude = altitude;</span>
+<span class="nc" id="L67">        this.direction = direction;</span>
+<span class="nc" id="L68">    }</span>
+
+
+<span class="fc" id="L71">    public Location(double latitude, double longitude) {</span>
+<span class="fc" id="L72">        this.latitude = latitude;</span>
+<span class="fc" id="L73">        this.longitude = longitude;</span>
+<span class="fc" id="L74">    }</span>
+
+    private static double haversine(double lat1, double lon1, double lat2, double lon2) {
+<span class="fc" id="L77">        double R = 6372.8;</span>
+<span class="fc" id="L78">        double dLat = Math.toRadians(lat2 - lat1);</span>
+<span class="fc" id="L79">        double dLon = Math.toRadians(lon2 - lon1);</span>
+<span class="fc" id="L80">        lat1 = Math.toRadians(lat1);</span>
+<span class="fc" id="L81">        lat2 = Math.toRadians(lat2);</span>
+
+<span class="fc" id="L83">        double a = MathUtil.pow(Math.sin(dLat / 2), 2) + MathUtil.pow(Math.sin(dLon / 2), 2) * Math.cos(lat1) * Math.cos(lat2);</span>
+<span class="fc" id="L84">        double c = 2 * MathUtil.asin(Math.sqrt(a));</span>
+<span class="fc" id="L85">        return R * c;</span>
+    }
+
+    /**
+     * Returns the horizontal accuracy of the location in meters
+     *
+     * @return the accuracy if exists or 0.0 if not.
+     */
+    public float getAccuracy() {
+<span class="nc" id="L94">        return accuracy;</span>
+    }
+
+    public void setAccuracy(float accuracy) {
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (accuracy != Float.NaN) {</span>
+<span class="nc" id="L99">            this.accuracy = accuracy;</span>
+        }
+<span class="nc" id="L101">    }</span>
+
+    /**
+     * Returns the altitude of this Location
+     *
+     * @return altitude
+     */
+    public double getAltitude() {
+<span class="nc" id="L109">        return altitude;</span>
+    }
+
+    /**
+     * Sets the altitude of this Location
+     *
+     * @param altitude
+     */
+    public void setAltitude(double altitude) {
+<span class="nc" id="L118">        this.altitude = altitude;</span>
+<span class="nc" id="L119">    }</span>
+
+    /**
+     * Returns the direction of this Location in degress 0-360
+     *
+     * @return direction in degrees
+     */
+    public float getDirection() {
+<span class="nc" id="L127">        return direction;</span>
+    }
+
+    /**
+     * Sets the direction of this Location
+     *
+     * @param direction
+     */
+    public void setDirection(float direction) {
+<span class="nc" id="L136">        this.direction = direction;</span>
+<span class="nc" id="L137">    }</span>
+
+    /**
+     * Returns the latitude of this Location
+     *
+     * @return latitude
+     */
+    public double getLatitude() {
+<span class="fc" id="L145">        return latitude;</span>
+    }
+
+    /**
+     * Sets the latitude of this Location
+     *
+     * @param latitude
+     */
+    public void setLatitude(double latitude) {
+<span class="fc" id="L154">        this.latitude = latitude;</span>
+<span class="fc" id="L155">    }</span>
+
+    /**
+     * Returns the longitude of this Location
+     *
+     * @return longitude
+     */
+    public double getLongitude() {
+<span class="fc" id="L163">        return longitude;</span>
+    }
+
+    /**
+     * Sets the longitude of this Location
+     *
+     * @param longitude
+     */
+    public void setLongitude(double longtitude) {
+<span class="fc" id="L172">        this.longitude = longtitude;</span>
+<span class="fc" id="L173">    }</span>
+
+    /**
+     * Returns the longitude of this Location
+     *
+     * @return longitude
+     * @deprecated use getLongitude
+     */
+    public double getLongtitude() {
+<span class="nc" id="L182">        return longitude;</span>
+    }
+
+    /**
+     * Sets the longitude of this Location
+     *
+     * @param longitude
+     * @deprecated use setLongitude
+     */
+    public void setLongtitude(double longtitude) {
+<span class="nc" id="L192">        this.longitude = longtitude;</span>
+<span class="nc" id="L193">    }</span>
+
+    /**
+     * The status of the location one of: LocationManager.AVAILABLE,
+     * LocationManager.OUT_OF_SERVICE or LocationManager.TEMPORARILY_UNAVAILABLE:
+     */
+    public int getStatus() {
+<span class="nc" id="L200">        return status;</span>
+    }
+
+    /**
+     * The status of the location one of: LocationProvider.AVAILABLE,
+     * LocationProvider.OUT_OF_SERVICE or LocationProvider.TEMPORARILY_UNAVAILABLE:
+     */
+    public void setStatus(int status) {
+<span class="nc" id="L208">        this.status = status;</span>
+<span class="nc" id="L209">    }</span>
+
+    /**
+     * Returns the timestamp of this Location
+     *
+     * @return timestamp
+     */
+    public long getTimeStamp() {
+<span class="nc" id="L217">        return timeStamp;</span>
+    }
+
+    /**
+     * Sets the timeStamp of this Location
+     *
+     * @param timeStamp
+     */
+    public void setTimeStamp(long timeStamp) {
+<span class="nc" id="L226">        this.timeStamp = timeStamp;</span>
+<span class="nc" id="L227">    }</span>
+
+    /**
+     * Returns the velocity of this Location in meters per second (m/s)
+     *
+     * @return velocity
+     */
+    public float getVelocity() {
+<span class="nc" id="L235">        return velocity;</span>
+    }
+
+    /**
+     * Sets the velocity of this Location
+     *
+     * @param velocity
+     */
+    public void setVelocity(float velocity) {
+<span class="nc" id="L244">        this.velocity = velocity;</span>
+<span class="nc" id="L245">    }</span>
+
+    /**
+     * Gets the distance in metres from the current location to another location.
+     *
+     * @param l2 The location to measure distance to.
+     * @return The number of metres between the current location and {@literal l2}.
+     */
+    public double getDistanceTo(Location l2) {
+<span class="fc" id="L254">        return haversine(getLatitude(), getLongitude(), l2.getLatitude(), l2.getLongitude()) * 1000;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String toString() {
+<span class="nc" id="L261">        return &quot;altitude = &quot; + altitude</span>
+                + &quot;\nlatitude&quot; + latitude
+                + &quot;\nlongtitude&quot; + longitude
+                + &quot;\ndirection&quot; + direction
+                + &quot;\ntimeStamp&quot; + timeStamp
+                + &quot;\nvelocity&quot; + velocity;
+
+    }
+
+    /**
+     * Creates a comparator for sorting locations in order of increasing distance from the current
+     * location.
+     *
+     * @return
+     */
+    public Comparator&lt;Location&gt; createDistanceCompartor() {
+<span class="nc" id="L277">        return new Comparator&lt;Location&gt;() {</span>
+
+            public int compare(Location o1, Location o2) {
+<span class="nc" id="L280">                double d1 = Location.this.getDistanceTo(o1);</span>
+<span class="nc" id="L281">                double d2 = Location.this.getDistanceTo(o2);</span>
+<span class="nc bnc" id="L282" title="All 4 branches missed.">                return d1 &lt; d2 ? -1 : d2 &lt; d1 ? 1 : 0;</span>
+            }
+
+        };
+    }
+
+    /**
+     * Checks if the latitude and longitude of this location is the same as the provided location.
+     * Null values for {@literal l} are safe.
+     *
+     * @param l
+     * @return True if l has same latitude and longitude as this location.
+     */
+    boolean equalsLatLng(Location l) {
+
+<span class="nc bnc" id="L297" title="All 6 branches missed.">        return l != null &amp;&amp; l.latitude == latitude &amp;&amp; l.longitude == longitude;</span>
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

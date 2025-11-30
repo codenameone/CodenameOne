@@ -1,0 +1,279 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultListCellRenderer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.list</a> &gt; <span class="el_source">DefaultListCellRenderer.java</span></div><h1>DefaultListCellRenderer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.list;
+
+import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.List;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+import java.util.Map;
+
+/**
+ * Default implementation of the renderer based on a label see the {@link ListCellRenderer}
+ * for more information about the use and purpose of this class
+ *
+ * @author Chen Fishbein
+ */
+public class DefaultListCellRenderer&lt;T&gt; extends Label implements ListCellRenderer&lt;T&gt;, CellRenderer&lt;T&gt; {
+<span class="fc" id="L44">    private static boolean showNumbersDefault = true;</span>
+    private boolean showNumbers;
+    private boolean showNumbersForce;
+<span class="fc" id="L47">    private final Label focusComponent = new Label();</span>
+    private boolean rightAlignNumbers;
+    private boolean alwaysRenderSelection;
+
+    /**
+     * Creates a new instance of DefaultCellRenderer
+     */
+    public DefaultListCellRenderer() {
+<span class="fc" id="L55">        super(&quot;&quot;);</span>
+<span class="fc" id="L56">        setCellRenderer(true);</span>
+<span class="fc" id="L57">        setEndsWith3Points(false);</span>
+<span class="fc" id="L58">        focusComponent.setUIID(&quot;ListRendererFocus&quot;);</span>
+<span class="fc" id="L59">        focusComponent.setFocus(true);</span>
+<span class="fc" id="L60">        setUIID(&quot;ListRenderer&quot;);</span>
+<span class="fc" id="L61">    }</span>
+
+    /**
+     * Creates a new instance of DefaultCellRenderer
+     *
+     * @param showNumbers indicates numbers should be shown
+     */
+    public DefaultListCellRenderer(boolean showNumbers) {
+<span class="fc" id="L69">        this();</span>
+<span class="fc" id="L70">        showNumbersForce = true;</span>
+<span class="fc" id="L71">        this.showNumbers = showNumbers;</span>
+<span class="fc" id="L72">    }</span>
+
+    /**
+     * Indicates whether the default list cell renderer will show numbers by default
+     * when constructed
+     *
+     * @return true when showing numbers, false otherwise
+     */
+    public static boolean isShowNumbersDefault() {
+<span class="nc" id="L81">        return showNumbersDefault;</span>
+    }
+
+    /**
+     * Indicates whether the default list cell renderer will show numbers by default
+     * when constructed
+     *
+     * @param def true to show numbers for all renderers created in the future
+     */
+    public static void setShowNumbersDefault(boolean def) {
+<span class="nc" id="L91">        showNumbersDefault = def;</span>
+<span class="nc" id="L92">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void initLaf(UIManager uim) {
+<span class="fc" id="L98">        super.initLaf(uim);</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (!showNumbersForce) {</span>
+<span class="fc" id="L100">            showNumbers = uim.isThemeConstant(&quot;rendererShowsNumbersBool&quot;, showNumbersDefault);</span>
+        }
+<span class="fc" id="L102">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void refreshTheme(boolean merge) {
+<span class="fc" id="L108">        super.refreshTheme(merge);</span>
+<span class="fc" id="L109">        focusComponent.refreshTheme(merge);</span>
+<span class="fc" id="L110">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Component getCellRendererComponent(Component list, Object model, T value, int index, boolean isSelected) {
+<span class="pc bpc" id="L116" title="1 of 4 branches missed.">        if (!alwaysRenderSelection &amp;&amp; !Display.getInstance().shouldRenderSelection(list)) {</span>
+<span class="nc" id="L117">            isSelected = false;</span>
+        }
+<span class="fc" id="L119">        setFocus(isSelected);</span>
+<span class="fc bfc" id="L120" title="All 2 branches covered.">        if (showNumbers) {</span>
+<span class="fc" id="L121">            String text = &quot;&quot; + value;</span>
+<span class="fc" id="L122">            Map&lt;String, String&gt; t = UIManager.getInstance().getBundle();</span>
+<span class="pc bpc" id="L123" title="3 of 4 branches missed.">            if (t != null &amp;&amp; value != null) {</span>
+<span class="nc" id="L124">                Object o = t.get(value.toString());</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">                if (o != null) {</span>
+<span class="nc" id="L126">                    text = (String) o;</span>
+                }
+            }
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            if (isRTL()) {</span>
+<span class="nc" id="L130">                setText(text + &quot; .&quot; + (index + 1));</span>
+            } else {
+<span class="fc" id="L132">                setText(&quot;&quot; + (index + 1) + &quot;. &quot; + text);</span>
+            }
+<span class="fc" id="L134">        } else {</span>
+<span class="fc bfc" id="L135" title="All 2 branches covered.">            if (value != null) {</span>
+<span class="fc" id="L136">                String v = value.toString();</span>
+<span class="fc" id="L137">                setText(v);</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">                if (isRightAlignNumbers()) {</span>
+<span class="fc" id="L139">                    char c = v.charAt(0);</span>
+<span class="fc" id="L140">                    Style s = getStyle();</span>
+<span class="pc bpc" id="L141" title="2 of 4 branches missed.">                    if (c &gt;= '0' &amp;&amp; c &lt;= '9') {</span>
+<span class="fc" id="L142">                        s.setAlignment(RIGHT);</span>
+                    } else {
+<span class="nc" id="L144">                        s.setAlignment(LEFT);</span>
+                    }
+                }
+<span class="fc" id="L147">            } else {</span>
+<span class="fc" id="L148">                setText(&quot;null&quot;);</span>
+            }
+        }
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (value instanceof Command) {</span>
+<span class="nc" id="L152">            Image i = ((Command) value).getIcon();</span>
+<span class="nc bnc" id="L153" title="All 2 branches missed.">            if (i == null) {</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                if (((Command) value).getMaterialIcon() != 0) {</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">                    if (((Command) value).getIconFont() != null) {</span>
+<span class="nc" id="L156">                        setFontIcon(((Command) value).getIconFont(), ((Command) value).getMaterialIcon());</span>
+                    } else {
+<span class="nc" id="L158">                        setMaterialIcon(((Command) value).getMaterialIcon());</span>
+                    }
+                } else {
+<span class="nc" id="L161">                    setIcon(null);</span>
+                }
+            } else {
+<span class="nc" id="L164">                setIcon(i);</span>
+            }
+<span class="nc" id="L166">            setEnabled(((Command) value).isEnabled());</span>
+        }
+<span class="fc" id="L168">        return this;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Style getStyle() {
+<span class="fc bfc" id="L175" title="All 4 branches covered.">        if (alwaysRenderSelection &amp;&amp; hasFocus()) {</span>
+<span class="fc" id="L176">            return getSelectedStyle();</span>
+        }
+
+<span class="fc" id="L179">        return super.getStyle();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Component getListCellRendererComponent(List list, T value, int index, boolean isSelected) {
+<span class="fc" id="L186">        return getCellRendererComponent(list, list.getModel(), value, index, isSelected);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Component getListFocusComponent(List list) {
+<span class="fc" id="L193">        return focusComponent;</span>
+    }
+
+    /**
+     * Overriden to do nothing and remove a performance issue where renderer changes
+     * perform needless repaint calls
+     */
+    public void repaint() {
+<span class="fc" id="L201">    }</span>
+
+    /**
+     * Indicate whether numbering should exist for the default cell renderer
+     *
+     * @return true if numers are shown by the numbers
+     */
+    public boolean isShowNumbers() {
+<span class="nc" id="L209">        return showNumbers;</span>
+    }
+
+    /**
+     * Indicate whether numbering should exist for the default cell renderer
+     *
+     * @param showNumbers indicate whether numbering should exist for the default cell renderer
+     */
+    public void setShowNumbers(boolean showNumbers) {
+<span class="fc" id="L218">        this.showNumbers = showNumbers;</span>
+<span class="fc" id="L219">        showNumbersForce = true;</span>
+<span class="fc" id="L220">    }</span>
+
+    /**
+     * The background transparency factor to apply to the selection focus
+     *
+     * @return selection transperancy value
+     */
+    public int getSelectionTransparency() {
+<span class="nc" id="L228">        return focusComponent.getUnselectedStyle().getBgTransparency() &amp; 0xff;</span>
+    }
+
+    /**
+     * The background transparency factor to apply to the selection focus
+     *
+     * @param selectionTransparency the selection transperancy value
+     */
+    public void setSelectionTransparency(int selectionTransparency) {
+<span class="nc" id="L237">        focusComponent.getUnselectedStyle().setBgTransparency(selectionTransparency);</span>
+<span class="nc" id="L238">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Component getFocusComponent(Component list) {
+<span class="nc" id="L244">        return focusComponent;</span>
+    }
+
+    /**
+     * @return the rightAlignNumbers
+     */
+    public boolean isRightAlignNumbers() {
+<span class="fc" id="L251">        return rightAlignNumbers;</span>
+    }
+
+    /**
+     * @param rightAlignNumbers the rightAlignNumbers to set
+     */
+    public void setRightAlignNumbers(boolean rightAlignNumbers) {
+<span class="fc" id="L258">        this.rightAlignNumbers = rightAlignNumbers;</span>
+<span class="fc" id="L259">    }</span>
+
+    /**
+     * Indicates that selection should always be rendered regardless of the status of the shouldRenderSelection flag
+     *
+     * @return the alwaysRenderSelection
+     */
+    public boolean isAlwaysRenderSelection() {
+<span class="nc" id="L267">        return alwaysRenderSelection;</span>
+    }
+
+    /**
+     * Indicates that selection should always be rendered regardless of the status of the shouldRenderSelection flag
+     *
+     * @param alwaysRenderSelection the alwaysRenderSelection to set
+     */
+    public void setAlwaysRenderSelection(boolean alwaysRenderSelection) {
+<span class="fc" id="L276">        this.alwaysRenderSelection = alwaysRenderSelection;</span>
+<span class="fc" id="L277">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

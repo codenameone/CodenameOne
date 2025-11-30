@@ -1,0 +1,919 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InteractionDialog.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">InteractionDialog.java</span></div><h1>InteractionDialog.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.components;
+
+import com.codename1.ui.CN;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+/**
+ * &lt;p&gt;Unlike a regular dialog the interaction dialog only looks like a dialog,
+ * it resides in the layered pane and can be used to implement features where
+ * interaction with the background form is still required.&lt;br&gt;
+ * Since this code is designed for interaction all &quot;dialogs&quot; created thru here are
+ * modless and never block.&lt;/p&gt;
+ *
+ * &lt;script src=&quot;https://gist.github.com/codenameone/d1db2033981c835fb925.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-interaction-dialog.png&quot; alt=&quot;InteractionDialog Sample&quot; /&gt;
+ *
+ * @author Shai Almog
+ */
+public class InteractionDialog extends Container {
+<span class="pc" id="L57">    private final Label title = new Label();</span>
+<span class="pc" id="L58">    private final Container titleArea = new Container(new BorderLayout());</span>
+    private final Container contentPane;
+<span class="pc" id="L60">    private boolean animateShow = true;</span>
+<span class="pc" id="L61">    private boolean repositionAnimation = true;</span>
+    private boolean disposed;
+    private boolean disposeWhenPointerOutOfBounds;
+
+    /**
+     * Whether the interaction dialog uses the form layered pane of the regular layered pane
+     */
+    private boolean formMode;
+    private boolean pressedOutOfBounds;
+    private ActionListener pressedListener;
+    private ActionListener releasedListener;
+
+    /**
+     * Default constructor with no title
+     */
+    public InteractionDialog() {
+<span class="fc" id="L77">        super(new BorderLayout());</span>
+<span class="fc" id="L78">        contentPane = new Container();</span>
+<span class="fc" id="L79">        init();</span>
+<span class="fc" id="L80">    }</span>
+
+    /**
+     * Default constructor with layout
+     *
+     * @param l layout
+     */
+    public InteractionDialog(Layout l) {
+<span class="fc" id="L88">        super(new BorderLayout());</span>
+<span class="fc" id="L89">        contentPane = new Container(l);</span>
+<span class="fc" id="L90">        init();</span>
+<span class="fc" id="L91">    }</span>
+
+    /**
+     * Constructor with dialog title
+     *
+     * @param title the title of the dialog
+     */
+    public InteractionDialog(String title) {
+<span class="fc" id="L99">        super(new BorderLayout());</span>
+<span class="fc" id="L100">        contentPane = new Container();</span>
+<span class="fc" id="L101">        this.title.setText(title);</span>
+<span class="fc" id="L102">        init();</span>
+<span class="fc" id="L103">    }</span>
+
+
+    /**
+     * Constructor with dialog title
+     *
+     * @param title the title of the dialog
+     * @param l     the layout for the content pane
+     */
+    public InteractionDialog(String title, Layout l) {
+<span class="nc" id="L113">        super(new BorderLayout());</span>
+<span class="nc" id="L114">        contentPane = new Container(l);</span>
+<span class="nc" id="L115">        this.title.setText(title);</span>
+<span class="nc" id="L116">        init();</span>
+<span class="nc" id="L117">    }</span>
+
+    private void init() {
+<span class="fc" id="L120">        setUIID(&quot;Dialog&quot;);</span>
+<span class="fc" id="L121">        title.setUIID(&quot;DialogTitle&quot;);</span>
+<span class="fc" id="L122">        contentPane.setUIID(&quot;DialogContentPane&quot;);</span>
+<span class="fc" id="L123">        super.addComponent(BorderLayout.NORTH, titleArea);</span>
+<span class="fc" id="L124">        titleArea.addComponent(BorderLayout.CENTER, title);</span>
+<span class="fc" id="L125">        super.addComponent(BorderLayout.CENTER, contentPane);</span>
+<span class="fc" id="L126">        setGrabsPointerEvents(true);</span>
+<span class="fc" id="L127">    }</span>
+
+    @Override
+    protected void initComponent() {
+<span class="fc" id="L131">        super.initComponent();</span>
+<span class="fc" id="L132">        installPointerOutOfBoundsListeners();</span>
+<span class="fc" id="L133">    }</span>
+
+    /**
+     * This flag indicates if the dialog should be disposed if a pointer
+     * released event occurred out of the dialog content.
+     *
+     * @return true if the dialog should dispose
+     */
+    public boolean isDisposeWhenPointerOutOfBounds() {
+<span class="nc" id="L142">        return disposeWhenPointerOutOfBounds;</span>
+    }
+
+    /**
+     * This flag indicates if the dialog should be disposed if a pointer
+     * released event occurred out of the dialog content.
+     *
+     * @param disposeWhenPointerOutOfBounds
+     */
+    public void setDisposeWhenPointerOutOfBounds(boolean disposeWhenPointerOutOfBounds) {
+<span class="fc" id="L152">        this.disposeWhenPointerOutOfBounds = disposeWhenPointerOutOfBounds;</span>
+<span class="fc" id="L153">    }</span>
+
+    /**
+     * Returns the body of the interaction dialog
+     *
+     * @return the container where the elements of the interaction dialog are added.
+     */
+    public Container getContentPane() {
+<span class="fc" id="L161">        return contentPane;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setScrollable(boolean scrollable) {
+<span class="nc" id="L168">        getContentPane().setScrollable(scrollable);</span>
+<span class="nc" id="L169">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Layout getLayout() {
+<span class="nc" id="L175">        return contentPane.getLayout();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setLayout(Layout layout) {
+<span class="nc" id="L182">        contentPane.setLayout(layout);</span>
+<span class="nc" id="L183">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public String getTitle() {
+<span class="fc" id="L189">        return title.getText();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setTitle(String title) {
+<span class="nc" id="L196">        this.title.setText(title);</span>
+<span class="nc" id="L197">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addComponent(Component cmp) {
+<span class="fc" id="L203">        contentPane.addComponent(cmp);</span>
+<span class="fc" id="L204">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addComponent(Object constraints, Component cmp) {
+<span class="fc" id="L210">        contentPane.addComponent(constraints, cmp);</span>
+<span class="fc" id="L211">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addComponent(int index, Object constraints, Component cmp) {
+<span class="nc" id="L217">        contentPane.addComponent(index, constraints, cmp);</span>
+<span class="nc" id="L218">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addComponent(int index, Component cmp) {
+<span class="nc" id="L224">        contentPane.addComponent(index, cmp);</span>
+<span class="nc" id="L225">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void removeAll() {
+<span class="nc" id="L231">        contentPane.removeAll();</span>
+<span class="nc" id="L232">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void removeComponent(Component cmp) {
+<span class="nc" id="L238">        contentPane.removeComponent(cmp);</span>
+<span class="nc" id="L239">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Label getTitleComponent() {
+<span class="fc" id="L245">        return title;</span>
+    }
+
+    private void cleanupLayer(Form f) {
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        if (formMode) {</span>
+<span class="fc" id="L250">            Container c = f.getFormLayeredPane(InteractionDialog.class, true);</span>
+<span class="fc" id="L251">            c.removeAll();</span>
+<span class="fc" id="L252">            c.remove();</span>
+        }
+<span class="fc" id="L254">    }</span>
+
+    private Container getLayeredPane(Form f) {
+        //return f.getLayeredPane();
+        Container c;
+<span class="fc bfc" id="L259" title="All 2 branches covered.">        if (formMode) {</span>
+<span class="fc" id="L260">            c = f.getFormLayeredPane(InteractionDialog.class, true);</span>
+        } else {
+<span class="fc" id="L262">            c = f.getLayeredPane(InteractionDialog.class, true);</span>
+        }
+<span class="fc bfc" id="L264" title="All 2 branches covered.">        if (!(c.getLayout() instanceof LayeredLayout)) {</span>
+<span class="fc" id="L265">            c.setLayout(new LayeredLayout());</span>
+        }
+
+<span class="fc" id="L268">        return c;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void deinitialize() {
+<span class="fc" id="L276">        super.deinitialize();</span>
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        if (disposed) {</span>
+<span class="fc" id="L278">            Form f = getComponentForm();</span>
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">            if (f != null) {</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">                if (pressedListener != null) {</span>
+<span class="fc" id="L281">                    f.removePointerPressedListener(pressedListener);</span>
+                }
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">                if (releasedListener != null) {</span>
+<span class="fc" id="L284">                    f.removePointerReleasedListener(releasedListener);</span>
+                }
+<span class="fc" id="L286">                Container pp = getLayeredPane(f);</span>
+<span class="fc" id="L287">                Container p = getParent();</span>
+<span class="fc" id="L288">                remove();</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">                if (p.getComponentCount() == 0) {</span>
+<span class="fc" id="L290">                    p.remove();</span>
+                }
+                //pp.removeAll();
+<span class="fc" id="L293">                pp.revalidateLater();</span>
+<span class="fc" id="L294">                cleanupLayer(f);</span>
+            }
+        }
+<span class="fc" id="L297">    }</span>
+
+    public void resize(final int top, final int bottom, final int left, final int right) {
+<span class="nc bnc" id="L300" title="All 2 branches missed.">        if (!disposed) {</span>
+<span class="nc" id="L301">            final Form f = Display.getInstance().getCurrent();</span>
+
+<span class="nc" id="L303">            Style unselectedStyle = getUnselectedStyle();</span>
+
+<span class="nc" id="L305">            unselectedStyle.setMargin(TOP, Math.max(0, top));</span>
+<span class="nc" id="L306">            unselectedStyle.setMargin(BOTTOM, Math.max(0, bottom));</span>
+<span class="nc" id="L307">            unselectedStyle.setMargin(LEFT, Math.max(0, left));</span>
+<span class="nc" id="L308">            unselectedStyle.setMargin(RIGHT, Math.max(0, right));</span>
+<span class="nc" id="L309">            unselectedStyle.setMarginUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);</span>
+
+<span class="nc" id="L311">            getParent().setX(getX());</span>
+<span class="nc" id="L312">            getParent().setY(getY());</span>
+<span class="nc" id="L313">            setX(0);</span>
+<span class="nc" id="L314">            setY(0);</span>
+<span class="nc" id="L315">            getParent().setWidth(getWidth());</span>
+<span class="nc" id="L316">            getParent().setHeight(getHeight());</span>
+
+<span class="nc" id="L318">            getLayeredPane(f).animateLayout(getUIManager().getThemeConstant(&quot;interactionDialogSpeedInt&quot;, 400));</span>
+        }
+<span class="nc" id="L320">    }</span>
+
+    /**
+     * This method shows the form as a modal alert allowing us to produce a behavior
+     * of an alert/dialog box. This method will block the calling thread even if the
+     * calling thread is the EDT. Notice that this method will not release the block
+     * until dispose is called even if show() from another form is called!
+     * &lt;p&gt;Modal dialogs Allow the forms &quot;content&quot; to &quot;hang in mid air&quot; this is especially useful for
+     * dialogs where you would want the underlying form to &quot;peek&quot; from behind the
+     * form.
+     *
+     * @param top    space in pixels between the top of the screen and the form
+     * @param bottom space in pixels between the bottom of the screen and the form
+     * @param left   space in pixels between the left of the screen and the form
+     * @param right  space in pixels between the right of the screen and the form
+     */
+    public void show(int top, int bottom, int left, int right) {
+<span class="fc" id="L337">        getUnselectedStyle().setOpacity(255);</span>
+<span class="fc" id="L338">        disposed = false;</span>
+<span class="fc" id="L339">        Form f = Display.getInstance().getCurrent();</span>
+<span class="fc" id="L340">        Style unselectedStyle = getUnselectedStyle();</span>
+
+<span class="fc" id="L342">        unselectedStyle.setMargin(TOP, top);</span>
+<span class="fc" id="L343">        unselectedStyle.setMargin(BOTTOM, bottom);</span>
+<span class="fc" id="L344">        unselectedStyle.setMargin(LEFT, left);</span>
+<span class="fc" id="L345">        unselectedStyle.setMargin(RIGHT, right);</span>
+<span class="fc" id="L346">        unselectedStyle.setMarginUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);</span>
+
+        // might occur when showing the dialog twice...
+<span class="fc" id="L349">        remove();</span>
+
+        // We issue a revalidate in case this is the first time the layered pane
+        // appears in the form.  Without this, the &quot;show&quot; animation won't work
+        // the first time.
+<span class="fc" id="L354">        getLayeredPane(f).revalidate();</span>
+
+<span class="fc" id="L356">        getLayeredPane(f).addComponent(BorderLayout.center(this));</span>
+<span class="fc bfc" id="L357" title="All 2 branches covered.">        if (animateShow) {</span>
+<span class="fc" id="L358">            int x = left + (f.getWidth() - right - left) / 2;</span>
+<span class="fc" id="L359">            int y = top + (f.getHeight() - bottom - top) / 2;</span>
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">            if (repositionAnimation) {</span>
+<span class="nc" id="L361">                getParent().setX(x);</span>
+<span class="nc" id="L362">                getParent().setY(y);</span>
+<span class="nc" id="L363">                getParent().setWidth(1);</span>
+<span class="nc" id="L364">                getParent().setHeight(1);</span>
+            } else {
+<span class="fc" id="L366">                getParent().setX(getX());</span>
+<span class="fc" id="L367">                getParent().setY(getY());</span>
+<span class="fc" id="L368">                setX(0);</span>
+<span class="fc" id="L369">                setY(0);</span>
+<span class="fc" id="L370">                getParent().setWidth(getWidth());</span>
+<span class="fc" id="L371">                getParent().setHeight(getHeight());</span>
+            }
+<span class="fc" id="L373">            getLayeredPane(f).animateLayout(getUIManager().getThemeConstant(&quot;interactionDialogSpeedInt&quot;, 400));</span>
+<span class="fc" id="L374">        } else {</span>
+            //getLayeredPane(f).revalidate();
+<span class="fc" id="L376">            f.revalidateWithAnimationSafety();</span>
+        }
+        /*
+        Form f = Display.getInstance().getCurrent();
+        f.getLayeredPane().setLayout(new BorderLayout());
+        getUnselectedStyle().setMargin(TOP, top);
+        getUnselectedStyle().setMargin(BOTTOM, bottom);
+        getUnselectedStyle().setMargin(LEFT, left);
+        getUnselectedStyle().setMargin(RIGHT, right);
+        getUnselectedStyle().setMarginUnit(new byte[] {Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS});
+        f.getLayeredPane().addComponent(BorderLayout.CENTER, this);
+        if(animateShow) {
+            int x = left + (f.getWidth() - right - left) / 2;
+            int y = top + (f.getHeight() - bottom - top) / 2;
+            setX(x);
+            setY(y);
+            setWidth(1);
+            setHeight(1);
+            f.getLayeredPane().animateLayout(400);
+        } else {
+            f.getLayeredPane().revalidate();
+        }
+        */
+<span class="fc" id="L399">    }</span>
+
+    /**
+     * Removes the interaction dialog from view
+     */
+    public void dispose() {
+<span class="fc" id="L405">        disposed = true;</span>
+<span class="fc" id="L406">        Container p = getParent();</span>
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">        if (p != null) {</span>
+<span class="fc" id="L408">            Form f = p.getComponentForm();</span>
+<span class="pc bpc" id="L409" title="1 of 2 branches missed.">            if (f != null) {</span>
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">                if (animateShow) {</span>
+<span class="nc bnc" id="L411" title="All 2 branches missed.">                    if (repositionAnimation) {</span>
+<span class="nc" id="L412">                        setX(getX() + getWidth() / 2);</span>
+<span class="nc" id="L413">                        setY(getY() + getHeight() / 2);</span>
+<span class="nc" id="L414">                        setWidth(1);</span>
+<span class="nc" id="L415">                        setHeight(1);</span>
+                    }
+<span class="nc" id="L417">                    p.animateUnlayoutAndWait(getUIManager().getThemeConstant(&quot;interactionDialogSpeedInt&quot;, 400), 100);</span>
+                }
+<span class="fc" id="L419">                Container pp = getLayeredPane(f);</span>
+<span class="fc" id="L420">                remove();</span>
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">                if (p.getComponentCount() == 0) {</span>
+<span class="fc" id="L422">                    p.remove();</span>
+                }
+                //p.remove();
+                //pp.removeAll();
+
+<span class="fc" id="L427">                pp.revalidate();</span>
+<span class="fc" id="L428">                cleanupLayer(f);</span>
+<span class="fc" id="L429">            } else {</span>
+<span class="nc" id="L430">                p.remove();</span>
+            }
+        }
+<span class="fc" id="L433">    }</span>
+
+    /**
+     * Removes the interaction dialog from view with an animation to the left
+     */
+    public void disposeToTheLeft() {
+<span class="fc" id="L439">        disposeTo(Component.LEFT);</span>
+<span class="fc" id="L440">    }</span>
+
+    /**
+     * Removes the interaction dialog from view with an animation to the bottom
+     */
+    public void disposeToTheBottom() {
+<span class="nc" id="L446">        disposeTo(Component.BOTTOM);</span>
+<span class="nc" id="L447">    }</span>
+
+    /**
+     * Removes the interaction dialog from view with an animation to the bottom
+     *
+     * @param onFinish Callback called when dispose animation is complete.
+     */
+    public void disposeToTheBottom(Runnable onFinish) {
+<span class="nc" id="L455">        disposeTo(Component.BOTTOM, onFinish);</span>
+<span class="nc" id="L456">    }</span>
+
+    /**
+     * Removes the interaction dialog from view with an animation to the top
+     */
+    public void disposeToTheTop() {
+<span class="nc" id="L462">        disposeTo(Component.TOP);</span>
+<span class="nc" id="L463">    }</span>
+
+    /**
+     * Removes the interaction dialog from view with an animation to the right
+     */
+    public void disposeToTheRight() {
+<span class="fc" id="L469">        disposeTo(Component.RIGHT);</span>
+<span class="fc" id="L470">    }</span>
+
+    private void disposeTo(int direction) {
+<span class="fc" id="L473">        disposeTo(direction, null);</span>
+<span class="fc" id="L474">    }</span>
+
+    private void disposeTo(int direction, final Runnable onFinish) {
+<span class="fc" id="L477">        disposed = true;</span>
+<span class="fc" id="L478">        final Container p = getParent();</span>
+<span class="pc bpc" id="L479" title="1 of 2 branches missed.">        if (p != null) {</span>
+<span class="fc" id="L480">            final Form f = p.getComponentForm();</span>
+<span class="pc bpc" id="L481" title="1 of 2 branches missed.">            if (f != null) {</span>
+<span class="pc bpc" id="L482" title="3 of 5 branches missed.">                switch (direction) {</span>
+                    case Component.LEFT:
+<span class="fc" id="L484">                        setX(-getWidth());</span>
+<span class="fc" id="L485">                        break;</span>
+                    case Component.TOP:
+<span class="nc" id="L487">                        setY(-getHeight());</span>
+<span class="nc" id="L488">                        break;</span>
+                    case Component.RIGHT:
+<span class="fc" id="L490">                        setX(Display.getInstance().getDisplayWidth());</span>
+<span class="fc" id="L491">                        break;</span>
+                    case Component.BOTTOM:
+<span class="nc" id="L493">                        setY(Display.getInstance().getDisplayHeight());</span>
+                        break;
+
+                }
+
+<span class="fc bfc" id="L498" title="All 2 branches covered.">                if (animateShow) {</span>
+<span class="fc" id="L499">                    p.animateUnlayout(getUIManager().getThemeConstant(&quot;interactionDialogSpeedInt&quot;, 400), 255, new Runnable() {</span>
+                        public void run() {
+<span class="nc bnc" id="L501" title="All 2 branches missed.">                            if (p.getParent() != null) {</span>
+<span class="nc" id="L502">                                Container pp = getLayeredPane(f);</span>
+<span class="nc" id="L503">                                remove();</span>
+<span class="nc" id="L504">                                p.remove();</span>
+<span class="nc" id="L505">                                pp.removeAll();</span>
+<span class="nc" id="L506">                                pp.revalidate();</span>
+<span class="nc" id="L507">                                cleanupLayer(f);</span>
+                            }
+<span class="nc bnc" id="L509" title="All 2 branches missed.">                            if (onFinish != null) {</span>
+<span class="nc" id="L510">                                onFinish.run();</span>
+                            }
+<span class="nc" id="L512">                        }</span>
+                    });
+                } else {
+<span class="fc" id="L515">                    p.revalidate();</span>
+<span class="fc" id="L516">                    Container pp = getLayeredPane(f);</span>
+<span class="fc" id="L517">                    remove();</span>
+<span class="fc" id="L518">                    p.remove();</span>
+<span class="fc" id="L519">                    pp.removeAll();</span>
+<span class="fc" id="L520">                    pp.revalidate();</span>
+<span class="pc bpc" id="L521" title="1 of 2 branches missed.">                    if (onFinish != null) {</span>
+<span class="nc" id="L522">                        onFinish.run();</span>
+                    }
+<span class="fc" id="L524">                }</span>
+            } else {
+<span class="nc" id="L526">                remove();</span>
+<span class="nc bnc" id="L527" title="All 2 branches missed.">                if (onFinish != null) {</span>
+<span class="nc" id="L528">                    onFinish.run();</span>
+                }
+            }
+        }
+<span class="fc" id="L532">    }</span>
+
+    /**
+     * Will return true if the dialog is currently showing
+     *
+     * @return true if showing
+     */
+    public boolean isShowing() {
+<span class="fc bfc" id="L540" title="All 2 branches covered.">        return getParent() != null;</span>
+    }
+
+    /**
+     * Indicates whether show/dispose should be animated or not
+     *
+     * @return the animateShow
+     */
+    public boolean isAnimateShow() {
+<span class="nc" id="L549">        return animateShow;</span>
+    }
+
+    /**
+     * Indicates whether show/dispose should be animated or not
+     *
+     * @param animateShow the animateShow to set
+     */
+    public void setAnimateShow(boolean animateShow) {
+<span class="fc" id="L558">        this.animateShow = animateShow;</span>
+<span class="fc" id="L559">    }</span>
+
+    private void installPointerOutOfBoundsListeners() {
+
+<span class="fc" id="L563">        final Form f = getComponentForm();</span>
+<span class="pc bpc" id="L564" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="fc bfc" id="L565" title="All 2 branches covered.">            if (pressedListener == null) {</span>
+<span class="fc" id="L566">                pressedListener = new ActionListener() {</span>
+
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L570" title="All 2 branches missed.">                        if (disposed) {</span>
+<span class="nc" id="L571">                            f.removePointerPressedListener(pressedListener);</span>
+<span class="nc" id="L572">                            f.removePointerReleasedListener(releasedListener);</span>
+<span class="nc" id="L573">                            return;</span>
+                        }
+<span class="nc bnc" id="L575" title="All 2 branches missed.">                        pressedOutOfBounds = disposeWhenPointerOutOfBounds &amp;&amp;</span>
+<span class="nc bnc" id="L576" title="All 2 branches missed.">                                !getContentPane().containsOrOwns(evt.getX(), evt.getY()) &amp;&amp;</span>
+<span class="nc bnc" id="L577" title="All 2 branches missed.">                                !getTitleComponent().containsOrOwns(evt.getX(), evt.getY())</span>
+                        ;
+<span class="nc bnc" id="L579" title="All 4 branches missed.">                        if (pressedOutOfBounds &amp;&amp; disposeWhenPointerOutOfBounds) {</span>
+<span class="nc" id="L580">                            evt.consume();</span>
+                        }
+<span class="nc" id="L582">                    }</span>
+                };
+            }
+<span class="fc bfc" id="L585" title="All 2 branches covered.">            if (releasedListener == null) {</span>
+<span class="fc" id="L586">                releasedListener = new ActionListener() {</span>
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+<span class="pc bpc" id="L589" title="1 of 2 branches missed.">                        if (disposed) {</span>
+<span class="nc" id="L590">                            f.removePointerPressedListener(pressedListener);</span>
+<span class="nc" id="L591">                            f.removePointerReleasedListener(releasedListener);</span>
+<span class="nc" id="L592">                            return;</span>
+                        }
+<span class="pc bpc" id="L594" title="1 of 2 branches missed.">                        if (disposeWhenPointerOutOfBounds &amp;&amp;</span>
+<span class="nc bnc" id="L595" title="All 2 branches missed.">                                pressedOutOfBounds &amp;&amp;</span>
+<span class="nc bnc" id="L596" title="All 2 branches missed.">                                !getContentPane().containsOrOwns(evt.getX(), evt.getY()) &amp;&amp;</span>
+<span class="nc bnc" id="L597" title="All 2 branches missed.">                                !getTitleComponent().containsOrOwns(evt.getX(), evt.getY())) {</span>
+<span class="nc" id="L598">                            evt.consume();</span>
+<span class="nc" id="L599">                            f.removePointerPressedListener(pressedListener);</span>
+<span class="nc" id="L600">                            f.removePointerReleasedListener(releasedListener);</span>
+<span class="nc" id="L601">                            dispose();</span>
+                        }
+<span class="fc" id="L603">                    }</span>
+                };
+            }
+<span class="fc" id="L606">            f.addPointerPressedListener(pressedListener);</span>
+<span class="fc" id="L607">            f.addPointerReleasedListener(releasedListener);</span>
+
+        }
+<span class="fc" id="L610">    }</span>
+
+    /**
+     * A popup dialog is shown with the context of a component and  its selection. You should use {@link #setDisposeWhenPointerOutOfBounds(boolean)} to make it dispose
+     * when the user clicks outside the bounds of the popup. It can optionally provide an arrow in the theme to point at the context component. The popup
+     * dialog has the {@literal PopupDialog} style by default.
+     *
+     * @param c the context component which is used to position the dialog and can also be pointed at
+     */
+    public void showPopupDialog(Component c) {
+<span class="nc" id="L620">        showPopupDialog(c, Display.getInstance().isPortrait());</span>
+<span class="nc" id="L621">    }</span>
+
+    /**
+     * A popup dialog is shown with the context of a component and  its selection. You should use {@link #setDisposeWhenPointerOutOfBounds(boolean)} to make it dispose
+     * when the user clicks outside the bounds of the popup. It can optionally provide an arrow in the theme to point at the context component. The popup
+     * dialog has the {@literal PopupDialog} style by default.
+     *
+     * @param c    the context component which is used to position the dialog and can also be pointed at
+     * @param bias biases the dialog to appear above/below or to the sides.
+     *             This is ignored if there isn't enough space
+     */
+    public void showPopupDialog(Component c, boolean bias) {
+<span class="pc bpc" id="L633" title="1 of 2 branches missed.">        Form f = c == null ? null : c.getComponentForm(); // PMD Fix: BrokenNullCheck</span>
+<span class="pc bpc" id="L634" title="3 of 6 branches missed.">        if (f != null &amp;&amp; !formMode &amp;&amp; !f.getContentPane().contains(c)) {</span>
+<span class="nc" id="L635">            setFormMode(true);</span>
+        }
+<span class="fc" id="L637">        disposed = false;</span>
+<span class="fc" id="L638">        getUnselectedStyle().setOpacity(255);</span>
+<span class="fc" id="L639">        Rectangle componentPos = c.getSelectedRect();</span>
+<span class="fc" id="L640">        componentPos.setX(componentPos.getX() - c.getScrollX());</span>
+<span class="fc" id="L641">        componentPos.setY(componentPos.getY() - c.getScrollY());</span>
+<span class="fc" id="L642">        setOwner(c);</span>
+<span class="fc" id="L643">        showPopupDialog(componentPos, bias);</span>
+<span class="fc" id="L644">    }</span>
+
+    /**
+     * A popup dialog is shown with the context of a component and  its selection. You should use {@link #setDisposeWhenPointerOutOfBounds(boolean)} to make it dispose
+     * when the user clicks outside the bounds of the popup.  It can optionally provide an arrow in the theme to point at the context component. The popup
+     * dialog has the {@literal PopupDialog} style by default.
+     *
+     * @param rect the screen rectangle to which the popup should point
+     */
+    public void showPopupDialog(Rectangle rect) {
+<span class="fc" id="L654">        showPopupDialog(rect, Display.getInstance().isPortrait());</span>
+<span class="fc" id="L655">    }</span>
+
+    /**
+     * A popup dialog is shown with the context of a component and  its selection. You should use {@link #setDisposeWhenPointerOutOfBounds(boolean)} to make it dispose
+     * when the user clicks outside the bounds of the popup.  It can optionally provide an arrow in the theme to point at the context component. The popup
+     * dialog has the {@literal PopupDialog} style by default.
+     *
+     * @param rect the screen rectangle to which the popup should point
+     * @param bias biases the dialog to appear above/below or to the sides.
+     *             This is ignored if there isn't enough space
+     */
+    public void showPopupDialog(Rectangle rect, boolean bias) {
+<span class="fc" id="L667">        Form f = Display.getInstance().getCurrent();</span>
+<span class="fc" id="L668">        Rectangle origRect = rect;</span>
+<span class="fc" id="L669">        rect = new Rectangle(rect);</span>
+<span class="fc" id="L670">        rect.setX(rect.getX() - getLayeredPane(f).getAbsoluteX());</span>
+<span class="fc" id="L671">        rect.setY(rect.getY() - getLayeredPane(f).getAbsoluteY());</span>
+<span class="fc" id="L672">        disposed = false;</span>
+<span class="fc" id="L673">        pressedOutOfBounds = false;</span>
+<span class="fc" id="L674">        getUnselectedStyle().setOpacity(255);</span>
+<span class="fc bfc" id="L675" title="All 2 branches covered.">        if (getUIID().equals(&quot;Dialog&quot;)) {</span>
+<span class="fc" id="L676">            setUIID(&quot;PopupDialog&quot;);</span>
+<span class="pc bpc" id="L677" title="1 of 2 branches missed.">            if (getTitleComponent().getUIID().equals(&quot;DialogTitle&quot;)) {</span>
+<span class="fc" id="L678">                getTitleComponent().setUIID(&quot;PopupDialogTitle&quot;);</span>
+            }
+<span class="fc" id="L680">            getContentPane().setUIID(&quot;PopupContentPane&quot;);</span>
+        }
+
+<span class="fc" id="L683">        Label title = getTitleComponent();</span>
+
+<span class="fc" id="L685">        UIManager manager = getUIManager();</span>
+
+<span class="fc" id="L687">        String dialogTitle = title.getText();</span>
+
+        // hide the title if no text is there to allow the styles of the dialog title to disappear, we need this code here since otherwise the
+        // preferred size logic of the dialog won't work with large title borders
+<span class="pc bpc" id="L691" title="3 of 6 branches missed.">        if ((dialogTitle == null || dialogTitle.length() == 0) &amp;&amp; manager.isThemeConstant(&quot;hideEmptyTitleBool&quot;, true)) {</span>
+<span class="pc bpc" id="L692" title="1 of 2 branches missed.">            boolean b = getTitle().length() &gt; 0;</span>
+<span class="fc" id="L693">            titleArea.setVisible(b);</span>
+<span class="fc" id="L694">            getTitleComponent().setVisible(b);</span>
+<span class="pc bpc" id="L695" title="2 of 4 branches missed.">            if (!b &amp;&amp; manager.isThemeConstant(&quot;shrinkPopupTitleBool&quot;, true)) {</span>
+<span class="fc" id="L696">                getTitleComponent().setPreferredSize(new Dimension(0, 0));</span>
+<span class="fc" id="L697">                getTitleComponent().getStyle().setBorder(null);</span>
+<span class="fc" id="L698">                titleArea.setPreferredSize(new Dimension(0, 0));</span>
+            }
+        }
+
+        // allows a text area to recalculate its preferred size if embedded within a dialog
+<span class="fc" id="L703">        revalidate();</span>
+
+<span class="fc" id="L705">        Style contentPaneStyle = getStyle(); // PMD Fix: UnusedLocalVariable removed redundant contentPane reference</span>
+
+<span class="pc bpc" id="L707" title="1 of 2 branches missed.">        if (manager.isThemeConstant(getUIID() + &quot;ArrowBool&quot;, false)) {</span>
+<span class="nc" id="L708">            Image t = manager.getThemeImageConstant(getUIID() + &quot;ArrowTopImage&quot;);</span>
+<span class="nc" id="L709">            Image b = manager.getThemeImageConstant(getUIID() + &quot;ArrowBottomImage&quot;);</span>
+<span class="nc" id="L710">            Image l = manager.getThemeImageConstant(getUIID() + &quot;ArrowLeftImage&quot;);</span>
+<span class="nc" id="L711">            Image r = manager.getThemeImageConstant(getUIID() + &quot;ArrowRightImage&quot;);</span>
+<span class="nc" id="L712">            Border border = contentPaneStyle.getBorder();</span>
+<span class="nc bnc" id="L713" title="All 2 branches missed.">            if (border != null) {</span>
+<span class="nc" id="L714">                border.setImageBorderSpecialTile(t, b, l, r, rect);</span>
+            }
+<span class="nc" id="L716">        } else {</span>
+<span class="fc" id="L717">            Border border = contentPaneStyle.getBorder();</span>
+<span class="fc bfc" id="L718" title="All 2 branches covered.">            if (border != null) {</span>
+<span class="fc" id="L719">                border.setTrackComponent(origRect);</span>
+            }
+        }
+<span class="fc" id="L722">        calcPreferredSize();</span>
+<span class="fc" id="L723">        int prefHeight = getPreferredH();</span>
+<span class="fc" id="L724">        int prefWidth = getPreferredW();</span>
+<span class="fc bfc" id="L725" title="All 2 branches covered.">        if (contentPaneStyle.getBorder() != null) {</span>
+<span class="fc" id="L726">            prefWidth = Math.max(contentPaneStyle.getBorder().getMinimumWidth(), prefWidth);</span>
+<span class="fc" id="L727">            prefHeight = Math.max(contentPaneStyle.getBorder().getMinimumHeight(), prefHeight);</span>
+        }
+
+
+<span class="fc" id="L731">        int availableHeight = getLayeredPane(f).getParent().getHeight();</span>
+<span class="pc bpc" id="L732" title="1 of 2 branches missed.">        if (availableHeight == 0) {</span>
+<span class="nc" id="L733">            availableHeight = CN.getDisplayHeight();</span>
+        }
+<span class="fc" id="L735">        int availableWidth = getLayeredPane(f).getParent().getWidth();</span>
+<span class="pc bpc" id="L736" title="1 of 2 branches missed.">        if (availableWidth == 0) {</span>
+<span class="nc" id="L737">            availableWidth = CN.getDisplayWidth();</span>
+        }
+<span class="fc" id="L739">        int width = Math.min(availableWidth, prefWidth);</span>
+<span class="fc" id="L740">        setWidth(width);</span>
+<span class="fc" id="L741">        setShouldCalcPreferredSize(true);</span>
+<span class="fc" id="L742">        revalidate();</span>
+<span class="fc" id="L743">        prefHeight = getPreferredH();</span>
+
+<span class="fc" id="L745">        int x = 0;</span>
+<span class="fc" id="L746">        int y = 0;</span>
+
+<span class="fc" id="L748">        boolean showPortrait = bias;</span>
+
+        // if we don't have enough space then disregard device orientation
+<span class="pc bpc" id="L751" title="1 of 2 branches missed.">        if (showPortrait) {</span>
+<span class="pc bpc" id="L752" title="3 of 4 branches missed.">            if (availableHeight &lt; prefHeight &amp;&amp; availableHeight &lt; (availableWidth - rect.getWidth()) / 2) {</span>
+<span class="nc" id="L753">                showPortrait = false;</span>
+            }
+        } else {
+<span class="nc bnc" id="L756" title="All 4 branches missed.">            if (availableWidth &lt; prefWidth &amp;&amp; availableHeight / 2 &gt; availableWidth - rect.getWidth()) {</span>
+<span class="nc" id="L757">                showPortrait = true;</span>
+            }
+        }
+
+
+<span class="pc bpc" id="L762" title="1 of 2 branches missed.">        if (showPortrait) {</span>
+<span class="pc bpc" id="L763" title="1 of 2 branches missed.">            if (width &lt; availableWidth) {</span>
+<span class="fc" id="L764">                int idealX = rect.getX() - width / 2 + rect.getSize().getWidth() / 2;</span>
+
+                // if the ideal position is less than 0 just use 0
+<span class="pc bpc" id="L767" title="1 of 2 branches missed.">                if (idealX &gt; 0) {</span>
+                    // if the idealX is too far to the right just align to the right
+<span class="pc bpc" id="L769" title="1 of 2 branches missed.">                    if (idealX + width &gt; availableWidth) {</span>
+<span class="nc" id="L770">                        x = availableWidth - width;</span>
+                    } else {
+<span class="fc" id="L772">                        x = idealX;</span>
+                    }
+                }
+            }
+<span class="fc bfc" id="L776" title="All 2 branches covered.">            if (rect.getY() + rect.getHeight() &lt; availableHeight / 2) {</span>
+                // popup downwards
+<span class="fc" id="L778">                y = rect.getY() + rect.getHeight();</span>
+<span class="fc" id="L779">                int height = Math.min(prefHeight, Math.max(0, availableHeight - y));</span>
+<span class="fc" id="L780">                padOrientation(contentPaneStyle, TOP, 1);</span>
+<span class="fc" id="L781">                show(Math.max(0, y), Math.max(0, availableHeight - height - y),</span>
+<span class="fc" id="L782">                        Math.max(0, x), Math.max(0, availableWidth - width - x));</span>
+<span class="fc" id="L783">                padOrientation(contentPaneStyle, TOP, -1);</span>
+<span class="pc bpc" id="L784" title="1 of 2 branches missed.">            } else if (rect.getY() &gt; availableHeight / 2) {</span>
+                // popup upwards
+<span class="nc" id="L786">                int height = Math.min(prefHeight, rect.getY());</span>
+<span class="nc" id="L787">                y = rect.getY() - height;</span>
+<span class="nc" id="L788">                padOrientation(contentPaneStyle, BOTTOM, 1);</span>
+<span class="nc" id="L789">                show(y, Math.max(0, availableHeight - rect.getY()), x, Math.max(0, availableWidth - width - x));</span>
+<span class="nc" id="L790">                padOrientation(contentPaneStyle, BOTTOM, -1);</span>
+<span class="pc bpc" id="L791" title="1 of 2 branches missed.">            } else if (rect.getY() &lt; availableHeight / 2) {</span>
+                // popup over aligned with top of rect, but inset a few mm
+<span class="fc" id="L793">                y = rect.getY() + CN.convertToPixels(3);</span>
+
+<span class="fc" id="L795">                int height = Math.min(prefHeight, availableHeight - y);</span>
+<span class="fc" id="L796">                padOrientation(contentPaneStyle, BOTTOM, 1);</span>
+<span class="fc" id="L797">                show(y, Math.max(0, availableHeight - height - y),</span>
+<span class="fc" id="L798">                        Math.max(0, x), Math.max(0, availableWidth - width - x));</span>
+<span class="fc" id="L799">                padOrientation(contentPaneStyle, BOTTOM, -1);</span>
+<span class="fc" id="L800">            } else {</span>
+                // popup over aligned with bottom of rect but inset a few mm
+<span class="nc" id="L802">                y = Math.max(0, rect.getY() + rect.getHeight() - CN.convertToPixels(3) - prefHeight);</span>
+<span class="nc" id="L803">                int height = prefHeight;</span>
+<span class="nc" id="L804">                padOrientation(contentPaneStyle, TOP, 1);</span>
+<span class="nc" id="L805">                show(y, Math.max(0, availableHeight - height - y),</span>
+<span class="nc" id="L806">                        Math.max(0, x), Math.max(0, availableWidth - width - x));</span>
+<span class="nc" id="L807">                padOrientation(contentPaneStyle, TOP, -1);</span>
+<span class="nc" id="L808">            }</span>
+        } else {
+<span class="nc" id="L810">            int height = Math.min(prefHeight, availableHeight);</span>
+<span class="nc bnc" id="L811" title="All 2 branches missed.">            if (height &lt; availableHeight) {</span>
+<span class="nc" id="L812">                int idealY = rect.getY() - height / 2 + rect.getSize().getHeight() / 2;</span>
+
+                // if the ideal position is less than 0 just use 0
+<span class="nc bnc" id="L815" title="All 2 branches missed.">                if (idealY &gt; 0) {</span>
+                    // if the idealY is too far up just align to the top
+<span class="nc bnc" id="L817" title="All 2 branches missed.">                    if (idealY + height &gt; availableHeight) {</span>
+<span class="nc" id="L818">                        y = availableHeight - height;</span>
+                    } else {
+<span class="nc" id="L820">                        y = idealY;</span>
+                    }
+                }
+            }
+
+<span class="nc bnc" id="L825" title="All 2 branches missed.">            if (prefWidth &lt; availableWidth - rect.getX() - rect.getWidth()) {</span>
+                // popup right
+<span class="nc" id="L827">                x = rect.getX() + rect.getWidth();</span>
+
+
+<span class="nc" id="L830">                width = Math.min(prefWidth, availableWidth - x);</span>
+<span class="nc" id="L831">                show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x));</span>
+<span class="nc bnc" id="L832" title="All 2 branches missed.">            } else if (prefWidth &lt; rect.getX()) {</span>
+<span class="nc" id="L833">                x = rect.getX() - prefWidth;</span>
+<span class="nc" id="L834">                width = prefWidth;</span>
+<span class="nc" id="L835">                show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x));</span>
+            } else {
+                // popup left
+<span class="nc" id="L838">                width = Math.min(prefWidth, availableWidth - (availableWidth - rect.getX()));</span>
+<span class="nc" id="L839">                x = rect.getX() - width;</span>
+<span class="nc" id="L840">                show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x));</span>
+            }
+        }
+<span class="fc" id="L843">    }</span>
+
+
+    private void padOrientation(Style s, int orientation, int padding) {
+<span class="fc" id="L847">        byte[] b = s.getPaddingUnit();</span>
+<span class="fc bfc" id="L848" title="All 2 branches covered.">        byte unit = b == null ? Style.UNIT_TYPE_PIXELS : s.getPaddingUnit()[orientation];</span>
+<span class="fc bfc" id="L849" title="All 2 branches covered.">        if (unit != Style.UNIT_TYPE_DIPS) {</span>
+<span class="fc" id="L850">            padding = Display.getInstance().convertToPixels(padding);</span>
+        }
+<span class="fc" id="L852">        s.setPadding(orientation, s.getPaddingFloatValue(isRTL(),</span>
+                orientation) + padding);
+<span class="fc" id="L854">    }</span>
+
+    /**
+     * Returns the uiid of the dialog
+     *
+     * @return the uiid of the dialog
+     */
+    public String getDialogUIID() {
+<span class="nc" id="L862">        return getContentPane().getUIID();</span>
+    }
+
+    /**
+     * Simple setter to set the Dialog uiid
+     *
+     * @param uiid the id for the dialog
+     */
+    public void setDialogUIID(String uiid) {
+<span class="fc" id="L871">        getContentPane().setUIID(uiid);</span>
+<span class="fc" id="L872">    }</span>
+
+    /**
+     * Simple getter to get the Dialog Style
+     *
+     * @return the style of the dialog
+     */
+    public Style getDialogStyle() {
+<span class="nc" id="L880">        return getContentPane().getStyle();</span>
+    }
+
+    /**
+     * Repositions the component so the animation will &quot;grow/shrink&quot; when showing/disposing
+     *
+     * @return the repositionAnimation
+     */
+    public boolean isRepositionAnimation() {
+<span class="nc" id="L889">        return repositionAnimation;</span>
+    }
+
+    /**
+     * Repositions the component so the animation will &quot;grow/shrink&quot; when showing/disposing
+     *
+     * @param repositionAnimation the repositionAnimation to set
+     */
+    public void setRepositionAnimation(boolean repositionAnimation) {
+<span class="fc" id="L898">        this.repositionAnimation = repositionAnimation;</span>
+<span class="fc" id="L899">    }</span>
+
+    /**
+     * Whether the interaction dialog uses the form layered pane of the regular layered pane
+     *
+     * @return the formMode
+     */
+    public boolean isFormMode() {
+<span class="nc" id="L907">        return formMode;</span>
+    }
+
+    /**
+     * Whether the interaction dialog uses the form layered pane of the regular layered pane
+     *
+     * @param formMode the formMode to set
+     */
+    public void setFormMode(boolean formMode) {
+<span class="fc" id="L916">        this.formMode = formMode;</span>
+<span class="fc" id="L917">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

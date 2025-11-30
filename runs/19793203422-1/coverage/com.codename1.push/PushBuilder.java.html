@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PushBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.push</a> &gt; <span class="el_source">PushBuilder.java</span></div><h1>PushBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.push;
+
+import com.codename1.xml.Element;
+
+/**
+ * A convenience class for building a push notification Payload.
+ *
+ * @author shannah
+ */
+<span class="fc" id="L32">public class PushBuilder {</span>
+    private String title, body, metaData, imageUrl, category;
+    private int type, badge;
+
+    /**
+     * Sets the title of the push notification.
+     *
+     * @param title The title of the push notification.
+     * @return Self for chaining.
+     */
+    public PushBuilder title(String title) {
+<span class="fc" id="L43">        this.title = title;</span>
+<span class="fc" id="L44">        return this;</span>
+    }
+
+    /**
+     * Sets the badge to set with the push notification.
+     *
+     * @param badge The badge to set.
+     * @return Self for chaining.
+     */
+    public PushBuilder badge(int badge) {
+<span class="fc" id="L54">        this.badge = badge;</span>
+<span class="fc" id="L55">        return this;</span>
+    }
+
+    /**
+     * Sets the body of the push notification.
+     *
+     * @param body The body of the push notification.
+     * @return Self for chaining.
+     */
+    public PushBuilder body(String body) {
+<span class="fc" id="L65">        this.body = body;</span>
+<span class="fc" id="L66">        return this;</span>
+    }
+
+    /**
+     * Sets the metadata (i.e. content the user shouldn't see) for the push notification.
+     *
+     * @param metaData The metadata.
+     * @return Self for chaining.
+     */
+    public PushBuilder metaData(String metaData) {
+<span class="fc" id="L76">        this.metaData = metaData;</span>
+<span class="fc" id="L77">        return this;</span>
+    }
+
+    /**
+     * Sets the URL for an image to send in the push notification.  Make sure you use https:// or the image won't be shown on iOS.
+     *
+     * @param imageUrl The image URL.
+     * @return Self for chaining.
+     */
+    public PushBuilder imageUrl(String imageUrl) {
+<span class="fc" id="L87">        this.imageUrl = imageUrl;</span>
+<span class="fc" id="L88">        return this;</span>
+    }
+
+    /**
+     * Sets the category of the push notification.
+     *
+     * @param category The category.
+     * @return Self for chaining.
+     */
+    public PushBuilder category(String category) {
+<span class="fc" id="L98">        this.category = category;</span>
+<span class="fc" id="L99">        return this;</span>
+    }
+
+    /**
+     * Sets the type of the push notification.
+     * &lt;p&gt;&lt;strong&gt;Types&lt;/strong&gt;&lt;/p&gt;
+     * &lt;table&gt;&lt;tr&gt;&lt;th&gt;Type&lt;/th&gt;&lt;th&gt;Description&lt;/th&gt;&lt;/tr&gt;
+     * &lt;tr&gt;&lt;td&gt;1&lt;/td&gt;&lt;td&gt;Sends only body as the notification message&lt;/td&gt;&lt;/tr&gt;
+     * &lt;tr&gt;&lt;td&gt;2&lt;/td&gt;&lt;td&gt;Sends only metadata.  Invisible to user but will be received in push callback&lt;/td&gt;&lt;/tr&gt;
+     * &lt;tr&gt;&lt;td&gt;3&lt;/td&gt;&lt;td&gt;Sends both metadata and body.  Body is visible to the user.  Push callback will receive &amp;lt;metadata&amp;gt;;&amp;lt;body&amp;gt;.&lt;/td&gt;&lt;/tr&gt;
+     * &lt;tr&gt;&lt;td&gt;4&lt;/td&gt;&lt;td&gt;Sends both title and body. Push callback will receive &amp;lt;title&amp;gt;;&amp;lt;body&amp;gt;&lt;/td&gt;&lt;/tr&gt;
+     * &lt;tr&gt;&lt;td&gt;100&lt;/td&gt;&lt;td&gt;Sends only the badge&lt;/td&gt;&lt;/tr&gt;
+     * &lt;tr&gt;&lt;td&gt;101&lt;/td&gt;&lt;td&gt;Sends the badge and body.  Push callback will receive the body only.&lt;/td&gt;&lt;/tr&gt;
+     * &lt;tr&gt;&lt;td&gt;102&lt;/td&gt;&lt;td&gt;Sends the badge, title, and body. Push callback will receive &amp;lt;title&amp;gt;;&amp;lt;body&amp;gt;&lt;/td&gt;&lt;tr&gt;
+     * &lt;/table&gt;
+     *
+     * &lt;p&gt;Both {@link #imageUrl} and {@link #category} can be added to any notification type.  If either of these values are non-null,
+     * then the push notification is considered to be a rich push notification, and {@link #getType() } will return {@literal 99},
+     * which signifies that it is a rich push notification.&lt;/p&gt;
+     *
+     * @param type The type of the push notification.
+     * @return Self for chaining.
+     */
+    public PushBuilder type(int type) {
+<span class="fc" id="L123">        this.type = type;</span>
+<span class="fc" id="L124">        return this;</span>
+    }
+
+    /**
+     * A notification is considered to be a rich push notification if either {@link #imageUrl} or {@link #category} is set.
+     *
+     * @return True if the notification is a rich notification.
+     */
+    public boolean isRichPush() {
+<span class="fc bfc" id="L133" title="All 4 branches covered.">        return imageUrl != null || category != null;</span>
+    }
+
+    /**
+     * Gets the type of the notification.  This will return {@literal 99} if {@link #isRichPush() } is true.  Otherwise
+     * it will return the underlying type as set with {@link #type(int) }.
+     *
+     * @return The type of the notification.
+     * @see #type(int)
+     * @see #isRichPush()
+     */
+    public int getType() {
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (isRichPush()) {</span>
+<span class="fc" id="L146">            return 99;</span>
+        }
+<span class="fc" id="L148">        return type;</span>
+    }
+
+
+    /**
+     * Builds the payload for this rich push notification.
+     *
+     * @return The payload that can be passed as the message body to {@link Push}
+     */
+    public String build() {
+<span class="fc" id="L158">        StringBuilder sb = new StringBuilder();</span>
+
+<span class="pc bpc" id="L160" title="1 of 8 branches missed.">        switch (type) {</span>
+            case 0:
+            case 1:
+            case 5:
+<span class="fc" id="L164">                sb.append(body);</span>
+<span class="fc" id="L165">                break;</span>
+            case 2:
+<span class="fc" id="L167">                sb.append(metaData);</span>
+<span class="fc" id="L168">                break;</span>
+            case 3:
+<span class="fc" id="L170">                sb.append(metaData).append(&quot;;&quot;).append(body);</span>
+<span class="fc" id="L171">                break;</span>
+            case 4:
+<span class="fc" id="L173">                sb.append(title).append(&quot;;&quot;).append(body);</span>
+<span class="fc" id="L174">                break;</span>
+            case 6:
+            case 100:
+<span class="fc" id="L177">                sb.append(badge);</span>
+<span class="fc" id="L178">                break;</span>
+            case 101:
+<span class="fc" id="L180">                sb.append(badge).append(&quot; &quot;).append(body);</span>
+<span class="fc" id="L181">                break;</span>
+
+            case 102:
+<span class="fc" id="L184">                sb.append(badge).append(&quot;;&quot;).append(title).append(&quot;;&quot;).append(body);</span>
+                break;
+        }
+
+<span class="fc bfc" id="L188" title="All 2 branches covered.">        if (isRichPush()) {</span>
+<span class="fc" id="L189">            String b = sb.toString();</span>
+<span class="fc" id="L190">            sb.setLength(0);</span>
+<span class="fc" id="L191">            Element el = new Element(&quot;push&quot;);</span>
+<span class="fc" id="L192">            el.setAttribute(&quot;type&quot;, &quot;&quot; + type);</span>
+<span class="fc" id="L193">            el.setAttribute(&quot;body&quot;, b);</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">            if (category != null) {</span>
+<span class="fc" id="L195">                el.setAttribute(&quot;category&quot;, category);</span>
+            }
+<span class="fc bfc" id="L197" title="All 2 branches covered.">            if (imageUrl != null) {</span>
+<span class="fc" id="L198">                Element imgEl = new Element(&quot;img&quot;);</span>
+<span class="fc" id="L199">                imgEl.setAttribute(&quot;src&quot;, imageUrl);</span>
+<span class="fc" id="L200">                el.addChild(imgEl);</span>
+            }
+<span class="fc" id="L202">            return el.toString();</span>
+        }
+<span class="fc" id="L204">        return sb.toString();</span>
+
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WAVWriter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media</a> &gt; <span class="el_source">WAVWriter.java</span></div><h1>WAVWriter.java</h1><pre class="source lang-java linenums">package com.codename1.media;
+
+import com.codename1.io.File;
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Util;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+/**
+ * A class that can write raw PCM data to a WAV file.
+ *
+ * @author shannah
+ * @since 7.0
+ */
+public class WAVWriter implements AutoCloseable {
+    private final File outputFile;
+    private OutputStream out;
+    private final int samplingRate;
+    private final int channels;
+    private final int numBits;
+    private long dataLength;
+
+    /**
+     * Creates a new writer for writing a WAV file.
+     *
+     * @param outputFile   The output file.
+     * @param samplingRate The sampling rate.  E.g. 44100
+     * @param channels     The number of channels.  E.g. 1 or 2
+     * @param numBits      8 or 16
+     * @throws IOException
+     */
+<span class="fc" id="L34">    public WAVWriter(final File outputFile, final int samplingRate, final int channels, final int numBits) throws IOException {</span>
+<span class="fc" id="L35">        this.outputFile = outputFile;</span>
+<span class="fc" id="L36">        this.out = FileSystemStorage.getInstance().openOutputStream(outputFile.getAbsolutePath());</span>
+<span class="fc" id="L37">        this.samplingRate = samplingRate;</span>
+<span class="fc" id="L38">        this.channels = channels;</span>
+<span class="fc" id="L39">        this.numBits = numBits;</span>
+<span class="fc" id="L40">    }</span>
+
+    private void writeHeader() throws IOException {
+<span class="fc" id="L43">        final byte[] header = new byte[44];</span>
+<span class="fc" id="L44">        long totalDataLen = dataLength + 36;</span>
+<span class="fc" id="L45">        final long bitrate = (long) this.samplingRate * this.channels * this.numBits;</span>
+<span class="fc" id="L46">        header[0] = 82;</span>
+<span class="fc" id="L47">        header[1] = 73;</span>
+<span class="fc" id="L48">        header[3] = (header[2] = 70);</span>
+<span class="fc" id="L49">        header[4] = (byte) (totalDataLen &amp; 0xFFL);</span>
+<span class="fc" id="L50">        header[5] = (byte) (totalDataLen &gt;&gt; 8 &amp; 0xFFL);</span>
+<span class="fc" id="L51">        header[6] = (byte) (totalDataLen &gt;&gt; 16 &amp; 0xFFL);</span>
+<span class="fc" id="L52">        header[7] = (byte) (totalDataLen &gt;&gt; 24 &amp; 0xFFL);</span>
+<span class="fc" id="L53">        header[8] = 87;</span>
+<span class="fc" id="L54">        header[9] = 65;</span>
+<span class="fc" id="L55">        header[10] = 86;</span>
+<span class="fc" id="L56">        header[11] = 69;</span>
+<span class="fc" id="L57">        header[12] = 102;</span>
+<span class="fc" id="L58">        header[13] = 109;</span>
+<span class="fc" id="L59">        header[14] = 116;</span>
+<span class="fc" id="L60">        header[15] = 32;</span>
+<span class="fc" id="L61">        header[16] = (byte) this.numBits;</span>
+<span class="fc" id="L62">        header[17] = 0;</span>
+<span class="fc" id="L63">        header[19] = (header[18] = 0);</span>
+<span class="fc" id="L64">        header[20] = 1;</span>
+<span class="fc" id="L65">        header[21] = 0;</span>
+<span class="fc" id="L66">        header[22] = (byte) this.channels;</span>
+<span class="fc" id="L67">        header[23] = 0;</span>
+<span class="fc" id="L68">        header[24] = (byte) (this.samplingRate &amp; 0xFF);</span>
+<span class="fc" id="L69">        header[25] = (byte) (this.samplingRate &gt;&gt; 8 &amp; 0xFF);</span>
+<span class="fc" id="L70">        header[26] = (byte) (this.samplingRate &gt;&gt; 16 &amp; 0xFF);</span>
+<span class="fc" id="L71">        header[27] = (byte) (this.samplingRate &gt;&gt; 24 &amp; 0xFF);</span>
+<span class="fc" id="L72">        header[28] = (byte) (bitrate / 8L &amp; 0xFFL);</span>
+<span class="fc" id="L73">        header[29] = (byte) (bitrate / 8L &gt;&gt; 8 &amp; 0xFFL);</span>
+<span class="fc" id="L74">        header[30] = (byte) (bitrate / 8L &gt;&gt; 16 &amp; 0xFFL);</span>
+<span class="fc" id="L75">        header[31] = (byte) (bitrate / 8L &gt;&gt; 24 &amp; 0xFFL);</span>
+<span class="fc" id="L76">        header[32] = (byte) (this.channels * this.numBits / 8);</span>
+<span class="fc" id="L77">        header[33] = 0;</span>
+<span class="fc" id="L78">        header[34] = 16;</span>
+<span class="fc" id="L79">        header[35] = 0;</span>
+<span class="fc" id="L80">        header[36] = 100;</span>
+<span class="fc" id="L81">        header[37] = 97;</span>
+<span class="fc" id="L82">        header[38] = 116;</span>
+<span class="fc" id="L83">        header[39] = 97;</span>
+<span class="fc" id="L84">        header[40] = (byte) (dataLength &amp; 0xff);</span>
+<span class="fc" id="L85">        header[41] = (byte) ((dataLength &gt;&gt; 8) &amp; 0xff);</span>
+<span class="fc" id="L86">        header[42] = (byte) ((dataLength &gt;&gt; 16) &amp; 0xff);</span>
+<span class="fc" id="L87">        header[43] = (byte) ((dataLength &gt;&gt; 24) &amp; 0xff);</span>
+<span class="fc" id="L88">        this.out.write(header);</span>
+<span class="fc" id="L89">    }</span>
+
+    /**
+     * Writes PCM data to the file.
+     *
+     * @param pcmData PCM data to write.  These are float values between -1 and 1.
+     * @param offset  Offset in pcmData array to start writing.
+     * @param len     Length in pcmData array to write.
+     * @throws IOException
+     */
+    public void write(final float[] pcmData, final int offset, final int len) throws IOException {
+<span class="fc bfc" id="L100" title="All 2 branches covered.">        for (int i = 0; i &lt; len; ++i) {</span>
+<span class="fc" id="L101">            final float sample = pcmData[offset + i];</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if (this.numBits == 8) {</span>
+<span class="nc" id="L103">                final byte byteSample = (byte) (sample * 127.0f);</span>
+<span class="nc" id="L104">                this.out.write(byteSample &amp; 0xff);</span>
+<span class="nc" id="L105">                ++this.dataLength;</span>
+<span class="nc" id="L106">            } else {</span>
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">                if (this.numBits != 16) {</span>
+<span class="nc" id="L108">                    throw new IllegalArgumentException(&quot;numBits must be 8 or 16 but found &quot; + this.numBits);</span>
+                }
+<span class="fc" id="L110">                final short shortSample = (short) (sample * 32767.0f);</span>
+<span class="fc" id="L111">                this.out.write(shortSample &amp; 0xff);</span>
+<span class="fc" id="L112">                this.out.write((shortSample &gt;&gt; 8) &amp; 0xff);</span>
+<span class="fc" id="L113">                this.dataLength += 2L;</span>
+            }
+        }
+<span class="fc" id="L116">    }</span>
+
+    private String getPCMFile() {
+<span class="fc" id="L119">        return this.outputFile.getAbsolutePath() + &quot;.pcm&quot;;</span>
+    }
+
+    /**
+     * Closes the writer, and writes the WAV file.
+     *
+     * @throws Exception
+     */
+    @Override
+    public void close() throws Exception {
+<span class="fc" id="L129">        this.out.close();</span>
+<span class="fc" id="L130">        final FileSystemStorage fs = FileSystemStorage.getInstance();</span>
+<span class="fc" id="L131">        fs.rename(this.outputFile.getAbsolutePath(), new File(this.getPCMFile()).getName());</span>
+        try {
+<span class="fc" id="L133">            this.out = fs.openOutputStream(this.outputFile.getAbsolutePath());</span>
+<span class="fc" id="L134">            final InputStream in = fs.openInputStream(this.getPCMFile());</span>
+<span class="fc" id="L135">            this.writeHeader();</span>
+<span class="fc" id="L136">            Util.copy(in, this.out);</span>
+            try {
+<span class="fc" id="L138">                this.out.close();</span>
+<span class="nc" id="L139">            } catch (Throwable t) {</span>
+<span class="fc" id="L140">            }</span>
+            try {
+<span class="fc" id="L142">                in.close();</span>
+<span class="nc" id="L143">            } catch (Throwable t2) {</span>
+<span class="fc" id="L144">            }</span>
+        } finally {
+<span class="fc" id="L146">            fs.delete(this.getPCMFile());</span>
+        }
+<span class="fc" id="L148">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

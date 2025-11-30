@@ -1,0 +1,1101 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LC.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts.mig</a> &gt; <span class="el_source">LC.java</span></div><h1>LC.java</h1><pre class="source lang-java linenums">package com.codename1.ui.layouts.mig;
+
+/*
+ * License (BSD):
+ * ==============
+ *
+ * Copyright (c) 2004, Mikael Grev, MiG InfoCom AB. (miglayout (at) miginfocom (dot) com)
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * Neither the name of the MiG InfoCom AB nor the names of its contributors may be
+ * used to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ *
+ * @version 1.0
+ * @author Mikael Grev, MiG InfoCom AB
+ *         Date: 2006-sep-08
+ */
+
+/**
+ * Contains the constraints for an instance of the {@link LC} layout manager.
+ */
+public final class LC {
+    // See the corresponding set/get method for documentation of the property!
+
+<span class="fc" id="L43">    private int wrapAfter = LayoutUtil.INF;</span>
+
+<span class="fc" id="L45">    private Boolean leftToRight = null;</span>
+
+<span class="fc" id="L47">    private UnitValue[] insets = null;    // Never null elememts but if unset array is null</span>
+
+<span class="fc" id="L49">    private UnitValue alignX = null, alignY = null;</span>
+
+<span class="fc" id="L51">    private BoundSize gridGapX = null, gridGapY = null;</span>
+
+<span class="fc" id="L53">    private BoundSize width = BoundSize.NULL_SIZE, height = BoundSize.NULL_SIZE;</span>
+
+<span class="fc" id="L55">    private BoundSize packW = BoundSize.NULL_SIZE, packH = BoundSize.NULL_SIZE;</span>
+
+<span class="fc" id="L57">    private float pwAlign = 0.5f, phAlign = 1.0f;</span>
+
+<span class="fc" id="L59">    private int debugMillis = 0;</span>
+
+<span class="fc" id="L61">    private int hideMode = 0;</span>
+
+<span class="fc" id="L63">    private boolean noCache = false;</span>
+
+<span class="fc" id="L65">    private boolean flowX = true;</span>
+
+<span class="fc" id="L67">    private boolean fillX = false, fillY = false;</span>
+
+<span class="fc" id="L69">    private boolean topToBottom = true;</span>
+
+<span class="fc" id="L71">    private boolean noGrid = false;</span>
+
+<span class="fc" id="L73">    private boolean visualPadding = true;</span>
+
+    /**
+     * Empty constructor.
+     */
+<span class="fc" id="L78">    public LC() {</span>
+<span class="fc" id="L79">    }</span>
+
+    // ************************************************************************
+    // * JavaBean get/set methods.
+    // ************************************************************************
+
+
+    /**
+     * If components have sizes or positions linked to the bounds of the parent in some way (as for instance the &lt;code&gt;&quot;%&quot;&lt;/code&gt; unit has) the cache
+     * must be turned off for the panel. If components does not get the correct or expected size or position try to set this property to &lt;code&gt;true&lt;/code&gt;.
+     *
+     * @return &lt;code&gt;true&lt;/code&gt; means no cache and slightly slower layout.
+     */
+    public boolean isNoCache() {
+<span class="nc" id="L93">        return noCache;</span>
+    }
+
+    /**
+     * If components have sizes or positions linked to the bounds of the parent in some way (as for instance the &lt;code&gt;&quot;%&quot;&lt;/code&gt; unit has) the cache
+     * must be turned off for the panel. If components does not get the correct or expected size or position try to set this property to &lt;code&gt;true&lt;/code&gt;.
+     *
+     * @param b &lt;code&gt;true&lt;/code&gt; means no cache and slightly slower layout.
+     */
+    public void setNoCache(boolean b) {
+<span class="nc" id="L103">        this.noCache = b;</span>
+<span class="nc" id="L104">    }</span>
+
+    /**
+     * If the laid out components' bounds in total is less than the final size of the container these align values will be used to align the components
+     * in the parent. &lt;code&gt;null&lt;/code&gt; is default and that means top/left alignment. The relative distances between the components will not be affected
+     * by this property.
+     *
+     * @return The current alignment.
+     */
+    public UnitValue getAlignX() {
+<span class="fc" id="L114">        return alignX;</span>
+    }
+
+    /**
+     * If the laid out components' bounds in total is less than the final size of the container these align values will be used to align the components
+     * in the parent. &lt;code&gt;null&lt;/code&gt; is default and that means top/left alignment. The relative distances between the components will not be affected
+     * by this property.
+     *
+     * @param uv The new alignment. Use {@link ConstraintParser#parseAlignKeywords(String, boolean)} to create the {@link UnitValue}. May be &lt;code&gt;null&lt;/code&gt;.
+     */
+    public void setAlignX(UnitValue uv) {
+<span class="nc" id="L125">        this.alignX = uv;</span>
+<span class="nc" id="L126">    }</span>
+
+    /**
+     * If the laid out components' bounds in total is less than the final size of the container these align values will be used to align the components
+     * in the parent. &lt;code&gt;null&lt;/code&gt; is default and that means top/left alignment. The relative distances between the components will not be affected
+     * by this property.
+     *
+     * @return The current alignment.
+     */
+    public UnitValue getAlignY() {
+<span class="fc" id="L136">        return alignY;</span>
+    }
+
+    /**
+     * If the laid out components' bounds in total is less than the final size of the container these align values will be used to align the components
+     * in the parent. &lt;code&gt;null&lt;/code&gt; is default and that means top/left alignment. The relative distances between the components will not be affected
+     * by this property.
+     *
+     * @param uv The new alignment. Use {@link ConstraintParser#parseAlignKeywords(String, boolean)} to create the {@link UnitValue}. May be &lt;code&gt;null&lt;/code&gt;.
+     */
+    public void setAlignY(UnitValue uv) {
+<span class="nc" id="L147">        this.alignY = uv;</span>
+<span class="nc" id="L148">    }</span>
+
+    /**
+     * If &lt;code&gt;&amp;gt; 0&lt;/code&gt; the debug decorations will be repainted every &lt;code&gt;millis&lt;/code&gt;. No debug information if &lt;code&gt;&amp;lt;= 0&lt;/code&gt; (default).
+     *
+     * @return The current debug repaint interval.
+     */
+    public int getDebugMillis() {
+<span class="fc" id="L156">        return debugMillis;</span>
+    }
+
+    /**
+     * If &lt;code&gt;&amp;gt; 0&lt;/code&gt; the debug decorations will be repainted every &lt;code&gt;millis&lt;/code&gt;. No debug information if &lt;code&gt;&amp;lt;= 0&lt;/code&gt; (default).
+     *
+     * @param millis The new debug repaint interval.
+     */
+    public void setDebugMillis(int millis) {
+<span class="nc" id="L165">        this.debugMillis = millis;</span>
+<span class="nc" id="L166">    }</span>
+
+    /**
+     * If the layout should always claim the whole bounds of the laid out container even if the preferred size is smaller.
+     *
+     * @return &lt;code&gt;true&lt;/code&gt; means fill. &lt;code&gt;false&lt;/code&gt; is default.
+     */
+    public boolean isFillX() {
+<span class="fc" id="L174">        return fillX;</span>
+    }
+
+    /**
+     * If the layout should always claim the whole bounds of the laid out container even if the preferred size is smaller.
+     *
+     * @param b &lt;code&gt;true&lt;/code&gt; means fill. &lt;code&gt;false&lt;/code&gt; is default.
+     */
+    public void setFillX(boolean b) {
+<span class="nc" id="L183">        this.fillX = b;</span>
+<span class="nc" id="L184">    }</span>
+
+    /**
+     * If the layout should always claim the whole bounds of the laid out container even if the preferred size is smaller.
+     *
+     * @return &lt;code&gt;true&lt;/code&gt; means fill. &lt;code&gt;false&lt;/code&gt; is default.
+     */
+    public boolean isFillY() {
+<span class="fc" id="L192">        return fillY;</span>
+    }
+
+    /**
+     * If the layout should always claim the whole bounds of the laid out container even if the preferred size is smaller.
+     *
+     * @param b &lt;code&gt;true&lt;/code&gt; means fill. &lt;code&gt;false&lt;/code&gt; is default.
+     */
+    public void setFillY(boolean b) {
+<span class="nc" id="L201">        this.fillY = b;</span>
+<span class="nc" id="L202">    }</span>
+
+    /**
+     * The default flow direction. Normally (which is &lt;code&gt;true&lt;/code&gt;) this is horizontal and that means that the &quot;next&quot; component
+     * will be put in the cell to the right (or to the left if left-to-right is false).
+     *
+     * @return &lt;code&gt;true&lt;/code&gt; is the default flow horizontally.
+     * @see #setLeftToRight(Boolean)
+     */
+    public boolean isFlowX() {
+<span class="fc" id="L212">        return flowX;</span>
+    }
+
+    /**
+     * The default flow direction. Normally (which is &lt;code&gt;true&lt;/code&gt;) this is horizontal and that means that the &quot;next&quot; component
+     * will be put in the cell to the right (or to the left if left-to-right is false).
+     *
+     * @param b &lt;code&gt;true&lt;/code&gt; is the default flow horizontally.
+     * @see #setLeftToRight(Boolean)
+     */
+    public void setFlowX(boolean b) {
+<span class="nc" id="L223">        this.flowX = b;</span>
+<span class="nc" id="L224">    }</span>
+
+    /**
+     * If non-&lt;code&gt;null&lt;/code&gt; (&lt;code&gt;null&lt;/code&gt; is default) these value will be used as the default gaps between the columns in the grid.
+     *
+     * @return The default grid gap between columns in the grid. &lt;code&gt;null&lt;/code&gt; if the platform default is used.
+     */
+    public BoundSize getGridGapX() {
+<span class="fc" id="L232">        return gridGapX;</span>
+    }
+
+    /**
+     * If non-&lt;code&gt;null&lt;/code&gt; (&lt;code&gt;null&lt;/code&gt; is default) these value will be used as the default gaps between the columns in the grid.
+     *
+     * @param x The default grid gap between columns in the grid. If &lt;code&gt;null&lt;/code&gt; the platform default is used.
+     */
+    public void setGridGapX(BoundSize x) {
+<span class="nc" id="L241">        this.gridGapX = x;</span>
+<span class="nc" id="L242">    }</span>
+
+    /**
+     * If non-&lt;code&gt;null&lt;/code&gt; (&lt;code&gt;null&lt;/code&gt; is default) these value will be used as the default gaps between the rows in the grid.
+     *
+     * @return The default grid gap between rows in the grid. &lt;code&gt;null&lt;/code&gt; if the platform default is used.
+     */
+    public BoundSize getGridGapY() {
+<span class="fc" id="L250">        return gridGapY;</span>
+    }
+
+    /**
+     * If non-&lt;code&gt;null&lt;/code&gt; (&lt;code&gt;null&lt;/code&gt; is default) these value will be used as the default gaps between the rows in the grid.
+     *
+     * @param y The default grid gap between rows in the grid. If &lt;code&gt;null&lt;/code&gt; the platform default is used.
+     */
+    public void setGridGapY(BoundSize y) {
+<span class="nc" id="L259">        this.gridGapY = y;</span>
+<span class="nc" id="L260">    }</span>
+
+    /**
+     * How a component that is hidden (not visible) should be treated by default.
+     *
+     * @return The mode:&lt;br&gt;
+     * 0 == Normal. Bounds will be calculated as if the component was visible.&lt;br&gt;
+     * 1 == If hidden the size will be 0, 0 but the gaps remain.&lt;br&gt;
+     * 2 == If hidden the size will be 0, 0 and gaps set to zero.&lt;br&gt;
+     * 3 == If hidden the component will be disregarded completely and not take up a cell in the grid..
+     */
+    public int getHideMode() {
+<span class="nc" id="L272">        return hideMode;</span>
+    }
+
+    /**
+     * How a component that is hidden (not visible) should be treated.
+     *
+     * @param mode The mode:&lt;br&gt;
+     *             0 == Normal. Bounds will be calculated as if the component was visible.&lt;br&gt;
+     *             1 == If hidden the size will be 0, 0 but the gaps remain.&lt;br&gt;
+     *             2 == If hidden the size will be 0, 0 and gaps set to zero.&lt;br&gt;
+     *             3 == If hidden the component will be disregarded completely and not take up a cell in the grid..
+     */
+    public void setHideMode(int mode) {
+<span class="nc bnc" id="L285" title="All 4 branches missed.">        if (mode &lt; 0 || mode &gt; 3)</span>
+<span class="nc" id="L286">            throw new IllegalArgumentException(&quot;Wrong hideMode: &quot; + mode);</span>
+
+<span class="nc" id="L288">        this.hideMode = mode;</span>
+<span class="nc" id="L289">    }</span>
+
+    /**
+     * The insets for the layed out panel. The insets will be an empty space around the components in the panel. &lt;code&gt;null&lt;/code&gt; values
+     * means that the default panel insets for the platform is used. See {@link PlatformDefaults#setDialogInsets(net.miginfocom.layout.UnitValue, net.miginfocom.layout.UnitValue, net.miginfocom.layout.UnitValue, net.miginfocom.layout.UnitValue)}.
+     *
+     * @return The insets. Of length 4 (top, left, bottom, right) or &lt;code&gt;null&lt;/code&gt;. The elements (1 to 4) may be &lt;code&gt;null&lt;/code&gt;. The array is a copy and can be used freely.
+     * @see net.miginfocom.layout.ConstraintParser#parseInsets(String, boolean)
+     */
+    public UnitValue[] getInsets() {
+<span class="pc bpc" id="L299" title="1 of 2 branches missed.">        return insets != null ? new UnitValue[]{insets[0], insets[1], insets[2], insets[3]} : null;</span>
+    }
+
+    /**
+     * The insets for the layed out panel. The insets will be an empty space around the components in the panel. &lt;code&gt;null&lt;/code&gt; values
+     * means that the default panel insets for the platform is used. See {@link PlatformDefaults#setDialogInsets(net.miginfocom.layout.UnitValue, net.miginfocom.layout.UnitValue, net.miginfocom.layout.UnitValue, net.miginfocom.layout.UnitValue)}.
+     *
+     * @param ins The new insets. Must be of length 4 (top, left, bottom, right) or &lt;code&gt;null&lt;/code&gt;. The elements (1 to 4) may be &lt;code&gt;null&lt;/code&gt; to use
+     *            the platform default for that side. The array is copied for storage.
+     * @see net.miginfocom.layout.ConstraintParser#parseInsets(String, boolean)
+     */
+    public void setInsets(UnitValue[] ins) {
+<span class="nc bnc" id="L311" title="All 2 branches missed.">        this.insets = ins != null ? new UnitValue[]{ins[0], ins[1], ins[2], ins[3]} : null;</span>
+<span class="nc" id="L312">    }</span>
+
+    /**
+     * If the layout should be forced to be left-to-right or right-to-left. A value of &lt;code&gt;null&lt;/code&gt; is default and
+     * means that this will be picked up from the {@link java.util.Locale} that the container being layed out is reporting.
+     *
+     * @return &lt;code&gt;Boolean.TRUE&lt;/code&gt; if force left-to-right. &lt;code&gt;Boolean.FALSE&lt;/code&gt; if force tight-to-left. &lt;code&gt;null&lt;/code&gt;
+     * for the default &quot;let the current Locale decide&quot;.
+     */
+    public Boolean getLeftToRight() {
+<span class="fc" id="L322">        return leftToRight;</span>
+    }
+
+    /**
+     * If the layout should be forced to be left-to-right or right-to-left. A value of &lt;code&gt;null&lt;/code&gt; is default and
+     * means that this will be picked up from the {@link java.util.Locale} that the container being layed out is reporting.
+     *
+     * @param b &lt;code&gt;Boolean.TRUE&lt;/code&gt; to force left-to-right. &lt;code&gt;Boolean.FALSE&lt;/code&gt; to force tight-to-left. &lt;code&gt;null&lt;/code&gt;
+     *          for the default &quot;let the current Locale decide&quot;.
+     */
+    public void setLeftToRight(Boolean b) {
+<span class="nc" id="L333">        this.leftToRight = b;</span>
+<span class="nc" id="L334">    }</span>
+
+    /**
+     * If the whole layout should be non grid based. It is the same as setting the &quot;nogrid&quot; property on every row/column in the grid.
+     *
+     * @return &lt;code&gt;true&lt;/code&gt; means not grid based. &lt;code&gt;false&lt;/code&gt; is default.
+     */
+    public boolean isNoGrid() {
+<span class="fc" id="L342">        return noGrid;</span>
+    }
+
+    /**
+     * If the whole layout should be non grid based. It is the same as setting the &quot;nogrid&quot; property on every row/column in the grid.
+     *
+     * @param b &lt;code&gt;true&lt;/code&gt; means no grid. &lt;code&gt;false&lt;/code&gt; is default.
+     */
+    public void setNoGrid(boolean b) {
+<span class="nc" id="L351">        this.noGrid = b;</span>
+<span class="nc" id="L352">    }</span>
+
+    /**
+     * If the layout should go from the default top-to-bottom in the grid instead of the optinal bottom-to-top.
+     *
+     * @return &lt;code&gt;true&lt;/code&gt; for the default top-to-bottom.
+     */
+    public boolean isTopToBottom() {
+<span class="fc" id="L360">        return topToBottom;</span>
+    }
+
+    /**
+     * If the layout should go from the default top-to-bottom in the grid instead of the optinal bottom-to-top.
+     *
+     * @param b &lt;code&gt;true&lt;/code&gt; for the default top-to-bottom.
+     */
+    public void setTopToBottom(boolean b) {
+<span class="nc" id="L369">        this.topToBottom = b;</span>
+<span class="nc" id="L370">    }</span>
+
+    /**
+     * If visual padding should be automatically used and compensated for by this layout instance.
+     *
+     * @return &lt;code&gt;true&lt;/code&gt; if visual padding.
+     */
+    public boolean isVisualPadding() {
+<span class="fc" id="L378">        return visualPadding;</span>
+    }
+
+    /**
+     * If visual padding should be automatically used and compensated for by this layout instance.
+     *
+     * @param b &lt;code&gt;true&lt;/code&gt; turns on visual padding.
+     */
+    public void setVisualPadding(boolean b) {
+<span class="nc" id="L387">        this.visualPadding = b;</span>
+<span class="nc" id="L388">    }</span>
+
+    /**
+     * Returns after what cell the grid should always auto wrap.
+     *
+     * @return After what cell the grid should always auto wrap. If &lt;code&gt;0&lt;/code&gt; the number of columns/rows in the
+     * {@link net.miginfocom.layout.AC} is used. &lt;code&gt;LayoutUtil.INF&lt;/code&gt; is used for no auto wrap.
+     */
+    public int getWrapAfter() {
+<span class="fc" id="L397">        return wrapAfter;</span>
+    }
+
+    /**
+     * Sets after what cell the grid should always auto wrap.
+     *
+     * @param count After what cell the grid should always auto wrap. If &lt;code&gt;0&lt;/code&gt; the number of columns/rows in the
+     *              {@link net.miginfocom.layout.AC} is used. &lt;code&gt;LayoutUtil.INF&lt;/code&gt; is used for no auto wrap.
+     */
+    public void setWrapAfter(int count) {
+<span class="fc" id="L407">        this.wrapAfter = count;</span>
+<span class="fc" id="L408">    }</span>
+
+    /**
+     * Returns the &quot;pack width&quot; for the &lt;b&gt;window&lt;/b&gt; that this container is located in. When the size of this container changes
+     * the size of the window will be corrected to be within this BoundsSize. It can be used to set the minimum and/or maximum size of the window
+     * as well as the size window should optimally get. This optimal size is normally its &quot;preferred&quot; size which is why &quot;preferred&quot;
+     * is the normal value to set here.
+     * &lt;p&gt;
+     * &quot;:push&quot; can be appended to the bound size to only push the size bigger and never shrink it if the preferred size gets smaller.
+     * &lt;p&gt;
+     * E.g. &quot;pref&quot;, &quot;100:pref&quot;, &quot;pref:700&quot;, &quot;300::700&quot;, &quot;pref:push&quot;
+     *
+     * @return The current value. Never &lt;code&gt;null&lt;/code&gt;. Check if not set with &lt;code&gt;.isUnset()&lt;/code&gt;.
+     * @since 3.5
+     */
+    public BoundSize getPackWidth() {
+<span class="nc" id="L424">        return packW;</span>
+    }
+
+    /**
+     * Sets the &quot;pack width&quot; for the &lt;b&gt;window&lt;/b&gt; that this container is located in. When the size of this container changes
+     * the size of the window will be corrected to be within this BoundsSize. It can be used to set the minimum and/or maximum size of the window
+     * as well as the size window should optimally get. This optimal size is normally its &quot;preferred&quot; size which is why &quot;preferred&quot;
+     * is the normal value to set here.
+     * &lt;p&gt;
+     * &quot;:push&quot; can be appended to the bound size to only push the size bigger and never shrink it if the preferred size gets smaller.
+     * &lt;p&gt;
+     * E.g. &quot;pref&quot;, &quot;100:pref&quot;, &quot;pref:700&quot;, &quot;300::700&quot;, &quot;pref:push&quot;
+     *
+     * @param size The new pack size. If &lt;code&gt;null&lt;/code&gt; it will be corrected to an &quot;unset&quot; BoundSize.
+     * @since 3.5
+     */
+    public void setPackWidth(BoundSize size) {
+<span class="nc bnc" id="L441" title="All 2 branches missed.">        packW = size != null ? size : BoundSize.NULL_SIZE;</span>
+<span class="nc" id="L442">    }</span>
+
+    /**
+     * Returns the &quot;pack height&quot; for the &lt;b&gt;window&lt;/b&gt; that this container is located in. When the size of this container changes
+     * the size of the window will be corrected to be within this BoundsSize. It can be used to set the minimum and/or maximum size of the window
+     * as well as the size window should optimally get. This optimal size is normally its &quot;preferred&quot; size which is why &quot;preferred&quot;
+     * is the normal value to set here.
+     * &lt;p&gt;
+     * &quot;:push&quot; can be appended to the bound size to only push the size bigger and never shrink it if the preferred size gets smaller.
+     * &lt;p&gt;
+     * E.g. &quot;pref&quot;, &quot;100:pref&quot;, &quot;pref:700&quot;, &quot;300::700&quot;, &quot;pref:push&quot;
+     *
+     * @return The current value. Never &lt;code&gt;null&lt;/code&gt;. Check if not set with &lt;code&gt;.isUnset()&lt;/code&gt;.
+     * @since 3.5
+     */
+    public BoundSize getPackHeight() {
+<span class="nc" id="L458">        return packH;</span>
+    }
+
+    /**
+     * Sets the &quot;pack height&quot; for the &lt;b&gt;window&lt;/b&gt; that this container is located in. When the size of this container changes
+     * the size of the window will be corrected to be within this BoundsSize. It can be used to set the minimum and/or maximum size of the window
+     * as well as the size window should optimally get. This optimal size is normally its &quot;preferred&quot; size which is why &quot;preferred&quot;
+     * is the normal value to set here.
+     * &lt;p&gt;
+     * &quot;:push&quot; can be appended to the bound size to only push the size bigger and never shrink it if the preferred size gets smaller.
+     * &lt;p&gt;
+     * E.g. &quot;pref&quot;, &quot;100:pref&quot;, &quot;pref:700&quot;, &quot;300::700&quot;, &quot;pref:push&quot;
+     *
+     * @param size The new pack size. If &lt;code&gt;null&lt;/code&gt; it will be corrected to an &quot;unset&quot; BoundSize.
+     * @since 3.5
+     */
+    public void setPackHeight(BoundSize size) {
+<span class="nc bnc" id="L475" title="All 2 branches missed.">        packH = size != null ? size : BoundSize.NULL_SIZE;</span>
+<span class="nc" id="L476">    }</span>
+
+
+    /**
+     * If there is a resize of the window due to packing (see {@link #setPackHeight(BoundSize)} this value, which is between 0f and 1f,
+     * decides where the extra/superfluous size is placed. 0f means that the window will resize so that the upper part moves up and the
+     * lower side stays in the same place. 0.5f will expand/reduce the window equally upwards and downwards. 1f will do the opposite of 0f
+     * of course.
+     *
+     * @return The pack alignment. Always between 0f and 1f, inclusive.
+     * @since 3.5
+     */
+    public float getPackHeightAlign() {
+<span class="nc" id="L489">        return phAlign;</span>
+    }
+
+    /**
+     * If there is a resize of the window due to packing (see {@link #setPackHeight(BoundSize)} this value, which is between 0f and 1f,
+     * decides where the extra/superfluous size is placed. 0f means that the window will resize so that the upper part moves up and the
+     * lower side stays in the same place. 0.5f will expand/reduce the window equally upwards and downwards. 1f will do the opposite of 0f
+     * of course.
+     *
+     * @param align The pack alignment. Always between 0f and 1f, inclusive. Values outside this will be truncated.
+     * @since 3.5
+     */
+    public void setPackHeightAlign(float align) {
+<span class="nc" id="L502">        phAlign = Math.max(0f, Math.min(1f, align));</span>
+<span class="nc" id="L503">    }</span>
+
+    /**
+     * If there is a resize of the window due to packing (see {@link #setPackHeight(BoundSize)} this value, which is between 0f and 1f,
+     * decides where the extra/superfluous size is placed. 0f means that the window will resize so that the left part moves left and the
+     * right side stays in the same place. 0.5f will expand/reduce the window equally to the right and lefts. 1f will do the opposite of 0f
+     * of course.
+     *
+     * @return The pack alignment. Always between 0f and 1f, inclusive.
+     * @since 3.5
+     */
+    public float getPackWidthAlign() {
+<span class="nc" id="L515">        return pwAlign;</span>
+    }
+
+    /**
+     * If there is a resize of the window due to packing (see {@link #setPackHeight(BoundSize)} this value, which is between 0f and 1f,
+     * decides where the extra/superfluous size is placed. 0f means that the window will resize so that the left part moves left and the
+     * right side stays in the same place. 0.5f will expand/reduce the window equally to the right and lefts. 1f will do the opposite of 0f
+     * of course.
+     *
+     * @param align The pack alignment. Always between 0f and 1f, inclusive. Values outside this will be truncated.
+     * @since 3.5
+     */
+    public void setPackWidthAlign(float align) {
+<span class="nc" id="L528">        pwAlign = Math.max(0f, Math.min(1f, align));</span>
+<span class="nc" id="L529">    }</span>
+
+    /**
+     * Returns the minimum/preferred/maximum size for the container that this layout constraint is set for. Any of these
+     * sizes that is not &lt;code&gt;null&lt;/code&gt; will be returned directly instead of determining the corresponding size through
+     * asking the components in this container.
+     *
+     * @return The width for the container that this layout constraint is set for. Not &lt;code&gt;null&lt;/code&gt; but
+     * all sizes can be &lt;code&gt;null&lt;/code&gt;.
+     * @since 3.5
+     */
+    public BoundSize getWidth() {
+<span class="fc" id="L541">        return width;</span>
+    }
+
+    /**
+     * Sets the minimum/preferred/maximum size for the container that this layout constraint is set for. Any of these
+     * sizes that is not &lt;code&gt;null&lt;/code&gt; will be returned directly instead of determining the corresponding size through
+     * asking the components in this container.
+     *
+     * @param size The width for the container that this layout constraint is set for. &lt;code&gt;null&lt;/code&gt; is translated to
+     *             a bound size containing only null sizes.
+     * @since 3.5
+     */
+    public void setWidth(BoundSize size) {
+<span class="nc bnc" id="L554" title="All 2 branches missed.">        this.width = size != null ? size : BoundSize.NULL_SIZE;</span>
+<span class="nc" id="L555">    }</span>
+
+    /**
+     * Returns the minimum/preferred/maximum size for the container that this layout constraint is set for. Any of these
+     * sizes that is not &lt;code&gt;null&lt;/code&gt; will be returned directly instead of determining the corresponding size through
+     * asking the components in this container.
+     *
+     * @return The height for the container that this layout constraint is set for. Not &lt;code&gt;null&lt;/code&gt; but
+     * all sizes can be &lt;code&gt;null&lt;/code&gt;.
+     * @since 3.5
+     */
+    public BoundSize getHeight() {
+<span class="fc" id="L567">        return height;</span>
+    }
+
+    /**
+     * Sets the minimum/preferred/maximum size for the container that this layout constraint is set for. Any of these
+     * sizes that is not &lt;code&gt;null&lt;/code&gt; will be returned directly instead of determining the corresponding size through
+     * asking the components in this container.
+     *
+     * @param size The height for the container that this layout constraint is set for. &lt;code&gt;null&lt;/code&gt; is translated to
+     *             a bound size containing only null sizes.
+     * @since 3.5
+     */
+    public void setHeight(BoundSize size) {
+<span class="nc bnc" id="L580" title="All 2 branches missed.">        this.height = size != null ? size : BoundSize.NULL_SIZE;</span>
+<span class="nc" id="L581">    }</span>
+
+    // ************************************************************************
+    // * Builder methods.
+    // ************************************************************************
+
+    /**
+     * Short for, and thus same as, &lt;code&gt;.pack(&quot;pref&quot;, &quot;pref&quot;)&lt;/code&gt;.
+     * &lt;p&gt;
+     * Same functionality as {@link #setPackHeight(BoundSize)} and {@link #setPackWidth(net.miginfocom.layout.BoundSize)}
+     * only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.5
+     */
+    public LC pack() {
+<span class="nc" id="L599">        return pack(&quot;pref&quot;, &quot;pref&quot;);</span>
+    }
+
+    /**
+     * Sets the pack width and height.
+     * &lt;p&gt;
+     * Same functionality as {@link #setPackHeight(BoundSize)} and {@link #setPackWidth(net.miginfocom.layout.BoundSize)}
+     * only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param width  The pack width. May be &lt;code&gt;null&lt;/code&gt;.
+     * @param height The pack height. May be &lt;code&gt;null&lt;/code&gt;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.5
+     */
+    public LC pack(String width, String height) {
+<span class="nc bnc" id="L616" title="All 2 branches missed.">        setPackWidth(width != null ? ConstraintParser.parseBoundSize(width, false, true) : BoundSize.NULL_SIZE);</span>
+<span class="nc bnc" id="L617" title="All 2 branches missed.">        setPackHeight(height != null ? ConstraintParser.parseBoundSize(height, false, false) : BoundSize.NULL_SIZE);</span>
+<span class="nc" id="L618">        return this;</span>
+    }
+
+    /**
+     * Sets the pack width and height alignment.
+     * &lt;p&gt;
+     * Same functionality as {@link #setPackHeightAlign(float)} and {@link #setPackWidthAlign(float)}
+     * only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param alignX The pack width alignment. 0.5f is default.
+     * @param alignY The pack height alignment. 0.5f is default.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.5
+     */
+    public LC packAlign(float alignX, float alignY) {
+<span class="nc" id="L635">        setPackWidthAlign(alignX);</span>
+<span class="nc" id="L636">        setPackHeightAlign(alignY);</span>
+<span class="nc" id="L637">        return this;</span>
+    }
+
+    /**
+     * Sets a wrap after the number of columns/rows that is defined in the {@link net.miginfocom.layout.AC}.
+     * &lt;p&gt;
+     * Same functionality as calling {@link #setWrapAfter(int)} with &lt;code&gt;0&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public LC wrap() {
+<span class="nc" id="L650">        setWrapAfter(0);</span>
+<span class="nc" id="L651">        return this;</span>
+    }
+
+    /**
+     * Same functionality as {@link #setWrapAfter(int)} only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param count After what cell the grid should always auto wrap. If &lt;code&gt;0&lt;/code&gt; the number of columns/rows in the
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public LC wrapAfter(int count) {
+<span class="nc" id="L663">        setWrapAfter(count);</span>
+<span class="nc" id="L664">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setNoCache(boolean)} with &lt;code&gt;true&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public LC noCache() {
+<span class="nc" id="L675">        setNoCache(true);</span>
+<span class="nc" id="L676">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setFlowX(boolean)} with &lt;code&gt;false&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public LC flowY() {
+<span class="nc" id="L687">        setFlowX(false);</span>
+<span class="nc" id="L688">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setFlowX(boolean)} with &lt;code&gt;true&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public LC flowX() {
+<span class="nc" id="L699">        setFlowX(true);</span>
+<span class="nc" id="L700">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setFillX(boolean)} with &lt;code&gt;true&lt;/code&gt; and {@link #setFillY(boolean)} with &lt;code&gt;true&lt;/code&gt; conmbined.T his method returns
+     * &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public LC fill() {
+<span class="nc" id="L712">        setFillX(true);</span>
+<span class="nc" id="L713">        setFillY(true);</span>
+<span class="nc" id="L714">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setFillX(boolean)} with &lt;code&gt;true&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public LC fillX() {
+<span class="nc" id="L725">        setFillX(true);</span>
+<span class="nc" id="L726">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setFillY(boolean)} with &lt;code&gt;true&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public LC fillY() {
+<span class="nc" id="L737">        setFillY(true);</span>
+<span class="nc" id="L738">        return this;</span>
+    }
+
+    /**
+     * Same functionality as {@link #setLeftToRight(Boolean)} only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param b &lt;code&gt;true&lt;/code&gt; for forcing left-to-right. &lt;code&gt;false&lt;/code&gt; for forcing right-to-left.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public LC leftToRight(boolean b) {
+<span class="nc bnc" id="L750" title="All 2 branches missed.">        setLeftToRight(b ? Boolean.TRUE : Boolean.FALSE);</span>
+<span class="nc" id="L751">        return this;</span>
+    }
+
+    /**
+     * Same functionality as setLeftToRight(false) only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public LC rightToLeft() {
+<span class="nc" id="L763">        setLeftToRight(Boolean.FALSE);</span>
+<span class="nc" id="L764">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setTopToBottom(boolean)} with &lt;code&gt;false&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public LC bottomToTop() {
+<span class="nc" id="L775">        setTopToBottom(false);</span>
+<span class="nc" id="L776">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setTopToBottom(boolean)} with &lt;code&gt;true&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @since 3.7.2
+     */
+    public LC topToBottom() {
+<span class="nc" id="L788">        setTopToBottom(true);</span>
+<span class="nc" id="L789">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setNoGrid(boolean)} with &lt;code&gt;true&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public LC noGrid() {
+<span class="nc" id="L800">        setNoGrid(true);</span>
+<span class="nc" id="L801">        return this;</span>
+    }
+
+    /**
+     * Same functionality as calling {@link #setVisualPadding(boolean)} with &lt;code&gt;false&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public LC noVisualPadding() {
+<span class="nc" id="L812">        setVisualPadding(false);</span>
+<span class="nc" id="L813">        return this;</span>
+    }
+
+    /**
+     * Sets the same inset (expressed as a &lt;code&gt;UnitValue&lt;/code&gt;, e.g. &quot;10px&quot; or &quot;20mm&quot;) all around.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param allSides The unit value to set for all sides. May be &lt;code&gt;null&lt;/code&gt; which means that the default panel insets
+     *                 for the platform is used.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setInsets(UnitValue[])
+     */
+    public LC insetsAll(String allSides) {
+<span class="nc" id="L827">        UnitValue insH = ConstraintParser.parseUnitValue(allSides, true);</span>
+<span class="nc" id="L828">        UnitValue insV = ConstraintParser.parseUnitValue(allSides, false);</span>
+<span class="nc" id="L829">        insets = new UnitValue[]{insV, insH, insV, insH}; // No setter to avoid copy again</span>
+<span class="nc" id="L830">        return this;</span>
+    }
+
+    /**
+     * Same functionality as &lt;code&gt;setInsets(ConstraintParser.parseInsets(s, true))&lt;/code&gt;. This method returns &lt;code&gt;this&lt;/code&gt;
+     * for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param s The string to parse. E.g. &quot;10 10 10 10&quot; or &quot;20&quot;. If less than 4 groups the last will be used for the missing.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setInsets(UnitValue[])
+     */
+    public LC insets(String s) {
+<span class="nc" id="L844">        insets = ConstraintParser.parseInsets(s, true);</span>
+<span class="nc" id="L845">        return this;</span>
+    }
+
+    /**
+     * Sets the different insets (expressed as a &lt;code&gt;UnitValue&lt;/code&gt;s, e.g. &quot;10px&quot; or &quot;20mm&quot;) for the corresponding sides.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param top    The top inset. E.g. &quot;10px&quot; or &quot;10mm&quot; or &quot;related&quot;. May be &lt;code&gt;null&lt;/code&gt; in which case the default inset for this
+     *               side for the platform will be used.
+     * @param left   The left inset. E.g. &quot;10px&quot; or &quot;10mm&quot; or &quot;related&quot;. May be &lt;code&gt;null&lt;/code&gt; in which case the default inset for this
+     *               side for the platform will be used.
+     * @param bottom The bottom inset. E.g. &quot;10px&quot; or &quot;10mm&quot; or &quot;related&quot;. May be &lt;code&gt;null&lt;/code&gt; in which case the default inset for this
+     *               side for the platform will be used.
+     * @param right  The right inset. E.g. &quot;10px&quot; or &quot;10mm&quot; or &quot;related&quot;. May be &lt;code&gt;null&lt;/code&gt; in which case the default inset for this
+     *               side for the platform will be used.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setInsets(UnitValue[])
+     */
+    public LC insets(String top, String left, String bottom, String right) {
+<span class="nc" id="L865">        insets = new UnitValue[]{ // No setter to avoid copy again</span>
+<span class="nc" id="L866">                ConstraintParser.parseUnitValue(top, false),</span>
+<span class="nc" id="L867">                ConstraintParser.parseUnitValue(left, true),</span>
+<span class="nc" id="L868">                ConstraintParser.parseUnitValue(bottom, false),</span>
+<span class="nc" id="L869">                ConstraintParser.parseUnitValue(right, true)};</span>
+<span class="nc" id="L870">        return this;</span>
+    }
+
+    /**
+     * Same functionality as &lt;code&gt;setAlignX(ConstraintParser.parseUnitValueOrAlign(unitValue, true))&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt;
+     * for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param align The align keyword or for instance &quot;100px&quot;. E.g &quot;left&quot;, &quot;right&quot;, &quot;leading&quot; or &quot;trailing&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setAlignX(UnitValue)
+     */
+    public LC alignX(String align) {
+<span class="nc" id="L884">        setAlignX(ConstraintParser.parseUnitValueOrAlign(align, true, null));</span>
+<span class="nc" id="L885">        return this;</span>
+    }
+
+    /**
+     * Same functionality as &lt;code&gt;setAlignY(ConstraintParser.parseUnitValueOrAlign(align, false))&lt;/code&gt; only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param align The align keyword or for instance &quot;100px&quot;. E.g &quot;top&quot; or &quot;bottom&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setAlignY(UnitValue)
+     */
+    public LC alignY(String align) {
+<span class="nc" id="L898">        setAlignY(ConstraintParser.parseUnitValueOrAlign(align, false, null));</span>
+<span class="nc" id="L899">        return this;</span>
+    }
+
+    /**
+     * Sets both the alignX and alignY as the same time.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param ax The align keyword or for instance &quot;100px&quot;. E.g &quot;left&quot;, &quot;right&quot;, &quot;leading&quot; or &quot;trailing&quot;.
+     * @param ay The align keyword or for instance &quot;100px&quot;. E.g &quot;top&quot; or &quot;bottom&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #alignX(String)
+     * @see #alignY(String)
+     */
+    public LC align(String ax, String ay) {
+<span class="nc bnc" id="L914" title="All 2 branches missed.">        if (ax != null)</span>
+<span class="nc" id="L915">            alignX(ax);</span>
+
+<span class="nc bnc" id="L917" title="All 2 branches missed.">        if (ay != null)</span>
+<span class="nc" id="L918">            alignY(ay);</span>
+
+<span class="nc" id="L920">        return this;</span>
+    }
+
+    /**
+     * Same functionality as &lt;code&gt;setGridGapX(ConstraintParser.parseBoundSize(boundsSize, true, true))&lt;/code&gt; only this method
+     * returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param boundsSize The &lt;code&gt;BoundSize&lt;/code&gt; of the gap. This is a minimum and/or preferred and/or maximum size. E.g.
+     *                   &lt;code&gt;&quot;50:100:200&quot;&lt;/code&gt; or &lt;code&gt;&quot;100px&quot;&lt;/code&gt;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setGridGapX(BoundSize)
+     */
+    public LC gridGapX(String boundsSize) {
+<span class="nc" id="L935">        setGridGapX(ConstraintParser.parseBoundSize(boundsSize, true, true));</span>
+<span class="nc" id="L936">        return this;</span>
+    }
+
+    /**
+     * Same functionality as &lt;code&gt;setGridGapY(ConstraintParser.parseBoundSize(boundsSize, true, false))&lt;/code&gt; only this method
+     * returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param boundsSize The &lt;code&gt;BoundSize&lt;/code&gt; of the gap. This is a minimum and/or preferred and/or maximum size. E.g.
+     *                   &lt;code&gt;&quot;50:100:200&quot;&lt;/code&gt; or &lt;code&gt;&quot;100px&quot;&lt;/code&gt;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setGridGapY(BoundSize)
+     */
+    public LC gridGapY(String boundsSize) {
+<span class="nc" id="L951">        setGridGapY(ConstraintParser.parseBoundSize(boundsSize, true, false));</span>
+<span class="nc" id="L952">        return this;</span>
+    }
+
+    /**
+     * Sets both grid gaps at the same time. see {@link #gridGapX(String)} and {@link #gridGapY(String)}.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param gapx The &lt;code&gt;BoundSize&lt;/code&gt; of the gap. This is a minimum and/or preferred and/or maximum size. E.g.
+     *             &lt;code&gt;&quot;50:100:200&quot;&lt;/code&gt; or &lt;code&gt;&quot;100px&quot;&lt;/code&gt;.
+     * @param gapy The &lt;code&gt;BoundSize&lt;/code&gt; of the gap. This is a minimum and/or preferred and/or maximum size. E.g.
+     *             &lt;code&gt;&quot;50:100:200&quot;&lt;/code&gt; or &lt;code&gt;&quot;100px&quot;&lt;/code&gt;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #gridGapX(String)
+     * @see #gridGapY(String)
+     */
+    public LC gridGap(String gapx, String gapy) {
+<span class="nc bnc" id="L969" title="All 2 branches missed.">        if (gapx != null)</span>
+<span class="nc" id="L970">            gridGapX(gapx);</span>
+
+<span class="nc bnc" id="L972" title="All 2 branches missed.">        if (gapy != null)</span>
+<span class="nc" id="L973">            gridGapY(gapy);</span>
+
+<span class="nc" id="L975">        return this;</span>
+    }
+
+    /**
+     * Calls {@link #debug(int)} with 300 as an argument.
+     *
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setDebugMillis(int)
+     */
+    public LC debug() {
+<span class="nc" id="L985">        setDebugMillis(300);</span>
+<span class="nc" id="L986">        return this;</span>
+    }
+
+    /**
+     * Same functionality as {@link #setDebugMillis(int repaintMillis)} only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param repaintMillis The new debug repaint interval.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setDebugMillis(int)
+     */
+    public LC debug(int repaintMillis) {
+<span class="nc" id="L999">        setDebugMillis(repaintMillis);</span>
+<span class="nc" id="L1000">        return this;</span>
+    }
+
+    /**
+     * Same functionality as {@link #setHideMode(int mode)} only this method returns &lt;code&gt;this&lt;/code&gt; for chaining multiple calls.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcomponents.com.
+     *
+     * @param mode The mode:&lt;br&gt;
+     *             0 == Normal. Bounds will be calculated as if the component was visible.&lt;br&gt;
+     *             1 == If hidden the size will be 0, 0 but the gaps remain.&lt;br&gt;
+     *             2 == If hidden the size will be 0, 0 and gaps set to zero.&lt;br&gt;
+     *             3 == If hidden the component will be disregarded completely and not take up a cell in the grid..
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     * @see #setHideMode(int)
+     */
+    public LC hideMode(int mode) {
+<span class="nc" id="L1017">        setHideMode(mode);</span>
+<span class="nc" id="L1018">        return this;</span>
+    }
+
+    /**
+     * The minimum width for the container. The value will override any value that is set on the container itself.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or Cheat Sheet at www.migcontainers.com.
+     *
+     * @param width The width expressed as a &lt;code&gt;UnitValue&lt;/code&gt;. E.g. &quot;100px&quot; or &quot;200mm&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public LC minWidth(String width) {
+<span class="nc" id="L1030">        setWidth(LayoutUtil.derive(getWidth(), ConstraintParser.parseUnitValue(width, true), null, null));</span>
+<span class="nc" id="L1031">        return this;</span>
+    }
+
+    /**
+     * The width for the container as a min and/or preferred and/or maximum width. The value will override any value that is set on
+     * the container itself.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or Cheat Sheet at www.migcontainers.com.
+     *
+     * @param width The width expressed as a &lt;code&gt;BoundSize&lt;/code&gt;. E.g. &quot;50:100px:200mm&quot; or &quot;100px&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public LC width(String width) {
+<span class="nc" id="L1044">        setWidth(ConstraintParser.parseBoundSize(width, false, true));</span>
+<span class="nc" id="L1045">        return this;</span>
+    }
+
+    /**
+     * The maximum width for the container. The value will override any value that is set on the container itself.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or Cheat Sheet at www.migcontainers.com.
+     *
+     * @param width The width expressed as a &lt;code&gt;UnitValue&lt;/code&gt;. E.g. &quot;100px&quot; or &quot;200mm&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public LC maxWidth(String width) {
+<span class="nc" id="L1057">        setWidth(LayoutUtil.derive(getWidth(), null, null, ConstraintParser.parseUnitValue(width, true)));</span>
+<span class="nc" id="L1058">        return this;</span>
+    }
+
+    /**
+     * The minimum height for the container. The value will override any value that is set on the container itself.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or Cheat Sheet at www.migcontainers.com.
+     *
+     * @param height The height expressed as a &lt;code&gt;UnitValue&lt;/code&gt;. E.g. &quot;100px&quot; or &quot;200mm&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public LC minHeight(String height) {
+<span class="nc" id="L1070">        setHeight(LayoutUtil.derive(getHeight(), ConstraintParser.parseUnitValue(height, false), null, null));</span>
+<span class="nc" id="L1071">        return this;</span>
+    }
+
+    /**
+     * The height for the container as a min and/or preferred and/or maximum height. The value will override any value that is set on
+     * the container itself.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcontainers.com.
+     *
+     * @param height The height expressed as a &lt;code&gt;BoundSize&lt;/code&gt;. E.g. &quot;50:100px:200mm&quot; or &quot;100px&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public LC height(String height) {
+<span class="nc" id="L1084">        setHeight(ConstraintParser.parseBoundSize(height, false, false));</span>
+<span class="nc" id="L1085">        return this;</span>
+    }
+
+    /**
+     * The maximum height for the container. The value will override any value that is set on the container itself.
+     * &lt;p&gt;
+     * For a more thorough explanation of what this constraint does see the white paper or cheat Sheet at www.migcontainers.com.
+     *
+     * @param height The height expressed as a &lt;code&gt;UnitValue&lt;/code&gt;. E.g. &quot;100px&quot; or &quot;200mm&quot;.
+     * @return &lt;code&gt;this&lt;/code&gt; so it is possible to chain calls. E.g. &lt;code&gt;new LayoutConstraint().noGrid().gap().fill()&lt;/code&gt;.
+     */
+    public LC maxHeight(String height) {
+<span class="nc" id="L1097">        setHeight(LayoutUtil.derive(getHeight(), null, null, ConstraintParser.parseUnitValue(height, false)));</span>
+<span class="nc" id="L1098">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

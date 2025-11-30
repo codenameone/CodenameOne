@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TarOutputStream.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.tar</a> &gt; <span class="el_source">TarOutputStream.java</span></div><h1>TarOutputStream.java</h1><pre class="source lang-java linenums">/**
+ * Copyright 2012 Kamran Zafar
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * The original source has been modified by Paul Williams.
+ */
+
+package com.codename1.io.tar;
+
+import com.codename1.io.BufferedOutputStream;
+
+import java.io.IOException;
+import java.io.OutputStream;
+
+/**
+ * @author Kamran Zafar
+ *
+ */
+public class TarOutputStream extends BufferedOutputStream {
+    private long bytesWritten;
+    private long currentFileSize;
+    private TarEntry currentEntry;
+
+    public TarOutputStream(OutputStream out) {
+<span class="fc" id="L38">        super(out);</span>
+<span class="fc" id="L39">        bytesWritten = 0;</span>
+<span class="fc" id="L40">        currentFileSize = 0;</span>
+<span class="fc" id="L41">    }</span>
+
+    /**
+     * Appends the EOF record and closes the stream
+     *
+     * @see java.io.FilterOutputStream#close()
+     */
+    @Override
+    public void close() throws IOException {
+<span class="fc" id="L50">        closeCurrentEntry();</span>
+<span class="fc" id="L51">        write(new byte[TarConstants.EOF_BLOCK]);</span>
+<span class="fc" id="L52">        super.close();</span>
+<span class="fc" id="L53">    }</span>
+
+    /**
+     * Writes a byte to the stream and updates byte counters
+     *
+     * @see java.io.FilterOutputStream#write(int)
+     */
+    @Override
+    public void write(int b) throws IOException {
+<span class="nc" id="L62">        super.write(b);</span>
+<span class="nc" id="L63">        bytesWritten += 1;</span>
+
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (currentEntry != null) {</span>
+<span class="nc" id="L66">            currentFileSize += 1;</span>
+        }
+<span class="nc" id="L68">    }</span>
+
+    /**
+     * Checks if the bytes being written exceed the current entry size.
+     *
+     * @see java.io.FilterOutputStream#write(byte[], int, int)
+     */
+    @Override
+    public void write(byte[] b, int off, int len) throws IOException {
+<span class="pc bpc" id="L77" title="1 of 4 branches missed.">        if (currentEntry != null &amp;&amp; !currentEntry.isDirectory()) {</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">            if (currentEntry.getSize() &lt; currentFileSize + len) {</span>
+<span class="nc" id="L79">                throw new IOException(&quot;The current entry[&quot; + currentEntry.getName() + &quot;] size[&quot;</span>
+<span class="nc" id="L80">                        + currentEntry.getSize() + &quot;] is smaller than the bytes[&quot; + (currentFileSize + len)</span>
+                        + &quot;] being written.&quot;);
+            } else {
+<span class="fc" id="L83">                currentFileSize += len;</span>
+            }
+        }
+
+<span class="fc" id="L87">        bytesWritten += len;</span>
+<span class="fc" id="L88">        super.write(b, off, len);</span>
+<span class="fc" id="L89">    }</span>
+
+    /**
+     * Writes the next tar entry header on the stream
+     *
+     * @param entry
+     * @throws IOException
+     */
+    public void putNextEntry(TarEntry entry) throws IOException {
+<span class="fc" id="L98">        closeCurrentEntry();</span>
+
+<span class="fc" id="L100">        byte[] header = new byte[TarConstants.HEADER_BLOCK];</span>
+<span class="fc" id="L101">        entry.writeEntryHeader(header);</span>
+
+<span class="fc" id="L103">        write(header);</span>
+
+<span class="fc" id="L105">        currentEntry = entry;</span>
+<span class="fc" id="L106">    }</span>
+
+    /**
+     * Closes the current tar entry
+     *
+     * @throws IOException
+     */
+    protected void closeCurrentEntry() throws IOException {
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (currentEntry != null) {</span>
+<span class="pc bpc" id="L115" title="1 of 2 branches missed.">            if (currentEntry.getSize() &gt; currentFileSize) {</span>
+<span class="nc" id="L116">                throw new IOException(&quot;The current entry[&quot; + currentEntry.getName() + &quot;] of size[&quot;</span>
+<span class="nc" id="L117">                        + currentEntry.getSize() + &quot;] has not been fully written.&quot;);</span>
+            }
+
+<span class="fc" id="L120">            currentEntry = null;</span>
+<span class="fc" id="L121">            currentFileSize = 0;</span>
+
+<span class="fc" id="L123">            pad();</span>
+        }
+<span class="fc" id="L125">    }</span>
+
+    /**
+     * Pads the last content block
+     *
+     * @throws IOException
+     */
+    protected void pad() throws IOException {
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (bytesWritten &gt; 0) {</span>
+<span class="fc" id="L134">            int extra = (int) (bytesWritten % TarConstants.DATA_BLOCK);</span>
+
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">            if (extra &gt; 0) {</span>
+<span class="fc" id="L137">                write(new byte[TarConstants.DATA_BLOCK - extra]);</span>
+            }
+        }
+<span class="fc" id="L140">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

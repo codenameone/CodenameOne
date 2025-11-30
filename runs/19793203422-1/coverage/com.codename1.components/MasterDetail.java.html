@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MasterDetail.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">MasterDetail.java</span></div><h1>MasterDetail.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+
+/**
+ * Master-detail utility class simplifying the process of defining a master/detail
+ *
+ * @author Shai Almog
+ * @deprecated this was a half baked idea that made it into the public API
+ */
+<span class="nc" id="L44">public class MasterDetail {</span>
+    /**
+     * @deprecated this was a half baked idea that made it into the public API
+     */
+    public static void bindTabletLandscapeMaster(final Form rootForm, Container parentContainer, Component landscapeUI, final Component portraitUI, final String commandTitle, Image commandIcon) {
+<span class="fc" id="L49">        landscapeUI.setHideInPortrait(true);</span>
+<span class="fc" id="L50">        parentContainer.addComponent(BorderLayout.WEST, landscapeUI);</span>
+
+<span class="fc" id="L52">        final Command masterCommand = new Command(commandTitle, commandIcon) {</span>
+            public void actionPerformed(ActionEvent ev) {
+<span class="nc" id="L54">                Dialog dlg = new Dialog();</span>
+<span class="nc" id="L55">                dlg.setLayout(new BorderLayout());</span>
+<span class="nc" id="L56">                dlg.setDialogUIID(&quot;Container&quot;);</span>
+<span class="nc" id="L57">                dlg.getContentPane().setUIID(&quot;Container&quot;);</span>
+<span class="nc" id="L58">                Container titleArea = new Container(new BorderLayout());</span>
+<span class="nc" id="L59">                dlg.addComponent(BorderLayout.NORTH, titleArea);</span>
+<span class="nc" id="L60">                titleArea.setUIID(&quot;TitleArea&quot;);</span>
+<span class="nc" id="L61">                Label title = new Label(commandTitle);</span>
+<span class="nc" id="L62">                titleArea.addComponent(BorderLayout.CENTER, title);</span>
+<span class="nc" id="L63">                title.setUIID(&quot;Title&quot;);</span>
+<span class="nc" id="L64">                Container body = new Container(new BorderLayout());</span>
+<span class="nc" id="L65">                body.setUIID(&quot;Form&quot;);</span>
+<span class="nc" id="L66">                body.addComponent(BorderLayout.CENTER, portraitUI);</span>
+<span class="nc" id="L67">                dlg.setTransitionInAnimator(CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, false, 250));</span>
+<span class="nc" id="L68">                dlg.setTransitionOutAnimator(CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, true, 250));</span>
+<span class="nc" id="L69">                dlg.addComponent(BorderLayout.CENTER, body);</span>
+<span class="nc" id="L70">                dlg.setDisposeWhenPointerOutOfBounds(true);</span>
+<span class="nc" id="L71">                dlg.showStetched(BorderLayout.WEST, true);</span>
+<span class="nc" id="L72">                dlg.removeComponent(portraitUI);</span>
+<span class="nc" id="L73">            }</span>
+        };
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (Display.getInstance().isPortrait()) {</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">            if (rootForm.getCommandCount() &gt; 0) {</span>
+<span class="nc" id="L77">                rootForm.addCommand(masterCommand, 1);</span>
+            } else {
+<span class="fc" id="L79">                rootForm.addCommand(masterCommand);</span>
+            }
+        }
+<span class="fc" id="L82">        rootForm.addOrientationListener(new ActionListener() {</span>
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L84" title="All 2 branches missed.">                if (portraitUI.getParent() != null) {</span>
+<span class="nc" id="L85">                    Form f = Display.getInstance().getCurrent();</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">                    if (f instanceof Dialog) {</span>
+<span class="nc" id="L87">                        ((Dialog) f).dispose();</span>
+                    }
+                }
+<span class="nc bnc" id="L90" title="All 2 branches missed.">                if (Display.getInstance().isPortrait()) {</span>
+<span class="nc" id="L91">                    rootForm.addCommand(masterCommand, 1);</span>
+                } else {
+<span class="nc" id="L93">                    rootForm.removeCommand(masterCommand);</span>
+<span class="nc" id="L94">                    rootForm.revalidate();</span>
+                }
+<span class="nc" id="L96">            }</span>
+        });
+<span class="fc" id="L98">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

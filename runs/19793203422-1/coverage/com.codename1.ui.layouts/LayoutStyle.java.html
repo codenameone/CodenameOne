@@ -1,0 +1,366 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LayoutStyle.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts</a> &gt; <span class="el_source">LayoutStyle.java</span></div><h1>LayoutStyle.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.layouts;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+
+
+/**
+ * LayoutStyle is used to determine how much space to place between components
+ * during layout.  LayoutStyle can be obtained for two components, or for
+ * a component relative to an edge of a parent container.  The amount of
+ * space can vary depending upon whether or not the components are
+ * logically grouped together (&lt;code&gt;RELATED&lt;/code&gt;).
+ * &lt;p&gt;
+ * This class is primarily useful for JREs prior to 1.6.  In 1.6 API for this
+ * was added to Swing.  When run on a JRE of 1.6 or greater this will call into
+ * the appropriate methods in Swing.
+ *
+ * @version $Revision: 1.10 $
+ */
+<span class="fc" id="L44">public class LayoutStyle {</span>
+    /**
+     * Possible argument to getPreferredGap.  Used to indicate the two components
+     * are grouped together.
+     */
+    public static final int RELATED = 0;
+    /**
+     * Possible argument to getPreferredGap.  Used to indicate the two components
+     * are not grouped together.
+     */
+    public static final int UNRELATED = 1;
+
+    /**
+     * Possible argument to getPreferredGap.  Used to indicate the distance
+     * to indent a component is being requested.  To visually indicate
+     * a set of related components they will often times be horizontally
+     * indented, the &lt;code&gt;INDENT&lt;/code&gt; constant for this.
+     * For example, to indent a check box relative to a label use this
+     * constant to &lt;code&gt;getPreferredGap&lt;/code&gt;.
+     */
+    public static final int INDENT = 3;
+
+<span class="fc" id="L66">    private static LayoutStyle layoutStyle = new LayoutStyle();</span>
+    //private static LookAndFeel laf;
+
+    /**
+     * Factory methods for obtaining the current &lt;code&gt;LayoutStyle&lt;/code&gt;
+     * object appropriate for the current look and feel.
+     *
+     * @return the current LayoutStyle instance
+     */
+    public static LayoutStyle getSharedInstance() {
+<span class="fc" id="L76">        return layoutStyle;</span>
+    }
+
+    /**
+     * Sets the LayoutStyle instance to use for this look and feel.
+     * You generally don't need to invoke this, instead use the getter which
+     * will return the LayoutStyle appropriate for the current look and feel.
+     *
+     * @param layout the LayoutStyle to use; a value of null indicates
+     *               the default should be used
+     */
+    public static void setSharedInstance(LayoutStyle layout) {
+<span class="fc" id="L88">        layoutStyle = layout;</span>
+<span class="fc" id="L89">    }</span>
+
+    /**
+     * Returns the amount of space to use between two components.
+     * The return value indicates the distance to place
+     * &lt;code&gt;component2&lt;/code&gt; relative to &lt;code&gt;component1&lt;/code&gt;.
+     * For example, the following returns the amount of space to place
+     * between &lt;code&gt;component2&lt;/code&gt; and &lt;code&gt;component1&lt;/code&gt;
+     * when &lt;code&gt;component2&lt;/code&gt; is placed vertically above
+     * &lt;code&gt;component1&lt;/code&gt;:
+     * &lt;pre&gt;
+     *   int gap = getPreferredGap(component1, component2,
+     *                             LayoutStyle.RELATED,
+     *                             SwingConstants.NORTH, parent);
+     * &lt;/pre&gt;
+     * The &lt;code&gt;type&lt;/code&gt; parameter indicates the type
+     * of gap being requested.  It can be one of the following values:
+     * &lt;table&gt;
+     * &lt;tr&gt;&lt;td&gt;&lt;code&gt;RELATED&lt;/code&gt;
+     *     &lt;td&gt;If the two components will be contained in
+     *         the same parent and are showing similar logically related
+     *         items, use &lt;code&gt;RELATED&lt;/code&gt;.
+     * &lt;tr&gt;&lt;td&gt;&lt;code&gt;UNRELATED&lt;/code&gt;
+     *     &lt;td&gt;If the two components will be
+     *          contained in the same parent but show logically unrelated items
+     *          use &lt;code&gt;UNRELATED&lt;/code&gt;.
+     * &lt;tr&gt;&lt;td&gt;&lt;code&gt;INDENT&lt;/code&gt;
+     *     &lt;td&gt;Used to obtain the preferred distance to indent a component
+     *         relative to another.  For example, if you want to horizontally
+     *         indent a JCheckBox relative to a JLabel use &lt;code&gt;INDENT&lt;/code&gt;.
+     *         This is only useful for the horizontal axis.
+     * &lt;/table&gt;
+     * &lt;p&gt;
+     * It's important to note that some look and feels may not distinguish
+     * between &lt;code&gt;RELATED&lt;/code&gt; and &lt;code&gt;UNRELATED&lt;/code&gt;.
+     * &lt;p&gt;
+     * The return value is not intended to take into account the
+     * current size and position of &lt;code&gt;component2&lt;/code&gt; or
+     * &lt;code&gt;component1&lt;/code&gt;.  The return value may take into
+     * consideration various properties of the components.  For
+     * example, the space may vary based on font size, or the preferred
+     * size of the component.
+     *
+     * @param component1 the &lt;code&gt;JComponent&lt;/code&gt;
+     *                   &lt;code&gt;component2&lt;/code&gt; is being placed relative to
+     * @param component2 the &lt;code&gt;JComponent&lt;/code&gt; being placed
+     * @param type       how the two components are being placed
+     * @param position   the position &lt;code&gt;component2&lt;/code&gt; is being placed
+     *                   relative to &lt;code&gt;component1&lt;/code&gt;; one of
+     *                   &lt;code&gt;SwingConstants.NORTH&lt;/code&gt;,
+     *                   &lt;code&gt;SwingConstants.SOUTH&lt;/code&gt;,
+     *                   &lt;code&gt;SwingConstants.EAST&lt;/code&gt; or
+     *                   &lt;code&gt;SwingConstants.WEST&lt;/code&gt;
+     * @param parent     the parent of &lt;code&gt;component2&lt;/code&gt;; this may differ
+     *                   from the actual parent and may be null
+     * @return the amount of space to place between the two components
+     * @throws IllegalArgumentException if &lt;code&gt;position&lt;/code&gt; is not
+     *                                  one of &lt;code&gt;SwingConstants.NORTH&lt;/code&gt;,
+     *                                  &lt;code&gt;SwingConstants.SOUTH&lt;/code&gt;,
+     *                                  &lt;code&gt;SwingConstants.EAST&lt;/code&gt; or
+     *                                  &lt;code&gt;SwingConstants.WEST&lt;/code&gt;; &lt;code&gt;type&lt;/code&gt; not one
+     *                                  of &lt;code&gt;INDENT&lt;/code&gt;, &lt;code&gt;RELATED&lt;/code&gt;
+     *                                  or &lt;code&gt;UNRELATED&lt;/code&gt;; or &lt;code&gt;component1&lt;/code&gt; or
+     *                                  &lt;code&gt;component2&lt;/code&gt; is null
+     */
+    public int getPreferredGap(Component component1, Component component2,
+                               int type, int position, Container parent) {
+<span class="pc bpc" id="L156" title="2 of 8 branches missed.">        if (position != GroupLayout.NORTH &amp;&amp;</span>
+                position != GroupLayout.SOUTH &amp;&amp;
+                position != GroupLayout.WEST &amp;&amp;
+                position != GroupLayout.EAST) {
+<span class="nc" id="L160">            throw new IllegalArgumentException(&quot;Invalid position&quot;);</span>
+        }
+<span class="pc bpc" id="L162" title="1 of 4 branches missed.">        if (component1 == null || component2 == null) {</span>
+<span class="fc" id="L163">            throw new IllegalArgumentException(&quot;Components must be non-null&quot;);</span>
+        }
+<span class="fc bfc" id="L165" title="All 2 branches covered.">        if (type == RELATED) {</span>
+<span class="fc" id="L166">            return Display.getInstance().convertToPixels(1, true);</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        } else if (type == UNRELATED) {</span>
+<span class="fc" id="L168">            return Display.getInstance().convertToPixels(2, true);</span>
+<span class="pc bpc" id="L169" title="1 of 2 branches missed.">        } else if (type == INDENT) {</span>
+<span class="nc bnc" id="L170" title="All 4 branches missed.">            if (position == GroupLayout.EAST || position == GroupLayout.WEST) {</span>
+<span class="nc" id="L171">                int gap = getButtonChildIndent(component1, position);</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">                if (gap != 0) {</span>
+<span class="nc" id="L173">                    return gap;</span>
+                }
+<span class="nc" id="L175">                return Display.getInstance().convertToPixels(1, true);</span>
+            }
+<span class="nc" id="L177">            return Display.getInstance().convertToPixels(1, true);</span>
+        }
+<span class="fc" id="L179">        throw new IllegalArgumentException(&quot;Invalid type&quot;);</span>
+    }
+
+    /**
+     * Returns the amount of space to position a component inside its
+     * parent.
+     *
+     * @param component the &lt;code&gt;Component&lt;/code&gt; being positioned
+     * @param position  the position &lt;code&gt;component&lt;/code&gt; is being placed
+     *                  relative to its parent; one of
+     *                  &lt;code&gt;SwingConstants.NORTH&lt;/code&gt;,
+     *                  &lt;code&gt;SwingConstants.SOUTH&lt;/code&gt;,
+     *                  &lt;code&gt;SwingConstants.EAST&lt;/code&gt; or
+     *                  &lt;code&gt;SwingConstants.WEST&lt;/code&gt;
+     * @param parent    the parent of &lt;code&gt;component&lt;/code&gt;; this may differ
+     *                  from the actual parent and may be null
+     * @return the amount of space to place between the component and specified
+     * edge
+     * @throws IllegalArgumentException if &lt;code&gt;position&lt;/code&gt; is not
+     *                                  one of &lt;code&gt;SwingConstants.NORTH&lt;/code&gt;,
+     *                                  &lt;code&gt;SwingConstants.SOUTH&lt;/code&gt;,
+     *                                  &lt;code&gt;SwingConstants.EAST&lt;/code&gt; or
+     *                                  &lt;code&gt;SwingConstants.WEST&lt;/code&gt;;
+     *                                  or &lt;code&gt;component&lt;/code&gt; is null
+     */
+    public int getContainerGap(Component component, int position,
+                               Container parent) {
+<span class="pc bpc" id="L206" title="2 of 8 branches missed.">        if (position != GroupLayout.NORTH &amp;&amp;</span>
+                position != GroupLayout.SOUTH &amp;&amp;
+                position != GroupLayout.WEST &amp;&amp;
+                position != GroupLayout.EAST) {
+<span class="nc" id="L210">            throw new IllegalArgumentException(&quot;Invalid position&quot;);</span>
+        }
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        if (component == null) {</span>
+<span class="nc" id="L213">            throw new IllegalArgumentException(&quot;Component must be non-null&quot;);</span>
+        }
+<span class="fc" id="L215">        return Display.getInstance().convertToPixels(2, true);</span>
+    }
+
+    /**
+     * For some look and feels check boxs and radio buttons have an empty
+     * border around them.  Look and feel guidelines generally don't include
+     * this space.  Use this method to subtract this space from the specified
+     * components.
+     *
+     * @param source   First component
+     * @param target   Second component
+     * @param position Position doing layout along.
+     * @param offset   Ideal offset, not including border/margin
+     * @return offset - border/margin around the component.
+     */
+    int getCBRBPadding(Component source, Component target, int position,
+                       int offset) {
+<span class="nc" id="L232">        offset -= getCBRBPadding(source, position);</span>
+<span class="nc bnc" id="L233" title="All 2 branches missed.">        if (offset &gt; 0) {</span>
+<span class="nc" id="L234">            offset -= getCBRBPadding(target, flipDirection(position));</span>
+        }
+<span class="nc bnc" id="L236" title="All 2 branches missed.">        if (offset &lt; 0) {</span>
+<span class="nc" id="L237">            return 0;</span>
+        }
+<span class="nc" id="L239">        return offset;</span>
+    }
+
+    /**
+     * For some look and feels check boxs and radio buttons have an empty
+     * border around them.  Look and feel guidelines generally don't include
+     * this space.  Use this method to subtract this space from the specified
+     * components.
+     *
+     * @param source   Component
+     * @param position Position doing layout along.
+     * @param offset   Ideal offset, not including border/margin
+     * @return offset - border/margin around the component.
+     */
+    int getCBRBPadding(Component source, int position, int offset) {
+<span class="nc" id="L254">        offset -= getCBRBPadding(source, position);</span>
+<span class="nc" id="L255">        return Math.max(offset, 0);</span>
+    }
+
+    int flipDirection(int position) {
+<span class="nc bnc" id="L259" title="All 5 branches missed.">        switch (position) {</span>
+            case GroupLayout.NORTH:
+<span class="nc" id="L261">                return GroupLayout.SOUTH;</span>
+            case GroupLayout.SOUTH:
+<span class="nc" id="L263">                return GroupLayout.NORTH;</span>
+            case GroupLayout.EAST:
+<span class="nc" id="L265">                return GroupLayout.WEST;</span>
+            case GroupLayout.WEST:
+<span class="nc" id="L267">                return GroupLayout.EAST;</span>
+            default:
+<span class="nc" id="L269">                throw new IllegalArgumentException(&quot;Illegal position: &quot; + position);</span>
+        }
+    }
+
+    private int getCBRBPadding(Component c, int position) {
+        /*if (c.getUIClassID() == &quot;CheckBoxUI&quot; ||
+              c.getUIClassID() == &quot;RadioButtonUI&quot;) {
+            Border border = c.getBorder();
+            if (border instanceof UIResource) {
+                return getInset(c, position);
+            }
+        }*/
+<span class="nc" id="L281">        return 0;</span>
+    }
+
+    private int getInset(Component c, int position) {
+<span class="nc" id="L285">        int insetLeft = c.getStyle().getMarginLeftNoRTL();</span>
+<span class="nc" id="L286">        int insetTop = c.getStyle().getMarginTop();</span>
+<span class="nc" id="L287">        int insetRight = c.getStyle().getMarginRightNoRTL();</span>
+<span class="nc" id="L288">        int insetBottom = c.getStyle().getMarginBottom();</span>
+<span class="nc bnc" id="L289" title="All 5 branches missed.">        switch (position) {</span>
+            case GroupLayout.NORTH:
+<span class="nc" id="L291">                return insetTop;</span>
+            case GroupLayout.SOUTH:
+<span class="nc" id="L293">                return insetBottom;</span>
+            case GroupLayout.EAST:
+<span class="nc" id="L295">                return insetRight;</span>
+            case GroupLayout.WEST:
+<span class="nc" id="L297">                return insetLeft;</span>
+            default:
+<span class="nc" id="L299">                throw new IllegalArgumentException(&quot;Illegal argument position: &quot; + position);</span>
+        }
+    }
+
+    // Fix component alignment to work with labels etc when doing bidi
+    /*private boolean isLeftAligned(Label button, int position) {
+        if (position == GroupLayout.WEST) {
+            boolean ltr = button.getComponentOrientation().isLeftToRight();
+            int hAlign = button.getHorizontalAlignment();
+            return ((ltr &amp;&amp; (hAlign == SwingConstants.LEFT ||
+                             hAlign == SwingConstants.LEADING)) ||
+                    (!ltr &amp;&amp; (hAlign == SwingConstants.TRAILING)));
+        }
+        return false;
+    }
+
+    private boolean isRightAligned(AbstractButton button, int position) {
+        if (position == SwingConstants.EAST) {
+            boolean ltr = button.getComponentOrientation().isLeftToRight();
+            int hAlign = button.getHorizontalAlignment();
+            return ((ltr &amp;&amp; (hAlign == SwingConstants.RIGHT ||
+                             hAlign == SwingConstants.TRAILING)) ||
+                    (!ltr &amp;&amp; (hAlign == SwingConstants.LEADING)));
+        }
+        return false;
+    }*/
+
+    /*private Image getIcon(Label button) {
+        Icon icon = button.getIcon();
+        if (icon != null) {
+            return icon;
+        }
+        String key = null;
+        if (button instanceof JCheckBox) {
+            key = &quot;CheckBox.icon&quot;;
+        } else if (button instanceof JRadioButton) {
+            key = &quot;RadioButton.icon&quot;;
+        }
+        if (key != null) {
+            Object oIcon = UIManager.get(key);
+            if (oIcon instanceof Icon) {
+                return (Icon)oIcon;
+            }
+        }
+        return null;
+    }*/
+
+    /**
+     * Returns the amount to indent the specified component if it's
+     * a JCheckBox or JRadioButton.  If the component is not a JCheckBox or
+     * JRadioButton, 0 will be returned.
+     */
+    int getButtonChildIndent(Component c, int position) {
+        /*if ((c instanceof JRadioButton) || (c instanceof JCheckBox)) {
+            AbstractButton button = (AbstractButton)c;
+            Insets insets = c.getInsets();
+            Icon icon = getIcon(button);
+            int gap = button.getIconTextGap();
+            if (isLeftAligned(button, position)) {
+                return insets.left + icon.getIconWidth() + gap;
+            } else if (isRightAligned(button, position)) {
+                return insets.right + icon.getIconWidth() + gap;
+            }
+        }*/
+<span class="nc" id="L363">        return 0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

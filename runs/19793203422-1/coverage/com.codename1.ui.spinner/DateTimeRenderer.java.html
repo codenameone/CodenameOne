@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DateTimeRenderer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.spinner</a> &gt; <span class="el_source">DateTimeRenderer.java</span></div><h1>DateTimeRenderer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.ui.spinner;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.List;
+
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Map;
+
+/**
+ * A renderer that can represent values for Date and time, time is represented as an integer
+ * for seconds since midnight. This is formatted accordingly by the renderer
+ *
+ * @author Shai Almog
+ * @deprecated use Picker instead
+ */
+class DateTimeRenderer extends SpinnerRenderer&lt;Object&gt; {
+<span class="fc" id="L42">    static final String[] MONTHS = {</span>
+            &quot;Jan&quot;, &quot;Feb&quot;, &quot;Mar&quot;, &quot;Apr&quot;, &quot;May&quot;, &quot;Jun&quot;, &quot;Jul&quot;, &quot;Aug&quot;, &quot;Sep&quot;, &quot;Oct&quot;, &quot;Nov&quot;, &quot;Dec&quot;
+    };
+<span class="fc" id="L45">    static final String[] DAYS = {</span>
+            &quot;Sun&quot;, &quot;Mon&quot;, &quot;Tue&quot;, &quot;Wed&quot;, &quot;Thu&quot;, &quot;Fri&quot;, &quot;Sat&quot;
+    };
+
+    private boolean markToday;
+    private String originalUIID;
+    private boolean date;
+    private int type;
+    private char separatorChar;
+    private boolean twentyFourHours;
+    private boolean showSeconds;
+
+    private DateTimeRenderer() {
+    }
+
+    /**
+     * Construct a time renderer
+     *
+     * @param twentyFourHours show the value as 24 hour values or AM/PM
+     * @param showSeconds     show the value of the seconds as well or hide it
+     */
+    public static DateTimeRenderer createTimeRenderer(boolean twentyFourHours, boolean showSeconds) {
+<span class="fc" id="L67">        DateTimeRenderer d = new DateTimeRenderer();</span>
+<span class="fc" id="L68">        d.twentyFourHours = twentyFourHours;</span>
+<span class="fc" id="L69">        d.showSeconds = showSeconds;</span>
+<span class="fc" id="L70">        return d;</span>
+    }
+
+    /**
+     * Constructs a date renderer
+     *
+     * @param separatorChar char separating the entries within the renderer such as /, - etc.
+     * @param format        the date, one of the constant values in this class
+     */
+    public static DateTimeRenderer createDateRenderer(char separatorChar, int format) {
+<span class="fc" id="L80">        DateTimeRenderer d = new DateTimeRenderer();</span>
+<span class="fc" id="L81">        d.date = true;</span>
+<span class="fc" id="L82">        d.separatorChar = separatorChar;</span>
+<span class="fc" id="L83">        d.type = format;</span>
+<span class="fc" id="L84">        return d;</span>
+    }
+
+    void setType(int type) {
+<span class="nc" id="L88">        this.type = type;</span>
+<span class="nc" id="L89">    }</span>
+
+    boolean isShowSeconds() {
+<span class="fc" id="L92">        return showSeconds;</span>
+    }
+
+    void setMarkToday(boolean markToday, long today) {
+<span class="nc" id="L96">        this.markToday = markToday;</span>
+<span class="nc" id="L97">    }</span>
+
+    private String twoDigits(int i) {
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (i &lt; 10) {</span>
+<span class="fc" id="L101">            return &quot;0&quot; + i;</span>
+        }
+<span class="nc" id="L103">        return &quot;&quot; + i;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (value instanceof String) {</span>
+            // rendering prototype
+<span class="nc" id="L112">            return super.getListCellRendererComponent(list, value, index, isSelected);</span>
+        }
+<span class="fc bfc" id="L114" title="All 2 branches covered.">        if (date) {</span>
+<span class="fc" id="L115">            Date d = (Date) value;</span>
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">            if (markToday) {</span>
+<span class="nc" id="L117">                Calendar cl = Calendar.getInstance();</span>
+<span class="nc" id="L118">                cl.setTime(new Date());</span>
+<span class="nc" id="L119">                int dm = cl.get(Calendar.DAY_OF_MONTH);</span>
+<span class="nc" id="L120">                int m = cl.get(Calendar.MONTH);</span>
+<span class="nc" id="L121">                int year = cl.get(Calendar.YEAR);</span>
+<span class="nc" id="L122">                cl.setTime(d);</span>
+<span class="nc bnc" id="L123" title="All 6 branches missed.">                if (dm == cl.get(Calendar.DAY_OF_MONTH) &amp;&amp; year == cl.get(Calendar.YEAR) &amp;&amp; m == cl.get(Calendar.MONTH)) {</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">                    if (originalUIID == null) {</span>
+<span class="nc" id="L125">                        originalUIID = getUIID();</span>
+<span class="nc" id="L126">                        setUIID(&quot;TODAY&quot;);</span>
+<span class="nc" id="L127">                        return super.getListCellRendererComponent(list, &quot;Today&quot;, index, isSelected);</span>
+                    }
+                } else {
+<span class="nc bnc" id="L130" title="All 2 branches missed.">                    if (originalUIID != null) {</span>
+<span class="nc" id="L131">                        setUIID(originalUIID);</span>
+<span class="nc" id="L132">                        originalUIID = null;</span>
+                    }
+                }
+            }
+
+<span class="fc" id="L137">            Calendar c = Calendar.getInstance();</span>
+<span class="fc" id="L138">            c.setTime(d);</span>
+<span class="fc" id="L139">            int day = c.get(Calendar.DAY_OF_MONTH);</span>
+<span class="fc" id="L140">            int month = c.get(Calendar.MONTH) + 1;</span>
+<span class="fc" id="L141">            int year = c.get(Calendar.YEAR);</span>
+<span class="pc bpc" id="L142" title="6 of 7 branches missed.">            switch (type) {</span>
+                case Spinner.DATE_FORMAT_DD_MM_YYYY:
+<span class="nc" id="L144">                    value = twoDigits(day) + separatorChar + twoDigits(month) + separatorChar + year;</span>
+<span class="nc" id="L145">                    break;</span>
+                case Spinner.DATE_FORMAT_MM_DD_YYYY:
+<span class="nc" id="L147">                    value = twoDigits(month) + separatorChar + twoDigits(day) + separatorChar + year;</span>
+<span class="nc" id="L148">                    break;</span>
+                case Spinner.DATE_FORMAT_DD_MM_YY:
+<span class="nc" id="L150">                    value = twoDigits(day) + separatorChar + twoDigits(month) + separatorChar + (year % 100);</span>
+<span class="nc" id="L151">                    break;</span>
+                case Spinner.DATE_FORMAT_MM_DD_YY:
+<span class="nc" id="L153">                    value = twoDigits(month) + separatorChar + twoDigits(day) + separatorChar + (year % 100);</span>
+<span class="nc" id="L154">                    break;</span>
+                case Spinner.DATE_FORMAT_DOW_MON_DD:
+<span class="nc" id="L156">                    value = getLocalizedDay(c.get(Calendar.DAY_OF_WEEK) - 1) + separatorChar + getLocalizedMonth(month - 1) + separatorChar + twoDigits(day);</span>
+<span class="nc" id="L157">                    break;</span>
+                case Spinner.DATE_FORMAT_DOW_MON_DD_YY:
+<span class="fc" id="L159">                    value = getLocalizedDay(c.get(Calendar.DAY_OF_WEEK) - 1) + separatorChar + getLocalizedMonth(month - 1) + separatorChar + twoDigits(day) + separatorChar + year;</span>
+                    break;
+            }
+<span class="fc" id="L162">        } else {</span>
+<span class="fc" id="L163">            int v = ((Integer) value).intValue();</span>
+<span class="fc" id="L164">            int seconds = v % 60;</span>
+<span class="fc" id="L165">            v /= 60;</span>
+<span class="fc" id="L166">            int minutes = v % 60;</span>
+<span class="fc" id="L167">            v /= 60;</span>
+            int hours;
+<span class="fc" id="L169">            String amPm = &quot;&quot;;</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">            if (twentyFourHours) {</span>
+<span class="fc" id="L171">                hours = v % 24;</span>
+            } else {
+<span class="nc" id="L173">                hours = v % 12;</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">                if (v &gt;= 12) {</span>
+<span class="nc" id="L175">                    amPm = &quot;PM&quot;;</span>
+                } else {
+<span class="nc" id="L177">                    amPm = &quot;AM&quot;;</span>
+                }
+            }
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">            if (showSeconds) {</span>
+<span class="fc" id="L181">                value = twoDigits(hours) + &quot;:&quot; + twoDigits(minutes) + &quot;:&quot; + twoDigits(seconds) + amPm;</span>
+            } else {
+<span class="nc" id="L183">                value = twoDigits(hours) + &quot;:&quot; + twoDigits(minutes) + amPm;</span>
+            }
+        }
+<span class="fc" id="L186">        return super.getListCellRendererComponent(list, value, index, isSelected);</span>
+    }
+
+    private String getLocalizedMonth(int i) {
+<span class="fc" id="L190">        Map&lt;String, String&gt; t = getUIManager().getBundle();</span>
+<span class="fc" id="L191">        String text = MONTHS[i];</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        if (t != null) {</span>
+<span class="nc" id="L193">            Object o = t.get(&quot;Calendar.&quot; + text);</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">            if (o != null) {</span>
+<span class="nc" id="L195">                text = (String) o;</span>
+            }
+        }
+<span class="fc" id="L198">        return text;</span>
+    }
+
+    private String getLocalizedDay(int i) {
+<span class="fc" id="L202">        Map&lt;String, String&gt; t = getUIManager().getBundle();</span>
+<span class="fc" id="L203">        String text = DAYS[i];</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">        if (t != null) {</span>
+<span class="nc" id="L205">            Object o = t.get(&quot;Calendar.&quot; + text);</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            if (o != null) {</span>
+<span class="nc" id="L207">                text = (String) o;</span>
+            }
+        }
+<span class="fc" id="L210">        return text;</span>
+    }
+
+    /**
+     * @return the twentyFourHours
+     */
+    public boolean isTwentyFourHours() {
+<span class="nc" id="L217">        return twentyFourHours;</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

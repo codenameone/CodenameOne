@@ -1,0 +1,1041 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XYChart.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.views</a> &gt; <span class="el_source">XYChart.java</span></div><h1>XYChart.java</h1><pre class="source lang-java linenums">/**
+ * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.codename1.charts.views;
+
+import com.codename1.charts.compat.Canvas;
+import com.codename1.charts.compat.Paint;
+import com.codename1.charts.compat.Paint.Align;
+import com.codename1.charts.compat.Paint.Style;
+import com.codename1.charts.models.Point;
+import com.codename1.charts.models.SeriesSelection;
+import com.codename1.charts.models.XYMultipleSeriesDataset;
+import com.codename1.charts.models.XYSeries;
+import com.codename1.charts.renderers.BasicStroke;
+import com.codename1.charts.renderers.DefaultRenderer;
+import com.codename1.charts.renderers.SimpleSeriesRenderer;
+import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
+import com.codename1.charts.renderers.XYMultipleSeriesRenderer.Orientation;
+import com.codename1.charts.renderers.XYSeriesRenderer;
+import com.codename1.charts.util.MathHelper;
+import com.codename1.ui.Component;
+import com.codename1.ui.Font;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.geom.Rectangle2D;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.SortedMap;
+
+
+/**
+ * The XY chart rendering class.
+ */
+public abstract class XYChart extends AbstractChart {
+    /** The calculated range. */
+<span class="pc" id="L52">    private final HashMap&lt;Integer, double[]&gt; mCalcRange = new HashMap&lt;Integer, double[]&gt;();</span>
+    /** The multiple series dataset. */
+    protected XYMultipleSeriesDataset mDataset;
+    /** The multiple series renderer. */
+    protected XYMultipleSeriesRenderer mRenderer;
+    /** The current scale value. */
+    private float mScale;
+    /** The current translate value. */
+    private float mTranslate;
+    /** The canvas center point. */
+    private Point mCenter;
+    /** The visible chart area, in screen coordinates. */
+    private Rectangle mScreenR;
+    /**
+     * The clickable areas for all points. The array index is the series index,
+     * and the RectF list index is the point index in that series.
+     */
+<span class="pc" id="L69">    private HashMap&lt;Integer, List&lt;ClickableArea&gt;&gt; clickableAreas = new HashMap&lt;Integer, List&lt;ClickableArea&gt;&gt;();</span>
+
+<span class="nc" id="L71">    protected XYChart() {</span>
+<span class="nc" id="L72">    }</span>
+
+    /**
+     * Builds a new XY chart instance.
+     *
+     * @param dataset the multiple series dataset
+     * @param renderer the multiple series renderer
+     */
+<span class="fc" id="L80">    public XYChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer) {</span>
+<span class="fc" id="L81">        mDataset = dataset;</span>
+<span class="fc" id="L82">        mRenderer = renderer;</span>
+<span class="fc" id="L83">    }</span>
+
+    // TODO: javadoc
+    protected void setDatasetRenderer(XYMultipleSeriesDataset dataset,
+                                      XYMultipleSeriesRenderer renderer) {
+<span class="nc" id="L88">        mDataset = dataset;</span>
+<span class="nc" id="L89">        mRenderer = renderer;</span>
+<span class="nc" id="L90">    }</span>
+
+    /**
+     * The graphical representation of the XY chart.
+     *
+     * @param canvas the canvas to paint to
+     * @param x the top left x value of the view to draw to
+     * @param y the top left y value of the view to draw to
+     * @param width the width of the view to draw to
+     * @param height the height of the view to draw to
+     * @param paint the paint
+     */
+    public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
+<span class="fc" id="L103">        paint.setAntiAlias(mRenderer.isAntialiasing());</span>
+<span class="fc" id="L104">        int legendSize = getLegendSize(mRenderer, height / 5, mRenderer.getAxisTitleTextSize());</span>
+<span class="fc" id="L105">        int[] margins = mRenderer.getMargins();</span>
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        int left = x + margins[1] + (int) mRenderer.getAxisTitleTextSize() + (mRenderer.isShowLabels() ? (int) mRenderer.getLabelsTextSize() : 0);</span>
+<span class="fc" id="L107">        int top = y + margins[0];</span>
+<span class="fc" id="L108">        int right = x + width - margins[3];</span>
+<span class="fc" id="L109">        int sLength = mDataset.getSeriesCount();</span>
+<span class="fc" id="L110">        String[] titles = new String[sLength];</span>
+<span class="fc bfc" id="L111" title="All 2 branches covered.">        for (int i = 0; i &lt; sLength; i++) {</span>
+<span class="fc" id="L112">            titles[i] = mDataset.getSeriesAt(i).getTitle();</span>
+        }
+<span class="pc bpc" id="L114" title="3 of 4 branches missed.">        if (mRenderer.isFitLegend() &amp;&amp; mRenderer.isShowLegend()) {</span>
+<span class="nc" id="L115">            legendSize = drawLegend(canvas, mRenderer, titles, left, right, y, width, height, legendSize,</span>
+                    paint, true);
+        }
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">        int bottom = y + height - margins[2] - legendSize - (int) mRenderer.getAxisTitleTextSize() - (mRenderer.isShowLabels() ? (int) mRenderer.getLabelsTextSize() : 0);</span>
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (mScreenR == null) {</span>
+<span class="fc" id="L120">            mScreenR = new Rectangle();</span>
+        }
+<span class="fc" id="L122">        mScreenR.setBounds(left, top, right - left, bottom - top);</span>
+<span class="fc" id="L123">        drawBackground(mRenderer, canvas, x, y, width, height, paint, false, DefaultRenderer.NO_COLOR);</span>
+
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (paint.getTypeface() == null</span>
+<span class="pc bpc" id="L126" title="3 of 4 branches missed.">                || (mRenderer.getTextTypeface() != null &amp;&amp; paint.getTypeface().equals(</span>
+<span class="nc" id="L127">                mRenderer.getTextTypeface()))</span>
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">                || !paint.getTypeface().toString().equals(mRenderer.getTextTypefaceName())</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">                || paint.getTypeface().getStyle() != mRenderer.getTextTypefaceStyle()) {</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">            if (mRenderer.getTextTypeface() != null) {</span>
+<span class="nc" id="L131">                paint.setTypeface(mRenderer.getTextTypeface());</span>
+            } else {
+<span class="fc" id="L133">                paint.setTypeface(Font.createSystemFont(mRenderer.getTextTypefaceName(),</span>
+<span class="fc" id="L134">                        mRenderer.getTextTypefaceStyle(), Font.SIZE_SMALL));</span>
+            }
+        }
+<span class="fc" id="L137">        Orientation or = mRenderer.getOrientation();</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (or == Orientation.VERTICAL) {</span>
+<span class="nc" id="L139">            right -= legendSize;</span>
+<span class="nc" id="L140">            bottom += legendSize - 20;</span>
+        }
+<span class="fc" id="L142">        int angle = or.getAngle();</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        boolean rotate = angle == 90;</span>
+<span class="fc" id="L144">        mScale = (float) (height) / width;</span>
+<span class="fc" id="L145">        mTranslate = Math.abs(width - height) / 2;</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (mScale &lt; 1) {</span>
+<span class="nc" id="L147">            mTranslate *= -1;</span>
+        }
+<span class="fc" id="L149">        mCenter = new Point((x + width) / 2, (y + height) / 2);</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (rotate) {</span>
+<span class="nc" id="L151">            transform(canvas, angle, false);</span>
+        }
+
+<span class="fc" id="L154">        int maxScaleNumber = -Integer.MAX_VALUE;</span>
+<span class="fc bfc" id="L155" title="All 2 branches covered.">        for (int i = 0; i &lt; sLength; i++) {</span>
+<span class="fc" id="L156">            maxScaleNumber = Math.max(maxScaleNumber, mDataset.getSeriesAt(i).getScaleNumber());</span>
+        }
+<span class="fc" id="L158">        maxScaleNumber++;</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        if (maxScaleNumber &lt; 0) {</span>
+<span class="nc" id="L160">            return;</span>
+        }
+<span class="fc" id="L162">        double[] minX = new double[maxScaleNumber];</span>
+<span class="fc" id="L163">        double[] maxX = new double[maxScaleNumber];</span>
+<span class="fc" id="L164">        double[] minY = new double[maxScaleNumber];</span>
+<span class="fc" id="L165">        double[] maxY = new double[maxScaleNumber];</span>
+<span class="fc" id="L166">        boolean[] isMinXSet = new boolean[maxScaleNumber];</span>
+<span class="fc" id="L167">        boolean[] isMaxXSet = new boolean[maxScaleNumber];</span>
+<span class="fc" id="L168">        boolean[] isMinYSet = new boolean[maxScaleNumber];</span>
+<span class="fc" id="L169">        boolean[] isMaxYSet = new boolean[maxScaleNumber];</span>
+
+<span class="fc bfc" id="L171" title="All 2 branches covered.">        for (int i = 0; i &lt; maxScaleNumber; i++) {</span>
+<span class="fc" id="L172">            minX[i] = mRenderer.getXAxisMin(i);</span>
+<span class="fc" id="L173">            maxX[i] = mRenderer.getXAxisMax(i);</span>
+<span class="fc" id="L174">            minY[i] = mRenderer.getYAxisMin(i);</span>
+<span class="fc" id="L175">            maxY[i] = mRenderer.getYAxisMax(i);</span>
+<span class="fc" id="L176">            isMinXSet[i] = mRenderer.isMinXSet(i);</span>
+<span class="fc" id="L177">            isMaxXSet[i] = mRenderer.isMaxXSet(i);</span>
+<span class="fc" id="L178">            isMinYSet[i] = mRenderer.isMinYSet(i);</span>
+<span class="fc" id="L179">            isMaxYSet[i] = mRenderer.isMaxYSet(i);</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">            if (mCalcRange.get(i) == null) {</span>
+<span class="fc" id="L181">                mCalcRange.put(i, new double[4]);</span>
+            }
+        }
+<span class="fc" id="L184">        double[] xPixelsPerUnit = new double[maxScaleNumber];</span>
+<span class="fc" id="L185">        double[] yPixelsPerUnit = new double[maxScaleNumber];</span>
+<span class="fc bfc" id="L186" title="All 2 branches covered.">        for (int i = 0; i &lt; sLength; i++) {</span>
+<span class="fc" id="L187">            XYSeries series = mDataset.getSeriesAt(i);</span>
+<span class="fc" id="L188">            int scale = series.getScaleNumber();</span>
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">            if (series.getItemCount() == 0) {</span>
+<span class="nc" id="L190">                continue;</span>
+            }
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            if (!isMinXSet[scale]) {</span>
+<span class="fc" id="L193">                double minimumX = series.getMinX();</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">                if (minimumX != MathHelper.NULL_VALUE) {</span>
+<span class="fc bfc" id="L195" title="All 2 branches covered.">                    minX[scale] = minX[scale] == MathHelper.NULL_VALUE ? minimumX : Math.min(minX[scale], minimumX);</span>
+<span class="fc" id="L196">                    mCalcRange.get(scale)[0] = minX[scale];</span>
+                } else {
+<span class="nc" id="L198">                    minX[scale] = 0;</span>
+<span class="nc" id="L199">                    mCalcRange.get(scale)[0] = 0;</span>
+                }
+            }
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">            if (!isMaxXSet[scale]) {</span>
+<span class="fc" id="L203">                double maximumX = series.getMaxX();</span>
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">                if (maximumX != MathHelper.NULL_VALUE) {</span>
+<span class="fc bfc" id="L205" title="All 2 branches covered.">                    maxX[scale] = maxX[scale] == MathHelper.NULL_VALUE ? maximumX : Math.max(maxX[scale], maximumX);</span>
+<span class="fc" id="L206">                    mCalcRange.get(scale)[1] = maxX[scale];</span>
+                } else {
+<span class="nc" id="L208">                    maxX[scale] = minX[scale] + 1;</span>
+<span class="nc" id="L209">                    mCalcRange.get(scale)[1] = maxX[scale];</span>
+                }
+            }
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">            if (!isMinYSet[scale]) {</span>
+<span class="fc" id="L213">                double minimumY = series.getMinY();</span>
+<span class="pc bpc" id="L214" title="1 of 2 branches missed.">                if (minimumY != MathHelper.NULL_VALUE) {</span>
+<span class="fc bfc" id="L215" title="All 2 branches covered.">                    minY[scale] = minY[scale] == MathHelper.NULL_VALUE ? minimumY : Math.min(minY[scale], (float) minimumY);</span>
+<span class="fc" id="L216">                    mCalcRange.get(scale)[2] = minY[scale];</span>
+                } else {
+<span class="nc" id="L218">                    minY[scale] = 0;</span>
+<span class="nc" id="L219">                    mCalcRange.get(scale)[2] = 0;</span>
+                }
+            }
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">            if (!isMaxYSet[scale]) {</span>
+<span class="fc" id="L223">                double maximumY = series.getMaxY();</span>
+<span class="pc bpc" id="L224" title="1 of 2 branches missed.">                if (maximumY != MathHelper.NULL_VALUE) {</span>
+<span class="fc bfc" id="L225" title="All 2 branches covered.">                    maxY[scale] = maxY[scale] == MathHelper.NULL_VALUE ? maximumY : Math.max(maxY[scale], (float) maximumY);</span>
+<span class="fc" id="L226">                    mCalcRange.get(scale)[3] = maxY[scale];</span>
+                } else {
+<span class="nc" id="L228">                    maxY[scale] = minY[scale] + 1;</span>
+<span class="nc" id="L229">                    mCalcRange.get(scale)[3] = maxY[scale];</span>
+                }
+
+            }
+        }
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        for (int i = 0; i &lt; maxScaleNumber; i++) {</span>
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">            if (maxX[i] - minX[i] != 0) {</span>
+<span class="fc" id="L236">                xPixelsPerUnit[i] = (right - left) / (maxX[i] - minX[i]);</span>
+            }
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">            if (maxY[i] - minY[i] != 0) {</span>
+<span class="fc" id="L239">                yPixelsPerUnit[i] = (float) ((bottom - top) / (maxY[i] - minY[i]));</span>
+            }
+            // the X axis on multiple scales was wrong without this fix
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">            if (i &gt; 0) {</span>
+<span class="nc" id="L243">                xPixelsPerUnit[i] = xPixelsPerUnit[0];</span>
+<span class="nc" id="L244">                minX[i] = minX[0];</span>
+<span class="nc" id="L245">                maxX[i] = maxX[0];</span>
+            }
+        }
+
+<span class="fc" id="L249">        boolean hasValues = false;</span>
+        // use a linked list for these reasons:
+        // 1) Avoid a large contiguous memory allocation
+        // 2) We don't need random seeking, only sequential reading/writing, so
+        // linked list makes sense
+<span class="fc" id="L254">        clickableAreas = new HashMap&lt;Integer, List&lt;ClickableArea&gt;&gt;();</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        for (int i = 0; i &lt; sLength; i++) {</span>
+<span class="fc" id="L256">            XYSeries series = mDataset.getSeriesAt(i);</span>
+<span class="fc" id="L257">            int scale = series.getScaleNumber();</span>
+<span class="pc bpc" id="L258" title="1 of 2 branches missed.">            if (series.getItemCount() == 0) {</span>
+<span class="nc" id="L259">                continue;</span>
+            }
+
+<span class="fc" id="L262">            hasValues = true;</span>
+<span class="fc" id="L263">            XYSeriesRenderer seriesRenderer = (XYSeriesRenderer) mRenderer.getSeriesRendererAt(i);</span>
+
+            // int originalValuesLength = series.getItemCount();
+            // int valuesLength = originalValuesLength;
+            // int length = valuesLength * 2;
+
+<span class="fc" id="L269">            List&lt;Float&gt; points = new ArrayList&lt;Float&gt;();</span>
+<span class="fc" id="L270">            List&lt;Double&gt; values = new ArrayList&lt;Double&gt;();</span>
+<span class="fc" id="L271">            float yAxisValue = Math.min(bottom, (float) (bottom + yPixelsPerUnit[scale] * minY[scale]));</span>
+<span class="fc" id="L272">            LinkedList&lt;ClickableArea&gt; clickableArea = new LinkedList&lt;ClickableArea&gt;();</span>
+
+<span class="fc" id="L274">            clickableAreas.put(i, clickableArea);</span>
+
+<span class="fc" id="L276">            synchronized (series) {</span>
+<span class="fc" id="L277">                SortedMap&lt;Double, Double&gt; range = series.getRange(minX[scale], maxX[scale],</span>
+<span class="fc" id="L278">                        seriesRenderer.isDisplayBoundingPoints());</span>
+<span class="fc" id="L279">                int startIndex = -1;</span>
+
+<span class="fc bfc" id="L281" title="All 2 branches covered.">                for (Map.Entry&lt;Double, Double&gt; entry : range.entrySet()) {</span>
+<span class="fc" id="L282">                    Double value = entry.getKey();</span>
+<span class="fc" id="L283">                    double xValue = value.doubleValue();</span>
+<span class="fc" id="L284">                    Double rValue = entry.getValue();</span>
+<span class="fc" id="L285">                    double yValue = rValue.doubleValue();</span>
+<span class="pc bpc" id="L286" title="3 of 6 branches missed.">                    if (startIndex &lt; 0 &amp;&amp; (!isNullValue(yValue) || isRenderNullValues())) {</span>
+<span class="fc" id="L287">                        startIndex = series.getIndexForKey(xValue);</span>
+                    }
+
+                    // points.add((float) (left + xPixelsPerUnit[scale]
+                    // * (value.getKey().floatValue() - minX[scale])));
+                    // points.add((float) (bottom - yPixelsPerUnit[scale]
+                    // * (value.getValue().floatValue() - minY[scale])));
+<span class="fc" id="L294">                    values.add(value);</span>
+<span class="fc" id="L295">                    values.add(rValue);</span>
+
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">                    if (!isNullValue(yValue)) {</span>
+<span class="fc" id="L298">                        points.add((float) (left + xPixelsPerUnit[scale] * (xValue - minX[scale])));</span>
+<span class="fc" id="L299">                        points.add((float) (bottom - yPixelsPerUnit[scale] * (yValue - minY[scale])));</span>
+<span class="nc bnc" id="L300" title="All 2 branches missed.">                    } else if (isRenderNullValues()) {</span>
+<span class="nc" id="L301">                        points.add((float) (left + xPixelsPerUnit[scale] * (xValue - minX[scale])));</span>
+<span class="nc" id="L302">                        points.add((float) (bottom - yPixelsPerUnit[scale] * (-minY[scale])));</span>
+                    } else {
+<span class="nc bnc" id="L304" title="All 2 branches missed.">                        if (points.size() &gt; 0) {</span>
+<span class="nc" id="L305">                            drawSeries(series, canvas, paint, points, seriesRenderer, yAxisValue, i, or,</span>
+                                    startIndex);
+<span class="nc" id="L307">                            ClickableArea[] clickableAreasForSubSeries = clickableAreasForPoints(points, values,</span>
+                                    yAxisValue, i, startIndex);
+<span class="nc" id="L309">                            clickableArea.addAll(Arrays.asList(clickableAreasForSubSeries));</span>
+<span class="nc" id="L310">                            points.clear();</span>
+<span class="nc" id="L311">                            values.clear();</span>
+<span class="nc" id="L312">                            startIndex = -1;</span>
+                        }
+<span class="nc" id="L314">                        clickableArea.add(null);</span>
+                    }
+<span class="fc" id="L316">                }</span>
+
+<span class="fc" id="L318">                int count = series.getAnnotationCount();</span>
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">                if (count &gt; 0) {</span>
+<span class="nc" id="L320">                    paint.setColor(seriesRenderer.getAnnotationsColor());</span>
+<span class="nc" id="L321">                    paint.setTextSize(seriesRenderer.getAnnotationsTextSize());</span>
+<span class="nc" id="L322">                    paint.setTextAlign(seriesRenderer.getAnnotationsTextAlign());</span>
+<span class="nc" id="L323">                    Rectangle2D bound = new Rectangle2D();</span>
+<span class="nc bnc" id="L324" title="All 2 branches missed.">                    for (int j = 0; j &lt; count; j++) {</span>
+<span class="nc" id="L325">                        float xS = (float) (left + xPixelsPerUnit[scale]</span>
+<span class="nc" id="L326">                                * (series.getAnnotationX(j) - minX[scale]));</span>
+<span class="nc" id="L327">                        float yS = (float) (bottom - yPixelsPerUnit[scale]</span>
+<span class="nc" id="L328">                                * (series.getAnnotationY(j) - minY[scale]));</span>
+<span class="nc" id="L329">                        paint.getTextBounds(series.getAnnotationAt(j), 0, series.getAnnotationAt(j).length(),</span>
+                                bound);
+<span class="nc bnc" id="L331" title="All 4 branches missed.">                        if (xS &lt; (xS + bound.getWidth()) &amp;&amp; yS &lt; canvas.getHeight()) {</span>
+<span class="nc" id="L332">                            drawString(canvas, series.getAnnotationAt(j), xS, yS, paint);</span>
+                        }
+                    }
+                }
+
+<span class="pc bpc" id="L337" title="1 of 2 branches missed.">                if (points.size() &gt; 0) {</span>
+<span class="fc" id="L338">                    drawSeries(series, canvas, paint, points, seriesRenderer, yAxisValue, i, or, startIndex);</span>
+<span class="fc" id="L339">                    ClickableArea[] clickableAreasForSubSeries = clickableAreasForPoints(points, values,</span>
+                            yAxisValue, i, startIndex);
+<span class="fc" id="L341">                    clickableArea.addAll(Arrays.asList(clickableAreasForSubSeries));</span>
+                }
+<span class="fc" id="L343">            }</span>
+        }
+        // draw stuff over the margins such as data doesn't render on these areas
+<span class="fc" id="L346">        drawBackground(mRenderer, canvas, x, bottom, width, height - bottom, paint, true,</span>
+<span class="fc" id="L347">                mRenderer.getMarginsColor());</span>
+<span class="fc" id="L348">        drawBackground(mRenderer, canvas, x, y, width, margins[0], paint, true,</span>
+<span class="fc" id="L349">                mRenderer.getMarginsColor());</span>
+<span class="pc bpc" id="L350" title="1 of 2 branches missed.">        if (or == Orientation.HORIZONTAL) {</span>
+<span class="fc" id="L351">            drawBackground(mRenderer, canvas, x, y, left - x, height - y, paint, true,</span>
+<span class="fc" id="L352">                    mRenderer.getMarginsColor());</span>
+<span class="fc" id="L353">            drawBackground(mRenderer, canvas, right, y, margins[3], height - y, paint, true,</span>
+<span class="fc" id="L354">                    mRenderer.getMarginsColor());</span>
+<span class="nc bnc" id="L355" title="All 2 branches missed.">        } else if (or == Orientation.VERTICAL) {</span>
+<span class="nc" id="L356">            drawBackground(mRenderer, canvas, right, y, width - right, height - y, paint, true,</span>
+<span class="nc" id="L357">                    mRenderer.getMarginsColor());</span>
+<span class="nc" id="L358">            drawBackground(mRenderer, canvas, x, y, left - x, height - y, paint, true,</span>
+<span class="nc" id="L359">                    mRenderer.getMarginsColor());</span>
+        }
+
+<span class="pc bpc" id="L362" title="2 of 4 branches missed.">        boolean showLabels = mRenderer.isShowLabels() &amp;&amp; hasValues;</span>
+<span class="fc" id="L363">        boolean showGridX = mRenderer.isShowGridX();</span>
+<span class="fc" id="L364">        boolean showTickMarks = mRenderer.isShowTickMarks();</span>
+        // boolean showCustomTextGridX = mRenderer.isShowCustomTextGridX();
+<span class="fc" id="L366">        boolean showCustomTextGridY = mRenderer.isShowCustomTextGridY();</span>
+<span class="pc bpc" id="L367" title="3 of 4 branches missed.">        if (showLabels || showGridX) {</span>
+<span class="fc" id="L368">            List&lt;Double&gt; xLabels = getValidLabels(getXLabels(minX[0], maxX[0], mRenderer.getXLabels()));</span>
+<span class="fc" id="L369">            Map&lt;Integer, List&lt;Double&gt;&gt; allYLabels = getYLabels(minY, maxY, maxScaleNumber);</span>
+
+<span class="fc" id="L371">            int xLabelsLeft = left;</span>
+<span class="pc bpc" id="L372" title="1 of 2 branches missed.">            if (showLabels) {</span>
+<span class="fc" id="L373">                paint.setColor(mRenderer.getXLabelsColor());</span>
+<span class="fc" id="L374">                paint.setTextSize(mRenderer.getLabelsTextSize());</span>
+<span class="fc" id="L375">                paint.setTextAlign(mRenderer.getXLabelsAlign());</span>
+                // if (mRenderer.getXLabelsAlign() == Align.LEFT) {
+                // xLabelsLeft += mRenderer.getLabelsTextSize() / 4;
+                // }
+            }
+<span class="fc" id="L380">            drawXLabels(xLabels, mRenderer.getXTextLabelLocations(), canvas, paint, xLabelsLeft, top,</span>
+                    bottom, xPixelsPerUnit[0], minX[0], maxX[0]);
+<span class="fc" id="L382">            drawYLabels(allYLabels, canvas, paint, maxScaleNumber, left, right, bottom, yPixelsPerUnit,</span>
+                    minY);
+
+<span class="pc bpc" id="L385" title="1 of 2 branches missed.">            if (showLabels) {</span>
+<span class="fc" id="L386">                paint.setColor(mRenderer.getLabelsColor());</span>
+<span class="fc bfc" id="L387" title="All 2 branches covered.">                for (int i = 0; i &lt; maxScaleNumber; i++) {</span>
+<span class="fc" id="L388">                    int axisAlign = mRenderer.getYAxisAlign(i);</span>
+<span class="fc" id="L389">                    Double[] yTextLabelLocations = mRenderer.getYTextLabelLocations(i);</span>
+<span class="pc bpc" id="L390" title="1 of 2 branches missed.">                    for (Double location : yTextLabelLocations) {</span>
+<span class="nc bnc" id="L391" title="All 4 branches missed.">                        if (minY[i] &lt;= location &amp;&amp; location &lt;= maxY[i]) {</span>
+<span class="nc" id="L392">                            float yLabel = (float) (bottom - yPixelsPerUnit[i]</span>
+<span class="nc" id="L393">                                    * (location.doubleValue() - minY[i]));</span>
+<span class="nc" id="L394">                            String label = mRenderer.getYTextLabel(location, i);</span>
+<span class="nc" id="L395">                            paint.setColor(mRenderer.getYLabelsColor(i));</span>
+<span class="nc" id="L396">                            paint.setTextAlign(mRenderer.getYLabelsAlign(i));</span>
+<span class="nc bnc" id="L397" title="All 2 branches missed.">                            if (or == Orientation.HORIZONTAL) {</span>
+<span class="nc bnc" id="L398" title="All 2 branches missed.">                                if (axisAlign == Align.LEFT) {</span>
+<span class="nc bnc" id="L399" title="All 2 branches missed.">                                    if (showTickMarks) {</span>
+<span class="nc" id="L400">                                        canvas.drawLine(left + getLabelLinePos(axisAlign), yLabel, left, yLabel, paint);</span>
+                                    }
+<span class="nc" id="L402">                                    drawText(canvas, label, left - mRenderer.getYLabelsPadding(),</span>
+<span class="nc" id="L403">                                            yLabel - mRenderer.getYLabelsVerticalPadding(), paint,</span>
+<span class="nc" id="L404">                                            mRenderer.getYLabelsAngle());</span>
+                                } else {
+<span class="nc bnc" id="L406" title="All 2 branches missed.">                                    if (showTickMarks) {</span>
+<span class="nc" id="L407">                                        canvas.drawLine(right, yLabel, right + getLabelLinePos(axisAlign), yLabel,</span>
+                                                paint);
+                                    }
+<span class="nc" id="L410">                                    drawText(canvas, label, right - mRenderer.getYLabelsPadding(),</span>
+<span class="nc" id="L411">                                            yLabel - mRenderer.getYLabelsVerticalPadding(), paint,</span>
+<span class="nc" id="L412">                                            mRenderer.getYLabelsAngle());</span>
+                                }
+
+<span class="nc bnc" id="L415" title="All 2 branches missed.">                                if (showCustomTextGridY) {</span>
+<span class="nc" id="L416">                                    paint.setColor(mRenderer.getGridColor(i));</span>
+<span class="nc" id="L417">                                    canvas.drawLine(left, yLabel, right, yLabel, paint);</span>
+                                }
+                            } else {
+<span class="nc bnc" id="L420" title="All 2 branches missed.">                                if (showTickMarks) {</span>
+<span class="nc" id="L421">                                    canvas.drawLine(right - getLabelLinePos(axisAlign), yLabel, right, yLabel, paint);</span>
+                                }
+<span class="nc" id="L423">                                drawText(canvas, label, right + 10, yLabel - mRenderer.getYLabelsVerticalPadding(),</span>
+<span class="nc" id="L424">                                        paint, mRenderer.getYLabelsAngle());</span>
+<span class="nc bnc" id="L425" title="All 2 branches missed.">                                if (showCustomTextGridY) {</span>
+<span class="nc" id="L426">                                    paint.setColor(mRenderer.getGridColor(i));</span>
+<span class="nc" id="L427">                                    canvas.drawLine(right, yLabel, left, yLabel, paint);</span>
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">            if (showLabels) {</span>
+<span class="fc" id="L436">                paint.setColor(mRenderer.getLabelsColor());</span>
+<span class="fc" id="L437">                float size = mRenderer.getAxisTitleTextSize();</span>
+<span class="fc" id="L438">                paint.setTextSize(size);</span>
+<span class="fc" id="L439">                paint.setTextAlign(Align.CENTER);</span>
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">                if (or == Orientation.HORIZONTAL) {</span>
+<span class="fc" id="L441">                    drawText(</span>
+                            canvas,
+<span class="fc" id="L443">                            mRenderer.getXTitle(),</span>
+                            x + width / 2,
+<span class="fc" id="L445">                            bottom + mRenderer.getLabelsTextSize() * 4 / 3 + mRenderer.getXLabelsPadding() + size,</span>
+                            paint, 0);
+<span class="fc bfc" id="L447" title="All 2 branches covered.">                    for (int i = 0; i &lt; maxScaleNumber; i++) {</span>
+<span class="fc" id="L448">                        int axisAlign = mRenderer.getYAxisAlign(i);</span>
+<span class="pc bpc" id="L449" title="1 of 2 branches missed.">                        if (axisAlign == Align.LEFT) {</span>
+<span class="fc" id="L450">                            drawText(canvas, mRenderer.getYTitle(i), x + size, y + height / 2, paint, -90);</span>
+                        } else {
+<span class="nc" id="L452">                            drawText(canvas, mRenderer.getYTitle(i), x + width, y + height / 2, paint, -90);</span>
+                        }
+                    }
+<span class="fc" id="L455">                    paint.setTextSize(mRenderer.getChartTitleTextSize());</span>
+<span class="fc" id="L456">                    drawText(canvas, mRenderer.getChartTitle(), x + width / 2,</span>
+<span class="fc" id="L457">                            y + mRenderer.getChartTitleTextSize(), paint, 0);</span>
+<span class="nc bnc" id="L458" title="All 2 branches missed.">                } else if (or == Orientation.VERTICAL) {</span>
+<span class="nc" id="L459">                    drawText(canvas, mRenderer.getXTitle(), x + width / 2,</span>
+<span class="nc" id="L460">                            y + height - size + mRenderer.getXLabelsPadding(), paint, -90);</span>
+<span class="nc" id="L461">                    drawText(canvas, mRenderer.getYTitle(), right + 20, y + height / 2, paint, 0);</span>
+<span class="nc" id="L462">                    paint.setTextSize(mRenderer.getChartTitleTextSize());</span>
+<span class="nc" id="L463">                    drawText(canvas, mRenderer.getChartTitle(), x + size, top + height / 2, paint, 0);</span>
+                }
+            }
+        }
+<span class="pc bpc" id="L467" title="1 of 2 branches missed.">        if (or == Orientation.HORIZONTAL) {</span>
+<span class="fc" id="L468">            drawLegend(canvas, mRenderer, titles, left, right, y + (int) mRenderer.getXLabelsPadding(),</span>
+                    width, height, legendSize, paint, false);
+<span class="nc bnc" id="L470" title="All 2 branches missed.">        } else if (or == Orientation.VERTICAL) {</span>
+<span class="nc" id="L471">            transform(canvas, angle, true);</span>
+<span class="nc" id="L472">            drawLegend(canvas, mRenderer, titles, left, right, y + (int) mRenderer.getXLabelsPadding(),</span>
+                    width, height, legendSize, paint, false);
+<span class="nc" id="L474">            transform(canvas, angle, false);</span>
+        }
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">        if (mRenderer.isShowAxes()) {</span>
+<span class="fc" id="L477">            paint.setColor(mRenderer.getXAxisColor());</span>
+<span class="fc" id="L478">            canvas.drawLine(left, bottom, right, bottom, paint);</span>
+<span class="fc" id="L479">            paint.setColor(mRenderer.getYAxisColor());</span>
+<span class="fc" id="L480">            boolean rightAxis = false;</span>
+<span class="pc bpc" id="L481" title="1 of 4 branches missed.">            for (int i = 0; i &lt; maxScaleNumber &amp;&amp; !rightAxis; i++) {</span>
+<span class="pc bpc" id="L482" title="1 of 2 branches missed.">                rightAxis = mRenderer.getYAxisAlign(i) == Align.RIGHT;</span>
+            }
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">            if (or == Orientation.HORIZONTAL) {</span>
+<span class="fc" id="L485">                canvas.drawLine(left, top, left, bottom, paint);</span>
+<span class="pc bpc" id="L486" title="1 of 2 branches missed.">                if (rightAxis) {</span>
+<span class="nc" id="L487">                    canvas.drawLine(right, top, right, bottom, paint);</span>
+                }
+<span class="nc bnc" id="L489" title="All 2 branches missed.">            } else if (or == Orientation.VERTICAL) {</span>
+<span class="nc" id="L490">                canvas.drawLine(right, top, right, bottom, paint);</span>
+            }
+        }
+<span class="pc bpc" id="L493" title="1 of 2 branches missed.">        if (rotate) {</span>
+<span class="nc" id="L494">            transform(canvas, angle, true);</span>
+        }
+<span class="fc" id="L496">    }</span>
+
+    protected List&lt;Double&gt; getXLabels(double min, double max, int count) {
+<span class="fc" id="L499">        return MathHelper.getLabels(min, max, count);</span>
+    }
+
+    protected Map&lt;Integer, List&lt;Double&gt;&gt; getYLabels(double[] minY, double[] maxY, int maxScaleNumber) {
+<span class="fc" id="L503">        HashMap&lt;Integer, List&lt;Double&gt;&gt; allYLabels = new HashMap&lt;Integer, List&lt;Double&gt;&gt;();</span>
+<span class="fc bfc" id="L504" title="All 2 branches covered.">        for (int i = 0; i &lt; maxScaleNumber; i++) {</span>
+<span class="fc" id="L505">            allYLabels.put(i,</span>
+<span class="fc" id="L506">                    getValidLabels(MathHelper.getLabels(minY[i], maxY[i], mRenderer.getYLabels())));</span>
+        }
+<span class="fc" id="L508">        return allYLabels;</span>
+    }
+
+    protected Rectangle getScreenR() {
+<span class="nc" id="L512">        return mScreenR;</span>
+    }
+
+    protected void setScreenR(Rectangle screenR) {
+<span class="nc" id="L516">        mScreenR = screenR;</span>
+<span class="nc" id="L517">    }</span>
+
+    private List&lt;Double&gt; getValidLabels(List&lt;Double&gt; labels) {
+<span class="fc" id="L520">        List&lt;Double&gt; result = new ArrayList&lt;Double&gt;(labels);</span>
+<span class="fc bfc" id="L521" title="All 2 branches covered.">        for (Double label : labels) {</span>
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">            if (label.isNaN()) {</span>
+<span class="nc" id="L523">                result.remove(label);</span>
+            }
+<span class="fc" id="L525">        }</span>
+<span class="fc" id="L526">        return result;</span>
+    }
+
+    /**
+     * Draws the series.
+     *
+     * @param series the series
+     * @param canvas the canvas
+     * @param paint the paint object
+     * @param pointsList the points to be rendered
+     * @param seriesRenderer the series renderer
+     * @param yAxisValue the y axis value in pixels
+     * @param seriesIndex the series index
+     * @param or the orientation
+     * @param startIndex the start index of the rendering points
+     */
+    protected void drawSeries(XYSeries series, Canvas canvas, Paint paint, List&lt;Float&gt; pointsList,
+                              XYSeriesRenderer seriesRenderer, float yAxisValue, int seriesIndex, Orientation or,
+                              int startIndex) {
+<span class="fc" id="L545">        BasicStroke stroke = seriesRenderer.getStroke();</span>
+<span class="fc" id="L546">        int cap = paint.getStrokeCap();</span>
+<span class="fc" id="L547">        int join = paint.getStrokeJoin();</span>
+<span class="fc" id="L548">        float miter = paint.getStrokeMiter();</span>
+        //PathEffect pathEffect = paint.getPathEffect();
+<span class="fc" id="L550">        Style style = paint.getStyle();</span>
+<span class="pc bpc" id="L551" title="1 of 2 branches missed.">        if (stroke != null) {</span>
+
+<span class="nc" id="L553">            setStroke(stroke.getCap(), stroke.getJoin(), stroke.getMiter(), Style.FILL_AND_STROKE, paint);</span>
+        }
+        // float[] points = MathHelper.getFloats(pointsList);
+<span class="fc" id="L556">        drawSeries(canvas, paint, pointsList, seriesRenderer, yAxisValue, seriesIndex, startIndex);</span>
+<span class="fc" id="L557">        drawPoints(canvas, paint, pointsList, seriesRenderer, yAxisValue, seriesIndex, startIndex);</span>
+<span class="fc" id="L558">        paint.setTextSize(seriesRenderer.getChartValuesTextSize());</span>
+<span class="pc bpc" id="L559" title="1 of 2 branches missed.">        if (or == Orientation.HORIZONTAL) {</span>
+<span class="fc" id="L560">            paint.setTextAlign(Align.CENTER);</span>
+        } else {
+<span class="nc" id="L562">            paint.setTextAlign(Align.LEFT);</span>
+        }
+<span class="pc bpc" id="L564" title="1 of 2 branches missed.">        if (seriesRenderer.isDisplayChartValues()) {</span>
+<span class="nc" id="L565">            paint.setTextAlign(seriesRenderer.getChartValuesTextAlign());</span>
+<span class="nc" id="L566">            drawChartValuesText(canvas, series, seriesRenderer, paint, pointsList, seriesIndex,</span>
+                    startIndex);
+        }
+<span class="pc bpc" id="L569" title="1 of 2 branches missed.">        if (stroke != null) {</span>
+<span class="nc" id="L570">            setStroke(cap, join, miter, style, paint);</span>
+        }
+<span class="fc" id="L572">    }</span>
+
+    /**
+     * Draws the series points.
+     *
+     * @param canvas the canvas
+     * @param paint the paint object
+     * @param pointsList the points to be rendered
+     * @param seriesRenderer the series renderer
+     * @param yAxisValue the y axis value in pixels
+     * @param seriesIndex the series index
+     * @param startIndex the start index of the rendering points
+     */
+    protected void drawPoints(Canvas canvas, Paint paint, List&lt;Float&gt; pointsList,
+                              XYSeriesRenderer seriesRenderer, float yAxisValue, int seriesIndex, int startIndex) {
+<span class="pc bpc" id="L587" title="1 of 2 branches missed.">        if (isRenderPoints(seriesRenderer)) {</span>
+<span class="nc" id="L588">            ScatterChart pointsChart = getPointsChart();</span>
+<span class="nc bnc" id="L589" title="All 2 branches missed.">            if (pointsChart != null) {</span>
+<span class="nc" id="L590">                pointsChart.drawSeries(canvas, paint, pointsList, seriesRenderer, yAxisValue, seriesIndex,</span>
+                        startIndex);
+            }
+        }
+<span class="fc" id="L594">    }</span>
+
+    private void setStroke(int cap, int join, float miter, Style style,
+                           Paint paint) {
+<span class="nc" id="L598">        paint.setStrokeCap(cap);</span>
+<span class="nc" id="L599">        paint.setStrokeJoin(join);</span>
+<span class="nc" id="L600">        paint.setStrokeMiter(miter);</span>
+        //paint.setPathEffect(pathEffect);
+<span class="nc" id="L602">        paint.setStyle(style);</span>
+<span class="nc" id="L603">    }</span>
+
+    /**
+     * The graphical representation of the series values as text.
+     *
+     * @param canvas the canvas to paint to
+     * @param series the series to be painted
+     * @param renderer the series renderer
+     * @param paint the paint to be used for drawing
+     * @param points the array of points to be used for drawing the series
+     * @param seriesIndex the index of the series currently being drawn
+     * @param startIndex the start index of the rendering points
+     */
+    protected void drawChartValuesText(Canvas canvas, XYSeries series, XYSeriesRenderer renderer,
+                                       Paint paint, List&lt;Float&gt; points, int seriesIndex, int startIndex) {
+<span class="nc bnc" id="L618" title="All 2 branches missed.">        if (points.size() &gt; 2) { // there are more than one point</span>
+            // record the first point's position
+<span class="nc" id="L620">            float previousPointX = points.get(0);</span>
+<span class="nc" id="L621">            float previousPointY = points.get(1);</span>
+<span class="nc bnc" id="L622" title="All 2 branches missed.">            for (int k = 0; k &lt; points.size(); k += 2) {</span>
+<span class="nc bnc" id="L623" title="All 4 branches missed.">                if (k == 2 &amp;&amp; (Math.abs(points.get(2) - points.get(0)) &gt; renderer.getDisplayChartValuesDistance()</span>
+<span class="nc bnc" id="L624" title="All 2 branches missed.">                        || Math.abs(points.get(3) - points.get(1)) &gt; renderer.getDisplayChartValuesDistance())) { // PMD Fix: CollapsibleIfStatements combined nested checks</span>
+                    // first point
+<span class="nc" id="L626">                    drawText(canvas, getLabel(renderer.getChartValuesFormat(), series.getY(startIndex)),</span>
+<span class="nc" id="L627">                            points.get(0), points.get(1) - renderer.getChartValuesSpacing(), paint, 0);</span>
+                    // second point
+<span class="nc" id="L629">                    drawText(canvas,</span>
+<span class="nc" id="L630">                            getLabel(renderer.getChartValuesFormat(), series.getY(startIndex + 1)),</span>
+<span class="nc" id="L631">                            points.get(2), points.get(3) - renderer.getChartValuesSpacing(), paint, 0);</span>
+
+<span class="nc" id="L633">                    previousPointX = points.get(2);</span>
+<span class="nc" id="L634">                    previousPointY = points.get(3);</span>
+<span class="nc bnc" id="L635" title="All 4 branches missed.">                } else if (k &gt; 2 &amp;&amp; (Math.abs(points.get(k) - previousPointX) &gt; renderer.getDisplayChartValuesDistance()</span>
+<span class="nc" id="L636">                        || Math.abs(points.get(k + 1) - previousPointY) &gt; renderer</span>
+<span class="nc bnc" id="L637" title="All 2 branches missed.">                        .getDisplayChartValuesDistance())) { // PMD Fix: CollapsibleIfStatements merged nested checks</span>
+                    // compare current point's position with the previous point's, if they
+                    // are not too close, display
+<span class="nc" id="L640">                    drawText(canvas,</span>
+<span class="nc" id="L641">                            getLabel(renderer.getChartValuesFormat(), series.getY(startIndex + k / 2)),</span>
+<span class="nc" id="L642">                            points.get(k), points.get(k + 1) - renderer.getChartValuesSpacing(), paint, 0);</span>
+<span class="nc" id="L643">                    previousPointX = points.get(k);</span>
+<span class="nc" id="L644">                    previousPointY = points.get(k + 1);</span>
+                }
+            }
+<span class="nc" id="L647">        } else { // if only one point, display it</span>
+<span class="nc bnc" id="L648" title="All 2 branches missed.">            for (int k = 0; k &lt; points.size(); k += 2) {</span>
+<span class="nc" id="L649">                drawText(canvas,</span>
+<span class="nc" id="L650">                        getLabel(renderer.getChartValuesFormat(), series.getY(startIndex + k / 2)),</span>
+<span class="nc" id="L651">                        points.get(k), points.get(k + 1) - renderer.getChartValuesSpacing(), paint, 0);</span>
+            }
+        }
+<span class="nc" id="L654">    }</span>
+
+    /**
+     * The graphical representation of a text, to handle both HORIZONTAL and
+     * VERTICAL orientations and extra rotation angles.
+     *
+     * @param canvas the canvas to paint to
+     * @param text the text to be rendered
+     * @param x the X axis location of the text
+     * @param y the Y axis location of the text
+     * @param paint the paint to be used for drawing
+     * @param extraAngle the text angle
+     */
+    protected void drawText(Canvas canvas, String text, float x, float y, Paint paint,
+                            float extraAngle) {
+<span class="fc" id="L669">        float angle = -mRenderer.getOrientation().getAngle() + extraAngle;</span>
+<span class="fc bfc" id="L670" title="All 2 branches covered.">        if (angle != 0) {</span>
+            // canvas.scale(1 / mScale, mScale);
+<span class="fc" id="L672">            canvas.rotate(angle, x, y);</span>
+        }
+<span class="fc" id="L674">        drawString(canvas, text, x, y, paint);</span>
+<span class="fc bfc" id="L675" title="All 2 branches covered.">        if (angle != 0) {</span>
+<span class="fc" id="L676">            canvas.rotate(-angle, x, y);</span>
+            // canvas.scale(mScale, 1 / mScale);
+        }
+<span class="fc" id="L679">    }</span>
+
+    /**
+     * Transform the canvas such as it can handle both HORIZONTAL and VERTICAL
+     * orientations.
+     *
+     * @param canvas the canvas to paint to
+     * @param angle the angle of rotation
+     * @param inverse if the inverse transform needs to be applied
+     */
+    private void transform(Canvas canvas, float angle, boolean inverse) {
+<span class="nc bnc" id="L690" title="All 2 branches missed.">        if (inverse) {</span>
+<span class="nc" id="L691">            canvas.scale(1 / mScale, mScale);</span>
+<span class="nc" id="L692">            canvas.translate(mTranslate, -mTranslate);</span>
+<span class="nc" id="L693">            canvas.rotate(-angle, mCenter.getX(), mCenter.getY());</span>
+        } else {
+<span class="nc" id="L695">            canvas.rotate(angle, mCenter.getX(), mCenter.getY());</span>
+<span class="nc" id="L696">            canvas.translate(-mTranslate, mTranslate);</span>
+<span class="nc" id="L697">            canvas.scale(mScale, 1 / mScale);</span>
+        }
+<span class="nc" id="L699">    }</span>
+
+    /**
+     * The graphical representation of the labels on the X axis.
+     *
+     * @param xLabels the X labels values
+     * @param xTextLabelLocations the X text label locations
+     * @param canvas the canvas to paint to
+     * @param paint the paint to be used for drawing
+     * @param left the left value of the labels area
+     * @param top the top value of the labels area
+     * @param bottom the bottom value of the labels area
+     * @param xPixelsPerUnit the amount of pixels per one unit in the chart labels
+     * @param minX the minimum value on the X axis in the chart
+     * @param maxX the maximum value on the X axis in the chart
+     */
+    protected void drawXLabels(List&lt;Double&gt; xLabels, Double[] xTextLabelLocations, Canvas canvas,
+                               Paint paint, int left, int top, int bottom, double xPixelsPerUnit, double minX, double maxX) {
+<span class="fc" id="L717">        int length = xLabels.size();</span>
+<span class="fc" id="L718">        boolean showLabels = mRenderer.isShowLabels();</span>
+<span class="fc" id="L719">        boolean showGridY = mRenderer.isShowGridY();</span>
+<span class="fc" id="L720">        boolean showTickMarks = mRenderer.isShowTickMarks();</span>
+<span class="fc bfc" id="L721" title="All 2 branches covered.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="fc" id="L722">            double label = xLabels.get(i);</span>
+<span class="fc" id="L723">            float xLabel = (float) (left + xPixelsPerUnit * (label - minX));</span>
+<span class="pc bpc" id="L724" title="1 of 2 branches missed.">            if (showLabels) {</span>
+<span class="fc" id="L725">                paint.setColor(mRenderer.getXLabelsColor());</span>
+<span class="pc bpc" id="L726" title="1 of 2 branches missed.">                if (showTickMarks) {</span>
+<span class="fc" id="L727">                    canvas</span>
+<span class="fc" id="L728">                            .drawLine(xLabel, bottom, xLabel, bottom + mRenderer.getLabelsTextSize() / 3, paint);</span>
+                }
+<span class="fc" id="L730">                drawText(canvas, getLabel(mRenderer.getXLabelFormat(), label), xLabel,</span>
+<span class="fc" id="L731">                        bottom + mRenderer.getLabelsTextSize() * 4 / 3 + mRenderer.getXLabelsPadding(), paint,</span>
+<span class="fc" id="L732">                        mRenderer.getXLabelsAngle());</span>
+            }
+<span class="pc bpc" id="L734" title="1 of 2 branches missed.">            if (showGridY) {</span>
+<span class="nc" id="L735">                paint.setColor(mRenderer.getGridColor(0));</span>
+<span class="nc" id="L736">                canvas.drawLine(xLabel, bottom, xLabel, top, paint);</span>
+            }
+        }
+<span class="fc" id="L739">        drawXTextLabels(xTextLabelLocations, canvas, paint, showLabels, left, top, bottom,</span>
+                xPixelsPerUnit, minX, maxX);
+<span class="fc" id="L741">    }</span>
+
+    /**
+     * The graphical representation of the labels on the Y axis.
+     *
+     * @param allYLabels the Y labels values
+     * @param canvas the canvas to paint to
+     * @param paint the paint to be used for drawing
+     * @param maxScaleNumber the maximum scale number
+     * @param left the left value of the labels area
+     * @param right the right value of the labels area
+     * @param bottom the bottom value of the labels area
+     * @param yPixelsPerUnit the amount of pixels per one unit in the chart labels
+     * @param minY the minimum value on the Y axis in the chart
+     */
+    protected void drawYLabels(Map&lt;Integer, List&lt;Double&gt;&gt; allYLabels, Canvas canvas, Paint paint,
+                               int maxScaleNumber, int left, int right, int bottom, double[] yPixelsPerUnit, double[] minY) {
+<span class="fc" id="L758">        Orientation or = mRenderer.getOrientation();</span>
+<span class="fc" id="L759">        boolean showGridX = mRenderer.isShowGridX();</span>
+<span class="fc" id="L760">        boolean showLabels = mRenderer.isShowLabels();</span>
+<span class="fc" id="L761">        boolean showTickMarks = mRenderer.isShowTickMarks();</span>
+<span class="fc" id="L762">        paint.setTextSize(mRenderer.getLabelsTextSize());</span>
+<span class="fc bfc" id="L763" title="All 2 branches covered.">        for (int i = 0; i &lt; maxScaleNumber; i++) {</span>
+<span class="fc" id="L764">            paint.setTextAlign(mRenderer.getYLabelsAlign(i));</span>
+<span class="fc" id="L765">            List&lt;Double&gt; yLabels = allYLabels.get(i);</span>
+<span class="fc" id="L766">            int length = yLabels.size();</span>
+<span class="fc bfc" id="L767" title="All 2 branches covered.">            for (int j = 0; j &lt; length; j++) {</span>
+<span class="fc" id="L768">                double label = yLabels.get(j);</span>
+<span class="fc" id="L769">                int axisAlign = mRenderer.getYAxisAlign(i);</span>
+<span class="pc bpc" id="L770" title="1 of 2 branches missed.">                boolean textLabel = mRenderer.getYTextLabel(label, i) != null;</span>
+<span class="fc" id="L771">                float yLabel = (float) (bottom - yPixelsPerUnit[i] * (label - minY[i]));</span>
+<span class="pc bpc" id="L772" title="1 of 2 branches missed.">                if (or == Orientation.HORIZONTAL) {</span>
+<span class="pc bpc" id="L773" title="2 of 4 branches missed.">                    if (showLabels &amp;&amp; !textLabel) {</span>
+<span class="fc" id="L774">                        paint.setColor(mRenderer.getYLabelsColor(i));</span>
+<span class="pc bpc" id="L775" title="1 of 2 branches missed.">                        if (axisAlign == Align.LEFT) {</span>
+<span class="pc bpc" id="L776" title="1 of 2 branches missed.">                            if (showTickMarks) {</span>
+<span class="fc" id="L777">                                canvas.drawLine(left + getLabelLinePos(axisAlign), yLabel, left, yLabel, paint);</span>
+                            }
+<span class="fc" id="L779">                            drawText(canvas, getLabel(mRenderer.getYLabelFormat(i), label),</span>
+<span class="fc" id="L780">                                    left - mRenderer.getYLabelsPadding(),</span>
+<span class="fc" id="L781">                                    yLabel - mRenderer.getYLabelsVerticalPadding(), paint,</span>
+<span class="fc" id="L782">                                    mRenderer.getYLabelsAngle());</span>
+                        } else {
+<span class="nc bnc" id="L784" title="All 2 branches missed.">                            if (showTickMarks) {</span>
+<span class="nc" id="L785">                                canvas.drawLine(right, yLabel, right + getLabelLinePos(axisAlign), yLabel, paint);</span>
+                            }
+<span class="nc" id="L787">                            drawText(canvas, getLabel(mRenderer.getYLabelFormat(i), label),</span>
+<span class="nc" id="L788">                                    right + mRenderer.getYLabelsPadding(),</span>
+<span class="nc" id="L789">                                    yLabel - mRenderer.getYLabelsVerticalPadding(), paint,</span>
+<span class="nc" id="L790">                                    mRenderer.getYLabelsAngle());</span>
+                        }
+                    }
+<span class="pc bpc" id="L793" title="1 of 2 branches missed.">                    if (showGridX) {</span>
+<span class="nc" id="L794">                        paint.setColor(mRenderer.getGridColor(i));</span>
+<span class="nc" id="L795">                        canvas.drawLine(left, yLabel, right, yLabel, paint);</span>
+                    }
+<span class="nc bnc" id="L797" title="All 2 branches missed.">                } else if (or == Orientation.VERTICAL) {</span>
+<span class="nc bnc" id="L798" title="All 4 branches missed.">                    if (showLabels &amp;&amp; !textLabel) {</span>
+<span class="nc" id="L799">                        paint.setColor(mRenderer.getYLabelsColor(i));</span>
+<span class="nc bnc" id="L800" title="All 2 branches missed.">                        if (showTickMarks) {</span>
+<span class="nc" id="L801">                            canvas.drawLine(right - getLabelLinePos(axisAlign), yLabel, right, yLabel, paint);</span>
+                        }
+<span class="nc" id="L803">                        drawText(canvas, getLabel(mRenderer.getLabelFormat(), label),</span>
+<span class="nc" id="L804">                                right + 10 + mRenderer.getYLabelsPadding(),</span>
+<span class="nc" id="L805">                                yLabel - mRenderer.getYLabelsVerticalPadding(), paint, mRenderer.getYLabelsAngle());</span>
+                    }
+<span class="nc bnc" id="L807" title="All 2 branches missed.">                    if (showGridX) {</span>
+<span class="nc" id="L808">                        paint.setColor(mRenderer.getGridColor(i));</span>
+<span class="nc bnc" id="L809" title="All 2 branches missed.">                        if (showTickMarks) {</span>
+<span class="nc" id="L810">                            canvas.drawLine(right, yLabel, left, yLabel, paint);</span>
+                        }
+                    }
+                }
+            }
+        }
+<span class="fc" id="L816">    }</span>
+
+    /**
+     * The graphical representation of the text labels on the X axis.
+     *
+     * @param xTextLabelLocations the X text label locations
+     * @param canvas the canvas to paint to
+     * @param paint the paint to be used for drawing
+     * @param left the left value of the labels area
+     * @param top the top value of the labels area
+     * @param bottom the bottom value of the labels area
+     * @param xPixelsPerUnit the amount of pixels per one unit in the chart labels
+     * @param minX the minimum value on the X axis in the chart
+     * @param maxX the maximum value on the X axis in the chart
+     */
+    protected void drawXTextLabels(Double[] xTextLabelLocations, Canvas canvas, Paint paint,
+                                   boolean showLabels, int left, int top, int bottom, double xPixelsPerUnit, double minX,
+                                   double maxX) {
+<span class="fc" id="L834">        boolean showCustomTextGridX = mRenderer.isShowCustomTextGridX();</span>
+<span class="fc" id="L835">        boolean showTickMarks = mRenderer.isShowTickMarks();</span>
+<span class="pc bpc" id="L836" title="1 of 2 branches missed.">        if (showLabels) {</span>
+<span class="fc" id="L837">            paint.setColor(mRenderer.getXLabelsColor());</span>
+<span class="pc bpc" id="L838" title="1 of 2 branches missed.">            for (Double location : xTextLabelLocations) {</span>
+<span class="nc bnc" id="L839" title="All 4 branches missed.">                if (minX &lt;= location &amp;&amp; location &lt;= maxX) {</span>
+<span class="nc" id="L840">                    float xLabel = (float) (left + xPixelsPerUnit * (location.doubleValue() - minX));</span>
+<span class="nc" id="L841">                    paint.setColor(mRenderer.getXLabelsColor());</span>
+<span class="nc bnc" id="L842" title="All 2 branches missed.">                    if (showTickMarks) {</span>
+<span class="nc" id="L843">                        canvas.drawLine(xLabel, bottom, xLabel, bottom + mRenderer.getLabelsTextSize() / 3,</span>
+                                paint);
+                    }
+<span class="nc" id="L846">                    drawText(canvas, mRenderer.getXTextLabel(location), xLabel,</span>
+<span class="nc" id="L847">                            bottom + mRenderer.getLabelsTextSize() * 4 / 3 + mRenderer.getXLabelsPadding(),</span>
+<span class="nc" id="L848">                            paint, mRenderer.getXLabelsAngle());</span>
+<span class="nc bnc" id="L849" title="All 2 branches missed.">                    if (showCustomTextGridX) {</span>
+<span class="nc" id="L850">                        paint.setColor(mRenderer.getGridColor(0));</span>
+<span class="nc" id="L851">                        canvas.drawLine(xLabel, bottom, xLabel, top, paint);</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L856">    }</span>
+
+    // TODO: docs
+    public XYMultipleSeriesRenderer getRenderer() {
+<span class="fc" id="L860">        return mRenderer;</span>
+    }
+
+    public XYMultipleSeriesDataset getDataset() {
+<span class="fc" id="L864">        return mDataset;</span>
+    }
+
+    public double[] getCalcRange(int scale) {
+<span class="fc" id="L868">        return mCalcRange.get(scale);</span>
+    }
+
+    public void setCalcRange(double[] range, int scale) {
+<span class="fc" id="L872">        mCalcRange.put(scale, range);</span>
+<span class="fc" id="L873">    }</span>
+
+    public double[] toRealPoint(float screenX, float screenY) {
+<span class="fc" id="L876">        return toRealPoint(screenX, screenY, 0);</span>
+    }
+
+    public double[] toScreenPoint(double[] realPoint) {
+<span class="fc" id="L880">        return toScreenPoint(realPoint, 0);</span>
+    }
+
+    private int getLabelLinePos(int align) {
+<span class="fc" id="L884">        int pos = 4;</span>
+<span class="pc bpc" id="L885" title="1 of 2 branches missed.">        if (align == Component.LEFT) {</span>
+<span class="fc" id="L886">            pos = -pos;</span>
+        }
+<span class="fc" id="L888">        return pos;</span>
+    }
+
+    /**
+     * Transforms a screen point to a real coordinates point.
+     *
+     * @param screenX the screen x axis value
+     * @param screenY the screen y axis value
+     * @return the real coordinates point
+     */
+    public double[] toRealPoint(float screenX, float screenY, int scale) {
+<span class="fc" id="L899">        double realMinX = mRenderer.getXAxisMin(scale);</span>
+<span class="fc" id="L900">        double realMaxX = mRenderer.getXAxisMax(scale);</span>
+<span class="fc" id="L901">        double realMinY = mRenderer.getYAxisMin(scale);</span>
+<span class="fc" id="L902">        double realMaxY = mRenderer.getYAxisMax(scale);</span>
+<span class="pc bpc" id="L903" title="3 of 6 branches missed.">        if (!mRenderer.isMinXSet(scale) || !mRenderer.isMaxXSet(scale) || !mRenderer.isMinYSet(scale)</span>
+<span class="pc bpc" id="L904" title="1 of 2 branches missed.">                || !mRenderer.isMaxYSet(scale)) {</span>
+<span class="nc" id="L905">            double[] calcRange = getCalcRange(scale);</span>
+<span class="nc bnc" id="L906" title="All 2 branches missed.">            if (calcRange != null) {</span>
+<span class="nc" id="L907">                realMinX = calcRange[0];</span>
+<span class="nc" id="L908">                realMaxX = calcRange[1];</span>
+<span class="nc" id="L909">                realMinY = calcRange[2];</span>
+<span class="nc" id="L910">                realMaxY = calcRange[3];</span>
+            }
+        }
+<span class="pc bpc" id="L913" title="1 of 2 branches missed.">        if (mScreenR != null) {</span>
+<span class="fc" id="L914">            return new double[]{</span>
+<span class="fc" id="L915">                    (screenX - mScreenR.getX()) * (realMaxX - realMinX) / mScreenR.getWidth() + realMinX,</span>
+<span class="fc" id="L916">                    (mScreenR.getY() + mScreenR.getHeight() - screenY) * (realMaxY - realMinY) / mScreenR.getHeight()</span>
+                            + realMinY};
+        } else {
+<span class="nc" id="L919">            return new double[]{screenX, screenY};</span>
+        }
+    }
+
+    public double[] toScreenPoint(double[] realPoint, int scale) {
+<span class="fc" id="L924">        double realMinX = mRenderer.getXAxisMin(scale);</span>
+<span class="fc" id="L925">        double realMaxX = mRenderer.getXAxisMax(scale);</span>
+<span class="fc" id="L926">        double realMinY = mRenderer.getYAxisMin(scale);</span>
+<span class="fc" id="L927">        double realMaxY = mRenderer.getYAxisMax(scale);</span>
+<span class="pc bpc" id="L928" title="5 of 6 branches missed.">        if (!mRenderer.isMinXSet(scale) || !mRenderer.isMaxXSet(scale) || !mRenderer.isMinYSet(scale)</span>
+<span class="nc bnc" id="L929" title="All 2 branches missed.">                || !mRenderer.isMaxYSet(scale)) {</span>
+<span class="fc" id="L930">            double[] calcRange = getCalcRange(scale);</span>
+<span class="fc" id="L931">            realMinX = calcRange[0];</span>
+<span class="fc" id="L932">            realMaxX = calcRange[1];</span>
+<span class="fc" id="L933">            realMinY = calcRange[2];</span>
+<span class="fc" id="L934">            realMaxY = calcRange[3];</span>
+        }
+<span class="pc bpc" id="L936" title="1 of 2 branches missed.">        if (mScreenR != null) {</span>
+<span class="fc" id="L937">            return new double[]{</span>
+<span class="fc" id="L938">                    (realPoint[0] - realMinX) * mScreenR.getWidth() / (realMaxX - realMinX) + mScreenR.getX(),</span>
+<span class="fc" id="L939">                    (realMaxY - realPoint[1]) * mScreenR.getHeight() / (realMaxY - realMinY) + mScreenR.getY()};</span>
+        } else {
+<span class="nc" id="L941">            return realPoint;</span>
+        }
+    }
+
+
+    public SeriesSelection getSeriesAndPointForScreenCoordinate(final Point screenPoint) {
+<span class="pc bpc" id="L947" title="1 of 2 branches missed.">        if (clickableAreas != null)</span>
+<span class="pc bpc" id="L948" title="1 of 2 branches missed.">            for (int seriesIndex = clickableAreas.size() - 1; seriesIndex &gt;= 0; seriesIndex--) {</span>
+                // series 0 is drawn first. Then series 1 is drawn on top, and series 2
+                // on top of that.
+                // we want to know what the user clicked on, so traverse them in the
+                // order they appear on the screen.
+<span class="fc" id="L953">                int pointIndex = 0;</span>
+<span class="pc bpc" id="L954" title="1 of 2 branches missed.">                if (clickableAreas.get(seriesIndex) != null) {</span>
+                    Rectangle2D rectangle;
+<span class="pc bpc" id="L956" title="1 of 2 branches missed.">                    for (ClickableArea area : clickableAreas.get(seriesIndex)) {</span>
+<span class="pc bpc" id="L957" title="1 of 2 branches missed.">                        if (area != null) {</span>
+<span class="fc" id="L958">                            rectangle = area.getRect();</span>
+<span class="pc bpc" id="L959" title="2 of 4 branches missed.">                            if (rectangle != null &amp;&amp; rectangle.contains(screenPoint.getX(), screenPoint.getY())) {</span>
+<span class="fc" id="L960">                                return new SeriesSelection(seriesIndex, pointIndex, area.getX(), area.getY());</span>
+                            }
+                        }
+<span class="nc" id="L963">                        pointIndex++;</span>
+<span class="nc" id="L964">                    }</span>
+                }
+            }
+<span class="nc" id="L967">        return super.getSeriesAndPointForScreenCoordinate(screenPoint);</span>
+    }
+
+    /**
+     * The graphical representation of a series.
+     *
+     * @param canvas the canvas to paint to
+     * @param paint the paint to be used for drawing
+     * @param points the array of points to be used for drawing the series
+     * @param seriesRenderer the series renderer
+     * @param yAxisValue the minimum value of the y axis
+     * @param seriesIndex the index of the series currently being drawn
+     * @param startIndex the start index of the rendering points
+     */
+    public abstract void drawSeries(Canvas canvas, Paint paint, List&lt;Float&gt; points,
+                                    XYSeriesRenderer seriesRenderer, float yAxisValue, int seriesIndex, int startIndex);
+
+    /**
+     * Returns the clickable areas for all passed points
+     *
+     * @param points the array of points
+     * @param values the array of values of each point
+     * @param yAxisValue the minimum value of the y axis
+     * @param seriesIndex the index of the series to which the points belong
+     * @return an array of rectangles with the clickable area
+     * @param startIndex the start index of the rendering points
+     */
+    protected abstract ClickableArea[] clickableAreasForPoints(List&lt;Float&gt; points,
+                                                               List&lt;Double&gt; values, float yAxisValue, int seriesIndex, int startIndex);
+
+    /**
+     * Returns if the chart should display the null values.
+     *
+     * @return if null values should be rendered
+     */
+    protected boolean isRenderNullValues() {
+<span class="nc" id="L1003">        return false;</span>
+    }
+
+    /**
+     * Returns if the chart should display the points as a certain shape.
+     *
+     * @param renderer the series renderer
+     */
+    public boolean isRenderPoints(SimpleSeriesRenderer renderer) {
+<span class="nc" id="L1012">        return false;</span>
+    }
+
+    /**
+     * Returns the default axis minimum.
+     *
+     * @return the default axis minimum
+     */
+    public double getDefaultMinimum() {
+<span class="nc" id="L1021">        return MathHelper.NULL_VALUE;</span>
+    }
+
+    /**
+     * Returns the scatter chart to be used for drawing the data points.
+     *
+     * @return the data points scatter chart
+     */
+    public ScatterChart getPointsChart() {
+<span class="nc" id="L1030">        return null;</span>
+    }
+
+    /**
+     * Returns the chart type identifier.
+     *
+     * @return the chart type
+     */
+    public abstract String getChartType();
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HeavyButton.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">HeavyButton.java</span></div><h1>HeavyButton.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.events.ActionListener;
+
+/**
+ * A Button that is rendered by the native platform, over top of the light-weight components.
+ * The action listener is also fired on the native main thread.
+ *
+ * &lt;p&gt;Currently this is only used in the Javascript port because there are some functions
+ * that can only be performed in direct response to user action.  Using a HeavyButton
+ * rather than a button to invoke the action will solve this.&lt;/p&gt;
+ *
+ * &lt;p&gt;WARNING: You can't use any concurrency (wait, sleep, etc..) in the action listener
+ * or it will break Javascript.  Only use this class if you know what you're doing.&lt;/p&gt;
+ *
+ * @author shannah
+ */
+class HeavyButton extends Button {
+    Object peer;
+
+    HeavyButton(String label) {
+<span class="fc" id="L44">        super(label);</span>
+<span class="fc bfc" id="L45" title="All 2 branches covered.">        if (Display.impl.requiresHeavyButtonForCopyToClipboard()) {</span>
+<span class="fc" id="L46">            peer = Display.impl.createHeavyButton(this);</span>
+        }
+
+<span class="fc" id="L49">    }</span>
+
+    @Override
+    public void addActionListener(ActionListener l) {
+<span class="fc" id="L53">        super.addActionListener(l);</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (peer != null) {</span>
+<span class="fc" id="L55">            Display.impl.addHeavyActionListener(peer, l);</span>
+        }
+<span class="fc" id="L57">    }</span>
+
+    @Override
+    public void removeActionListener(ActionListener l) {
+<span class="fc" id="L61">        super.removeActionListener(l);</span>
+<span class="pc bpc" id="L62" title="1 of 2 branches missed.">        if (peer != null) {</span>
+<span class="fc" id="L63">            Display.impl.removeHeavyActionListener(peer, l);</span>
+        }
+<span class="fc" id="L65">    }</span>
+
+    private void updateHeavyBounds() {
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        if (peer != null) {</span>
+<span class="fc" id="L69">            Display.impl.updateHeavyButtonBounds(peer, getAbsoluteX(), getAbsoluteY(), getWidth(), getHeight());</span>
+        }
+<span class="fc" id="L71">    }</span>
+
+    public void setWidth(int w) {
+<span class="fc" id="L74">        super.setWidth(w);</span>
+<span class="fc" id="L75">        updateHeavyBounds();</span>
+<span class="fc" id="L76">    }</span>
+
+    public void setHeight(int h) {
+<span class="fc" id="L79">        super.setHeight(h);</span>
+<span class="fc" id="L80">        updateHeavyBounds();</span>
+<span class="fc" id="L81">    }</span>
+
+    public void setX(int x) {
+<span class="fc" id="L84">        super.setX(x);</span>
+<span class="fc" id="L85">        updateHeavyBounds();</span>
+<span class="fc" id="L86">    }</span>
+
+    public void setY(int y) {
+<span class="fc" id="L89">        super.setY(y);</span>
+<span class="fc" id="L90">        updateHeavyBounds();</span>
+<span class="fc" id="L91">    }</span>
+
+    @Override
+    protected void initComponent() {
+<span class="fc" id="L95">        super.initComponent();</span>
+
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (peer != null) {</span>
+<span class="fc" id="L98">            Display.impl.initHeavyButton(peer);</span>
+        }
+<span class="fc" id="L100">    }</span>
+
+    @Override
+    protected void deinitialize() {
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (peer != null) {</span>
+<span class="fc" id="L105">            Display.impl.deinitializeHeavyButton(peer);</span>
+        }
+<span class="fc" id="L107">        super.deinitialize();</span>
+<span class="fc" id="L108">    }</span>
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

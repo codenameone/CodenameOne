@@ -1,0 +1,473 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RadioButton.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">RadioButton.java</span></div><h1>RadioButton.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.cloud.BindTarget;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.DefaultLookAndFeel;
+import com.codename1.ui.plaf.LookAndFeel;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.EventDispatcher;
+
+/**
+ * &lt;p&gt;RadioButton is a {@link Button} that maintains a selection state exclusively
+ * within a specific {@link ButtonGroup}. Check out {@link com.codename1.ui.CheckBox} for
+ * a looser selection approach. Both components support a toggle button
+ * mode using the {@link com.codename1.ui.Button#setToggle(boolean)} API.&lt;/p&gt;
+ *
+ * &lt;script src=&quot;https://gist.github.com/codenameone/dc7fccf13dc102bc5ea0.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-radiobutton-checkbox.png&quot; alt=&quot;Sample usage of CheckBox/RadioButton/ButtonGroup&quot; /&gt;
+ *
+ * @author Chen Fishbein
+ */
+public class RadioButton extends Button {
+
+    private boolean unselectAllowed;
+
+    private boolean selected;
+
+    /**
+     * The group in which this button is a part
+     */
+    private ButtonGroup group;
+
+    private boolean oppositeSide;
+
+    private EventDispatcher bindListeners;
+    private EventDispatcher changeListeners;
+
+    /**
+     * Constructs a radio with the given text
+     *
+     * @param text to display next to the button
+     */
+    public RadioButton(String text) {
+<span class="fc" id="L68">        this(text, null);</span>
+<span class="fc" id="L69">    }</span>
+
+    /**
+     * Creates an empty radio button
+     */
+    public RadioButton() {
+<span class="fc" id="L75">        this(&quot;&quot;);</span>
+<span class="fc" id="L76">    }</span>
+
+    /**
+     * Constructs a radio with the given icon
+     *
+     * @param icon icon to show next to the button
+     */
+    public RadioButton(Image icon) {
+<span class="nc" id="L84">        this(&quot;&quot;, icon);</span>
+<span class="nc" id="L85">    }</span>
+
+    /**
+     * Constructs a radio with the given text and icon
+     *
+     * @param text to display next to the button
+     * @param icon icon to show next to the button
+     */
+    public RadioButton(String text, Image icon) {
+<span class="fc" id="L94">        super(text, icon);</span>
+<span class="fc" id="L95">        setUIID(&quot;RadioButton&quot;);</span>
+<span class="fc" id="L96">    }</span>
+
+    /**
+     * Shorthand for creating the radio button, adding it to a group, setting the icon/text and making it into
+     * a toggle button
+     *
+     * @param text the text for the button
+     * @param icon the icon for the button
+     * @param bg   the button group
+     * @return a radio button
+     */
+    public static RadioButton createToggle(String text, Image icon, ButtonGroup bg) {
+<span class="fc" id="L108">        RadioButton rb = new RadioButton(text, icon);</span>
+<span class="fc" id="L109">        bg.add(rb);</span>
+<span class="fc" id="L110">        rb.setToggle(true);</span>
+<span class="fc" id="L111">        return rb;</span>
+    }
+
+    /**
+     * Shorthand for creating the radio button, adding it to a group, setting the icon/text and making it into
+     * a toggle button
+     *
+     * @param text the text for the button
+     * @param bg   the button group
+     * @return a radio button
+     */
+    public static RadioButton createToggle(String text, ButtonGroup bg) {
+<span class="fc" id="L123">        return createToggle(text, null, bg);</span>
+    }
+
+    /**
+     * Shorthand for creating the radio button, adding it to a group, setting the icon/text and making it into
+     * a toggle button
+     *
+     * @param icon the icon for the button
+     * @param bg   the button group
+     * @return a radio button
+     */
+    public static RadioButton createToggle(Image icon, ButtonGroup bg) {
+<span class="nc" id="L135">        return createToggle(null, icon, bg);</span>
+    }
+
+    /**
+     * Shorthand for creating the radio button, adding it to a group, setting the command and making it into
+     * a toggle button
+     *
+     * @param cmd the command
+     * @param bg  the button group
+     * @return a radio button
+     */
+    public static RadioButton createToggle(Command cmd, ButtonGroup bg) {
+<span class="nc" id="L147">        RadioButton rb = new RadioButton(cmd.getCommandName(), cmd.getIcon());</span>
+<span class="nc" id="L148">        rb.setCommand(cmd);</span>
+<span class="nc" id="L149">        bg.add(rb);</span>
+<span class="nc" id="L150">        rb.setToggle(true);</span>
+<span class="nc" id="L151">        return rb;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void initLaf(UIManager uim) {
+<span class="fc" id="L158">        super.initLaf(uim);</span>
+<span class="fc" id="L159">        Boolean v = getUIManager().isThemeConstant(&quot;radioOppositeSideBool&quot;);</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">        if (v != null) {</span>
+<span class="fc" id="L161">            oppositeSide = v.booleanValue();</span>
+        }
+
+<span class="fc" id="L164">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void fireActionEvent(int x, int y) {
+<span class="fc" id="L171">        super.fireActionEvent(x, y);</span>
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (bindListeners != null) {</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            if (isSelected()) {</span>
+<span class="nc" id="L174">                bindListeners.fireBindTargetChange(this, &quot;selected&quot;, Boolean.TRUE, Boolean.FALSE);</span>
+            } else {
+<span class="nc" id="L176">                bindListeners.fireBindTargetChange(this, &quot;selected&quot;, Boolean.FALSE, Boolean.TRUE);</span>
+            }
+        }
+<span class="fc" id="L179">    }</span>
+
+
+    /**
+     * {@inheritDoc}
+     */
+    public String toString() {
+<span class="nc" id="L186">        return &quot;Radio Button &quot; + getText();</span>
+    }
+
+    int getAvaliableSpaceForText() {
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (isToggle()) {</span>
+<span class="fc" id="L191">            return super.getAvaliableSpaceForText();</span>
+        }
+<span class="nc" id="L193">        LookAndFeel l = getUIManager().getLookAndFeel();</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if (l instanceof DefaultLookAndFeel) {</span>
+<span class="nc" id="L195">            Image[] rButtonImages = ((DefaultLookAndFeel) l).getRadioButtonImages();</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">            if (rButtonImages != null) {</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">                int index = isSelected() ? 1 : 0;</span>
+<span class="nc" id="L198">                return super.getAvaliableSpaceForText() - rButtonImages[index].getWidth();</span>
+            }
+        }
+<span class="nc" id="L201">        return super.getAvaliableSpaceForText() - (getHeight() + getGap());</span>
+    }
+
+    /**
+     * Returns true if the radio button is selected
+     *
+     * @return true if the radio button is selected
+     */
+    public boolean isSelected() {
+<span class="fc" id="L210">        return selected;</span>
+    }
+
+    /**
+     * Selects the current radio button
+     *
+     * @param selected value for selection
+     */
+    public void setSelected(boolean selected) {
+<span class="fc" id="L219">        setSelectedImpl(selected);</span>
+<span class="fc bfc" id="L220" title="All 4 branches covered.">        if (group != null &amp;&amp; selected) {</span>
+<span class="fc" id="L221">            group.setSelected(this);</span>
+        }
+<span class="fc" id="L223">    }</span>
+
+    void setSelectedImpl(boolean selected) {
+<span class="fc bfc" id="L226" title="All 2 branches covered.">        boolean changed = selected != this.selected;</span>
+<span class="fc" id="L227">        this.selected = selected;</span>
+<span class="fc bfc" id="L228" title="All 2 branches covered.">        if (changed) {</span>
+<span class="fc" id="L229">            fireChangeEvent();</span>
+        }
+<span class="fc" id="L231">        repaint();</span>
+<span class="fc" id="L232">    }</span>
+
+    /**
+     * Returns true if this RadioButton can be unselected
+     *
+     * @return true to allow deselection of radio buttons
+     */
+    public boolean isUnselectAllowed() {
+<span class="nc" id="L240">        return unselectAllowed;</span>
+    }
+
+    /**
+     * Allows unselecting a selected RadioButton.
+     * This is useful for when implementing a ButtonGroup that allows no selection or a single selection.,
+     *
+     * @param unselectAllowed true to allow deselection of a radio button, false for the default behavior
+     */
+    public void setUnselectAllowed(boolean unselectAllowed) {
+<span class="fc" id="L250">        this.unselectAllowed = unselectAllowed;</span>
+<span class="fc" id="L251">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void released(int x, int y) {
+        // prevent the radio button from being &quot;turned off&quot; unless unselectAllowed
+<span class="fc bfc" id="L258" title="All 4 branches covered.">        if (!isSelected() || unselectAllowed) {</span>
+<span class="fc bfc" id="L259" title="All 2 branches covered.">            setSelected(!isSelected());</span>
+        }
+<span class="fc" id="L261">        super.released(x, y);</span>
+<span class="fc" id="L262">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void paint(Graphics g) {
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">        if (isToggle()) {</span>
+<span class="fc" id="L269">            getUIManager().getLookAndFeel().drawButton(g, this);</span>
+        } else {
+<span class="nc" id="L271">            getUIManager().getLookAndFeel().drawRadioButton(g, this);</span>
+        }
+<span class="fc" id="L273">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L279">        return getUIManager().getLookAndFeel().getRadioButtonPreferredSize(this);</span>
+    }
+
+    /**
+     * Returns the parent button group
+     *
+     * @return the parent button group
+     */
+    public ButtonGroup getButtonGroup() {
+<span class="nc" id="L288">        return group;</span>
+    }
+
+    /**
+     * Setting a new button group
+     *
+     * @param group a new button group
+     */
+    void setButtonGroup(ButtonGroup group) {
+<span class="fc" id="L297">        this.group = group;</span>
+<span class="fc" id="L298">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    void fireActionEvent() {
+<span class="nc bnc" id="L304" title="All 2 branches missed.">        if (group != null) {</span>
+<span class="nc" id="L305">            group.setSelected(this);</span>
+        }
+<span class="nc" id="L307">        super.fireActionEvent();</span>
+<span class="nc" id="L308">    }</span>
+
+    void initComponentImpl() {
+<span class="fc" id="L311">        super.initComponentImpl();</span>
+<span class="fc" id="L312">        initNamedGroup();</span>
+<span class="fc" id="L313">    }</span>
+
+    private void initNamedGroup() {
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        if (isInitialized()) {</span>
+<span class="fc" id="L317">            String s = getGroup();</span>
+<span class="pc bpc" id="L318" title="1 of 2 branches missed.">            if (s != null) {</span>
+<span class="nc" id="L319">                Form f = getComponentForm();</span>
+<span class="nc" id="L320">                ButtonGroup b = (ButtonGroup) f.getClientProperty(&quot;$radio&quot; + s);</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">                if (b == null) {</span>
+<span class="nc" id="L322">                    b = new ButtonGroup();</span>
+<span class="nc" id="L323">                    f.putClientProperty(&quot;$radio&quot; + s, b);</span>
+                }
+<span class="nc" id="L325">                b.add(this);</span>
+            }
+        }
+<span class="fc" id="L328">    }</span>
+
+    /**
+     * This is a helper method to ease the usage of button groups
+     *
+     * @return the name of the group
+     */
+    public String getGroup() {
+<span class="fc" id="L336">        return (String) getClientProperty(&quot;$group&quot;);</span>
+    }
+
+    /**
+     * This is a helper method to ease the usage of button groups
+     *
+     * @param groupName a name for the goup
+     */
+    public void setGroup(String groupName) {
+<span class="fc" id="L345">        putClientProperty(&quot;$group&quot;, groupName);</span>
+<span class="fc" id="L346">        initNamedGroup();</span>
+<span class="fc" id="L347">    }</span>
+
+    /**
+     * Places the radio box on the opposite side at the far end
+     *
+     * @return the oppositeSide
+     */
+    public boolean isOppositeSide() {
+<span class="fc" id="L355">        return oppositeSide;</span>
+    }
+
+    /**
+     * Places the radio box on the opposite side at the far end
+     *
+     * @param oppositeSide the oppositeSide to set
+     */
+    public void setOppositeSide(boolean oppositeSide) {
+<span class="nc" id="L364">        this.oppositeSide = oppositeSide;</span>
+<span class="nc" id="L365">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getBindablePropertyNames() {
+<span class="nc" id="L371">        return new String[]{&quot;selected&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getBindablePropertyTypes() {
+<span class="nc" id="L378">        return new Class[]{Boolean.class};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void bindProperty(String prop, BindTarget target) {
+<span class="nc bnc" id="L385" title="All 2 branches missed.">        if (prop.equals(&quot;selected&quot;)) {</span>
+<span class="nc bnc" id="L386" title="All 2 branches missed.">            if (bindListeners == null) {</span>
+<span class="nc" id="L387">                bindListeners = new EventDispatcher();</span>
+            }
+<span class="nc" id="L389">            bindListeners.addListener(target);</span>
+<span class="nc" id="L390">            return;</span>
+        }
+<span class="nc" id="L392">        super.bindProperty(prop, target);</span>
+<span class="nc" id="L393">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void unbindProperty(String prop, BindTarget target) {
+<span class="nc bnc" id="L399" title="All 2 branches missed.">        if (prop.equals(&quot;selected&quot;)) {</span>
+<span class="nc bnc" id="L400" title="All 2 branches missed.">            if (bindListeners == null) {</span>
+<span class="nc" id="L401">                return;</span>
+            }
+<span class="nc" id="L403">            bindListeners.removeListener(target);</span>
+<span class="nc bnc" id="L404" title="All 2 branches missed.">            if (!bindListeners.hasListeners()) {</span>
+<span class="nc" id="L405">                bindListeners = null;</span>
+            }
+<span class="nc" id="L407">            return;</span>
+        }
+<span class="nc" id="L409">        super.unbindProperty(prop, target);</span>
+<span class="nc" id="L410">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getBoundPropertyValue(String prop) {
+<span class="nc bnc" id="L416" title="All 2 branches missed.">        if (prop.equals(&quot;selected&quot;)) {</span>
+<span class="nc bnc" id="L417" title="All 2 branches missed.">            if (isSelected()) {</span>
+<span class="nc" id="L418">                return Boolean.TRUE;</span>
+            }
+<span class="nc" id="L420">            return Boolean.FALSE;</span>
+        }
+<span class="nc" id="L422">        return super.getBoundPropertyValue(prop);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setBoundPropertyValue(String prop, Object value) {
+<span class="nc bnc" id="L429" title="All 2 branches missed.">        if (prop.equals(&quot;selected&quot;)) {</span>
+<span class="nc bnc" id="L430" title="All 4 branches missed.">            setSelected(value != null &amp;&amp; ((Boolean) value).booleanValue());</span>
+<span class="nc" id="L431">            return;</span>
+        }
+<span class="nc" id="L433">        super.setBoundPropertyValue(prop, value);</span>
+<span class="nc" id="L434">    }</span>
+
+    /**
+     * Adds a listener to be notified when the the checkbox's selected value changes.  The difference
+     * between a change listener and an action listener is that a change listener is fired
+     * whenever there is a change, but action events are only fired when the change is a result
+     * of the user clicking on the checkbox.
+     *
+     * @param l Listener to be notified when selected value changes.
+     * @see #removeChangeListener(com.codename1.ui.events.ActionListener)
+     * @since 6.0
+     */
+    public void addChangeListener(ActionListener l) {
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">        if (changeListeners == null) {</span>
+<span class="fc" id="L448">            changeListeners = new EventDispatcher();</span>
+        }
+<span class="fc" id="L450">        changeListeners.addListener(l);</span>
+<span class="fc" id="L451">    }</span>
+
+    /**
+     * Removes a change change listener.
+     *
+     * @param l
+     * @see #addChangeListener(com.codename1.ui.events.ActionListener)
+     * @since 6.0
+     */
+    public void removeChangeListeners(ActionListener l) {
+<span class="pc bpc" id="L461" title="1 of 2 branches missed.">        if (changeListeners != null) {</span>
+<span class="fc" id="L462">            changeListeners.removeListener(l);</span>
+        }
+<span class="fc" id="L464">    }</span>
+
+    private void fireChangeEvent() {
+<span class="fc bfc" id="L467" title="All 2 branches covered.">        if (changeListeners != null) {</span>
+<span class="fc" id="L468">            ActionEvent evt = new ActionEvent(this, ActionEvent.Type.Change);</span>
+<span class="fc" id="L469">            changeListeners.fireActionEvent(evt);</span>
+        }
+<span class="fc" id="L471">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

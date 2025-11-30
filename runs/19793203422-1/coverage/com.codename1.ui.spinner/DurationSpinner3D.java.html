@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DurationSpinner3D.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.spinner</a> &gt; <span class="el_source">DurationSpinner3D.java</span></div><h1>DurationSpinner3D.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.spinner;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Label;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+/**
+ * A duration Spinner widget  Used by the Picker in lightweight mode.
+ *
+ * @author Steve Hannah
+ */
+class DurationSpinner3D extends Container implements InternalPickerWidget {
+    public static final int FIELD_YEAR = 0;
+    public static final int FIELD_MONTH = 1;
+    public static final int FIELD_DAY = 2;
+    public static final int FIELD_HOUR = 4;
+    public static final int FIELD_MINUTE = 8;
+    public static final int FIELD_SECOND = 16;
+    public static final int FIELD_MILLISECOND = 32;
+    private final boolean includeDays, includeHours, includeMinutes, includeSeconds, includeMilliseconds;
+    private final int minuteStep;
+    private Spinner3D days, hours, minutes, seconds, milliseconds;
+
+    public DurationSpinner3D(int fields) {
+<span class="fc" id="L52">        this(fields, 5);</span>
+<span class="fc" id="L53">    }</span>
+
+<span class="fc" id="L55">    public DurationSpinner3D(int fields, int minuteStep) {</span>
+
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">        includeDays = (fields &amp; FIELD_DAY) != 0;</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">        includeHours = (fields &amp; FIELD_HOUR) != 0;</span>
+<span class="pc bpc" id="L59" title="1 of 2 branches missed.">        includeMinutes = (fields &amp; FIELD_MINUTE) != 0;</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        includeSeconds = (fields &amp; FIELD_SECOND) != 0;</span>
+<span class="pc bpc" id="L61" title="1 of 2 branches missed.">        includeMilliseconds = (fields &amp; FIELD_MILLISECOND) != 0;</span>
+<span class="fc" id="L62">        this.minuteStep = minuteStep;</span>
+<span class="fc" id="L63">        init();</span>
+<span class="fc" id="L64">    }</span>
+
+    private void init() {
+<span class="fc" id="L67">        setLayout(new BorderLayout());</span>
+<span class="fc" id="L68">        Container wrapper = new Container(new LayeredLayout());</span>
+
+<span class="fc" id="L70">        Container box = new Container(BoxLayout.x());</span>
+<span class="fc" id="L71">        UIManager uim = UIManager.getInstance();</span>
+
+<span class="fc" id="L73">        Style s = null;</span>
+
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (includeDays) {</span>
+<span class="fc" id="L76">            days = Spinner3D.create(0, 1000, 0, 1);</span>
+<span class="fc" id="L77">            days.setPreferredW(new Label(&quot;000&quot;, &quot;Spinner3DRow&quot;).getPreferredW());</span>
+<span class="fc" id="L78">            s = Style.createProxyStyle(days.getRowStyle(), days.getSelectedRowStyle());</span>
+<span class="fc" id="L79">            s.setAlignment(Component.RIGHT);</span>
+<span class="fc" id="L80">            box.add(days);</span>
+<span class="fc" id="L81">            box.add(new Label(uim.localize(&quot;day&quot;, &quot;day&quot;)));</span>
+        }
+<span class="pc bpc" id="L83" title="1 of 2 branches missed.">        if (includeHours) {</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">            hours = Spinner3D.create(0, includeDays ? 24 : 1000, 0, 1);</span>
+<span class="fc" id="L85">            hours.setPreferredW(new Label(&quot;000&quot;, &quot;Spinner3DRow&quot;).getPreferredW());</span>
+<span class="fc" id="L86">            s = Style.createProxyStyle(hours.getRowStyle(), hours.getSelectedRowStyle());</span>
+<span class="fc" id="L87">            s.setAlignment(Component.RIGHT);</span>
+<span class="fc" id="L88">            box.add(hours);</span>
+<span class="fc" id="L89">            box.add(new Label(uim.localize(&quot;hour&quot;, &quot;hour&quot;)));</span>
+        }
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">        if (includeMinutes) {</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">            minutes = Spinner3D.create(0, includeHours ? 59 : 1000, 0, minuteStep);</span>
+<span class="fc" id="L93">            minutes.setPreferredW(new Label(&quot;000&quot;, &quot;Spinner3DRow&quot;).getPreferredW());</span>
+<span class="fc" id="L94">            s = Style.createProxyStyle(minutes.getRowStyle(), minutes.getSelectedRowStyle());</span>
+<span class="fc" id="L95">            s.setAlignment(Component.RIGHT);</span>
+<span class="fc" id="L96">            box.add(minutes);</span>
+<span class="fc" id="L97">            box.add(new Label(uim.localize(&quot;min&quot;, &quot;min&quot;)));</span>
+        }
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">        if (includeSeconds) {</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">            seconds = Spinner3D.create(0, includeMinutes ? 59 : 1000, 0, 1);</span>
+<span class="fc" id="L101">            seconds.setPreferredW(new Label(&quot;0000&quot;, &quot;Spinner3DRow&quot;).getPreferredW());</span>
+<span class="fc" id="L102">            s = Style.createProxyStyle(seconds.getRowStyle(), seconds.getSelectedRowStyle());</span>
+<span class="fc" id="L103">            s.setAlignment(Component.RIGHT);</span>
+<span class="fc" id="L104">            box.add(seconds);</span>
+<span class="fc" id="L105">            box.add(new Label(uim.localize(&quot;sec&quot;, &quot;sec&quot;)));</span>
+        }
+<span class="pc bpc" id="L107" title="1 of 2 branches missed.">        if (includeMilliseconds) {</span>
+<span class="nc" id="L108">            milliseconds = Spinner3D.create(0, 1000, 0, 1);</span>
+<span class="nc" id="L109">            milliseconds.setPreferredW(new Label(&quot;0000&quot;, &quot;Spinner3DRow&quot;).getPreferredW());</span>
+<span class="nc" id="L110">            s = Style.createProxyStyle(milliseconds.getRowStyle(), milliseconds.getSelectedRowStyle());</span>
+<span class="nc" id="L111">            s.setAlignment(Component.RIGHT);</span>
+<span class="nc" id="L112">            box.add(milliseconds);</span>
+<span class="nc" id="L113">            box.add(new Label(&quot;ms&quot;, &quot;ms&quot;));</span>
+        }
+
+<span class="fc" id="L116">        wrapper.add(box);</span>
+<span class="fc" id="L117">        LayeredLayout ll = (LayeredLayout) wrapper.getLayout();</span>
+<span class="fc" id="L118">        ll.setInsets(box, &quot;0 auto 0 auto&quot;);</span>
+<span class="fc" id="L119">        add(BorderLayout.CENTER, wrapper);</span>
+<span class="fc" id="L120">    }</span>
+
+    @Override
+    public Object getValue() {
+<span class="fc" id="L124">        long l = 0L;</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (days != null) {</span>
+<span class="fc" id="L126">            long DAY = (1000L * 60L * 60L * 24L);</span>
+<span class="fc" id="L127">            long numDays = ((Integer) days.getValue()).intValue();</span>
+<span class="fc" id="L128">            l += DAY * numDays;</span>
+        }
+
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        if (hours != null) {</span>
+<span class="fc" id="L132">            long HOUR = (1000L * 60L * 60L);</span>
+<span class="fc" id="L133">            long numHours = ((Integer) hours.getValue()).intValue();</span>
+<span class="fc" id="L134">            l += HOUR * numHours;</span>
+        }
+
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (minutes != null) {</span>
+<span class="fc" id="L138">            long MINUTE = (1000L * 60L);</span>
+<span class="fc" id="L139">            long numMinutes = ((Integer) minutes.getValue()).intValue();</span>
+
+<span class="fc" id="L141">            l += MINUTE * numMinutes;</span>
+        }
+
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (seconds != null) {</span>
+<span class="fc" id="L145">            long SECOND = (1000L);</span>
+<span class="fc" id="L146">            long numSeconds = ((Integer) seconds.getValue()).intValue();</span>
+<span class="fc" id="L147">            l += SECOND * numSeconds;</span>
+        }
+
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (milliseconds != null) {</span>
+<span class="nc" id="L151">            l += ((Integer) milliseconds.getValue());</span>
+        }
+<span class="fc" id="L153">        return l;</span>
+    }
+
+    @Override
+    public void setValue(Object value) {
+<span class="fc" id="L158">        long l = (Long) value;</span>
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        if (days != null) {</span>
+<span class="fc" id="L160">            long DAY = (1000L * 60L * 60L * 24L);</span>
+<span class="fc" id="L161">            long numDays = l / DAY;</span>
+<span class="fc" id="L162">            days.setValue((int) numDays);</span>
+<span class="fc" id="L163">            l -= DAY * numDays;</span>
+        }
+
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (hours != null) {</span>
+<span class="fc" id="L167">            long HOUR = (1000L * 60L * 60L);</span>
+<span class="fc" id="L168">            long numHours = l / HOUR;</span>
+<span class="fc" id="L169">            hours.setValue((int) numHours);</span>
+<span class="fc" id="L170">            l -= HOUR * numHours;</span>
+        }
+
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">        if (minutes != null) {</span>
+<span class="fc" id="L174">            long MINUTE = (1000L * 60L);</span>
+<span class="fc" id="L175">            long numMinutes = l / MINUTE;</span>
+<span class="fc" id="L176">            minutes.setValue((int) numMinutes);</span>
+<span class="fc" id="L177">            l -= MINUTE * numMinutes;</span>
+        }
+
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (seconds != null) {</span>
+<span class="fc" id="L181">            long SECOND = (1000L);</span>
+<span class="fc" id="L182">            long numSeconds = l / SECOND;</span>
+<span class="fc" id="L183">            seconds.setValue((int) numSeconds);</span>
+<span class="fc" id="L184">            l -= SECOND * numSeconds;</span>
+        }
+
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (milliseconds != null) {</span>
+<span class="nc" id="L188">            milliseconds.setValue((int) l);</span>
+        }
+<span class="fc" id="L190">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,674 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AsyncResource.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">AsyncResource.java</span></div><h1>AsyncResource.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.util;
+
+
+import com.codename1.annotations.Async;
+import com.codename1.io.Util;
+import com.codename1.ui.CN;
+import com.codename1.util.promise.Promise;
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Observable;
+import java.util.Observer;
+import java.util.Set;
+
+import static com.codename1.ui.CN.invokeAndBlock;
+import static com.codename1.ui.CN.isEdt;
+
+/**
+ * A wrapper for an object that needs to be loaded asynchronously.  This can serve
+ * as a handle for the object to be passed around irrespective of whether the
+ * object has finished loading.  Conceptually this is very similar to Futures and
+ * Promises.
+ *
+ * @author shannah
+ * @since 7.0
+ */
+public class AsyncResource&lt;V&gt; extends Observable {
+<span class="fc" id="L50">    private final Object lock = new Object();</span>
+    private V value;
+    private Throwable error;
+    private SuccessCallback&lt;V&gt; successCallback;
+    private SuccessCallback&lt;Throwable&gt; errorCallback;
+    private boolean done;
+    private boolean cancelled;
+
+
+    @Async.Schedule
+<span class="fc" id="L60">    public AsyncResource() {</span>
+
+<span class="fc" id="L62">    }</span>
+
+    /**
+     * Returns true if the provided throwable was caused by a cancellation of an AsyncResource.
+     *
+     * @param t The exception to check for a cancellation.
+     * @return True if the exception was caused by cancelling an AsyncResource.
+     * @since 7.0
+     */
+    public static boolean isCancelled(Throwable t) {
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (t == null) {</span>
+<span class="nc" id="L73">            return false;</span>
+        }
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">        if (t instanceof AsyncExecutionException) {</span>
+<span class="fc" id="L76">            return ((AsyncExecutionException) t).isCancelled();</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        } else return t.getClass() == CancellationException.class;</span>
+    }
+
+    /**
+     * Creates a single AsyncResource that will fire its ready() only when all of the provided resources
+     * are ready.  And will fire an exception if any of the provided resources fires an exception.
+     *
+     * @param resources One ore more resources to wrap.
+     * @return A combined AsyncResource.
+     * @since 7.0
+     */
+    public static AsyncResource&lt;Boolean&gt; all(AsyncResource&lt;?&gt;... resources) {
+<span class="fc" id="L89">        final AsyncResource&lt;Boolean&gt; out = new AsyncResource&lt;Boolean&gt;();</span>
+<span class="fc" id="L90">        final Set&lt;AsyncResource&gt; pending = new HashSet&lt;AsyncResource&gt;(Arrays.asList(resources));</span>
+<span class="fc" id="L91">        final boolean[] complete = new boolean[1];</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">        for (final AsyncResource&lt;?&gt; res : resources) {</span>
+<span class="fc" id="L93">            res.ready(new SuccessCallback() {</span>
+                public void onSucess(Object arg) {
+<span class="fc" id="L95">                    synchronized (complete) {</span>
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">                        if (complete[0]) {</span>
+<span class="nc" id="L97">                            return;</span>
+                        }
+<span class="fc" id="L99">                        pending.remove(res);</span>
+<span class="fc bfc" id="L100" title="All 2 branches covered.">                        if (pending.isEmpty()) {</span>
+<span class="fc" id="L101">                            complete[0] = true;</span>
+                            //out.complete(true);
+                        } else {
+<span class="fc" id="L104">                            return;</span>
+                        }
+<span class="fc" id="L106">                    }</span>
+<span class="fc" id="L107">                    out.complete(true);</span>
+<span class="fc" id="L108">                }</span>
+            });
+<span class="fc" id="L110">            res.except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                public void onSucess(Throwable ex) {
+<span class="fc" id="L112">                    synchronized (complete) {</span>
+<span class="pc bpc" id="L113" title="1 of 2 branches missed.">                        if (complete[0]) {</span>
+<span class="nc" id="L114">                            return;</span>
+                        }
+<span class="fc" id="L116">                        pending.remove(res);</span>
+<span class="fc" id="L117">                        complete[0] = true;</span>
+<span class="fc" id="L118">                    }</span>
+
+<span class="fc" id="L120">                    out.error(ex);</span>
+
+<span class="fc" id="L122">                }</span>
+            });
+        }
+<span class="fc" id="L125">        return out;</span>
+    }
+
+    /**
+     * Creates a single AsyncResource that will fire its ready() only when all of the provided resources
+     * are ready.  And will fire an exception if any of the provided resources fires an exception.
+     *
+     * @param resources One ore more resources to wrap.
+     * @return A combined AsyncResource.
+     * @since 7.0
+     */
+    public static AsyncResource&lt;Boolean&gt; all(java.util.Collection&lt;AsyncResource&lt;?&gt;&gt; resources) {
+<span class="nc" id="L137">        return all(resources.toArray(new AsyncResource[resources.size()]));</span>
+    }
+
+    /**
+     * Waits for a set of AsyncResources to be complete.  If any of them fires an exception,
+     * then this method will throw a RuntimeException with that exception as the cause.
+     *
+     * @param resources The resources to wait for.
+     * @since 7.0
+     */
+    public static void await(java.util.Collection&lt;AsyncResource&lt;?&gt;&gt; resources) throws AsyncExecutionException {
+<span class="nc" id="L148">        await(resources.toArray(new AsyncResource[resources.size()]));</span>
+<span class="nc" id="L149">    }</span>
+
+    /**
+     * Waits for a set of AsyncResources to be complete.  If any of them fires an exception,
+     * then this method will throw a RuntimeException with that exception as the cause.
+     *
+     * @param resources The resources to wait for.
+     * @since 7.0
+     */
+    public static void await(AsyncResource&lt;?&gt;... resources) throws AsyncExecutionException {
+<span class="fc" id="L159">        final boolean[] complete = new boolean[1];</span>
+<span class="fc" id="L160">        final Throwable[] t = new Throwable[1];</span>
+<span class="fc" id="L161">        all(resources)</span>
+<span class="fc" id="L162">                .ready(new SuccessCallback() {</span>
+                    @Override
+                    public void onSucess(Object arg) {
+<span class="fc" id="L165">                        synchronized (complete) {</span>
+<span class="fc" id="L166">                            complete[0] = true;</span>
+<span class="fc" id="L167">                            complete.notify();</span>
+<span class="fc" id="L168">                        }</span>
+<span class="fc" id="L169">                    }</span>
+<span class="fc" id="L170">                }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                    @Override
+                    public void onSucess(Throwable ex) {
+<span class="fc" id="L173">                        synchronized (complete) {</span>
+<span class="fc" id="L174">                            t[0] = ex;</span>
+<span class="fc" id="L175">                            complete[0] = true;</span>
+<span class="fc" id="L176">                            complete.notify();</span>
+<span class="fc" id="L177">                        }</span>
+<span class="fc" id="L178">                    }</span>
+                });
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        while (!complete[0]) {</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">            if (isEdt()) {</span>
+<span class="nc" id="L182">                invokeAndBlock(new Runnable() {</span>
+                    public void run() {
+<span class="nc" id="L184">                        synchronized (complete) {</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">                            if (!complete[0]) {</span>
+<span class="nc" id="L186">                                Util.wait(complete);</span>
+                            }
+<span class="nc" id="L188">                        }</span>
+<span class="nc" id="L189">                    }</span>
+                });
+            } else {
+<span class="nc" id="L192">                synchronized (complete) {</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">                    if (!complete[0]) {</span>
+<span class="nc" id="L194">                        Util.wait(complete);</span>
+                    }
+<span class="nc" id="L196">                }</span>
+            }
+        }
+
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        if (t[0] != null) {</span>
+<span class="fc" id="L201">            throw new AsyncExecutionException(t[0]);</span>
+        }
+<span class="fc" id="L203">    }</span>
+
+    /**
+     * Cancels loading the resource.
+     *
+     * @param mayInterruptIfRunning
+     * @return True if the resource loading was cancelled.  False if the loading was already done.
+     */
+    public boolean cancel(boolean mayInterruptIfRunning) {
+<span class="nc" id="L212">        boolean changed = false;</span>
+<span class="nc" id="L213">        synchronized (lock) {</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">            if (done) {</span>
+<span class="nc" id="L215">                return false;</span>
+            }
+<span class="nc bnc" id="L217" title="All 2 branches missed.">            if (!cancelled) {</span>
+<span class="nc" id="L218">                cancelled = true;</span>
+<span class="nc" id="L219">                done = true;</span>
+<span class="nc" id="L220">                error = new CancellationException();</span>
+<span class="nc" id="L221">                changed = true;</span>
+            }
+<span class="nc" id="L223">        }</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        if (changed) {</span>
+<span class="nc" id="L225">            setChanged();</span>
+        }
+<span class="nc" id="L227">        return true;</span>
+    }
+
+    /**
+     * Wait for loading to complete.  If on EDT, this will use invokeAndBlock to safely
+     * block until loading is complete.
+     */
+    public void waitFor() {
+        try {
+<span class="nc" id="L236">            get();</span>
+<span class="nc" id="L237">        } catch (Throwable t) {</span>
+<span class="nc" id="L238">        }</span>
+<span class="nc" id="L239">    }</span>
+
+    /**
+     * Gets the resource synchronously. This will wait until either the resource failed
+     * with an exception, or the loading was canceled, or was done without error.
+     *
+     * &lt;p&gt;If on edt, this uses invokeAndBlock to block safely.&lt;/p&gt;
+     *
+     * @return The wrapped resource.
+     * @throws AsyncExecutionException if the resource failed with an error.  To get the actual error, use {@link Throwable#getCause() }.
+     */
+    public V get() {
+        try {
+<span class="nc" id="L252">            return get(-1);</span>
+<span class="nc" id="L253">        } catch (InterruptedException ex) {</span>
+            // This should never happen
+<span class="nc" id="L255">            throw new RuntimeException(&quot;Interrupted exception occurred, but this should never happen.  Likely programming error.&quot;);</span>
+        }
+    }
+
+    /**
+     * Gets the resource synchronously. This will wait until either the resource failed
+     * with an exception, or the loading was canceled, or was done without error.
+     *
+     * &lt;p&gt;If on edt, this uses invokeAndBlock to block safely.&lt;/p&gt;
+     *
+     * @param timeout Timeout
+     * @return The wrapped resource.
+     * @throws AsyncExecutionException if the resource failed with an error.  To get the actual error, use {@link Throwable#getCause() }.
+     * @throws InterruptedException    if timeout occurs.
+     */
+    public V get(final int timeout) throws InterruptedException {
+<span class="nc bnc" id="L271" title="All 2 branches missed.">        final long startTime = (timeout &gt; 0) ? System.currentTimeMillis() : 0;</span>
+
+<span class="nc bnc" id="L273" title="All 4 branches missed.">        if (done &amp;&amp; error == null) {</span>
+<span class="nc" id="L274">            return value;</span>
+        }
+<span class="nc bnc" id="L276" title="All 4 branches missed.">        if (done &amp;&amp; error != null) {</span>
+<span class="nc" id="L277">            throw new AsyncExecutionException(error);</span>
+        }
+<span class="nc" id="L279">        final boolean[] complete = new boolean[1];</span>
+<span class="nc" id="L280">        Observer observer = new Observer() {</span>
+            public void update(Observable obj, Object arg) {
+<span class="nc bnc" id="L282" title="All 2 branches missed.">                if (isDone()) {</span>
+<span class="nc" id="L283">                    complete[0] = true;</span>
+<span class="nc" id="L284">                    synchronized (complete) {</span>
+<span class="nc" id="L285">                        complete.notify();</span>
+<span class="nc" id="L286">                    }</span>
+                }
+<span class="nc" id="L288">            }</span>
+        };
+<span class="nc" id="L290">        addObserver(observer);</span>
+
+<span class="nc bnc" id="L292" title="All 2 branches missed.">        while (!complete[0]) {</span>
+<span class="nc bnc" id="L293" title="All 4 branches missed.">            if (timeout &gt; 0 &amp;&amp; System.currentTimeMillis() &gt; startTime + timeout) {</span>
+<span class="nc" id="L294">                throw new InterruptedException(&quot;Timeout occurred in get()&quot;);</span>
+            }
+<span class="nc bnc" id="L296" title="All 2 branches missed.">            if (isEdt()) {</span>
+<span class="nc" id="L297">                CN.invokeAndBlock(new Runnable() {</span>
+                    public void run() {
+<span class="nc" id="L299">                        synchronized (complete) {</span>
+<span class="nc bnc" id="L300" title="All 2 branches missed.">                            if (timeout &gt; 0) {</span>
+<span class="nc" id="L301">                                Util.wait(complete, (int) Math.max(1, timeout - (System.currentTimeMillis() - startTime)));</span>
+                            } else {
+<span class="nc" id="L303">                                Util.wait(complete);</span>
+                            }
+<span class="nc" id="L305">                        }</span>
+<span class="nc" id="L306">                    }</span>
+                });
+            } else {
+<span class="nc" id="L309">                synchronized (complete) {</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">                    if (timeout &gt; 0) {</span>
+<span class="nc" id="L311">                        Util.wait(complete, (int) Math.max(1, timeout - (System.currentTimeMillis() - startTime)));</span>
+                    } else {
+<span class="nc" id="L313">                        Util.wait(complete);</span>
+                    }
+<span class="nc" id="L315">                }</span>
+            }
+        }
+<span class="nc" id="L318">        deleteObserver(observer);</span>
+<span class="nc bnc" id="L319" title="All 2 branches missed.">        if (error != null) {</span>
+<span class="nc" id="L320">            throw new AsyncExecutionException(error);</span>
+        }
+<span class="nc" id="L322">        return value;</span>
+    }
+
+    /**
+     * Gets the resource if it is ready.  If it is not ready, then it will simply
+     * return the provided defaultVal.
+     *
+     * @param defaultVal
+     * @return Either the resource value, or the provided default.
+     */
+    public V get(V defaultVal) {
+<span class="nc bnc" id="L333" title="All 2 branches missed.">        if (value != null) {</span>
+<span class="nc" id="L334">            return value;</span>
+        }
+<span class="nc" id="L336">        return defaultVal;</span>
+    }
+
+    /**
+     * Checks if the resource loading was cancelled.
+     *
+     * @return
+     */
+    public boolean isCancelled() {
+<span class="nc" id="L345">        return cancelled;</span>
+    }
+
+    /**
+     * Checks if the resource loading is done.  This will be true
+     * even if the resource loading failed with an error.
+     *
+     * @return
+     */
+    public boolean isDone() {
+<span class="fc" id="L355">        return done;</span>
+    }
+
+    /**
+     * Checks if the resource is ready.
+     *
+     * @return
+     */
+    public boolean isReady() {
+<span class="nc bnc" id="L364" title="All 4 branches missed.">        return done &amp;&amp; error == null;</span>
+    }
+
+    /**
+     * Runs the provided callback when the resource is ready.
+     *
+     * &lt;p&gt;If an {@link EasyThread} is provided, then the callback will be run on that
+     * thread.  If an EasyThread is not provided, and this call is made on the EDT, then
+     * the callback will be run on the EDT.  Otherwise, the callback will occur on
+     * whatever thread the {@link #complete(java.lang.Object) } call is called on.&lt;/p&gt;
+     *
+     * @param callback Callback to run when the resource is ready.
+     * @param t        Optional EasyThread on which the callback should be run.
+     * @return Self for chaining
+     */
+    public AsyncResource&lt;V&gt; ready(final SuccessCallback&lt;V&gt; callback, EasyThread t) {
+<span class="fc" id="L380">        AsyncCallback runImmediately = null;</span>
+<span class="fc" id="L381">        synchronized (lock) {</span>
+<span class="fc bfc" id="L382" title="All 4 branches covered.">            if (done &amp;&amp; error == null) {</span>
+<span class="fc" id="L383">                runImmediately = new AsyncCallback(callback, t);</span>
+            } else {
+<span class="fc bfc" id="L385" title="All 2 branches covered.">                if (successCallback == null) {</span>
+<span class="fc" id="L386">                    successCallback = new AsyncCallback&lt;V&gt;(callback, t);</span>
+                } else {
+<span class="fc" id="L388">                    final SuccessCallback&lt;V&gt; oldCallback = successCallback;</span>
+<span class="fc" id="L389">                    successCallback = new AsyncCallback&lt;V&gt;(new SuccessCallback&lt;V&gt;() {</span>
+                        public void onSucess(V res) {
+<span class="nc" id="L391">                            oldCallback.onSucess(res);</span>
+<span class="nc" id="L392">                            callback.onSucess(res);</span>
+<span class="nc" id="L393">                        }</span>
+                    }, t);
+                }
+            }
+
+<span class="fc" id="L398">        }</span>
+<span class="fc bfc" id="L399" title="All 2 branches covered.">        if (runImmediately != null) {</span>
+<span class="fc" id="L400">            runImmediately.onSucess(value);</span>
+        }
+<span class="fc" id="L402">        return this;</span>
+
+    }
+
+    /**
+     * Runs the provided callback when the resource is ready.
+     *
+     * &lt;p&gt;If this call is made on the EDT, then the callback will be run on the EDT.
+     * Otherwise, it will be run on whatever thread the complete() methdo is invoked on.&lt;/p&gt;
+     *
+     * @param callback The callback to be run when the resource is ready.
+     * @return Self for chaining.
+     */
+    public AsyncResource&lt;V&gt; ready(SuccessCallback&lt;V&gt; callback) {
+<span class="fc" id="L416">        return ready(callback, null);</span>
+    }
+
+    /**
+     * Sets callback to run if an error occurs.
+     * &lt;p&gt;If an {@link EasyThread} is provided, then the callback will be run on that
+     * thread.  If an EasyThread is not provided, and this call is made on the EDT, then
+     * the callback will be run on the EDT.  Otherwise, the callback will occur on
+     * whatever thread the {@link #complete(java.lang.Object) } call is called on.&lt;/p&gt;
+     *
+     * @param callback Callback to run on error.
+     * @param t        Optional EasyThread to run callback on.
+     * @return Self for chaining.
+     */
+    public AsyncResource&lt;V&gt; except(final SuccessCallback&lt;Throwable&gt; callback, EasyThread t) {
+<span class="fc" id="L431">        AsyncCallback runImmediately = null;</span>
+<span class="fc" id="L432">        synchronized (lock) {</span>
+<span class="fc bfc" id="L433" title="All 4 branches covered.">            if (done &amp;&amp; error != null) {</span>
+<span class="fc" id="L434">                runImmediately = new AsyncCallback&lt;Throwable&gt;(callback, t);</span>
+            } else {
+<span class="fc bfc" id="L436" title="All 2 branches covered.">                if (errorCallback == null) {</span>
+<span class="fc" id="L437">                    errorCallback = new AsyncCallback&lt;Throwable&gt;(callback, t);</span>
+                } else {
+<span class="fc" id="L439">                    final SuccessCallback&lt;Throwable&gt; oldErrorCallback = errorCallback;</span>
+<span class="fc" id="L440">                    errorCallback = new AsyncCallback&lt;Throwable&gt;(new SuccessCallback&lt;Throwable&gt;() {</span>
+                        public void onSucess(Throwable res) {
+<span class="nc" id="L442">                            oldErrorCallback.onSucess(res);</span>
+<span class="nc" id="L443">                            callback.onSucess(res);</span>
+<span class="nc" id="L444">                        }</span>
+                    }, t);
+                }
+
+            }
+<span class="fc" id="L449">        }</span>
+<span class="fc bfc" id="L450" title="All 2 branches covered.">        if (runImmediately != null) {</span>
+<span class="fc" id="L451">            runImmediately.onSucess(error);</span>
+        }
+<span class="fc" id="L453">        return this;</span>
+    }
+
+    /**
+     * Sets callback to run if an error occurs.  If this call is made on the EDT,
+     * then the callback will be run on the EDT.  Otherwise it will be run on whatever
+     * thread the error() method is invoked on.
+     *
+     * @param callback The callback to run in case of error.
+     * @return
+     */
+    public AsyncResource&lt;V&gt; except(SuccessCallback&lt;Throwable&gt; callback) {
+<span class="fc" id="L465">        return except(callback, null);</span>
+    }
+
+    /**
+     * Sets the resource value.  This will trigger the ready callbacks to be run.
+     *
+     * @param value The value to set for the resource.
+     */
+    @Async.Execute
+    public void complete(final V value) {
+<span class="fc" id="L475">        SuccessCallback cb = null;</span>
+<span class="fc" id="L476">        synchronized (lock) {</span>
+<span class="fc" id="L477">            this.value = value;</span>
+<span class="fc" id="L478">            done = true;</span>
+<span class="fc bfc" id="L479" title="All 2 branches covered.">            if (successCallback != null) {</span>
+<span class="fc" id="L480">                cb = successCallback;</span>
+            }
+<span class="fc" id="L482">        }</span>
+
+<span class="fc" id="L484">        setChanged();</span>
+<span class="fc" id="L485">        notifyObservers();</span>
+<span class="fc bfc" id="L486" title="All 2 branches covered.">        if (cb != null) {</span>
+<span class="fc" id="L487">            cb.onSucess(value);</span>
+        }
+<span class="fc" id="L489">    }</span>
+
+    /**
+     * Sets the error for this resource in the case that it could not be loaded.  This will trigger
+     * the error callbacks.
+     *
+     * @param t
+     */
+    @Async.Execute
+    public void error(Throwable t) {
+<span class="fc" id="L499">        SuccessCallback cb = null;</span>
+<span class="fc" id="L500">        synchronized (lock) {</span>
+<span class="fc" id="L501">            this.error = t;</span>
+<span class="fc" id="L502">            done = true;</span>
+<span class="fc bfc" id="L503" title="All 2 branches covered.">            if (errorCallback != null) {</span>
+<span class="fc" id="L504">                cb = errorCallback;</span>
+            }
+<span class="fc" id="L506">        }</span>
+<span class="fc" id="L507">        setChanged();</span>
+<span class="fc" id="L508">        notifyObservers();</span>
+<span class="fc bfc" id="L509" title="All 2 branches covered.">        if (cb != null) {</span>
+<span class="fc" id="L510">            cb.onSucess(error);</span>
+        }
+<span class="fc" id="L512">    }</span>
+
+    /**
+     * Waits and blocks until this AsyncResource is done.
+     *
+     * @throws com.codename1.util.AsyncResource.AsyncExecutionException
+     */
+    public void await() throws AsyncExecutionException {
+<span class="nc" id="L520">        await(this);</span>
+<span class="nc" id="L521">    }</span>
+
+    /**
+     * Adds another AsyncResource as a listener to this async resource.
+     *
+     * @param resource
+     * @since 7.0
+     */
+    public void addListener(final AsyncResource&lt;V&gt; resource) {
+<span class="nc" id="L530">        ready(new SuccessCallback&lt;V&gt;() {</span>
+            @Override
+            public void onSucess(V value) {
+<span class="nc bnc" id="L533" title="All 2 branches missed.">                if (!resource.isDone()) {</span>
+<span class="nc" id="L534">                    resource.complete(value);</span>
+                }
+<span class="nc" id="L536">            }</span>
+<span class="nc" id="L537">        }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+            @Override
+            public void onSucess(Throwable value) {
+<span class="nc bnc" id="L540" title="All 2 branches missed.">                if (!resource.isDone()) {</span>
+<span class="nc" id="L541">                    resource.error(value);</span>
+                }
+<span class="nc" id="L543">            }</span>
+        });
+<span class="nc" id="L545">    }</span>
+
+    /**
+     * Combines ready() and except() into a single callback with 2 parameters.
+     *
+     * @param onResult A callback that handles both the ready() case and the except() case.  Use {@link #isCancelled(java.lang.Throwable) }
+     *                 to test the error parameter of {@link AsyncResult#onReady(java.lang.Object, java.lang.Throwable) } to see if
+     *                 if was caused by a cancellation.
+     * @since 7.0
+     */
+    public void onResult(final AsyncResult&lt;V&gt; onResult) {
+<span class="nc" id="L556">        ready(new SuccessCallback&lt;V&gt;() {</span>
+            @Override
+            public void onSucess(V value) {
+<span class="nc" id="L559">                onResult.onReady(value, null);</span>
+<span class="nc" id="L560">            }</span>
+<span class="nc" id="L561">        }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+            @Override
+            public void onSucess(Throwable value) {
+<span class="nc" id="L564">                onResult.onReady(null, value);</span>
+<span class="nc" id="L565">            }</span>
+        });
+<span class="nc" id="L567">    }</span>
+
+    /**
+     * Wraps this AsyncResource object as a {@link Promise}
+     *
+     * @return A Promise wrapping this AsyncResource.
+     * @since 8.0
+     */
+    public Promise&lt;V&gt; asPromise() {
+<span class="nc" id="L576">        return Promise.promisify(this);</span>
+    }
+
+    /**
+     * Exception to wrap exceptions that are thrown during asynchronous execution.
+     * This is thrown by {@link #get() } if the this resource failed with an exception.
+     *
+     * &lt;p&gt;Call {@link AsyncExecutionException#getCause() } to get the original exception.&lt;/p&gt;
+     */
+    public static class AsyncExecutionException extends RuntimeException {
+        private final Throwable cause;
+
+        public AsyncExecutionException(Throwable cause) {
+<span class="fc" id="L589">            super(cause.getMessage());</span>
+<span class="fc" id="L590">            this.cause = cause;</span>
+<span class="fc" id="L591">        }</span>
+
+        public Throwable getCause() {
+<span class="fc" id="L594">            return cause;</span>
+        }
+
+        /**
+         * Returns true if this exception wraps a {@link CancellationException}, or another
+         * AsyncExecutionException that has {@link #isCancelled() } true.
+         *
+         * @return True if this exception was caused by cancelling an AsyncResource.
+         * @since 7.0
+         */
+        public boolean isCancelled() {
+<span class="pc bpc" id="L605" title="1 of 4 branches missed.">            if (cause != null &amp;&amp; cause.getClass() == CancellationException.class) {</span>
+<span class="fc" id="L606">                return true;</span>
+            }
+<span class="pc bpc" id="L608" title="2 of 4 branches missed.">            if (cause != null &amp;&amp; cause instanceof AsyncExecutionException) {</span>
+<span class="nc" id="L609">                return ((AsyncExecutionException) cause).isCancelled();</span>
+            }
+<span class="fc" id="L611">            return false;</span>
+        }
+
+    }
+
+    /**
+     * Exception thrown when the AsyncResource is cancelled.  Use {@link AsyncResource#isCancelled(java.lang.Throwable)
+     * to test a particular exception to see if it resulted from cancelling an AsyncResource as this will
+     * return turn true if the exception itself is a CancellationException, or if the exception was caused by
+     * a CancellationException.
+     *
+     * @see #isCancelled(java.lang.Throwable)
+     * @since 7.0
+     */
+    public static class CancellationException extends RuntimeException {
+        public CancellationException() {
+<span class="fc" id="L627">            super(&quot;Cancelled&quot;);</span>
+<span class="fc" id="L628">        }</span>
+
+
+    }
+
+    private class AsyncCallback&lt;T&gt; implements SuccessCallback&lt;T&gt; {
+        private final SuccessCallback&lt;T&gt; cb;
+        private final EasyThread t;
+        private final boolean edt;
+
+<span class="fc" id="L638">        AsyncCallback(SuccessCallback&lt;T&gt; cb, EasyThread t) {</span>
+<span class="fc" id="L639">            this.cb = cb;</span>
+<span class="fc" id="L640">            this.t = t;</span>
+<span class="pc bpc" id="L641" title="2 of 4 branches missed.">            this.edt = t == null &amp;&amp; CN.isEdt();</span>
+<span class="fc" id="L642">        }</span>
+
+        @Override
+        public void onSucess(final T value) {
+<span class="pc bpc" id="L646" title="2 of 4 branches missed.">            if (edt &amp;&amp; !CN.isEdt()) {</span>
+<span class="nc" id="L647">                CN.callSerially(new Runnable() {</span>
+                    public void run() {
+<span class="nc" id="L649">                        onSucess(value);</span>
+<span class="nc" id="L650">                    }</span>
+                });
+<span class="nc" id="L652">                return;</span>
+            }
+<span class="pc bpc" id="L654" title="3 of 4 branches missed.">            if (t != null &amp;&amp; !t.isThisIt()) {</span>
+<span class="nc" id="L655">                t.run(new Runnable() {</span>
+
+                    @Override
+                    public void run() {
+<span class="nc" id="L659">                        onSucess(value);</span>
+<span class="nc" id="L660">                    }</span>
+                });
+<span class="nc" id="L662">                return;</span>
+
+            }
+<span class="fc" id="L665">            cb.onSucess(value);</span>
+
+<span class="fc" id="L667">        }</span>
+
+
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,511 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InfiniteProgress.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">InfiniteProgress.java</span></div><h1>InfiniteProgress.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.FontImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.Stroke;
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.animations.Motion;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.WeakHashMap;
+
+/**
+ * &lt;p&gt;Shows a &quot;Washing Machine&quot; infinite progress indication animation, to customize the image you can either
+ * use the infiniteImage theme constant or the &lt;code&gt;setAnimation&lt;/code&gt; method. The image is rotated
+ * automatically so don't use an animated image or anything like that as it would fail with the rotation logic.&lt;/p&gt;
+ *
+ * &lt;p&gt;This class can be used in one of two ways either by embedding the component into the UI thru something
+ * like this:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/bddead645fcd8ee33e9c.js&quot;&gt;&lt;/script&gt;
+ *
+ * &lt;p&gt;
+ * Notice that this can be used within a custom dialog too.&lt;br&gt;
+ * A second approach allows showing the infinite progress over the entire screen which blocks all input. This tints
+ * the background while the infinite progress rotates:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/a0a6abca781cd86e4f5e.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/infinite-progress.png&quot; alt=&quot;InfiniteProgress&quot;&gt;
+ *
+ * @author Shai Almog
+ */
+public class InfiniteProgress extends Component {
+    /**
+     * Indicates whether infinite progress and pull to refresh work in the material
+     * design mode by default
+     */
+    private static boolean defaultMaterialDesignMode;
+
+    /**
+     * The default color of the current material design progress spinner
+     */
+<span class="fc" id="L72">    private static int defaultMaterialDesignColor = 0x6200ee;</span>
+    private Image animation;
+<span class="fc" id="L74">    private int angle = 0;</span>
+    private int tick;
+<span class="fc" id="L76">    private final WeakHashMap&lt;Integer, Image&gt; cache = new WeakHashMap&lt;Integer, Image&gt;();</span>
+<span class="fc" id="L77">    private int tintColor = 0x90000000;</span>
+    /**
+     * Indicates whether this instance of infinite progress works in the material
+     * design mode by default
+     */
+<span class="fc" id="L82">    private boolean materialDesignMode = defaultMaterialDesignMode;</span>
+    /**
+     * The color of the current material design progress spinner
+     */
+<span class="fc" id="L86">    private int materialDesignColor = defaultMaterialDesignColor;</span>
+    private Motion materialLengthAngle;
+    private boolean materialLengthDirection;
+    /**
+     * The animation rotates with EDT ticks, but not for every tick. To slow down the animation increase this
+     * number and to speed it up reduce it to 1. It can't be 0 or lower.
+     */
+<span class="fc" id="L93">    private int tickCount = 3;</span>
+    /**
+     * The angle to increase (in degrees naturally) in every tick count, reduce to 1 to make the animation perfectly
+     * slow and smooth, increase to 45 to make it fast and jumpy. Its probably best to use a number that divides well
+     * with 360 but that isn't a requirement. Valid numbers are anything between 1 and 359.
+     */
+<span class="fc" id="L99">    private int angleIncrease = 16;</span>
+    /**
+     * Default constructor to define the UIID
+     */
+<span class="fc" id="L103">    public InfiniteProgress() {</span>
+<span class="fc" id="L104">        setUIID(&quot;InfiniteProgress&quot;);</span>
+<span class="fc" id="L105">    }</span>
+
+    /**
+     * Indicates whether infinite progress and pull to refresh work in the material
+     * design mode by default
+     *
+     * @return the defaultMaterialDesignMode
+     */
+    public static boolean isDefaultMaterialDesignMode() {
+<span class="fc" id="L114">        return defaultMaterialDesignMode;</span>
+    }
+
+    /**
+     * Indicates whether infinite progress and pull to refresh work in the material
+     * design mode by default
+     *
+     * @param aDefaultMaterialDesignMode the defaultMaterialDesignMode to set
+     */
+    public static void setDefaultMaterialDesignMode(
+            boolean aDefaultMaterialDesignMode) {
+<span class="fc" id="L125">        defaultMaterialDesignMode = aDefaultMaterialDesignMode;</span>
+<span class="fc" id="L126">    }</span>
+
+    /**
+     * The default color of the current material design progress spinner
+     *
+     * @return the defaultMaterialDesignColor
+     */
+    public static int getDefaultMaterialDesignColor() {
+<span class="fc" id="L134">        return defaultMaterialDesignColor;</span>
+    }
+
+    /**
+     * The default color of the current material design progress spinner
+     *
+     * @param aDefaultMaterialDesignColor the defaultMaterialDesignColor to set
+     */
+    public static void setDefaultMaterialDesignColor(
+            int aDefaultMaterialDesignColor) {
+<span class="fc" id="L144">        defaultMaterialDesignColor = aDefaultMaterialDesignColor;</span>
+<span class="fc" id="L145">    }</span>
+
+    /**
+     * Shows the infinite progress over the whole screen, the blocking can be competed by calling &lt;code&gt;dispose()&lt;/code&gt;
+     * on the returned &lt;code&gt;Dialog&lt;/code&gt;.
+     * &lt;script src=&quot;https://gist.github.com/codenameone/a0a6abca781cd86e4f5e.js&quot;&gt;&lt;/script&gt;
+     *
+     * @return the dialog created for the blocking effect, disposing it will return to the previous form and remove the input block.
+     * @deprecated typo in method name please use {@link #showInfiniteBlocking()} instead
+     */
+    public Dialog showInifiniteBlocking() {
+<span class="fc" id="L156">        return showInfiniteBlocking();</span>
+    }
+
+    /**
+     * Shows the infinite progress over the whole screen, the blocking can be competed by calling &lt;code&gt;dispose()&lt;/code&gt;
+     * on the returned &lt;code&gt;Dialog&lt;/code&gt;.
+     * &lt;script src=&quot;https://gist.github.com/codenameone/a0a6abca781cd86e4f5e.js&quot;&gt;&lt;/script&gt;
+     *
+     * @return the dialog created for the blocking effect, disposing it will return to the previous form and remove the input block.
+     */
+    public Dialog showInfiniteBlocking() {
+<span class="fc" id="L167">        Form f = Display.getInstance().getCurrent();</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (f == null) {</span>
+<span class="nc" id="L169">            f = new Form();</span>
+<span class="nc" id="L170">            f.show();</span>
+        }
+<span class="pc bpc" id="L172" title="1 of 2 branches missed.">        if (f.getClientProperty(&quot;isInfiniteProgress&quot;) == null) {</span>
+<span class="fc" id="L173">            f.setTintColor(tintColor);</span>
+        }
+<span class="fc" id="L175">        Dialog d = new Dialog();</span>
+<span class="fc" id="L176">        d.putClientProperty(&quot;isInfiniteProgress&quot;, true);</span>
+<span class="fc" id="L177">        d.setTintColor(0x0);</span>
+<span class="fc" id="L178">        d.setDialogUIID(&quot;Container&quot;);</span>
+<span class="fc" id="L179">        d.setLayout(new BorderLayout());</span>
+<span class="fc" id="L180">        d.addComponent(BorderLayout.CENTER, this);</span>
+<span class="fc" id="L181">        d.setTransitionInAnimator(CommonTransitions.createEmpty());</span>
+<span class="fc" id="L182">        d.setTransitionOutAnimator(CommonTransitions.createEmpty());</span>
+<span class="fc" id="L183">        d.showPacked(BorderLayout.CENTER, false);</span>
+<span class="fc" id="L184">        return d;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void initComponent() {
+<span class="fc" id="L191">        super.initComponent();</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        if (animation == null) {</span>
+<span class="fc" id="L193">            animation = UIManager.getInstance().getThemeImageConstant(&quot;infiniteImage&quot;);</span>
+        }
+<span class="fc" id="L195">        Form f = getComponentForm();</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="fc" id="L197">            f.registerAnimated(this);</span>
+        }
+<span class="fc" id="L199">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void deinitialize() {
+<span class="fc" id="L205">        Form f = getComponentForm();</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if (f == null) {</span>
+<span class="nc" id="L207">            f = Display.getInstance().getCurrent();</span>
+        }
+<span class="fc" id="L209">        f.deregisterAnimated(this);</span>
+<span class="fc" id="L210">        super.deinitialize();</span>
+<span class="fc" id="L211">    }</span>
+
+    /**
+     * Updates the progress animation.  This only updates if the InfiniteProgress is on the
+     * currently displayed form and is visible.  If you need to update the progress animation
+     * in another context, use {@link #animate(boolean) }.
+     *
+     * @return true if it animated and should be repainted.
+     */
+    public boolean animate() {
+<span class="fc" id="L221">        return animate(false);</span>
+    }
+
+    /**
+     * Updates the progress animation.
+     *
+     * @param force If false, then the animation is only updated if the progress is visible and on
+     *              the current form.  True will force the update.
+     * @return True if it animated and should be repainted.
+     * @since 7.0
+     */
+    public boolean animate(boolean force) {
+<span class="pc bpc" id="L233" title="2 of 6 branches missed.">        if (!force &amp;&amp; (!isVisible() || Display.getInstance().getCurrent() != this.getComponentForm())) { // PMD Fix: CollapsibleIfStatements merged visibility checks</span>
+<span class="nc" id="L234">            return false;</span>
+        }
+        // reduce repaint thrushing of the UI from the infinite progress
+<span class="pc bpc" id="L237" title="1 of 4 branches missed.">        boolean val = super.animate() || tick % tickCount == 0;</span>
+<span class="fc" id="L238">        tick++;</span>
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        if (val) {</span>
+<span class="fc" id="L240">            angle += angleIncrease;</span>
+        }
+<span class="fc" id="L242">        return val;</span>
+    }
+
+    private int getMaterialDesignSize() {
+<span class="fc" id="L246">        float dipCount = Float.parseFloat(getUIManager().</span>
+<span class="fc" id="L247">                getThemeConstant(&quot;infiniteMaterialDesignSize&quot;, &quot;6.667f&quot;));</span>
+
+<span class="fc" id="L249">        return Display.getInstance().convertToPixels(dipCount);</span>
+    }
+
+    private int getMaterialImageSize() {
+<span class="fc" id="L253">        float dipCount = Float.parseFloat(getUIManager().</span>
+<span class="fc" id="L254">                getThemeConstant(&quot;infiniteMaterialImageSize&quot;, &quot;7&quot;));</span>
+
+<span class="fc" id="L256">        return Display.getInstance().convertToPixels(dipCount);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected Dimension calcPreferredSize() {
+<span class="fc bfc" id="L263" title="All 2 branches covered.">        if (materialDesignMode) {</span>
+<span class="fc" id="L264">            int size = getMaterialDesignSize();</span>
+<span class="fc" id="L265">            return new Dimension(getStyle().getHorizontalPadding() + size,</span>
+<span class="fc" id="L266">                    getStyle().getVerticalPadding() + size);</span>
+        }
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">        if (animation == null) {</span>
+<span class="fc" id="L269">            animation = UIManager.getInstance().getThemeImageConstant(&quot;infiniteImage&quot;);</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">            if (animation == null) {</span>
+<span class="fc" id="L271">                int size = getMaterialImageSize();</span>
+<span class="fc" id="L272">                String f = getUIManager().getThemeConstant(&quot;infiniteDefaultColor&quot;, null);</span>
+<span class="fc" id="L273">                int color = 0x777777;</span>
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">                if (f != null) {</span>
+<span class="nc" id="L275">                    color = Integer.parseInt(f, 16);</span>
+                }
+<span class="fc" id="L277">                FontImage fi = FontImage.createFixed(&quot;&quot; + FontImage.MATERIAL_AUTORENEW,</span>
+<span class="fc" id="L278">                        FontImage.getMaterialDesignFont(),</span>
+                        color, size, size, 0);
+
+<span class="fc" id="L281">                animation = fi.toImage();</span>
+            }
+        }
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">        if (animation == null) {</span>
+<span class="fc" id="L285">            return new Dimension(100, 100);</span>
+        }
+<span class="nc" id="L287">        Style s = getStyle();</span>
+<span class="nc" id="L288">        return new Dimension(s.getHorizontalPadding() + animation.getWidth(),</span>
+<span class="nc" id="L289">                s.getVerticalPadding() + animation.getHeight());</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void paint(Graphics g) {
+<span class="pc bpc" id="L296" title="2 of 4 branches missed.">        if (this.getComponentForm() != null &amp;&amp; Display.getInstance().getCurrent() != this.getComponentForm()) {</span>
+<span class="nc" id="L297">            return;</span>
+        }
+<span class="fc" id="L299">        super.paint(g);</span>
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        if (materialDesignMode) {</span>
+<span class="nc" id="L301">            int size = getMaterialDesignSize();</span>
+<span class="nc" id="L302">            int strokeWidth = Display.getInstance().convertToPixels(0.635f);</span>
+<span class="nc" id="L303">            int oldColor = g.getColor();</span>
+<span class="nc" id="L304">            g.setColor(materialDesignColor);</span>
+<span class="nc" id="L305">            int oldAlpha = g.setAndGetAlpha(255);</span>
+
+<span class="nc" id="L307">            Style s = getStyle();</span>
+<span class="nc" id="L308">            GeneralPath gp = new GeneralPath();</span>
+<span class="nc bnc" id="L309" title="All 4 branches missed.">            if (materialLengthAngle == null || materialLengthAngle.isFinished()) {</span>
+<span class="nc" id="L310">                materialLengthAngle = Motion.createEaseInOutMotion(</span>
+                        10, 300, 1000);
+<span class="nc" id="L312">                materialLengthAngle.start();</span>
+<span class="nc bnc" id="L313" title="All 2 branches missed.">                materialLengthDirection = !materialLengthDirection;</span>
+            }
+<span class="nc" id="L315">            int angleLength = materialLengthAngle.getValue();</span>
+            double dr;
+<span class="nc bnc" id="L317" title="All 2 branches missed.">            if (!materialLengthDirection) {</span>
+<span class="nc" id="L318">                angleLength = 300 - angleLength;</span>
+<span class="nc" id="L319">                dr = Math.toRadians((angle - angleLength) % 360);</span>
+            } else {
+<span class="nc" id="L321">                dr = Math.toRadians(angle % 360);</span>
+            }
+<span class="nc" id="L323">            double x = getX() + s.getPaddingLeft(isRTL());</span>
+<span class="nc" id="L324">            double y = getY() + s.getPaddingTop();</span>
+            //System.out.println(&quot;Arc x: &quot; + x + &quot; y: &quot; + y + &quot; width/height: &quot; + size + &quot; angle: &quot; + angle + &quot; endAngle: &quot; + (angle % 180 + 45));
+<span class="nc" id="L326">            gp.arc(x, y, size, size, dr, Math.toRadians(angleLength));</span>
+<span class="nc" id="L327">            Stroke st = new Stroke(strokeWidth, Stroke.CAP_ROUND, Stroke.JOIN_MITER, 1);</span>
+<span class="nc" id="L328">            g.setAntiAliased(true);</span>
+<span class="nc" id="L329">            g.drawShape(gp, st);</span>
+<span class="nc" id="L330">            g.setColor(oldColor);</span>
+<span class="nc" id="L331">            g.setAlpha(oldAlpha);</span>
+<span class="nc" id="L332">            return;</span>
+        }
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">        if (animation == null) {</span>
+<span class="fc" id="L335">            return;</span>
+        }
+<span class="nc" id="L337">        int v = angle % 360;</span>
+<span class="nc" id="L338">        Style s = getStyle();</span>
+        /*if(g.isAffineSupported()) {
+            g.rotate(((float)v) / 57.2957795f, getAbsoluteX() + s.getPadding(LEFT) + getWidth() / 2, getAbsoluteY() + s.getPadding(TOP) + getHeight() / 2);
+            g.drawImage(getAnimation(), getX() + s.getPadding(LEFT), getY() + s.getPadding(TOP));
+            g.resetAffine();
+        } else {*/
+
+        Image rotated;
+<span class="nc bnc" id="L346" title="All 2 branches missed.">        if (animation instanceof FontImage) {</span>
+<span class="nc" id="L347">            rotated = animation.rotate(v);</span>
+        } else {
+<span class="nc" id="L349">            Integer angle = Integer.valueOf(v); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor</span>
+<span class="nc" id="L350">            rotated = cache.get(angle);</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">            if (rotated == null) {</span>
+<span class="nc" id="L352">                rotated = animation.rotate(v);</span>
+<span class="nc" id="L353">                cache.put(angle, rotated);</span>
+            }
+        }
+<span class="nc" id="L356">        g.drawImage(rotated, getX() + s.getPaddingLeftNoRTL(), getY() + s.getPaddingTop());</span>
+        //}
+<span class="nc" id="L358">    }</span>
+
+    /**
+     * @return the animation
+     */
+    public Image getAnimation() {
+<span class="fc" id="L364">        return animation;</span>
+    }
+
+    /**
+     * Allows setting the image that will be rotated as part of this effect
+     *
+     * @param animation the animation to set
+     */
+    public void setAnimation(Image animation) {
+<span class="fc" id="L373">        this.animation = animation;</span>
+<span class="fc" id="L374">        cache.clear();</span>
+<span class="fc" id="L375">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+<span class="fc" id="L381">        return new String[]{&quot;animation&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+<span class="fc" id="L388">        return new Class[]{Image.class};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">        if (name.equals(&quot;animation&quot;)) {</span>
+<span class="fc" id="L396">            return animation;</span>
+        }
+<span class="nc" id="L398">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+<span class="pc bpc" id="L405" title="1 of 2 branches missed.">        if (name.equals(&quot;animation&quot;)) {</span>
+<span class="fc" id="L406">            this.animation = (Image) value;</span>
+<span class="fc" id="L407">            cache.clear();</span>
+<span class="fc" id="L408">            return null;</span>
+        }
+<span class="nc" id="L410">        return super.setPropertyValue(name, value);</span>
+    }
+
+    /**
+     * The tinting color of the screen when the showInfiniteBlocking method is invoked
+     *
+     * @return the tintColor
+     */
+    public int getTintColor() {
+<span class="fc" id="L419">        return tintColor;</span>
+    }
+
+    /**
+     * The tinting color of the screen when the showInfiniteBlocking method is invoked
+     *
+     * @param tintColor the tintColor to set
+     */
+    public void setTintColor(int tintColor) {
+<span class="fc" id="L428">        this.tintColor = tintColor;</span>
+<span class="fc" id="L429">    }</span>
+
+    /**
+     * The animation rotates with EDT ticks, but not for every tick. To slow down the animation increase this
+     * number and to speed it up reduce it to 1. It can't be 0 or lower.
+     *
+     * @return the tickCount
+     */
+    public int getTickCount() {
+<span class="fc" id="L438">        return tickCount;</span>
+    }
+
+    /**
+     * The animation rotates with EDT ticks, but not for every tick. To slow down the animation increase this
+     * number and to speed it up reduce it to 1. It can't be 0 or lower.
+     *
+     * @param tickCount the tickCount to set
+     */
+    public void setTickCount(int tickCount) {
+<span class="fc" id="L448">        this.tickCount = tickCount;</span>
+<span class="fc" id="L449">    }</span>
+
+    /**
+     * The angle to increase (in degrees naturally) in every tick count, reduce to 1 to make the animation perfectly
+     * slow and smooth, increase to 45 to make it fast and jumpy. Its probably best to use a number that divides well
+     * with 360 but that isn't a requirement. Valid numbers are anything between 1 and 359.
+     *
+     * @return the angleIncrease
+     */
+    public int getAngleIncrease() {
+<span class="fc" id="L459">        return angleIncrease;</span>
+    }
+
+    /**
+     * The angle to increase (in degrees naturally) in every tick count, reduce to 1 to make the animation perfectly
+     * slow and smooth, increase to 45 to make it fast and jumpy. Its probably best to use a number that divides well
+     * with 360 but that isn't a requirement. Valid numbers are anything between 1 and 359.
+     *
+     * @param angleIncrease the angleIncrease to set
+     */
+    public void setAngleIncrease(int angleIncrease) {
+<span class="fc" id="L470">        this.angleIncrease = angleIncrease;</span>
+<span class="fc" id="L471">    }</span>
+
+    /**
+     * Indicates whether this instance of infinite progress works in the material
+     * design mode by default
+     *
+     * @return the materialDesignMode
+     */
+    public boolean isMaterialDesignMode() {
+<span class="fc" id="L480">        return materialDesignMode;</span>
+    }
+
+    /**
+     * Indicates whether this instance of infinite progress works in the material
+     * design mode by default
+     *
+     * @param materialDesignMode the materialDesignMode to set
+     */
+    public void setMaterialDesignMode(boolean materialDesignMode) {
+<span class="fc" id="L490">        this.materialDesignMode = materialDesignMode;</span>
+<span class="fc" id="L491">    }</span>
+
+    /**
+     * The color of the current material design progress spinner
+     *
+     * @return the materialDesignColor
+     */
+    public int getMaterialDesignColor() {
+<span class="fc" id="L499">        return materialDesignColor;</span>
+    }
+
+    /**
+     * The color of the current material design progress spinner
+     *
+     * @param materialDesignColor the materialDesignColor to set
+     */
+    public void setMaterialDesignColor(int materialDesignColor) {
+<span class="fc" id="L508">        this.materialDesignColor = materialDesignColor;</span>
+<span class="fc" id="L509">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

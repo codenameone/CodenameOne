@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Address.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.contacts</a> &gt; <span class="el_source">Address.java</span></div><h1>Address.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.contacts;
+
+/**
+ * This class represents a Contact Address
+ *
+ * @author Chen
+ */
+public class Address {
+
+    private String streetAddress;
+    private String locality;
+    private String region;
+    private String postalCode;
+    private String country;
+
+    /**
+     * Empty Constructor
+     */
+<span class="nc" id="L41">    public Address() {</span>
+<span class="nc" id="L42">    }</span>
+
+    /**
+     * Gets Address Country
+     *
+     * @return
+     */
+    public String getCountry() {
+<span class="nc" id="L50">        return country;</span>
+    }
+
+    /**
+     * Sets Address Country
+     */
+    public void setCountry(String country) {
+<span class="nc" id="L57">        this.country = country;</span>
+<span class="nc" id="L58">    }</span>
+
+    /**
+     * Gets Address Locality
+     *
+     * @return
+     */
+    public String getLocality() {
+<span class="nc" id="L66">        return locality;</span>
+    }
+
+    /**
+     * Sets Address Locality
+     */
+    public void setLocality(String locality) {
+<span class="nc" id="L73">        this.locality = locality;</span>
+<span class="nc" id="L74">    }</span>
+
+    /**
+     * Gets Address Postal Code
+     *
+     * @return
+     */
+    public String getPostalCode() {
+<span class="nc" id="L82">        return postalCode;</span>
+    }
+
+    /**
+     * Sets Address Postal Code
+     */
+    public void setPostalCode(String postalCode) {
+<span class="nc" id="L89">        this.postalCode = postalCode;</span>
+<span class="nc" id="L90">    }</span>
+
+    /**
+     * Gets Address Region
+     *
+     * @return
+     */
+    public String getRegion() {
+<span class="nc" id="L98">        return region;</span>
+    }
+
+    /**
+     * Sets Address Region
+     */
+    public void setRegion(String region) {
+<span class="nc" id="L105">        this.region = region;</span>
+<span class="nc" id="L106">    }</span>
+
+    /**
+     * Gets Address Street
+     *
+     * @return
+     */
+    public String getStreetAddress() {
+<span class="nc" id="L114">        return streetAddress;</span>
+    }
+
+    /**
+     * Sets Address street
+     */
+    public void setStreetAddress(String streetAddress) {
+<span class="nc" id="L121">        this.streetAddress = streetAddress;</span>
+<span class="nc" id="L122">    }</span>
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

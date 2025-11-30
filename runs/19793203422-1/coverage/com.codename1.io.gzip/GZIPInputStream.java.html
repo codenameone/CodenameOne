@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GZIPInputStream.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.gzip</a> &gt; <span class="el_source">GZIPInputStream.java</span></div><h1>GZIPInputStream.java</h1><pre class="source lang-java linenums">/* -*-mode:java; c-basic-offset:2; indent-tabs-mode:nil -*- */
+/*
+Copyright (c) 2011 ymnk, JCraft,Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+  1. Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright 
+     notice, this list of conditions and the following disclaimer in 
+     the documentation and/or other materials provided with the distribution.
+
+  3. The names of the authors may not be used to endorse or promote products
+     derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL JCRAFT,
+INC. OR ANY CONTRIBUTORS TO THIS SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+package com.codename1.io.gzip;
+
+import java.io.IOException;
+import java.io.InputStream;
+
+public class GZIPInputStream extends InflaterInputStream {
+
+    public GZIPInputStream(InputStream in) throws IOException {
+<span class="fc" id="L38">        this(in, DEFAULT_BUFSIZE, true);</span>
+<span class="fc" id="L39">    }</span>
+
+    public GZIPInputStream(InputStream in,
+                           int size,
+                           boolean close_in) throws IOException {
+<span class="fc" id="L44">        this(in, new Inflater(15 + 16), size, close_in);</span>
+<span class="fc" id="L45">        myinflater = true;</span>
+<span class="fc" id="L46">    }</span>
+
+    public GZIPInputStream(InputStream in,
+                           Inflater inflater,
+                           int size,
+                           boolean close_in) throws IOException {
+<span class="fc" id="L52">        super(in, inflater, size, close_in);</span>
+<span class="fc" id="L53">    }</span>
+
+    public long getModifiedtime() {
+<span class="fc" id="L56">        return inflater.istate.getGZIPHeader().getModifiedTime();</span>
+    }
+
+    public int getOS() {
+<span class="fc" id="L60">        return inflater.istate.getGZIPHeader().getOS();</span>
+    }
+
+    public String getName() {
+<span class="fc" id="L64">        return inflater.istate.getGZIPHeader().getName();</span>
+    }
+
+    public String getComment() {
+<span class="fc" id="L68">        return inflater.istate.getGZIPHeader().getComment();</span>
+    }
+
+    public long getCRC() throws GZIPException {
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (inflater.istate.mode != 12 /*DONE*/)</span>
+<span class="fc" id="L73">            throw new GZIPException(&quot;checksum is not calculated yet.&quot;);</span>
+<span class="fc" id="L74">        return inflater.istate.getGZIPHeader().getCRC();</span>
+    }
+
+    public void readHeader() throws IOException {
+
+<span class="fc" id="L79">        byte[] empty = &quot;&quot;.getBytes();</span>
+<span class="fc" id="L80">        inflater.setOutput(empty, 0, 0);</span>
+<span class="fc" id="L81">        inflater.setInput(empty, 0, 0, false);</span>
+
+<span class="fc" id="L83">        byte[] b = new byte[10];</span>
+
+<span class="fc" id="L85">        int n = fill(b);</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        if (n != 10) {</span>
+<span class="pc bpc" id="L87" title="1 of 2 branches missed.">            if (n &gt; 0) {</span>
+<span class="fc" id="L88">                inflater.setInput(b, 0, n, false);</span>
+                //inflater.next_in_index = n;
+<span class="fc" id="L90">                inflater.next_in_index = 0;</span>
+<span class="fc" id="L91">                inflater.avail_in = n;</span>
+            }
+<span class="fc" id="L93">            throw new IOException(&quot;no input&quot;);</span>
+        }
+
+<span class="fc" id="L96">        inflater.setInput(b, 0, n, false);</span>
+
+<span class="fc" id="L98">        byte[] b1 = new byte[1];</span>
+        do {
+<span class="fc bfc" id="L100" title="All 2 branches covered.">            if (inflater.avail_in &lt;= 0) {</span>
+<span class="fc" id="L101">                int i = in.read(b1);</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">                if (i &lt;= 0)</span>
+<span class="nc" id="L103">                    throw new IOException(&quot;no input&quot;);</span>
+<span class="fc" id="L104">                inflater.setInput(b1, 0, 1, true);</span>
+            }
+
+<span class="fc" id="L107">            int err = inflater.inflate(JZlib.Z_NO_FLUSH);</span>
+
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">            if (err != 0/*Z_OK*/) {</span>
+<span class="nc" id="L110">                int len = 2048 - inflater.next_in.length;</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">                if (len &gt; 0) {</span>
+<span class="nc" id="L112">                    byte[] tmp = new byte[len];</span>
+<span class="nc" id="L113">                    n = fill(tmp);</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">                    if (n &gt; 0) {</span>
+<span class="nc" id="L115">                        inflater.avail_in += inflater.next_in_index;</span>
+<span class="nc" id="L116">                        inflater.next_in_index = 0;</span>
+<span class="nc" id="L117">                        inflater.setInput(tmp, 0, n, true);</span>
+                    }
+                }
+                //inflater.next_in_index = inflater.next_in.length;
+<span class="nc" id="L121">                inflater.avail_in += inflater.next_in_index;</span>
+<span class="nc" id="L122">                inflater.next_in_index = 0;</span>
+<span class="nc" id="L123">                throw new IOException(inflater.msg);</span>
+            }
+        }
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        while (inflater.istate.inParsingHeader());</span>
+<span class="fc" id="L127">    }</span>
+
+    private int fill(byte[] buf) {
+<span class="fc" id="L130">        int len = buf.length;</span>
+<span class="fc" id="L131">        int n = 0;</span>
+        do {
+<span class="fc" id="L133">            int i = -1;</span>
+            try {
+<span class="fc" id="L135">                i = in.read(buf, n, buf.length - n);</span>
+<span class="nc" id="L136">            } catch (IOException e) {</span>
+<span class="fc" id="L137">            }</span>
+<span class="fc bfc" id="L138" title="All 2 branches covered.">            if (i == -1) {</span>
+<span class="fc" id="L139">                break;</span>
+            }
+<span class="fc" id="L141">            n += i;</span>
+        }
+<span class="fc bfc" id="L143" title="All 2 branches covered.">        while (n &lt; len);</span>
+<span class="fc" id="L144">        return n;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

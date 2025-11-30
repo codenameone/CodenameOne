@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GridBagConstraints.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts</a> &gt; <span class="el_source">GridBagConstraints.java</span></div><h1>GridBagConstraints.java</h1><pre class="source lang-java linenums">/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the &quot;License&quot;); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+package com.codename1.ui.layouts;
+
+/**
+ * Port of the GridBag code from Apache's Harmony
+ *
+ * @author Michael Danilov
+ */
+public class GridBagConstraints {
+    public static final int RELATIVE = -1;
+    public static final int REMAINDER = 0;
+
+    public static final int NONE = 0;
+    public static final int BOTH = 1;
+    public static final int HORIZONTAL = 2;
+    public static final int VERTICAL = 3;
+
+    public static final int CENTER = 10;
+    public static final int NORTH = 11;
+    public static final int NORTHEAST = 12;
+    public static final int EAST = 13;
+    public static final int SOUTHEAST = 14;
+    public static final int SOUTH = 15;
+    public static final int SOUTHWEST = 16;
+    public static final int WEST = 17;
+    public static final int NORTHWEST = 18;
+
+    public static final int PAGE_START = 19;
+    public static final int PAGE_END = 20;
+    public static final int LINE_START = 21;
+    public static final int LINE_END = 22;
+    public static final int FIRST_LINE_START = 23;
+    public static final int FIRST_LINE_END = 24;
+    public static final int LAST_LINE_START = 25;
+    public static final int LAST_LINE_END = 26;
+
+    public int gridx;
+    public int gridy;
+    public int gridwidth;
+    public int gridheight;
+
+    public double weightx;
+    public double weighty;
+
+    public int anchor;
+    public int fill;
+
+    public Insets insets;
+    public int ipadx;
+    public int ipady;
+
+    public GridBagConstraints(int gridx, int gridy, int gridwidth,
+                              int gridheight, double weightx, double weighty, int anchor,
+<span class="fc" id="L69">                              int fill, Insets insets, int ipadx, int ipady) {</span>
+<span class="fc" id="L70">        this.gridx = gridx;</span>
+<span class="fc" id="L71">        this.gridy = gridy;</span>
+<span class="fc" id="L72">        this.gridwidth = gridwidth;</span>
+<span class="fc" id="L73">        this.gridheight = gridheight;</span>
+<span class="fc" id="L74">        this.weightx = weightx;</span>
+<span class="fc" id="L75">        this.weighty = weighty;</span>
+<span class="fc" id="L76">        this.anchor = anchor;</span>
+<span class="fc" id="L77">        this.fill = fill;</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        this.insets = (insets == null) ? null : (Insets) insets.clone();</span>
+<span class="fc" id="L79">        this.ipadx = ipadx;</span>
+<span class="fc" id="L80">        this.ipady = ipady;</span>
+<span class="fc" id="L81">    }</span>
+
+<span class="fc" id="L83">    public GridBagConstraints() {</span>
+<span class="fc" id="L84">        gridx = RELATIVE;</span>
+<span class="fc" id="L85">        gridy = RELATIVE;</span>
+<span class="fc" id="L86">        gridwidth = 1;</span>
+<span class="fc" id="L87">        gridheight = 1;</span>
+<span class="fc" id="L88">        weightx = 0.;</span>
+<span class="fc" id="L89">        weighty = 0.;</span>
+<span class="fc" id="L90">        anchor = CENTER;</span>
+<span class="fc" id="L91">        fill = NONE;</span>
+<span class="fc" id="L92">        insets = new Insets(0, 0, 0, 0);</span>
+<span class="fc" id="L93">        ipadx = 0;</span>
+<span class="fc" id="L94">        ipady = 0;</span>
+<span class="fc" id="L95">    }</span>
+
+    public Object clone() {
+<span class="fc" id="L98">        return new GridBagConstraints(gridx, gridy, gridwidth, gridheight,</span>
+                weightx, weighty, anchor, fill, insets, ipadx, ipady);
+    }
+
+    void verify() throws IllegalArgumentException {
+<span class="fc" id="L103">        int maxN = GridBagLayout.MAXGRIDSIZE - 1;</span>
+
+<span class="pc bpc" id="L105" title="4 of 6 branches missed.">        if (((gridx != RELATIVE) &amp;&amp; (gridx &lt; 0)) || (gridx &gt;= maxN)) {</span>
+            // awt.9C=wrong value of GridBagConstraints: {0}
+<span class="nc" id="L107">            throw new IllegalArgumentException(&quot;wrong value of GridBagConstraints: &quot; + gridx); //$NON-NLS-1$ //$NON-NLS-2$</span>
+        }
+<span class="pc bpc" id="L109" title="4 of 6 branches missed.">        if (((gridy != RELATIVE) &amp;&amp; (gridy &lt; 0)) || (gridy &gt;= maxN)) {</span>
+            // awt.9C= {0}
+<span class="nc" id="L111">            throw new IllegalArgumentException(&quot;wrong value of GridBagConstraints: &quot; + gridy); //$NON-NLS-1$  //$NON-NLS-2$</span>
+        }
+<span class="pc bpc" id="L113" title="4 of 8 branches missed.">        if (((gridwidth != RELATIVE) &amp;&amp; (gridwidth != REMAINDER) &amp;&amp; (gridwidth &lt; 0))</span>
+                || (gridwidth &gt; maxN)) {
+            // awt.9C={0}
+<span class="nc" id="L116">            throw new IllegalArgumentException(&quot;wrong value of GridBagConstraints: &quot; + gridwidth); //$NON-NLS-1$ //$NON-NLS-2$</span>
+        }
+<span class="pc bpc" id="L118" title="4 of 8 branches missed.">        if (((gridheight != RELATIVE) &amp;&amp; (gridheight != REMAINDER) &amp;&amp; (gridheight &lt; 0))</span>
+                || (gridheight &gt; maxN)) {
+            // awt.9C=
+<span class="nc" id="L121">            throw new IllegalArgumentException(&quot;wrong value of GridBagConstraints: &quot; + gridheight); //$NON-NLS-1$ //$NON-NLS-2$</span>
+        }
+<span class="pc bpc" id="L123" title="6 of 8 branches missed.">        if (((gridx &gt;= 0) || (gridy &gt;= 0))</span>
+                &amp;&amp; ((gridwidth &lt;= 0) || (gridheight &lt;= 0))) {
+<span class="nc" id="L125">            throw new IllegalArgumentException(&quot;relative grid size parameter goes after absolute grid coordinate&quot;); //$NON-NLS-1$</span>
+        }
+<span class="pc bpc" id="L127" title="3 of 4 branches missed.">        if ((gridx != RELATIVE) &amp;&amp; ((gridwidth + gridx) &gt; maxN)) {</span>
+<span class="nc" id="L128">            throw new IllegalArgumentException(&quot;wrong values sum of GridBagConstraints' gridwidth and gridx&quot;); //$NON-NLS-1$</span>
+        }
+<span class="pc bpc" id="L130" title="3 of 4 branches missed.">        if ((gridy != RELATIVE) &amp;&amp; ((gridheight + gridy) &gt; maxN)) {</span>
+            // awt.9F=
+<span class="nc" id="L132">            throw new IllegalArgumentException(&quot;wrong values sum of GridBagConstraints' gridheight and gridy&quot;); //$NON-NLS-1$</span>
+        }
+<span class="pc bpc" id="L134" title="3 of 4 branches missed.">        if ((gridwidth == RELATIVE) &amp;&amp; (gridheight == RELATIVE)) {</span>
+            // awt.100=
+<span class="nc" id="L136">            throw new IllegalArgumentException(&quot;component has RELATIVE width and height&quot;); //$NON-NLS-1$</span>
+        }
+
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (weightx &lt; 0.) {</span>
+            // awt.9C= {0}
+<span class="nc" id="L141">            throw new IllegalArgumentException(&quot;wrong value of GridBagConstraints: &quot; + weightx); //$NON-NLS-1$ //$NON-NLS-2$</span>
+        }
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">        if (weighty &lt; 0.) {</span>
+            // awt.9C=wrong value of GridBagConstraints: {0}
+<span class="nc" id="L145">            throw new IllegalArgumentException(&quot;wrong value of GridBagConstraints: &quot; + weighty); //$NON-NLS-1$ //$NON-NLS-2$</span>
+        }
+
+<span class="pc bpc" id="L148" title="17 of 34 branches missed.">        if ((anchor != CENTER) &amp;&amp; (anchor != NORTH) &amp;&amp; (anchor != NORTHEAST)</span>
+                &amp;&amp; (anchor != EAST) &amp;&amp; (anchor != SOUTHEAST)
+                &amp;&amp; (anchor != SOUTH) &amp;&amp; (anchor != SOUTHWEST)
+                &amp;&amp; (anchor != WEST) &amp;&amp; (anchor != NORTHWEST)
+                &amp;&amp; (anchor != PAGE_START) &amp;&amp; (anchor != PAGE_END)
+                &amp;&amp; (anchor != LINE_START) &amp;&amp; (anchor != LINE_END)
+                &amp;&amp; (anchor != FIRST_LINE_START) &amp;&amp; (anchor != FIRST_LINE_END)
+                &amp;&amp; (anchor != LAST_LINE_START) &amp;&amp; (anchor != LAST_LINE_END)) {
+            // awt.9C=wrong value of GridBagConstraints: {0}
+<span class="fc" id="L157">            throw new IllegalArgumentException(&quot;wrong value of GridBagConstraints: &quot; + anchor); //$NON-NLS-1$ //$NON-NLS-2$</span>
+        }
+<span class="nc bnc" id="L159" title="All 8 branches missed.">        if ((fill != NONE) &amp;&amp; (fill != HORIZONTAL) &amp;&amp; (fill != VERTICAL)</span>
+                &amp;&amp; (fill != BOTH)) {
+            // awt.9C=wrong value of GridBagConstraints: {0}
+<span class="nc" id="L162">            throw new IllegalArgumentException(&quot;wrong value of GridBagConstraints: &quot; + fill); //$NON-NLS-1$ //$NON-NLS-2$</span>
+        }
+
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        if (ipadx &lt; 0) {</span>
+            // awt.9C=wrong value of GridBagConstraints: {0}
+<span class="nc" id="L167">            throw new IllegalArgumentException(&quot;wrong value of GridBagConstraints: &quot; + ipadx); //$NON-NLS-1$ //$NON-NLS-2$</span>
+        }
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        if (ipady &lt; 0) {</span>
+            // awt.9C=wrong value of GridBagConstraints: {0}
+<span class="nc" id="L171">            throw new IllegalArgumentException(&quot;wrong value of GridBagConstraints: &quot; + ipady); //$NON-NLS-1$ //$NON-NLS-2$</span>
+        }
+<span class="nc bnc" id="L173" title="All 10 branches missed.">        if ((insets == null) || (insets.left &lt; 0) || (insets.left &lt; 0)</span>
+                || (insets.left &lt; 0) || (insets.left &lt; 0)) {
+            // awt.9C=wrong value of GridBagConstraints: {0}
+<span class="nc" id="L176">            throw new IllegalArgumentException(&quot;wrong value of GridBagConstraints: &quot; + insets); //$NON-NLS-1$ //$NON-NLS-2$</span>
+        }
+<span class="nc" id="L178">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AudioBuffer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media</a> &gt; <span class="el_source">AudioBuffer.java</span></div><h1>AudioBuffer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media;
+
+import java.util.ArrayList;
+
+/**
+ * This class can be used to capture raw PCM data from the device's microphone.
+ * AudioBuffers should be obtained via the {@link MediaManager#getAudioBuffer(java.lang.String, boolean, int) }
+ * method.
+ *
+ * @author shannah
+ */
+public class AudioBuffer {
+<span class="fc" id="L35">    private final Object refLock = new Object();</span>
+    private int refCounter;
+    /**
+     * Registered callbacks to be notified when the contents of this buffer changes.
+     */
+<span class="fc" id="L40">    private final ArrayList&lt;AudioBufferCallback&gt; callbacks = new ArrayList&lt;AudioBufferCallback&gt;();</span>
+    /**
+     * The buffer contents.
+     */
+    private final float[] buffer;
+    private final float[] tmpDownSampleBuffer;
+    /**
+     * Internal flag used to indicate that we are currently firing callbacks.  This is used
+     * internally to prevent modification of the callbacks array while we are firing callbacks.
+     * A call is made to addCallback or removeCallback while this flag is set, then,
+     * the add/remove will be delated until after the fireCallback sequence is complete
+     * so we don't get a concurrentModificationException on the callbacks list.
+     */
+<span class="fc" id="L53">    private boolean inFireFrame = false;</span>
+    /**
+     * Used to store pending add/remove calls while inFireFrame is true.  These are all
+     * executed when the callbacks have all finished firing.
+     */
+<span class="fc" id="L58">    private final ArrayList&lt;Runnable&gt; pendingOps = new ArrayList&lt;Runnable&gt;();</span>
+    /**
+     * The current size of the buffer.  Every time the buffer contents are changed, this value
+     * is set.  This is not to be confused with the maximum buffer size.
+     */
+    private int size;
+    private int sampleRate;
+    private int numChannels;
+
+    /**
+     * Creates a new AudioBuffer with the given maximum size.
+     *
+     * @param maxSize The maximum size of the buffer.
+     */
+<span class="fc" id="L72">    public AudioBuffer(int maxSize) {</span>
+<span class="fc" id="L73">        buffer = new float[maxSize];</span>
+<span class="fc" id="L74">        tmpDownSampleBuffer = new float[maxSize];</span>
+<span class="fc" id="L75">    }</span>
+
+    int retain() {
+<span class="fc" id="L78">        synchronized (refLock) {</span>
+<span class="fc" id="L79">            refCounter++;</span>
+<span class="fc" id="L80">            return refCounter;</span>
+        }
+    }
+
+    int release() {
+<span class="fc" id="L85">        synchronized (refLock) {</span>
+<span class="fc" id="L86">            refCounter--;</span>
+<span class="fc" id="L87">            return refCounter;</span>
+        }
+    }
+
+    /**
+     * Copies data into the buffer from the given source buffer.  This will trigger the callbacks' {@link AudioBufferCallback#frameReceived(com.codename1.media.AudioBuffer) }
+     * method.
+     *
+     * @param source The source buffer to copy from.
+     */
+    public void copyFrom(AudioBuffer source) {
+<span class="nc" id="L98">        copyFrom(source.getSampleRate(), source.getNumChannels(), source.buffer, 0, source.size);</span>
+<span class="nc" id="L99">    }</span>
+
+    /**
+     * Copies data from the source array into this buffer. This will trigger the callbacks' {@link AudioBufferCallback#frameReceived(com.codename1.media.AudioBuffer) }
+     * method.
+     *
+     * @param source
+     */
+    public void copyFrom(int sampleRate, int numChannels, float[] source) {
+<span class="fc" id="L108">        copyFrom(sampleRate, numChannels, source, 0, source.length);</span>
+<span class="fc" id="L109">    }</span>
+
+    /**
+     * Copies data from the source array (in the given range) into the buffer. This will trigger the callbacks' {@link AudioBufferCallback#frameReceived(com.codename1.media.AudioBuffer) }
+     * method.
+     *
+     * @param source The source array to copy data from.
+     * @param offset The offset in the source array to begin copying from.
+     * @param len    The length of the range to copy.
+     */
+    public void copyFrom(int sampleRate, int numChannels, float[] source, int offset, int len) {
+<span class="pc bpc" id="L120" title="1 of 2 branches missed.">        if (len &gt; buffer.length) {</span>
+<span class="nc" id="L121">            throw new IllegalArgumentException(&quot;Buffer size is &quot; + buffer.length + &quot; but attempt to copy &quot; + len + &quot; samples into it&quot;);</span>
+        }
+<span class="fc" id="L123">        this.sampleRate = sampleRate;</span>
+<span class="fc" id="L124">        this.numChannels = numChannels;</span>
+<span class="fc" id="L125">        System.arraycopy(source, offset, buffer, 0, len);</span>
+<span class="fc" id="L126">        size = len;</span>
+<span class="fc" id="L127">        fireFrameReceived();</span>
+<span class="fc" id="L128">    }</span>
+
+    /**
+     * Copies data to another audio buffer. This will trigger callbacks in the destination.
+     *
+     * @param dest The destination audio buffer.
+     */
+    public void copyTo(AudioBuffer dest) {
+<span class="nc" id="L136">        dest.copyFrom(this);</span>
+<span class="nc" id="L137">    }</span>
+
+    /**
+     * Copies data from this buffer to the given float array.
+     *
+     * @param dest The destination float array to copy to.
+     */
+    public void copyTo(float[] dest) {
+<span class="fc" id="L145">        copyTo(dest, 0);</span>
+<span class="fc" id="L146">    }</span>
+
+    /**
+     * Copies data from this buffer to the given float array.
+     *
+     * @param dest   The destination float array.
+     * @param offset The offset in the destination array to start copying to.
+     */
+    public void copyTo(float[] dest, int offset) {
+<span class="fc" id="L155">        int len = size;</span>
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (dest.length &lt; offset + len) {</span>
+<span class="nc" id="L157">            throw new IllegalArgumentException(&quot;Destination is not big enough to store len &quot; + len + &quot; at offset &quot; + offset + &quot;.  Length only &quot; + dest.length);</span>
+        }
+
+<span class="fc" id="L160">        System.arraycopy(buffer, 0, dest, offset, len);</span>
+<span class="fc" id="L161">    }</span>
+
+    /**
+     * The current size of the buffer.  This value will be changed each time data is copied into the buffer to reflect the current size of the data.
+     *
+     * @return
+     */
+    public int getSize() {
+<span class="fc" id="L169">        return size;</span>
+    }
+
+    /**
+     * Gets the maximum size of the buffer.  Trying to copy more than this amount of data into the buffer will result in an IndexOutOfBoundsException.
+     *
+     * @return
+     */
+    public int getMaxSize() {
+<span class="fc" id="L178">        return buffer.length;</span>
+    }
+
+    /**
+     * Called when a frame is received.  This will call the {@link AudioBufferCallback#frameReceived(com.codename1.media.AudioBuffer) } method in all
+     * registered callbacks.
+     */
+    private void fireFrameReceived() {
+<span class="fc" id="L186">        inFireFrame = true;</span>
+
+        try {
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            for (AudioBufferCallback l : callbacks) {</span>
+<span class="fc" id="L190">                l.frameReceived(this);</span>
+<span class="fc" id="L191">            }</span>
+        } finally {
+<span class="fc" id="L193">            inFireFrame = false;</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">            while (!pendingOps.isEmpty()) {</span>
+<span class="nc" id="L195">                Runnable r = pendingOps.remove(0);</span>
+<span class="nc" id="L196">                r.run();</span>
+<span class="nc" id="L197">            }</span>
+        }
+<span class="fc" id="L199">    }</span>
+
+    /**
+     * Adds a callback to be notified when the contents of this buffer are changed.
+     *
+     * @param l The AudioBufferCallback
+     */
+    public void addCallback(final AudioBufferCallback l) {
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">        if (inFireFrame) {</span>
+<span class="nc" id="L208">            pendingOps.add(new Runnable() {</span>
+                public void run() {
+<span class="nc" id="L210">                    callbacks.add(l);</span>
+<span class="nc" id="L211">                }</span>
+            });
+        } else {
+<span class="fc" id="L214">            callbacks.add(l);</span>
+        }
+<span class="fc" id="L216">    }</span>
+
+    /**
+     * Removes a callback from the audio buffer.
+     *
+     * @param l The callback to remove.
+     */
+    public void removeCallback(final AudioBufferCallback l) {
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        if (inFireFrame) {</span>
+<span class="nc" id="L225">            pendingOps.add(new Runnable() {</span>
+                public void run() {
+<span class="nc" id="L227">                    callbacks.remove(l);</span>
+<span class="nc" id="L228">                }</span>
+            });
+        } else {
+<span class="nc" id="L231">            callbacks.remove(l);</span>
+        }
+<span class="nc" id="L233">    }</span>
+
+    /**
+     * @return the sampleRate
+     */
+    public int getSampleRate() {
+<span class="fc" id="L239">        return sampleRate;</span>
+    }
+
+    /**
+     * @return the numChannels
+     */
+    public int getNumChannels() {
+<span class="nc" id="L246">        return numChannels;</span>
+    }
+
+    /**
+     * Downsamples the buffer to the given rate.  This will change the result of
+     * {@link #getSize() } and {@link #getSampleRate() }.
+     * &lt;p&gt;
+     * Note:  This should only be called inside the AudioBuffer callback since it is
+     * modifying the contents of the buffer.
+     *
+     * @param targetSampleRate The new target rate.
+     */
+    public void downSample(int targetSampleRate) {
+
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">        if (targetSampleRate == sampleRate) {</span>
+<span class="nc" id="L261">            return;</span>
+        }
+<span class="pc bpc" id="L263" title="1 of 2 branches missed.">        if (targetSampleRate &gt; sampleRate) {</span>
+<span class="nc" id="L264">            throw new IllegalArgumentException(&quot;downsample() expects a target rate that it same or lower than current sample rate.  Current rate=&quot; + sampleRate + &quot; target rate requested=&quot; + targetSampleRate);</span>
+        }
+<span class="fc" id="L266">        float ratio = targetSampleRate / (float) sampleRate;</span>
+
+<span class="fc" id="L268">        float stepSize = 1 / ratio;</span>
+<span class="fc" id="L269">        int len = size;</span>
+<span class="fc" id="L270">        int j = 0;</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        for (int channel = 0; channel &lt; numChannels; channel++) {</span>
+<span class="pc bpc" id="L272" title="1 of 2 branches missed.">            if (numChannels == 1) {</span>
+<span class="fc" id="L273">                System.arraycopy(buffer, 0, tmpDownSampleBuffer, 0, len);</span>
+            } else {
+<span class="nc" id="L275">                int k = 0;</span>
+<span class="nc bnc" id="L276" title="All 2 branches missed.">                for (int i = 0; i &lt; size; i += numChannels) {</span>
+<span class="nc" id="L277">                    tmpDownSampleBuffer[k++] = buffer[i + channel];</span>
+                }
+            }
+<span class="fc" id="L280">            len = size / numChannels;</span>
+<span class="fc bfc" id="L281" title="All 2 branches covered.">            for (float i = 0; i &lt; len; i += stepSize) {</span>
+
+<span class="fc" id="L283">                int i0 = (int) Math.floor(i);</span>
+<span class="fc" id="L284">                int i1 = (int) Math.ceil(i);</span>
+<span class="pc bpc" id="L285" title="3 of 4 branches missed.">                if (i1 == i0 || i1 &gt; len - 1) {</span>
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">                    if (i0 &gt; len - 1) {</span>
+<span class="nc" id="L287">                        break;</span>
+                    }
+<span class="fc" id="L289">                    buffer[j + channel] = tmpDownSampleBuffer[i0];</span>
+<span class="fc" id="L290">                    j += numChannels;</span>
+                } else {
+<span class="nc" id="L292">                    float v0 = tmpDownSampleBuffer[i0];</span>
+<span class="nc" id="L293">                    float v1 = tmpDownSampleBuffer[i1];</span>
+<span class="nc" id="L294">                    float t = Math.round(i) - i0;</span>
+<span class="nc" id="L295">                    float v = v0 + t * (v1 - v0);</span>
+<span class="nc" id="L296">                    buffer[j + channel] = v;</span>
+<span class="nc" id="L297">                    j += numChannels;</span>
+
+                }
+
+            }
+        }
+
+<span class="fc" id="L304">        size = j;</span>
+<span class="fc" id="L305">        sampleRate = targetSampleRate;</span>
+
+
+<span class="fc" id="L308">    }</span>
+
+
+    /**
+     * A callback that can be registered to receive notifications when the contents of the
+     * AudioBuffer is changed.
+     * &lt;p&gt;&lt;strong&gt;IMPORTANT:&lt;/strong&gt; There are no guarantees what thread this callback will be
+     * run on, and it will almost never occur on the EDT.&lt;/p&gt;
+     */
+    public interface AudioBufferCallback {
+        /**
+         * Method called when the contents of the AudioBuffer are changed.
+         * &lt;p&gt;&lt;strong&gt;IMPORTANT:&lt;/strong&gt; There are no guarantees what thread this callback will be
+         * run on, and it will almost never occur on the EDT.&lt;/p&gt;
+         *
+         * @param buffer
+         */
+        void frameReceived(AudioBuffer buffer);
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
