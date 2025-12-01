@@ -47,8 +47,10 @@ class AutocompletePopupFormTest extends UITestBase {
         assertEquals(5, suggestionList.getModel().getSize());
         assertEquals(5, suggestionList.getMinElementHeight(), "Minimum elements hint should propagate to list");
 
-        implementation.dispatchPointerPressAndRelease(suggestionList.getAbsoluteX() + 1, suggestionList.getAbsoluteY() + 1);
+        implementation.tapComponent(suggestionList);
+        DisplayTest.flushEdt();
         flushSerialCalls();
+        DisplayTest.flushEdt();
 
         assertEquals("Red", field.getText(), "Selecting the first suggestion should update the text");
         assertFalse(popup.isVisible(), "Popup should hide after selection");
