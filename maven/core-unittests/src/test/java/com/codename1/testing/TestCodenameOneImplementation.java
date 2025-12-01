@@ -61,6 +61,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * Lightweight {@link CodenameOneImplementation} used by unit tests.  It provides deterministic,
@@ -183,6 +184,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private VideoCaptureConstraints lastVideoConstraints;
     private final List<AudioCaptureFrame> audioCaptureFrames = new ArrayList<AudioCaptureFrame>();
     private TextArea activeTextEditor;
+    private Function<String, byte[]> connectionResponseProvider;
 
 
     public TestCodenameOneImplementation() {
@@ -1821,7 +1823,18 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         if (write) {
             connection.writeRequested = true;
         }
+        if (connectionResponseProvider != null) {
+            byte[] response = connectionResponseProvider.apply(url);
+            if (response != null) {
+                connection.setInputData(response);
+                connection.setContentLength(response.length);
+            }
+        }
         return connection;
+    }
+
+    public void setConnectionResponseProvider(Function<String, byte[]> provider) {
+        this.connectionResponseProvider = provider;
     }
 
     public TestConnection getConnection(String url) {
