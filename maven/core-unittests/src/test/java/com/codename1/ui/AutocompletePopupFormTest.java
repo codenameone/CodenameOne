@@ -3,9 +3,9 @@ package com.codename1.ui;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation;
-import com.codename1.ui.Display;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.DisplayTest;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -27,7 +27,9 @@ class AutocompletePopupFormTest extends UITestBase {
 
         form.add(content);
         form.show();
+        DisplayTest.flushEdt();
         flushSerialCalls();
+        DisplayTest.flushEdt();
 
         Container layered = form.getLayeredPane(AutoCompleteTextField.class, true);
         assertTrue(layered.getComponentCount() > 0, "Popup wrapper should be attached to layered pane");
@@ -36,13 +38,9 @@ class AutocompletePopupFormTest extends UITestBase {
         assertFalse(popup.isVisible(), "Popup should be hidden initially");
 
         implementation.tapComponent(open);
+        DisplayTest.flushEdt();
         flushSerialCalls();
-
-        // Process any pending form revalidation triggered by the popup visibility change
-        Display.getInstance().callSeriallyAndWait(new Runnable() {
-            public void run() {
-            }
-        });
+        DisplayTest.flushEdt();
 
         assertTrue(popup.isVisible(), "Popup should become visible after triggering showPopup");
         com.codename1.ui.List suggestionList = (com.codename1.ui.List) popup.getComponentAt(0);
