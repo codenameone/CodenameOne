@@ -124,6 +124,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private Media mediaRecorder;
     private boolean trueTypeSupported = true;
     private static TestCodenameOneImplementation instance;
+
+    private boolean autoProcessConnections = true;
     private Map<String, String> properties = new HashMap<>();
     private boolean blockCopyAndPaste;
     private PeerComponent browserComponent;
@@ -2342,7 +2344,17 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         if (r != null) {
             queuedRequests.add(r);
         }
-        super.addConnectionToQueue(r);
+        if (autoProcessConnections) {
+            super.addConnectionToQueue(r);
+        }
+    }
+
+    public boolean isAutoProcessConnections() {
+        return autoProcessConnections;
+    }
+
+    public void setAutoProcessConnections(boolean autoProcessConnections) {
+        this.autoProcessConnections = autoProcessConnections;
     }
 
     public void clearQueuedRequests() {
