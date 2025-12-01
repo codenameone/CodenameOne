@@ -61,6 +61,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * Lightweight {@link CodenameOneImplementation} used by unit tests.  It provides deterministic,
@@ -123,6 +124,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private Media mediaRecorder;
     private boolean trueTypeSupported = true;
     private static TestCodenameOneImplementation instance;
+
+    private boolean autoProcessConnections = true;
     private Map<String, String> properties = new HashMap<>();
     private boolean blockCopyAndPaste;
     private PeerComponent browserComponent;
@@ -183,6 +186,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private VideoCaptureConstraints lastVideoConstraints;
     private final List<AudioCaptureFrame> audioCaptureFrames = new ArrayList<AudioCaptureFrame>();
     private TextArea activeTextEditor;
+    private Function<String, byte[]> connectionResponseProvider;
 
 
     public TestCodenameOneImplementation() {
@@ -1267,9 +1271,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         final boolean reenter = beginAllowingEditDuringKey(keyCode);
         if (editing != null && shouldInsertCharacter(editing.isEditable(), keyCode)) {
             insertCharacter(editing, (char) keyCode, editing.getMaxSize());
+        } else {
+            display.keyPressed(keyCode);
+            display.keyReleased(keyCode);
         }
-        display.keyPressed(keyCode);
-        display.keyReleased(keyCode);
         if (reenter) {
             display.callSerially(new Runnable() {
                 public void run() {
@@ -1820,7 +1825,18 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         if (write) {
             connection.writeRequested = true;
         }
+        if (connectionResponseProvider != null) {
+            byte[] response = connectionResponseProvider.apply(url);
+            if (response != null) {
+                connection.setInputData(response);
+                connection.setContentLength(response.length);
+            }
+        }
         return connection;
+    }
+
+    public void setConnectionResponseProvider(Function<String, byte[]> provider) {
+        this.connectionResponseProvider = provider;
     }
 
     public TestConnection getConnection(String url) {
@@ -2328,7 +2344,17 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         if (r != null) {
             queuedRequests.add(r);
         }
-        super.addConnectionToQueue(r);
+        if (autoProcessConnections) {
+            super.addConnectionToQueue(r);
+        }
+    }
+
+    public boolean isAutoProcessConnections() {
+        return autoProcessConnections;
+    }
+
+    public void setAutoProcessConnections(boolean autoProcessConnections) {
+        this.autoProcessConnections = autoProcessConnections;
     }
 
     public void clearQueuedRequests() {
