@@ -18,7 +18,7 @@ class AutocompletePopupFormTest extends UITestBase {
         AutoCompleteTextField field = new AutoCompleteTextField("Red", "Green", "Blue", "Orange", "Yellow");
         field.setMinimumElementsShownInPopup(5);
 
-        Button open = new Button();
+        Button open = new Button("Open");
         Container content = new Container(new BorderLayout());
         content.add(BorderLayout.CENTER, field);
         content.add(BorderLayout.EAST, open);
@@ -34,7 +34,10 @@ class AutocompletePopupFormTest extends UITestBase {
         Container popup = (Container) popupWrapper.getComponentAt(0);
         assertFalse(popup.isVisible(), "Popup should be hidden initially");
 
-        TestCodenameOneImplementation.getInstance().tapComponent(open);
+        TestCodenameOneImplementation.getInstance().dispatchPointerPressAndRelease(
+                open.getAbsoluteX() + open.getWidth() / 2,
+                open.getAbsoluteY() + open.getHeight() / 2
+        );
         flushSerialCalls();
 
         assertTrue(popup.isVisible(), "Popup should become visible after triggering showPopup");
