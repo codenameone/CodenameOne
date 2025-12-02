@@ -35,11 +35,12 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         final AutoCompleteTextField field;
         AutoCompleteTextComponent.AutoCompleteFilter filter;
         AutoCompleteTextComponent component;
+        final DefaultListModel<String> localModel = new DefaultListModel<String>();
 
         filter = new AutoCompleteTextComponent.AutoCompleteFilter() {
             public boolean filter(String text) {
                 filtered.add(text);
-                DefaultListModel<String> model = (DefaultListModel<String>) suggestionModel;
+                DefaultListModel<String> model = localModel;
                 if (text.length() == 0) {
                     model.removeAll();
                     return true;
@@ -48,16 +49,15 @@ public class AutoCompleteTextComponentTest extends UITestBase {
                 return text.length() > 0;
             }
         };
-        component = new AutoCompleteTextComponent(suggestionModel, filter);
+        component = new AutoCompleteTextComponent(localModel, filter);
         field = component.getAutoCompleteField();
         assertSame(field, component.getField(), "getField should expose the underlying AutoCompleteTextField");
         assertSame(field, component.getEditor(), "getEditor should return the AutoCompleteTextField instance");
 
         form.add(component);
+        field.setMinimumLength(1);
         form.show();
         flushSerialCalls();
-
-        field.setMinimumLength(1);
         implementation.tapComponent(field);
         flushSerialCalls();
 
@@ -173,7 +173,7 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         flushSerialCalls();
 
         final List<String> filteredInputs = new ArrayList<String>();
-        final DefaultListModel<String> colors = new DefaultListModel<String>(new String[]{"Red", "Green", "Blue"});
+        final DefaultListModel<String> colors = new DefaultListModel<String>();
         AutoCompleteTextComponent.AutoCompleteFilter filter = new AutoCompleteTextComponent.AutoCompleteFilter() {
             public boolean filter(String text) {
                 filteredInputs.add(text);
@@ -185,7 +185,9 @@ public class AutoCompleteTextComponentTest extends UITestBase {
                     }
                     return true;
                 }
-                colors.removeAll();
+                if (colors.getSize() > 0) {
+                    colors.removeAll();
+                }
                 return true;
             }
         };
@@ -194,10 +196,9 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         component.label("Color");
         component.hint("Type a color");
         form.add(component);
+        field.setMinimumLength(2);
         form.revalidate();
         flushSerialCalls();
-
-        field.setMinimumLength(2);
         implementation.tapComponent(field);
         flushSerialCalls();
 
