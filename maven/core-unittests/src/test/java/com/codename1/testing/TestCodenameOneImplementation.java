@@ -1304,6 +1304,17 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         dispatchPointerPressAndRelease(x, y);
     }
 
+    public void tapListRow(com.codename1.ui.List list, int rowIndex) {
+        if (list == null) {
+            return;
+        }
+        int visibleRows = Math.min(Math.max(1, list.getMinElementHeight()), list.getModel().getSize());
+        int rowHeight = list.getHeight() / visibleRows;
+        int x = list.getAbsoluteX() + list.getWidth() / 2;
+        int y = list.getAbsoluteY() + Math.max(0, rowIndex) * rowHeight + rowHeight / 2;
+        dispatchPointerPressAndRelease(x, y);
+    }
+
     private boolean beginAllowingEditDuringKey(int keyCode) {
         TextArea area = getActiveEditingArea();
         if (area == null) {
