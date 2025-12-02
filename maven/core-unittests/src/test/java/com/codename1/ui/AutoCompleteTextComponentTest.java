@@ -2,11 +2,14 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.ComponentSelector;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.list.DefaultListModel;
+import com.codename1.ui.list.ListCellRenderer;
 import com.codename1.ui.list.ListModel;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.layouts.BoxLayout;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -122,6 +125,72 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         assertEquals(5, field.getColumns());
         assertEquals(2, field.getRows());
         assertEquals(TextArea.PHONENUMBER, field.getConstraint());
+    }
+
+    @FormTest
+    void autoCompleteComponentRequiresMultipleCharactersForPopup() {
+        Form form = new Form("AutoComplete", BoxLayout.y());
+        form.show();
+        flushSerialCalls();
+
+        final List<String> filteredInputs = new ArrayList<String>();
+        AutoCompleteTextComponent.AutoCompleteFilter filter = new AutoCompleteTextComponent.AutoCompleteFilter() {
+            public boolean filter(String text) {
+                filteredInputs.add(text);
+                return text.trim().length() > 1;
+            }
+        };
+
+        ListModel<String> colors = new DefaultListModel<String>(new String[]{"Red", "Green", "Blue"});
+        AutoCompleteTextComponent component = new AutoCompleteTextComponent(colors, filter);
+        component.label("Color");
+        component.hint("Type a color");
+        form.add(component);
+        form.revalidate();
+        flushSerialCalls();
+
+        AutoCompleteTextField field = component.getAutoCompleteField();
+        field.setMinimumLength(0);
+        implementation.tapComponent(field);
+        flushSerialCalls();
+
+        implementation.dispatchKeyPress('r');
+        flushSerialCalls();
+        assertEquals("r", field.getText());
+
+        ComponentSelector listsAfterSingle = ComponentSelector.$("AutoCompleteList", form);
+        assertEquals(0, listsAfterSingle.size(), "Popup should remain hidden when the filter rejects input");
+        assertTrue(filteredInputs.contains("r"));
+
+        implementation.dispatchKeyPress('e');
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+
+        ComponentSelector listsAfterDouble = ComponentSelector.$("AutoCompleteList", form);
+        assertEquals(1, listsAfterDouble.size(), "Popup should appear after entering enough text");
+
+        com.codename1.ui.List popupList = (com.codename1.ui.List) listsAfterDouble.iterator().next();
+        assertTrue(popupList.isVisible());
+        assertTrue(popupList.getModel().getSize() > 0);
+
+        Object firstValue = popupList.getModel().getItemAt(0);
+        @SuppressWarnings({"rawtypes", "unchecked"})
+        ListCellRenderer renderer = (ListCellRenderer) popupList.getRenderer();
+        Dimension cellSize = renderer.getListCellRendererComponent(popupList, firstValue, 0, true).getPreferredSize();
+        int selectX = popupList.getAbsoluteX() + Math.max(1, Math.min(cellSize.getWidth(), popupList.getWidth()) / 2);
+        int selectY = popupList.getAbsoluteY() + Math.max(1, Math.min(cellSize.getHeight(), popupList.getHeight()) / 2);
+        implementation.dispatchPointerPressAndRelease(selectX, selectY);
+        flushSerialCalls();
+
+        if (!"Red".equals(field.getText())) {
+            popupList.setSelectedIndex(0);
+            popupList.fireActionEvent();
+            flushSerialCalls();
+        }
+
+        assertEquals("Red", field.getText());
+        assertEquals("Red", component.getText());
+        assertTrue(filteredInputs.contains("re"));
     }
 
     private enum AcceptAllFilter implements AutoCompleteTextComponent.AutoCompleteFilter {
