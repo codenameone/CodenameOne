@@ -8284,8 +8284,8 @@ JAVA_LONG com_codename1_impl_ios_IOSNative_nativePathRendererCreateTexture___lon
         GLuint tex=0;
         JAVA_INT x = min(outputBounds[0], outputBounds[2]);
         JAVA_INT y = min(outputBounds[1], outputBounds[3]);
-        JAVA_INT width = outputBounds[2]-outputBounds[0];
-        JAVA_INT height = outputBounds[3]-outputBounds[1];
+        JAVA_INT width = (outputBounds[2]-outputBounds[0]) + 1;
+        JAVA_INT height = (outputBounds[3]-outputBounds[1]) + 1;
         
         if ( width < 0 ) width = -width;
         if ( height < 0 ) height = -height;

@@ -2052,7 +2052,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         if ( tex == 0 ){
             return null;
         }
-        return new TextureAlphaMask(tex, new Rectangle(bounds[0], bounds[1], bounds[2]-bounds[0], bounds[3]-bounds[1]), padding);
+        return new TextureAlphaMask(tex, new Rectangle(bounds[0], bounds[1], (bounds[2]-bounds[0]) + 1, (bounds[3]-bounds[1]) + 1), padding);
     }
     
     @Override
@@ -2061,7 +2061,7 @@ public class IOSImplementation extends CodenameOneImplementation {
         int[] argb = renderer.toARGB(color);
         int[] bounds = new int[4];
         renderer.getOutputBounds(bounds);
-        Image out = Image.createImage(argb, bounds[2]-bounds[0], bounds[3]-bounds[1]);
+        Image out = Image.createImage(argb, (bounds[2]-bounds[0]) + 1, (bounds[3]-bounds[1]) + 1);
         renderer.destroy();
         return out;
     }
