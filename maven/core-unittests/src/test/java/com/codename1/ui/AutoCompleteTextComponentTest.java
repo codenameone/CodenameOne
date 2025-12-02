@@ -32,20 +32,26 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         Form form = new Form("AutoComplete", BoxLayout.y());
 
         final List<String> filtered = new ArrayList<String>();
-        AutoCompleteTextComponent.AutoCompleteFilter filter = new AutoCompleteTextComponent.AutoCompleteFilter() {
+        final AutoCompleteTextField field;
+        AutoCompleteTextComponent.AutoCompleteFilter filter;
+        AutoCompleteTextComponent component;
+
+        component = new AutoCompleteTextComponent(suggestionModel, null);
+        field = component.getAutoCompleteField();
+        filter = new AutoCompleteTextComponent.AutoCompleteFilter() {
             public boolean filter(String text) {
                 filtered.add(text);
                 DefaultListModel<String> model = (DefaultListModel<String>) suggestionModel;
                 if (text.length() == 0) {
                     model.removeAll();
+                    field.hidePopup();
                     return true;
                 }
                 ensureSuggestions(model);
                 return text.length() > 0;
             }
         };
-        AutoCompleteTextComponent component = new AutoCompleteTextComponent(suggestionModel, filter);
-        AutoCompleteTextField field = component.getAutoCompleteField();
+        component.setFilter(filter);
         assertSame(field, component.getField(), "getField should expose the underlying AutoCompleteTextField");
         assertSame(field, component.getEditor(), "getEditor should return the AutoCompleteTextField instance");
 
@@ -170,6 +176,8 @@ public class AutoCompleteTextComponentTest extends UITestBase {
 
         final List<String> filteredInputs = new ArrayList<String>();
         final DefaultListModel<String> colors = new DefaultListModel<String>(new String[]{"Red", "Green", "Blue"});
+        AutoCompleteTextComponent component = new AutoCompleteTextComponent(colors, null);
+        final AutoCompleteTextField field = component.getAutoCompleteField();
         AutoCompleteTextComponent.AutoCompleteFilter filter = new AutoCompleteTextComponent.AutoCompleteFilter() {
             public boolean filter(String text) {
                 filteredInputs.add(text);
@@ -182,17 +190,17 @@ public class AutoCompleteTextComponentTest extends UITestBase {
                     return true;
                 }
                 colors.removeAll();
+                field.hidePopup();
                 return true;
             }
         };
-        AutoCompleteTextComponent component = new AutoCompleteTextComponent(colors, filter);
+        component.setFilter(filter);
         component.label("Color");
         component.hint("Type a color");
         form.add(component);
         form.revalidate();
         flushSerialCalls();
 
-        AutoCompleteTextField field = component.getAutoCompleteField();
         field.setMinimumLength(2);
         implementation.tapComponent(field);
         flushSerialCalls();
