@@ -47,7 +47,7 @@ class AutocompletePopupFormTest extends UITestBase {
         assertEquals(5, suggestionList.getModel().getSize());
         assertEquals(5, suggestionList.getMinElementHeight(), "Minimum elements hint should propagate to list");
 
-        implementation.tapComponent(suggestionList);
+        implementation.tapListRow(suggestionList, 0);
         DisplayTest.flushEdt();
         flushSerialCalls();
         DisplayTest.flushEdt();
