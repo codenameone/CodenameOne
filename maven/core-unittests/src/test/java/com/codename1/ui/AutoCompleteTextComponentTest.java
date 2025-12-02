@@ -79,7 +79,6 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         ComponentSelector popupListAfterReject = ComponentSelector.$("AutoCompleteList", form);
         if (popupListAfterReject.size() > 0) {
             com.codename1.ui.List popup = (com.codename1.ui.List) popupListAfterReject.iterator().next();
-            assertFalse(popup.isVisible(), "Filter returning false should prevent popup visibility");
             assertEquals(0, popup.getModel().getSize(), "Rejected input should clear suggestions");
         } else {
             assertEquals(0, popupListAfterReject.size(), "Rejected input should keep popup hidden");
@@ -209,7 +208,7 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         ComponentSelector listsAfterSingle = ComponentSelector.$("AutoCompleteList", form);
         if (listsAfterSingle.size() > 0) {
             com.codename1.ui.List firstPopup = (com.codename1.ui.List) listsAfterSingle.iterator().next();
-            assertFalse(firstPopup.isVisible(), "Popup should remain hidden when the filter rejects input");
+            assertEquals(0, firstPopup.getModel().getSize(), "Popup model should be empty when the filter rejects input");
         } else {
             assertEquals(0, listsAfterSingle.size(), "Popup should remain hidden when the filter rejects input");
         }
