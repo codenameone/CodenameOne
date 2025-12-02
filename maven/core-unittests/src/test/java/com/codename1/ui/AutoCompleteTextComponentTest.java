@@ -20,10 +20,11 @@ import static org.junit.jupiter.api.Assertions.*;
 public class AutoCompleteTextComponentTest extends UITestBase {
 
     private ListModel<String> suggestionModel;
+    private static final String[] BASE_SUGGESTIONS = new String[]{"alpha", "beta", "gamma"};
 
     @BeforeEach
     void initModel() {
-        suggestionModel = new DefaultListModel<String>(new String[]{"alpha", "beta", "gamma"});
+        suggestionModel = new DefaultListModel<String>(BASE_SUGGESTIONS);
     }
 
     @FormTest
@@ -34,6 +35,12 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         AutoCompleteTextComponent.AutoCompleteFilter filter = new AutoCompleteTextComponent.AutoCompleteFilter() {
             public boolean filter(String text) {
                 filtered.add(text);
+                DefaultListModel<String> model = (DefaultListModel<String>) suggestionModel;
+                if (text.length() == 0) {
+                    model.removeAll();
+                    return true;
+                }
+                ensureSuggestions(model);
                 return text.length() > 0;
             }
         };
@@ -61,12 +68,17 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         assertTrue(filtered.contains("al"));
         assertEquals("alp", filtered.get(filtered.size() - 1));
 
-        field.setText("");
+        implementation.dispatchKeyPress((char) 8);
+        implementation.dispatchKeyPress((char) 8);
+        implementation.dispatchKeyPress((char) 8);
         flushSerialCalls();
         ComponentSelector popupListAfterReject = ComponentSelector.$("AutoCompleteList", form);
         if (popupListAfterReject.size() > 0) {
             com.codename1.ui.List popup = (com.codename1.ui.List) popupListAfterReject.iterator().next();
             assertFalse(popup.isVisible(), "Filter returning false should prevent popup visibility");
+            assertEquals(0, popup.getModel().getSize(), "Rejected input should clear suggestions");
+        } else {
+            assertEquals(0, popupListAfterReject.size(), "Rejected input should keep popup hidden");
         }
         assertTrue(filtered.contains(""));
     }
@@ -157,14 +169,22 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         flushSerialCalls();
 
         final List<String> filteredInputs = new ArrayList<String>();
+        final DefaultListModel<String> colors = new DefaultListModel<String>(new String[]{"Red", "Green", "Blue"});
         AutoCompleteTextComponent.AutoCompleteFilter filter = new AutoCompleteTextComponent.AutoCompleteFilter() {
             public boolean filter(String text) {
                 filteredInputs.add(text);
-                return text.trim().length() > 1;
+                if (text.trim().length() > 1) {
+                    if (colors.getSize() == 0) {
+                        colors.addItem("Red");
+                        colors.addItem("Green");
+                        colors.addItem("Blue");
+                    }
+                    return true;
+                }
+                colors.removeAll();
+                return true;
             }
         };
-
-        ListModel<String> colors = new DefaultListModel<String>(new String[]{"Red", "Green", "Blue"});
         AutoCompleteTextComponent component = new AutoCompleteTextComponent(colors, filter);
         component.label("Color");
         component.hint("Type a color");
@@ -219,6 +239,14 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         assertEquals("Red", field.getText());
         assertEquals("Red", component.getText());
         assertTrue(filteredInputs.contains("re"));
+    }
+
+    private void ensureSuggestions(DefaultListModel<String> model) {
+        if (model.getSize() == 0) {
+            for (int i = 0; i < BASE_SUGGESTIONS.length; i++) {
+                model.addItem(BASE_SUGGESTIONS[i]);
+            }
+        }
     }
 
     private enum AcceptAllFilter implements AutoCompleteTextComponent.AutoCompleteFilter {
