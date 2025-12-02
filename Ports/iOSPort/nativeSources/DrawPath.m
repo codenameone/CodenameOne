@@ -28,6 +28,7 @@
 #import "Transformer.h"
 #import "PathConsumer.h"
 #import "AlphaConsumer.h"
+#include <stdlib.h>
 #define min(a,b) ((a)<(b)?(a):(b))
 #define max(a,b) ((a)>(b)?(a):(b))
 #define abs(x) ((x)>0?(x):-(x))
@@ -83,9 +84,13 @@
         height,
     };
     
-    jbyte maskArray[ac.width*ac.height];
-    
-    ac.alphas = (JAVA_BYTE*)&maskArray;
+    size_t alphaCount = (size_t)ac.width * (size_t)ac.height;
+    jbyte* maskArray = calloc(alphaCount, sizeof(jbyte));
+    if (maskArray == NULL) {
+        return;
+    }
+
+    ac.alphas = (JAVA_BYTE*)maskArray;
     Renderer_produceAlphas(renderer, &ac);
     
     
@@ -123,7 +128,7 @@
     //_glDisable(GL_TEXTURE_2D);
     GLErrorLog;
 
-    
+    free(maskArray);
 }
 -(void)dealloc
 {
