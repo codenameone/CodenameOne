@@ -36,22 +36,20 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         AutoCompleteTextComponent.AutoCompleteFilter filter;
         AutoCompleteTextComponent component;
 
-        component = new AutoCompleteTextComponent(suggestionModel, null);
-        field = component.getAutoCompleteField();
         filter = new AutoCompleteTextComponent.AutoCompleteFilter() {
             public boolean filter(String text) {
                 filtered.add(text);
                 DefaultListModel<String> model = (DefaultListModel<String>) suggestionModel;
                 if (text.length() == 0) {
                     model.removeAll();
-                    field.hidePopup();
                     return true;
                 }
                 ensureSuggestions(model);
                 return text.length() > 0;
             }
         };
-        component.setFilter(filter);
+        component = new AutoCompleteTextComponent(suggestionModel, filter);
+        field = component.getAutoCompleteField();
         assertSame(field, component.getField(), "getField should expose the underlying AutoCompleteTextField");
         assertSame(field, component.getEditor(), "getEditor should return the AutoCompleteTextField instance");
 
@@ -176,8 +174,6 @@ public class AutoCompleteTextComponentTest extends UITestBase {
 
         final List<String> filteredInputs = new ArrayList<String>();
         final DefaultListModel<String> colors = new DefaultListModel<String>(new String[]{"Red", "Green", "Blue"});
-        AutoCompleteTextComponent component = new AutoCompleteTextComponent(colors, null);
-        final AutoCompleteTextField field = component.getAutoCompleteField();
         AutoCompleteTextComponent.AutoCompleteFilter filter = new AutoCompleteTextComponent.AutoCompleteFilter() {
             public boolean filter(String text) {
                 filteredInputs.add(text);
@@ -190,11 +186,11 @@ public class AutoCompleteTextComponentTest extends UITestBase {
                     return true;
                 }
                 colors.removeAll();
-                field.hidePopup();
                 return true;
             }
         };
-        component.setFilter(filter);
+        AutoCompleteTextComponent component = new AutoCompleteTextComponent(colors, filter);
+        final AutoCompleteTextField field = component.getAutoCompleteField();
         component.label("Color");
         component.hint("Type a color");
         form.add(component);
