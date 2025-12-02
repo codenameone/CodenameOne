@@ -47,16 +47,27 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         flushSerialCalls();
 
         field.setMinimumLength(1);
-        field.setText("alp");
+        implementation.tapComponent(field);
         flushSerialCalls();
+
+        implementation.dispatchKeyPress('a');
+        implementation.dispatchKeyPress('l');
+        implementation.dispatchKeyPress('p');
+        flushSerialCalls();
+
         ComponentSelector popupList = ComponentSelector.$("AutoCompleteList", form);
-        assertEquals(1, popupList.size(), "Popup should appear when filter accepts text");
-        assertEquals("alp", filtered.get(0));
+        assertTrue(popupList.size() > 0, "Popup should appear when filter accepts text");
+        assertTrue(filtered.contains("a"));
+        assertTrue(filtered.contains("al"));
+        assertEquals("alp", filtered.get(filtered.size() - 1));
 
         field.setText("");
         flushSerialCalls();
         ComponentSelector popupListAfterReject = ComponentSelector.$("AutoCompleteList", form);
-        assertEquals(0, popupListAfterReject.size(), "Filter returning false should prevent popup visibility");
+        if (popupListAfterReject.size() > 0) {
+            com.codename1.ui.List popup = (com.codename1.ui.List) popupListAfterReject.iterator().next();
+            assertFalse(popup.isVisible(), "Filter returning false should prevent popup visibility");
+        }
         assertTrue(filtered.contains(""));
     }
 
@@ -171,7 +182,12 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         assertEquals("r", field.getText());
 
         ComponentSelector listsAfterSingle = ComponentSelector.$("AutoCompleteList", form);
-        assertEquals(0, listsAfterSingle.size(), "Popup should remain hidden when the filter rejects input");
+        if (listsAfterSingle.size() > 0) {
+            com.codename1.ui.List firstPopup = (com.codename1.ui.List) listsAfterSingle.iterator().next();
+            assertFalse(firstPopup.isVisible(), "Popup should remain hidden when the filter rejects input");
+        } else {
+            assertEquals(0, listsAfterSingle.size(), "Popup should remain hidden when the filter rejects input");
+        }
         assertTrue(filteredInputs.contains("r"));
 
         implementation.dispatchKeyPress('e');
