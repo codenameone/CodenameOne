@@ -76,10 +76,11 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         implementation.dispatchKeyPress((char) 8);
         implementation.dispatchKeyPress((char) 8);
         flushSerialCalls();
+        assertEquals(0, localModel.getSize(), "Rejected input should clear suggestions");
         ComponentSelector popupListAfterReject = ComponentSelector.$("AutoCompleteList", form);
         if (popupListAfterReject.size() > 0) {
             com.codename1.ui.List popup = (com.codename1.ui.List) popupListAfterReject.iterator().next();
-            assertEquals(0, popup.getModel().getSize(), "Rejected input should clear suggestions");
+            assertEquals(0, popup.getModel().getSize(), "Rejected input should clear suggestions even if the popup remains visible");
         }
         assertTrue(filtered.contains(""));
     }
@@ -203,6 +204,7 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         flushSerialCalls();
         assertEquals("r", field.getText());
 
+        assertEquals(0, colors.getSize(), "Backing model should be empty when the filter rejects input");
         ComponentSelector listsAfterSingle = ComponentSelector.$("AutoCompleteList", form);
         if (listsAfterSingle.size() > 0) {
             com.codename1.ui.List firstPopup = (com.codename1.ui.List) listsAfterSingle.iterator().next();
