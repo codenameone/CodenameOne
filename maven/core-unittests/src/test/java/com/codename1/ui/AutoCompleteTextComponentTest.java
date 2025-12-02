@@ -11,7 +11,6 @@ import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.layouts.BoxLayout;
 import org.junit.jupiter.api.BeforeEach;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
@@ -28,7 +27,9 @@ public class AutoCompleteTextComponentTest extends UITestBase {
     }
 
     @FormTest
-    void constructorAppliesCustomFilterAndProvidesEditorAccess() throws Exception {
+    void constructorAppliesCustomFilterAndProvidesEditorAccess() {
+        Form form = new Form("AutoComplete", BoxLayout.y());
+
         final List<String> filtered = new ArrayList<String>();
         AutoCompleteTextComponent.AutoCompleteFilter filter = new AutoCompleteTextComponent.AutoCompleteFilter() {
             public boolean filter(String text) {
@@ -38,14 +39,25 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         };
         AutoCompleteTextComponent component = new AutoCompleteTextComponent(suggestionModel, filter);
         AutoCompleteTextField field = component.getAutoCompleteField();
-        Method filterMethod = AutoCompleteTextField.class.getDeclaredMethod("filter", String.class);
-        filterMethod.setAccessible(true);
-        Boolean result = (Boolean) filterMethod.invoke(field, "alp");
-        assertTrue(result.booleanValue(), "Custom filter should return its result");
-        assertEquals(1, filtered.size(), "Filter should be invoked with provided text");
-        assertEquals("alp", filtered.get(0));
         assertSame(field, component.getField(), "getField should expose the underlying AutoCompleteTextField");
         assertSame(field, component.getEditor(), "getEditor should return the AutoCompleteTextField instance");
+
+        form.add(component);
+        form.show();
+        flushSerialCalls();
+
+        field.setMinimumLength(1);
+        field.setText("alp");
+        flushSerialCalls();
+        ComponentSelector popupList = ComponentSelector.$("AutoCompleteList", form);
+        assertEquals(1, popupList.size(), "Popup should appear when filter accepts text");
+        assertEquals("alp", filtered.get(0));
+
+        field.setText("");
+        flushSerialCalls();
+        ComponentSelector popupListAfterReject = ComponentSelector.$("AutoCompleteList", form);
+        assertEquals(0, popupListAfterReject.size(), "Filter returning false should prevent popup visibility");
+        assertTrue(filtered.contains(""));
     }
 
     @FormTest
@@ -150,7 +162,7 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         flushSerialCalls();
 
         AutoCompleteTextField field = component.getAutoCompleteField();
-        field.setMinimumLength(0);
+        field.setMinimumLength(2);
         implementation.tapComponent(field);
         flushSerialCalls();
 
