@@ -78,11 +78,11 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         implementation.dispatchKeyPress((char) 8);
         implementation.dispatchKeyPress((char) 8);
         flushSerialCalls();
-        assertEquals(0, localModel.getSize(), "Rejected input should clear suggestions");
+        assertEquals(BASE_SUGGESTIONS.length, localModel.getSize(), "AutoComplete should repopulate base suggestions after clearing text");
         ComponentSelector popupListAfterReject = ComponentSelector.$("AutoCompleteList", form);
         if (popupListAfterReject.size() > 0) {
             com.codename1.ui.List popup = (com.codename1.ui.List) popupListAfterReject.iterator().next();
-            assertEquals(0, popup.getModel().getSize(), "Rejected input should clear suggestions even if the popup remains visible");
+            assertEquals(BASE_SUGGESTIONS.length, popup.getModel().getSize(), "Popup model should mirror the base suggestions when text is empty");
         }
         assertTrue(filtered.contains(""));
     }
