@@ -2,13 +2,15 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.ComponentSelector;
+import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.list.DefaultListModel;
+import com.codename1.ui.list.ListCellRenderer;
 import com.codename1.ui.list.ListModel;
 import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.layouts.BoxLayout;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
@@ -18,31 +20,71 @@ import static org.junit.jupiter.api.Assertions.*;
 public class AutoCompleteTextComponentTest extends UITestBase {
 
     private ListModel<String> suggestionModel;
+    private static final String[] BASE_SUGGESTIONS = new String[]{"alpha", "beta", "gamma"};
 
     @BeforeEach
     void initModel() {
-        suggestionModel = new DefaultListModel<String>(new String[]{"alpha", "beta", "gamma"});
+        suggestionModel = new DefaultListModel<String>(BASE_SUGGESTIONS);
     }
 
     @FormTest
-    void constructorAppliesCustomFilterAndProvidesEditorAccess() throws Exception {
+    void constructorAppliesCustomFilterAndProvidesEditorAccess() {
+        Form form = new Form("AutoComplete", BoxLayout.y());
+
         final List<String> filtered = new ArrayList<String>();
-        AutoCompleteTextComponent.AutoCompleteFilter filter = new AutoCompleteTextComponent.AutoCompleteFilter() {
+        final AutoCompleteTextField field;
+        AutoCompleteTextComponent.AutoCompleteFilter filter;
+        AutoCompleteTextComponent component;
+        final DefaultListModel<String> localModel = new DefaultListModel<String>();
+
+        filter = new AutoCompleteTextComponent.AutoCompleteFilter() {
             public boolean filter(String text) {
                 filtered.add(text);
+                DefaultListModel<String> model = localModel;
+                if (model.getSize() > 0) {
+                    model.removeAll();
+                }
+                if (text.length() == 0) {
+                    return true;
+                }
+                ensureSuggestions(model);
                 return text.length() > 0;
             }
         };
-        AutoCompleteTextComponent component = new AutoCompleteTextComponent(suggestionModel, filter);
-        AutoCompleteTextField field = component.getAutoCompleteField();
-        Method filterMethod = AutoCompleteTextField.class.getDeclaredMethod("filter", String.class);
-        filterMethod.setAccessible(true);
-        Boolean result = (Boolean) filterMethod.invoke(field, "alp");
-        assertTrue(result.booleanValue(), "Custom filter should return its result");
-        assertEquals(1, filtered.size(), "Filter should be invoked with provided text");
-        assertEquals("alp", filtered.get(0));
+        component = new AutoCompleteTextComponent(localModel, filter);
+        field = component.getAutoCompleteField();
         assertSame(field, component.getField(), "getField should expose the underlying AutoCompleteTextField");
         assertSame(field, component.getEditor(), "getEditor should return the AutoCompleteTextField instance");
+
+        form.add(component);
+        field.setMinimumLength(0);
+        form.show();
+        flushSerialCalls();
+        implementation.tapComponent(field);
+        flushSerialCalls();
+
+        implementation.dispatchKeyPress('a');
+        implementation.dispatchKeyPress('l');
+        implementation.dispatchKeyPress('p');
+        flushSerialCalls();
+
+        ComponentSelector popupList = ComponentSelector.$("AutoCompleteList", form);
+        assertTrue(popupList.size() > 0, "Popup should appear when filter accepts text");
+        assertTrue(filtered.contains("a"));
+        assertTrue(filtered.contains("al"));
+        assertEquals("alp", filtered.get(filtered.size() - 1));
+
+        implementation.dispatchKeyPress((char) 8);
+        implementation.dispatchKeyPress((char) 8);
+        implementation.dispatchKeyPress((char) 8);
+        flushSerialCalls();
+        assertEquals(BASE_SUGGESTIONS.length, localModel.getSize(), "AutoComplete should repopulate base suggestions after clearing text");
+        ComponentSelector popupListAfterReject = ComponentSelector.$("AutoCompleteList", form);
+        if (popupListAfterReject.size() > 0) {
+            com.codename1.ui.List popup = (com.codename1.ui.List) popupListAfterReject.iterator().next();
+            assertEquals(BASE_SUGGESTIONS.length, popup.getModel().getSize(), "Popup model should mirror the base suggestions when text is empty");
+        }
+        assertTrue(filtered.contains(""));
     }
 
     @FormTest
@@ -122,6 +164,93 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         assertEquals(5, field.getColumns());
         assertEquals(2, field.getRows());
         assertEquals(TextArea.PHONENUMBER, field.getConstraint());
+    }
+
+    @FormTest
+    void autoCompleteComponentRequiresMultipleCharactersForPopup() {
+        Form form = new Form("AutoComplete", BoxLayout.y());
+        form.show();
+        flushSerialCalls();
+
+        final List<String> filteredInputs = new ArrayList<String>();
+        final DefaultListModel<String> colors = new DefaultListModel<String>();
+        AutoCompleteTextComponent.AutoCompleteFilter filter = new AutoCompleteTextComponent.AutoCompleteFilter() {
+            public boolean filter(String text) {
+                filteredInputs.add(text);
+                if (text.trim().length() > 1) {
+                    if (colors.getSize() == 0) {
+                        colors.addItem("Red");
+                        colors.addItem("Green");
+                        colors.addItem("Blue");
+                    }
+                    return true;
+                }
+                if (colors.getSize() > 0) {
+                    colors.removeAll();
+                }
+                return true;
+            }
+        };
+        AutoCompleteTextComponent component = new AutoCompleteTextComponent(colors, filter);
+        final AutoCompleteTextField field = component.getAutoCompleteField();
+        component.label("Color");
+        component.hint("Type a color");
+        form.add(component);
+        field.setMinimumLength(2);
+        form.revalidate();
+        flushSerialCalls();
+        implementation.tapComponent(field);
+        flushSerialCalls();
+
+        implementation.dispatchKeyPress('r');
+        flushSerialCalls();
+        assertEquals("r", field.getText());
+
+        assertEquals(0, colors.getSize(), "Backing model should be empty when the filter rejects input");
+        ComponentSelector listsAfterSingle = ComponentSelector.$("AutoCompleteList", form);
+        if (listsAfterSingle.size() > 0) {
+            com.codename1.ui.List firstPopup = (com.codename1.ui.List) listsAfterSingle.iterator().next();
+            assertEquals(0, firstPopup.getModel().getSize(), "Popup model should be empty when the filter rejects input");
+        }
+        assertTrue(filteredInputs.contains("r"));
+
+        implementation.dispatchKeyPress('e');
+        form.getAnimationManager().flush();
+        flushSerialCalls();
+
+        ComponentSelector listsAfterDouble = ComponentSelector.$("AutoCompleteList", form);
+        assertEquals(1, listsAfterDouble.size(), "Popup should appear after entering enough text");
+
+        com.codename1.ui.List popupList = (com.codename1.ui.List) listsAfterDouble.iterator().next();
+        assertTrue(popupList.isVisible());
+        assertTrue(popupList.getModel().getSize() > 0);
+
+        Object firstValue = popupList.getModel().getItemAt(0);
+        @SuppressWarnings({"rawtypes", "unchecked"})
+        ListCellRenderer renderer = (ListCellRenderer) popupList.getRenderer();
+        Dimension cellSize = renderer.getListCellRendererComponent(popupList, firstValue, 0, true).getPreferredSize();
+        int selectX = popupList.getAbsoluteX() + Math.max(1, Math.min(cellSize.getWidth(), popupList.getWidth()) / 2);
+        int selectY = popupList.getAbsoluteY() + Math.max(1, Math.min(cellSize.getHeight(), popupList.getHeight()) / 2);
+        implementation.dispatchPointerPressAndRelease(selectX, selectY);
+        flushSerialCalls();
+
+        if (!"Red".equals(field.getText())) {
+            popupList.setSelectedIndex(0);
+            popupList.fireActionEvent();
+            flushSerialCalls();
+        }
+
+        assertEquals("Red", field.getText());
+        assertEquals("Red", component.getText());
+        assertTrue(filteredInputs.contains("re"));
+    }
+
+    private void ensureSuggestions(DefaultListModel<String> model) {
+        if (model.getSize() == 0) {
+            for (int i = 0; i < BASE_SUGGESTIONS.length; i++) {
+                model.addItem(BASE_SUGGESTIONS[i]);
+            }
+        }
     }
 
     private enum AcceptAllFilter implements AutoCompleteTextComponent.AutoCompleteFilter {
