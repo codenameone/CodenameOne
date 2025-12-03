@@ -33,7 +33,7 @@ class BadgesSampleTest extends UITestBase {
 
             assertEquals("1", label.getBadgeText());
             assertEquals(Style.UNIT_TYPE_PIXELS, style.getPaddingUnit()[Component.RIGHT]);
-            assertEquals(CN.convertToPixels(1.5f), style.getPaddingRight());
+            assertEquals(CN.convertToPixels(1.5f), style.getPaddingRight(false));
         } finally {
             harness.cleanup();
         }
