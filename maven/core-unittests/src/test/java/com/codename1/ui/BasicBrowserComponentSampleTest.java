@@ -86,10 +86,10 @@ public class BasicBrowserComponentSampleTest extends UITestBase {
         flushSerialCalls();
         form.getAnimationManager().flush();
 
-        Form current = Display.getInstance().getCurrent();
-        assertTrue(current instanceof Sheet, "Sheet should be displayed after tapping popup command");
-        assertEquals("A Popop", current.getTitle());
-        assertTrue(((Sheet) current).getContentPane().getComponentAt(0) instanceof Label);
+        Sheet currentSheet = Sheet.getCurrentSheet();
+        assertNotNull(currentSheet, "Sheet should be displayed after tapping popup command");
+        assertEquals("A Popop", currentSheet.getTitle());
+        assertTrue(currentSheet.getContentPane().getComponentAt(0) instanceof Label);
     }
 
     private PeerComponent createBrowserPeer() {
