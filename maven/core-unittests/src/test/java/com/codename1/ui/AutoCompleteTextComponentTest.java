@@ -41,8 +41,10 @@ public class AutoCompleteTextComponentTest extends UITestBase {
             public boolean filter(String text) {
                 filtered.add(text);
                 DefaultListModel<String> model = localModel;
-                if (text.length() == 0) {
+                if (model.getSize() > 0) {
                     model.removeAll();
+                }
+                if (text.length() == 0) {
                     return true;
                 }
                 ensureSuggestions(model);
