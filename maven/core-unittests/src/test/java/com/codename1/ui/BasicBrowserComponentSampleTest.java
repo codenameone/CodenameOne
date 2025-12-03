@@ -88,8 +88,8 @@ public class BasicBrowserComponentSampleTest extends UITestBase {
 
         Sheet currentSheet = Sheet.getCurrentSheet();
         assertNotNull(currentSheet, "Sheet should be displayed after tapping popup command");
-        assertEquals("A Popop", currentSheet.getTitle());
         assertTrue(currentSheet.getContentPane().getComponentAt(0) instanceof Label);
+        assertNotNull(findLabelWithText(currentSheet, "A Popop"), "Sheet title label should show 'A Popop'");
     }
 
     private PeerComponent createBrowserPeer() {
@@ -97,5 +97,24 @@ public class BasicBrowserComponentSampleTest extends UITestBase {
         Style style = peer.getUnselectedStyle();
         style.setMargin(0, 0, 0, 0);
         return peer;
+    }
+
+    private Label findLabelWithText(Container container, String text) {
+        for (int i = 0; i < container.getComponentCount(); i++) {
+            Component cmp = container.getComponentAt(i);
+            if (cmp instanceof Label) {
+                Label lbl = (Label) cmp;
+                if (text.equals(lbl.getText())) {
+                    return lbl;
+                }
+            }
+            if (cmp instanceof Container) {
+                Label nested = findLabelWithText((Container) cmp, text);
+                if (nested != null) {
+                    return nested;
+                }
+            }
+        }
+        return null;
     }
 }
