@@ -55,7 +55,7 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         assertSame(field, component.getEditor(), "getEditor should return the AutoCompleteTextField instance");
 
         form.add(component);
-        field.setMinimumLength(1);
+        field.setMinimumLength(0);
         form.show();
         flushSerialCalls();
         implementation.tapComponent(field);
