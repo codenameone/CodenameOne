@@ -2,6 +2,7 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.DisplayTest;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.GridLayout;
 import com.codename1.ui.plaf.Style;
@@ -24,11 +25,11 @@ public class BasicBrowserComponentSampleTest extends UITestBase {
         form.add(BorderLayout.CENTER, browser);
 
         form.show();
-        form.getAnimationManager().flush();
+        DisplayTest.flushEdt();
         flushSerialCalls();
-        form.getAnimationManager().flush();
+        DisplayTest.flushEdt();
 
-        assertEquals("true", implementation.getProperty("BrowserComponent.useCEF", "false"));
+        assertEquals("true", Display.getInstance().getProperty("BrowserComponent.useCEF", "false"));
         assertEquals("https://www.codenameone.com", browser.getURL());
         assertEquals(1, browser.getComponentCount());
         assertSame(browser.getComponentAt(0), browser.getInternal());
@@ -63,17 +64,19 @@ public class BasicBrowserComponentSampleTest extends UITestBase {
         });
 
         form.show();
-        form.getAnimationManager().flush();
+        DisplayTest.flushEdt();
         flushSerialCalls();
-        form.getAnimationManager().flush();
+        DisplayTest.flushEdt();
 
         implementation.tapComponent(hello);
+        DisplayTest.flushEdt();
         flushSerialCalls();
-        form.getAnimationManager().flush();
+        DisplayTest.flushEdt();
 
         implementation.tapComponent(prompt);
+        DisplayTest.flushEdt();
         flushSerialCalls();
-        form.getAnimationManager().flush();
+        DisplayTest.flushEdt();
 
         assertEquals(2, implementation.getBrowserExecuted().size());
         assertTrue(implementation.getBrowserExecuted().get(0).contains("confirm('continue?')"));
@@ -83,8 +86,9 @@ public class BasicBrowserComponentSampleTest extends UITestBase {
         assertNotNull(popupButton, "Popup command should create a button in the right bar");
 
         implementation.tapComponent(popupButton);
+        DisplayTest.flushEdt();
         flushSerialCalls();
-        form.getAnimationManager().flush();
+        DisplayTest.flushEdt();
 
         Sheet currentSheet = Sheet.getCurrentSheet();
         assertNotNull(currentSheet, "Sheet should be displayed after tapping popup command");
