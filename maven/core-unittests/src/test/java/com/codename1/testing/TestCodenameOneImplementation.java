@@ -1300,7 +1300,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
     }
 
-    public void dispatchPointerPressAndRelease(int x, int y) {
+    public void dispatchPointerPress(int x, int y) {
         Display display = Display.getInstance();
         if (display == null) {
             return;
@@ -1308,7 +1308,39 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         int[] xs = new int[]{x};
         int[] ys = new int[]{y};
         display.pointerPressed(xs, ys);
+    }
+
+    public void dispatchPointerRelease(int x, int y) {
+        Display display = Display.getInstance();
+        if (display == null) {
+            return;
+        }
+        int[] xs = new int[]{x};
+        int[] ys = new int[]{y};
         display.pointerReleased(xs, ys);
+    }
+
+    public void dispatchPointerPressAndRelease(int x, int y) {
+        dispatchPointerPress(x, y);
+        dispatchPointerRelease(x, y);
+    }
+
+    public void pressComponent(Component component) {
+        if (component == null) {
+            return;
+        }
+        int x = component.getAbsoluteX() + component.getWidth() / 2;
+        int y = component.getAbsoluteY() + component.getHeight() / 2;
+        dispatchPointerPress(x, y);
+    }
+
+    public void releaseComponent(Component component) {
+        if (component == null) {
+            return;
+        }
+        int x = component.getAbsoluteX() + component.getWidth() / 2;
+        int y = component.getAbsoluteY() + component.getHeight() / 2;
+        dispatchPointerRelease(x, y);
     }
 
     public void tapComponent(Component component) {
