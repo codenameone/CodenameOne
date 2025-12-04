@@ -62,8 +62,9 @@ public class BasicBrowserComponentSampleTest extends UITestBase {
         final Sheet[] sheetHolder = new Sheet[1];
         Command popupCommand = toolbar.addMaterialCommandToRightBar("Popup", FontImage.MATERIAL_OPEN_IN_NEW, evt -> {
             Sheet sheet = new Sheet(null, "A Popop");
-            sheet.setLayout(new BorderLayout());
-            sheet.add(BorderLayout.CENTER, new Label("Hello World"));
+            Container contentPane = sheet.getContentPane();
+            contentPane.setLayout(new BorderLayout());
+            contentPane.add(BorderLayout.CENTER, new Label("Hello World"));
             sheetHolder[0] = sheet;
             sheet.show();
         });
