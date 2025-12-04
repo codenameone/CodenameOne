@@ -59,9 +59,12 @@ public class BasicBrowserComponentSampleTest extends UITestBase {
 
         form.add(BorderLayout.SOUTH, GridLayout.encloseIn(2, hello, prompt));
 
+        final Sheet[] sheetHolder = new Sheet[1];
         Command popupCommand = toolbar.addMaterialCommandToRightBar("Popup", FontImage.MATERIAL_OPEN_IN_NEW, evt -> {
             Sheet sheet = new Sheet(null, "A Popop");
+            sheet.setLayout(new BorderLayout());
             sheet.add(BorderLayout.CENTER, new Label("Hello World"));
+            sheetHolder[0] = sheet;
             sheet.show();
         });
 
@@ -94,6 +97,7 @@ public class BasicBrowserComponentSampleTest extends UITestBase {
 
         Sheet currentSheet = Sheet.getCurrentSheet();
         assertNotNull(currentSheet, "Sheet should be displayed after tapping popup command");
+        assertSame(sheetHolder[0], currentSheet, "Popup command should show the created sheet instance");
         assertTrue(currentSheet.getContentPane().getComponentCount() > 0, "Sheet should contain components");
         assertNotNull(findLabelWithText(currentSheet, "A Popop"), "Sheet title label should show 'A Popop'");
         assertNotNull(findLabelWithText(currentSheet, "Hello World"), "Sheet body should show 'Hello World'");
