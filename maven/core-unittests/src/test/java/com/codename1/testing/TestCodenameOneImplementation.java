@@ -1350,10 +1350,12 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
                 if (display.getCurrent() == null) {
                     return;
                 }
+                int[] xs = new int[] {x};
+                int[] ys = new int[] {y};
                 if (pressed) {
-                    display.pointerPressed(x, y);
+                    display.pointerPressed(xs, ys);
                 } else {
-                    display.pointerReleased(x, y);
+                    display.pointerReleased(xs, ys);
                 }
             }
         };
