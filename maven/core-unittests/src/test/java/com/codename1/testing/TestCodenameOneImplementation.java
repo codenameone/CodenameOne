@@ -1347,7 +1347,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
         Runnable r = new Runnable() {
             public void run() {
-                Form form = display.getCurrentForm();
+                Form form = display.getCurrent();
                 if (form == null) {
                     return;
                 }
