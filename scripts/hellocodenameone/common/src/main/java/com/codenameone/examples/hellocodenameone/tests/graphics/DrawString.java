@@ -9,7 +9,7 @@ public class DrawString extends AbstractGraphicsScreenshotTest {
     @Override
     protected void drawContent(Graphics g, Rectangle bounds) {
         g.setColor(0);
-        g.fillShape(bounds);
+        g.fillRect(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
         g.setColor(0xffffff);
         int y = bounds.getY();
         g.drawString("Default Font", bounds.getX(), y);

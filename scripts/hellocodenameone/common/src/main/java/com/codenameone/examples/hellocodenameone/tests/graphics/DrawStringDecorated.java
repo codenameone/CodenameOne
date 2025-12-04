@@ -10,7 +10,7 @@ public class DrawStringDecorated extends AbstractGraphicsScreenshotTest {
     @Override
     protected void drawContent(Graphics g, Rectangle bounds) {
         g.setColor(0xffffff);
-        g.fillShape(bounds);
+        g.fillRect(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
         g.setColor(0);
         int y = bounds.getY();
         g.drawString("No Decoration", bounds.getX(), y, Style.TEXT_DECORATION_NONE);
