@@ -29,6 +29,8 @@ public class BasicBrowserComponentSampleTest extends UITestBase {
         flushSerialCalls();
         DisplayTest.flushEdt();
 
+        assertNotNull(browser.getInternal(), "Browser peer should be initialized");
+
         assertEquals("true", Display.getInstance().getProperty("BrowserComponent.useCEF", "false"));
         assertEquals("https://www.codenameone.com", browser.getURL());
         assertEquals(1, browser.getComponentCount());
@@ -92,8 +94,9 @@ public class BasicBrowserComponentSampleTest extends UITestBase {
 
         Sheet currentSheet = Sheet.getCurrentSheet();
         assertNotNull(currentSheet, "Sheet should be displayed after tapping popup command");
-        assertTrue(currentSheet.getContentPane().getComponentAt(0) instanceof Label);
+        assertTrue(currentSheet.getContentPane().getComponentCount() > 0, "Sheet should contain components");
         assertNotNull(findLabelWithText(currentSheet, "A Popop"), "Sheet title label should show 'A Popop'");
+        assertNotNull(findLabelWithText(currentSheet, "Hello World"), "Sheet body should show 'Hello World'");
     }
 
     private PeerComponent createBrowserPeer() {
