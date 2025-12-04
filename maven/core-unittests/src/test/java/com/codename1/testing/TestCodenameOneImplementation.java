@@ -130,6 +130,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private boolean blockCopyAndPaste;
     private PeerComponent browserComponent;
     private final List<String> browserExecuted = new ArrayList<>();
+    private final Map<PeerComponent, String> browserUrls = new HashMap<PeerComponent, String>();
     private AsyncResource<Media> backgroundMediaAsync;
     private Media backgroundMedia;
     private Media media;
@@ -660,6 +661,21 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     public String browserExecuteAndReturnString(PeerComponent internal, String javaScript) {
         browserExecuted.add(javaScript);
         return javaScript;
+    }
+
+    @Override
+    public void setBrowserURL(PeerComponent internal, String url) {
+        browserUrls.put(internal, url);
+    }
+
+    @Override
+    public void setBrowserURL(PeerComponent internal, String url, Map headers) {
+        browserUrls.put(internal, url);
+    }
+
+    @Override
+    public String getBrowserURL(PeerComponent internal) {
+        return browserUrls.get(internal);
     }
 
     public List<String> getBrowserExecuted() {
