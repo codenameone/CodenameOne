@@ -6831,7 +6831,7 @@ public class JavaSEPort extends CodenameOneImplementation {
         BufferedImage b = createTrackableBufferedImage(width, height);
         if (a != 0) {
             Graphics2D g = b.createGraphics();
-            g.setColor(new Color(fillColor));
+            g.setColor(new Color(fillColor, true));
             g.fillRect(0, 0, width, height);
             g.dispose();
         }
