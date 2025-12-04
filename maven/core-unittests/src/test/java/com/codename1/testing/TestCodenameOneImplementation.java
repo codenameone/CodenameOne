@@ -1307,7 +1307,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
         int[] xs = new int[]{x};
         int[] ys = new int[]{y};
-        display.pointerPressed(xs, ys);
+        pointerPressed(xs, ys);
     }
 
     public void dispatchPointerRelease(int x, int y) {
@@ -1317,7 +1317,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
         int[] xs = new int[]{x};
         int[] ys = new int[]{y};
-        display.pointerReleased(xs, ys);
+        pointerReleased(xs, ys);
     }
 
     public void dispatchPointerPressAndRelease(int x, int y) {
