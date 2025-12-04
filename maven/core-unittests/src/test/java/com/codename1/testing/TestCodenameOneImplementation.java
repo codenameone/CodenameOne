@@ -1301,23 +1301,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     public void dispatchPointerPress(int x, int y) {
-        Display display = Display.getInstance();
-        if (display == null) {
-            return;
-        }
-        int[] xs = new int[]{x};
-        int[] ys = new int[]{y};
-        pointerPressed(xs, ys);
+        sendPointerEventToCurrentForm(true, x, y);
     }
 
     public void dispatchPointerRelease(int x, int y) {
-        Display display = Display.getInstance();
-        if (display == null) {
-            return;
-        }
-        int[] xs = new int[]{x};
-        int[] ys = new int[]{y};
-        pointerReleased(xs, ys);
+        sendPointerEventToCurrentForm(false, x, y);
     }
 
     public void dispatchPointerPressAndRelease(int x, int y) {
@@ -1350,6 +1338,33 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         int x = component.getAbsoluteX() + component.getWidth() / 2;
         int y = component.getAbsoluteY() + component.getHeight() / 2;
         dispatchPointerPressAndRelease(x, y);
+    }
+
+    private void sendPointerEventToCurrentForm(boolean pressed, int x, int y) {
+        Display display = Display.getInstance();
+        if (display == null) {
+            return;
+        }
+        Runnable r = new Runnable() {
+            public void run() {
+                Form form = display.getCurrentForm();
+                if (form == null) {
+                    return;
+                }
+                int[] xs = new int[]{x};
+                int[] ys = new int[]{y};
+                if (pressed) {
+                    form.pointerPressed(xs, ys);
+                } else {
+                    form.pointerReleased(xs, ys);
+                }
+            }
+        };
+        if (display.isEdt()) {
+            r.run();
+        } else {
+            display.callSeriallyAndWait(r);
+        }
     }
 
     public void tapListRow(com.codename1.ui.List list, int rowIndex) {
