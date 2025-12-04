@@ -1341,22 +1341,19 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     private void sendPointerEventToCurrentForm(boolean pressed, int x, int y) {
-        Display display = Display.getInstance();
+        final Display display = Display.getInstance();
         if (display == null) {
             return;
         }
         Runnable r = new Runnable() {
             public void run() {
-                Form form = display.getCurrent();
-                if (form == null) {
+                if (display.getCurrent() == null) {
                     return;
                 }
-                int[] xs = new int[]{x};
-                int[] ys = new int[]{y};
                 if (pressed) {
-                    form.pointerPressed(xs, ys);
+                    display.pointerPressed(x, y);
                 } else {
-                    form.pointerReleased(xs, ys);
+                    display.pointerReleased(x, y);
                 }
             }
         };
