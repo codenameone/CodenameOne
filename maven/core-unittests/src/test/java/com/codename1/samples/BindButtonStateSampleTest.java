@@ -27,26 +27,19 @@ class BindButtonStateSampleTest extends UITestBase {
         form.addAll(primary, follower);
 
         form.show();
-        form.revalidate();
-        flushSerialCalls();
-        DisplayTest.flushEdt();
-        flushSerialCalls();
+        drainEdt(form);
 
         ensureSized(primary, form);
         ensureSized(follower, form);
 
         implementation.pressComponent(primary);
-        flushSerialCalls();
-        DisplayTest.flushEdt();
-        flushSerialCalls();
+        drainEdt(form);
 
         assertEquals(Button.STATE_PRESSED, primary.getState());
         assertEquals(Button.STATE_PRESSED, follower.getState());
 
         implementation.releaseComponent(primary);
-        flushSerialCalls();
-        DisplayTest.flushEdt();
-        flushSerialCalls();
+        drainEdt(form);
 
         assertEquals(Button.STATE_DEFAULT, primary.getState());
         assertEquals(Button.STATE_DEFAULT, follower.getState());
@@ -55,7 +48,16 @@ class BindButtonStateSampleTest extends UITestBase {
     private void ensureSized(Component component, Form form) {
         for (int i = 0; i < 5 && (component.getWidth() <= 0 || component.getHeight() <= 0); i++) {
             form.revalidate();
-            flushSerialCalls();
+            drainEdt(form);
         }
+        assertTrue(component.getWidth() > 0, "Component should have width after layout");
+        assertTrue(component.getHeight() > 0, "Component should have height after layout");
+    }
+
+    private void drainEdt(Form form) {
+        form.revalidate();
+        flushSerialCalls();
+        DisplayTest.flushEdt();
+        flushSerialCalls();
     }
 }
