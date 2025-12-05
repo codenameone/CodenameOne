@@ -1340,7 +1340,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         dispatchPointerPressAndRelease(x, y);
     }
 
-    private void sendPointerEventToCurrentForm(boolean pressed, int x, int y) {
+    private void sendPointerEventToCurrentForm(final boolean pressed, final int x, final int y) {
         final Display display = Display.getInstance();
         if (display == null) {
             return;
@@ -1355,9 +1355,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
                 int[] xs = new int[] {x};
                 int[] ys = new int[] {y};
                 if (pressed) {
-                    current.pointerPressed(xs, ys);
+                    display.pointerPressed(xs, ys);
                 } else {
-                    current.pointerReleased(xs, ys);
+                    display.pointerReleased(xs, ys);
                 }
             }
         };
