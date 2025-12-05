@@ -636,6 +636,7 @@ public final class Graphics {
      * @param character - the character to be drawn
      * @param x         the x coordinate of the baseline of the text
      * @param y         the y coordinate of the baseline of the text
+     * @deprecated use drawString instead, this method is inefficient
      */
     public void drawChar(char character, int x, int y) {
         drawString("" + character, x, y);
@@ -650,6 +651,7 @@ public final class Graphics {
      * @param length the number of characters to be drawn
      * @param x      the x coordinate of the baseline of the text
      * @param y      the y coordinate of the baseline of the text
+     * @deprecated use drawString instead, this method is inefficient
      */
     public void drawChars(char[] data, int offset, int length, int x, int y) {
         if (!(current instanceof CustomFont)) {

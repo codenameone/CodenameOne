@@ -52,3 +52,12 @@ SideCommand {
     font-size: 4mm;
     border-bottom: 2px solid #cccccc;
 }
+
+GraphicsForm {
+    background: #cccccc;
+}
+
+GraphicsComponent {
+    padding: 0px;
+    margin: 1mm;
+}

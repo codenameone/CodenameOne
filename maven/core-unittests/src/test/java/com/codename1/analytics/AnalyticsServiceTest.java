@@ -2,6 +2,7 @@ package com.codename1.analytics;
 
 import com.codename1.io.ConnectionRequest;
 import com.codename1.junit.FormTest;
+import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
 
 import java.util.List;
@@ -27,6 +28,7 @@ class AnalyticsServiceTest extends UITestBase {
 
     @FormTest
     void testCrashReportQueued() {
+        TestLogger.install();
         implementation.clearQueuedRequests();
         AnalyticsService.init("UA-2", "app.example.com");
         AnalyticsService.setAppsMode(true);
@@ -35,5 +37,6 @@ class AnalyticsServiceTest extends UITestBase {
         List<ConnectionRequest> requests = implementation.getQueuedRequests();
         assertEquals(1, requests.size());
         assertTrue(requests.get(0).getUrl().contains("google-analytics"));
+        TestLogger.remove();
     }
 }

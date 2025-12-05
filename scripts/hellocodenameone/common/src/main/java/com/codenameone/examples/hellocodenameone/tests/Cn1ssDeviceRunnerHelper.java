@@ -1,5 +1,6 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
+import com.codename1.io.Storage;
 import com.codename1.io.Util;
 import com.codename1.io.Log;
 import com.codename1.ui.Display;
@@ -60,6 +61,9 @@ final class Cn1ssDeviceRunnerHelper {
             if (io == null || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {
                 println("CN1SS:ERR:test=" + safeName + " message=PNG encoding unavailable");
                 println("CN1SS:END:" + safeName);
+            }
+            if(Display.getInstance().isSimulator()) {
+                io.save(screenshot, Storage.getInstance().createOutputStream(safeName + ".png"), ImageIO.FORMAT_PNG, 1);
             }
             ByteArrayOutputStream pngOut = new ByteArrayOutputStream(Math.max(1024, width * height / 2));
             io.save(screenshot, pngOut, ImageIO.FORMAT_PNG, 1f);
