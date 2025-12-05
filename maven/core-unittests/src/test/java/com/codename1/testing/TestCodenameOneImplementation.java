@@ -1348,14 +1348,15 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
         Runnable r = new Runnable() {
             public void run() {
-                if (display.getCurrent() == null) {
+                Form current = display.getCurrent();
+                if (current == null) {
                     return;
                 }
 
                 if (pressed) {
-                    display.pointerPressed(new int[] { x }, new int[] { y });
+                    current.pointerPressed(new int[] { x }, new int[] { y });
                 } else {
-                    display.pointerReleased(new int[] { x }, new int[] { y });
+                    current.pointerReleased(new int[] { x }, new int[] { y });
                 }
             }
         };
