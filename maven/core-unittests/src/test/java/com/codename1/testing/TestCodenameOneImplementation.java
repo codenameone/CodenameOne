@@ -1352,12 +1352,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
         Runnable r = new Runnable() {
             public void run() {
-                int[] xs = new int[] {x};
-                int[] ys = new int[] {y};
                 if (pressed) {
-                    display.pointerPressed(xs, ys);
+                    current.pointerPressed(x, y);
                 } else {
-                    display.pointerReleased(xs, ys);
+                    current.pointerReleased(x, y);
                 }
             }
         };
