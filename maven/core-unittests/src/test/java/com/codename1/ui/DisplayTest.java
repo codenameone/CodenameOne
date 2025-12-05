@@ -16,7 +16,17 @@ import static org.mockito.Mockito.when;
 public class DisplayTest extends UITestBase {
 
     public static void flushEdt() {
-        Display.getInstance().flushEdt();
+        final Display display = Display.getInstance();
+        if (display.isEdt()) {
+            display.flushEdt();
+            return;
+        }
+
+        display.callSeriallyAndWait(new Runnable() {
+            public void run() {
+                display.flushEdt();
+            }
+        });
     }
 
     @AfterEach
