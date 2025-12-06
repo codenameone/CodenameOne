@@ -7,7 +7,6 @@ import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.layouts.BoxLayout;
-import com.codename1.io.Util;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -35,15 +34,18 @@ class ButtonLongPointerPressSampleTest extends UITestBase {
 
         ensureSized(button, form);
 
-        implementation.pressComponent(button);
+        int x = button.getAbsoluteX() + button.getWidth() / 2;
+        int y = button.getAbsoluteY() + button.getHeight() / 2;
+
+        form.pointerPressed(x, y);
         drainEdt(form);
 
-        Util.sleep(600);
+        form.longPointerPress(x, y);
         drainEdt(form);
 
         assertTrue(longPressReceived[0], "Long pointer press should trigger override");
 
-        implementation.releaseComponent(button);
+        form.pointerReleased(x, y);
         drainEdt(form);
     }
 
