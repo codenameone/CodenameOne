@@ -16,6 +16,5 @@ mvn -pl core-unittests -am \
   -DunitTests=true \
   -Dmaven.javadoc.skip=true \
   -Dtest=ButtonGroupTest \
-  -DfailIfNoTests=false \
   -Plocal-dev-javase \
   test
