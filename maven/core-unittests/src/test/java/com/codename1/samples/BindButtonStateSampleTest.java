@@ -41,8 +41,8 @@ class BindButtonStateSampleTest extends UITestBase {
         implementation.releaseComponent(primary);
         drainEdt(form);
 
-        assertEquals(Button.STATE_DEFAULT, primary.getState());
-        assertEquals(Button.STATE_DEFAULT, follower.getState());
+        assertEquals(Button.STATE_ROLLOVER, primary.getState());
+        assertEquals(Button.STATE_ROLLOVER, follower.getState());
     }
 
     private void ensureSized(Component component, Form form) {
