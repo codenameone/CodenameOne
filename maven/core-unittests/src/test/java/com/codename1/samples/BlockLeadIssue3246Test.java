@@ -51,8 +51,13 @@ class BlockLeadIssue3246Test extends UITestBase {
         assertEquals(1, blockedInvocations[0], "Blocked component should handle its own action when blockLead is true");
 
         blocked.setBlockLead(false);
+        container.setLeadComponent(main);
         blockedInvocations[0] = 0;
         mainInvocations[0] = 0;
+
+        form.revalidate();
+        flushSerialCalls();
+        DisplayTest.flushEdt();
 
         implementation.tapComponent(blocked);
         flushSerialCalls();
