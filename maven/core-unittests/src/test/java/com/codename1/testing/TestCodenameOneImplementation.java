@@ -1300,15 +1300,35 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         }
     }
 
+    public void dispatchPointerPress(int x, int y) {
+        sendPointerEventToCurrentForm(true, x, y);
+    }
+
+    public void dispatchPointerRelease(int x, int y) {
+        sendPointerEventToCurrentForm(false, x, y);
+    }
+
     public void dispatchPointerPressAndRelease(int x, int y) {
-        Display display = Display.getInstance();
-        if (display == null) {
+        dispatchPointerPress(x, y);
+        dispatchPointerRelease(x, y);
+    }
+
+    public void pressComponent(Component component) {
+        if (component == null) {
             return;
         }
-        int[] xs = new int[]{x};
-        int[] ys = new int[]{y};
-        display.pointerPressed(xs, ys);
-        display.pointerReleased(xs, ys);
+        int x = component.getAbsoluteX() + component.getWidth() / 2;
+        int y = component.getAbsoluteY() + component.getHeight() / 2;
+        dispatchPointerPress(x, y);
+    }
+
+    public void releaseComponent(Component component) {
+        if (component == null) {
+            return;
+        }
+        int x = component.getAbsoluteX() + component.getWidth() / 2;
+        int y = component.getAbsoluteY() + component.getHeight() / 2;
+        dispatchPointerRelease(x, y);
     }
 
     public void tapComponent(Component component) {
@@ -1318,6 +1338,34 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         int x = component.getAbsoluteX() + component.getWidth() / 2;
         int y = component.getAbsoluteY() + component.getHeight() / 2;
         dispatchPointerPressAndRelease(x, y);
+    }
+
+    private void sendPointerEventToCurrentForm(final boolean pressed, final int x, final int y) {
+        final Display display = Display.getInstance();
+        if (display == null) {
+            return;
+        }
+
+        Runnable r = new Runnable() {
+            public void run() {
+                Form current = display.getCurrent();
+                if (current == null) {
+                    return;
+                }
+
+                if (pressed) {
+                    current.pointerPressed(x, y);
+                } else {
+                    current.pointerReleased(x, y);
+                }
+            }
+        };
+
+        if (display.isEdt()) {
+            r.run();
+        } else {
+            display.callSeriallyAndWait(r);
+        }
     }
 
     public void tapListRow(com.codename1.ui.List list, int rowIndex) {
