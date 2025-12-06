@@ -1,0 +1,1266 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JSONSanitizer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">JSONSanitizer.java</span></div><h1>JSONSanitizer.java</h1><pre class="source lang-java linenums">// Copyright (C) 2012 Google Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package com.codename1.io;
+
+/**
+ * Given JSON-like content, converts it to valid JSON.
+ * This can be attached at either end of a data-pipeline to help satisfy
+ * Postel's principle:
+ * &lt;blockquote&gt;
+ * be conservative in what you do, be liberal in what you accept from others
+ * &lt;/blockquote&gt;
+ * &lt;p&gt;
+ * Applied to JSON-like content from others, it will produce well-formed JSON
+ * that should satisfy any parser you use.
+ * &lt;p&gt;
+ * Applied to your output before you send, it will coerce minor mistakes in
+ * encoding and make it easier to embed your JSON in HTML and XML.
+ *
+ * &lt;h3&gt;Input&lt;/h3&gt;
+ * The sanitizer takes JSON like content, and interprets it as JS eval would.
+ * Specifically, it deals with these non-standard constructs.
+ * &lt;ul&gt;
+ * &lt;li&gt;{@code '...'} Single quoted strings are converted to JSON strings.
+ * &lt;li&gt;{@code \xAB} Hex escapes are converted to JSON unicode escapes.
+ * &lt;li&gt;{@code \012} Octal escapes are converted to JSON unicode escapes.
+ * &lt;li&gt;{@code 0xAB} Hex integer literals are converted to JSON decimal numbers.
+ * &lt;li&gt;{@code 012} Octal integer literals are converted to JSON decimal numbers.
+ * &lt;li&gt;{@code +.5} Decimal numbers are coerced to JSON's stricter format.
+ * &lt;li&gt;{@code [0,,2]} Elisions in arrays are filled with {@code null}.
+ * &lt;li&gt;{@code [1,2,3,]} Trailing commas are removed.
+ * &lt;li&gt;&lt;code&gt;{foo:&quot;bar&quot;}&lt;/code&gt; Unquoted property names are quoted.
+ * &lt;li&gt;&lt;code&gt;//comments&lt;/code&gt; JS style line and block comments are removed.
+ * &lt;li&gt;&lt;code&gt;(...)&lt;/code&gt; Grouping parentheses are removed.
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ * The sanitizer fixes missing punctuation, end quotes, and mismatched or
+ * missing close brackets. If an input contains only white-space then the valid
+ * JSON string {@code null} is substituted.
+ *
+ * &lt;h3&gt;Output&lt;/h3&gt;
+ * The output is well-formed JSON as defined by
+ * &lt;a href=&quot;http://www.ietf.org/rfc/rfc4627.txt&quot;&gt;RFC 4627&lt;/a&gt;.
+ * The output satisfies three additional properties:
+ * &lt;ol&gt;
+ * &lt;li&gt;The output will not contain the substring (case-insensitively)
+ *   {@code &quot;&lt;/script&quot;} so can be embedded inside an HTML script element without
+ *   further encoding.
+ * &lt;li&gt;The output will not contain the substring {@code &quot;]]&gt;&quot;} so can be
+ *   embedded inside an XML CDATA section without further encoding.&lt;/li&gt;
+ * &lt;li&gt;The output is a valid Javascript expression, so can be parsed by
+ *   Javascript's &lt;code&gt;eval&lt;/code&gt; builtin (after being wrapped in parentheses)
+ *   or by &lt;code&gt;JSON.parse&lt;/code&gt;.
+ *   Specifically, the output will not contain any string literals with embedded
+ *   JS newlines (U+2028 Paragraph separator or U+2029 Line separator).
+ * &lt;li&gt;The output contains only valid Unicode scalar values
+ *   (no isolated UTF-16 surrogates) that are
+ *   &lt;a href=&quot;http://www.w3.org/TR/xml/#charsets&quot;&gt;allowed in XML&lt;/a&gt; unescaped.
+ * &lt;/ol&gt;
+ *
+ * &lt;h3&gt;Security&lt;/h3&gt;
+ * Since the output is well-formed JSON, passing it to &lt;code&gt;eval&lt;/code&gt; will
+ * have no side-effects and no free variables, so is neither a code-injection
+ * vector, nor a vector for exfiltration of secrets.
+ *
+ * &lt;p&gt;This library only ensures that the JSON string &amp;rarr; Javascript object
+ * phase has no side effects and resolves no free variables, and cannot control
+ * how other client side code later interprets the resulting Javascript object.
+ * So if client-side code takes a part of the parsed data that is controlled by
+ * an attacker and passes it back through a powerful interpreter like
+ * {@code eval} or {@code innerHTML} then that client-side code might suffer
+ * unintended side-effects.
+ *
+ * &lt;h3&gt;Efficiency&lt;/h3&gt;
+ * The sanitize method will return the input string without allocating a new
+ * buffer when the input is already valid JSON that satisfies the properties
+ * above.  Thus, if used on input that is usually well formed, it has minimal
+ * memory overhead.
+ * &lt;p&gt;The sanitize method takes O(n) time where n is the length in UTF-16
+ * code-units.
+ */
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">final class JSONSanitizer {</span>
+
+    /**
+     * The default for the maximumNestingDepth constructor parameter.
+     */
+    public static final int DEFAULT_NESTING_DEPTH = 64;
+
+    /**
+     * The maximum value for the maximumNestingDepth constructor parameter.
+     */
+    public static final int MAXIMUM_NESTING_DEPTH = 4096;
+    private static final boolean SUPER_VERBOSE_AND_SLOW_LOGGING = false;
+<span class="fc" id="L105">    private static final char[] HEX_DIGITS = new char[]{</span>
+            '0', '1', '2', '3', '4', '5', '6', '7',
+            '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
+    };
+    /**
+     * The maximum nesting depth. According to RFC4627 it is implementation-specific.
+     */
+    private final int maximumNestingDepth;
+    private final String jsonish;
+    /**
+     * The number of brackets that have been entered and not subsequently exited.
+     * Also, the length of the used prefix of {@link #isMap}.
+     */
+    private int bracketDepth;
+    /**
+     * {@code isMap[i]} when {@code 0 &lt;= i &amp;&amp; i &lt; bracketDepth} is true iff
+     * the i-th open bracket was a &lt;code&gt;'{'&lt;/code&gt;, not a &lt;code&gt;'['&lt;/code&gt;.
+     */
+    private boolean[] isMap;
+    /**
+     * If non-null, then contains the sanitized form of
+     * {@code jsonish.substring(0, cleaned)}.
+     * If {@code null}, then no unclean constructs have been found in
+     * {@code jsonish} yet.
+     */
+    private StringBuilder sanitizedJson;
+    /**
+     * The length of the prefix of {@link #jsonish} that has been written onto
+     * {@link #sanitizedJson}.
+     */
+    private int cleaned;
+    JSONSanitizer(String jsonish) {
+<span class="nc" id="L137">        this(jsonish, DEFAULT_NESTING_DEPTH);</span>
+<span class="nc" id="L138">    }</span>
+
+<span class="fc" id="L140">    JSONSanitizer(String jsonish, int maximumNestingDepth) {</span>
+<span class="fc" id="L141">        this.maximumNestingDepth = Math.min(Math.max(1, maximumNestingDepth), MAXIMUM_NESTING_DEPTH);</span>
+        if (SUPER_VERBOSE_AND_SLOW_LOGGING) {
+            System.err.println(&quot;\n&quot; + jsonish + &quot;\n========&quot;);
+        }
+<span class="pc bpc" id="L145" title="1 of 2 branches missed.">        this.jsonish = jsonish != null ? jsonish : &quot;null&quot;;</span>
+<span class="fc" id="L146">    }</span>
+
+    /**
+     * Given JSON-like content, produces a string of JSON that is safe to embed,
+     * safe to pass to JavaScript's {@code eval} operator.
+     *
+     * @param jsonish JSON-like content.
+     * @return embeddable JSON
+     */
+    public static String sanitize(String jsonish) {
+<span class="fc" id="L156">        return sanitize(jsonish, DEFAULT_NESTING_DEPTH);</span>
+    }
+
+    /**
+     * Same as {@link JsonSanitizer#sanitize(String)}, but allows to set a custom
+     * maximum nesting depth.
+     *
+     * @param jsonish             JSON-like content.
+     * @param maximumNestingDepth maximum nesting depth.
+     * @return embeddable JSON
+     */
+    public static String sanitize(String jsonish, int maximumNestingDepth) {
+<span class="fc" id="L168">        JSONSanitizer s = new JSONSanitizer(jsonish, maximumNestingDepth);</span>
+<span class="fc" id="L169">        s.sanitize();</span>
+<span class="fc" id="L170">        return s.toString();</span>
+    }
+
+    /**
+     * The position past the last character within the quotes of the quoted
+     * string starting at {@code s.charAt(start)}.  Does not assume that the
+     * quoted string is properly closed.
+     */
+    private static int endOfQuotedString(String s, int start) {
+<span class="fc" id="L179">        char quote = s.charAt(start);</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        for (int i = start; (i = s.indexOf(quote, i + 1)) &gt;= 0; ) {</span>
+            // If there are an even number of preceding backslashes then this is
+            // the end of the string.
+<span class="fc" id="L183">            int slashRunStart = i;</span>
+<span class="pc bpc" id="L184" title="2 of 4 branches missed.">            while (slashRunStart &gt; start &amp;&amp; s.charAt(slashRunStart - 1) == '\\') {</span>
+<span class="nc" id="L185">                --slashRunStart;</span>
+            }
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">            if (((i - slashRunStart) &amp; 1) == 0) {</span>
+<span class="fc" id="L188">                return i + 1;</span>
+            }
+<span class="nc" id="L190">        }</span>
+<span class="nc" id="L191">        return s.length();</span>
+    }
+
+    /**
+     * @param sanStart the start (inclusive) of the number on sanitizedJson.
+     * @param sanEnd   the end (exclusive) of the number on sanitizedJson.
+     * @return true when the number could be canonicalized.
+     */
+    private static boolean canonicalizeNumber(
+            StringBuilder sanitizedJson, int sanStart, int sanEnd) {
+        // Now we perform several steps.
+        // 1. Convert from scientific notation to regular or vice-versa based on
+        //    normalized exponent.
+        // 2. Remove trailing zeroes from the fraction and truncate it to 24 digits.
+        // 3. Elide the fraction entirely if it is &quot;.0&quot;.
+        // 4. Convert any 'E' that separates the exponent to lower-case.
+        // 5. Elide any minus sign on a zero value.
+        // to convert the number to its canonical JS string form.
+
+        // Figure out where the parts of the number start and end.
+        int intStart, intEnd, fractionStart, fractionEnd, expStart, expEnd;
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        intStart = sanStart + (sanitizedJson.charAt(sanStart) == '-' ? 1 : 0);</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">        for (intEnd = intStart; intEnd &lt; sanEnd; ++intEnd) {</span>
+<span class="nc" id="L214">            char ch = sanitizedJson.charAt(intEnd);</span>
+<span class="nc bnc" id="L215" title="All 4 branches missed.">            if (!('0' &lt;= ch &amp;&amp; ch &lt;= '9')) {</span>
+<span class="nc" id="L216">                break;</span>
+            }
+        }
+<span class="nc bnc" id="L219" title="All 4 branches missed.">        if (intEnd == sanEnd || '.' != sanitizedJson.charAt(intEnd)) {</span>
+<span class="nc" id="L220">            fractionStart = fractionEnd = intEnd;</span>
+        } else {
+<span class="nc" id="L222">            fractionStart = intEnd + 1;</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">            for (fractionEnd = fractionStart; fractionEnd &lt; sanEnd; ++fractionEnd) {</span>
+<span class="nc" id="L224">                char ch = sanitizedJson.charAt(fractionEnd);</span>
+<span class="nc bnc" id="L225" title="All 4 branches missed.">                if (!('0' &lt;= ch &amp;&amp; ch &lt;= '9')) {</span>
+<span class="nc" id="L226">                    break;</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L230" title="All 2 branches missed.">        if (fractionEnd == sanEnd) {</span>
+<span class="nc" id="L231">            expStart = expEnd = sanEnd;</span>
+        } else {
+<span class="nc bnc" id="L233" title="All 2 branches missed.">            if (!('e' == (sanitizedJson.charAt(fractionEnd) | 32))) {</span>
+<span class="nc" id="L234">                throw new RuntimeException(&quot;AssertionError: 'e' == (sanitizedJson.charAt(fractionEnd) | 32))&quot;);</span>
+            }
+<span class="nc" id="L236">            expStart = fractionEnd + 1;</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">            if (sanitizedJson.charAt(expStart) == '+') {</span>
+<span class="nc" id="L238">                ++expStart;</span>
+            }
+<span class="nc" id="L240">            expEnd = sanEnd;</span>
+        }
+
+<span class="nc bnc" id="L243" title="All 10 branches missed.">        if (!(</span>
+                intStart &lt;= intEnd
+                        &amp;&amp; intEnd &lt;= fractionStart
+                        &amp;&amp; fractionStart &lt;= fractionEnd
+                        &amp;&amp; fractionEnd &lt;= expStart
+                        &amp;&amp; expStart &lt;= expEnd)) {
+<span class="nc" id="L249">            throw new RuntimeException(&quot;Assertion error in JSONSanitizer: intStart &lt;= intEnd, etc...&quot;);</span>
+        }
+
+        int exp;
+<span class="nc bnc" id="L253" title="All 2 branches missed.">        if (expEnd == expStart) {</span>
+<span class="nc" id="L254">            exp = 0;</span>
+        } else {
+            try {
+<span class="nc" id="L257">                exp = Integer.parseInt(sanitizedJson.toString().substring(expStart, expEnd), 10);</span>
+<span class="nc" id="L258">            } catch (NumberFormatException ex) {</span>
+                // The exponent is out of the range of representable ints.
+                // JSON does not place limits on the range of representable numbers but
+                // nor does it allow bare numbers as keys.
+<span class="nc" id="L262">                return false;</span>
+<span class="nc" id="L263">            }</span>
+        }
+
+        // Numbered Comments below come from the EcmaScript 5 language specification
+        // section 9.8.1 : ToString Applied to the Number Type
+        // http://es5.github.com/#x9.8.1
+
+        // 5. let n, k, and s be integers such that k &gt;= 1, 10k-1 &lt;= s &lt; 10k, the
+        // Number value for s * 10n-k is m, and k is as small as possible.
+        // Note that k is the number of digits in the decimal representation of s,
+        // that s is not divisible by 10, and that the least significant digit of s
+        // is not necessarily uniquely determined by these criteria.
+<span class="nc" id="L275">        int n = exp;  // Exponent</span>
+
+        // s, the string of decimal digits in the representation of m are stored in
+        // sanitizedJson.substring(intStart).
+        // k, the number of digits in s is computed later.
+
+        // Leave only the number representation on the output buffer after intStart.
+        // This leaves any sign on the digit per
+        // 3. If m is less than zero, return the String concatenation of the
+        //    String &quot;-&quot; and ToString(-m).
+<span class="nc" id="L285">        boolean sawDecimal = false;</span>
+<span class="nc" id="L286">        boolean zero = true;</span>
+<span class="nc" id="L287">        int digitOutPos = intStart;</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">        for (int i = intStart, nZeroesPending = 0; i &lt; fractionEnd; ++i) {</span>
+<span class="nc" id="L289">            char ch = sanitizedJson.charAt(i);</span>
+<span class="nc bnc" id="L290" title="All 2 branches missed.">            if (ch == '.') {</span>
+<span class="nc" id="L291">                sawDecimal = true;</span>
+<span class="nc bnc" id="L292" title="All 2 branches missed.">                if (zero) {</span>
+<span class="nc" id="L293">                    nZeroesPending = 0;</span>
+                }
+                continue;
+            }
+
+<span class="nc" id="L298">            char digit = ch;</span>
+<span class="nc bnc" id="L299" title="All 6 branches missed.">            if ((!zero || digit != '0') &amp;&amp; !sawDecimal) {</span>
+<span class="nc" id="L300">                ++n;</span>
+            }
+
+<span class="nc bnc" id="L303" title="All 2 branches missed.">            if (digit == '0') {</span>
+                // Keep track of runs of zeros so that we can take them into account
+                // if we later see a non-zero digit.
+<span class="nc" id="L306">                ++nZeroesPending;</span>
+            } else {
+<span class="nc bnc" id="L308" title="All 2 branches missed.">                if (zero) {  // First non-zero digit.</span>
+                    // Discard runs of zeroes at the front of the integer part, but
+                    // any after the decimal point factor into the exponent, n.
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                    if (sawDecimal) {</span>
+<span class="nc" id="L312">                        n -= nZeroesPending;</span>
+                    }
+<span class="nc" id="L314">                    nZeroesPending = 0;</span>
+                }
+<span class="nc" id="L316">                zero = false;</span>
+<span class="nc bnc" id="L317" title="All 4 branches missed.">                while (nZeroesPending != 0 || digit != 0) {</span>
+                    char vdigit;
+<span class="nc bnc" id="L319" title="All 2 branches missed.">                    if (nZeroesPending == 0) {</span>
+<span class="nc" id="L320">                        vdigit = digit;</span>
+<span class="nc" id="L321">                        digit = (char) 0;</span>
+                    } else {
+<span class="nc" id="L323">                        vdigit = '0';</span>
+<span class="nc" id="L324">                        --nZeroesPending;</span>
+                    }
+
+                    // TODO: limit s to 21 digits?
+<span class="nc" id="L328">                    sanitizedJson.setCharAt(digitOutPos++, vdigit);</span>
+<span class="nc" id="L329">                }</span>
+            }
+        }
+<span class="nc" id="L332">        sanitizedJson.setLength(digitOutPos);</span>
+        // Number of digits in decimal representation of s.
+<span class="nc" id="L334">        int k = digitOutPos - intStart;</span>
+
+        // Now we have computed n, k, and s as defined above.  Time to add decimal
+        // points, exponents, and leading zeroes per the rest of the JS number
+        // formatting specification.
+
+<span class="nc bnc" id="L340" title="All 2 branches missed.">        if (zero) {  // There are no non-zero decimal digits.</span>
+            // 2. If m is +0 or -0, return the String &quot;0&quot;.
+<span class="nc" id="L342">            sanitizedJson.setLength(sanStart);  // Elide any sign.</span>
+<span class="nc" id="L343">            sanitizedJson.append('0');</span>
+<span class="nc" id="L344">            return true;</span>
+        }
+
+        // 6. If k &lt;= n &lt;= 21, return the String consisting of the k digits of the
+        // decimal representation of s (in order, with no leading zeroes),
+        // followed by n-k occurrences of the character '0'.
+<span class="nc bnc" id="L350" title="All 4 branches missed.">        if (k &lt;= n &amp;&amp; n &lt;= 21) {</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">            for (int i = k; i &lt; n; ++i) {</span>
+<span class="nc" id="L352">                sanitizedJson.append('0');</span>
+            }
+
+            // 7. If 0 &lt; n &lt;= 21, return the String consisting of the most significant n
+            // digits of the decimal representation of s, followed by a decimal point
+            // '.', followed by the remaining k-n digits of the decimal representation
+            // of s.
+<span class="nc bnc" id="L359" title="All 4 branches missed.">        } else if (0 &lt; n &amp;&amp; n &lt;= 21) {</span>
+<span class="nc" id="L360">            sanitizedJson.insert(intStart + n, '.');</span>
+
+            // 8. If -6 &lt; n &lt;= 0, return the String consisting of the character '0',
+            // followed by a decimal point '.', followed by -n occurrences of the
+            // character '0', followed by the k digits of the decimal representation of
+            // s.
+<span class="nc bnc" id="L366" title="All 4 branches missed.">        } else if (-6 &lt; n &amp;&amp; n &lt;= 0) {</span>
+<span class="nc" id="L367">            sanitizedJson.insert(intStart, &quot;0.000000&quot;.substring(0, 2 - n));</span>
+
+        } else {
+
+            // 9. Otherwise, if k = 1, return the String consisting of the single
+            // digit of s, followed by lowercase character 'e', followed by a plus
+            // sign '+' or minus sign '-' according to whether n-1 is positive or
+            // negative, followed by the decimal representation of the integer
+            // abs(n-1) (with no leading zeros).
+<span class="nc bnc" id="L376" title="All 2 branches missed.">            if (k == 1) {</span>
+                // Sole digit already on sanitizedJson.
+
+                // 10. Return the String consisting of the most significant digit of the
+                // decimal representation of s, followed by a decimal point '.', followed
+                // by the remaining k-1 digits of the decimal representation of s,
+                // followed by the lowercase character 'e', followed by a plus sign '+'
+                // or minus sign '-' according to whether n-1 is positive or negative,
+                // followed by the decimal representation of the integer abs(n-1) (with
+                // no leading zeros).
+            } else {
+<span class="nc" id="L387">                sanitizedJson.insert(intStart + 1, '.');</span>
+            }
+<span class="nc" id="L389">            int nLess1 = n - 1;</span>
+<span class="nc bnc" id="L390" title="All 2 branches missed.">            sanitizedJson.append('e').append(nLess1 &lt; 0 ? '-' : '+')</span>
+<span class="nc" id="L391">                    .append(Math.abs(nLess1));</span>
+        }
+<span class="nc" id="L393">        return true;</span>
+    }
+
+    private static boolean regionMatches(String s1, int offset, String s2, int ooffset, int len) {
+<span class="fc bfc" id="L397" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="fc bfc" id="L398" title="All 2 branches covered.">            if (s1.charAt(offset + i) != s2.charAt(ooffset + i)) {</span>
+<span class="fc" id="L399">                return false;</span>
+            }
+        }
+<span class="fc" id="L402">        return true;</span>
+    }
+
+    private static boolean isIdentifierCharacter(char tch) {
+<span class="pc bpc" id="L406" title="5 of 22 branches missed.">        return ('a' &lt;= tch &amp;&amp; tch &lt;= 'z') || ('0' &lt;= tch &amp;&amp; tch &lt;= '9')</span>
+                || tch == '+' || tch == '-' || tch == '.'
+                || ('A' &lt;= tch &amp;&amp; tch &lt;= 'Z') || tch == '_' || tch == '$';
+    }
+
+    int getMaximumNestingDepth() {
+<span class="nc" id="L412">        return this.maximumNestingDepth;</span>
+    }
+
+    void sanitize() {
+        // Return to consistent state.
+<span class="fc" id="L417">        bracketDepth = cleaned = 0;</span>
+<span class="fc" id="L418">        sanitizedJson = null;</span>
+
+<span class="fc" id="L420">        State state = State.START_ARRAY;</span>
+<span class="fc" id="L421">        int n = jsonish.length();</span>
+
+        // Walk over each token and either validate it, by just advancing i and
+        // computing the next state, or manipulate cleaned&amp;sanitizedJson so that
+        // sanitizedJson contains the sanitized equivalent of
+        // jsonish.substring(0, cleaned).
+        token_loop:
+<span class="fc bfc" id="L428" title="All 2 branches covered.">        for (int i = 0; i &lt; n; ++i) {</span>
+            try {
+<span class="fc" id="L430">                char ch = jsonish.charAt(i);</span>
+                if (SUPER_VERBOSE_AND_SLOW_LOGGING) {
+                    String sanitizedJsonStr =
+                            (sanitizedJson == null ? &quot;&quot; : sanitizedJson)
+                                    + jsonish.substring(cleaned, i);
+                    System.err.println(&quot;i=&quot; + i + &quot;, ch=&quot; + ch + &quot;, state=&quot; + state
+                            + &quot;, sanitized=&quot; + sanitizedJsonStr);
+                }
+<span class="pc bpc" id="L438" title="2 of 9 branches missed.">                switch (ch) {</span>
+                    case '\t':
+                    case '\n':
+                    case '\r':
+                    case ' ':
+<span class="fc" id="L443">                        break;</span>
+
+                    case '&quot;':
+                    case '\'':
+<span class="fc" id="L447">                        state = requireValueState(i, state, true);</span>
+<span class="fc" id="L448">                        int strEnd = endOfQuotedString(jsonish, i);</span>
+<span class="fc" id="L449">                        sanitizeString(i, strEnd);</span>
+<span class="fc" id="L450">                        i = strEnd - 1;</span>
+<span class="fc" id="L451">                        break;</span>
+
+                    case '(':
+                    case ')':
+                        // Often JSON-like content which is meant for use by eval is
+                        // wrapped in parentheses so that the JS parser treats contained
+                        // curly brackets as part of an object constructor instead of a
+                        // block statement.
+                        // We elide these grouping parentheses to ensure valid JSON.
+<span class="nc" id="L460">                        elide(i, i + 1);</span>
+<span class="nc" id="L461">                        break;</span>
+
+                    case '{':
+                    case '[':
+<span class="fc" id="L465">                        state = requireValueState(i, state, false);</span>
+<span class="fc bfc" id="L466" title="All 2 branches covered.">                        if (isMap == null) {</span>
+<span class="fc" id="L467">                            isMap = new boolean[maximumNestingDepth];</span>
+                        }
+<span class="fc bfc" id="L469" title="All 2 branches covered.">                        boolean map = ch == '{';</span>
+<span class="fc" id="L470">                        isMap[bracketDepth] = map;</span>
+<span class="fc" id="L471">                        ++bracketDepth;</span>
+<span class="fc bfc" id="L472" title="All 2 branches covered.">                        state = map ? State.START_MAP : State.START_ARRAY;</span>
+<span class="fc" id="L473">                        break;</span>
+
+                    case '}':
+                    case ']':
+<span class="pc bpc" id="L477" title="1 of 2 branches missed.">                        if (bracketDepth == 0) {</span>
+<span class="nc" id="L478">                            elide(i, jsonish.length());</span>
+<span class="nc" id="L479">                            break token_loop;</span>
+                        }
+
+                        // Strip trailing comma to convert {&quot;a&quot;:0,} -&gt; {&quot;a&quot;:0}
+                        // and [1,2,3,] -&gt; [1,2,3,]
+<span class="pc bpc" id="L484" title="3 of 4 branches missed.">                        switch (state) {</span>
+                            case BEFORE_VALUE:
+<span class="nc" id="L486">                                insert(i, &quot;null&quot;);</span>
+<span class="nc" id="L487">                                break;</span>
+                            case BEFORE_ELEMENT:
+                            case BEFORE_KEY:
+<span class="nc" id="L490">                                elideTrailingComma(i);</span>
+<span class="nc" id="L491">                                break;</span>
+                            case AFTER_KEY:
+<span class="nc" id="L493">                                insert(i, &quot;:null&quot;);</span>
+<span class="nc" id="L494">                                break;</span>
+                            case START_MAP:
+                            case START_ARRAY:
+                            case AFTER_ELEMENT:
+                            case AFTER_VALUE:
+                                break;
+                        }
+
+<span class="fc" id="L502">                        --bracketDepth;</span>
+<span class="fc bfc" id="L503" title="All 2 branches covered.">                        char closeBracket = isMap[bracketDepth] ? '}' : ']';</span>
+<span class="pc bpc" id="L504" title="1 of 2 branches missed.">                        if (ch != closeBracket) {</span>
+<span class="nc" id="L505">                            replace(i, i + 1, closeBracket);</span>
+                        }
+<span class="pc bpc" id="L507" title="1 of 4 branches missed.">                        state = bracketDepth == 0 || !isMap[bracketDepth - 1]</span>
+                                ? State.AFTER_ELEMENT : State.AFTER_VALUE;
+<span class="fc" id="L509">                        break;</span>
+                    case ',':
+<span class="pc bpc" id="L511" title="1 of 2 branches missed.">                        if (bracketDepth == 0) {</span>
+<span class="nc" id="L512">                            throw new RuntimeException(&quot;Unbracketed comma&quot;);</span>
+                        }
+                        // Convert comma elisions like [1,,3] to [1,null,3].
+                        // [1,,3] in JS is an array that has no element at index 1
+                        // according to the &quot;in&quot; operator so accessing index 1 will
+                        // yield the special value &quot;undefined&quot; which is equivalent to
+                        // JS's &quot;null&quot; value according to &quot;==&quot;.
+<span class="pc bpc" id="L519" title="4 of 6 branches missed.">                        switch (state) {</span>
+                            // Normal
+                            case AFTER_ELEMENT:
+<span class="fc" id="L522">                                state = State.BEFORE_ELEMENT;</span>
+<span class="fc" id="L523">                                break;</span>
+                            case AFTER_VALUE:
+<span class="fc" id="L525">                                state = State.BEFORE_KEY;</span>
+<span class="fc" id="L526">                                break;</span>
+                            // Array elision.
+                            case START_ARRAY:
+                            case BEFORE_ELEMENT:
+<span class="nc" id="L530">                                insert(i, &quot;null&quot;);</span>
+<span class="nc" id="L531">                                state = State.BEFORE_ELEMENT;</span>
+<span class="nc" id="L532">                                break;</span>
+                            // Ignore
+                            case START_MAP:
+                            case BEFORE_KEY:
+                            case AFTER_KEY:
+<span class="nc" id="L537">                                elide(i, i + 1);</span>
+<span class="nc" id="L538">                                break;</span>
+                            // Supply missing value.
+                            case BEFORE_VALUE:
+<span class="nc" id="L541">                                insert(i, &quot;null&quot;);</span>
+<span class="nc" id="L542">                                state = State.BEFORE_KEY;</span>
+                                break;
+                        }
+<span class="fc" id="L545">                        break;</span>
+
+                    case ':':
+<span class="pc bpc" id="L548" title="1 of 2 branches missed.">                        if (state == State.AFTER_KEY) {</span>
+<span class="fc" id="L549">                            state = State.BEFORE_VALUE;</span>
+                        } else {
+<span class="nc" id="L551">                            elide(i, i + 1);</span>
+                        }
+<span class="nc" id="L553">                        break;</span>
+
+                    case '/':
+                        // Skip over JS-style comments since people like inserting them into
+                        // data files and getting huffy with Crockford when he says no to
+                        // versioning JSON to allow ignorable tokens.
+<span class="nc" id="L559">                        int end = i + 1;</span>
+<span class="nc bnc" id="L560" title="All 2 branches missed.">                        if (i + 1 &lt; n) {</span>
+<span class="nc bnc" id="L561" title="All 3 branches missed.">                            switch (jsonish.charAt(i + 1)) {</span>
+                                case '/':
+<span class="nc" id="L563">                                    end = n;  // Worst case.</span>
+<span class="nc bnc" id="L564" title="All 2 branches missed.">                                    for (int j = i + 2; j &lt; n; ++j) {</span>
+<span class="nc" id="L565">                                        char cch = jsonish.charAt(j);</span>
+<span class="nc bnc" id="L566" title="All 8 branches missed.">                                        if (cch == '\n' || cch == '\r'</span>
+                                                || cch == '\u2028' || cch == '\u2029') {
+<span class="nc" id="L568">                                            end = j + 1;</span>
+<span class="nc" id="L569">                                            break;</span>
+                                        }
+                                    }
+<span class="nc" id="L572">                                    break;</span>
+                                case '*':
+<span class="nc" id="L574">                                    end = n;</span>
+<span class="nc bnc" id="L575" title="All 2 branches missed.">                                    if (i + 3 &lt; n) {</span>
+<span class="nc" id="L576">                                        for (int j = i + 2;</span>
+<span class="nc bnc" id="L577" title="All 2 branches missed.">                                             (j = jsonish.indexOf('/', j + 1)) &gt;= 0; ) {</span>
+<span class="nc bnc" id="L578" title="All 2 branches missed.">                                            if (jsonish.charAt(j - 1) == '*') {</span>
+<span class="nc" id="L579">                                                end = j + 1;</span>
+<span class="nc" id="L580">                                                break;</span>
+                                            }
+                                        }
+                                    }
+                                    break;
+                            }
+                        }
+<span class="nc" id="L587">                        elide(i, end);</span>
+<span class="nc" id="L588">                        i = end - 1;</span>
+<span class="nc" id="L589">                        break;</span>
+
+                    default:
+                        // Three kinds of other values can occur.
+                        // 1. Numbers
+                        // 2. Keyword values (&quot;false&quot;, &quot;null&quot;, &quot;true&quot;)
+                        // 3. Unquoted JS property names as in the JS expression
+                        //      ({ foo: &quot;bar&quot;})
+                        //    which is equivalent to the JSON
+                        //      { &quot;foo&quot;: &quot;bar&quot; }
+                        // 4. Cruft tokens like BOMs.
+
+                        // Look for a run of '.', [0-9], [a-zA-Z_$], [+-] which subsumes
+                        // all the above without including any JSON special characters
+                        // outside keyword and number.
+<span class="fc" id="L604">                        int runEnd = i;</span>
+<span class="pc bpc" id="L605" title="1 of 4 branches missed.">                        while (runEnd &lt; n &amp;&amp; isIdentifierCharacter(jsonish.charAt(runEnd))) {</span>
+<span class="fc" id="L606">                            runEnd++;</span>
+                        }
+
+<span class="pc bpc" id="L609" title="1 of 2 branches missed.">                        if (runEnd == i) {</span>
+<span class="nc" id="L610">                            elide(i, i + 1);</span>
+<span class="nc" id="L611">                            break;</span>
+                        }
+
+<span class="fc" id="L614">                        state = requireValueState(i, state, true);</span>
+
+<span class="pc bpc" id="L616" title="3 of 10 branches missed.">                        boolean isNumber = ('0' &lt;= ch &amp;&amp; ch &lt;= '9')</span>
+                                || ch == '.' || ch == '+' || ch == '-';
+<span class="fc bfc" id="L618" title="All 4 branches covered.">                        boolean isKeyword = !isNumber &amp;&amp; isKeyword(i, runEnd);</span>
+
+<span class="fc bfc" id="L620" title="All 4 branches covered.">                        if (!(isNumber || isKeyword)) {</span>
+                            // We're going to have to quote the output.  Further expand to
+                            // include more of an unquoted token in a string.
+<span class="pc bpc" id="L623" title="2 of 4 branches missed.">                            while (runEnd &lt; n &amp;&amp; !isJsonSpecialChar(runEnd)) {</span>
+<span class="nc" id="L624">                                runEnd++;</span>
+                            }
+<span class="pc bpc" id="L626" title="2 of 4 branches missed.">                            if (runEnd &lt; n &amp;&amp; jsonish.charAt(runEnd) == '&quot;') {</span>
+<span class="nc" id="L627">                                ++runEnd;</span>
+                            }
+                        }
+
+<span class="fc bfc" id="L631" title="All 2 branches covered.">                        if (state == State.AFTER_KEY) {</span>
+                            // We need to quote whatever we have since it is used as a
+                            // property name in a map and only quoted strings can be used that
+                            // way in JSON.
+<span class="fc" id="L635">                            insert(i, '&quot;');</span>
+<span class="pc bpc" id="L636" title="1 of 2 branches missed.">                            if (isNumber) {</span>
+                                // By JS rules,
+                                //   { .5e-1: &quot;bar&quot; }
+                                // is the same as
+                                //   { &quot;0.05&quot;: &quot;bar&quot; }
+                                // because a number literal is converted to its string form
+                                // before being used as a property name.
+<span class="nc" id="L643">                                canonicalizeNumber(i, runEnd);</span>
+                                // We intentionally ignore the return value of canonicalize.
+                                // Uncanonicalizable numbers just get put straight through as
+                                // string values.
+<span class="nc" id="L647">                                insert(runEnd, '&quot;');</span>
+                            } else {
+<span class="fc" id="L649">                                sanitizeString(i, runEnd);</span>
+                            }
+                        } else {
+<span class="fc bfc" id="L652" title="All 2 branches covered.">                            if (isNumber) {</span>
+                                // Convert hex and octal constants to decimal and ensure that
+                                // integer and fraction portions are not empty.
+<span class="fc" id="L655">                                normalizeNumber(i, runEnd);</span>
+<span class="fc bfc" id="L656" title="All 2 branches covered.">                            } else if (!isKeyword) {</span>
+                                // Treat as an unquoted string literal.
+<span class="fc" id="L658">                                insert(i, '&quot;');</span>
+<span class="fc" id="L659">                                sanitizeString(i, runEnd);</span>
+                            }
+                        }
+<span class="fc" id="L662">                        i = runEnd - 1;</span>
+                }
+<span class="nc" id="L664">            } catch (@SuppressWarnings(&quot;unused&quot;) UnbracketedComma e) {</span>
+<span class="nc" id="L665">                elide(i, jsonish.length());</span>
+<span class="nc" id="L666">                break;</span>
+<span class="fc" id="L667">            }</span>
+        }
+
+<span class="pc bpc" id="L670" title="3 of 4 branches missed.">        if (state == State.START_ARRAY &amp;&amp; bracketDepth == 0) {</span>
+            // No tokens.  Only whitespace
+<span class="nc" id="L672">            insert(n, &quot;null&quot;);</span>
+<span class="nc" id="L673">            state = State.AFTER_ELEMENT;</span>
+        }
+
+        if (SUPER_VERBOSE_AND_SLOW_LOGGING) {
+            System.err.println(
+                    &quot;state=&quot; + state + &quot;, sanitizedJson=&quot; + sanitizedJson
+                            + &quot;, cleaned=&quot; + cleaned + &quot;, bracketDepth=&quot; + bracketDepth);
+        }
+
+<span class="pc bpc" id="L682" title="6 of 8 branches missed.">        if ((sanitizedJson != null &amp;&amp; sanitizedJson.length() != 0)</span>
+                || cleaned != 0 || bracketDepth != 0) {
+<span class="pc bpc" id="L684" title="1 of 2 branches missed.">            if (sanitizedJson == null) {</span>
+<span class="nc" id="L685">                sanitizedJson = new StringBuilder(n + bracketDepth);</span>
+            }
+<span class="fc" id="L687">            sanitizedJson.append(jsonish.substring(cleaned, n));</span>
+<span class="fc" id="L688">            cleaned = n;</span>
+
+<span class="pc bpc" id="L690" title="3 of 4 branches missed.">            switch (state) {</span>
+                case BEFORE_ELEMENT:
+                case BEFORE_KEY:
+<span class="nc" id="L693">                    elideTrailingComma(n);</span>
+<span class="nc" id="L694">                    break;</span>
+                case AFTER_KEY:
+<span class="nc" id="L696">                    sanitizedJson.append(&quot;:null&quot;);</span>
+<span class="nc" id="L697">                    break;</span>
+                case BEFORE_VALUE:
+<span class="nc" id="L699">                    sanitizedJson.append(&quot;null&quot;);</span>
+<span class="nc" id="L700">                    break;</span>
+                default:
+                    break;
+            }
+
+            // Insert brackets to close unclosed content.
+<span class="pc bpc" id="L706" title="1 of 2 branches missed.">            while (bracketDepth != 0) { // PMD Fix: AvoidBranchingStatementAsLastInLoop</span>
+<span class="nc bnc" id="L707" title="All 2 branches missed.">                sanitizedJson.append(isMap[--bracketDepth] ? '}' : ']');</span>
+            }
+        }
+<span class="fc" id="L710">    }</span>
+
+    /**
+     * Ensures that the output corresponding to {@code jsonish[start:end]} is a
+     * valid JSON string that has the same meaning when parsed by Javascript
+     * {@code eval}.
+     * &lt;ul&gt;
+     *   &lt;li&gt;Making sure that it is fully quoted with double-quotes.
+     *   &lt;li&gt;Escaping any Javascript newlines : CR, LF, U+2028, U+2029
+     *   &lt;li&gt;Escaping HTML special characters to allow it to be safely embedded
+     *       in HTML {@code &lt;script&gt;} elements and XML {@code &lt;!CDATA[...]]&gt;}
+     *       sections.
+     *   &lt;li&gt;Rewrite hex, octal, and other escapes that are valid in Javascript
+     *       but not in JSON.
+     * &lt;/ul&gt;
+     *
+     * @param start inclusive
+     * @param end   exclusive
+     */
+    private void sanitizeString(int start, int end) {
+<span class="fc" id="L730">        boolean closed = false;</span>
+<span class="fc bfc" id="L731" title="All 2 branches covered.">        for (int i = start; i &lt; end; ++i) {</span>
+<span class="fc" id="L732">            char ch = jsonish.charAt(i);</span>
+<span class="pc bpc" id="L733" title="7 of 9 branches missed.">            switch (ch) {</span>
+                // Fixup newlines.
+                case '\n':
+<span class="nc" id="L736">                    replace(i, i + 1, &quot;\\n&quot;);</span>
+<span class="nc" id="L737">                    break;</span>
+                case '\r':
+<span class="nc" id="L739">                    replace(i, i + 1, &quot;\\r&quot;);</span>
+<span class="nc" id="L740">                    break;</span>
+                // Not newlines in JSON but unparseable by JS eval.
+                case '\u2028':
+<span class="nc" id="L743">                    replace(i, i + 1, &quot;\\u2028&quot;);</span>
+<span class="nc" id="L744">                    break;</span>
+                case '\u2029':
+<span class="nc" id="L746">                    replace(i, i + 1, &quot;\\u2029&quot;);</span>
+<span class="nc" id="L747">                    break;</span>
+                // String delimiting quotes that need to be converted : 'foo' -&gt; &quot;foo&quot;
+                // or internal quotes that might need to be escaped : f&quot;o -&gt; f\&quot;o.
+                case '&quot;':
+                case '\'':
+<span class="fc bfc" id="L752" title="All 2 branches covered.">                    if (i == start) {</span>
+<span class="pc bpc" id="L753" title="1 of 2 branches missed.">                        if (ch == '\'') {</span>
+<span class="fc" id="L754">                            replace(i, i + 1, '&quot;');</span>
+                        }
+                    } else {
+<span class="pc bpc" id="L757" title="1 of 2 branches missed.">                        if (i + 1 == end) {</span>
+<span class="fc" id="L758">                            char startDelim = jsonish.charAt(start);</span>
+<span class="pc bpc" id="L759" title="1 of 2 branches missed.">                            if (startDelim != '\'') {</span>
+                                // If we're sanitizing a string whose start was inferred, then
+                                // treat '&quot;' as closing regardless.
+<span class="nc" id="L762">                                startDelim = '&quot;';</span>
+                            }
+<span class="pc bpc" id="L764" title="1 of 2 branches missed.">                            closed = startDelim == ch;</span>
+                        }
+<span class="pc bpc" id="L766" title="1 of 2 branches missed.">                        if (closed) {</span>
+<span class="pc bpc" id="L767" title="1 of 2 branches missed.">                            if (ch == '\'') {</span>
+<span class="fc" id="L768">                                replace(i, i + 1, '&quot;');</span>
+                            }
+<span class="nc bnc" id="L770" title="All 2 branches missed.">                        } else if (ch == '&quot;') {</span>
+<span class="nc" id="L771">                            insert(i, '\\');</span>
+                        }
+                    }
+                    break;
+                // Embedding.  Disallow &lt;/script and ]]&gt; in string literals so that
+                // the output can be embedded in HTML script elements and in XML CDATA
+                // sections.
+                case '/':
+                    // Don't over escape.  Many JSON bodies contain innocuous HTML
+                    // that can be safely embedded.
+<span class="nc bnc" id="L781" title="All 6 branches missed.">                    if (i &gt; start &amp;&amp; i + 2 &lt; end &amp;&amp; '&lt;' == jsonish.charAt(i - 1)</span>
+<span class="nc bnc" id="L782" title="All 2 branches missed.">                            &amp;&amp; 's' == (jsonish.charAt(i + 1) | 32)</span>
+<span class="nc bnc" id="L783" title="All 2 branches missed.">                            &amp;&amp; 'c' == (jsonish.charAt(i + 2) | 32)) {</span>
+<span class="nc" id="L784">                        insert(i, '\\');</span>
+                    }
+                    break;
+                case ']':
+<span class="nc bnc" id="L788" title="All 4 branches missed.">                    if (i + 2 &lt; end &amp;&amp; ']' == jsonish.charAt(i + 1)</span>
+<span class="nc bnc" id="L789" title="All 2 branches missed.">                            &amp;&amp; '&gt;' == jsonish.charAt(i + 2)) {</span>
+<span class="nc" id="L790">                        replace(i, i + 1, &quot;\\u005d&quot;);</span>
+                    }
+                    break;
+                // Normalize escape sequences.
+                case '\\':
+<span class="nc bnc" id="L795" title="All 2 branches missed.">                    if (i + 1 == end) {</span>
+<span class="nc" id="L796">                        elide(i, i + 1);</span>
+<span class="nc" id="L797">                        break;</span>
+                    }
+<span class="nc" id="L799">                    char sch = jsonish.charAt(i + 1);</span>
+<span class="nc bnc" id="L800" title="All 6 branches missed.">                    switch (sch) {</span>
+                        case 'b':
+                        case 'f':
+                        case 'n':
+                        case 'r':
+                        case 't':
+                        case '\\':
+                        case '/':
+                        case '&quot;':
+<span class="nc" id="L809">                            ++i;</span>
+<span class="nc" id="L810">                            break;</span>
+                        case 'v':  // Recognized by JS but not by JSON.
+<span class="nc" id="L812">                            replace(i, i + 2, &quot;\\u0008&quot;);</span>
+<span class="nc" id="L813">                            ++i;</span>
+<span class="nc" id="L814">                            break;</span>
+                        case 'x':
+<span class="nc bnc" id="L816" title="All 6 branches missed.">                            if (i + 4 &lt; end &amp;&amp; isHexAt(i + 2) &amp;&amp; isHexAt(i + 3)) {</span>
+<span class="nc" id="L817">                                replace(i, i + 2, &quot;\\u00&quot;);  // \xab -&gt; \u00ab</span>
+<span class="nc" id="L818">                                i += 3;</span>
+<span class="nc" id="L819">                                break;</span>
+                            }
+<span class="nc" id="L821">                            elide(i, i + 1);</span>
+<span class="nc" id="L822">                            break;</span>
+                        case 'u':
+<span class="nc bnc" id="L824" title="All 6 branches missed.">                            if (i + 6 &lt; end &amp;&amp; isHexAt(i + 2) &amp;&amp; isHexAt(i + 3)</span>
+<span class="nc bnc" id="L825" title="All 4 branches missed.">                                    &amp;&amp; isHexAt(i + 4) &amp;&amp; isHexAt(i + 5)) {</span>
+<span class="nc" id="L826">                                i += 5;</span>
+<span class="nc" id="L827">                                break;</span>
+                            }
+<span class="nc" id="L829">                            elide(i, i + 1);</span>
+<span class="nc" id="L830">                            break;</span>
+                        case '0':
+                        case '1':
+                        case '2':
+                        case '3':
+                        case '4':
+                        case '5':
+                        case '6':
+                        case '7':
+<span class="nc" id="L839">                            int octalEnd = i + 1;</span>
+<span class="nc bnc" id="L840" title="All 4 branches missed.">                            if (octalEnd + 1 &lt; end &amp;&amp; isOctAt(octalEnd + 1)) {</span>
+<span class="nc" id="L841">                                ++octalEnd;</span>
+<span class="nc bnc" id="L842" title="All 6 branches missed.">                                if (ch &lt;= '3' &amp;&amp; octalEnd + 1 &lt; end &amp;&amp; isOctAt(octalEnd + 1)) {</span>
+<span class="nc" id="L843">                                    ++octalEnd;</span>
+                                }
+<span class="nc" id="L845">                                int value = 0;</span>
+<span class="nc bnc" id="L846" title="All 2 branches missed.">                                for (int j = i; j &lt; octalEnd; ++j) {</span>
+<span class="nc" id="L847">                                    value = (value &lt;&lt; 3) | (jsonish.charAt(j) - '0');</span>
+                                }
+<span class="nc" id="L849">                                replace(i + 1, octalEnd, &quot;u00&quot;);</span>
+<span class="nc" id="L850">                                appendHex(value, 2);</span>
+                            }
+<span class="nc" id="L852">                            i = octalEnd - 1;</span>
+<span class="nc" id="L853">                            break;</span>
+                        default:
+                            // Literal char that is recognized by JS but not by JSON.
+                            // &quot;\-&quot; is valid JS but not valid JSON.
+<span class="nc" id="L857">                            elide(i, i + 1);</span>
+<span class="nc" id="L858">                            break;</span>
+                    }
+                    break;
+                default:
+                    // Escape all control code-points and isolated surrogates which are
+                    // not embeddable in XML.
+                    // http://www.w3.org/TR/xml/#charsets says
+                    //     Char ::= #x9 | #xA | #xD | [#x20-#xD7FF] | [#xE000-#xFFFD]
+                    //            | [#x10000-#x10FFFF]
+<span class="pc bpc" id="L867" title="1 of 2 branches missed.">                    if (ch &lt; 0x20) {</span>
+<span class="nc bnc" id="L868" title="All 6 branches missed.">                        if (ch == 9 || ch == 0xa || ch == 0xd) {</span>
+<span class="nc" id="L869">                            continue;</span>
+                        }
+<span class="pc bpc" id="L871" title="1 of 2 branches missed.">                    } else if (ch &lt; 0xd800) {  // Not a surrogate.</span>
+<span class="fc" id="L872">                        continue;</span>
+<span class="nc bnc" id="L873" title="All 2 branches missed.">                    } else if (ch &lt; 0xe000) {  // A surrogate</span>
+<span class="nc bnc" id="L874" title="All 4 branches missed.">                        if (Character.isHighSurrogate(ch) &amp;&amp; i + 1 &lt; end</span>
+<span class="nc bnc" id="L875" title="All 2 branches missed.">                                &amp;&amp; Character.isLowSurrogate(jsonish.charAt(i + 1))) {</span>
+<span class="nc" id="L876">                            ++i;  // Skip over low surrogate since we have already vetted it.</span>
+<span class="nc" id="L877">                            continue;</span>
+                        }
+<span class="nc bnc" id="L879" title="All 2 branches missed.">                    } else if (ch &lt;= 0xfffd) {  // Not one of the 0xff.. controls.</span>
+<span class="nc" id="L880">                        continue;</span>
+                    }
+<span class="nc" id="L882">                    replace(i, i + 1, &quot;\\u&quot;);</span>
+<span class="nc bnc" id="L883" title="All 2 branches missed.">                    for (int j = 4; --j &gt;= 0; ) {</span>
+<span class="nc" id="L884">                        sanitizedJson.append(HEX_DIGITS[(ch &gt;&gt;&gt; (j &lt;&lt; 2)) &amp; 0xf]);</span>
+                    }
+                    break;
+            }
+        }
+<span class="fc bfc" id="L889" title="All 2 branches covered.">        if (!closed) {</span>
+<span class="fc" id="L890">            insert(end, '&quot;');</span>
+        }
+<span class="fc" id="L892">    }</span>
+
+    private State requireValueState(int pos, State state, boolean canBeKey)
+            throws UnbracketedComma {
+<span class="pc bpc" id="L896" title="4 of 7 branches missed.">        switch (state) {</span>
+            case START_MAP:
+            case BEFORE_KEY:
+<span class="pc bpc" id="L899" title="1 of 2 branches missed.">                if (canBeKey) {</span>
+<span class="fc" id="L900">                    return State.AFTER_KEY;</span>
+                } else {
+<span class="nc" id="L902">                    insert(pos, &quot;\&quot;\&quot;:&quot;);</span>
+<span class="nc" id="L903">                    return State.AFTER_VALUE;</span>
+                }
+            case AFTER_KEY:
+<span class="nc" id="L906">                insert(pos, ':');</span>
+<span class="nc" id="L907">                return State.AFTER_VALUE;</span>
+            case BEFORE_VALUE:
+<span class="fc" id="L909">                return State.AFTER_VALUE;</span>
+            case AFTER_VALUE:
+<span class="nc bnc" id="L911" title="All 2 branches missed.">                if (canBeKey) {</span>
+<span class="nc" id="L912">                    insert(pos, ',');</span>
+<span class="nc" id="L913">                    return State.AFTER_KEY;</span>
+                } else {
+<span class="nc" id="L915">                    insert(pos, &quot;,\&quot;\&quot;:&quot;);</span>
+<span class="nc" id="L916">                    return State.AFTER_VALUE;</span>
+                }
+            case START_ARRAY:
+            case BEFORE_ELEMENT:
+<span class="fc" id="L920">                return State.AFTER_ELEMENT;</span>
+            case AFTER_ELEMENT:
+<span class="nc bnc" id="L922" title="All 2 branches missed.">                if (bracketDepth == 0) {</span>
+<span class="nc" id="L923">                    throw new RuntimeException(&quot;Unbracketed comma&quot;);</span>
+                }
+<span class="nc" id="L925">                insert(pos, ',');</span>
+<span class="nc" id="L926">                return State.AFTER_ELEMENT;</span>
+        }
+<span class="nc" id="L928">        throw new RuntimeException();</span>
+    }
+
+    private void insert(int pos, char ch) {
+<span class="fc" id="L932">        replace(pos, pos, ch);</span>
+<span class="fc" id="L933">    }</span>
+
+    private void insert(int pos, String s) {
+<span class="nc" id="L936">        replace(pos, pos, s);</span>
+<span class="nc" id="L937">    }</span>
+
+    private void elide(int start, int end) {
+<span class="fc bfc" id="L940" title="All 2 branches covered.">        if (sanitizedJson == null) {</span>
+<span class="fc" id="L941">            sanitizedJson = new StringBuilder(jsonish.length() + 16);</span>
+        }
+<span class="fc" id="L943">        sanitizedJson.append(jsonish.substring(cleaned, start));</span>
+<span class="fc" id="L944">        cleaned = end;</span>
+<span class="fc" id="L945">    }</span>
+
+    private void replace(int start, int end, char ch) {
+<span class="fc" id="L948">        elide(start, end);</span>
+<span class="fc" id="L949">        sanitizedJson.append(ch);</span>
+<span class="fc" id="L950">    }</span>
+
+    private void replace(int start, int end, String s) {
+<span class="nc" id="L953">        elide(start, end);</span>
+<span class="nc" id="L954">        sanitizedJson.append(s);</span>
+<span class="nc" id="L955">    }</span>
+
+    private void elideTrailingComma(int closeBracketPos) {
+        // The content before closeBracketPos is stored in two places.
+        // 1. sanitizedJson
+        // 2. jsonish.substring(cleaned, closeBracketPos)
+        // We walk over whitespace characters in both right-to-left looking for a
+        // comma.
+<span class="nc bnc" id="L963" title="All 2 branches missed.">        for (int i = closeBracketPos; --i &gt;= cleaned; ) {</span>
+<span class="nc bnc" id="L964" title="All 3 branches missed.">            switch (jsonish.charAt(i)) {</span>
+                case '\t':
+                case '\n':
+                case '\r':
+                case ' ':
+<span class="nc" id="L969">                    continue;</span>
+                case ',':
+<span class="nc" id="L971">                    elide(i, i + 1);</span>
+<span class="nc" id="L972">                    return;</span>
+                default:
+<span class="nc" id="L974">                    throw new RuntimeException(&quot;&quot; + jsonish.charAt(i));</span>
+            }
+        }
+<span class="nc bnc" id="L977" title="All 4 branches missed.">        assert sanitizedJson != null;</span>
+<span class="nc bnc" id="L978" title="All 2 branches missed.">        for (int i = sanitizedJson.length(); --i &gt;= 0; ) {</span>
+<span class="nc bnc" id="L979" title="All 3 branches missed.">            switch (sanitizedJson.charAt(i)) {</span>
+                case '\t':
+                case '\n':
+                case '\r':
+                case ' ':
+<span class="nc" id="L984">                    continue;</span>
+                case ',':
+<span class="nc" id="L986">                    sanitizedJson.setLength(i);</span>
+<span class="nc" id="L987">                    return;</span>
+                default:
+<span class="nc" id="L989">                    throw new RuntimeException(&quot;&quot; + sanitizedJson.charAt(i));</span>
+            }
+        }
+<span class="nc" id="L992">        throw new RuntimeException(</span>
+                &quot;Trailing comma not found in &quot; + jsonish + &quot; or &quot; + sanitizedJson);
+    }
+
+    /**
+     * Ensures that the given run of characters is a valid JSON number.  This is
+     * less aggressive than {@link #canonicalizeNumber} since it can be called
+     * on inputs that are valid JSON so is on the fast path.
+     * &lt;p&gt;
+     * JS numbers differ from JSON numbers in several ways:&lt;ul&gt;
+     * &lt;li&gt;They can have '+' as a sign prefix:  +1
+     * &lt;li&gt;They allow a 0x... hexadecimal form: 0xA4
+     * &lt;li&gt;They allow a 0... octal form:        012
+     * &lt;li&gt;The integer part can be empty:       .5
+     * &lt;li&gt;The fraction part can be empty:      1.
+     * &lt;/ul&gt;
+     */
+    private void normalizeNumber(int start, int end) {
+<span class="fc" id="L1010">        int pos = start;</span>
+        // Sign
+<span class="pc bpc" id="L1012" title="1 of 2 branches missed.">        if (pos &lt; end) {</span>
+<span class="pc bpc" id="L1013" title="2 of 3 branches missed.">            switch (jsonish.charAt(pos)) {</span>
+                case '+':
+<span class="nc" id="L1015">                    elide(pos, pos + 1);</span>
+<span class="nc" id="L1016">                    ++pos;</span>
+<span class="nc" id="L1017">                    break;</span>
+                case '-':
+<span class="nc" id="L1019">                    ++pos;</span>
+<span class="nc" id="L1020">                    break;</span>
+                default:
+                    break;
+            }
+        }
+
+        // Integer part
+<span class="fc" id="L1027">        int intEnd = endOfDigitRun(pos, end);</span>
+<span class="pc bpc" id="L1028" title="1 of 2 branches missed.">        if (pos == intEnd) {  // No empty integer parts allowed in JSON.</span>
+<span class="nc" id="L1029">            insert(pos, '0');</span>
+<span class="pc bpc" id="L1030" title="1 of 2 branches missed.">        } else if ('0' == jsonish.charAt(pos)) {</span>
+<span class="nc" id="L1031">            boolean reencoded = false;</span>
+<span class="nc" id="L1032">            long value = 0;</span>
+<span class="nc bnc" id="L1033" title="All 4 branches missed.">            if (intEnd - pos == 1 &amp;&amp; intEnd &lt; end</span>
+<span class="nc bnc" id="L1034" title="All 2 branches missed.">                    &amp;&amp; 'x' == (jsonish.charAt(intEnd) | 32)) {  // Recode hex.</span>
+<span class="nc bnc" id="L1035" title="All 2 branches missed.">                for (intEnd = intEnd + 1; intEnd &lt; end; ++intEnd) {</span>
+<span class="nc" id="L1036">                    char ch = jsonish.charAt(intEnd);</span>
+                    int digVal;
+<span class="nc bnc" id="L1038" title="All 4 branches missed.">                    if ('0' &lt;= ch &amp;&amp; ch &lt;= '9') {</span>
+<span class="nc" id="L1039">                        digVal = ch - '0';</span>
+                    } else {
+<span class="nc" id="L1041">                        ch |= 32;</span>
+<span class="nc bnc" id="L1042" title="All 4 branches missed.">                        if ('a' &lt;= ch &amp;&amp; ch &lt;= 'f') {</span>
+<span class="nc" id="L1043">                            digVal = ch - ('a' - 10);</span>
+                        } else {
+                            break;
+                        }
+                    }
+<span class="nc" id="L1048">                    value = (value &lt;&lt; 4) | digVal;</span>
+                }
+<span class="nc" id="L1050">                reencoded = true;</span>
+<span class="nc bnc" id="L1051" title="All 2 branches missed.">            } else if (intEnd - pos &gt; 1) {  // Recode octal.</span>
+<span class="nc bnc" id="L1052" title="All 2 branches missed.">                for (int i = pos; i &lt; intEnd; ++i) {</span>
+<span class="nc" id="L1053">                    int digVal = jsonish.charAt(i) - '0';</span>
+<span class="nc bnc" id="L1054" title="All 2 branches missed.">                    if (digVal &lt; 0) {</span>
+<span class="nc" id="L1055">                        break;</span>
+                    }
+<span class="nc" id="L1057">                    value = (value &lt;&lt; 3) | digVal;</span>
+                }
+<span class="nc" id="L1059">                reencoded = true;</span>
+            }
+<span class="nc bnc" id="L1061" title="All 2 branches missed.">            if (reencoded) {</span>
+<span class="nc" id="L1062">                elide(pos, intEnd);</span>
+<span class="nc bnc" id="L1063" title="All 2 branches missed.">                if (value &lt; 0) {</span>
+                    // Underflow.
+                    // Avoid multiple signs.
+                    // Putting out the underflowed value is the least bad option.
+                    //
+                    // We could use BigInteger, but that won't help many clients,
+                    // and there is a valid use case for underflow: hex-encoded uint64s.
+                    //
+                    // First, consume any sign so that we don't put out strings like
+                    // --1
+<span class="nc" id="L1073">                    int lastIndex = sanitizedJson.length() - 1;</span>
+<span class="nc bnc" id="L1074" title="All 2 branches missed.">                    if (lastIndex &gt;= 0) {</span>
+<span class="nc" id="L1075">                        char last = sanitizedJson.charAt(lastIndex);</span>
+<span class="nc bnc" id="L1076" title="All 4 branches missed.">                        if (last == '-' || last == '+') {</span>
+<span class="nc" id="L1077">                            elide(lastIndex, lastIndex + 1);</span>
+<span class="nc bnc" id="L1078" title="All 2 branches missed.">                            if (last == '-') {</span>
+<span class="nc" id="L1079">                                value = -value;</span>
+                            }
+                        }
+                    }
+                }
+<span class="nc" id="L1084">                sanitizedJson.append(value);</span>
+            }
+        }
+<span class="fc" id="L1087">        pos = intEnd;</span>
+
+        // Optional fraction.
+<span class="pc bpc" id="L1090" title="3 of 4 branches missed.">        if (pos &lt; end &amp;&amp; jsonish.charAt(pos) == '.') {</span>
+<span class="nc" id="L1091">            ++pos;</span>
+<span class="nc" id="L1092">            int fractionEnd = endOfDigitRun(pos, end);</span>
+<span class="nc bnc" id="L1093" title="All 2 branches missed.">            if (fractionEnd == pos) {</span>
+<span class="nc" id="L1094">                insert(pos, '0');</span>
+            }
+            // JS eval will discard digits after 24(?) but will not treat them as a
+            // syntax error, and JSON allows arbitrary length fractions.
+<span class="nc" id="L1098">            pos = fractionEnd;</span>
+        }
+
+        // Optional exponent.
+<span class="pc bpc" id="L1102" title="3 of 4 branches missed.">        if (pos &lt; end &amp;&amp; 'e' == (jsonish.charAt(pos) | 32)) {</span>
+<span class="nc" id="L1103">            ++pos;</span>
+<span class="nc bnc" id="L1104" title="All 2 branches missed.">            if (pos &lt; end) {</span>
+<span class="nc bnc" id="L1105" title="All 2 branches missed.">                switch (jsonish.charAt(pos)) {</span>
+                    // JSON allows explicit + in exponent but not for number as a whole.
+                    case '+':
+                    case '-':
+<span class="nc" id="L1109">                        ++pos;</span>
+<span class="nc" id="L1110">                        break;</span>
+                    default:
+                        break;
+                }
+            }
+            // JSON allows leading zeros on exponent part.
+<span class="nc" id="L1116">            int expEnd = endOfDigitRun(pos, end);</span>
+<span class="nc bnc" id="L1117" title="All 2 branches missed.">            if (expEnd == pos) {</span>
+<span class="nc" id="L1118">                insert(pos, '0');</span>
+            }
+<span class="nc" id="L1120">            pos = expEnd;</span>
+        }
+<span class="pc bpc" id="L1122" title="1 of 2 branches missed.">        if (pos != end) {</span>
+<span class="nc" id="L1123">            elide(pos, end);</span>
+        }
+<span class="fc" id="L1125">    }</span>
+
+    /**
+     * Converts a run of characters that form a JS number to its canonical form
+     * which happens to also be a valid JSON number.
+     *
+     * @return true when the number could be canonicalized.
+     */
+    private boolean canonicalizeNumber(int start, int end) {
+<span class="nc" id="L1134">        elide(start, start);</span>
+<span class="nc" id="L1135">        int sanStart = sanitizedJson.length();</span>
+
+<span class="nc" id="L1137">        normalizeNumber(start, end);</span>
+
+        // Ensure that the number is on the output buffer.  Since this method is
+        // only called when we are quoting a number that appears where a property
+        // name is expected, we can force the sanitized form to contain it without
+        // affecting the fast-track for already valid inputs.
+<span class="nc" id="L1143">        elide(end, end);</span>
+<span class="nc" id="L1144">        int sanEnd = sanitizedJson.length();</span>
+
+<span class="nc" id="L1146">        return canonicalizeNumber(sanitizedJson, sanStart, sanEnd);</span>
+    }
+
+    private boolean isKeyword(int start, int end) {
+<span class="fc" id="L1150">        int n = end - start;</span>
+<span class="fc bfc" id="L1151" title="All 2 branches covered.">        if (n == 5) {</span>
+<span class="fc" id="L1152">            return regionMatches(&quot;false&quot;, 0, jsonish, start, n);</span>
+<span class="fc bfc" id="L1153" title="All 2 branches covered.">        } else if (n == 4) {</span>
+<span class="pc bpc" id="L1154" title="1 of 2 branches missed.">            return regionMatches(&quot;null&quot;, 0, jsonish, start, n)</span>
+<span class="pc bpc" id="L1155" title="1 of 2 branches missed.">                    || regionMatches(&quot;true&quot;, 0, jsonish, start, n);</span>
+        }
+<span class="fc" id="L1157">        return false;</span>
+    }
+
+    private boolean isOctAt(int i) {
+<span class="nc" id="L1161">        char ch = jsonish.charAt(i);</span>
+<span class="nc bnc" id="L1162" title="All 4 branches missed.">        return '0' &lt;= ch &amp;&amp; ch &lt;= '7';</span>
+    }
+
+    private boolean isHexAt(int i) {
+<span class="nc" id="L1166">        char ch = jsonish.charAt(i);</span>
+<span class="nc bnc" id="L1167" title="All 4 branches missed.">        if ('0' &lt;= ch &amp;&amp; ch &lt;= '9') {</span>
+<span class="nc" id="L1168">            return true;</span>
+        }
+<span class="nc" id="L1170">        ch |= 32;</span>
+<span class="nc bnc" id="L1171" title="All 4 branches missed.">        return 'a' &lt;= ch &amp;&amp; ch &lt;= 'f';</span>
+    }
+
+    private boolean isJsonSpecialChar(int i) {
+<span class="fc" id="L1175">        char ch = jsonish.charAt(i);</span>
+<span class="pc bpc" id="L1176" title="1 of 2 branches missed.">        if (ch &lt;= ' ') {</span>
+<span class="nc" id="L1177">            return true;</span>
+        }
+<span class="pc bpc" id="L1179" title="1 of 2 branches missed.">        switch (ch) {</span>
+            case '&quot;':
+            case ',':
+            case ':':
+            case '[':
+            case ']':
+            case '{':
+            case '}':
+<span class="fc" id="L1187">                return true;</span>
+            default:
+<span class="nc" id="L1189">                return false;</span>
+        }
+    }
+
+    private void appendHex(int n, int nDigits) {
+<span class="nc bnc" id="L1194" title="All 2 branches missed.">        for (int i = 0, x = n; i &lt; nDigits; ++i, x &gt;&gt;&gt;= 4) {</span>
+<span class="nc" id="L1195">            int dig = x &amp; 0xf;</span>
+<span class="nc bnc" id="L1196" title="All 2 branches missed.">            sanitizedJson.append(dig + (dig &lt; 10 ? '0' : (char) ('a' - 10)));</span>
+        }
+<span class="nc" id="L1198">    }</span>
+
+    private int endOfDigitRun(int start, int limit) {
+<span class="fc bfc" id="L1201" title="All 2 branches covered.">        for (int end = start; end &lt; limit; ++end) {</span>
+<span class="fc" id="L1202">            char ch = jsonish.charAt(end);</span>
+<span class="pc bpc" id="L1203" title="2 of 4 branches missed.">            if (!('0' &lt;= ch &amp;&amp; ch &lt;= '9')) {</span>
+<span class="nc" id="L1204">                return end;</span>
+            }
+        }
+<span class="fc" id="L1207">        return limit;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="pc bpc" id="L1212" title="1 of 2 branches missed.">        return sanitizedJson != null ? sanitizedJson.toString() : jsonish;</span>
+    }
+
+
+    /**
+     * Describes where we are in a state machine that consists of transitions on
+     * complete values, colons, commas, and brackets.
+     */
+<span class="fc" id="L1220">    private enum State {</span>
+        /**
+         * Immediately after '[' and
+         * {@link #BEFORE_ELEMENT before the first element}.
+         */
+<span class="fc" id="L1225">        START_ARRAY,</span>
+        /**
+         * Before a JSON value in an array or at the top level.
+         */
+<span class="fc" id="L1229">        BEFORE_ELEMENT,</span>
+        /**
+         * After a JSON value in an array or at the top level, and before any
+         * following comma or close bracket.
+         */
+<span class="fc" id="L1234">        AFTER_ELEMENT,</span>
+        /**
+         * Immediately after '{' and {@link #BEFORE_KEY before the first key}.
+         */
+<span class="fc" id="L1238">        START_MAP,</span>
+        /**
+         * Before a key in a key-value map.
+         */
+<span class="fc" id="L1242">        BEFORE_KEY,</span>
+        /**
+         * After a key in a key-value map but before the required colon.
+         */
+<span class="fc" id="L1246">        AFTER_KEY,</span>
+        /**
+         * Before a value in a key-value map.
+         */
+<span class="fc" id="L1250">        BEFORE_VALUE,</span>
+        /**
+         * After a value in a key-value map but before any following comma or
+         * close bracket.
+         */
+<span class="fc" id="L1255">        AFTER_VALUE,</span>
+    }
+
+    /**
+     * Indicates that a comma was seen at the top level.
+     */
+    private static final class UnbracketedComma extends Exception {
+        private static final long serialVersionUID = 783239978717247850L;
+        // No members.  Used for nominal type.
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

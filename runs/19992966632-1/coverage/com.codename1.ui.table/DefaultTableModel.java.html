@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DefaultTableModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.table</a> &gt; <span class="el_source">DefaultTableModel.java</span></div><h1>DefaultTableModel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.table;
+
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.util.EventDispatcher;
+
+import java.util.ArrayList;
+import java.util.Collections;
+
+/**
+ * &lt;p&gt;A default implementation of the table model based on a two dimensional array.
+ * &lt;/p&gt;
+ *
+ * &lt;script src=&quot;https://gist.github.com/codenameone/6b106772ad1d58c50270.js&quot;&gt;&lt;/script&gt;
+ *
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-table-pinstripe.png&quot; alt=&quot;Table with customize cells using the pinstripe effect&quot; /&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-table-pinstripe-edit.png&quot; alt=&quot;Picker table cell during edit&quot; /&gt;
+ *
+ * @author Shai Almog
+ */
+public class DefaultTableModel extends AbstractTableModel {
+<span class="pc" id="L44">    ArrayList&lt;Object[]&gt; data = new ArrayList&lt;Object[]&gt;();</span>
+    String[] columnNames;
+    boolean editable;
+<span class="pc" id="L47">    private final EventDispatcher dispatcher = new EventDispatcher();</span>
+
+    /**
+     * Constructs a new table with a 2 dimensional array for row/column data
+     *
+     * @param columnNames the names of the columns
+     * @param data        the data within the table
+     */
+    public DefaultTableModel(String[] columnNames, Object[][] data) {
+<span class="fc" id="L56">        this(columnNames, data, false);</span>
+<span class="fc" id="L57">    }</span>
+
+    /**
+     * Constructs a new table with a 2 dimensional array for row/column data
+     *
+     * @param columnNames the names of the columns
+     * @param data        the data within the table
+     * @param editable    indicates whether table cells are editable or not by default
+     * @see #isCellEditable(int, int)
+     */
+<span class="fc" id="L67">    public DefaultTableModel(String[] columnNames, Object[][] data, boolean editable) {</span>
+<span class="fc" id="L68">        Collections.addAll(this.data, data);</span>
+<span class="fc" id="L69">        this.columnNames = columnNames;</span>
+<span class="fc" id="L70">        this.editable = editable;</span>
+<span class="fc" id="L71">    }</span>
+
+<span class="nc" id="L73">    DefaultTableModel(String[] columnNames, ArrayList&lt;Object[]&gt; data, boolean editable) {</span>
+<span class="nc" id="L74">        this.data = data;</span>
+<span class="nc" id="L75">        this.columnNames = columnNames;</span>
+<span class="nc" id="L76">        this.editable = editable;</span>
+<span class="nc" id="L77">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getRowCount() {
+<span class="fc" id="L83">        return data.size();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getColumnCount() {
+<span class="fc" id="L90">        return columnNames.length;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String getColumnName(int i) {
+<span class="fc" id="L97">        return columnNames[i];</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean isCellEditable(int row, int column) {
+<span class="fc" id="L104">        return editable;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getValueAt(int row, int column) {
+        try {
+<span class="fc" id="L112">            return data.get(row)[column];</span>
+<span class="nc" id="L113">        } catch (ArrayIndexOutOfBoundsException err) {</span>
+            // not the best situation but quite useful for the resource editor
+            //err.printStackTrace();
+<span class="nc" id="L116">            return &quot;&quot;;</span>
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setValueAt(int row, int column, Object o) {
+<span class="nc" id="L124">        data.get(row)[column] = o;</span>
+<span class="nc" id="L125">        dispatcher.fireDataChangeEvent(column, row);</span>
+<span class="nc" id="L126">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addDataChangeListener(DataChangedListener d) {
+<span class="nc" id="L132">        dispatcher.addListener(d);</span>
+<span class="nc" id="L133">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void removeDataChangeListener(DataChangedListener d) {
+<span class="nc" id="L139">        dispatcher.removeListener(d);</span>
+<span class="nc" id="L140">    }</span>
+
+    /**
+     * Adds the given row to the table data
+     *
+     * @param row array or row items, notice that row.length should match the column count exactly!
+     */
+    public void addRow(Object... row) {
+<span class="nc" id="L148">        data.add(row);</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        for (int col = 0; col &lt; row.length; col++) {</span>
+<span class="nc" id="L150">            dispatcher.fireDataChangeEvent(col, data.size() - 1);</span>
+        }
+<span class="nc" id="L152">    }</span>
+
+    /**
+     * Inserts the given row to the table data at the given offset
+     *
+     * @param offset position within the table that is 0 or larger yet smaller than the row count
+     * @param row    array or row items, notice that row.length should match the column count exactly!
+     */
+    public void insertRow(int offset, Object... row) {
+<span class="nc" id="L161">        data.add(offset, row);</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        for (int col = 0; col &lt; row.length; col++) {</span>
+<span class="nc" id="L163">            dispatcher.fireDataChangeEvent(col, data.size() - 1);</span>
+<span class="nc" id="L164">            dispatcher.fireDataChangeEvent(col, offset);</span>
+        }
+<span class="nc" id="L166">    }</span>
+
+    /**
+     * Removes the given row offset from the table
+     *
+     * @param offset position within the table that is 0 or larger yet smaller than the row count
+     */
+    public void removeRow(int offset) {
+<span class="nc" id="L174">        data.remove(offset);</span>
+<span class="nc" id="L175">        dispatcher.fireDataChangeEvent(Integer.MIN_VALUE, Integer.MIN_VALUE);</span>
+<span class="nc" id="L176">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

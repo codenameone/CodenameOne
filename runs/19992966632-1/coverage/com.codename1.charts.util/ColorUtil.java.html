@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ColorUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.util</a> &gt; <span class="el_source">ColorUtil.java</span></div><h1>ColorUtil.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.charts.util;
+
+/**
+ * @author shannah
+ */
+<span class="nc" id="L29">public class ColorUtil {</span>
+<span class="fc" id="L30">    public static int LTGRAY = IColor.LightGray.argb;</span>
+<span class="fc" id="L31">    public static int BLUE = IColor.Blue.argb;</span>
+<span class="fc" id="L32">    public static int BLACK = IColor.Black.argb;</span>
+<span class="fc" id="L33">    public static int WHITE = IColor.White.argb;</span>
+<span class="fc" id="L34">    public static int CYAN = IColor.Cyan.argb;</span>
+<span class="fc" id="L35">    public static int GREEN = IColor.Green.argb;</span>
+<span class="fc" id="L36">    public static int YELLOW = IColor.Yellow.argb;</span>
+<span class="fc" id="L37">    public static int MAGENTA = IColor.Magenta.argb;</span>
+<span class="fc" id="L38">    public static int GRAY = IColor.Gray.argb;</span>
+
+
+    public static int argb(int a, int r, int g, int b) {
+<span class="fc" id="L42">        IColor c = new IColor(a, r, g, b);</span>
+<span class="fc" id="L43">        return c.argb;</span>
+    }
+
+    public static int alpha(int c) {
+<span class="fc" id="L47">        IColor pc = new IColor(c);</span>
+<span class="fc" id="L48">        return pc.alpha;</span>
+    }
+
+    public static int red(int c) {
+<span class="fc" id="L52">        IColor pc = new IColor(c);</span>
+<span class="fc" id="L53">        return pc.red;</span>
+    }
+
+    public static int green(int c) {
+<span class="fc" id="L57">        IColor pc = new IColor(c);</span>
+<span class="fc" id="L58">        return pc.green;</span>
+    }
+
+    public static int blue(int c) {
+<span class="fc" id="L62">        IColor pc = new IColor(c);</span>
+<span class="fc" id="L63">        return pc.blue;</span>
+    }
+
+    public static int rgb(int r, int g, int b) {
+<span class="fc" id="L67">        IColor c = new IColor(r, g, b);</span>
+<span class="fc" id="L68">        return c.argb;</span>
+    }
+
+
+    /*
+     * Pisces User
+     * Copyright (C) 2009 John Pritchard
+     * Codename One Modifications Copyright (C) 2013 Steve Hannah
+     *
+     * This program is free software; you can redistribute it and/or
+     * modify it under the terms of the GNU General Public License as
+     * published by the Free Software Foundation; either version 2 of the
+     * License, or (at your option) any later version.  The copyright
+     * holders designate particular file as subject to the &quot;Classpath&quot;
+     * exception as provided in the LICENSE file that accompanied this
+     * code.
+     *
+     * This program is distributed in the hope that it will be useful, but
+     * WITHOUT ANY WARRANTY; without even the implied warranty of
+     * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+     * General Public License for more details.
+     *
+     * You should have received a copy of the GNU General Public License
+     * along with this program; if not, write to the Free Software
+     * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+     * 02110-1301 USA.
+     */
+
+
+    /**
+     * @see Graphics
+     */
+    private static class IColor
+            implements Cloneable {
+
+<span class="fc" id="L103">        public final static IColor White = new IColor(255, 255, 255);</span>
+<span class="fc" id="L104">        public final static IColor LightGray = new IColor(192, 192, 192);</span>
+<span class="fc" id="L105">        public final static IColor Gray = new IColor(128, 128, 128);</span>
+<span class="fc" id="L106">        public final static IColor DarkGray = new IColor(64, 64, 64);</span>
+<span class="fc" id="L107">        public final static IColor Black = new IColor(0, 0, 0);</span>
+<span class="fc" id="L108">        public final static IColor Red = new IColor(255, 0, 0);</span>
+<span class="fc" id="L109">        public final static IColor Pink = new IColor(255, 175, 175);</span>
+<span class="fc" id="L110">        public final static IColor Orange = new IColor(255, 200, 0);</span>
+<span class="fc" id="L111">        public final static IColor Yellow = new IColor(255, 255, 0);</span>
+<span class="fc" id="L112">        public final static IColor Green = new IColor(0, 255, 0);</span>
+<span class="fc" id="L113">        public final static IColor Magenta = new IColor(255, 0, 255);</span>
+<span class="fc" id="L114">        public final static IColor Cyan = new IColor(0, 255, 255);</span>
+<span class="fc" id="L115">        public final static IColor Blue = new IColor(0, 0, 255);</span>
+        public final int alpha, red, green, blue;
+        public final int argb;
+
+        public IColor(int argb) {
+<span class="fc" id="L120">            super();</span>
+
+<span class="fc" id="L122">            int a = ((argb &gt;&gt;&gt; 24) &amp; 0xff);</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (0 == a)</span>
+<span class="fc" id="L124">                this.alpha = 255;</span>
+            else
+<span class="fc" id="L126">                this.alpha = a;</span>
+
+<span class="fc" id="L128">            this.red = (argb &gt;&gt;&gt; 16) &amp; 0xff;</span>
+<span class="fc" id="L129">            this.green = (argb &gt;&gt;&gt; 8) &amp; 0xff;</span>
+<span class="fc" id="L130">            this.blue = (argb &amp; 0xff);</span>
+
+<span class="fc" id="L132">            this.argb = ToARGB(this);</span>
+<span class="fc" id="L133">        }</span>
+
+
+        public IColor(int r, int g, int b) {
+<span class="fc" id="L137">            this(0xff, r, g, b);</span>
+<span class="fc" id="L138">        }</span>
+
+        public IColor(int a, int r, int g, int b) {
+<span class="fc" id="L141">            super();</span>
+<span class="fc" id="L142">            this.alpha = (a &amp; 0xff);</span>
+<span class="fc" id="L143">            this.red = (r &amp; 0xff);</span>
+<span class="fc" id="L144">            this.green = (g &amp; 0xff);</span>
+<span class="fc" id="L145">            this.blue = (b &amp; 0xff);</span>
+
+<span class="fc" id="L147">            this.argb = ToARGB(this);</span>
+<span class="fc" id="L148">        }</span>
+
+        private static int ToARGB(IColor c) { // PMD Fix: UnnecessaryModifier removed redundant final
+<span class="fc" id="L151">            return ((c.alpha &lt;&lt; 24) |</span>
+                    (c.red &lt;&lt; 16) |
+                    (c.green &lt;&lt; 8) |
+                    (c.blue &amp; 0xff));
+        }
+
+        public IColor clone() {
+            //try {
+            //    return (IColor)super.clone();
+            //}
+            //catch (CloneNotSupportedException err){
+<span class="nc" id="L162">            throw new RuntimeException();</span>
+            //}
+        }
+
+        public int hashCode() {
+<span class="nc" id="L167">            return this.argb;</span>
+        }
+
+        public boolean equals(Object that) {
+<span class="nc bnc" id="L171" title="All 2 branches missed.">            if (this == that)</span>
+<span class="nc" id="L172">                return true;</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            else if (null == that)</span>
+<span class="nc" id="L174">                return false;</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            else if (that instanceof IColor)</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">                return (this.hashCode() == that.hashCode());</span>
+            else
+<span class="nc" id="L178">                return false;</span>
+        }
+
+        public String toString() {
+<span class="nc" id="L182">            return &quot;{Red:&quot; + this.red + &quot; Green:&quot; + this.green + &quot; Blue:&quot; + this.blue + &quot; Alpha:&quot; + this.alpha + &quot;}&quot;;</span>
+        }
+
+        public static class Transparent
+                extends IColor {
+
+<span class="nc" id="L188">            public final static Transparent White = new Transparent(255, 255, 255);</span>
+<span class="nc" id="L189">            public final static Transparent LightGray = new Transparent(192, 192, 192);</span>
+<span class="nc" id="L190">            public final static Transparent Gray = new Transparent(128, 128, 128);</span>
+<span class="nc" id="L191">            public final static Transparent DarkGray = new Transparent(64, 64, 64);</span>
+<span class="nc" id="L192">            public final static Transparent Black = new Transparent(0, 0, 0);</span>
+<span class="nc" id="L193">            public final static Transparent Red = new Transparent(255, 0, 0);</span>
+<span class="nc" id="L194">            public final static Transparent Pink = new Transparent(255, 175, 175);</span>
+<span class="nc" id="L195">            public final static Transparent Orange = new Transparent(255, 200, 0);</span>
+<span class="nc" id="L196">            public final static Transparent Yellow = new Transparent(255, 255, 0);</span>
+<span class="nc" id="L197">            public final static Transparent Green = new Transparent(0, 255, 0);</span>
+<span class="nc" id="L198">            public final static Transparent Magenta = new Transparent(255, 0, 255);</span>
+<span class="nc" id="L199">            public final static Transparent Cyan = new Transparent(0, 255, 255);</span>
+<span class="nc" id="L200">            public final static Transparent Blue = new Transparent(0, 0, 255);</span>
+
+
+            public Transparent(int r, int g, int b) {
+<span class="nc" id="L204">                super(0, r, g, b);</span>
+<span class="nc" id="L205">            }</span>
+        }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,424 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CommonProgressAnimations.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">CommonProgressAnimations.java</span></div><h1>CommonProgressAnimations.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.io.Log;
+import com.codename1.ui.animations.Transition;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.Style;
+
+import static com.codename1.ui.ComponentSelector.$;
+
+/**
+ * A collection of useful progress animations and utility methods.
+ *
+ * @author shannah
+ * @since 7.0
+ */
+<span class="nc" id="L38">public class CommonProgressAnimations {</span>
+
+    /**
+     * Base class for ProgressAnimations
+     *
+     * @since 7.0
+     */
+<span class="fc" id="L45">    public static abstract class ProgressAnimation extends Component {</span>
+        private static final String PROGRESS_KEY = &quot;$$ProgressAnimation&quot;;
+        protected Component cmp;
+
+        /**
+         * Marks a component as &quot;loading&quot;, replacing it in its parent conatiner with
+         * a progress animation.  When the component's content is &quot;ready&quot; or finished loading
+         * you should call {@link #markComponentReady(com.codename1.ui.Component) } to swap
+         * the component back into its parent, and removing the progress animation.
+         *
+         * &lt;p&gt;If the component has already been marked as &quot;loading&quot;, this will simply return
+         * the progress animation that was previously assigned to it.&lt;/p&gt;
+         *
+         * @param cmp  The component to be replaced by a progress animation.
+         * @param type The type of progress animation to use.
+         * @return The ProgressAnimation that is currently occuppying the component's space.
+         */
+        public static ProgressAnimation markComponentLoading(Component cmp, Class&lt;? extends ProgressAnimation&gt; type) {
+<span class="pc bpc" id="L63" title="1 of 2 branches missed.">            if (type == null) {</span>
+<span class="nc" id="L64">                type = CircleProgress.class;</span>
+            }
+<span class="fc bfc" id="L66" title="All 2 branches covered.">            if (getProgressAnimation(cmp) != null) {</span>
+<span class="fc" id="L67">                return getProgressAnimation(cmp);</span>
+            }
+            try {
+<span class="fc" id="L70">                ProgressAnimation prg = (ProgressAnimation) type.newInstance();</span>
+<span class="fc" id="L71">                prg.setPreferredH(cmp.getPreferredH());</span>
+<span class="fc" id="L72">                prg.setPreferredW(cmp.getPreferredW());</span>
+<span class="fc" id="L73">                replaceUntilReady(cmp, prg);</span>
+<span class="fc" id="L74">                return prg;</span>
+<span class="fc" id="L75">            } catch (Throwable t) {</span>
+<span class="fc" id="L76">                Log.e(t);</span>
+<span class="fc" id="L77">                throw new RuntimeException(&quot;Failed to create progress component: &quot; + t.getMessage());</span>
+            }
+        }
+
+        private static void replaceUntilReady(Component cmp, ProgressAnimation progress) {
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">            if (cmp.getClientProperty(PROGRESS_KEY) instanceof ProgressAnimation) {</span>
+<span class="nc" id="L83">                throw new IllegalStateException(&quot;Component already has ProgressAnimation assigned to it&quot;);</span>
+            }
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            if (cmp.getParent() == null) {</span>
+<span class="fc" id="L86">                throw new IllegalStateException(&quot;Component has no parent so cannot be replaced by progress&quot;);</span>
+            }
+<span class="fc" id="L88">            cmp.putClientProperty(PROGRESS_KEY, progress);</span>
+<span class="fc" id="L89">            cmp.getParent().replace(cmp, progress, null);</span>
+<span class="fc" id="L90">            progress.cmp = cmp;</span>
+
+<span class="fc" id="L92">        }</span>
+
+        /**
+         * Marks a component as &quot;ready&quot;, if it had previously been marked as &quot;loading&quot;.  If the component
+         * had been replaced in its parent container by a progress animation, then this will swap it back.
+         *
+         * @param cmp The component to mark as &quot;ready&quot;.
+         * @param t   The transition to use for replacing the progress animation with the component.  Null for immediate replacement.
+         */
+        public static void markComponentReady(Component cmp, Transition t) {
+<span class="fc" id="L102">            ProgressAnimation progress = (ProgressAnimation) cmp.getClientProperty(PROGRESS_KEY);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">            if (progress == null) {</span>
+<span class="fc" id="L104">                return;</span>
+            }
+<span class="fc" id="L106">            cmp.putClientProperty(PROGRESS_KEY, null);</span>
+<span class="fc" id="L107">            Container parent = progress.getParent();</span>
+<span class="pc bpc" id="L108" title="1 of 2 branches missed.">            if (parent != null) {</span>
+<span class="fc" id="L109">                parent.replace(progress, cmp, t);</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">                if (t == null) {</span>
+<span class="fc" id="L111">                    parent.revalidateLater();</span>
+                }
+            }
+<span class="fc" id="L114">        }</span>
+
+        /**
+         * Marks a component as &quot;ready&quot;, if it had previously been marked as &quot;loading&quot;.  If the component
+         * had been replaced in its parent container by a progress animation, then this will swap it back.
+         *
+         * @param cmp The component to mark as &quot;ready&quot;.
+         */
+        public static void markComponentReady(Component cmp) {
+<span class="fc" id="L123">            markComponentReady(cmp, null);</span>
+<span class="fc" id="L124">        }</span>
+
+        /**
+         * Gets the progress animation that is currently showing for a component.  The progress
+         * animation would be &quot;assigned&quot; by {@link #markComponentLoading(com.codename1.ui.Component, java.lang.Class) },
+         * and can be &quot;deassigned&quot; by by {@link #markComponentReady(com.codename1.ui.Component) }.
+         *
+         * &lt;p&gt;This may return null, if the component isn't currently marked as loading.&lt;/p&gt;
+         *
+         * @param cmp The Component whose progress animation we're seeking.
+         * @return The ProgressAnimation, or null if the component isn't &quot;loading&quot;.
+         */
+        public static ProgressAnimation getProgressAnimation(Component cmp) {
+<span class="fc" id="L137">            return (ProgressAnimation) cmp.getClientProperty(PROGRESS_KEY);</span>
+        }
+
+        @Override
+        protected void initComponent() {
+<span class="fc" id="L142">            super.initComponent();</span>
+<span class="fc" id="L143">            getComponentForm().registerAnimated(this);</span>
+<span class="fc" id="L144">        }</span>
+
+        @Override
+        protected void deinitialize() {
+<span class="fc" id="L148">            getComponentForm().deregisterAnimated(this);</span>
+<span class="fc" id="L149">            super.deinitialize();</span>
+<span class="fc" id="L150">        }</span>
+    }
+
+    /**
+     * A progress animation that shows an animated circle.
+     *
+     * @since 7.0
+     */
+<span class="fc" id="L158">    public static class CircleProgress extends ProgressAnimation {</span>
+<span class="fc" id="L159">        int stepSize = (int) Math.round(360 / Display.getInstance().getFrameRate() / 1.5);</span>
+<span class="fc" id="L160">        int step = 0;</span>
+
+        /**
+         * Replaces the given component with a CircleProgress until its content is ready.
+         * When the component's content is ready, then make sure to call {@link ProgressAnimation#markComponentReady(com.codename1.ui.Component) )
+         * to swap the component back into its parent.
+         *
+         * @param cmp
+         * @return
+         */
+        public static CircleProgress markComponentLoading(Component cmp) {
+<span class="fc" id="L171">            return (CircleProgress) markComponentLoading(cmp, CircleProgress.class);</span>
+        }
+
+        @Override
+        public void paint(Graphics g) {
+<span class="nc" id="L176">            super.paint(g);</span>
+<span class="nc" id="L177">        }</span>
+
+        @Override
+        public boolean animate() {
+<span class="fc" id="L181">            step += stepSize;</span>
+<span class="fc" id="L182">            step = step % 720;</span>
+<span class="fc" id="L183">            return true;</span>
+        }
+
+        @Override
+        protected void paintBackground(Graphics g) {
+<span class="nc" id="L188">            g.setColor(getStyle().getFgColor());</span>
+<span class="nc" id="L189">            int alpha = g.concatenateAlpha(getStyle().getFgAlpha());</span>
+<span class="nc" id="L190">            boolean anti = g.isAntiAliased();</span>
+<span class="nc" id="L191">            g.setAntiAliased(true);</span>
+<span class="nc" id="L192">            int d = Math.min(getWidth(), getHeight());</span>
+<span class="nc" id="L193">            int x = getX() + (getWidth() - d) / 2;</span>
+<span class="nc" id="L194">            int y = getY() + (getHeight() - d) / 2;</span>
+<span class="nc" id="L195">            int w = d;</span>
+<span class="nc" id="L196">            int h = d;</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">            if (step &lt;= 360) {</span>
+<span class="nc" id="L198">                g.fillArc(x, y, w, h, 0, -step);</span>
+            } else {
+<span class="nc" id="L200">                g.fillArc(x, y, w, h, 0, (720 - step));</span>
+            }
+<span class="nc" id="L202">            g.setAntiAliased(anti);</span>
+<span class="nc" id="L203">            g.setAlpha(alpha);</span>
+<span class="nc" id="L204">        }</span>
+
+        @Override
+        protected Dimension calcPreferredSize() {
+<span class="fc" id="L208">            Dimension out = new Dimension(CN.convertToPixels(8f), CN.convertToPixels(8f));</span>
+<span class="fc" id="L209">            return out;</span>
+        }
+
+
+    }
+
+    /**
+     * An empty progress animation.
+     *
+     * @since 7.0
+     */
+<span class="fc" id="L220">    public static class EmptyAnimation extends ProgressAnimation {</span>
+        /**
+         * Replaces the given component with an EmptyAnimation until its content is ready.
+         * When the component's content is ready, then make sure to call {@link ProgressAnimation#markComponentReady(com.codename1.ui.Component) )
+         * to swap the component back into its parent.
+         *
+         * @param cmp
+         * @return
+         */
+        public static EmptyAnimation markComponentLoading(Component cmp) {
+<span class="nc" id="L230">            return (EmptyAnimation) markComponentLoading(cmp, EmptyAnimation.class);</span>
+        }
+
+        @Override
+        protected Dimension calcPreferredSize() {
+<span class="fc" id="L235">            Dimension out = new Dimension(CN.convertToPixels(8f), CN.convertToPixels(8f));</span>
+<span class="fc" id="L236">            return out;</span>
+        }
+    }
+
+    /**
+     * A progress animation that shows a block of text being typed.  Except words
+     * are rendered as filled rectangles instead of actual glyphs.  This is appropriate
+     * where a paragraph of text is scheduled to appear, but is not ready to show yet.
+     *
+     * @since 7.0
+     */
+    public static class LoadingTextAnimation extends ProgressAnimation {
+
+        private static final String loremIpsum = &quot;Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.&quot;;
+<span class="fc" id="L250">        private final int lettersPerChunk = 3;</span>
+<span class="fc" id="L251">        private final int cyclesPerChunk = 3; // Number of cycles required to type a letter.</span>
+<span class="fc" id="L252">        private int pauseCounter = 0;</span>
+<span class="fc" id="L253">        private final int pauseLength = Display.getInstance().getFrameRate();</span>
+<span class="fc" id="L254">        private int rows = 3;</span>
+<span class="fc" id="L255">        private int cols = 40;</span>
+        private int cycleCount;
+<span class="fc" id="L257">        private int strlen = loremIpsum.length();</span>
+<span class="fc" id="L258">        private int strpos = 0;</span>
+
+
+<span class="fc" id="L261">        public LoadingTextAnimation() {</span>
+<span class="fc" id="L262">            getStyle().setFgColor(0x666666);</span>
+<span class="fc" id="L263">            getStyle().setOpacity(0x66);</span>
+<span class="fc" id="L264">            $(this).setPaddingMillimeters(2f);</span>
+<span class="fc" id="L265">        }</span>
+
+        /**
+         * Replaces the given component with a LoadingTextAnimation until its content is ready.
+         * When the component's content is ready, then make sure to call {@link ProgressAnimation#markComponentReady(com.codename1.ui.Component) )
+         * to swap the component back into its parent.
+         *
+         * @param cmp
+         * @return
+         */
+        public static LoadingTextAnimation markComponentLoading(Component cmp) {
+<span class="nc" id="L276">            return (LoadingTextAnimation) markComponentLoading(cmp, LoadingTextAnimation.class);</span>
+        }
+
+        @Override
+        public boolean animate() {
+<span class="fc bfc" id="L281" title="All 2 branches covered.">            if (pauseCounter &gt; 0) {</span>
+<span class="fc" id="L282">                pauseCounter--;</span>
+<span class="pc bpc" id="L283" title="1 of 2 branches missed.">                if (pauseCounter == 0) {</span>
+<span class="nc" id="L284">                    strpos = 0;</span>
+                }
+<span class="fc" id="L286">                return true;</span>
+            }
+<span class="fc" id="L288">            cycleCount = (cycleCount + 1) % cyclesPerChunk;</span>
+<span class="pc bpc" id="L289" title="1 of 2 branches missed.">            if (cycleCount == 1) {</span>
+<span class="fc" id="L290">                strpos = (strpos + lettersPerChunk);</span>
+<span class="pc bpc" id="L291" title="1 of 2 branches missed.">                if (strpos &gt;= strlen) {</span>
+<span class="fc" id="L292">                    pauseCounter = pauseLength;</span>
+
+                } else {
+<span class="nc" id="L295">                    strpos = strpos % strlen;</span>
+                }
+            }
+<span class="fc" id="L298">            return true;</span>
+        }
+
+        @Override
+        public void paint(Graphics g) {
+<span class="nc" id="L303">            super.paint(g);</span>
+<span class="nc" id="L304">        }</span>
+
+        @Override
+        protected void paintBackground(Graphics g) {
+<span class="nc" id="L308">            strlen = loremIpsum.length();</span>
+<span class="nc" id="L309">            g.setColor(getStyle().getFgColor());</span>
+
+<span class="nc" id="L311">            int alpha = g.getAlpha();</span>
+<span class="nc" id="L312">            float pauseRatio = 1f;</span>
+<span class="nc bnc" id="L313" title="All 2 branches missed.">            if (pauseCounter &gt; 0) {</span>
+<span class="nc" id="L314">                pauseRatio = pauseCounter / (float) pauseLength;</span>
+            }
+<span class="nc" id="L316">            g.setAlpha((int) (getStyle().getOpacity() / 255f * alpha * pauseRatio));</span>
+<span class="nc" id="L317">            g.concatenateAlpha(getStyle().getFgAlpha());</span>
+<span class="nc bnc" id="L318" title="All 2 branches missed.">            Font f = cmp == null ? getStyle().getFont() : cmp.getStyle().getFont();</span>
+<span class="nc bnc" id="L319" title="All 2 branches missed.">            if (f == null) {</span>
+<span class="nc" id="L320">                f = Font.getDefaultFont();</span>
+            }
+<span class="nc" id="L322">            int h = f.getHeight();</span>
+<span class="nc" id="L323">            int w = f.charWidth('M');</span>
+<span class="nc bnc" id="L324" title="All 2 branches missed.">            Style s = cmp == null ? getStyle() : cmp.getStyle();</span>
+
+<span class="nc" id="L326">            int paddingLeft = s.getPaddingLeftNoRTL();</span>
+<span class="nc" id="L327">            int paddingRight = s.getPaddingRightNoRTL();</span>
+<span class="nc" id="L328">            int paddingBottom = s.getPaddingBottom();</span>
+<span class="nc" id="L329">            int leftBounds = getX() + paddingLeft;</span>
+<span class="nc" id="L330">            int rightBounds = getX() + getWidth() - paddingRight;</span>
+<span class="nc" id="L331">            int bottomBounds = getY() + getHeight() - paddingBottom;</span>
+<span class="nc" id="L332">            int topBounds = getY() + paddingBottom;</span>
+<span class="nc" id="L333">            int x = leftBounds;</span>
+<span class="nc" id="L334">            int y = topBounds;</span>
+<span class="nc" id="L335">            int wordStartX = x;</span>
+<span class="nc" id="L336">            int wordStartPos = 0;</span>
+<span class="nc" id="L337">            int leading = h / 2;</span>
+<span class="nc" id="L338">            int row = 0;</span>
+<span class="nc bnc" id="L339" title="All 2 branches missed.">            for (int i = 0; i &lt; strpos; i++) {</span>
+<span class="nc" id="L340">                char c = loremIpsum.charAt(i);</span>
+
+<span class="nc bnc" id="L342" title="All 2 branches missed.">                if (c == ' ') {</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">                    if (wordStartX &lt; x) {</span>
+<span class="nc" id="L344">                        g.fillRect(wordStartX, y, x - wordStartX, h);</span>
+                    }
+<span class="nc" id="L346">                    x += w;</span>
+<span class="nc" id="L347">                    wordStartX = x;</span>
+<span class="nc" id="L348">                    wordStartPos = i + 1;</span>
+                } else {
+<span class="nc" id="L350">                    x += w;</span>
+                }
+<span class="nc bnc" id="L352" title="All 2 branches missed.">                if (x &gt; rightBounds) {</span>
+<span class="nc" id="L353">                    row++;</span>
+<span class="nc" id="L354">                    x = leftBounds;</span>
+<span class="nc" id="L355">                    i = wordStartPos - 1;</span>
+<span class="nc" id="L356">                    wordStartX = x;</span>
+<span class="nc" id="L357">                    y += h + leading;</span>
+                }
+<span class="nc bnc" id="L359" title="All 4 branches missed.">                if (y + h &gt; bottomBounds || row &gt; rows - 1) {</span>
+<span class="nc" id="L360">                    strlen = i + 1;</span>
+<span class="nc" id="L361">                    break;</span>
+                }
+
+            }
+<span class="nc" id="L365">            g.setAlpha(alpha);</span>
+
+<span class="nc" id="L367">        }</span>
+
+        @Override
+        protected Dimension calcPreferredSize() {
+<span class="nc" id="L371">            Font f = getStyle().getFont();</span>
+<span class="nc bnc" id="L372" title="All 2 branches missed.">            if (f == null) {</span>
+<span class="nc" id="L373">                f = Font.getDefaultFont();</span>
+            }
+<span class="nc" id="L375">            int charWidth = f.charWidth('M');</span>
+<span class="nc" id="L376">            int charHeight = f.getHeight();</span>
+<span class="nc" id="L377">            int leading = charHeight / 2;</span>
+
+<span class="nc" id="L379">            Dimension out = new Dimension(charWidth * cols + getStyle().getHorizontalPadding(), rows * (charHeight + leading) - leading + getStyle().getVerticalPadding());</span>
+<span class="nc" id="L380">            return out;</span>
+        }
+
+        /**
+         * Returns the number of rows of text to render.
+         *
+         * @return
+         */
+        public int rows() {
+<span class="nc" id="L389">            return rows;</span>
+        }
+
+        /**
+         * Returns the number of columns to render.
+         *
+         * @return
+         */
+        public int cols() {
+<span class="nc" id="L398">            return cols;</span>
+        }
+
+        /**
+         * Sets the number of rows to render.
+         *
+         * @param rows The number of rows to render.
+         * @return Self for chaining.
+         */
+        public LoadingTextAnimation rows(int rows) {
+<span class="nc" id="L408">            this.rows = rows;</span>
+<span class="nc" id="L409">            return this;</span>
+        }
+
+        /**
+         * Returns the number of columns to render.
+         *
+         * @param cols The number of columns to render.
+         * @return Self for chaining.
+         */
+        public LoadingTextAnimation cols(int cols) {
+<span class="nc" id="L419">            this.cols = cols;</span>
+<span class="nc" id="L420">            return this;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

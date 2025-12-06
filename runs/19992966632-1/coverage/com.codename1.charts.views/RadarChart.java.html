@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RadarChart.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.views</a> &gt; <span class="el_source">RadarChart.java</span></div><h1>RadarChart.java</h1><pre class="source lang-java linenums">/**
+ * Copyright (C) 2019 dj6082013
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.codename1.charts.views;
+
+import com.codename1.charts.compat.Canvas;
+import com.codename1.charts.compat.Paint;
+import com.codename1.charts.compat.Paint.Style;
+import com.codename1.charts.models.AreaSeries;
+import com.codename1.charts.renderers.DefaultRenderer;
+import com.codename1.charts.renderers.SimpleSeriesRenderer;
+import com.codename1.charts.util.ColorUtil;
+import com.codename1.ui.geom.Rectangle2D;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Draws multi-dimensional data as a web chart (also known as a radar or spider
+ * chart).
+ * &lt;p&gt;
+ * The chart consumes an {@link AreaSeries} where each category represents an
+ * axis radiating from the centre. Configure colours and labelling through a
+ * {@link DefaultRenderer} and wrap the instance in a
+ * {@link com.codename1.charts.ChartComponent} to present it inside your UI.
+ */
+public class RadarChart extends RoundChart {
+
+    /**
+     * The series dataset.
+     */
+    private final AreaSeries mDataset;
+
+    /**
+     * A step variable to control the size of the legend shape.
+     */
+    private int mStep;
+
+    /**
+     * Builds a new radar chart instance.
+     *
+     * @param dataset the series dataset
+     * @param renderer the series renderer
+     */
+    public RadarChart(AreaSeries dataset, DefaultRenderer renderer) {
+<span class="fc" id="L58">        super(null, renderer);</span>
+<span class="fc" id="L59">        mDataset = dataset;</span>
+<span class="fc" id="L60">    }</span>
+
+    /**
+     * The graphical representation of the radar chart.
+     *
+     * @param canvas the canvas to paint to
+     * @param x the top left x value of the view to draw to
+     * @param y the top left y value of the view to draw to
+     * @param width the width of the view to draw to
+     * @param height the height of the view to draw to
+     * @param paint the paint
+     */
+    @Override
+    public void draw(Canvas canvas, int x, int y, int width, int height, Paint paint) {
+<span class="nc" id="L74">        paint.setAntiAlias(mRenderer.isAntialiasing());</span>
+<span class="nc" id="L75">        paint.setStyle(Style.FILL);</span>
+<span class="nc" id="L76">        paint.setTextSize(mRenderer.getLabelsTextSize());</span>
+<span class="nc" id="L77">        int legendSize = getLegendSize(mRenderer, height / 5, 0);</span>
+<span class="nc" id="L78">        int left = x;</span>
+<span class="nc" id="L79">        int top = y;</span>
+<span class="nc" id="L80">        int right = x + width;</span>
+
+<span class="nc" id="L82">        int cLength = mDataset.getCategoriesCount();</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (cLength &lt; 3) {</span>
+<span class="nc" id="L84">            return;</span>
+        }
+<span class="nc" id="L86">        String[] categories = mDataset.getCategories();</span>
+
+<span class="nc" id="L88">        int bottom = y + height - legendSize;</span>
+<span class="nc" id="L89">        drawBackground(mRenderer, canvas, x, y, width, height, paint, false, DefaultRenderer.NO_COLOR);</span>
+<span class="nc" id="L90">        mStep = SHAPE_WIDTH * 3 / 4;</span>
+
+<span class="nc" id="L92">        int mRadius = Math.min(Math.abs(right - left), Math.abs(bottom - top));</span>
+<span class="nc" id="L93">        double rCoef = 0.35 * mRenderer.getScale();</span>
+<span class="nc" id="L94">        double decCoef = 0.2;</span>
+<span class="nc" id="L95">        int radius = (int) (mRadius * rCoef);</span>
+<span class="nc bnc" id="L96" title="All 4 branches missed.">        if (autoCalculateCenter || mCenterX == NO_VALUE) {</span>
+<span class="nc" id="L97">            mCenterX = (left + right) / 2;</span>
+        }
+<span class="nc bnc" id="L99" title="All 4 branches missed.">        if (autoCalculateCenter || mCenterY == NO_VALUE) {</span>
+<span class="nc" id="L100">            mCenterY = (bottom + top) / 2;</span>
+        }
+<span class="nc" id="L102">        float shortRadius = radius;</span>
+<span class="nc" id="L103">        float longRadius = radius * 1.1f;</span>
+<span class="nc" id="L104">        List&lt;Rectangle2D&gt; prevLabelsBounds = new ArrayList&lt;Rectangle2D&gt;();</span>
+
+<span class="nc" id="L106">        float currentAngle = mRenderer.getStartAngle();</span>
+<span class="nc" id="L107">        float angle = 360f / cLength;</span>
+
+        // Draw web
+<span class="nc" id="L110">        float centerX = (left + right) / 2, centerY = (top + bottom) / 2;</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        for (int i = 0; i &lt; cLength; i++) {</span>
+<span class="nc" id="L112">            paint.setColor(ColorUtil.GRAY);</span>
+<span class="nc" id="L113">            float thisRad = (float) Math.toRadians(90 - currentAngle);</span>
+<span class="nc" id="L114">            float nextRad = (float) Math.toRadians(90 - (currentAngle + angle));</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            for (double level = 0; level &lt;= 1d; level += decCoef) { // PMD Fix: DontUseFloatTypeForLoopIndices switched to double</span>
+<span class="nc" id="L116">                float levelFactor = (float) level;</span>
+<span class="nc" id="L117">                float thisX = (float) (centerX - Math.sin(thisRad) * radius * levelFactor);</span>
+<span class="nc" id="L118">                float thisY = (float) (centerY - Math.cos(thisRad) * radius * levelFactor);</span>
+<span class="nc" id="L119">                float nextX = (float) (centerX - Math.sin(nextRad) * radius * levelFactor);</span>
+<span class="nc" id="L120">                float nextY = (float) (centerY - Math.cos(nextRad) * radius * levelFactor);</span>
+<span class="nc" id="L121">                canvas.drawLine(thisX, thisY, nextX, nextY, paint);</span>
+            }
+<span class="nc" id="L123">            canvas.drawLine(centerX, centerY, centerX - (float) Math.sin(thisRad) * radius, centerY - (float) Math.cos(thisRad) * radius, paint);</span>
+
+<span class="nc" id="L125">            paint.setColor(ColorUtil.GRAY);</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">            if (cLength % 2 == 0) {</span>
+<span class="nc" id="L127">                drawLabel(canvas, categories[i], mRenderer, prevLabelsBounds, mCenterX, mCenterY,</span>
+<span class="nc" id="L128">                        shortRadius, longRadius, currentAngle - angle / 2, angle, left, right, mRenderer.getLabelsColor(),</span>
+                        paint, true, false);
+            } else {
+<span class="nc" id="L131">                drawLabel(canvas, categories[i], mRenderer, prevLabelsBounds, mCenterX, mCenterY,</span>
+<span class="nc" id="L132">                        shortRadius, longRadius, currentAngle, angle, left, right, mRenderer.getLabelsColor(),</span>
+                        paint, true, false);
+            }
+
+<span class="nc" id="L136">            currentAngle += angle;</span>
+        }
+
+// Draw area
+<span class="nc" id="L140">        int sLength = mDataset.getSeriesCount();</span>
+<span class="nc" id="L141">        int alignment = cLength / 2;</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">        for (int i = 0; i &lt; sLength; i++) {</span>
+<span class="nc" id="L143">            currentAngle = mRenderer.getStartAngle();</span>
+<span class="nc" id="L144">            paint.setColor(mRenderer.getSeriesRendererAt(i).getColor());</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">            for (int j = 0; j &lt; cLength; j++) {</span>
+<span class="nc" id="L146">                float thisValue = (float) mDataset.getValue(i, categories[(j + alignment) % cLength]);</span>
+<span class="nc" id="L147">                float nextValue = (float) mDataset.getValue(i, categories[(j + alignment + 1) % cLength]);</span>
+<span class="nc" id="L148">                float thisRad = (float) Math.toRadians(90 - currentAngle);</span>
+<span class="nc" id="L149">                float nextRad = (float) Math.toRadians(90 - (currentAngle + angle));</span>
+<span class="nc" id="L150">                float thisX = (float) (centerX - Math.sin(thisRad) * radius * thisValue);</span>
+<span class="nc" id="L151">                float thisY = (float) (centerY - Math.cos(thisRad) * radius * thisValue);</span>
+<span class="nc" id="L152">                float nextX = (float) (centerX - Math.sin(nextRad) * radius * nextValue);</span>
+<span class="nc" id="L153">                float nextY = (float) (centerY - Math.cos(nextRad) * radius * nextValue);</span>
+
+<span class="nc" id="L155">                canvas.drawLine(thisX, thisY, nextX, nextY, paint);</span>
+<span class="nc" id="L156">                currentAngle += angle;</span>
+            }
+        }
+// Draw Background
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        if (mRenderer.getBackgroundColor() != 0) {</span>
+<span class="nc" id="L161">            paint.setColor(mRenderer.getBackgroundColor());</span>
+        } else {
+<span class="nc" id="L163">            paint.setColor(ColorUtil.WHITE);</span>
+        }
+
+<span class="nc" id="L166">        prevLabelsBounds.clear();</span>
+<span class="nc" id="L167">        drawLegend(canvas, mRenderer, mDataset.getSeries(), left, right, y, width, height, legendSize, paint,</span>
+                false);
+<span class="nc" id="L169">        drawTitle(canvas, x, y, width, paint);</span>
+<span class="nc" id="L170">    }</span>
+
+    /**
+     * Returns the legend shape width.
+     *
+     * @param seriesIndex the series index
+     * @return the legend shape width
+     */
+    @Override
+    public int getLegendShapeWidth(int seriesIndex) {
+<span class="fc" id="L180">        return SHAPE_WIDTH;</span>
+    }
+
+    /**
+     * The graphical representation of the legend shape.
+     *
+     * @param canvas the canvas to paint to
+     * @param renderer the series renderer
+     * @param x the x value of the point the shape should be drawn at
+     * @param y the y value of the point the shape should be drawn at
+     * @param seriesIndex the series index
+     * @param paint the paint to be used for drawing
+     */
+    @Override
+    public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y, int seriesIndex, Paint paint) {
+<span class="nc" id="L195">        canvas.drawCircle(x + SHAPE_WIDTH - mStep, y, mStep, paint);</span>
+<span class="nc" id="L196">        mStep--;</span>
+<span class="nc" id="L197">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

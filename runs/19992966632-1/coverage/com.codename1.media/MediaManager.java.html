@@ -1,0 +1,534 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MediaManager.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media</a> &gt; <span class="el_source">MediaManager.java</span></div><h1>MediaManager.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.util.AsyncResource;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
+
+/**
+ * &lt;p&gt;
+ * Allow us to create {@ling com.codename1.media.Media} objects using String URI's or with a stream to
+ * the media data.&lt;br&gt;
+ * Notice that the underlying platforms contains the actual codecs, therefore
+ * you need to play common media file types such as mp3, mp4 to successfully play them across devices
+ * on all target platforms. The simulator can't accurately reproduce the behavior of this class in all devices/cases.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * The sample code below demonstrates simple video playback.
+ * &lt;/p&gt;
+ *
+ * &lt;script src=&quot;https://gist.github.com/codenameone/fb73f5d47443052f8956.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-mediaplayer.png&quot; alt=&quot;Media player sample&quot; /&gt;
+ *
+ * &lt;p&gt;
+ * The code below demonstrates capturing audio using the Capture API and playing back audio files using the Media API:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/a347dc9dcadaa759d0cb.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/capture-audio.png&quot; alt=&quot;Captured recordings in the demo&quot; /&gt;
+ *
+ * &lt;p&gt;
+ * The code below demonstrates capturing audio and playing back audio using the Media, MediaManager and MediaRecorderBuilder APIs,
+ * as alternative and more customizable approach than using the Capture API:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/jsfan3/419f44a9ad49d8fc1c1e3e325d1e5422.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://user-images.githubusercontent.com/1997316/78480286-02131b00-7735-11ea-8a70-5ca5512e7d92.png&quot; alt=&quot;Demonstrates capturing of audio files and their playback using the Codename One APIs Media, MediaManager and MediaRecorderBuilder&quot; /&gt;
+ */
+<span class="nc" id="L64">public class MediaManager {</span>
+
+    /**
+     * A static map of audio buffers.  These can be used to register an Audio buffer to receive
+     * raw PCM data from the microphone.
+     *
+     * @since 7.0
+     */
+<span class="fc" id="L72">    private static final Map&lt;String, AudioBuffer&gt; audioBuffers = new HashMap&lt;String, AudioBuffer&gt;();</span>
+    private static RemoteControlListener remoteControlListener;
+
+    /**
+     * Gets an audio buffer at the given path.
+     *
+     * @param path The path to the Audio buffer.  This path doesn't correspond to a real file.  It is just
+     *             used as a key to map to the audio buffer so that it can be addressed.
+     * @return The AudioBuffer or null if no buffer exists at that path.
+     * @since 7.0
+     */
+    public static AudioBuffer getAudioBuffer(String path) {
+<span class="fc" id="L84">        return getAudioBuffer(path, false, 256);</span>
+    }
+
+    /**
+     * Gets or creates an audio buffer at the given path.
+     *
+     * @param path   The path to the Audio buffer.  This path doesn't correspond to a real file.  It is just
+     *               used as a key to map to the audio buffer so that it can be addressed.
+     * @param create If this flag is {@literal true} and no buffer exists at the given path,
+     *               then the buffer will be created.
+     * @param size   The maximum size of the buffer.
+     * @return The audio buffer or null if no buffer exists at that path and the {@literal create} flag is {@literal false}.
+     * @since 7.0
+     */
+    public static AudioBuffer getAudioBuffer(String path, boolean create, int size) {
+<span class="fc" id="L99">        AudioBuffer buf = null;</span>
+<span class="fc bfc" id="L100" title="All 4 branches covered.">        if (create &amp;&amp; !audioBuffers.containsKey(path)) {</span>
+<span class="fc" id="L101">            buf = new AudioBuffer(size);</span>
+<span class="fc" id="L102">            audioBuffers.put(path, buf);</span>
+        }
+
+<span class="fc" id="L105">        buf = audioBuffers.get(path);</span>
+<span class="fc" id="L106">        buf.retain();</span>
+<span class="fc" id="L107">        return buf;</span>
+
+    }
+
+    /**
+     * Releases an audio buffer at a given path.  Audio buffers use a simple reference counter
+     * mechanism.  Every call to {@link #getAudioBuffer(java.lang.String, boolean, int) } will increment
+     * the counter, and calls to {@link #releaseAudioBuffer(java.lang.String) } will decrement the counter.
+     *
+     * @param path The path to the buffer.
+     * @since 7.0
+     */
+    public static void releaseAudioBuffer(String path) {
+<span class="fc" id="L120">        AudioBuffer buf = audioBuffers.get(path);</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (buf != null) {</span>
+<span class="fc" id="L122">            int refCount = buf.release();</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (refCount &lt;= 0) {</span>
+<span class="fc" id="L124">                audioBuffers.remove(path);</span>
+            }
+        }
+<span class="fc" id="L127">    }</span>
+
+    /**
+     * Deletes the audio buffer at the given path.
+     *
+     * @param path The path to the audio buffer to delete.
+     * @since 7.0
+     * @deprecated Prefer to use {@link #releaseAudioBuffer(java.lang.String) }
+     */
+    public static void deleteAudioBuffer(String path) {
+<span class="fc" id="L137">        audioBuffers.remove(path);</span>
+<span class="fc" id="L138">    }</span>
+
+    /**
+     * Gets the currently registered remote control listener.
+     *
+     * @return The currently registered remote control listener, or null if
+     * none is registered.
+     * @since 7.0
+     */
+    public static RemoteControlListener getRemoteControlListener() {
+<span class="fc" id="L148">        return remoteControlListener;</span>
+    }
+
+    /**
+     * Registers a listener to be notified of remote control events - e.g.
+     * the play/pause/seek buttons on the user's lock screen when background
+     * media is being played.
+     *
+     * @param l The remote control listener to set.  null to set no listener.
+     * @since 7.0
+     */
+    public static void setRemoteControlListener(RemoteControlListener l) {
+<span class="fc bfc" id="L160" title="All 4 branches covered.">        boolean shouldStop = remoteControlListener != null &amp;&amp; l == null;</span>
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (shouldStop) {</span>
+<span class="fc" id="L162">            Display.getInstance().stopRemoteControl();</span>
+        }
+<span class="pc bpc" id="L164" title="1 of 4 branches missed.">        boolean shouldStart = remoteControlListener == null &amp;&amp; l != null;</span>
+<span class="fc" id="L165">        remoteControlListener = l;</span>
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (shouldStart) {</span>
+<span class="fc" id="L167">            Display.getInstance().startRemoteControl();</span>
+        }
+
+<span class="fc" id="L170">    }</span>
+
+    /**
+     * Creates an audio media that can be played in the background.
+     *
+     * @param uri the uri of the media can start with jar://, file://, http://
+     *            (can also use rtsp:// if supported on the platform)
+     * @return Media a Media Object that can be used to control the playback
+     * of the media
+     * @throws IOException if creation of media from the given URI has failed
+     */
+    public static Media createBackgroundMedia(String uri) throws IOException {
+<span class="fc" id="L182">        return Display.getInstance().createBackgroundMedia(uri);</span>
+    }
+
+    /**
+     * Creates an audio media asynchronously that can be played in the background.
+     *
+     * @param uri the uri of the media can start with jar://, file://, http://
+     *            (can also use rtsp:// if supported on the platform)
+     * @return Media a Media Object that can be used to control the playback
+     * of the media
+     * @since 7.0
+     */
+    public static AsyncResource&lt;Media&gt; createBackgroundMediaAsync(String uri) {
+<span class="fc" id="L195">        return Display.getInstance().createBackgroundMediaAsync(uri);</span>
+    }
+
+    /**
+     * Creates a Media from a given URI
+     *
+     * @param uri     the uri of the media can start with file://, http:// (can also
+     *                use rtsp:// although may not be supported on all target platforms)
+     * @param isVideo a boolean flag to indicate if this is a video media
+     * @return Media a Media Object that can be used to control the playback
+     * of the media
+     * @throws IOException if creation of media from the given URI has failed
+     */
+    public static Media createMedia(String uri, boolean isVideo) throws IOException {
+<span class="fc" id="L209">        return createMedia(uri, isVideo, null);</span>
+    }
+
+    /**
+     * Creates the Media in the given stream.
+     * Notice that you should invoke cleanup on a media once you are done with it.
+     *
+     * @param stream   the stream containing the media data
+     * @param mimeType the type of the data in the stream
+     * @return Media a Media Object that can be used to control the playback
+     * of the media
+     * @throws java.io.IOException if the creation of the Media has failed
+     */
+    public static Media createMedia(InputStream stream, String mimeType) throws IOException {
+<span class="fc" id="L223">        return createMedia(stream, mimeType, null);</span>
+    }
+
+    /**
+     * Creates the Media in the given stream asynchronously.
+     * Notice that you should invoke cleanup on a media once you are done with it.
+     *
+     * @param stream   the stream containing the media data
+     * @param mimeType the type of the data in the stream
+     * @return Media a Media Object that can be used to control the playback
+     * of the media
+     * @since 7.0
+     */
+    public static AsyncResource&lt;Media&gt; createMediaAsync(InputStream stream, String mimeType, Runnable onCompletion) {
+<span class="fc" id="L237">        return Display.getInstance().createMediaAsync(stream, mimeType, onCompletion);</span>
+    }
+
+    /**
+     * Creates a Media from a given URI
+     *
+     * @param uri          the uri of the media can start with file://, http:// (can also
+     *                     use rtsp:// although may not be supported on all target platforms)
+     * @param isVideo      a boolean flag to indicate if this is a video media
+     * @param onCompletion a Runnable to be called when the media has finished
+     * @return Media a Media Object that can be used to control the playback
+     * of the media
+     * @throws IOException if creation of media from given URI failed
+     */
+    public static Media createMedia(String uri, boolean isVideo, Runnable onCompletion) throws IOException {
+<span class="fc" id="L252">        return Display.getInstance().createMedia(uri, isVideo, onCompletion);</span>
+    }
+
+    /**
+     * Creates a Media from a given URI asynchronously.
+     *
+     * @param uri          the uri of the media can start with file://, http:// (can also
+     *                     use rtsp:// although may not be supported on all target platforms)
+     * @param isVideo      a boolean flag to indicate if this is a video media
+     * @param onCompletion a Runnable to be called when the media has finished
+     * @return Media a Media Object that can be used to control the playback
+     * of the media
+     * @since 7.0
+     */
+    public static AsyncResource&lt;Media&gt; createMediaAsync(String uri, boolean isVideo, Runnable onCompletion) {
+<span class="fc" id="L267">        return Display.getInstance().createMediaAsync(uri, isVideo, onCompletion);</span>
+    }
+
+    /**
+     * Adds a callback to a Media element that will be called when the media finishes playing.
+     *
+     * @param media        The media to add the callback to.
+     * @param onCompletion The callback that will run on the EDT when the playback completes.
+     * @see #removeCompletionHandler(com.codename1.media.Media, java.lang.Runnable)
+     */
+    public static void addCompletionHandler(Media media, Runnable onCompletion) {
+<span class="fc" id="L278">        Display.getInstance().addCompletionHandler(media, onCompletion);</span>
+<span class="fc" id="L279">    }</span>
+
+    /**
+     * Removes onComplete callback from Media element.
+     *
+     * @param media        The media element.
+     * @param onCompletion The callback.
+     * @see #addCompletionHandler(com.codename1.media.Media, java.lang.Runnable)
+     */
+    public static void removeCompletionHandler(Media media, Runnable onCompletion) {
+<span class="fc" id="L289">        Display.getInstance().removeCompletionHandler(media, onCompletion);</span>
+<span class="fc" id="L290">    }</span>
+
+    /**
+     * Creates the Media in the given stream
+     * Notice that you should invoke cleanup on a media once you are done with it.
+     *
+     * @param stream       the stream containing the media data
+     * @param mimeType     the type of the data in the stream
+     * @param onCompletion a Runnable to be called when the media has finished
+     * @return Media a Media Object that can be used to control the playback
+     * of the media
+     * @throws java.io.IOException if the URI access fails
+     */
+    public static Media createMedia(InputStream stream, String mimeType, Runnable onCompletion) throws IOException {
+<span class="fc" id="L304">        return Display.getInstance().createMedia(stream, mimeType, onCompletion);</span>
+    }
+
+    /**
+     * Creates a Media recorder Object which will record from the device mic to
+     * a file in the given path.
+     * The output format will be amr-nb if supported by the platform.
+     *
+     * @param path a file path to where to store the recording, if the file does
+     *             not exists it will be created.
+     * @deprecated see createMediaRecorder(String path, String mimeType) instead
+     */
+    public static Media createMediaRecorder(String path) throws IOException {
+<span class="nc" id="L317">        return createMediaRecorder(path, getAvailableRecordingMimeTypes()[0]);</span>
+    }
+
+    /**
+     * Gets the recording mime type for the returned Media from the
+     * createMediaRecorder method
+     *
+     * @return the recording mime type
+     * @deprecated see getAvailableRecordingMimeTypes() instead
+     */
+    public static String getMediaRecorderingMimeType() {
+<span class="nc" id="L328">        return Display.getInstance().getMediaRecorderingMimeType();</span>
+    }
+
+    /**
+     * Gets the available recording MimeTypes
+     */
+    public static String[] getAvailableRecordingMimeTypes() {
+<span class="fc" id="L335">        return Display.getInstance().getAvailableRecordingMimeTypes();</span>
+    }
+
+    /**
+     * Creates a Media recorder Object which will record from the device mic to
+     * a file in the given path.
+     *
+     * @param path     a file path to where to store the recording, if the file does
+     *                 not exists it will be created.
+     * @param mimeType the output mime type that is supported see
+     *                 getAvailableRecordingMimeTypes()
+     * @throws IllegalArgumentException if given mime-type is not supported
+     * @throws IOException              id failed to create a Media object
+     */
+    public static Media createMediaRecorder(String path, String mimeType) throws IOException {
+<span class="nc" id="L350">        return createMediaRecorder(new MediaRecorderBuilder().path(path).mimeType(mimeType));</span>
+    }
+
+    /**
+     * Creates a Media recorder Object which will record from the device mic to
+     * a file in the given path.
+     *
+     * @param builder media settings
+     * @throws IllegalArgumentException if given mime-type is not supported
+     * @throws IOException              id failed to create a Media object
+     * @since 7.0
+     */
+    public static Media createMediaRecorder(MediaRecorderBuilder builder) throws IOException {
+<span class="fc bfc" id="L363" title="All 2 branches covered.">        if (builder.isRedirectToAudioBuffer()) {</span>
+<span class="fc" id="L364">            return builder.build();</span>
+        }
+<span class="fc" id="L366">        String mimeType = builder.getMimeType();</span>
+<span class="pc bpc" id="L367" title="1 of 4 branches missed.">        if (mimeType == null &amp;&amp; getAvailableRecordingMimeTypes().length &gt; 0) {</span>
+<span class="fc" id="L368">            mimeType = getAvailableRecordingMimeTypes()[0];</span>
+        }
+<span class="fc" id="L370">        String path = builder.getPath();</span>
+<span class="fc" id="L371">        boolean supportedMime = false;</span>
+<span class="fc" id="L372">        String[] supported = getAvailableRecordingMimeTypes();</span>
+<span class="fc" id="L373">        int slen = supported.length;</span>
+<span class="fc bfc" id="L374" title="All 2 branches covered.">        for (int i = 0; i &lt; slen; i++) {</span>
+<span class="fc" id="L375">            String mime = supported[i];</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">            if (mime.equals(mimeType)) {</span>
+<span class="fc" id="L377">                supportedMime = true;</span>
+<span class="fc" id="L378">                break;</span>
+            }
+        }
+<span class="fc bfc" id="L381" title="All 2 branches covered.">        if (!supportedMime) {</span>
+<span class="fc" id="L382">            throw new IllegalArgumentException(&quot;Mime type &quot; + mimeType +</span>
+                    &quot; is not supported on this platform use &quot;
+                    + &quot;getAvailableRecordingMimeTypes()&quot;);
+        }
+
+<span class="fc" id="L387">        return Display.getInstance().createMediaRecorder(path, mimeType);</span>
+    }
+
+    /**
+     * Converts the media object into an AsyncMedia object.  Many media objects
+     * area already instances of AsyncMedia, so this method would perform
+     * a simple cast.  For media objects that are not already async, this will
+     * return an Async wrapper.
+     *
+     * @param media The media object to convert.
+     * @return The media object as an AsyncMedia instance.
+     * @since 7.0
+     */
+    public static AsyncMedia getAsyncMedia(final Media media) {
+<span class="fc bfc" id="L401" title="All 2 branches covered.">        if (media instanceof AsyncMedia) {</span>
+<span class="fc" id="L402">            return (AsyncMedia) media;</span>
+        }
+<span class="fc" id="L404">        return new AbstractMedia() {</span>
+            @Override
+            protected void playImpl() {
+<span class="fc" id="L407">                State oldState = getState();</span>
+<span class="fc" id="L408">                media.play();</span>
+<span class="pc bpc" id="L409" title="2 of 4 branches missed.">                if (media.isPlaying() &amp;&amp; oldState != State.Playing) {</span>
+<span class="fc" id="L410">                    fireMediaStateChange(State.Playing);</span>
+                }
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">                if (!media.isPlaying()) {</span>
+<span class="nc" id="L413">                    final Timer t = new Timer();</span>
+<span class="nc" id="L414">                    t.schedule(new TimerTask() {</span>
+                        @Override
+                        public void run() {
+<span class="nc bnc" id="L417" title="All 2 branches missed.">                            if (media.isPlaying()) {</span>
+<span class="nc" id="L418">                                t.cancel();</span>
+<span class="nc" id="L419">                                fireMediaStateChange(State.Playing);</span>
+                            }
+<span class="nc" id="L421">                        }</span>
+
+                    }, 50, 50);
+                }
+
+<span class="fc" id="L426">            }</span>
+
+            @Override
+            protected void pauseImpl() {
+<span class="fc" id="L430">                State oldState = getState();</span>
+<span class="fc" id="L431">                media.pause();</span>
+<span class="pc bpc" id="L432" title="2 of 4 branches missed.">                if (!media.isPlaying() &amp;&amp; oldState != State.Paused) {</span>
+<span class="fc" id="L433">                    fireMediaStateChange(State.Paused);</span>
+                }
+<span class="pc bpc" id="L435" title="1 of 2 branches missed.">                if (media.isPlaying()) {</span>
+<span class="nc" id="L436">                    final Timer t = new Timer();</span>
+<span class="nc" id="L437">                    t.schedule(new TimerTask() {</span>
+                        @Override
+                        public void run() {
+<span class="nc bnc" id="L440" title="All 2 branches missed.">                            if (!media.isPlaying()) {</span>
+<span class="nc" id="L441">                                t.cancel();</span>
+<span class="nc" id="L442">                                fireMediaStateChange(State.Paused);</span>
+                            }
+<span class="nc" id="L444">                        }</span>
+
+                    }, 50, 50);
+                }
+<span class="fc" id="L448">            }</span>
+
+            @Override
+            public void prepare() {
+<span class="fc" id="L452">                media.prepare();</span>
+<span class="fc" id="L453">            }</span>
+
+            @Override
+            public void cleanup() {
+<span class="fc" id="L457">                media.cleanup();</span>
+<span class="fc" id="L458">            }</span>
+
+            @Override
+            public int getTime() {
+<span class="nc" id="L462">                return media.getTime();</span>
+            }
+
+            @Override
+            public void setTime(int time) {
+<span class="fc" id="L467">                media.setTime(time);</span>
+<span class="fc" id="L468">            }</span>
+
+            @Override
+            public int getDuration() {
+<span class="fc" id="L472">                return media.getDuration();</span>
+            }
+
+            @Override
+            public int getVolume() {
+<span class="nc" id="L477">                return media.getVolume();</span>
+            }
+
+            @Override
+            public void setVolume(int vol) {
+<span class="fc" id="L482">                media.setVolume(vol);</span>
+<span class="fc" id="L483">            }</span>
+
+            @Override
+            public boolean isPlaying() {
+<span class="fc" id="L487">                return media.isPlaying();</span>
+            }
+
+            @Override
+            public Component getVideoComponent() {
+<span class="fc" id="L492">                return media.getVideoComponent();</span>
+            }
+
+            @Override
+            public boolean isVideo() {
+<span class="fc" id="L497">                return media.isVideo();</span>
+            }
+
+            @Override
+            public boolean isFullScreen() {
+<span class="nc" id="L502">                return media.isFullScreen();</span>
+            }
+
+            @Override
+            public void setFullScreen(boolean fullScreen) {
+<span class="fc" id="L507">                media.setFullScreen(fullScreen);</span>
+<span class="fc" id="L508">            }</span>
+
+            @Override
+            public boolean isNativePlayerMode() {
+<span class="nc" id="L512">                return media.isNativePlayerMode();</span>
+            }
+
+            @Override
+            public void setNativePlayerMode(boolean nativePlayer) {
+<span class="fc" id="L517">                media.setNativePlayerMode(nativePlayer);</span>
+<span class="fc" id="L518">            }</span>
+
+            @Override
+            public void setVariable(String key, Object value) {
+<span class="fc" id="L522">                media.setVariable(key, value);</span>
+<span class="fc" id="L523">            }</span>
+
+            @Override
+            public Object getVariable(String key) {
+<span class="fc" id="L527">                return media.getVariable(key);</span>
+            }
+
+        };
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

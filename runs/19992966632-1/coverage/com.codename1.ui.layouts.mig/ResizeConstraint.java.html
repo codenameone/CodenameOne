@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ResizeConstraint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts.mig</a> &gt; <span class="el_source">ResizeConstraint.java</span></div><h1>ResizeConstraint.java</h1><pre class="source lang-java linenums">package com.codename1.ui.layouts.mig;
+
+/*
+ * License (BSD):
+ * ==============
+ *
+ * Copyright (c) 2004, Mikael Grev, MiG InfoCom AB. (miglayout (at) miginfocom (dot) com)
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * Neither the name of the MiG InfoCom AB nor the names of its contributors may be
+ * used to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ *
+ * @version 1.0
+ * @author Mikael Grev, MiG InfoCom AB
+ *         Date: 2006-sep-08
+ */
+
+/**
+ * A parsed constraint that specifies how an entity (normally column/row or component) can shrink or
+ * grow compared to other entities.
+ */
+final class ResizeConstraint {
+<span class="fc" id="L42">    static final Float WEIGHT_100 = new Float(100);</span>
+
+    /**
+     * How flexilble the entity should be, relative to other entities, when it comes to growing. &lt;code&gt;null&lt;/code&gt; or
+     * zero mean it will never grow. An entity that has twise the growWeight compared to another entity will get twice
+     * as much of available space.
+     * &lt;p&gt;
+     * &quot;grow&quot; are only compared within the same &quot;growPrio&quot;.
+     */
+<span class="fc" id="L51">    Float grow = null;</span>
+
+    /**
+     * The relative priority used for determining which entities gets the extra space first.
+     */
+<span class="fc" id="L56">    int growPrio = 100;</span>
+
+<span class="fc" id="L58">    Float shrink = WEIGHT_100;</span>
+
+<span class="fc" id="L60">    int shrinkPrio = 100;</span>
+
+    public ResizeConstraint()   // For Externalizable
+<span class="fc" id="L63">    {</span>
+<span class="fc" id="L64">    }</span>
+
+<span class="fc" id="L66">    ResizeConstraint(int shrinkPrio, Float shrinkWeight, int growPrio, Float growWeight) {</span>
+<span class="fc" id="L67">        this.shrinkPrio = shrinkPrio;</span>
+<span class="fc" id="L68">        this.shrink = shrinkWeight;</span>
+<span class="fc" id="L69">        this.growPrio = growPrio;</span>
+<span class="fc" id="L70">        this.grow = growWeight;</span>
+<span class="fc" id="L71">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TextModeLayout.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts</a> &gt; <span class="el_source">TextModeLayout.java</span></div><h1>TextModeLayout.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.layouts;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.InputComponent;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.table.TableLayout;
+
+import java.util.ArrayList;
+
+/**
+ * &lt;p&gt;This is a special case layout specifically designed for {@link com.codename1.ui.InputComponent}.
+ * When the  on top mode of text layout is used this layout acts exactly like a table layout and uses the
+ * given constraints. When this mode is false it uses a regular box Y layout mode and orders the elements one
+ * on top of the other.&lt;/p&gt;
+ * &lt;p&gt;One important difference between this layout and the default table layout is that the vertical alignment
+ * here is set to {@code TOP} so the error label below doesn't break component alignment if two components
+ * are on the same row and only one has an error message.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * The following code demonstrates a simple set of inputs and validation as it appears in iOS, Android and with
+ * validation errors
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/5a28c7944aeab7d8ae6b26dc81690238.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/blog/pixel-perfect-text-field-picker-ios.png&quot; alt=&quot;Running on iOS&quot; /&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/blog/pixel-perfect-text-field-picker-android.png&quot; alt=&quot;Running on Android&quot; /&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/blog/pixel-perfect-text-field-error-handling-blank.png&quot; alt=&quot;Android validation errors&quot; /&gt;
+ *
+ * @author Shai Almog
+ */
+public class TextModeLayout extends Layout {
+    /**
+     * The underlying table layout can be used freely to create constraints on the fly
+     */
+    public final TableLayout table;
+    private final Layout actual;
+
+    /**
+     * Automatically invokes the {@link com.codename1.ui.InputComponent#group(com.codename1.ui.Component...)}
+     * method on the text components in a BoxY layout scenario
+     */
+<span class="fc" id="L66">    private boolean autoGrouping = true;</span>
+
+<span class="fc" id="L68">    private int lastComponentCount = 0;</span>
+
+    /**
+     * The constructor works like the standard table layout constructor and will behave as such with the on
+     * top mode
+     *
+     * @param rows    the number of rows
+     * @param columns the number of columns;
+     */
+<span class="fc" id="L77">    public TextModeLayout(int rows, int columns) {</span>
+<span class="fc" id="L78">        table = new TableLayout(rows, columns);</span>
+<span class="fc" id="L79">        table.setGrowHorizontally(true);</span>
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">        if (!UIManager.getInstance().isThemeConstant(&quot;textComponentOnTopBool&quot;, false)) {</span>
+<span class="nc" id="L81">            actual = BoxLayout.y();</span>
+        } else {
+<span class="fc" id="L83">            actual = table;</span>
+        }
+<span class="fc" id="L85">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void addLayoutComponent(Object value, Component comp, Container c) {
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">        if (actual == table) {</span>
+            // forcing default constraint to still be aligned top
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            if (!(value instanceof TableLayout.Constraint)) {</span>
+<span class="nc" id="L95">                value = createConstraint();</span>
+            }
+<span class="fc" id="L97">            table.addLayoutComponent(value, comp, c);</span>
+        }
+<span class="fc" id="L99">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Object cloneConstraint(Object constraint) {
+<span class="fc" id="L106">        return actual.cloneConstraint(constraint);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Object getComponentConstraint(Component comp) {
+<span class="nc" id="L114">        return actual.getComponentConstraint(comp);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean isConstraintTracking() {
+<span class="nc" id="L122">        return actual.isConstraintTracking();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean isOverlapSupported() {
+<span class="fc" id="L130">        return actual.isOverlapSupported();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public boolean obscuresPotential(Container parent) {
+<span class="nc" id="L138">        return actual.obscuresPotential(parent);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void removeLayoutComponent(Component comp) {
+<span class="nc" id="L146">        actual.removeLayoutComponent(comp);</span>
+<span class="nc" id="L147">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void layoutContainer(Container parent) {
+<span class="pc bpc" id="L154" title="4 of 6 branches missed.">        if (autoGrouping &amp;&amp; actual != table &amp;&amp; lastComponentCount != parent.getComponentCount()) {</span>
+<span class="nc" id="L155">            lastComponentCount = parent.getComponentCount();</span>
+<span class="nc" id="L156">            ArrayList&lt;Component&gt; tc = new ArrayList&lt;Component&gt;();</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">            for (Component c : parent) {</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">                if (c instanceof InputComponent) {</span>
+<span class="nc" id="L159">                    tc.add(c);</span>
+                }
+<span class="nc" id="L161">            }</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">            if (tc.size() &gt; 0) {</span>
+<span class="nc" id="L163">                Component[] tcArr = new Component[tc.size()];</span>
+<span class="nc" id="L164">                tc.toArray(tcArr);</span>
+<span class="nc" id="L165">                InputComponent.group(tcArr);</span>
+            }
+        }
+<span class="fc" id="L168">        actual.layoutContainer(parent);</span>
+<span class="fc" id="L169">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Dimension getPreferredSize(Container parent) {
+<span class="nc" id="L176">        return actual.getPreferredSize(parent);</span>
+    }
+
+    /**
+     * Creates a new Constraint instance to add to the layout
+     *
+     * @return the default constraint
+     */
+    public TableLayout.Constraint createConstraint() {
+<span class="fc" id="L185">        return table.createConstraint().verticalAlign(Component.TOP);</span>
+    }
+
+    /**
+     * Creates a new Constraint instance to add to the layout
+     *
+     * @return the default constraint
+     */
+    public TableLayout.Constraint cc() {
+<span class="nc" id="L194">        return table.createConstraint().verticalAlign(Component.TOP);</span>
+    }
+
+    /**
+     * Creates a new Constraint instance to add to the layout
+     *
+     * @param row    the row for the table starting with 0
+     * @param column the column for the table starting with 0
+     * @return the new constraint
+     */
+    public TableLayout.Constraint createConstraint(int row, int column) {
+<span class="nc" id="L205">        return table.createConstraint(row, column).verticalAlign(Component.TOP);</span>
+    }
+
+    /**
+     * Creates a new Constraint instance to add to the layout
+     *
+     * @param row    the row for the table starting with 0
+     * @param column the column for the table starting with 0
+     * @return the default constraint
+     */
+    public TableLayout.Constraint cc(int row, int column) {
+<span class="nc" id="L216">        return table.createConstraint(row, column).verticalAlign(Component.TOP);</span>
+    }
+
+    /**
+     * Automatically invokes the {@link com.codename1.ui.InputComponent#group(com.codename1.ui.Component...)}
+     * method on the text components in a BoxY layout scenario
+     *
+     * @return the autoGrouping
+     */
+    public boolean isAutoGrouping() {
+<span class="nc" id="L226">        return autoGrouping;</span>
+    }
+
+    /**
+     * Automatically invokes the {@link com.codename1.ui.InputComponent#group(com.codename1.ui.Component...)}
+     * method on the text components in a BoxY layout scenario
+     *
+     * @param autoGrouping the autoGrouping to set
+     */
+    public void setAutoGrouping(boolean autoGrouping) {
+<span class="nc" id="L236">        this.autoGrouping = autoGrouping;</span>
+<span class="nc" id="L237">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

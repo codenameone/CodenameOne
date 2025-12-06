@@ -1,0 +1,398 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractMedia.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media</a> &gt; <span class="el_source">AbstractMedia.java</span></div><h1>AbstractMedia.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media;
+
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.util.EventDispatcher;
+import com.codename1.util.SuccessCallback;
+
+/**
+ * An abstract base class for AsyncMedia. Most media returned from {@link MediaManager} will
+ * be descendants of this class.
+ *
+ * @author shannah
+ * @since 7.0
+ */
+<span class="fc" id="L36">public abstract class AbstractMedia implements AsyncMedia {</span>
+<span class="fc" id="L37">    private final EventDispatcher stateChangeListeners = new EventDispatcher();</span>
+<span class="fc" id="L38">    private final EventDispatcher errorListeners = new EventDispatcher();</span>
+
+    /**
+     * Currently pending play request
+     */
+    private PlayRequest pendingPlayRequest;
+
+    /**
+     * Currently pending pause request.
+     */
+    private PauseRequest pendingPauseRequest;
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public State getState() {
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (isPlaying()) {</span>
+<span class="fc" id="L56">            return State.Playing;</span>
+        } else {
+<span class="fc" id="L58">            return State.Paused;</span>
+        }
+    }
+
+    /**
+     * Fires a media state change event to the registered state change listeners.
+     *
+     * @param newState The new state
+     * @return The state change event.
+     */
+    protected MediaStateChangeEvent fireMediaStateChange(State newState) {
+<span class="fc" id="L69">        MediaStateChangeEvent evt = new MediaStateChangeEvent(this, getState(), newState);</span>
+<span class="pc bpc" id="L70" title="1 of 2 branches missed.">        if (stateChangeListeners.hasListeners()) {</span>
+
+<span class="fc" id="L72">            stateChangeListeners.fireActionEvent(evt);</span>
+
+        }
+<span class="fc" id="L75">        return evt;</span>
+    }
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public void addMediaStateChangeListener(ActionListener&lt;MediaStateChangeEvent&gt; l) {
+<span class="fc" id="L83">        stateChangeListeners.addListener(l);</span>
+<span class="fc" id="L84">    }</span>
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public void removeMediaStateChangeListener(ActionListener&lt;MediaStateChangeEvent&gt; l) {
+<span class="nc" id="L91">        stateChangeListeners.removeListener(l);</span>
+<span class="nc" id="L92">    }</span>
+
+    /**
+     * Fires a media error event to registered listeners.
+     *
+     * @param ex The MediaException to deliver
+     * @return The MediaErrorEvent object sent to listeners.
+     * @see #addMediaErrorListener(com.codename1.ui.events.ActionListener)
+     * @see #removeMediaErrorListener(com.codename1.ui.events.ActionListener)
+     */
+    protected MediaErrorEvent fireMediaError(MediaException ex) {
+<span class="nc" id="L103">        MediaErrorEvent evt = new MediaErrorEvent(this, ex);</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (errorListeners.hasListeners()) {</span>
+<span class="nc" id="L105">            errorListeners.fireActionEvent(evt);</span>
+
+        }
+<span class="nc" id="L108">        return evt;</span>
+    }
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public void addMediaErrorListener(ActionListener&lt;MediaErrorEvent&gt; l) {
+<span class="nc" id="L116">        errorListeners.addListener(l);</span>
+<span class="nc" id="L117">    }</span>
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public void removeMediaErrorListener(ActionListener&lt;MediaErrorEvent&gt; l) {
+<span class="nc" id="L124">        errorListeners.removeListener(l);</span>
+<span class="nc" id="L125">    }</span>
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public void addMediaCompletionHandler(Runnable onComplete) {
+<span class="nc" id="L132">        MediaManager.addCompletionHandler(this, onComplete);</span>
+<span class="nc" id="L133">    }</span>
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public PlayRequest playAsync() {
+<span class="fc" id="L140">        return playAsync(new PlayRequest() {</span>
+            @Override
+            public void complete(AsyncMedia value) {
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                if (this == pendingPlayRequest) {</span>
+<span class="fc" id="L144">                    pendingPlayRequest = null;</span>
+                }
+<span class="fc" id="L146">                super.complete(value);</span>
+<span class="fc" id="L147">            }</span>
+
+            @Override
+            public void error(Throwable t) {
+<span class="nc bnc" id="L151" title="All 2 branches missed.">                if (this == pendingPlayRequest) {</span>
+<span class="nc" id="L152">                    pendingPlayRequest = null;</span>
+                }
+<span class="nc" id="L154">                super.error(t);</span>
+<span class="nc" id="L155">            }</span>
+        });
+    }
+
+
+    private PlayRequest playAsync(final PlayRequest out) {
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        if (out.isDone()) {</span>
+<span class="nc" id="L162">            return out;</span>
+        }
+
+
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (pendingPauseRequest != null) {</span>
+<span class="nc" id="L167">            pendingPauseRequest.ready(new SuccessCallback&lt;AsyncMedia&gt;() {</span>
+                @Override
+                public void onSucess(AsyncMedia value) {
+<span class="nc bnc" id="L170" title="All 2 branches missed.">                    if (!out.isDone()) {</span>
+<span class="nc" id="L171">                        playAsync(out);</span>
+                    }
+<span class="nc" id="L173">                }</span>
+<span class="nc" id="L174">            }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                @Override
+                public void onSucess(Throwable value) {
+<span class="nc bnc" id="L177" title="All 2 branches missed.">                    if (!out.isDone()) {</span>
+<span class="nc" id="L178">                        playAsync(out);</span>
+                    }
+<span class="nc" id="L180">                }</span>
+            });
+<span class="nc" id="L182">            pendingPauseRequest = null;</span>
+<span class="nc" id="L183">            pendingPlayRequest = out;</span>
+<span class="nc" id="L184">            return out;</span>
+        }
+
+<span class="pc bpc" id="L187" title="3 of 4 branches missed.">        if (pendingPlayRequest != null &amp;&amp; pendingPlayRequest != out) {</span>
+<span class="nc" id="L188">            pendingPlayRequest.ready(new SuccessCallback&lt;AsyncMedia&gt;() {</span>
+                @Override
+                public void onSucess(AsyncMedia value) {
+<span class="nc bnc" id="L191" title="All 2 branches missed.">                    if (!out.isDone()) {</span>
+<span class="nc" id="L192">                        out.complete(value);</span>
+                    }
+<span class="nc" id="L194">                }</span>
+<span class="nc" id="L195">            }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                @Override
+                public void onSucess(Throwable value) {
+<span class="nc bnc" id="L198" title="All 2 branches missed.">                    if (!out.isDone()) {</span>
+<span class="nc" id="L199">                        out.error(value);</span>
+                    }
+<span class="nc" id="L201">                }</span>
+            });
+<span class="nc" id="L203">            return out;</span>
+        } else {
+<span class="fc" id="L205">            pendingPlayRequest = out;</span>
+        }
+
+<span class="pc bpc" id="L208" title="1 of 2 branches missed.">        if (getState() == State.Playing) {</span>
+<span class="nc" id="L209">            out.complete(this);</span>
+<span class="nc" id="L210">            return out;</span>
+        }
+
+<span class="fc" id="L213">        class StateChangeListener implements ActionListener&lt;MediaStateChangeEvent&gt; {</span>
+            ActionListener&lt;MediaErrorEvent&gt; onError;
+
+            @Override
+            public void actionPerformed(MediaStateChangeEvent evt) {
+
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">                if (!out.isDone()) {</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">                    if (evt.getNewState() == State.Playing) {</span>
+<span class="fc" id="L221">                        stateChangeListeners.removeListener(this);</span>
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">                        if (onError != null) {</span>
+<span class="fc" id="L223">                            errorListeners.removeListener(onError);</span>
+                        }
+<span class="fc" id="L225">                        out.complete(AbstractMedia.this);</span>
+                    }
+                }
+
+<span class="fc" id="L229">            }</span>
+
+        }
+<span class="fc" id="L232">        final StateChangeListener onStateChange = new StateChangeListener();</span>
+<span class="fc" id="L233">        ActionListener&lt;MediaErrorEvent&gt; onError = new ActionListener&lt;MediaErrorEvent&gt;() {</span>
+            @Override
+            public void actionPerformed(MediaErrorEvent evt) {
+<span class="nc" id="L236">                stateChangeListeners.removeListener(onStateChange);</span>
+<span class="nc" id="L237">                errorListeners.removeListener(this);</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">                if (!out.isDone()) {</span>
+<span class="nc" id="L239">                    out.error(evt.getMediaException());</span>
+                }
+<span class="nc" id="L241">            }</span>
+
+        };
+<span class="fc" id="L244">        onStateChange.onError = onError;</span>
+<span class="fc" id="L245">        stateChangeListeners.addListener(onStateChange);</span>
+<span class="fc" id="L246">        errorListeners.addListener(onError);</span>
+<span class="fc" id="L247">        playImpl();</span>
+
+<span class="fc" id="L249">        return out;</span>
+
+    }
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public PauseRequest pauseAsync() {
+<span class="fc" id="L258">        return pauseAsync(new PauseRequest() {</span>
+            @Override
+            public void complete(AsyncMedia value) {
+<span class="pc bpc" id="L261" title="1 of 2 branches missed.">                if (pendingPauseRequest == this) {</span>
+<span class="fc" id="L262">                    pendingPauseRequest = null;</span>
+                }
+<span class="fc" id="L264">                super.complete(value);</span>
+<span class="fc" id="L265">            }</span>
+
+            @Override
+            public void error(Throwable t) {
+<span class="nc bnc" id="L269" title="All 2 branches missed.">                if (pendingPauseRequest == this) {</span>
+<span class="nc" id="L270">                    pendingPauseRequest = null;</span>
+                }
+<span class="nc" id="L272">                super.error(t);</span>
+<span class="nc" id="L273">            }</span>
+
+
+        });
+
+    }
+
+    private PauseRequest pauseAsync(final PauseRequest out) {
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">        if (out.isDone()) {</span>
+<span class="nc" id="L282">            return out;</span>
+        }
+
+
+<span class="pc bpc" id="L286" title="1 of 2 branches missed.">        if (pendingPlayRequest != null) {</span>
+<span class="nc" id="L287">            pendingPlayRequest.ready(new SuccessCallback&lt;AsyncMedia&gt;() {</span>
+                @Override
+                public void onSucess(AsyncMedia value) {
+<span class="nc bnc" id="L290" title="All 2 branches missed.">                    if (!out.isDone()) {</span>
+<span class="nc" id="L291">                        pauseAsync(out);</span>
+                    }
+<span class="nc" id="L293">                }</span>
+<span class="nc" id="L294">            }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                @Override
+                public void onSucess(Throwable value) {
+<span class="nc bnc" id="L297" title="All 2 branches missed.">                    if (!out.isDone()) {</span>
+<span class="nc" id="L298">                        pauseAsync(out);</span>
+                    }
+<span class="nc" id="L300">                }</span>
+            });
+<span class="nc" id="L302">            pendingPlayRequest = null;</span>
+<span class="nc" id="L303">            pendingPauseRequest = out;</span>
+<span class="nc" id="L304">            return out;</span>
+        }
+<span class="pc bpc" id="L306" title="3 of 4 branches missed.">        if (pendingPauseRequest != null &amp;&amp; pendingPauseRequest != out) {</span>
+<span class="nc" id="L307">            pendingPauseRequest.ready(new SuccessCallback&lt;AsyncMedia&gt;() {</span>
+                @Override
+                public void onSucess(AsyncMedia value) {
+<span class="nc bnc" id="L310" title="All 2 branches missed.">                    if (!out.isDone()) {</span>
+<span class="nc" id="L311">                        out.complete(value);</span>
+                    }
+<span class="nc" id="L313">                }</span>
+<span class="nc" id="L314">            }).except(new SuccessCallback&lt;Throwable&gt;() {</span>
+                @Override
+                public void onSucess(Throwable value) {
+<span class="nc bnc" id="L317" title="All 2 branches missed.">                    if (!out.isDone()) {</span>
+<span class="nc" id="L318">                        out.error(value);</span>
+                    }
+<span class="nc" id="L320">                }</span>
+            });
+<span class="nc" id="L322">            return out;</span>
+        } else {
+<span class="fc" id="L324">            pendingPauseRequest = out;</span>
+        }
+
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">        if (getState() == State.Paused) {</span>
+<span class="nc" id="L328">            out.complete(this);</span>
+<span class="nc" id="L329">            return out;</span>
+        }
+
+<span class="fc" id="L332">        class StateChangeListener implements ActionListener&lt;MediaStateChangeEvent&gt; {</span>
+            ActionListener&lt;MediaErrorEvent&gt; onError;
+
+            @Override
+            public void actionPerformed(MediaStateChangeEvent evt) {
+
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">                if (!out.isDone()) {</span>
+<span class="pc bpc" id="L339" title="1 of 2 branches missed.">                    if (evt.getNewState() == State.Paused) {</span>
+<span class="fc" id="L340">                        stateChangeListeners.removeListener(this);</span>
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">                        if (onError != null) {</span>
+<span class="fc" id="L342">                            errorListeners.removeListener(onError);</span>
+                        }
+<span class="fc" id="L344">                        out.complete(AbstractMedia.this);</span>
+                    }
+                }
+
+<span class="fc" id="L348">            }</span>
+
+        }
+
+<span class="fc" id="L352">        final StateChangeListener onStateChange = new StateChangeListener();</span>
+<span class="fc" id="L353">        ActionListener&lt;MediaErrorEvent&gt; onError = new ActionListener&lt;MediaErrorEvent&gt;() {</span>
+            @Override
+            public void actionPerformed(MediaErrorEvent evt) {
+<span class="nc" id="L356">                stateChangeListeners.removeListener(onStateChange);</span>
+<span class="nc" id="L357">                errorListeners.removeListener(this);</span>
+<span class="nc bnc" id="L358" title="All 2 branches missed.">                if (!out.isDone()) {</span>
+<span class="nc" id="L359">                    out.error(evt.getMediaException());</span>
+                }
+<span class="nc" id="L361">            }</span>
+
+        };
+<span class="fc" id="L364">        onStateChange.onError = onError;</span>
+<span class="fc" id="L365">        stateChangeListeners.addListener(onStateChange);</span>
+<span class="fc" id="L366">        errorListeners.addListener(onError);</span>
+<span class="fc" id="L367">        pauseImpl();</span>
+
+<span class="fc" id="L369">        return out;</span>
+    }
+
+    /**
+     * Initiates a play request on the media.
+     */
+    protected abstract void playImpl();
+
+    /**
+     * Initiates a pause request on the media.
+     */
+    protected abstract void pauseImpl();
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public final void play() {
+<span class="fc" id="L387">        playAsync();</span>
+<span class="fc" id="L388">    }</span>
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public final void pause() {
+<span class="fc" id="L395">        pauseAsync();</span>
+<span class="fc" id="L396">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

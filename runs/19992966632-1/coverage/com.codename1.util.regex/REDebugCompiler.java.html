@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>REDebugCompiler.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util.regex</a> &gt; <span class="el_source">REDebugCompiler.java</span></div><h1>REDebugCompiler.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.codename1.util.regex;
+
+import java.io.PrintStream;
+import java.util.HashMap;
+
+/**
+ * A subclass of RECompiler which can dump a regular expression program
+ * for debugging purposes.
+ *
+ * @author &lt;a href=&quot;mailto:jonl@muppetlabs.com&quot;&gt;Jonathan Locke&lt;/a&gt;
+ */
+<span class="nc" id="L29">public class REDebugCompiler extends RECompiler {</span>
+    /**
+     * Mapping from opcodes to descriptive strings
+     */
+<span class="nc" id="L33">    static HashMap hashOpcode = new HashMap();</span>
+
+    static {
+<span class="nc" id="L36">        hashOpcode.put(Integer.valueOf(RE.OP_RELUCTANTSTAR), &quot;OP_RELUCTANTSTAR&quot;);</span>
+<span class="nc" id="L37">        hashOpcode.put(Integer.valueOf(RE.OP_RELUCTANTPLUS), &quot;OP_RELUCTANTPLUS&quot;);</span>
+<span class="nc" id="L38">        hashOpcode.put(Integer.valueOf(RE.OP_RELUCTANTMAYBE), &quot;OP_RELUCTANTMAYBE&quot;);</span>
+<span class="nc" id="L39">        hashOpcode.put(Integer.valueOf(RE.OP_END), &quot;OP_END&quot;);</span>
+<span class="nc" id="L40">        hashOpcode.put(Integer.valueOf(RE.OP_BOL), &quot;OP_BOL&quot;);</span>
+<span class="nc" id="L41">        hashOpcode.put(Integer.valueOf(RE.OP_EOL), &quot;OP_EOL&quot;);</span>
+<span class="nc" id="L42">        hashOpcode.put(Integer.valueOf(RE.OP_ANY), &quot;OP_ANY&quot;);</span>
+<span class="nc" id="L43">        hashOpcode.put(Integer.valueOf(RE.OP_ANYOF), &quot;OP_ANYOF&quot;);</span>
+<span class="nc" id="L44">        hashOpcode.put(Integer.valueOf(RE.OP_BRANCH), &quot;OP_BRANCH&quot;);</span>
+<span class="nc" id="L45">        hashOpcode.put(Integer.valueOf(RE.OP_ATOM), &quot;OP_ATOM&quot;);</span>
+<span class="nc" id="L46">        hashOpcode.put(Integer.valueOf(RE.OP_STAR), &quot;OP_STAR&quot;);</span>
+<span class="nc" id="L47">        hashOpcode.put(Integer.valueOf(RE.OP_PLUS), &quot;OP_PLUS&quot;);</span>
+<span class="nc" id="L48">        hashOpcode.put(Integer.valueOf(RE.OP_MAYBE), &quot;OP_MAYBE&quot;);</span>
+<span class="nc" id="L49">        hashOpcode.put(Integer.valueOf(RE.OP_NOTHING), &quot;OP_NOTHING&quot;);</span>
+<span class="nc" id="L50">        hashOpcode.put(Integer.valueOf(RE.OP_GOTO), &quot;OP_GOTO&quot;);</span>
+<span class="nc" id="L51">        hashOpcode.put(Integer.valueOf(RE.OP_CONTINUE), &quot;OP_CONTINUE&quot;);</span>
+<span class="nc" id="L52">        hashOpcode.put(Integer.valueOf(RE.OP_ESCAPE), &quot;OP_ESCAPE&quot;);</span>
+<span class="nc" id="L53">        hashOpcode.put(Integer.valueOf(RE.OP_OPEN), &quot;OP_OPEN&quot;);</span>
+<span class="nc" id="L54">        hashOpcode.put(Integer.valueOf(RE.OP_CLOSE), &quot;OP_CLOSE&quot;);</span>
+<span class="nc" id="L55">        hashOpcode.put(Integer.valueOf(RE.OP_BACKREF), &quot;OP_BACKREF&quot;);</span>
+<span class="nc" id="L56">        hashOpcode.put(Integer.valueOf(RE.OP_POSIXCLASS), &quot;OP_POSIXCLASS&quot;);</span>
+<span class="nc" id="L57">        hashOpcode.put(Integer.valueOf(RE.OP_OPEN_CLUSTER), &quot;OP_OPEN_CLUSTER&quot;);</span>
+<span class="nc" id="L58">        hashOpcode.put(Integer.valueOf(RE.OP_CLOSE_CLUSTER), &quot;OP_CLOSE_CLUSTER&quot;);</span>
+<span class="nc" id="L59">    }</span>
+
+    /**
+     * Returns a descriptive string for an opcode.
+     *
+     * @param opcode Opcode to convert to a string
+     * @return Description of opcode
+     */
+    String opcodeToString(char opcode) {
+        // Get string for opcode
+<span class="nc" id="L69">        String ret = (String) hashOpcode.get(Integer.valueOf(opcode));</span>
+
+        // Just in case we have a corrupt program
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (ret == null) {</span>
+<span class="nc" id="L73">            ret = &quot;OP_????&quot;;</span>
+        }
+<span class="nc" id="L75">        return ret;</span>
+    }
+
+    /**
+     * Return a string describing a (possibly unprintable) character.
+     *
+     * @param c Character to convert to a printable representation
+     * @return String representation of character
+     */
+    String charToString(char c) {
+        // If it's unprintable, convert to '\###'
+<span class="nc bnc" id="L86" title="All 4 branches missed.">        if (c &lt; ' ' || c &gt; 127) {</span>
+<span class="nc" id="L87">            return &quot;\\&quot; + (int) c;</span>
+        }
+
+        // Return the character as a string
+<span class="nc" id="L91">        return String.valueOf(c);</span>
+    }
+
+    /**
+     * Returns a descriptive string for a node in a regular expression program.
+     *
+     * @param node Node to describe
+     * @return Description of node
+     */
+    String nodeToString(int node) {
+        // Get opcode and opdata for node
+<span class="nc" id="L102">        char opcode = instruction[node /* + RE.offsetOpcode */];</span>
+<span class="nc" id="L103">        int opdata = instruction[node + RE.offsetOpdata];</span>
+
+        // Return opcode as a string and opdata value
+<span class="nc" id="L106">        return opcodeToString(opcode) + &quot;, opdata = &quot; + opdata;</span>
+    }
+
+
+    /**
+     * Dumps the current program to a {@link PrintStream}.
+     *
+     * @param p PrintStream for program dump output
+     */
+    public void dumpProgram(PrintStream p) {
+        // Loop through the whole program
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        for (int i = 0; i &lt; lenInstruction; ) {</span>
+            // Get opcode, opdata and next fields of current program node
+<span class="nc" id="L119">            char opcode = instruction[i /* + RE.offsetOpcode */];</span>
+<span class="nc" id="L120">            char opdata = instruction[i + RE.offsetOpdata];</span>
+<span class="nc" id="L121">            int next = (short) instruction[i + RE.offsetNext];</span>
+
+            // Display the current program node
+<span class="nc" id="L124">            p.print(i + &quot;. &quot; + nodeToString(i) + &quot;, next = &quot;);</span>
+
+            // If there's no next, say 'none', otherwise give absolute index of next node
+<span class="nc bnc" id="L127" title="All 2 branches missed.">            if (next == 0) {</span>
+<span class="nc" id="L128">                p.print(&quot;none&quot;);</span>
+            } else {
+<span class="nc" id="L130">                p.print(i + next);</span>
+            }
+
+            // Move past node
+<span class="nc" id="L134">            i += RE.nodeSize;</span>
+
+            // If character class
+<span class="nc bnc" id="L137" title="All 2 branches missed.">            if (opcode == RE.OP_ANYOF) {</span>
+                // Opening bracket for start of char class
+<span class="nc" id="L139">                p.print(&quot;, [&quot;);</span>
+
+                // Show each range in the char class
+                // int rangeCount = opdata;
+<span class="nc bnc" id="L143" title="All 2 branches missed.">                for (int r = 0; r &lt; opdata; r++) {</span>
+                    // Get first and last chars in range
+<span class="nc" id="L145">                    char charFirst = instruction[i++];</span>
+<span class="nc" id="L146">                    char charLast = instruction[i++];</span>
+
+                    // Print range as X-Y, unless range encompasses only one char
+<span class="nc bnc" id="L149" title="All 2 branches missed.">                    if (charFirst == charLast) {</span>
+<span class="nc" id="L150">                        p.print(charToString(charFirst));</span>
+                    } else {
+<span class="nc" id="L152">                        p.print(charToString(charFirst) + &quot;-&quot; + charToString(charLast));</span>
+                    }
+                }
+
+                // Annotate the end of the char class
+<span class="nc" id="L157">                p.print(&quot;]&quot;);</span>
+            }
+
+            // If atom
+<span class="nc bnc" id="L161" title="All 2 branches missed.">            if (opcode == RE.OP_ATOM) {</span>
+                // Open quote
+<span class="nc" id="L163">                p.print(&quot;, \&quot;&quot;);</span>
+
+                // Print each character in the atom
+<span class="nc bnc" id="L166" title="All 2 branches missed.">                for (int len = opdata; len-- != 0; ) {</span>
+<span class="nc" id="L167">                    p.print(charToString(instruction[i++]));</span>
+                }
+
+                // Close quote
+<span class="nc" id="L171">                p.print(&quot;\&quot;&quot;);</span>
+            }
+
+            // Print a newline
+<span class="nc" id="L175">            p.println();</span>
+<span class="nc" id="L176">        }</span>
+<span class="nc" id="L177">    }</span>
+
+    /**
+     * Dumps the current program to a &lt;code&gt;System.out&lt;/code&gt;.
+     */
+    public void dumpProgram() {
+<span class="nc" id="L183">        PrintStream w = new PrintStream(System.out);</span>
+<span class="nc" id="L184">        dumpProgram(w);</span>
+<span class="nc" id="L185">        w.flush();</span>
+<span class="nc" id="L186">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

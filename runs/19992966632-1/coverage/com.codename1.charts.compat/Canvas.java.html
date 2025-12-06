@@ -1,0 +1,287 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Canvas.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.compat</a> &gt; <span class="el_source">Canvas.java</span></div><h1>Canvas.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.charts.compat;
+
+
+import com.codename1.charts.compat.GradientDrawable.Orientation;
+import com.codename1.charts.util.ColorUtil;
+import com.codename1.io.Log;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Image;
+import com.codename1.ui.Stroke;
+import com.codename1.ui.Transform;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.geom.Rectangle2D;
+import com.codename1.ui.geom.Shape;
+
+/**
+ * An internal compatibility class for use by the Charts library.  Since the
+ * library was ported from an Android library, it made use of Canvas and Paint,
+ * so rather than rewriting all of this, we added a Canvas and Paint compatibility
+ * layer.
+ * &lt;p&gt;
+ * **DO NOT USE DIRECTLY**
+ *
+ * @author shannah
+ * @deprecated
+ */
+public class Canvas {
+
+    public com.codename1.ui.Graphics g;
+
+<span class="fc" id="L54">    public Rectangle bounds = null;</span>
+<span class="fc" id="L55">    public int absoluteX = 0;</span>
+<span class="fc" id="L56">    public int absoluteY = 0;</span>
+
+<span class="fc" id="L58">    public Canvas() {</span>
+<span class="fc" id="L59">        Display d = Display.getInstance();</span>
+<span class="fc" id="L60">        bounds = new Rectangle(0, 0, d.getDisplayWidth(), d.getDisplayHeight());</span>
+<span class="fc" id="L61">        absoluteX = bounds.getX();</span>
+<span class="fc" id="L62">        absoluteY = bounds.getY();</span>
+
+<span class="fc" id="L64">    }</span>
+
+
+    public void getClipBounds(Rectangle mRect) {
+<span class="nc" id="L68">        int[] bounds = g.getClip();</span>
+<span class="nc" id="L69">        mRect.setBounds(bounds[0], bounds[1], bounds[2], bounds[3]);</span>
+
+<span class="nc" id="L71">    }</span>
+
+
+    private void applyPaint(Paint paint) {
+<span class="fc" id="L75">        applyPaint(paint, false);</span>
+<span class="fc" id="L76">    }</span>
+
+
+    private void applyPaint(Paint paint, boolean forText) {
+        //Log.p(&quot;Applyingn paint : &quot;+paint);
+<span class="fc" id="L81">        g.setColor(paint.getColor());</span>
+<span class="fc" id="L82">        int alpha = ColorUtil.alpha(paint.getColor());</span>
+<span class="fc" id="L83">        g.concatenateAlpha(alpha);</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (forText) {</span>
+<span class="fc" id="L85">            Font typeFace = paint.getTypeface();</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">            if (typeFace != null) {</span>
+
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                if (typeFace.getSize() != (int) paint.getTextSize()) {</span>
+<span class="fc" id="L89">                    typeFace = typeFace.derive(paint.getTextSize(), Font.STYLE_PLAIN);</span>
+
+                }
+<span class="fc" id="L92">                g.setFont(typeFace);</span>
+
+            } else {
+<span class="nc" id="L95">                g.setFont(null);</span>
+            }
+        }
+
+
+<span class="fc" id="L100">    }</span>
+
+
+    public void drawRect(float left, float top, float right, float bottom, Paint paint) {
+<span class="fc" id="L104">        applyPaint(paint);</span>
+<span class="fc" id="L105">        Paint.Style style = paint.getStyle();</span>
+<span class="fc bfc" id="L106" title="All 2 branches covered.">        if (Paint.Style.FILL.equals(style)) {</span>
+            //Log.p(&quot;Filling it&quot;);
+<span class="fc" id="L108">            g.fillRect((int) left, (int) top, (int) right - (int) left, (int) bottom - (int) top);</span>
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        } else if (Paint.Style.STROKE.equals(style)) {</span>
+<span class="fc" id="L110">            g.drawRect((int) left, (int) top, (int) right - (int) left, (int) bottom - (int) top);</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        } else if (Paint.Style.FILL_AND_STROKE.equals(style)) {</span>
+<span class="nc" id="L112">            g.fillRect((int) left, (int) top, (int) right - (int) left, (int) bottom - (int) top);</span>
+            //g.drawRect((int)left+bounds.getX(), (int)top+bounds.getY(), (int)right-(int)left, (int)bottom-(int)top);
+        }
+
+
+<span class="fc" id="L117">    }</span>
+
+    public void drawText(String string, float x, float y, Paint paint) {
+<span class="fc" id="L120">        applyPaint(paint, true);</span>
+<span class="fc" id="L121">        int offX = 0;</span>
+<span class="fc" id="L122">        int offY = 0;</span>
+<span class="fc bfc" id="L123" title="All 2 branches covered.">        if (paint.getTextAlign() == Component.CENTER) {</span>
+<span class="fc" id="L124">            offX = -g.getFont().stringWidth(string) / 2;</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        } else if (paint.getTextAlign() == Component.RIGHT) {</span>
+<span class="nc" id="L126">            offX = -g.getFont().stringWidth(string);</span>
+        }
+<span class="fc" id="L128">        int h = g.getFont().getAscent();</span>
+
+<span class="fc" id="L130">        g.drawString(string, (int) x + offX, (int) y - h + offY);</span>
+<span class="fc" id="L131">    }</span>
+
+    public int getHeight() {
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (bounds != null) {</span>
+<span class="fc" id="L135">            return bounds.getHeight();</span>
+        }
+<span class="nc" id="L137">        return g.getClipHeight();</span>
+    }
+
+    public int getWidth() {
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (bounds != null) {</span>
+<span class="fc" id="L142">            return bounds.getWidth();</span>
+        }
+<span class="nc" id="L144">        return g.getClipWidth();</span>
+    }
+
+
+    private Stroke getStroke(Paint paint) {
+<span class="fc" id="L149">        return new Stroke(</span>
+<span class="fc" id="L150">                paint.getStrokeWidth(),</span>
+<span class="fc" id="L151">                paint.getStrokeCap(),</span>
+<span class="fc" id="L152">                paint.getStrokeJoin(),</span>
+<span class="fc" id="L153">                paint.getStrokeMiter()</span>
+        );
+
+    }
+
+
+    public void drawPath(Shape p, Paint paint) {
+
+<span class="fc" id="L161">        applyPaint(paint);</span>
+<span class="fc" id="L162">        Paint.Style style = paint.getStyle();</span>
+<span class="pc bpc" id="L163" title="1 of 2 branches missed.">        if (style.equals(Paint.Style.FILL)) {</span>
+<span class="nc" id="L164">            g.fillShape(p);</span>
+            //g.drawShape(p, getStroke(paint));
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        } else if (style.equals(Paint.Style.STROKE)) {</span>
+<span class="fc" id="L167">            g.drawShape(p, getStroke(paint));</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        } else if (style.equals(Paint.Style.FILL_AND_STROKE)) {</span>
+<span class="nc" id="L169">            g.fillShape(p);</span>
+<span class="nc" id="L170">            g.drawShape(p, getStroke(paint));</span>
+        }
+
+<span class="fc" id="L173">    }</span>
+
+    public void drawLine(float x1, float y1, float x2, float y2, Paint paint) {
+<span class="fc" id="L176">        applyPaint(paint);</span>
+<span class="fc" id="L177">        g.drawLine((int) x1, (int) y1, (int) x2, (int) y2);</span>
+<span class="fc" id="L178">    }</span>
+
+    public void rotate(float angle, float x, float y) {
+        //Log.p(&quot;Rotating by angle &quot;+angle);
+<span class="fc" id="L182">        Transform t = g.getTransform();</span>
+<span class="fc" id="L183">        t.rotate((float) (angle * Math.PI / 180.0), x + absoluteX - bounds.getX(), y + absoluteY - bounds.getY());</span>
+<span class="fc" id="L184">        g.setTransform(t);</span>
+
+<span class="fc" id="L186">    }</span>
+
+    public void scale(float x, float y) {
+<span class="nc" id="L189">        Transform t = g.getTransform();</span>
+<span class="nc" id="L190">        t.translate(bounds.getX(), bounds.getY());</span>
+<span class="nc" id="L191">        t.scale(x, y);</span>
+<span class="nc" id="L192">        t.translate(-bounds.getX(), -bounds.getY());</span>
+<span class="nc" id="L193">        g.setTransform(t);</span>
+<span class="nc" id="L194">    }</span>
+
+    public void translate(float x, float y) {
+<span class="nc" id="L197">        Transform t = g.getTransform();</span>
+<span class="nc" id="L198">        t.translate(x, y);</span>
+<span class="nc" id="L199">        g.setTransform(t);</span>
+<span class="nc" id="L200">    }</span>
+
+    public void drawCircle(float cx, float cy, float r, Paint paint) {
+<span class="nc" id="L203">        drawArc(new Rectangle2D(cx - r, cy - r, 2 * r, 2 * r), 0, 360, true, paint);</span>
+
+<span class="nc" id="L205">    }</span>
+
+
+    public void drawArc(Rectangle2D oval, float currentAngle, float sweepAngle, boolean useCenter, Paint paint) {
+<span class="nc" id="L209">        applyPaint(paint);</span>
+<span class="nc" id="L210">        Paint.Style style = paint.getStyle();</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        if (Paint.Style.FILL.equals(style)) {</span>
+<span class="nc" id="L212">            g.fillArc((int) Math.round(oval.getX()), (int) Math.round(oval.getY()), (int) Math.round(oval.getWidth()), (int) Math.round(oval.getHeight()), -(int) Math.floor(currentAngle), -(int) Math.ceil(sweepAngle));</span>
+
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        } else if (Paint.Style.STROKE.equals(style)) {</span>
+<span class="nc" id="L215">            g.drawArc((int) Math.round(oval.getX()), (int) Math.round(oval.getY()), (int) Math.round(oval.getWidth()), (int) Math.round(oval.getHeight()), -(int) Math.floor(currentAngle), -(int) Math.ceil(sweepAngle));</span>
+
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        } else if (Paint.Style.FILL_AND_STROKE.equals(style)) {</span>
+<span class="nc" id="L218">            g.fillArc((int) Math.round(oval.getX()), (int) Math.round(oval.getY()), (int) Math.round(oval.getWidth()), (int) Math.round(oval.getHeight()), -(int) Math.floor(currentAngle), -(int) Math.ceil(sweepAngle));</span>
+<span class="nc" id="L219">            g.drawArc((int) Math.round(oval.getX()), (int) Math.round(oval.getY()), (int) Math.round(oval.getWidth()), (int) Math.round(oval.getHeight()), -(int) Math.floor(currentAngle), -(int) Math.ceil(sweepAngle));</span>
+
+        }
+
+<span class="nc" id="L223">    }</span>
+
+    public void drawArcWithGradient(Rectangle2D oval, float currentAngle, float sweepAngle, boolean useCenter, Paint paint, GradientDrawable gradient) {
+<span class="nc" id="L226">        g.fillRadialGradient(gradient.colors[1], gradient.colors[0], (int) oval.getX(), (int) oval.getY(), (int) oval.getWidth(), (int) oval.getHeight(), -(int) Math.floor(currentAngle), -(int) Math.ceil(sweepAngle));</span>
+<span class="nc" id="L227">    }</span>
+
+    public void drawPoint(Float get, Float get0, Paint paint) {
+<span class="nc" id="L230">        throw new RuntimeException(&quot;Not supported yet.&quot;); //To change body of generated methods, choose Tools | Templates.</span>
+    }
+
+    public void drawRoundRect(Rectangle2D rect, float rx, float ry, Paint mPaint) {
+<span class="nc" id="L234">        applyPaint(mPaint);</span>
+<span class="nc" id="L235">        Paint.Style style = mPaint.getStyle();</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">        if (Paint.Style.FILL.equals(style)) {</span>
+<span class="nc" id="L237">            g.fillRoundRect((int) rect.getX(), (int) rect.getY(), (int) (rect.getWidth()), (int) (rect.getHeight()), (int) rx, (int) ry);</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        } else if (Paint.Style.STROKE.equals(style)) {</span>
+<span class="nc" id="L239">            g.drawRoundRect((int) rect.getX(), (int) rect.getY(), (int) (rect.getWidth()), (int) (rect.getHeight()), (int) rx, (int) ry);</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        } else if (Paint.Style.FILL_AND_STROKE.equals(style)) {</span>
+<span class="nc" id="L241">            g.fillRoundRect((int) rect.getX(), (int) rect.getY(), (int) (rect.getWidth()), (int) (rect.getHeight()), (int) rx, (int) ry);</span>
+<span class="nc" id="L242">            g.drawRoundRect((int) rect.getX(), (int) rect.getY(), getWidth(), (int) (rect.getHeight()), (int) rx, (int) ry);</span>
+        }
+<span class="nc" id="L244">        g.drawRoundRect((int) rect.getX(), (int) rect.getY(), (int) (rect.getWidth()), (int) (rect.getHeight()), (int) rx, (int) ry);</span>
+
+
+<span class="nc" id="L247">    }</span>
+
+    public void drawBitmap(Image img, float left, float top, Paint paint) {
+<span class="nc" id="L250">        g.drawImage(img, (int) left, (int) top);</span>
+<span class="nc" id="L251">    }</span>
+
+    void drawGradient(GradientDrawable gradient) {
+<span class="fc" id="L254">        Orientation o = gradient.orientation;</span>
+<span class="fc" id="L255">        Rectangle r = gradient.bounds;</span>
+<span class="fc" id="L256">        int[] colors = gradient.colors;</span>
+<span class="fc" id="L257">        int clen = colors.length;</span>
+
+<span class="pc bpc" id="L259" title="2 of 4 branches missed.">        if (Orientation.TOP_BOTTOM.equals(o) || Orientation.BOTTOM_TOP.equals(o)) {</span>
+
+<span class="nc bnc" id="L261" title="All 2 branches missed.">            if (Orientation.BOTTOM_TOP.equals(o)) {</span>
+<span class="nc" id="L262">                colors = new int[clen];</span>
+
+<span class="nc bnc" id="L264" title="All 2 branches missed.">                for (int i = 0; i &lt; clen; i++) {</span>
+
+<span class="nc" id="L266">                    colors[i] = gradient.colors[clen - i - 1];</span>
+                }
+            }
+<span class="nc" id="L269">            g.fillLinearGradient(colors[0], colors[clen - 1], r.getX(), r.getY(), r.getWidth(), r.getHeight(), false);</span>
+
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        } else if (Orientation.LEFT_RIGHT.equals(o)) {</span>
+<span class="fc" id="L272">            g.fillLinearGradient(gradient.colors[0], gradient.colors[clen - 1], r.getX(), r.getY(), r.getWidth(), r.getHeight(), true);</span>
+        } else {
+<span class="fc" id="L274">            Log.p(&quot;Gradient with type &quot; + o + &quot; not implemented yet.  Just filling solid rect&quot;);</span>
+<span class="fc" id="L275">            g.setColor(gradient.colors[0]);</span>
+<span class="fc" id="L276">            g.fillRect(r.getX(), r.getY(), r.getWidth(), r.getHeight());</span>
+        }
+
+
+<span class="fc" id="L280">    }</span>
+
+    public boolean isShapeClipSupported() {
+<span class="nc" id="L283">        return g.isShapeClipSupported();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

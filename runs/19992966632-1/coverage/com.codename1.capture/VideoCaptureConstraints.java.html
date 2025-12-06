@@ -1,0 +1,556 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VideoCaptureConstraints.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.capture</a> &gt; <span class="el_source">VideoCaptureConstraints.java</span></div><h1>VideoCaptureConstraints.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.capture;
+
+/**
+ * Encapsulates constraints that can be used for capturing video.
+ *
+ * &lt;p&gt;You should set
+ * the preferred constraints then if they are supported using {@link #isSupported()}, {@link #isSizeSupported()}, {@link #isQualitySupported() },
+ * {@link #isMaxLengthSupported()}, or {@link #isMaxFileSizeSupported() }.  If all of the constraints
+ * are supported, then, {@link #isSupported() } will return true, and the resolved
+ * constraints ({@link #getWidth() }, {@link #getHeight() }, {@link #getQuality() }, {@link #getMaxLength() },
+ * {@link #getMaxLength() }) will match their preferred counterparts.  &lt;/p&gt;
+ *
+ * &lt;p&gt;If {@link #isSupported() } is {@literal false}, then at least one of the constraints
+ * is not supported by the system.  You can check support for a specific constraint using
+ * {@link #isSizeSupported() }, {@link #isMaxFileSizeSupported() }, {@link #isQualitySupported() },  or {@link #isMaxLengthSupported() }.&lt;/p&gt;
+ *
+ * &lt;h3&gt;Example Using size and duration constraints:&lt;/h3&gt;
+ *
+ * &lt;pre&gt;{@code
+ * // Create capture constraint 320x240, with max length 20 seconds
+ * VideoCaptureConstraints vcc = new VideoCaptureConstraints(320, 240, 20);
+ * if (vcc.isSupported()) {
+ *     // These constraints are fully supported by this platform
+ *     // We can pass them directly to Capture.captureVideo() and the resulting
+ *     // video will match the constraints exactly.
+ *     // At this point, the following conditions are guaranteed to be true:
+ *     // 1. vcc.getPreferredWidth() == vcc.getWidth() == 320
+ *     // 2. vcc.getPreferredHeight() == vcc.getHeight() == 320
+ *     // 3. vcc.getPreferredMaxLength() == vcc.getMaxLength() == 20
+ * } else {
+ *     // At least one of the constraints is not supported.
+ *     // You can find out the &quot;granted&quot; constraints using getWidth(), getHeight(),
+ *     // and getMaxLength().
+ * }
+ * }&lt;/pre&gt;
+ *
+ * &lt;h3&gt;Example Using Quality:&lt;/h3&gt;
+ *
+ * &lt;pre&gt;{@code
+ * //
+ * VideoCaptureConstraints vcc = new VideoCaptureConstraints(VideoCaptureConstraints.QUALITY_LOW);
+ * if (vcc.isSupported()) {
+ *     // This platform supports a 'low quality' setting.
+ *     //  Low quality generally means a smaller file size.
+ * } else {
+ *     // Low quality constraint is not supported.
+ * }
+ * }&lt;/pre&gt;
+ *
+ * &lt;h3&gt;Platform Support Status&lt;/h3&gt;
+ * &lt;p&gt;&lt;strong&gt;Android&lt;/strong&gt; {@link #preferredQuality(int) }, {@link #preferredMaxLength(int) },
+ * and {@link #preferredMaxFileSize(long) } natively.  It doesn't fully support specific widths and
+ * heights, but if {@link #preferredWidth(int) }, and {@link #preferredHeight(int) } are supplied, it will
+ * translate these into either {@link #QUALITY_LOW}, or {@link #QUALITY_HIGH}.&lt;/p&gt;
+ *
+ * &lt;p&gt;&lt;strong&gt;Javascript&lt;/strong&gt; supports ....
+ * TODO  Add support for javascript and others &lt;/p&gt;
+ *
+ * @author shannah
+ * @see Capture#captureVideo(com.codename1.capture.VideoCaptureConstraints)
+ * @see Capture#captureVideo(com.codename1.capture.VideoCaptureConstraints, com.codename1.ui.events.ActionListener)
+ * @since 7.0
+ */
+public class VideoCaptureConstraints {
+
+    public static final int QUALITY_LOW = 1;
+    public static final int QUALITY_HIGH = 2;
+
+
+    /**
+     * The compiler, which will be set by the implementation at initialization time.
+     */
+    private static Compiler compiler;
+    boolean compiled;
+    private int maxLength;
+    private int width;
+    private int height;
+    private int quality;
+    private long maxFileSize;
+    private int preferredMaxLength;
+    private int preferredWidth;
+    private int preferredHeight;
+    private int preferredQuality;
+    private long preferredMaxFileSize;
+    /**
+     * Creates a new video cosntraint with no constraints specified.
+     */
+<span class="fc" id="L110">    public VideoCaptureConstraints() {</span>
+
+<span class="fc" id="L112">    }</span>
+
+    /**
+     * Copy constructor.
+     *
+     * @param toCopy
+     */
+<span class="nc" id="L119">    public VideoCaptureConstraints(VideoCaptureConstraints toCopy) {</span>
+<span class="nc" id="L120">        this.preferredHeight = toCopy.preferredHeight;</span>
+<span class="nc" id="L121">        this.preferredWidth = toCopy.preferredWidth;</span>
+<span class="nc" id="L122">        this.preferredMaxLength = toCopy.preferredMaxLength;</span>
+<span class="nc" id="L123">        this.width = toCopy.width;</span>
+<span class="nc" id="L124">        this.height = toCopy.height;</span>
+<span class="nc" id="L125">        this.maxLength = toCopy.maxLength;</span>
+<span class="nc" id="L126">        this.compiled = toCopy.compiled;</span>
+<span class="nc" id="L127">        this.quality = toCopy.quality;</span>
+<span class="nc" id="L128">        this.preferredQuality = toCopy.preferredQuality;</span>
+<span class="nc" id="L129">        this.maxFileSize = toCopy.maxFileSize;</span>
+<span class="nc" id="L130">        this.preferredMaxFileSize = toCopy.preferredMaxFileSize;</span>
+<span class="nc" id="L131">    }</span>
+
+    /**
+     * Creates a new constraint with the given quality constraint.
+     *
+     * @param quality The quality of the constraint.  Should be one of {@link #QUALITY_LOW} or {@link #QUALITY_HIGH}
+     */
+<span class="nc" id="L138">    public VideoCaptureConstraints(int quality) {</span>
+<span class="nc" id="L139">        this.preferredQuality = quality;</span>
+<span class="nc" id="L140">    }</span>
+
+    /**
+     * Creates a new constraints with given preferred values.
+     *
+     * @param width     The preferred width.  Pass {@literal 0} for no constraint.
+     * @param height    The preferred height. Pass {@literal 0} for no constraint.
+     * @param maxLength The preferred max length in seconds. Pass {@literal 0} for no consraint.
+     */
+<span class="nc" id="L149">    public VideoCaptureConstraints(int width, int height, int maxLength) {</span>
+<span class="nc" id="L150">        this.preferredWidth = width;</span>
+<span class="nc" id="L151">        this.preferredHeight = height;</span>
+<span class="nc" id="L152">        this.preferredMaxLength = maxLength;</span>
+<span class="nc" id="L153">    }</span>
+
+    /**
+     * Sets the native platform constraint compiler.  Should be called once during
+     * platform initialization.
+     *
+     * @param cmp
+     * @deprecated Called by the platform.  For internal use only.
+     */
+    public static void init(Compiler cmp) {
+<span class="nc" id="L163">        compiler = cmp;</span>
+<span class="nc" id="L164">    }</span>
+
+    /**
+     * @return
+     */
+    @Override
+    public String toString() {
+<span class="nc" id="L171">        return &quot;VideoCaptureConstraints{&quot; + getWidth() + &quot;x&quot; + getHeight() + &quot; @ &quot; + getMaxLength() + &quot;s, &quot; + getQualityString() + &quot; &quot; + getMaxFileSizeString() + &quot;}&quot;;</span>
+    }
+
+    private String getQualityString() {
+<span class="nc bnc" id="L175" title="All 3 branches missed.">        switch (getQuality()) {</span>
+            case QUALITY_LOW:
+<span class="nc" id="L177">                return &quot;Low quality&quot;;</span>
+            case QUALITY_HIGH:
+<span class="nc" id="L179">                return &quot;High quality&quot;;</span>
+        }
+<span class="nc" id="L181">        return &quot;&quot;;</span>
+    }
+
+    private String getMaxFileSizeString() {
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        if (getMaxFileSize() &gt; 0) {</span>
+<span class="nc" id="L186">            return &quot;&lt;=&quot; + getMaxFileSize() + &quot; bytes&quot;;</span>
+        }
+<span class="nc" id="L188">        return &quot;&quot;;</span>
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">        if (obj.getClass() == VideoCaptureConstraints.class) {</span>
+<span class="fc" id="L194">            VideoCaptureConstraints c = (VideoCaptureConstraints) obj;</span>
+<span class="pc bpc" id="L195" title="5 of 10 branches missed.">            return c.preferredHeight == preferredHeight &amp;&amp;</span>
+                    c.preferredWidth == preferredWidth &amp;&amp;
+                    c.preferredMaxLength == preferredMaxLength &amp;&amp;
+                    c.preferredQuality == preferredQuality &amp;&amp;
+                    c.preferredMaxFileSize == preferredMaxFileSize;
+        }
+<span class="nc" id="L201">        return false;</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L206">        int hash = 7;</span>
+<span class="nc" id="L207">        hash = 29 * hash + this.preferredMaxLength;</span>
+<span class="nc" id="L208">        hash = 29 * hash + this.preferredWidth;</span>
+<span class="nc" id="L209">        hash = 29 * hash + this.preferredHeight;</span>
+<span class="nc" id="L210">        hash = 29 * hash + this.preferredQuality;</span>
+<span class="nc" id="L211">        hash = 29 * hash + (int) this.preferredMaxFileSize;</span>
+<span class="nc" id="L212">        return hash;</span>
+    }
+
+    /**
+     * Gets the maximum file size of the capture in bytes.
+     *
+     * @return The max file size.
+     * @see #preferredMaxFileSize(long)
+     */
+    public long getMaxFileSize() {
+<span class="nc" id="L222">        build();</span>
+<span class="nc" id="L223">        return maxFileSize;</span>
+    }
+
+    /**
+     * Sets the preferred max file size.
+     *
+     * @param size The max file size in bytes.
+     * @return Self for chaining
+     * @see #getMaxFileSize()
+     * @see #isMaxFileSizeSupported()
+     */
+    public VideoCaptureConstraints preferredMaxFileSize(long size) {
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        if (preferredMaxFileSize != size) {</span>
+<span class="nc" id="L236">            preferredMaxFileSize = size;</span>
+<span class="nc" id="L237">            compiled = false;</span>
+        }
+<span class="nc" id="L239">        return this;</span>
+    }
+
+    /**
+     * Gets the preferred max file size.
+     *
+     * @return The preferred max file size, in bytes.
+     * @see #preferredMaxFileSize(long)
+     * @see #getMaxFileSize()
+     * @see #isMaxFileSizeSupported()
+     */
+    public long getPreferredMaxFileSize() {
+<span class="nc" id="L251">        return preferredMaxFileSize;</span>
+    }
+
+    /**
+     * Returns the maximum length (in seconds) of this constraint.
+     *
+     * &lt;p&gt;This method always
+     * returns the resolved value that the platform supports.  If the platform doesn't support
+     * setting the max length of a video capture, then this will return {@literal 0}.  If it supports
+     * the value of {@link #getPreferredMaxLength() }, then this will return the same value.  If it
+     * supports limiting the length of video capture, but it doesn't support the preferred max length value,
+     * then this will return the closest that the platform can provide to the preferred value.&lt;/p&gt;
+     *
+     * &lt;p&gt;Note: This value will be equal to {@link #getPreferredMaxLength() } iff {@link #isMaxLengthSupported() } is {@literal true}.&lt;/p&gt;
+     *
+     * @return the maxLength The maximum length, in seconds, for the video capture.  Zero for no limit.
+     * @see #isMaxLengthSupported()
+     * @see #preferredMaxLength(int)
+     * @see #getPreferredMaxLength()
+     */
+    public int getMaxLength() {
+<span class="nc" id="L272">        build();</span>
+<span class="nc" id="L273">        return maxLength;</span>
+    }
+
+    /**
+     * Set the preferred max length for the video capture in seconds.
+     *
+     * &lt;p&gt;If the platform supports
+     * this value, then {@link #getMaxLength() } will return this same value.  If the platform
+     * does not support this value, then {@link #getMaxLength() } will return the closest value
+     * that the platform supports.&lt;/p&gt;
+     *
+     * @param maxLength the maxLength to set, in seconds. Set {@literal 0} for no limit.
+     * @return Self for chaining
+     * @see #getPreferredMaxLength()
+     * @see #getMaxLength()
+     * @see #isMaxLengthSupported()
+     */
+    public VideoCaptureConstraints preferredMaxLength(int maxLength) {
+<span class="nc bnc" id="L291" title="All 2 branches missed.">        if (maxLength != preferredMaxLength) {</span>
+<span class="nc" id="L292">            this.preferredMaxLength = maxLength;</span>
+<span class="nc" id="L293">            compiled = false;</span>
+        }
+<span class="nc" id="L295">        return this;</span>
+    }
+
+    /**
+     * Gets the preferred max length video capture, in seconds.
+     *
+     * @return The preferred max length, in seconds.
+     * @see #preferredMaxLength(int)
+     * @see #getMaxLength()
+     * @see #isMaxLengthSupported()
+     */
+    public int getPreferredMaxLength() {
+<span class="nc" id="L307">        return preferredMaxLength;</span>
+    }
+
+    /**
+     * Checks to see if the preferred max length specified in this constraint is supported
+     * by the underlying platform.
+     *
+     * @return True if and only if the preferred max length value is supported by the underlying platform.
+     * @see #getMaxLength()
+     * @see #preferredMaxLength(int)
+     * @see #getPreferredMaxLength()
+     */
+    public boolean isMaxLengthSupported() {
+<span class="nc" id="L320">        build();</span>
+<span class="nc bnc" id="L321" title="All 4 branches missed.">        return maxLength == 0 || maxLength == preferredMaxLength;</span>
+    }
+
+    /**
+     * Gets the width constraint that is supported by the platform, and is nearest to the specified
+     * preferred width.  If the platform supports the preferred width constraint, then {@link #getPreferredWidth() }
+     * will be the same as {@link #getWidth() }.  If the platform doesn't support any width constraints at all
+     * then this will return {@link 0}.  If the platform supports some width constraints, but not the constraint specified,
+     * then this will return the most nearest value that the platform supports.
+     *
+     * @return the Platform-supported width of this constraint.
+     * @see #getPreferredWidth()
+     * @see #isSizeSupported()
+     * @see #preferredWidth(int)
+     */
+    public int getWidth() {
+<span class="nc" id="L337">        build();</span>
+<span class="nc" id="L338">        return width;</span>
+    }
+
+    /**
+     * Gets the preferred width constraint.
+     *
+     * @return The preferred width constraint.
+     * @see #getWidth()
+     * @see #preferredWidth(int)
+     * @see #isSizeSupported()
+     */
+    public int getPreferredWidth() {
+<span class="nc" id="L350">        return preferredWidth;</span>
+    }
+
+    /**
+     * Gets the preferred height constraint.
+     *
+     * @return The preferred height constraint.
+     * @see #getHeight()
+     * @see #preferredHeight(int)
+     * @see #isSizeSupported() `
+     */
+    public int getPreferredHeight() {
+<span class="nc" id="L362">        return preferredHeight;</span>
+    }
+
+    /**
+     * Checks if the specified preferred width and height constraints are supported by the platform.
+     *
+     * @return True if the platform supports the width and height constraints specified directly.
+     * @see #getWidth()
+     * @see #getHeight()
+     * @see #getPreferredWidth()
+     * @see #getPreferredHeight()
+     * @see #preferredWidth(int)
+     * @see #preferredHeight(int)
+     * @see #isSupported()
+     */
+    public boolean isSizeSupported() {
+<span class="nc" id="L378">        build();</span>
+<span class="nc bnc" id="L379" title="All 4 branches missed.">        if (preferredWidth == 0 &amp;&amp; preferredHeight == 0) return true;</span>
+<span class="nc bnc" id="L380" title="All 4 branches missed.">        return (width == preferredWidth &amp;&amp; height == preferredHeight);</span>
+    }
+
+    /**
+     * Sets the preferred width constraint.
+     *
+     * @param width the width to set
+     * @see #getWidth()
+     * @see #getPreferredWidth()
+     * @see #isSizeSupported()
+     */
+    public VideoCaptureConstraints preferredWidth(int width) {
+<span class="nc bnc" id="L392" title="All 2 branches missed.">        if (width != preferredWidth) {</span>
+<span class="nc" id="L393">            this.preferredWidth = width;</span>
+<span class="nc" id="L394">            compiled = false;</span>
+        }
+<span class="nc" id="L396">        return this;</span>
+    }
+
+    /**
+     * Gets the platform-supported height constraint.  If the platform supports
+     * the preferred height constraint, then this will return the same value
+     * as {@link #getPreferredHeight() }.  If the platform doesn't support any
+     * height constraints, then this will return {@literal 0}.  If the platform
+     * supports height constraints, but not the specific preferred height value, then
+     * this will return the nearest value that is supported by the platform.
+     *
+     * @return the platform-supported height constraint.
+     * @see #getPreferredHeight()
+     * @see #preferredHeight(int)
+     * @see #isSizeSupported()
+     */
+    public int getHeight() {
+<span class="nc" id="L413">        build();</span>
+<span class="nc" id="L414">        return height;</span>
+    }
+
+    /**
+     * Sets the preferred height constraint.
+     *
+     * @param height the height to set
+     * @see #getPreferredHeight()
+     * @see #getHeight()
+     * @see #isSizeSupported()
+     */
+    public VideoCaptureConstraints preferredHeight(int height) {
+<span class="nc bnc" id="L426" title="All 2 branches missed.">        if (height != preferredHeight) {</span>
+<span class="nc" id="L427">            this.preferredHeight = height;</span>
+<span class="nc" id="L428">            compiled = false;</span>
+        }
+<span class="nc" id="L430">        return this;</span>
+    }
+
+    /**
+     * Gets the preferred quality of the recording.
+     *
+     * @return May be one of {@link #QUALITY_LOW}, {@link #QUALITY_HIGH}, or {@literal 0}.
+     * @see #preferredQuality(int)
+     * @see #isQualitySupported()
+     * @see #getQuality()
+     */
+    public int getPreferredQuality() {
+<span class="nc" id="L442">        return preferredQuality;</span>
+    }
+
+    /**
+     * Gets the quality of the recording.
+     *
+     * @return May be one of {@link #QUALITY_LOW}, {@link #QUALITY_HIGH}, or {@literal 0}.
+     * @see #getPreferredQuality()
+     * @see #preferredQuality(int)
+     * @see #isQualitySupported()
+     */
+    public int getQuality() {
+<span class="nc" id="L454">        build();</span>
+<span class="nc" id="L455">        return quality;</span>
+    }
+
+    /**
+     * Sets the preferred quality of the video recording.
+     *
+     * @param quality May be one of {@link #QUALITY_LOW}, {@link #QUALITY_HIGH}, or {@literal 0}.
+     * @return Self for chaining
+     * @see #getQuality()
+     * @see #getPreferredQuality()
+     * @see #isQualitySupported()
+     */
+    public VideoCaptureConstraints preferredQuality(int quality) {
+<span class="nc bnc" id="L468" title="All 2 branches missed.">        if (quality != preferredQuality) {</span>
+<span class="nc" id="L469">            preferredQuality = quality;</span>
+<span class="nc" id="L470">            compiled = false;</span>
+        }
+<span class="nc" id="L472">        return this;</span>
+    }
+
+    /**
+     * Builds the constraint.  This will defer to the platform's compiler to
+     * figure out the supported constraint values.
+     *
+     * @return
+     */
+    private VideoCaptureConstraints build() {
+<span class="nc bnc" id="L482" title="All 2 branches missed.">        if (compiled) return this;</span>
+<span class="nc bnc" id="L483" title="All 2 branches missed.">        if (compiler == null) {</span>
+<span class="nc" id="L484">            this.height = 0;</span>
+<span class="nc" id="L485">            this.width = 0;</span>
+<span class="nc" id="L486">            this.maxLength = 0;</span>
+<span class="nc" id="L487">            this.quality = 0;</span>
+<span class="nc" id="L488">            this.maxFileSize = 0;</span>
+        } else {
+<span class="nc" id="L490">            VideoCaptureConstraints result = compiler.compile(this);</span>
+<span class="nc" id="L491">            width = result.preferredWidth;</span>
+<span class="nc" id="L492">            height = result.preferredHeight;</span>
+<span class="nc" id="L493">            maxLength = result.preferredMaxLength;</span>
+<span class="nc" id="L494">            quality = result.preferredQuality;</span>
+<span class="nc" id="L495">            maxFileSize = result.preferredMaxFileSize;</span>
+        }
+<span class="nc" id="L497">        compiled = true;</span>
+<span class="nc" id="L498">        return this;</span>
+    }
+
+    /**
+     * Checks if this constraint is fully supported by the platform.
+     *
+     * @return True if the constrains described in this object are fully supported by the platform.
+     * @see #isSizeSupported()
+     * @see #isMaxLengthSupported()
+     */
+    public boolean isSupported() {
+<span class="nc bnc" id="L509" title="All 8 branches missed.">        return isSizeSupported() &amp;&amp; isMaxLengthSupported() &amp;&amp; isQualitySupported() &amp;&amp; isMaxFileSizeSupported();</span>
+    }
+
+    /**
+     * Checks if the preferred quality setting is supported.
+     *
+     * @return True if the preferred quality is not set (i.e. 0), or is supported by the platform.
+     * @see #getPreferredQuality()
+     * @see #getQuality()
+     * @see #preferredQuality(int)
+     */
+    public boolean isQualitySupported() {
+<span class="nc bnc" id="L521" title="All 4 branches missed.">        return preferredQuality == 0 || quality == preferredQuality;</span>
+    }
+
+    /**
+     * Checks if the max file size constraint is supported.
+     *
+     * @return true if the max file size constraint is supported, or the max file size constraint isn't set.
+     * @see #preferredMaxFileSize(long)
+     * @see #getMaxFileSize()
+     * @see #getPreferredMaxFileSize()
+     */
+    public boolean isMaxFileSizeSupported() {
+<span class="nc bnc" id="L533" title="All 4 branches missed.">        return preferredMaxFileSize == 0 || maxFileSize == preferredMaxFileSize;</span>
+    }
+
+    /**
+     * Checks if this constraint is effectively a null constraint.  I.e. it doesn't include
+     * any width, height, or max length constraints.
+     *
+     * @return True if this constraints is effectively null.
+     */
+    public boolean isNullConstraint() {
+<span class="nc bnc" id="L543" title="All 10 branches missed.">        return getWidth() == 0 &amp;&amp; getHeight() == 0 &amp;&amp; getMaxLength() == 0 &amp;&amp; getQuality() == 0 &amp;&amp; getMaxFileSize() == 0;</span>
+    }
+
+    /**
+     * An interface that will be implemented by the implementation. It's job is
+     * to transfer the &quot;preferred&quot; constraints to corresponding &quot;actual&quot; constraints
+     * based on what the platform supports.
+     */
+    public interface Compiler { // PMD Fix: UnnecessaryModifier removed implicit static
+        VideoCaptureConstraints compile(VideoCaptureConstraints cnst); // PMD Fix: UnnecessaryModifier removed redundant public
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

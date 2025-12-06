@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TimeChart.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.charts.views</a> &gt; <span class="el_source">TimeChart.java</span></div><h1>TimeChart.java</h1><pre class="source lang-java linenums">/**
+ * Copyright (C) 2009 - 2013 SC 4ViewSoft SRL
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.codename1.charts.views;
+
+import com.codename1.charts.compat.Canvas;
+import com.codename1.charts.compat.Paint;
+import com.codename1.charts.models.XYMultipleSeriesDataset;
+import com.codename1.charts.models.XYSeries;
+import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
+import com.codename1.io.Log;
+
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.TimeZone;
+
+
+/**
+ * Specialised {@link LineChart} that formats the X axis as dates or times.
+ * &lt;p&gt;
+ * Populate the chart with an {@link XYMultipleSeriesDataset} where X values are
+ * expressed as milliseconds since the epoch. Configure the desired date format
+ * using {@link #setDateFormat(String)} or let the chart choose an appropriate
+ * format automatically.
+ */
+public class TimeChart extends LineChart {
+    /**
+     /** The constant to identify this chart type. */
+    public static final String TYPE = &quot;Time&quot;;
+    /** The number of milliseconds in a day. */
+    public static final long DAY = 24 * 60 * 60 * 1000;
+    /**
+     * The number of milliseconds in a minute.
+     */
+    private static final int MILLIS_TO_MINUTES = 60000;
+    /**
+     * This is missing from the Codename One Calendar object, but required by
+     * TimeZone.getOffset()
+     */
+    private static final int ERA = 0;
+    /** The date format pattern to be used in formatting the X axis labels. */
+    private String mDateFormat;
+    /** The starting point for labels. */
+    private Double mStartPoint;
+
+<span class="nc" id="L62">    TimeChart() {</span>
+<span class="nc" id="L63">    }</span>
+
+    /**
+     * Builds a new time chart instance.
+     *
+     * @param dataset the multiple series dataset
+     * @param renderer the multiple series renderer
+     */
+    public TimeChart(XYMultipleSeriesDataset dataset, XYMultipleSeriesRenderer renderer) {
+<span class="nc" id="L72">        super(dataset, renderer);</span>
+<span class="nc" id="L73">    }</span>
+
+    /**
+     * Returns the date format pattern to be used for formatting the X axis
+     * labels.
+     *
+     * @return the date format pattern for the X axis labels
+     */
+    public String getDateFormat() {
+<span class="nc" id="L82">        return mDateFormat;</span>
+    }
+
+    /**
+     * Sets the date format pattern to be used for formatting the X axis labels.
+     *
+     * @param format the date format pattern for the X axis labels. If null, an
+     *          appropriate default format will be used.
+     */
+    public void setDateFormat(String format) {
+<span class="nc" id="L92">        mDateFormat = format;</span>
+<span class="nc" id="L93">    }</span>
+
+    /**
+     * The graphical representation of the labels on the X axis.
+     *
+     * @param xLabels the X labels values
+     * @param xTextLabelLocations the X text label locations
+     * @param canvas the canvas to paint to
+     * @param paint the paint to be used for drawing
+     * @param left the left value of the labels area
+     * @param top the top value of the labels area
+     * @param bottom the bottom value of the labels area
+     * @param xPixelsPerUnit the amount of pixels per one unit in the chart labels
+     * @param minX the minimum value on the X axis in the chart
+     * @param maxX the maximum value on the X axis in the chart
+     */
+    @Override
+    protected void drawXLabels(List&lt;Double&gt; xLabels, Double[] xTextLabelLocations, Canvas canvas,
+                               Paint paint, int left, int top, int bottom, double xPixelsPerUnit, double minX, double maxX) {
+<span class="nc" id="L112">        int length = xLabels.size();</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (length &gt; 0) {</span>
+<span class="nc" id="L114">            boolean showLabels = mRenderer.isShowLabels();</span>
+<span class="nc" id="L115">            boolean showGridY = mRenderer.isShowGridY();</span>
+<span class="nc" id="L116">            boolean showTickMarks = mRenderer.isShowTickMarks();</span>
+<span class="nc" id="L117">            DateFormat format = getDateFormat(xLabels.get(0), xLabels.get(length - 1));</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">            for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc" id="L119">                long label = Math.round(xLabels.get(i));</span>
+<span class="nc" id="L120">                float xLabel = (float) (left + xPixelsPerUnit * (label - minX));</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">                if (showLabels) {</span>
+<span class="nc" id="L122">                    paint.setColor(mRenderer.getXLabelsColor());</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">                    if (showTickMarks) {</span>
+<span class="nc" id="L124">                        canvas.drawLine(xLabel, bottom, xLabel, bottom + mRenderer.getLabelsTextSize() / 3,</span>
+                                paint);
+                    }
+<span class="nc" id="L127">                    drawText(canvas, format.format(new Date(label)), xLabel,</span>
+<span class="nc" id="L128">                            bottom + mRenderer.getLabelsTextSize() * 4 / 3 + mRenderer.getXLabelsPadding(),</span>
+<span class="nc" id="L129">                            paint, mRenderer.getXLabelsAngle());</span>
+                }
+<span class="nc bnc" id="L131" title="All 2 branches missed.">                if (showGridY) {</span>
+<span class="nc" id="L132">                    paint.setColor(mRenderer.getGridColor(0));</span>
+<span class="nc" id="L133">                    canvas.drawLine(xLabel, bottom, xLabel, top, paint);</span>
+                }
+            }
+        }
+<span class="nc" id="L137">        drawXTextLabels(xTextLabelLocations, canvas, paint, true, left, top, bottom, xPixelsPerUnit,</span>
+                minX, maxX);
+<span class="nc" id="L139">    }</span>
+
+    /**
+     * Returns the date format pattern to be used, based on the date range.
+     *
+     * @param start the start date in milliseconds
+     * @param end the end date in milliseconds
+     * @return the date format
+     */
+    private DateFormat getDateFormat(double start, double end) {
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (mDateFormat != null) {</span>
+<span class="nc" id="L150">            SimpleDateFormat format = null;</span>
+            try {
+<span class="nc" id="L152">                format = new SimpleDateFormat(mDateFormat);</span>
+<span class="nc" id="L153">                return format;</span>
+<span class="nc" id="L154">            } catch (Exception e) { // PMD Fix: EmptyCatchBlock log exception</span>
+<span class="nc" id="L155">                Log.e(e);</span>
+            }
+        }
+<span class="nc" id="L158">        DateFormat format = SimpleDateFormat.getDateInstance(SimpleDateFormat.MEDIUM);</span>
+<span class="nc" id="L159">        double diff = end - start;</span>
+<span class="nc bnc" id="L160" title="All 4 branches missed.">        if (diff &gt; DAY &amp;&amp; diff &lt; 5 * DAY) {</span>
+<span class="nc" id="L161">            format = SimpleDateFormat.getDateTimeInstance(SimpleDateFormat.SHORT, SimpleDateFormat.SHORT);</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        } else if (diff &lt; DAY) {</span>
+<span class="nc" id="L163">            format = SimpleDateFormat.getTimeInstance(SimpleDateFormat.MEDIUM);</span>
+        }
+<span class="nc" id="L165">        return format;</span>
+    }
+
+    /**
+     * Returns the chart type identifier.
+     *
+     * @return the chart type
+     */
+    public String getChartType() {
+<span class="nc" id="L174">        return TYPE;</span>
+    }
+
+    @Override
+    protected List&lt;Double&gt; getXLabels(double min, double max, int count) {
+<span class="nc" id="L179">        final List&lt;Double&gt; result = new ArrayList&lt;Double&gt;();</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        if (!mRenderer.isXRoundedLabels()) {</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">            if (mDataset.getSeriesCount() &gt; 0) {</span>
+<span class="nc" id="L182">                XYSeries series = mDataset.getSeriesAt(0);</span>
+<span class="nc" id="L183">                int length = series.getItemCount();</span>
+<span class="nc" id="L184">                int intervalLength = 0;</span>
+<span class="nc" id="L185">                int startIndex = -1;</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">                for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc" id="L187">                    double value = series.getX(i);</span>
+<span class="nc bnc" id="L188" title="All 4 branches missed.">                    if (min &lt;= value &amp;&amp; value &lt;= max) {</span>
+<span class="nc" id="L189">                        intervalLength++;</span>
+<span class="nc bnc" id="L190" title="All 2 branches missed.">                        if (startIndex &lt; 0) {</span>
+<span class="nc" id="L191">                            startIndex = i;</span>
+                        }
+                    }
+                }
+<span class="nc bnc" id="L195" title="All 2 branches missed.">                if (intervalLength &lt; count) {</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">                    for (int i = startIndex; i &lt; startIndex + intervalLength; i++) {</span>
+<span class="nc" id="L197">                        result.add(series.getX(i));</span>
+                    }
+                } else {
+<span class="nc" id="L200">                    float step = (float) intervalLength / count;</span>
+<span class="nc" id="L201">                    int intervalCount = 0;</span>
+<span class="nc bnc" id="L202" title="All 4 branches missed.">                    for (int i = 0; i &lt; length &amp;&amp; intervalCount &lt; count; i++) {</span>
+<span class="nc" id="L203">                        double value = series.getX(Math.round(i * step));</span>
+<span class="nc bnc" id="L204" title="All 4 branches missed.">                        if (min &lt;= value &amp;&amp; value &lt;= max) {</span>
+<span class="nc" id="L205">                            result.add(value);</span>
+<span class="nc" id="L206">                            intervalCount++;</span>
+                        }
+                    }
+                }
+<span class="nc" id="L210">                return result;</span>
+            } else {
+<span class="nc" id="L212">                return super.getXLabels(min, max, count);</span>
+            }
+        }
+<span class="nc bnc" id="L215" title="All 2 branches missed.">        if (mStartPoint == null) {</span>
+<span class="nc" id="L216">            TimeZone tz = TimeZone.getDefault();</span>
+<span class="nc" id="L217">            Calendar cal = Calendar.getInstance(tz);</span>
+<span class="nc" id="L218">            cal.setTime(new Date(Math.round(min)));</span>
+
+
+<span class="nc" id="L221">            int offset = getDSTOffset(cal);</span>
+<span class="nc" id="L222">            mStartPoint = min - (min % DAY) + DAY + offset * 60 * 60 * 1000;</span>
+        }
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        if (count &gt; 25) {</span>
+<span class="nc" id="L225">            count = 25;</span>
+        }
+
+<span class="nc" id="L228">        final double cycleMath = (max - min) / count;</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        if (cycleMath &lt;= 0) {</span>
+<span class="nc" id="L230">            return result;</span>
+        }
+<span class="nc" id="L232">        double cycle = DAY;</span>
+
+<span class="nc bnc" id="L234" title="All 2 branches missed.">        if (cycleMath &lt;= DAY) {</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">            while (cycleMath &lt; cycle / 2) {</span>
+<span class="nc" id="L236">                cycle = cycle / 2;</span>
+            }
+        } else {
+<span class="nc bnc" id="L239" title="All 2 branches missed.">            while (cycleMath &gt; cycle) {</span>
+<span class="nc" id="L240">                cycle = cycle * 2;</span>
+            }
+        }
+
+<span class="nc" id="L244">        double val = mStartPoint - Math.floor((mStartPoint - min) / cycle) * cycle;</span>
+<span class="nc" id="L245">        int i = 0;</span>
+<span class="nc bnc" id="L246" title="All 4 branches missed.">        while (val &lt; max &amp;&amp; i++ &lt;= count) {</span>
+<span class="nc" id="L247">            result.add(val);</span>
+<span class="nc" id="L248">            val += cycle;</span>
+        }
+
+<span class="nc" id="L251">        return result;</span>
+    }
+
+    /**
+     * Determine the number of minutes to adjust the date for local DST. This
+     * should provide a historically correct value, also accounting for changes
+     * in GMT offset. See TimeZone javadoc for more details.
+     *
+     * @param source
+     * @return
+     */
+    int getDSTOffset(Calendar source) {
+<span class="nc" id="L263">        TimeZone localTimezone = Calendar.getInstance().getTimeZone();</span>
+<span class="nc" id="L264">        int rawOffset = localTimezone.getRawOffset() / MILLIS_TO_MINUTES;</span>
+<span class="nc" id="L265">        return getOffsetInMinutes(source, localTimezone) - rawOffset;</span>
+    }
+
+    /**
+     * Get the offset from GMT for a given timezone.
+     *
+     * @param source
+     * @param timezone
+     * @return
+     */
+    int getOffsetInMinutes(Calendar source, TimeZone timezone) {
+<span class="nc" id="L276">        return timezone.getOffset(source.get(ERA), source.get(Calendar.YEAR), source.get(Calendar.MONTH),</span>
+<span class="nc" id="L277">                source.get(Calendar.DAY_OF_MONTH), source.get(Calendar.DAY_OF_WEEK), source.get(Calendar.MILLISECOND))</span>
+                / MILLIS_TO_MINUTES;
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,352 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CodenameOneMiGComponentWrapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts.mig</a> &gt; <span class="el_source">CodenameOneMiGComponentWrapper.java</span></div><h1>CodenameOneMiGComponentWrapper.java</h1><pre class="source lang-java linenums">package com.codename1.ui.layouts.mig;
+
+/*
+ * License (BSD):
+ * ==============
+ *
+ * Copyright (c) 2004, Mikael Grev, MiG InfoCom AB. (miglayout (at) miginfocom (dot) com)
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * Neither the name of the MiG InfoCom AB nor the names of its contributors may be
+ * used to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ *
+ * @version 1.0
+ * @author Mikael Grev, MiG InfoCom AB
+ *         Date: 2006-sep-08
+ */
+
+import com.codename1.components.InfiniteProgress;
+import com.codename1.ui.Button;
+import com.codename1.ui.CheckBox;
+import com.codename1.ui.ComboBox;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Font;
+import com.codename1.ui.Label;
+import com.codename1.ui.List;
+import com.codename1.ui.RadioButton;
+import com.codename1.ui.Slider;
+import com.codename1.ui.Tabs;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextField;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.spinner.BaseSpinner;
+import com.codename1.ui.table.Table;
+
+/**
+ *
+ */
+class CodenameOneMiGComponentWrapper implements ComponentWrapper {
+    /**
+     * Property to use in LAF settings and as JComponent client property
+     * to specify the visual padding.
+     * &lt;p&gt;
+     */
+<span class="fc" id="L65">    private static final String VISUAL_PADDING_PROPERTY = com.codename1.ui.layouts.mig.PlatformDefaults.VISUAL_PADDING_PROPERTY;</span>
+    /**
+     * Cache.
+     */
+    //private final static IdentityHashMap&lt;FontMetrics, Point.Float&gt; FM_MAP = new IdentityHashMap&lt;FontMetrics, Point.Float&gt;(4);
+<span class="fc" id="L70">    private final static Font SUBST_FONT = Font.getDefaultFont();</span>
+
+    /** Debug color for component bounds outline.
+     */
+    //private static final Color DB_COMP_OUTLINE = new Color(0, 0, 200);
+<span class="fc" id="L75">    private static boolean maxSet = false;</span>
+<span class="fc" id="L76">    private static boolean vp = true;</span>
+    private final Component c;
+<span class="fc" id="L78">    private int compType = TYPE_UNSET;</span>
+<span class="fc" id="L79">    private final Boolean bl = null;</span>
+<span class="fc" id="L80">    private final boolean prefCalled = false;</span>
+
+<span class="fc" id="L82">    public CodenameOneMiGComponentWrapper(Component c) {</span>
+<span class="fc" id="L83">        this.c = c;</span>
+<span class="fc" id="L84">    }</span>
+
+    /**
+     * @deprecated Java 1.4 is not supported anymore
+     */
+    public static boolean isMaxSizeSetOn1_4() {
+<span class="nc" id="L90">        return maxSet;</span>
+    }
+
+    /**
+     * @deprecated Java 1.4 is not supported anymore
+     */
+    public static void setMaxSizeSetOn1_4(boolean b) {
+<span class="nc" id="L97">        maxSet = b;</span>
+<span class="nc" id="L98">    }</span>
+
+    public static boolean isVisualPaddingEnabled() {
+<span class="nc" id="L101">        return vp;</span>
+    }
+
+    public static void setVisualPaddingEnabled(boolean b) {
+<span class="nc" id="L105">        vp = b;</span>
+<span class="nc" id="L106">    }</span>
+
+    public final int getBaseline(int width, int height) {
+<span class="pc bpc" id="L109" title="2 of 4 branches missed.">        int baseLine = c.getBaseline(width &lt; 0 ? c.getWidth() : width, height &lt; 0 ? c.getHeight() : height);</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">        if (baseLine != -1) {</span>
+<span class="fc" id="L111">            int[] visPad = getVisualPadding();</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">            if (visPad != null)</span>
+<span class="fc" id="L113">                baseLine += (visPad[2] - visPad[0] + 1) / 2;</span>
+        }
+<span class="fc" id="L115">        return baseLine;</span>
+    }
+
+    public final Object getComponent() {
+<span class="fc" id="L119">        return c;</span>
+    }
+
+    public final float getPixelUnitFactor(boolean isHor) {
+<span class="pc bpc" id="L123" title="2 of 3 branches missed.">        switch (PlatformDefaults.getLogicalPixelBase()) {</span>
+            case PlatformDefaults.BASE_FONT_SIZE:
+				/*Font font = c.getFont();
+				FontMetrics fm = c.getFontMetrics(font != null ? font : SUBST_FONT);
+				Point.Float p = FM_MAP.get(fm);
+				if (p == null) {
+					Rectangle2D r = fm.getStringBounds(&quot;X&quot;, c.getGraphics());
+					p = new Point.Float(((float) r.getWidth()) / 6f, ((float) r.getHeight()) / 13.27734375f);
+					FM_MAP.put(fm, p);
+				}
+				return isHor ? p.x : p.y;*/
+<span class="nc bnc" id="L134" title="All 2 branches missed.">                return isHor ? ((float) SUBST_FONT.charWidth('X')) / 6f : ((float) SUBST_FONT.getHeight() / 13.27734375f);</span>
+
+            case PlatformDefaults.BASE_SCALE_FACTOR:
+
+<span class="fc bfc" id="L138" title="All 2 branches covered.">                Float s = isHor ? PlatformDefaults.getHorizontalScaleFactor() : PlatformDefaults.getVerticalScaleFactor();</span>
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">                if (s == null)</span>
+<span class="fc" id="L140">                    s = new Float(1.0f);</span>
+<span class="fc bfc" id="L141" title="All 2 branches covered.">                return s * (isHor ? getHorizontalScreenDPI() : getVerticalScreenDPI()) / (float) PlatformDefaults.getDefaultDPI();</span>
+
+            default:
+<span class="nc" id="L144">                return 1f;</span>
+        }
+    }
+
+    public final int getX() {
+<span class="nc" id="L149">        return c.getX();</span>
+    }
+
+    public final int getY() {
+<span class="nc" id="L153">        return c.getY();</span>
+    }
+
+    public final int getHeight() {
+<span class="fc" id="L157">        return c.getHeight();</span>
+    }
+
+    public final int getWidth() {
+<span class="fc" id="L161">        return c.getWidth();</span>
+    }
+
+    public final int getScreenLocationX() {
+<span class="nc" id="L165">        return 0;</span>
+    }
+
+    public final int getScreenLocationY() {
+<span class="nc" id="L169">        return 0;</span>
+    }
+
+    public final int getMinimumHeight(int sz) {
+<span class="fc" id="L173">        return c.getPreferredH();</span>
+    }
+
+    public final int getMinimumWidth(int sz) {
+<span class="fc" id="L177">        return c.getPreferredW();</span>
+    }
+
+    public final int getPreferredHeight(int sz) {
+<span class="fc" id="L181">        return c.getPreferredH();</span>
+    }
+
+    public final int getPreferredWidth(int sz) {
+<span class="fc" id="L185">        return c.getPreferredW();</span>
+    }
+
+    public final int getMaximumHeight(int sz) {
+<span class="fc" id="L189">        Container p = c.getParent();</span>
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        if (p != null) {</span>
+<span class="fc" id="L191">            int w = p.getHeight();</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">            if (w &gt; 10) {</span>
+<span class="fc" id="L193">                return w;</span>
+            }
+        }
+<span class="nc" id="L196">        return Display.getInstance().getDisplayHeight();</span>
+    }
+
+    public final int getMaximumWidth(int sz) {
+<span class="fc" id="L200">        Container p = c.getParent();</span>
+<span class="pc bpc" id="L201" title="1 of 2 branches missed.">        if (p != null) {</span>
+<span class="fc" id="L202">            int w = p.getWidth();</span>
+<span class="pc bpc" id="L203" title="1 of 2 branches missed.">            if (w &gt; 10) {</span>
+<span class="fc" id="L204">                return w;</span>
+            }
+        }
+<span class="nc" id="L207">        return Display.getInstance().getDisplayWidth();</span>
+    }
+
+    private boolean isMaxSet(Component c) {
+<span class="nc" id="L211">        return false;</span>
+    }
+
+    public final ContainerWrapper getParent() {
+<span class="fc" id="L215">        Container p = c.getParent();</span>
+<span class="pc bpc" id="L216" title="1 of 2 branches missed.">        return p != null ? new CodenameOneMiGContainerWrapper(p) : null;</span>
+    }
+
+    public final int getHorizontalScreenDPI() {
+<span class="fc" id="L220">        return PlatformDefaults.getDefaultDPI();</span>
+    }
+
+    public final int getVerticalScreenDPI() {
+<span class="fc" id="L224">        return PlatformDefaults.getDefaultDPI();</span>
+    }
+
+    public final int getScreenWidth() {
+<span class="nc" id="L228">        return Display.getInstance().getDisplayWidth();</span>
+    }
+
+    public final int getScreenHeight() {
+<span class="nc" id="L232">        return Display.getInstance().getDisplayHeight();</span>
+    }
+
+    public final boolean hasBaseline() {
+<span class="fc" id="L236">        return true;</span>
+    }
+
+    public final String getLinkId() {
+<span class="fc" id="L240">        return c.getName();</span>
+    }
+
+    public final void setBounds(int x, int y, int width, int height) {
+<span class="fc" id="L244">        c.setX(x);</span>
+<span class="fc" id="L245">        c.setY(y);</span>
+<span class="fc" id="L246">        c.setWidth(width);</span>
+<span class="fc" id="L247">        c.setHeight(height);</span>
+<span class="fc" id="L248">    }</span>
+
+    public boolean isVisible() {
+<span class="fc" id="L251">        return c.isVisible();</span>
+    }
+
+    public final int[] getVisualPadding() {
+        // TOOD, optimize this
+<span class="fc" id="L256">        int[] padding = new int[]{c.getStyle().getMarginTop(), c.getStyle().getMarginLeftNoRTL(),</span>
+<span class="fc" id="L257">                c.getStyle().getMarginBottom(), c.getStyle().getMarginRightNoRTL()};</span>
+<span class="fc" id="L258">        return padding;</span>
+    }
+
+    public final void paintDebugOutline(boolean showVisualPadding) {
+		/*if (c.isShowing() == false)
+			return;
+
+		Graphics2D g = (Graphics2D) c.getGraphics();
+		if (g == null)
+			return;
+
+		g.setPaint(DB_COMP_OUTLINE);
+		g.setStroke(new BasicStroke(1f, BasicStroke.CAP_SQUARE, BasicStroke.JOIN_MITER, 10f, new float[] {2f, 4f}, 0));
+		g.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
+
+		if (showVisualPadding &amp;&amp; isVisualPaddingEnabled()) {
+			int[] padding = getVisualPadding();
+			if (padding != null) {
+				g.setColor(Color.GREEN);
+				g.drawRect(padding[1], padding[0], (getWidth() - 1) - (padding[1] + padding[3]), (getHeight() - 1) - (padding[0] + padding[2]));
+			}
+		}*/
+<span class="nc" id="L280">    }</span>
+
+    public int getComponentType(boolean disregardScrollPane) {
+<span class="nc bnc" id="L283" title="All 2 branches missed.">        if (compType == TYPE_UNSET)</span>
+<span class="nc" id="L284">            compType = checkType(disregardScrollPane);</span>
+
+<span class="nc" id="L286">        return compType;</span>
+    }
+
+    public int getLayoutHashCode() {
+<span class="fc" id="L290">        Dimension d = c.getPreferredSize();</span>
+<span class="fc" id="L291">        int hash = (d.getWidth() &lt;&lt; 10) + (d.getHeight() &lt;&lt; 15);</span>
+
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">        if (c.isVisible())</span>
+<span class="fc" id="L294">            hash += 1324511;</span>
+
+<span class="fc" id="L296">        String id = getLinkId();</span>
+<span class="pc bpc" id="L297" title="1 of 2 branches missed.">        if (id != null)</span>
+<span class="nc" id="L298">            hash += id.hashCode();</span>
+
+<span class="fc" id="L300">        return hash;</span>
+    }
+
+    private int checkType(boolean disregardScrollPane) {
+<span class="nc" id="L304">        Component c = this.c;</span>
+
+<span class="nc bnc" id="L306" title="All 2 branches missed.">        if (c instanceof TextField) {</span>
+<span class="nc" id="L307">            return TYPE_TEXT_FIELD;</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">        } else if (c instanceof Label) {</span>
+<span class="nc" id="L309">            return TYPE_LABEL;</span>
+<span class="nc bnc" id="L310" title="All 4 branches missed.">        } else if (c instanceof RadioButton || c instanceof CheckBox) {</span>
+<span class="nc" id="L311">            return TYPE_CHECK_BOX;</span>
+<span class="nc bnc" id="L312" title="All 2 branches missed.">        } else if (c instanceof Button) {</span>
+<span class="nc" id="L313">            return TYPE_BUTTON;</span>
+<span class="nc bnc" id="L314" title="All 2 branches missed.">        } else if (c instanceof ComboBox) {</span>
+<span class="nc" id="L315">            return TYPE_COMBO_BOX;</span>
+<span class="nc bnc" id="L316" title="All 2 branches missed.">        } else if (c instanceof TextArea) {</span>
+<span class="nc" id="L317">            return TYPE_TEXT_AREA;</span>
+<span class="nc bnc" id="L318" title="All 2 branches missed.">        } else if (c instanceof Container) {</span>
+<span class="nc" id="L319">            return TYPE_PANEL;</span>
+<span class="nc bnc" id="L320" title="All 2 branches missed.">        } else if (c instanceof List) {</span>
+<span class="nc" id="L321">            return TYPE_LIST;</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">        } else if (c instanceof Table) {</span>
+<span class="nc" id="L323">            return TYPE_TABLE;</span>
+<span class="nc bnc" id="L324" title="All 2 branches missed.">        } else if (c instanceof BaseSpinner) {</span>
+<span class="nc" id="L325">            return TYPE_SPINNER;</span>
+<span class="nc bnc" id="L326" title="All 2 branches missed.">        } else if (c instanceof Tabs) {</span>
+<span class="nc" id="L327">            return TYPE_TABBED_PANE;</span>
+<span class="nc bnc" id="L328" title="All 2 branches missed.">        } else if (c instanceof InfiniteProgress) {</span>
+<span class="nc" id="L329">            return TYPE_PROGRESS_BAR;</span>
+<span class="nc bnc" id="L330" title="All 2 branches missed.">        } else if (c instanceof Slider) {</span>
+<span class="nc" id="L331">            return TYPE_SLIDER;</span>
+        }
+<span class="nc" id="L333">        return TYPE_UNKNOWN;</span>
+    }
+
+    public final int hashCode() {
+<span class="fc" id="L337">        return getComponent().hashCode();</span>
+    }
+
+    public final boolean equals(Object o) {
+<span class="pc bpc" id="L341" title="1 of 2 branches missed.">        if (!(o instanceof ComponentWrapper))</span>
+<span class="nc" id="L342">            return false;</span>
+
+<span class="fc" id="L344">        return c.equals(((ComponentWrapper) o).getComponent());</span>
+    }
+
+    public int getContentBias() {
+<span class="pc bpc" id="L348" title="2 of 4 branches missed.">        return c instanceof TextArea || (Boolean.TRUE.equals(c.getClientProperty(&quot;migLayout.dynamicAspectRatio&quot;))) ? LayoutUtil.HORIZONTAL : -1;</span>
+    }
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

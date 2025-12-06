@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SwipeBackSupport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.util</a> &gt; <span class="el_source">SwipeBackSupport.java</span></div><h1>SwipeBackSupport.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.util;
+
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Painter;
+import com.codename1.ui.animations.Animation;
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.animations.Motion;
+import com.codename1.ui.animations.Transition;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.util.LazyValue;
+
+/**
+ * Allows binding a swipe listener to the form that enables the user to swipe back to the previous
+ * form.
+ *
+ * @author Shai Almog
+ */
+<span class="fc" id="L45">public class SwipeBackSupport {</span>
+    boolean sideSwipePotential;
+    int initialDragY;
+    int initialDragX;
+    boolean dragActivated;
+    boolean transitionRunning;
+    int currentX;
+    ActionListener pointerDragged;
+    ActionListener pointerPressed;
+    ActionListener pointerReleased;
+    Form destinationForm;
+
+    /**
+     * Binds support for swiping to the given forms
+     *
+     * @param currentForm the current form
+     * @param destination the destination form which can be created lazily
+     */
+    public static void bindBack(Form currentForm, LazyValue&lt;Form&gt; destination) {
+<span class="nc" id="L64">        new SwipeBackSupport().bind(currentForm, destination);</span>
+<span class="nc" id="L65">    }</span>
+
+    /**
+     * Binds support for swiping to the current form
+     *
+     * @param destination the destination form which can be created lazily
+     */
+    public static void bindBack(LazyValue&lt;Form&gt; destination) {
+<span class="nc" id="L73">        new SwipeBackSupport().bind(Display.getInstance().getCurrent(), destination);</span>
+<span class="nc" id="L74">    }</span>
+
+
+    /**
+     * Binds support for swiping to the given forms
+     *
+     * @param currentForm the current form
+     * @param destination the destination form which can be created lazily
+     */
+    protected void bind(final Form currentForm, final LazyValue&lt;Form&gt; destination) {
+<span class="fc" id="L84">        pointerDragged = new ActionListener() {</span>
+            public void actionPerformed(ActionEvent evt) {
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                if (sideSwipePotential) {</span>
+<span class="fc" id="L87">                    final int x = evt.getX();</span>
+<span class="fc" id="L88">                    final int y = evt.getY();</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">                    if (Math.abs(y - initialDragY) &gt; x - initialDragX) {</span>
+<span class="nc" id="L90">                        sideSwipePotential = false;</span>
+<span class="nc" id="L91">                        return;</span>
+                    }
+<span class="fc" id="L93">                    evt.consume();</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">                    if (dragActivated) {</span>
+<span class="nc" id="L95">                        currentX = x;</span>
+<span class="nc" id="L96">                        Display.getInstance().getCurrent().repaint();</span>
+                    } else {
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">                        if (x - initialDragX &gt; Display.getInstance().convertToPixels(currentForm.getUIManager().getThemeConstant(&quot;backGestureThresholdInt&quot;, 5), true)) {</span>
+<span class="fc" id="L99">                            dragActivated = true;</span>
+<span class="fc" id="L100">                            destinationForm = destination.get();</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">                            if (destinationForm != null) { //allow destination form to be null to disable swipeback, e.g. if conditions to exit Form are not fulfilled</span>
+<span class="fc" id="L102">                                startBackTransition(currentForm, destinationForm);</span>
+                            }
+                        }
+                    }
+                }
+<span class="fc" id="L107">            }</span>
+        };
+<span class="fc" id="L109">        pointerReleased = new ActionListener() {</span>
+            public void actionPerformed(ActionEvent evt) {
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">                if (dragActivated) {</span>
+<span class="fc" id="L112">                    int destNumberX = Display.getInstance().getDisplayWidth();</span>
+<span class="fc" id="L113">                    int incrementsX = Display.getInstance().convertToPixels(3, true);</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">                    if (currentX &lt; destNumberX / 2) {</span>
+<span class="nc" id="L115">                        destinationForm = currentForm;</span>
+<span class="nc" id="L116">                        destNumberX = 0;</span>
+<span class="nc" id="L117">                        incrementsX *= -1;</span>
+                    }
+<span class="fc" id="L119">                    final int destNumber = destNumberX;</span>
+<span class="fc" id="L120">                    final int increments = incrementsX;</span>
+<span class="fc" id="L121">                    Display.getInstance().getCurrent().registerAnimated(new Animation() {</span>
+                        public boolean animate() {
+<span class="fc" id="L123">                            currentX += increments;</span>
+<span class="pc bpc" id="L124" title="5 of 8 branches missed.">                            if (currentX &gt; 0 &amp;&amp; currentX &gt;= destNumber || currentX &lt; 0 &amp;&amp; currentX &lt;= destNumber) {</span>
+<span class="nc" id="L125">                                currentX = destNumber;</span>
+<span class="nc" id="L126">                                Transition t = destinationForm.getTransitionInAnimator();</span>
+<span class="nc" id="L127">                                destinationForm.setTransitionInAnimator(CommonTransitions.createEmpty());</span>
+<span class="nc" id="L128">                                destinationForm.show();</span>
+<span class="nc" id="L129">                                destinationForm.setTransitionInAnimator(t);</span>
+<span class="nc" id="L130">                                destinationForm = null;</span>
+<span class="nc" id="L131">                                dragActivated = false;</span>
+<span class="nc" id="L132">                                transitionRunning = false;</span>
+<span class="nc" id="L133">                                return false;</span>
+                            }
+<span class="fc" id="L135">                            return true;</span>
+                        }
+
+                        public void paint(Graphics g) {
+<span class="nc" id="L139">                        }</span>
+                    });
+                }
+<span class="fc" id="L142">            }</span>
+        };
+<span class="fc" id="L144">        pointerPressed = new ActionListener() {</span>
+            public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L146">                sideSwipePotential = false;</span>
+<span class="fc" id="L147">                int displayWidth = Display.getInstance().getDisplayWidth();</span>
+<span class="pc bpc" id="L148" title="2 of 4 branches missed.">                sideSwipePotential = !transitionRunning &amp;&amp; evt.getX() &lt; displayWidth / currentForm.getUIManager().getThemeConstant(&quot;sideSwipeSensitiveInt&quot;, 10);</span>
+<span class="fc" id="L149">                initialDragX = evt.getX();</span>
+<span class="fc" id="L150">                initialDragY = evt.getY();</span>
+                /*if (sideSwipePotential) {
+                    Component c = Display.getInstance().getCurrent().getComponentAt(initialDragX, initialDragY);
+                    if (c != null &amp;&amp; c.shouldBlockSideSwipe()) {
+                        sideSwipePotential = false;
+                    }
+                }*/
+<span class="fc" id="L157">            }</span>
+        };
+<span class="fc" id="L159">        currentForm.addPointerDraggedListener(pointerDragged);</span>
+<span class="fc" id="L160">        currentForm.addPointerReleasedListener(pointerReleased);</span>
+<span class="fc" id="L161">        currentForm.addPointerPressedListener(pointerPressed);</span>
+<span class="fc" id="L162">    }</span>
+
+    void startBackTransition(final Form currentForm, Form destination) {
+<span class="fc" id="L165">        transitionRunning = true;</span>
+<span class="fc" id="L166">        final Transition t = destination.getTransitionOutAnimator().copy(true);</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">        if (t instanceof CommonTransitions) {</span>
+<span class="fc" id="L168">            Transition originalTransition = currentForm.getTransitionOutAnimator();</span>
+<span class="fc" id="L169">            currentForm.setTransitionOutAnimator(CommonTransitions.createEmpty());</span>
+<span class="fc" id="L170">            Form blank = new Form() {</span>
+                protected boolean shouldSendPointerReleaseToOtherForm() {
+<span class="nc" id="L172">                    return true;</span>
+                }
+            };
+<span class="fc" id="L175">            blank.addPointerDraggedListener(pointerDragged);</span>
+<span class="fc" id="L176">            blank.addPointerReleasedListener(pointerReleased);</span>
+<span class="fc" id="L177">            blank.addPointerPressedListener(pointerPressed);</span>
+<span class="fc" id="L178">            blank.setTransitionInAnimator(CommonTransitions.createEmpty());</span>
+<span class="fc" id="L179">            blank.setTransitionOutAnimator(CommonTransitions.createEmpty());</span>
+<span class="fc" id="L180">            blank.show();</span>
+<span class="fc" id="L181">            currentForm.setTransitionOutAnimator(originalTransition);</span>
+<span class="fc" id="L182">            ((CommonTransitions) t).setMotion(new LazyValue&lt;Motion&gt;() {</span>
+                public Motion get(Object... args) {
+<span class="fc" id="L184">                    return new ManualMotion(((Integer) args[0]).intValue(), ((Integer) args[1]).intValue(), ((Integer) args[2]).intValue());</span>
+                }
+            });
+<span class="fc" id="L187">            t.init(currentForm, destination);</span>
+<span class="fc" id="L188">            t.initTransition();</span>
+<span class="fc" id="L189">            blank.setGlassPane(new Painter() {</span>
+                public void paint(Graphics g, Rectangle rect) {
+<span class="fc" id="L191">                    t.animate();</span>
+<span class="fc" id="L192">                    t.paint(g);</span>
+<span class="fc" id="L193">                }</span>
+            });
+        }
+<span class="fc" id="L196">    }</span>
+
+    class ManualMotion extends Motion {
+<span class="fc" id="L199">        protected ManualMotion(int sourceValue, int destinationValue, int duration) {</span>
+<span class="fc" id="L200">            super(sourceValue, destinationValue, duration);</span>
+<span class="fc" id="L201">        }</span>
+
+        public int getValue() {
+<span class="fc" id="L204">            int destinationValue = getDestinationValue();</span>
+<span class="fc" id="L205">            int sourceValue = getSourceValue();</span>
+<span class="fc" id="L206">            float ratio = ((float) currentX) / ((float) Display.getInstance().getDisplayWidth());</span>
+<span class="fc" id="L207">            int dis = destinationValue - sourceValue;</span>
+<span class="fc" id="L208">            int val = (int) (sourceValue + (ratio * dis));</span>
+
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">            if (destinationValue &lt; sourceValue) {</span>
+<span class="nc" id="L211">                return Math.max(destinationValue, val);</span>
+            } else {
+<span class="fc" id="L213">                return Math.min(destinationValue, val);</span>
+            }
+        }
+
+        public boolean isFinished() {
+<span class="fc" id="L218">            return false;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

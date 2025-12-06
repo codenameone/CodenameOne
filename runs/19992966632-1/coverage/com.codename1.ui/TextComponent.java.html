@@ -1,0 +1,518 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TextComponent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">TextComponent.java</span></div><h1>TextComponent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui;
+
+import com.codename1.ui.animations.ComponentAnimation;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.LayeredLayout;
+
+/**
+ * &lt;p&gt;Encapsulates a text field and label into a single component. This allows the UI to adapt for iOS/Android
+ * behavior differences and support features like floating hint when necessary. It also includes platform specific
+ * error handling logic.&lt;/p&gt;
+ * &lt;p&gt;
+ * It is highly recommended to use text components in the context of a {@link com.codename1.ui.layouts.TextModeLayout}
+ * This allows the layout to implicitly adapt to the on-top mode and use a box layout Y mode for iOS and other
+ * platforms.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * This class supports several theme constants:
+ * &lt;/p&gt;
+ * &lt;ol&gt;
+ * &lt;li&gt;{@code textComponentErrorColor} a hex RGB color which defaults to null in which case this has no effect.
+ *      When defined this will change the color of the border and label to the given color to match the material design
+ *      styling.
+ * &lt;li&gt;{@code textComponentErrorLineBorderBool} when set to {@code false}, this will prevent the text component from
+ * applying an underline border when there is a validation error. Defaults to {@code true}.
+ * &lt;li&gt;{@code textComponentOnTopBool} toggles the on top mode see {@link #onTopMode(boolean)}
+ * &lt;li&gt;{@code textComponentAnimBool} toggles the animation mode see {@link #focusAnimation(boolean)}
+ * &lt;li&gt;{@code textComponentFieldUIID} sets the UIID of the text field to something other than {@code TextField}
+ *      which is useful for platforms such as iOS where the look of the text field is different within the text component
+ * &lt;/ol&gt;
+ * &lt;p&gt;
+ * The following code demonstrates a simple set of inputs and validation as it appears in iOS, Android and with
+ * validation errors
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/5a28c7944aeab7d8ae6b26dc81690238.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/blog/pixel-perfect-text-field-picker-ios.png&quot; alt=&quot;Running on iOS&quot; /&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/blog/pixel-perfect-text-field-picker-android.png&quot; alt=&quot;Running on Android&quot; /&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/blog/pixel-perfect-text-field-error-handling-blank.png&quot; alt=&quot;Android validation errors&quot; /&gt;
+ *
+ * @author Shai Almog
+ */
+public class TextComponent extends InputComponent {
+<span class="fc" id="L67">    private static final int animationSpeed = 100;    private final TextField field = new TextField() {</span>
+        @Override
+        void paintHint(Graphics g) {
+<span class="fc bfc" id="L70" title="All 2 branches covered.">            if (isFocusAnimation()) {</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">                if (!hasFocus()) {</span>
+<span class="fc" id="L72">                    super.paintHint(g);</span>
+                }
+            } else {
+<span class="fc" id="L75">                super.paintHint(g);</span>
+            }
+<span class="fc" id="L77">        }</span>
+
+        @Override
+        void focusGainedInternal() {
+<span class="fc" id="L81">            super.focusGainedInternal();</span>
+<span class="pc bpc" id="L82" title="2 of 4 branches missed.">            if (isInitialized() &amp;&amp; isFocusAnimation()) {</span>
+<span class="nc" id="L83">                getLabel().setFocus(true);</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">                if (!getLabel().isVisible()) {</span>
+<span class="nc" id="L85">                    final Label text = new Label(getHint(), &quot;TextHint&quot;);</span>
+<span class="nc" id="L86">                    setHint(&quot;&quot;);</span>
+<span class="nc" id="L87">                    final Label placeholder = new Label();</span>
+<span class="nc" id="L88">                    Component.setSameSize(placeholder, field);</span>
+<span class="nc" id="L89">                    animationLayer.add(BorderLayout.NORTH, text);</span>
+<span class="nc" id="L90">                    animationLayer.add(BorderLayout.CENTER, placeholder);</span>
+<span class="nc" id="L91">                    text.setX(getX());</span>
+<span class="nc" id="L92">                    text.setY(getY());</span>
+<span class="nc" id="L93">                    text.setWidth(getWidth());</span>
+<span class="nc" id="L94">                    text.setHeight(getHeight());</span>
+<span class="nc" id="L95">                    ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation(&quot;FloatingHint&quot;, animationSpeed));</span>
+<span class="nc" id="L96">                    getAnimationManager().addAnimation(anim, new Runnable() {</span>
+                        public void run() {
+<span class="nc" id="L98">                            Component.setSameSize(field);</span>
+<span class="nc" id="L99">                            text.remove();</span>
+<span class="nc" id="L100">                            placeholder.remove();</span>
+<span class="nc" id="L101">                            getLabel().setVisible(true);</span>
+<span class="nc" id="L102">                        }</span>
+                    });
+                }
+            }
+<span class="fc" id="L106">        }</span>
+
+        @Override
+        void focusLostInternal() {
+<span class="nc" id="L110">            super.focusLostInternal();</span>
+<span class="nc bnc" id="L111" title="All 4 branches missed.">            if (isInitialized() &amp;&amp; isFocusAnimation()) {</span>
+<span class="nc" id="L112">                getLabel().setFocus(false);</span>
+<span class="nc bnc" id="L113" title="All 6 branches missed.">                if (getText().length() == 0 &amp;&amp; getLabel().isVisible() &amp;&amp; isOnTopMode()) {</span>
+<span class="nc" id="L114">                    final Label text = new Label(getLabel().getText(), getLabel().getUIID());</span>
+<span class="nc" id="L115">                    final Label placeholder = new Label();</span>
+<span class="nc" id="L116">                    Component.setSameSize(placeholder, getLabel());</span>
+<span class="nc" id="L117">                    animationLayer.add(BorderLayout.NORTH, placeholder);</span>
+<span class="nc" id="L118">                    animationLayer.add(BorderLayout.CENTER, text);</span>
+<span class="nc" id="L119">                    text.setX(getLabel().getX());</span>
+<span class="nc" id="L120">                    text.setY(getLabel().getY());</span>
+<span class="nc" id="L121">                    text.setWidth(getLabel().getWidth());</span>
+<span class="nc" id="L122">                    text.setHeight(getLabel().getHeight());</span>
+<span class="nc" id="L123">                    String hintLabelUIID = &quot;TextHint&quot;;</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">                    if (getHintLabel() != null) {</span>
+<span class="nc" id="L125">                        hintLabelUIID = getHintLabel().getUIID();</span>
+                    }
+<span class="nc" id="L127">                    ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation(hintLabelUIID, animationSpeed));</span>
+<span class="nc" id="L128">                    getAnimationManager().addAnimation(anim, new Runnable() {</span>
+                        public void run() {
+<span class="nc" id="L130">                            setHint(getLabel().getText());</span>
+<span class="nc" id="L131">                            getLabel().setVisible(false);</span>
+<span class="nc" id="L132">                            Component.setSameSize(getLabel());</span>
+<span class="nc" id="L133">                            text.remove();</span>
+<span class="nc" id="L134">                            placeholder.remove();</span>
+<span class="nc" id="L135">                        }</span>
+                    });
+                }
+            }
+<span class="nc" id="L139">        }</span>
+    };
+    private Container animationLayer;
+    private Boolean focusAnimation;
+    /**
+     * Default constructor allows us to create an arbitrary text component
+     */
+<span class="fc" id="L146">    public TextComponent() {</span>
+<span class="fc" id="L147">        initInput();</span>
+<span class="fc" id="L148">    }</span>
+
+    private void updateLabel() {
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        if (isFocusAnimation() &amp;&amp;</span>
+<span class="pc bpc" id="L152" title="1 of 4 branches missed.">                (field.getText() == null || field.getText().length() == 0)) {</span>
+<span class="fc" id="L153">            field.setHint(getLabel().getText());</span>
+<span class="fc" id="L154">            getLabel().setVisible(false);</span>
+        } else {
+<span class="fc" id="L156">            getLabel().setVisible(true);</span>
+        }
+<span class="fc" id="L158">    }</span>
+
+    void constructUI() {
+<span class="fc bfc" id="L161" title="All 2 branches covered.">        if (getComponentCount() == 0) {</span>
+<span class="fc bfc" id="L162" title="All 4 branches covered.">            if (isOnTopMode() &amp;&amp; isFocusAnimation()) {</span>
+<span class="fc" id="L163">                getLabel().setUIID(&quot;FloatingHint&quot;);</span>
+<span class="fc" id="L164">                setLayout(new LayeredLayout());</span>
+                Container tfContainer;
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">                if (action != null) {</span>
+<span class="nc" id="L167">                    tfContainer = BorderLayout.center(</span>
+<span class="nc" id="L168">                            LayeredLayout.encloseIn(</span>
+                                    field,
+<span class="nc" id="L170">                                    FlowLayout.encloseRightMiddle(action)</span>
+                            )
+                    );
+                } else {
+<span class="fc" id="L174">                    tfContainer = BorderLayout.center(field);</span>
+                }
+<span class="fc" id="L176">                tfContainer.add(BorderLayout.NORTH, getLabel()).</span>
+<span class="fc" id="L177">                        add(BorderLayout.SOUTH,</span>
+<span class="fc" id="L178">                                LayeredLayout.encloseIn(</span>
+<span class="fc" id="L179">                                        getErrorMessage(),</span>
+<span class="fc" id="L180">                                        getDescriptionMessage()));</span>
+<span class="fc" id="L181">                add(tfContainer);</span>
+
+<span class="fc" id="L183">                Label errorMessageFiller = new Label();</span>
+<span class="fc" id="L184">                Component.setSameSize(errorMessageFiller, getErrorMessage());</span>
+<span class="fc" id="L185">                animationLayer = BorderLayout.south(errorMessageFiller);</span>
+<span class="fc" id="L186">                add(animationLayer);</span>
+<span class="fc" id="L187">                updateLabel();</span>
+<span class="fc" id="L188">            } else {</span>
+<span class="fc" id="L189">                super.constructUI();</span>
+            }
+        }
+<span class="fc" id="L192">    }</span>
+
+    /**
+     * Returns the editor component e.g. text field picker etc.
+     *
+     * @return the editor component
+     */
+    public Component getEditor() {
+<span class="fc" id="L200">        return field;</span>
+    }
+
+    void refreshForGuiBuilder() {
+<span class="pc bpc" id="L204" title="1 of 2 branches missed.">        if (guiBuilderMode) {</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">            if (animationLayer != null) {</span>
+<span class="nc" id="L206">                animationLayer.remove();</span>
+            }
+<span class="nc" id="L208">            super.refreshForGuiBuilder();</span>
+        }
+<span class="fc" id="L210">    }</span>
+
+    /**
+     * The focus animation mode forces the hint and text to be identical and animates the hint to the label when
+     * focus is in the text field as is common on Android. This can be customized using the theme constant
+     * {@code textComponentAnimBool} which is true by default on Android. Notice that this is designed for the
+     * {@code onTopMode} and might not work if that is set to false...
+     *
+     * @return true if the text should be on top
+     */
+    public boolean isFocusAnimation() {
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (focusAnimation != null) {</span>
+<span class="fc" id="L222">            return focusAnimation.booleanValue();</span>
+        }
+<span class="fc" id="L224">        return getUIManager().isThemeConstant(&quot;textComponentAnimBool&quot;, false);</span>
+    }
+
+    /**
+     * The focus animation mode forces the hint and text to be identical and animates the hint to the label when
+     * focus is in the text field as is common on Android. This can be customized using the theme constant
+     * {@code textComponentAnimBool} which is true by default on Android. Notice that this is designed for the
+     * {@code onTopMode} and might not work if that is set to false...
+     *
+     * @param focusAnimation true for the label to animate into place on focus, false otherwise
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;); }
+     */
+    public TextComponent focusAnimation(boolean focusAnimation) {
+<span class="fc" id="L237">        this.focusAnimation = Boolean.valueOf(focusAnimation);</span>
+<span class="fc" id="L238">        refreshForGuiBuilder();</span>
+<span class="fc" id="L239">        return this;</span>
+    }
+
+    /**
+     * Sets the text of the field
+     *
+     * @param text the text
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;); }
+     */
+    public TextComponent text(String text) {
+<span class="fc" id="L249">        field.setText(text);</span>
+<span class="fc" id="L250">        updateLabel();</span>
+<span class="fc" id="L251">        refreshForGuiBuilder();</span>
+<span class="fc" id="L252">        return this;</span>
+    }
+
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    public TextComponent onTopMode(boolean onTopMode) {
+<span class="fc" id="L260">        return (TextComponent) super.onTopMode(onTopMode);</span>
+    }
+
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    public TextComponent action(char icon) {
+<span class="fc" id="L268">        super.action(icon);</span>
+<span class="fc" id="L269">        return this;</span>
+    }
+
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    public TextComponent actionClick(ActionListener c) {
+<span class="fc" id="L277">        super.actionClick(c);</span>
+<span class="fc" id="L278">        return this;</span>
+    }
+
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    public TextComponent errorMessage(String errorMessage) {
+<span class="fc" id="L286">        super.errorMessage(errorMessage);</span>
+<span class="fc" id="L287">        return this;</span>
+    }
+
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    public TextComponent descriptionMessage(String descriptionMessage) {
+<span class="nc" id="L295">        super.descriptionMessage(descriptionMessage);</span>
+<span class="nc" id="L296">        return this;</span>
+    }
+
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    public TextComponent label(String text) {
+<span class="fc" id="L304">        super.label(text);</span>
+<span class="fc" id="L305">        return this;</span>
+    }
+
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    @Override
+    public TextComponent actionAsButton(boolean asButton) {
+<span class="nc" id="L314">        return (TextComponent) super.actionAsButton(asButton);</span>
+    }
+
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    @Override
+    public TextComponent actionUIID(String uiid) {
+<span class="nc" id="L323">        return (TextComponent) super.actionUIID(uiid);</span>
+    }
+
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    @Override
+    public TextComponent actionText(String text) {
+<span class="nc" id="L332">        return (TextComponent) super.actionText(text);</span>
+    }
+
+    /**
+     * Convenience method for setting the label and hint together
+     *
+     * @param text the text and hint
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;);
+     * }
+     */
+    public TextComponent labelAndHint(String text) {
+<span class="fc" id="L343">        super.label(text);</span>
+<span class="fc" id="L344">        hint(text);</span>
+<span class="fc" id="L345">        return this;</span>
+    }
+
+    /**
+     * Sets the hint of the field
+     *
+     * @param hint the text of the hint
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;); }
+     */
+    public TextComponent hint(String hint) {
+<span class="fc" id="L355">        field.setHint(hint);</span>
+<span class="fc" id="L356">        refreshForGuiBuilder();</span>
+<span class="fc" id="L357">        return this;</span>
+    }
+
+    /**
+     * Sets the hint of the field
+     *
+     * @param hint the icon for the hint
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;); }
+     */
+    public TextComponent hint(Image hint) {
+<span class="nc" id="L367">        field.setHintIcon(hint);</span>
+<span class="nc" id="L368">        refreshForGuiBuilder();</span>
+<span class="nc" id="L369">        return this;</span>
+    }
+
+    /**
+     * Sets the text field to multiline or single line
+     *
+     * @param multiline true for multiline, false otherwise
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;); }
+     */
+    public TextComponent multiline(boolean multiline) {
+<span class="nc bnc" id="L379" title="All 2 branches missed.">        field.setSingleLineTextArea(!multiline);</span>
+<span class="nc" id="L380">        refreshForGuiBuilder();</span>
+<span class="nc" id="L381">        return this;</span>
+    }
+
+    /**
+     * Sets the columns in the text field
+     *
+     * @param columns the number of columns which is used for preferred size calculations
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;); }
+     */
+    public TextComponent columns(int columns) {
+<span class="fc" id="L391">        field.setColumns(columns);</span>
+<span class="fc" id="L392">        refreshForGuiBuilder();</span>
+<span class="fc" id="L393">        return this;</span>
+    }
+
+    /**
+     * Sets the rows in the text field
+     *
+     * @param rows the number of rows which is used for preferred size calculations
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;); }
+     */
+    public TextComponent rows(int rows) {
+<span class="fc" id="L403">        field.setRows(rows);</span>
+<span class="fc" id="L404">        refreshForGuiBuilder();</span>
+<span class="fc" id="L405">        return this;</span>
+    }
+
+    /**
+     * Sets the constraint for text input matching the constraints from the text area class
+     *
+     * @param constraint one of the constants from the {@link com.codename1.ui.TextArea} class see
+     *                   {@link com.codename1.ui.TextArea#setConstraint(int)}
+     * @return this for chaining calls E.g. {@code TextComponent tc = new TextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;); }
+     */
+    public TextComponent constraint(int constraint) {
+<span class="fc" id="L416">        field.setConstraint(constraint);</span>
+<span class="fc" id="L417">        return this;</span>
+    }
+
+    /**
+     * Allows us to invoke setters/getters and bind listeners to the text field
+     *
+     * @return the text field instance
+     */
+    public TextField getField() {
+<span class="fc" id="L426">        return field;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+<span class="nc" id="L433">        return new String[]{&quot;text&quot;, &quot;label&quot;, &quot;hint&quot;, &quot;multiline&quot;, &quot;columns&quot;, &quot;rows&quot;, &quot;constraint&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L440">        return new Class[]{String.class, String.class, String.class, Boolean.class, Integer.class, Integer.class, Integer.class};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyTypeNames() {
+<span class="nc" id="L447">        return new String[]{&quot;String&quot;, &quot;String&quot;, &quot;String&quot;, &quot;Boolean&quot;, &quot;Integer&quot;, &quot;Integer&quot;, &quot;Integer&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+<span class="fc bfc" id="L454" title="All 2 branches covered.">        if (name.equals(&quot;text&quot;)) {</span>
+<span class="fc" id="L455">            return field.getText();</span>
+        }
+<span class="fc bfc" id="L457" title="All 2 branches covered.">        if (name.equals(&quot;hint&quot;)) {</span>
+<span class="fc" id="L458">            return field.getHint();</span>
+        }
+<span class="pc bpc" id="L460" title="1 of 2 branches missed.">        if (name.equals(&quot;multiline&quot;)) {</span>
+<span class="nc bnc" id="L461" title="All 2 branches missed.">            return Boolean.valueOf(!field.isSingleLineTextArea());</span>
+        }
+<span class="fc bfc" id="L463" title="All 2 branches covered.">        if (name.equals(&quot;columns&quot;)) {</span>
+<span class="fc" id="L464">            return field.getColumns();</span>
+        }
+<span class="pc bpc" id="L466" title="1 of 2 branches missed.">        if (name.equals(&quot;rows&quot;)) {</span>
+<span class="fc" id="L467">            return field.getRows();</span>
+        }
+<span class="nc bnc" id="L469" title="All 2 branches missed.">        if (name.equals(&quot;constraint&quot;)) {</span>
+<span class="nc" id="L470">            return field.getConstraint();</span>
+        }
+
+<span class="nc" id="L473">        return super.getPropertyValue(name);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+<span class="fc bfc" id="L480" title="All 2 branches covered.">        if (name.equals(&quot;text&quot;)) {</span>
+<span class="fc" id="L481">            text((String) value);</span>
+<span class="fc" id="L482">            return null;</span>
+        }
+<span class="pc bpc" id="L484" title="1 of 2 branches missed.">        if (name.equals(&quot;hint&quot;)) {</span>
+<span class="nc" id="L485">            hint((String) value);</span>
+<span class="nc" id="L486">            return null;</span>
+        }
+<span class="fc bfc" id="L488" title="All 2 branches covered.">        if (name.equals(&quot;multiline&quot;)) {</span>
+<span class="pc bpc" id="L489" title="1 of 2 branches missed.">            field.setSingleLineTextArea(!((Boolean) value).booleanValue());</span>
+<span class="fc" id="L490">            return null;</span>
+        }
+<span class="pc bpc" id="L492" title="1 of 2 branches missed.">        if (name.equals(&quot;columns&quot;)) {</span>
+<span class="nc" id="L493">            field.setColumns((Integer) value);</span>
+<span class="nc" id="L494">            return null;</span>
+        }
+<span class="pc bpc" id="L496" title="1 of 2 branches missed.">        if (name.equals(&quot;rows&quot;)) {</span>
+<span class="nc" id="L497">            field.setRows((Integer) value);</span>
+<span class="nc" id="L498">            return null;</span>
+        }
+<span class="pc bpc" id="L500" title="1 of 2 branches missed.">        if (name.equals(&quot;constraint&quot;)) {</span>
+<span class="fc" id="L501">            field.setConstraint((Integer) value);</span>
+<span class="fc" id="L502">            return null;</span>
+        }
+<span class="nc" id="L504">        return super.setPropertyValue(name, value);</span>
+    }
+
+    /**
+     * Returns the text in the field {@link com.codename1.ui.TextArea#getText()}
+     *
+     * @return the text
+     */
+    public String getText() {
+<span class="nc" id="L513">        return field.getText();</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

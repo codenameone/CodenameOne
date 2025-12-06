@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Cookie.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">Cookie.java</span></div><h1>Cookie.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.io;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+
+/**
+ * A cookie for an HTTP request
+ *
+ * @author Shai Almog
+ */
+<span class="fc" id="L36">public class Cookie implements Externalizable {</span>
+<span class="fc" id="L37">    public static String STORAGE_NAME = &quot;Cookies&quot;;</span>
+<span class="fc" id="L38">    private static boolean autoStored = true;</span>
+
+    static {
+<span class="fc" id="L41">        Util.register(&quot;Cookie&quot;, Cookie.class);</span>
+<span class="fc" id="L42">    }</span>
+
+    private String name;
+    private String value;
+    private String domain;
+<span class="fc" id="L47">    private String path = &quot;/&quot;;</span>
+<span class="fc" id="L48">    private boolean secure = false;</span>
+<span class="fc" id="L49">    private boolean httpOnly = false;</span>
+    private long expires;
+
+    /**
+     * Returns true if the Cookies are auto stored to storage
+     *
+     * @return autoStored
+     */
+    public static boolean isAutoStored() {
+<span class="fc" id="L58">        return autoStored;</span>
+    }
+
+    /**
+     * This method configures the auto storage of cookies
+     *
+     * @param autoStored
+     */
+    public static void setAutoStored(boolean autoStored) {
+<span class="fc" id="L67">        Cookie.autoStored = autoStored;</span>
+<span class="fc" id="L68">    }</span>
+
+    /**
+     * Clears all cookies history from storage
+     */
+    public static void clearCookiesFromStorage() {
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (Storage.getInstance().exists(Cookie.STORAGE_NAME)) {</span>
+<span class="fc" id="L75">            Storage.getInstance().deleteStorageFile(Cookie.STORAGE_NAME);</span>
+        }
+        // This is necessary to clear cookies on iOS
+        // https://github.com/codenameone/CodenameOne/issues/1422
+<span class="fc" id="L79">        Util.getImplementation().clearNativeCookies();</span>
+<span class="fc" id="L80">    }</span>
+
+    /**
+     * @return the name
+     */
+    public String getName() {
+<span class="fc" id="L86">        return name;</span>
+    }
+
+    /**
+     * @param name the name to set
+     */
+    public void setName(String name) {
+<span class="fc" id="L93">        this.name = name;</span>
+<span class="fc" id="L94">    }</span>
+
+    public boolean isSecure() {
+<span class="fc" id="L97">        return this.secure;</span>
+    }
+
+    public void setSecure(boolean secure) {
+<span class="fc" id="L101">        this.secure = secure;</span>
+<span class="fc" id="L102">    }</span>
+
+    public boolean isHttpOnly() {
+<span class="fc" id="L105">        return this.httpOnly;</span>
+    }
+
+    public void setHttpOnly(boolean httpOnly) {
+<span class="fc" id="L109">        this.httpOnly = httpOnly;</span>
+<span class="fc" id="L110">    }</span>
+
+    public String getPath() {
+<span class="fc" id="L113">        return this.path;</span>
+    }
+
+    public void setPath(String path) {
+<span class="fc" id="L117">        this.path = path;</span>
+<span class="fc" id="L118">    }</span>
+
+    /**
+     * @return the value
+     */
+    public String getValue() {
+<span class="fc" id="L124">        return value;</span>
+    }
+
+    /**
+     * @param value the value to set
+     */
+    public void setValue(String value) {
+<span class="fc" id="L131">        this.value = value;</span>
+<span class="fc" id="L132">    }</span>
+
+    /**
+     * @return the domain
+     */
+    public String getDomain() {
+<span class="fc" id="L138">        return domain;</span>
+    }
+
+    /**
+     * @param domain the domain to set
+     */
+    public void setDomain(String domain) {
+<span class="fc" id="L145">        this.domain = domain;</span>
+<span class="fc" id="L146">    }</span>
+
+    /**
+     * @return the expires
+     */
+    public long getExpires() {
+<span class="fc" id="L152">        return expires;</span>
+    }
+
+    /**
+     * @param expires the expires to set
+     */
+    public void setExpires(long expires) {
+<span class="fc" id="L159">        this.expires = expires;</span>
+<span class="fc" id="L160">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getVersion() {
+<span class="fc" id="L166">        return 1;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void externalize(DataOutputStream out) throws IOException {
+<span class="fc" id="L173">        out.writeUTF(name);</span>
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        if (value != null) {</span>
+<span class="fc" id="L175">            out.writeBoolean(true);</span>
+<span class="fc" id="L176">            out.writeUTF(value);</span>
+        } else {
+<span class="fc" id="L178">            out.writeBoolean(false);</span>
+        }
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (domain != null) {</span>
+<span class="fc" id="L181">            out.writeBoolean(true);</span>
+<span class="fc" id="L182">            out.writeUTF(domain);</span>
+        } else {
+<span class="fc" id="L184">            out.writeBoolean(false);</span>
+        }
+<span class="fc" id="L186">        out.writeLong(expires);</span>
+<span class="fc" id="L187">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void internalize(int version, DataInputStream in) throws IOException {
+<span class="fc" id="L193">        name = in.readUTF();</span>
+<span class="fc bfc" id="L194" title="All 2 branches covered.">        if (in.readBoolean()) {</span>
+<span class="fc" id="L195">            value = in.readUTF();</span>
+        }
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        if (in.readBoolean()) {</span>
+<span class="fc" id="L198">            domain = in.readUTF();</span>
+        }
+<span class="fc" id="L200">        expires = in.readLong();</span>
+<span class="fc" id="L201">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public String getObjectId() {
+<span class="fc" id="L207">        return &quot;Cookie&quot;;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String toString() {
+<span class="fc" id="L214">        return &quot;name = &quot; + name + &quot; value = &quot; + value + &quot; domain = &quot; + domain + &quot;expires = &quot; + expires + &quot; secure = &quot; + secure + &quot; path = &quot; + path;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

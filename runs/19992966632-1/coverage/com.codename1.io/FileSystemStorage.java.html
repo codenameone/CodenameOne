@@ -1,0 +1,341 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileSystemStorage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">FileSystemStorage.java</span></div><h1>FileSystemStorage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.io;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.Timer;
+import java.util.TimerTask;
+
+/**
+ * &lt;p&gt;Unlike networking, the file system storage mostly tries to emulate java.io.File with
+ * some simplifications for mobile devices.&lt;br&gt;
+ * Check out a more thorough discussion of this API {@link com.codename1.io here}.&lt;br&gt;
+ * A lot of API's rely on {@code FileSystemStorage} as its the API native code usually uses consistently.
+ * E.g. in this sample below the {@code FileSystemStorage} is used to save a screenshot image for sharing
+ * on social media:&lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js&quot;&gt;&lt;/script&gt;
+ *
+ * &lt;p&gt;
+ * The sample below shows the {@code FileSystemStorage} as a tree:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/2877412809a8cff646af.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/filesystem-tree.png&quot; alt=&quot;Simple sample of a tree for the FileSystemStorage API&quot;&gt;
+ *
+ * @author Shai Almog
+ */
+public class FileSystemStorage {
+    /**
+     * Represents the type for the get root type method, this type generally represents the main
+     * phone memory
+     */
+    public static final int ROOT_TYPE_MAINSTORAGE = 1;
+    /**
+     * Represents the type for the get root type method, this type generally represents an
+     * SD card although due to variability in phone standards an SD card might be
+     * detected incorrectly. E.g. newer Nokia devices such as N97 have a large storage
+     * area that is marked as &quot;E:&quot; but is really internal storage. If an SD card isn't
+     * physically in the phone the &quot;F:&quot; won't be returned and it will be impossible to
+     * detect that &quot;E:&quot; is not the actual SD card.
+     */
+    public static final int ROOT_TYPE_SDCARD = 2;
+    /**
+     * Returned for different types of root for which there is no specific knowledge one
+     * way or the other.
+     */
+    public static final int ROOT_TYPE_UNKNOWN = 3;
+<span class="fc" id="L70">    private static final FileSystemStorage INSTANCE = new FileSystemStorage();</span>
+
+    private FileSystemStorage() {
+    }
+
+    /**
+     * This class is a singleton
+     *
+     * @return instance of this class
+     */
+    public static FileSystemStorage getInstance() {
+<span class="fc" id="L81">        return INSTANCE;</span>
+    }
+
+    /**
+     * Returns the filesystem roots from which the structure of the file system
+     * can be traversed
+     *
+     * @return the roots of the filesystem
+     */
+    public String[] getRoots() {
+<span class="fc" id="L91">        return Util.getImplementation().listFilesystemRoots();</span>
+    }
+
+    /**
+     * Returns the type of the root often by guessing
+     *
+     * @param root the root whose type we are checking
+     * @return one of the type constants above
+     */
+    public int getRootType(String root) {
+<span class="nc" id="L101">        return Util.getImplementation().getRootType(root);</span>
+    }
+
+
+    /**
+     * Lists the files within the given directory, returns relative file names and not
+     * full file names.
+     *
+     * @param directory the directory in which files should be listed
+     * @return array of file names
+     */
+    public String[] listFiles(String directory) throws IOException {
+<span class="nc" id="L113">        return Util.getImplementation().listFiles(directory);</span>
+    }
+
+    /**
+     * Returns the size of the given root directory
+     *
+     * @param root the root directory in the filesystem
+     * @return the byte size of the directory
+     */
+    public long getRootSizeBytes(String root) {
+<span class="nc" id="L123">        return Util.getImplementation().getRootSizeBytes(root);</span>
+    }
+
+    /**
+     * Returns the available space in the given root directory
+     *
+     * @param root the root directory in the filesystem
+     * @return the bytes available in the directory
+     */
+    public long getRootAvailableSpace(String root) {
+<span class="nc" id="L133">        return Util.getImplementation().getRootAvailableSpace(root);</span>
+    }
+
+    /**
+     * Creates the given directory
+     *
+     * @param directory the directory name to create
+     */
+    public void mkdir(String directory) {
+<span class="fc" id="L142">        Util.getImplementation().mkdir(directory);</span>
+<span class="fc" id="L143">    }</span>
+
+
+    /**
+     * Deletes the specific file or empty directory.
+     *
+     * @param file file or empty directory to delete
+     */
+    public void delete(String file) {
+<span class="fc" id="L152">        Util.getImplementation().deleteFile(file);</span>
+<span class="fc" id="L153">    }</span>
+
+    /**
+     * Deletes the specific file or empty directory, if the platform supports a
+     * delete on exit this method will activate it. Regardless it will retry
+     * deleting (with delay) several times to allow streams time to close.
+     *
+     * @param file       file to delete
+     * @param retryCount the number of times to retry
+     */
+    public void deleteRetry(final String file, final int retryCount) {
+<span class="nc" id="L164">        System.gc();</span>
+        try {
+<span class="nc" id="L166">            Util.getImplementation().deleteFile(file);</span>
+<span class="nc" id="L167">        } catch (Throwable t) {</span>
+<span class="nc" id="L168">        }</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        if (Util.getImplementation().exists(file)) {</span>
+<span class="nc bnc" id="L170" title="All 2 branches missed.">            if (retryCount &gt; 0) {</span>
+<span class="nc" id="L171">                new Timer().schedule(new TimerTask() {</span>
+                    public void run() {
+<span class="nc" id="L173">                        deleteRetry(file, retryCount - 1);</span>
+<span class="nc" id="L174">                    }</span>
+                }, 500);
+            }
+        }
+<span class="nc" id="L178">    }</span>
+
+
+    /**
+     * Indicates whether a file exists
+     *
+     * @param file the file to check
+     * @return true if the file exists and false otherwise
+     */
+    public boolean exists(String file) {
+<span class="fc" id="L188">        return Util.getImplementation().exists(file);</span>
+    }
+
+    /**
+     * Indicates the hidden state of the file
+     *
+     * @param file file
+     * @return true for a hidden file
+     */
+    public boolean isHidden(String file) {
+<span class="nc" id="L198">        return Util.getImplementation().isHidden(file);</span>
+    }
+
+    /**
+     * Toggles the hidden state of the file
+     *
+     * @param file file
+     * @param h    hidden state
+     */
+    public void setHidden(String file, boolean h) {
+<span class="nc" id="L208">        Util.getImplementation().setHidden(file, h);</span>
+<span class="nc" id="L209">    }</span>
+
+    /**
+     * Renames a file to the given name, expects the new name to be relative to the
+     * current directory
+     *
+     * @param file    absolute file name
+     * @param newName relative new name
+     */
+    public void rename(String file, String newName) {
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">        if (newName.indexOf('/') &gt; -1) {</span>
+<span class="nc" id="L220">            throw new RuntimeException(&quot;Rename accepts only relative file names not full paths: &quot; + newName);</span>
+        }
+<span class="fc" id="L222">        Util.getImplementation().rename(file, newName);</span>
+<span class="fc" id="L223">    }</span>
+
+    /**
+     * Returns the length of the file
+     *
+     * @param file file
+     * @return length of said file
+     */
+    public long getLength(String file) {
+<span class="fc" id="L232">        return Util.getImplementation().getFileLength(file);</span>
+    }
+
+    /**
+     * Returns the time that the file denoted by this abstract pathname was
+     * last modified.
+     *
+     * @return A long value representing the time the file was last modified,
+     * measured in milliseconds
+     * @deprecated this API requires additional privacy permissions on iOS
+     * and might cause problems with iOS submissions
+     */
+    public long getLastModified(String file) {
+<span class="nc" id="L245">        return Util.getImplementation().getFileLastModified(file);</span>
+    }
+
+    /**
+     * Indicates whether the given file is a directory
+     *
+     * @param file file
+     * @return true if its a directory
+     */
+    public boolean isDirectory(String file) {
+<span class="fc" id="L255">        return Util.getImplementation().isDirectory(file);</span>
+    }
+
+    /**
+     * Returns the file system separator char normally '/'
+     *
+     * @return the separator char
+     */
+    public char getFileSystemSeparator() {
+<span class="nc" id="L264">        return Util.getImplementation().getFileSystemSeparator();</span>
+    }
+
+    /**
+     * Opens an output stream to the given file
+     *
+     * @param file the file
+     * @return the output stream
+     */
+    public OutputStream openOutputStream(String file) throws IOException {
+<span class="fc" id="L274">        return Util.getImplementation().openFileOutputStream(file);</span>
+    }
+
+    /**
+     * Opens an input stream to the given file
+     *
+     * @param file the file
+     * @return the input stream
+     */
+    public InputStream openInputStream(String file) throws IOException {
+<span class="fc" id="L284">        return Util.getImplementation().openFileInputStream(file);</span>
+    }
+
+    /**
+     * Opens an output stream to the given file
+     *
+     * @param file   the file
+     * @param offset position in the file
+     * @return the output stream
+     */
+    public OutputStream openOutputStream(String file, int offset) throws IOException {
+<span class="nc" id="L295">        return Util.getImplementation().openOutputStream(file, offset);</span>
+    }
+
+    /**
+     * &lt;p&gt;The application home directory is a &quot;safe place&quot; to store files for this application in a portable way.
+     * On some platforms such as Android  &amp;amp; iOS this path may be visible only to the
+     * application itself, other apps won't have permission to access this path.&lt;br&gt;
+     * The sample below uses the app home directory to save a file so we can share it using the {@link com.codename1.components.ShareButton}:&lt;/p&gt;
+     *
+     * &lt;script src=&quot;https://gist.github.com/codenameone/6bf5e68b329ae59a25e3.js&quot;&gt;&lt;/script&gt;
+     *
+     * @return a writable directory that represent the application home directory
+     */
+    public String getAppHomePath() {
+<span class="fc" id="L309">        return Util.getImplementation().getAppHomePath();</span>
+    }
+
+    /**
+     * Returns true if the device has a directory dedicated for &quot;cache&quot; files
+     *
+     * @return true if a caches style directory exists in this device type
+     */
+    public boolean hasCachesDir() {
+<span class="nc" id="L318">        return Util.getImplementation().hasCachesDir();</span>
+    }
+
+    /**
+     * Returns a device specific directory designed for cache style files, or null if {@link #hasCachesDir()}
+     * is false
+     *
+     * @return file URL or null
+     */
+    public String getCachesDir() {
+<span class="nc" id="L328">        return Util.getImplementation().getCachesDir();</span>
+    }
+
+    /**
+     * Converts a file system path to a native path.
+     *
+     * @param path A file system path.
+     * @return The native path.
+     */
+    public String toNativePath(String path) {
+<span class="nc" id="L338">        return Util.getImplementation().toNativePath(path);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

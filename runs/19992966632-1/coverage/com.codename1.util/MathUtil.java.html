@@ -1,0 +1,1336 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MathUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">MathUtil.java</span></div><h1>MathUtil.java</h1><pre class="source lang-java linenums">package com.codename1.util;
+/*
+ * Ported from the Sun Microsystems FDLIBM C-library.
+ * (Freely Distributable Library for Math)
+ * ====================================================
+ * Copyright (C) 2004 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
+/**
+ * MathUtil for Java ME.
+ * This fills the gap in Java ME Math with a port of Sun's public FDLIBM C-library for IEEE-754.
+ *
+ * @author kmashint
+ * @see &lt;a href=&quot;http://www.netlib.org/fdlibm/readme&quot;&gt;http://www.netlib.org/fdlibm/readme&lt;/a&gt;
+ * For the Freely Distributable C-library conforming to IEEE-754 floating point math.
+ * @see &lt;a href=&quot;http://web.mit.edu/source/third/gcc/libjava/java/lang/&quot;&gt;http://web.mit.edu/source/third/gcc/libjava/java/lang/&lt;/a&gt;
+ * For the GNU C variant of the same IEEE-754 routines.
+ * @see &lt;a href=&quot;http://www.dclausen.net/projects/microfloat/&quot;&gt;http://www.dclausen.net/projects/microfloat/&lt;/a&gt;
+ * Another take on the IEEE-754 routines.
+ * @see &lt;a href=&quot;http://real-java.sourceforge.net/Real.html&quot;&gt;http://real-java.sourceforge.net/Real.html&lt;/a&gt;
+ * Yet another take on the IEEE-754 routines.
+ * @see &lt;a href=&quot;http://today.java.net/pub/a/today/2007/11/06/creating-java-me-math-pow-method.html&quot;&gt;http://today.java.net/pub/a/today/2007/11/06/creating-java-me-math-pow-method.html&lt;/a&gt;
+ * For other approximations.
+ * @see &lt;a href=&quot;http://martin.ankerl.com/2007/10/04/optimized-pow-approximation-for-java-and-c-c/&quot;&gt;http://martin.ankerl.com/2007/10/04/optimized-pow-approximation-for-java-and-c-c/&lt;/a&gt;
+ * For fast but rough approximations.
+ * @see &lt;a href=&quot;http://martin.ankerl.com/2007/02/11/optimized-exponential-functions-for-java/&quot;&gt;http://martin.ankerl.com/2007/02/11/optimized-exponential-functions-for-java/&lt;/a&gt;
+ * For more fast but rough approximations.
+ */
+<span class="nc" id="L34">public abstract class MathUtil {</span>
+
+    /* Common constants. */
+    private static final double zero = 0.0,
+            one = 1.0,
+            two = 2.0,
+            tiny = 1.0e-300,
+            huge = 1.0e+300,
+            two53 = 9007199254740992.0, /* 0x43400000, 0x00000000 */
+            two54 = 1.80143985094819840000e+16, /* 0x43500000, 0x00000000 */
+            twom54 = 5.55111512312578270212e-17, /* 0x3C900000, 0x00000000 */
+            P1 = 1.66666666666666019037e-01, /* 0x3FC55555, 0x5555553E */
+            P2 = -2.77777777770155933842e-03, /* 0xBF66C16C, 0x16BEBD93 */
+            P3 = 6.61375632143793436117e-05, /* 0x3F11566A, 0xAF25DE2C */
+            P4 = -1.65339022054652515390e-06, /* 0xBEBBBD41, 0xC5D26BF1 */
+            P5 = 4.13813679705723846039e-08; /* 0x3E663769, 0x72BEA4D0 */
+
+    private static final double pio2_hi = 1.57079632679489655800e+00, /* 0x3FF921FB, 0x54442D18 */
+            pio2_lo = 6.12323399573676603587e-17, /* 0x3C91A626, 0x33145C07 */
+            pio4_hi = 7.85398163397448278999e-01, /* 0x3FE921FB, 0x54442D18 */
+    /* coefficient for R(x^2) */
+    pS0 = 1.66666666666666657415e-01, /* 0x3FC55555, 0x55555555 */
+            pS1 = -3.25565818622400915405e-01, /* 0xBFD4D612, 0x03EB6F7D */
+            pS2 = 2.01212532134862925881e-01, /* 0x3FC9C155, 0x0E884455 */
+            pS3 = -4.00555345006794114027e-02, /* 0xBFA48228, 0xB5688F3B */
+            pS4 = 7.91534994289814532176e-04, /* 0x3F49EFE0, 0x7501B288 */
+            pS5 = 3.47933107596021167570e-05, /* 0x3F023DE1, 0x0DFDF709 */
+            qS1 = -2.40339491173441421878e+00, /* 0xC0033A27, 0x1C8A2D4B */
+            qS2 = 2.02094576023350569471e+00, /* 0x40002AE5, 0x9C598AC8 */
+            qS3 = -6.88283971605453293030e-01, /* 0xBFE6066C, 0x1B8D0159 */
+            qS4 = 7.70381505559019352791e-02; /* 0x3FB3B8C5, 0xB12E9282 */
+
+    private static final double pi_o_4 = 7.8539816339744827900E-01, /* 0x3FE921FB, 0x54442D18 */
+            pi_o_2 = 1.5707963267948965580E+00, /* 0x3FF921FB, 0x54442D18 */
+            pi = 3.1415926535897931160E+00, /* 0x400921FB, 0x54442D18 */
+            pi_lo = 1.2246467991473531772E-16; /* 0x3CA1A626, 0x33145C07 */
+
+    private static final double log10 = 2.302585092994046D; /* Natural log(10.0D). */
+
+    private static final long HI_MASK = 0xffffffff00000000L,
+            LO_MASK = 0x00000000ffffffffL;
+    private static final int HI_SHIFT = 32;
+    /* __ieee754_exp(x)
+     * Returns the exponential of x.
+     *
+     * Method
+     *   1. Argument reduction:
+     *      Reduce x to an r so that |r| &lt;= 0.5*ln2 ~ 0.34658.
+     *  Given x, find r and integer k such that
+     *
+     *               x = k*ln2 + r,  |r| &lt;= 0.5*ln2.
+     *
+     *      Here r will be represented as r = hi-lo for better
+     *  accuracy.
+     *
+     *   2. Approximation of exp(r) by a special rational function on
+     *  the interval [0,0.34658]:
+     *  Write
+     *      R(r**2) = r*(exp(r)+1)/(exp(r)-1) = 2 + r*r/6 - r**4/360 + ...
+     *      We use a special Remes algorithm on [0,0.34658] to generate
+     *  a polynomial of degree 5 to approximate R. The maximum error
+     *  of this polynomial approximation is bounded by 2**-59. In
+     *  other words,
+     *      R(z) ~ 2.0 + P1*z + P2*z**2 + P3*z**3 + P4*z**4 + P5*z**5
+     *    (where z=r*r, and the values of P1 to P5 are listed below)
+     *  and
+     *      |                  5          |     -59
+     *      | 2.0+P1*z+...+P5*z   -  R(z) | &lt;= 2
+     *      |                             |
+     *  The computation of exp(r) thus becomes
+     *                             2*r
+     *    exp(r) = 1 + -------
+     *                  R - r
+     *                                 r*R1(r)
+     *           = 1 + r + ----------- (for better accuracy)
+     *                      2 - R1(r)
+     *  where
+     *               2       4             10
+     *    R1(r) = r - (P1*r  + P2*r  + ... + P5*r   ).
+     *
+     *   3. Scale back to obtain exp(x):
+     *  From step 1, we have
+     *     exp(x) = 2^k * exp(r)
+     *
+     * Special cases:
+     *  exp(INF) is INF, exp(NaN) is NaN;
+     *  exp(-INF) is 0, and
+     *  for finite argument, only exp(0)=1 is exact.
+     *
+     * Accuracy:
+     *  according to an error analysis, the error is always less than
+     *  1 ulp (unit in the last place).
+     *
+     * Misc. info.
+     *  For IEEE double
+     *      if x &gt;  7.09782712893383973096e+02 then exp(x) overflow
+     *      if x &lt; -7.45133219101941108420e+02 then exp(x) underflow
+     *
+     * Constants:
+     * The hexadecimal values are the intended ones for the following
+     * constants. The decimal values may be used, provided that the
+     * compiler will convert from decimal to binary accurately enough
+     * to produce the hexadecimal values shown.
+     */
+    private static final double twom1000 = 9.33263618503218878990e-302, /* 2**-1000=0x01700000,0*/
+            o_threshold = 7.09782712893383973096e+02, /* 0x40862E42, 0xFEFA39EF */
+            u_threshold = -7.45133219101941108420e+02, /* 0xc0874910, 0xD52D3051 */
+            invln2 = 1.44269504088896338700e+00; /* 0x3ff71547, 0x652b82fe */
+<span class="fc" id="L142">    private static final double[] halF = new double[]{0.5, -0.5},</span>
+<span class="fc" id="L143">            ln2HI = new double[]{6.93147180369123816490e-01, /* 0x3fe62e42, 0xfee00000 */</span>
+                    -6.93147180369123816490e-01}, /* 0xbfe62e42, 0xfee00000 */
+<span class="fc" id="L145">            ln2LO = new double[]{1.90821492927058770002e-10, /* 0x3dea39ef, 0x35793c76 */</span>
+                    -1.90821492927058770002e-10}; /* 0xbdea39ef, 0x35793c76 */
+    /* __ieee754_log(x)
+     * Return the logrithm of x
+     *
+     * Method :
+     *   1. Argument Reduction: find k and f such that
+     *      x = 2^k * (1+f),
+     *     where  sqrt(2)/2 &lt; 1+f &lt; sqrt(2) .
+     *
+     *   2. Approximation of log(1+f).
+     *  Let s = f/(2+f) ; based on log(1+f) = log(1+s) - log(1-s)
+     *     = 2s + 2/3 s**3 + 2/5 s**5 + .....,
+     *         = 2s + s*R
+     *      We use a special Reme algorithm on [0,0.1716] to generate
+     *  a polynomial of degree 14 to approximate R The maximum error
+     *  of this polynomial approximation is bounded by 2**-58.45. In
+     *  other words,
+     *            2      4      6      8      10      12      14
+     *      R(z) ~ Lg1*s +Lg2*s +Lg3*s +Lg4*s +Lg5*s  +Lg6*s  +Lg7*s
+     *    (the values of Lg1 to Lg7 are listed in the program)
+     *  and
+     *      |      2          14          |     -58.45
+     *      | Lg1*s +...+Lg7*s    -  R(z) | &lt;= 2
+     *      |                             |
+     *  Note that 2s = f - s*f = f - hfsq + s*hfsq, where hfsq = f*f/2.
+     *  In order to guarantee error in log below 1ulp, we compute log
+     *  by
+     *    log(1+f) = f - s*(f - R)  (if f is not too large)
+     *    log(1+f) = f - (hfsq - s*(hfsq+R)). (better accuracy)
+     *
+     *  3. Finally,  log(x) = k*ln2 + log(1+f).
+     *          = k*ln2_hi+(f-(hfsq-(s*(hfsq+R)+k*ln2_lo)))
+     *     Here ln2 is split into two floating point number:
+     *      ln2_hi + ln2_lo,
+     *     where n*ln2_hi is always exact for |n| &lt; 2000.
+     *
+     * Special cases:
+     *  log(x) is NaN with signal if x &lt; 0 (including -INF) ;
+     *  log(+INF) is +INF; log(0) is -INF with signal;
+     *  log(NaN) is that NaN with no signal.
+     *
+     * Accuracy:
+     *  according to an error analysis, the error is always less than
+     *  1 ulp (unit in the last place).
+     *
+     * Constants:
+     * The hexadecimal values are the intended ones for the following
+     * constants. The decimal values may be used, provided that the
+     * compiler will convert from decimal to binary accurately enough
+     * to produce the hexadecimal values shown.
+     */
+    private static final double ln2_hi = 6.93147180369123816490e-01, /* 3fe62e42 fee00000 */
+            ln2_lo = 1.90821492927058770002e-10, /* 3dea39ef 35793c76 */
+            Lg1 = 6.666666666666735130e-01, /* 3FE55555 55555593 */
+            Lg2 = 3.999999999940941908e-01, /* 3FD99999 9997FA04 */
+            Lg3 = 2.857142874366239149e-01, /* 3FD24924 94229359 */
+            Lg4 = 2.222219843214978396e-01, /* 3FCC71C5 1D8E78AF */
+            Lg5 = 1.818357216161805012e-01, /* 3FC74664 96CB03DE */
+            Lg6 = 1.531383769920937332e-01, /* 3FC39A09 D078C69F */
+            Lg7 = 1.479819860511658591e-01;  /* 3FC2F112 DF3E5244 */
+    /* __ieee754_pow(x,y) return x**y
+     *
+     *          n
+     * Method:  Let x =  2   * (1+f)
+     *  1. Compute and return log2(x) in two pieces:
+     *    log2(x) = w1 + w2,
+     *     where w1 has 53-24 = 29 bit trailing zeros.
+     *  2. Perform y*log2(x) = n+y' by simulating muti-precision
+     *     arithmetic, where |y'|&lt;=0.5.
+     *  3. Return x**y = 2**n*exp(y'*log2)
+     *
+     * Special cases:
+     *  1.  (anything) ** 0  is 1
+     *  2.  (anything) ** 1  is itself
+     *  3.  (anything) ** NAN is NAN
+     *  4.  NAN ** (anything except 0) is NAN
+     *  5.  +-(|x| &gt; 1) **  +INF is +INF
+     *  6.  +-(|x| &gt; 1) **  -INF is +0
+     *  7.  +-(|x| &lt; 1) **  +INF is +0
+     *  8.  +-(|x| &lt; 1) **  -INF is +INF
+     *  9.  +-1         ** +-INF is NAN
+     *  10. +0 ** (+anything except 0, NAN)               is +0
+     *  11. -0 ** (+anything except 0, NAN, odd integer)  is +0
+     *  12. +0 ** (-anything except 0, NAN)               is +INF
+     *  13. -0 ** (-anything except 0, NAN, odd integer)  is +INF
+     *  14. -0 ** (odd integer) = -( +0 ** (odd integer) )
+     *  15. +INF ** (+anything except 0,NAN) is +INF
+     *  16. +INF ** (-anything except 0,NAN) is +0
+     *  17. -INF ** (anything)  = -0 ** (-anything)
+     *  18. (-anything) ** (integer) is (-1)**(integer)*(+anything**integer)
+     *  19. (-anything except 0 and inf) ** (non-integer) is NAN
+     *
+     * Accuracy:
+     *  pow(x,y) returns x**y nearly rounded. In particular
+     *      pow(integer,integer)
+     *  always returns the correct integer provided it is
+     *  representable.
+     *
+     * Constants :
+     * The hexadecimal values are the intended ones for the following
+     * constants. The decimal values may be used, provided that the
+     * compiler will convert from decimal to binary accurately enough
+     * to produce the hexadecimal values shown.
+     */
+<span class="fc" id="L250">    private static final double[] bp = {1.0, 1.5,};</span>
+<span class="fc" id="L251">    private static final double[] dp_h = {0.0, 5.84962487220764160156e-01,}; /* 0x3FE2B803, 0x40000000 */</span>
+<span class="fc" id="L252">            private static final double[] dp_l = {0.0, 1.35003920212974897128e-08,}; /* 0x3E4CFDEB, 0x43CFD006 */</span>
+    private static final double/* poly coefs for (3/2)*(log(x)-2s-2/3*s**3 */
+    L1 = 5.99999999999994648725e-01; /* 0x3FE33333, 0x33333303 */
+            private static final double L2 = 4.28571428578550184252e-01; /* 0x3FDB6DB6, 0xDB6FABFF */
+            private static final double L3 = 3.33333329818377432918e-01; /* 0x3FD55555, 0x518F264D */
+            private static final double L4 = 2.72728123808534006489e-01; /* 0x3FD17460, 0xA91D4101 */
+            private static final double L5 = 2.30660745775561754067e-01; /* 0x3FCD864A, 0x93C9DB65 */
+            private static final double L6 = 2.06975017800338417784e-01; /* 0x3FCA7E28, 0x4A454EEF */
+            private static final double lg2 = 6.93147180559945286227e-01; /* 0x3FE62E42, 0xFEFA39EF */
+            private static final double lg2_h = 6.93147182464599609375e-01; /* 0x3FE62E43, 0x00000000 */
+            private static final double lg2_l = -1.90465429995776804525e-09; /* 0xBE205C61, 0x0CA86C39 */
+            private static final double ovt = 8.0085662595372944372e-0017; /* -(1024-log2(ovfl+.5ulp)) */
+            private static final double cp = 9.61796693925975554329e-01; /* 0x3FEEC709, 0xDC3A03FD =2/(3ln2) */
+            private static final double cp_h = 9.61796700954437255859e-01; /* 0x3FEEC709, 0xE0000000 =(float)cp */
+            private static final double cp_l = -7.02846165095275826516e-09; /* 0xBE3E2FE0, 0x145B01F5 =tail of cp_h*/
+            private static final double ivln2 = 1.44269504088896338700e+00; /* 0x3FF71547, 0x652B82FE =1/ln2 */
+            private static final double ivln2_h = 1.44269502162933349609e+00; /* 0x3FF71547, 0x60000000 =24b 1/ln2*/
+            private static final double ivln2_l = 1.92596299112661746887e-08; /* 0x3E54AE0B, 0xF85DDF44 =1/ln2 tail*/
+    /* atan(x)
+     * Method
+     *   1. Reduce x to positive by atan(x) = -atan(-x).
+     *   2. According to the integer k=4t+0.25 chopped, t=x, the argument
+     *      is further reduced to one of the following intervals and the
+     *      arctangent of t is evaluated by the corresponding formula:
+     *
+     *      [0,7/16]      atan(x) = t-t^3*(a1+t^2*(a2+...(a10+t^2*a11)...)
+     *      [7/16,11/16]  atan(x) = atan(1/2) + atan( (t-0.5)/(1+t/2) )
+     *      [11/16.19/16] atan(x) = atan( 1 ) + atan( (t-1)/(1+t) )
+     *      [19/16,39/16] atan(x) = atan(3/2) + atan( (t-1.5)/(1+1.5t) )
+     *      [39/16,INF]   atan(x) = atan(INF) + atan( -1/t )
+     *
+     * Constants:
+     * The hexadecimal values are the intended ones for the following
+     * constants. The decimal values may be used, provided that the
+     * compiler will convert from decimal to binary accurately enough
+     * to produce the hexadecimal values shown.
+     */
+<span class="fc" id="L289">    private static final double[] atanhi = {</span>
+            4.63647609000806093515e-01, /* atan(0.5)hi 0x3FDDAC67, 0x0561BB4F */
+            7.85398163397448278999e-01, /* atan(1.0)hi 0x3FE921FB, 0x54442D18 */
+            9.82793723247329054082e-01, /* atan(1.5)hi 0x3FEF730B, 0xD281F69B */
+            1.57079632679489655800e+00, /* atan(inf)hi 0x3FF921FB, 0x54442D18 */};
+<span class="fc" id="L294">    private static final double[] atanlo = {</span>
+            2.26987774529616870924e-17, /* atan(0.5)lo 0x3C7A2B7F, 0x222F65E2 */
+            3.06161699786838301793e-17, /* atan(1.0)lo 0x3C81A626, 0x33145C07 */
+            1.39033110312309984516e-17, /* atan(1.5)lo 0x3C700788, 0x7AF0CBBD */
+            6.12323399573676603587e-17, /* atan(inf)lo 0x3C91A626, 0x33145C07 */};
+<span class="fc" id="L299">    private static final double[] aT = {</span>
+            3.33333333333329318027e-01, /* 0x3FD55555, 0x5555550D */
+            -1.99999999998764832476e-01, /* 0xBFC99999, 0x9998EBC4 */
+            1.42857142725034663711e-01, /* 0x3FC24924, 0x920083FF */
+            -1.11111104054623557880e-01, /* 0xBFBC71C6, 0xFE231671 */
+            9.09088713343650656196e-02, /* 0x3FB745CD, 0xC54C206E */
+            -7.69187620504482999495e-02, /* 0xBFB3B0F2, 0xAF749A6D */
+            6.66107313738753120669e-02, /* 0x3FB10D66, 0xA0D03D51 */
+            -5.83357013379057348645e-02, /* 0xBFADDE2D, 0x52DEFD9A */
+            4.97687799461593236017e-02, /* 0x3FA97B4B, 0x24760DEB */
+            -3.65315727442169155270e-02, /* 0xBFA2B444, 0x2C6A6C2F */
+            1.62858201153657823623e-02, /* 0x3F90AD3A, 0xE322DA11 */};
+    /*
+     * use a precalculated value for the ulp of Double.MAX_VALUE
+     */
+    private static final double MAX_ULP = 1.9958403095347198E292;
+
+    /**
+     * Return Math.E to the exponent a.
+     * This in turn uses ieee7854_exp(double).
+     */
+    public static final double exp(double a) {
+<span class="fc" id="L321">        return ieee754_exp(a);</span>
+    }
+
+    /**
+     * Return the natural logarithm, ln(a), as it relates to Math.E.
+     * This in turn uses ieee7854_log(double).
+     */
+    public static final double log(double a) {
+<span class="fc" id="L329">        return ieee754_log(a);</span>
+    }
+
+    /**
+     * Return the common base-10 logarithm, log10(a).
+     * This in turn uses ieee7854_log(double)/ieee7854_log(10.0).
+     */
+    public static final double log10(double a) {
+<span class="fc" id="L337">        return ieee754_log(a) / log10;</span>
+    }
+
+    /**
+     * Return a to the power of b, sometimes written as a ** b
+     * but not to be confused with the bitwise ^ operator.
+     * This in turn uses ieee7854_log(double).
+     */
+    public static final double pow(double a, double b) {
+<span class="fc" id="L346">        return ieee754_pow(a, b);</span>
+    }
+
+    /**
+     * Return the arcsine of a.
+     */
+    public static final double asin(double a) {
+<span class="fc" id="L353">        return ieee754_asin(a);</span>
+    }
+
+    /**
+     * Return the arccosine of a.
+     */
+    public static final double acos(double a) {
+<span class="fc" id="L360">        return ieee754_acos(a);</span>
+    }
+
+    /**
+     * Return the arctangent of a, call it b, where a = tan(b).
+     */
+    public static final double atan(double a) {
+<span class="fc" id="L367">        return ieee754_atan(a);</span>
+    }
+
+    /**
+     * For any real arguments x and y not both equal to zero, atan2(y, x)
+     * is the angle in radians between the positive x-axis of a plane
+     * and the point given by the coordinates (x, y) on it.
+     * The angle is positive for counter-clockwise angles (upper half-plane, y &gt; 0),
+     * and negative for clockwise angles (lower half-plane, y &lt; 0).
+     * This in turn uses ieee7854_arctan2(double).
+     */
+    public static final double atan2(double b, double a) {
+<span class="fc" id="L379">        return ieee754_atan2(a, b);</span>
+    }
+
+    private static final double ieee754_exp(double x) {
+        double y, c, t;
+<span class="fc" id="L384">        double hi = 0, lo = 0;</span>
+<span class="fc" id="L385">        int k = 0;</span>
+        int xsb, hx, lx;
+        long yl;
+<span class="fc" id="L388">        long xl = Double.doubleToLongBits(x);</span>
+
+<span class="fc" id="L390">        hx = (int) (xl &gt;&gt;&gt; HI_SHIFT); /* high word of x */</span>
+<span class="fc" id="L391">        xsb = (hx &gt;&gt; 31) &amp; 1;   /* sign bit of x */</span>
+<span class="fc" id="L392">        hx &amp;= 0x7fffffff;   /* high word of |x| */</span>
+
+        /* filter out non-finite argument */
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">        if (hx &gt;= 0x40862E42) {      /* if |x|&gt;=709.78... */</span>
+<span class="nc bnc" id="L396" title="All 2 branches missed.">            if (hx &gt;= 0x7ff00000) {</span>
+<span class="nc" id="L397">                lx = (int) (xl &amp; LO_MASK);  /* low word of x */</span>
+<span class="nc bnc" id="L398" title="All 2 branches missed.">                if (((hx &amp; 0xfffff) | lx) != 0) {</span>
+<span class="nc" id="L399">                    return x + x;    /* NaN */</span>
+                } else {
+<span class="nc bnc" id="L401" title="All 2 branches missed.">                    return (xsb == 0) ? x : 0.0;  /* exp(+-inf)={inf,0} */</span>
+                }
+            }
+<span class="nc bnc" id="L404" title="All 2 branches missed.">            if (x &gt; o_threshold) {</span>
+<span class="nc" id="L405">                return huge * huge; /* overflow */</span>
+            }
+<span class="nc bnc" id="L407" title="All 2 branches missed.">            if (x &lt; u_threshold) {</span>
+<span class="nc" id="L408">                return twom1000 * twom1000; /* underflow */</span>
+            }
+        }
+
+        /* argument reduction */
+<span class="fc bfc" id="L413" title="All 2 branches covered.">        if (hx &gt; 0x3fd62e42) {   /* if  |x| &gt; 0.5 ln2 */</span>
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">            if (hx &lt; 0x3FF0A2B2) { /* and |x| &lt; 1.5 ln2 */</span>
+<span class="nc" id="L415">                hi = x - ln2HI[xsb];</span>
+<span class="nc" id="L416">                lo = ln2LO[xsb];</span>
+<span class="nc" id="L417">                k = 1 - xsb - xsb;</span>
+            } else {
+<span class="fc" id="L419">                k = (int) (invln2 * x + halF[xsb]);</span>
+<span class="fc" id="L420">                t = k;</span>
+<span class="fc" id="L421">                hi = x - t * ln2HI[0];  /* t*ln2HI is exact here */</span>
+<span class="fc" id="L422">                lo = t * ln2LO[0];</span>
+            }
+<span class="fc" id="L424">            x = hi - lo;</span>
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">        } else if (hx &lt; 0x3e300000) { /* when |x|&lt;2**-28 */</span>
+<span class="nc bnc" id="L426" title="All 2 branches missed.">            if (huge + x &gt; one) {</span>
+<span class="nc" id="L427">                return one + x;/* trigger inexact */</span>
+            }
+        }
+        //else k = 0; // handled at declaration
+
+        /* x is now in primary range */
+<span class="fc" id="L433">        t = x * x;</span>
+<span class="fc" id="L434">        c = x - t * (P1 + t * (P2 + t * (P3 + t * (P4 + t * P5))));</span>
+<span class="fc bfc" id="L435" title="All 2 branches covered.">        if (k == 0) {</span>
+<span class="fc" id="L436">            return one - ((x * c) / (c - 2.0) - x);</span>
+        } else {
+<span class="fc" id="L438">            y = one - ((lo - (x * c) / (2.0 - c)) - hi);</span>
+        }
+<span class="fc" id="L440">        yl = Double.doubleToLongBits(y);</span>
+<span class="pc bpc" id="L441" title="1 of 2 branches missed.">        if (k &gt;= -1021) {</span>
+<span class="fc" id="L442">            yl += ((long) k &lt;&lt; (20 + HI_SHIFT)); /* add k to y's exponent */</span>
+<span class="fc" id="L443">            return Double.longBitsToDouble(yl);</span>
+        } else {
+<span class="nc" id="L445">            yl += ((long) (k + 1000) &lt;&lt; (20 + HI_SHIFT));/* add k to y's exponent */</span>
+<span class="nc" id="L446">            return Double.longBitsToDouble(yl) * twom1000;</span>
+        }
+    }
+
+    private static final double ieee754_log(double x) {
+        double hfsq, f, s, z, R, w, t1, t2, dk;
+        int k, hx, lx, i, j;
+<span class="fc" id="L453">        long xl = Double.doubleToLongBits(x);</span>
+
+<span class="fc" id="L455">        hx = (int) (xl &gt;&gt; HI_SHIFT);   /* high word of x */</span>
+<span class="fc" id="L456">        lx = (int) (xl &amp; LO_MASK);   /* low  word of x */</span>
+
+<span class="fc" id="L458">        k = 0;</span>
+<span class="pc bpc" id="L459" title="1 of 2 branches missed.">        if (hx &lt; 0x00100000) {      /* x &lt; 2**-1022  */</span>
+<span class="nc bnc" id="L460" title="All 2 branches missed.">            if (((hx &amp; 0x7fffffff) | lx) == 0) {</span>
+<span class="nc" id="L461">                return -two54 / zero;   /* log(+-0)=-inf */</span>
+            }
+<span class="nc bnc" id="L463" title="All 2 branches missed.">            if (hx &lt; 0) {</span>
+<span class="nc" id="L464">                return (0.0) / zero;  /* log(-#) = NaN */</span>
+            }
+<span class="nc" id="L466">            k -= 54;</span>
+<span class="nc" id="L467">            x *= two54; /* subnormal number, scale up x */</span>
+<span class="nc" id="L468">            hx = (int) (Double.doubleToLongBits(x) &gt;&gt;&gt; HI_SHIFT);    /* high word of x */</span>
+        }
+<span class="pc bpc" id="L470" title="1 of 2 branches missed.">        if (hx &gt;= 0x7ff00000) {</span>
+<span class="nc" id="L471">            return x + x;</span>
+        }
+<span class="fc" id="L473">        k += (hx &gt;&gt; 20) - 1023;</span>
+<span class="fc" id="L474">        hx &amp;= 0x000fffff;</span>
+<span class="fc" id="L475">        i = (hx + 0x95f64) &amp; 0x100000;</span>
+        //__HI(x) = hx|(i^0x3ff00000);  /* normalize x or x/2 */
+<span class="fc" id="L477">        x = Double.longBitsToDouble(((long) (hx | (i ^ 0x3ff00000)) &lt;&lt; HI_SHIFT) | (Double.doubleToLongBits(x) &amp; LO_MASK));</span>
+<span class="fc" id="L478">        k += (i &gt;&gt; 20);</span>
+<span class="fc" id="L479">        f = x - 1.0;</span>
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">        if ((0x000fffff &amp; (2 + hx)) &lt; 3) { /* |f| &lt; 2**-20 */</span>
+<span class="nc bnc" id="L481" title="All 2 branches missed.">            if (f == zero) {</span>
+<span class="nc bnc" id="L482" title="All 2 branches missed.">                if (k == 0) {</span>
+<span class="nc" id="L483">                    return zero;</span>
+                } else {
+<span class="nc" id="L485">                    dk = k;</span>
+<span class="nc" id="L486">                    return dk * ln2_hi + dk * ln2_lo;</span>
+                }
+            }
+<span class="nc" id="L489">            R = f * f * (0.5 - 0.33333333333333333 * f);</span>
+<span class="nc bnc" id="L490" title="All 2 branches missed.">            if (k == 0) {</span>
+<span class="nc" id="L491">                return f - R;</span>
+            } else {
+<span class="nc" id="L493">                dk = k;</span>
+<span class="nc" id="L494">                return dk * ln2_hi - ((R - dk * ln2_lo) - f);</span>
+            }
+        }
+<span class="fc" id="L497">        s = f / (2.0 + f);</span>
+<span class="fc" id="L498">        dk = k;</span>
+<span class="fc" id="L499">        z = s * s;</span>
+<span class="fc" id="L500">        i = hx - 0x6147a;</span>
+<span class="fc" id="L501">        w = z * z;</span>
+<span class="fc" id="L502">        j = 0x6b851 - hx;</span>
+<span class="fc" id="L503">        t1 = w * (Lg2 + w * (Lg4 + w * Lg6));</span>
+<span class="fc" id="L504">        t2 = z * (Lg1 + w * (Lg3 + w * (Lg5 + w * Lg7)));</span>
+<span class="fc" id="L505">        i |= j;</span>
+<span class="fc" id="L506">        R = t2 + t1;</span>
+<span class="pc bpc" id="L507" title="1 of 2 branches missed.">        if (i &gt; 0) {</span>
+<span class="nc" id="L508">            hfsq = 0.5 * f * f;</span>
+<span class="nc bnc" id="L509" title="All 2 branches missed.">            if (k == 0) {</span>
+<span class="nc" id="L510">                return f - (hfsq - s * (hfsq + R));</span>
+            } else {
+<span class="nc" id="L512">                return dk * ln2_hi - ((hfsq - (s * (hfsq + R) + dk * ln2_lo)) - f);</span>
+            }
+        } else {
+<span class="fc bfc" id="L515" title="All 2 branches covered.">            if (k == 0) {</span>
+<span class="fc" id="L516">                return f - s * (f - R);</span>
+            } else {
+<span class="fc" id="L518">                return dk * ln2_hi - ((s * (f - R) - dk * ln2_lo) - f);</span>
+            }
+        }
+    }
+
+    private static final double ieee754_pow(double x, double y) {
+        double z, ax, z_h, z_l, p_h, p_l;
+        double y1, t1, t2, r, s, t, u, v, w;
+        //int i0,i1;
+        int i, j, k, yisint, n;
+        int hx, hy, ix, iy;
+        int lx, ly;
+
+        //i0 = (int)((Double.doubleToLongBits(one)) &gt;&gt;&gt; (29+HI_SHIFT))^1;
+        //i1 = 1-i0;
+<span class="fc" id="L533">        hx = (int) (Double.doubleToLongBits(x) &gt;&gt;&gt; HI_SHIFT);</span>
+<span class="fc" id="L534">        lx = (int) (Double.doubleToLongBits(x) &amp; LO_MASK);</span>
+<span class="fc" id="L535">        hy = (int) (Double.doubleToLongBits(y) &gt;&gt;&gt; HI_SHIFT);</span>
+<span class="fc" id="L536">        ly = (int) (Double.doubleToLongBits(y) &amp; LO_MASK);</span>
+<span class="fc" id="L537">        ix = hx &amp; 0x7fffffff;</span>
+<span class="fc" id="L538">        iy = hy &amp; 0x7fffffff;</span>
+
+        /* y==zero: x**0 = 1 */
+<span class="fc bfc" id="L541" title="All 2 branches covered.">        if ((iy | ly) == 0) {</span>
+<span class="fc" id="L542">            return one;</span>
+        }
+
+        /* +-NaN return x+y */
+<span class="pc bpc" id="L546" title="8 of 12 branches missed.">        if (ix &gt; 0x7ff00000 || ((ix == 0x7ff00000) &amp;&amp; (lx != 0))</span>
+                || iy &gt; 0x7ff00000 || ((iy == 0x7ff00000) &amp;&amp; (ly != 0))) {
+<span class="nc" id="L548">            return x + y;</span>
+        }
+
+        /* determine if y is an odd int when x &lt; 0
+         * yisint = 0 ... y is not an integer
+         * yisint = 1 ... y is an odd int
+         * yisint = 2 ... y is an even int
+         */
+<span class="fc" id="L556">        yisint = 0;</span>
+<span class="fc bfc" id="L557" title="All 2 branches covered.">        if (hx &lt; 0) {</span>
+<span class="pc bpc" id="L558" title="1 of 2 branches missed.">            if (iy &gt;= 0x43400000) {</span>
+<span class="nc" id="L559">                yisint = 2; /* even integer y */</span>
+<span class="pc bpc" id="L560" title="1 of 2 branches missed.">            } else if (iy &gt;= 0x3ff00000) {</span>
+<span class="fc" id="L561">                k = (iy &gt;&gt; 20) - 0x3ff;    /* exponent */</span>
+<span class="pc bpc" id="L562" title="1 of 2 branches missed.">                if (k &gt; 20) {</span>
+<span class="nc" id="L563">                    j = ly &gt;&gt; (52 - k);</span>
+<span class="nc bnc" id="L564" title="All 2 branches missed.">                    if ((j &lt;&lt; (52 - k)) == ly) {</span>
+<span class="nc" id="L565">                        yisint = 2 - (j &amp; 1);</span>
+                    }
+<span class="pc bpc" id="L567" title="1 of 2 branches missed.">                } else if (ly == 0) {</span>
+<span class="fc" id="L568">                    j = iy &gt;&gt; (20 - k);</span>
+<span class="pc bpc" id="L569" title="1 of 2 branches missed.">                    if ((j &lt;&lt; (20 - k)) == iy) {</span>
+<span class="fc" id="L570">                        yisint = 2 - (j &amp; 1);</span>
+                    }
+                }
+            }
+        }
+
+        /* special value of y */
+<span class="pc bpc" id="L577" title="1 of 2 branches missed.">        if (ly == 0) {</span>
+<span class="pc bpc" id="L578" title="1 of 2 branches missed.">            if (iy == 0x7ff00000) { /* y is +-inf */</span>
+<span class="nc bnc" id="L579" title="All 2 branches missed.">                if (((ix - 0x3ff00000) | lx) == 0) {</span>
+<span class="nc" id="L580">                    return 0.0;  /* inf**+-1 is NaN */</span>
+<span class="nc bnc" id="L581" title="All 2 branches missed.">                } else if (ix &gt;= 0x3ff00000)/* (|x|&gt;1)**+-inf = inf,0 */ {</span>
+<span class="nc bnc" id="L582" title="All 2 branches missed.">                    return (hy &gt;= 0) ? y : zero;</span>
+                } else /* (|x|&lt;1)**-,+inf = inf,0 */ {
+<span class="nc bnc" id="L584" title="All 2 branches missed.">                    return (hy &lt; 0) ? -y : zero;</span>
+                }
+            }
+<span class="fc bfc" id="L587" title="All 2 branches covered.">            if (iy == 0x3ff00000) {  /* y is  +-1 */</span>
+<span class="fc bfc" id="L588" title="All 2 branches covered.">                if (hy &lt; 0) {</span>
+<span class="fc" id="L589">                    return one / x;</span>
+                } else {
+<span class="fc" id="L591">                    return x;</span>
+                }
+            }
+<span class="fc bfc" id="L594" title="All 2 branches covered.">            if (hy == 0x40000000) {</span>
+<span class="fc" id="L595">                return x * x; /* y is  2 */</span>
+            }
+<span class="pc bpc" id="L597" title="1 of 2 branches missed.">            if (hy == 0x3fe00000) {  /* y is  0.5 */</span>
+<span class="nc bnc" id="L598" title="All 2 branches missed.">                if (hx &gt;= 0) /* x &gt;= +0 */ {</span>
+<span class="nc" id="L599">                    return Math.sqrt(x);</span>
+                }
+            }
+        }
+
+<span class="fc" id="L604">        ax = Math.abs(x);</span>
+        /* special value of x */
+<span class="pc bpc" id="L606" title="1 of 2 branches missed.">        if (lx == 0) {</span>
+<span class="pc bpc" id="L607" title="2 of 6 branches missed.">            if (ix == 0x7ff00000 || ix == 0 || ix == 0x3ff00000) {</span>
+<span class="fc" id="L608">                z = ax;     /*x is +-0,+-inf,+-1*/</span>
+<span class="pc bpc" id="L609" title="1 of 2 branches missed.">                if (hy &lt; 0) {</span>
+<span class="nc" id="L610">                    z = one / z; /* z = (1/|x|) */</span>
+                }
+<span class="pc bpc" id="L612" title="1 of 2 branches missed.">                if (hx &lt; 0) {</span>
+<span class="pc bpc" id="L613" title="1 of 2 branches missed.">                    if (((ix - 0x3ff00000) | yisint) == 0) {</span>
+<span class="nc" id="L614">                        z = 1.0; /* (-1)**non-int is NaN */</span>
+<span class="fc bfc" id="L615" title="All 2 branches covered.">                    } else if (yisint == 1) {</span>
+<span class="fc" id="L616">                        z = -z;   /* (x&lt;0)**odd = -(|x|**odd) */</span>
+                    }
+                }
+<span class="fc" id="L619">                return z;</span>
+            }
+        }
+
+<span class="fc" id="L623">        n = (hx &gt;&gt;&gt; 31) + 1;</span>
+
+        /* (x&lt;0)**(non-int) is NaN */
+<span class="pc bpc" id="L626" title="1 of 2 branches missed.">        if ((n | yisint) == 0) {</span>
+<span class="nc" id="L627">            return 1.0;</span>
+        }
+
+<span class="fc" id="L630">        s = one; /* s (sign of result -ve**odd) = -1 else = 1 */</span>
+<span class="pc bpc" id="L631" title="1 of 2 branches missed.">        if ((n | (yisint - 1)) == 0) {</span>
+<span class="nc" id="L632">            s = -one;/* (-ve)**(odd int) */</span>
+        }
+
+        /* |y| is huge */
+<span class="pc bpc" id="L636" title="1 of 2 branches missed.">        if (iy &gt; 0x41e00000) { /* if |y| &gt; 2**31 */</span>
+<span class="nc bnc" id="L637" title="All 2 branches missed.">            if (iy &gt; 0x43f00000) {  /* if |y| &gt; 2**64, must o/uflow */</span>
+<span class="nc bnc" id="L638" title="All 2 branches missed.">                if (ix &lt;= 0x3fefffff) {</span>
+<span class="nc bnc" id="L639" title="All 2 branches missed.">                    return (hy &lt; 0) ? huge * huge : tiny * tiny;</span>
+                }
+<span class="nc bnc" id="L641" title="All 2 branches missed.">                if (ix &gt;= 0x3ff00000) {</span>
+<span class="nc bnc" id="L642" title="All 2 branches missed.">                    return (hy &gt; 0) ? huge * huge : tiny * tiny;</span>
+                }
+            }
+            /* over/underflow if x is not close to one */
+<span class="nc bnc" id="L646" title="All 2 branches missed.">            if (ix &lt; 0x3fefffff) {</span>
+<span class="nc bnc" id="L647" title="All 2 branches missed.">                return (hy &lt; 0) ? s * huge * huge : s * tiny * tiny;</span>
+            }
+<span class="nc bnc" id="L649" title="All 2 branches missed.">            if (ix &gt; 0x3ff00000) {</span>
+<span class="nc bnc" id="L650" title="All 2 branches missed.">                return (hy &gt; 0) ? s * huge * huge : s * tiny * tiny;</span>
+            }
+            /* now |1-x| is tiny &lt;= 2**-20, suffice to compute
+            log(x) by x-x^2/2+x^3/3-x^4/4 */
+<span class="nc" id="L654">            t = x - one;    /* t has 20 trailing zeros */</span>
+<span class="nc" id="L655">            w = (t * t) * (0.5 - t * (0.3333333333333333333333 - t * 0.25));</span>
+<span class="nc" id="L656">            u = ivln2_h * t;  /* ivln2_h has 21 sig. bits */</span>
+<span class="nc" id="L657">            v = t * ivln2_l - w * ivln2;</span>
+<span class="nc" id="L658">            t1 = u + v;</span>
+            //__LO(t1) = 0; // keep high word
+<span class="nc" id="L660">            t1 = Double.longBitsToDouble(Double.doubleToLongBits(t1) &amp; HI_MASK);</span>
+<span class="nc" id="L661">            t2 = v - (t1 - u);</span>
+        } else {
+            double ss, s2, s_h, s_l, t_h, t_l;
+<span class="fc" id="L664">            n = 0;</span>
+            /* take care subnormal number */
+<span class="pc bpc" id="L666" title="1 of 2 branches missed.">            if (ix &lt; 0x00100000) {</span>
+<span class="nc" id="L667">                ax *= two53;</span>
+<span class="nc" id="L668">                n -= 53;</span>
+<span class="nc" id="L669">                ix = (int) (Double.doubleToLongBits(ax) &gt;&gt;&gt; HI_SHIFT);</span>
+            }
+<span class="fc" id="L671">            n += ((ix) &gt;&gt; 20) - 0x3ff;</span>
+<span class="fc" id="L672">            j = ix &amp; 0x000fffff;</span>
+            /* determine interval */
+<span class="fc" id="L674">            ix = j | 0x3ff00000;    /* normalize ix */</span>
+<span class="pc bpc" id="L675" title="1 of 2 branches missed.">            if (j &lt;= 0x3988E) {</span>
+<span class="fc" id="L676">                k = 0;   /* |x|&lt;sqrt(3/2) */</span>
+<span class="nc bnc" id="L677" title="All 2 branches missed.">            } else if (j &lt; 0xBB67A) {</span>
+<span class="nc" id="L678">                k = 1; /* |x|&lt;sqrt(3)   */</span>
+            } else {
+<span class="nc" id="L680">                k = 0;</span>
+<span class="nc" id="L681">                n += 1;</span>
+<span class="nc" id="L682">                ix -= 0x00100000;</span>
+            }
+            //__HI(ax) = ix;
+<span class="fc" id="L685">            ax = Double.longBitsToDouble(((long) ix &lt;&lt; HI_SHIFT) | (Double.doubleToLongBits(ax) &amp; LO_MASK));</span>
+
+            /* compute ss = s_h+s_l = (x-1)/(x+1) or (x-1.5)/(x+1.5) */
+<span class="fc" id="L688">            u = ax - bp[k];   /* bp[0]=1.0, bp[1]=1.5 */</span>
+<span class="fc" id="L689">            v = one / (ax + bp[k]);</span>
+<span class="fc" id="L690">            ss = u * v;</span>
+<span class="fc" id="L691">            s_h = ss;</span>
+            //__LO(s_h) = 0; // keep high word
+<span class="fc" id="L693">            s_h = Double.longBitsToDouble(Double.doubleToLongBits(s_h) &amp; HI_MASK);</span>
+            /* t_h=ax+bp[k] High */
+<span class="fc" id="L695">            t_h = zero;</span>
+            //__HI(t_h)=((ix&gt;&gt;1)|0x20000000)+0x00080000+(k&lt;&lt;18);
+<span class="fc" id="L697">            t_h = Double.longBitsToDouble(((long) (((ix &gt;&gt; 1) | 0x20000000) + 0x00080000 + (k &lt;&lt; 18)) &lt;&lt; HI_SHIFT) | (Double.doubleToLongBits(t_h) &amp; LO_MASK));</span>
+<span class="fc" id="L698">            t_l = ax - (t_h - bp[k]);</span>
+<span class="fc" id="L699">            s_l = v * ((u - s_h * t_h) - s_h * t_l);</span>
+            /* compute log(ax) */
+<span class="fc" id="L701">            s2 = ss * ss;</span>
+<span class="fc" id="L702">            r = s2 * s2 * (L1 + s2 * (L2 + s2 * (L3 + s2 * (L4 + s2 * (L5 + s2 * L6)))));</span>
+<span class="fc" id="L703">            r += s_l * (s_h + ss);</span>
+<span class="fc" id="L704">            s2 = s_h * s_h;</span>
+<span class="fc" id="L705">            t_h = 3.0 + s2 + r;</span>
+            //__LO(t_h) = 0; // keep high word
+<span class="fc" id="L707">            t_h = Double.longBitsToDouble(Double.doubleToLongBits(t_h) &amp; HI_MASK);</span>
+<span class="fc" id="L708">            t_l = r - ((t_h - 3.0) - s2);</span>
+            /* u+v = ss*(1+...) */
+<span class="fc" id="L710">            u = s_h * t_h;</span>
+<span class="fc" id="L711">            v = s_l * t_h + t_l * ss;</span>
+            /* 2/(3log2)*(ss+...) */
+<span class="fc" id="L713">            p_h = u + v;</span>
+            //__LO(p_h) = 0; // keep high word
+<span class="fc" id="L715">            p_h = Double.longBitsToDouble(Double.doubleToLongBits(p_h) &amp; HI_MASK);</span>
+<span class="fc" id="L716">            p_l = v - (p_h - u);</span>
+<span class="fc" id="L717">            z_h = cp_h * p_h;   /* cp_h+cp_l = 2/(3*log2) */</span>
+<span class="fc" id="L718">            z_l = cp_l * p_h + p_l * cp + dp_l[k];</span>
+            /* log2(ax) = (ss+..)*2/(3*log2) = n + dp_h + z_h + z_l */
+<span class="fc" id="L720">            t = n;</span>
+<span class="fc" id="L721">            t1 = (((z_h + z_l) + dp_h[k]) + t);</span>
+            //__LO(t1) = 0; // keep high word
+<span class="fc" id="L723">            t1 = Double.longBitsToDouble(Double.doubleToLongBits(t1) &amp; HI_MASK);</span>
+<span class="fc" id="L724">            t2 = z_l - (((t1 - t) - dp_h[k]) - z_h);</span>
+        }
+
+        /* split up y into y1+y2 and compute (y1+y2)*(t1+t2) */
+<span class="fc" id="L728">        y1 = y;</span>
+        //__LO(y1) = 0; // keep high word
+<span class="fc" id="L730">        y1 = Double.longBitsToDouble(Double.doubleToLongBits(y1) &amp; HI_MASK);</span>
+<span class="fc" id="L731">        p_l = (y - y1) * t1 + y * t2;</span>
+<span class="fc" id="L732">        p_h = y1 * t1;</span>
+<span class="fc" id="L733">        z = p_l + p_h;</span>
+<span class="fc" id="L734">        j = (int) (Double.doubleToLongBits(z) &gt;&gt;&gt; HI_SHIFT);</span>
+<span class="fc" id="L735">        i = (int) (Double.doubleToLongBits(z) &amp; LO_MASK);</span>
+<span class="pc bpc" id="L736" title="1 of 2 branches missed.">        if (j &gt;= 0x40900000) {        /* z &gt;= 1024 */</span>
+<span class="nc bnc" id="L737" title="All 2 branches missed.">            if (((j - 0x40900000) | i) != 0) /* if z &gt; 1024 */ {</span>
+<span class="nc" id="L738">                return s * huge * huge;     /* overflow */</span>
+            } else {
+<span class="nc bnc" id="L740" title="All 2 branches missed.">                if (p_l + ovt &gt; z - p_h) {</span>
+<span class="nc" id="L741">                    return s * huge * huge; /* overflow */</span>
+                }
+            }
+<span class="pc bpc" id="L744" title="1 of 2 branches missed.">        } else if ((j &amp; 0x7fffffff) &gt;= 0x4090cc00) {  /* z &lt;= -1075 */</span>
+<span class="nc bnc" id="L745" title="All 2 branches missed.">            if (((j - 0xc090cc00) | i) != 0) /* z &lt; -1075 */ {</span>
+<span class="nc" id="L746">                return s * tiny * tiny;   /* underflow */</span>
+            } else {
+<span class="nc bnc" id="L748" title="All 2 branches missed.">                if (p_l &lt;= z - p_h) {</span>
+<span class="nc" id="L749">                    return s * tiny * tiny;  /* underflow */</span>
+                }
+            }
+        }
+        /*
+         * compute 2**(p_h+p_l)
+         */
+<span class="fc" id="L756">        i = j &amp; 0x7fffffff;</span>
+<span class="fc" id="L757">        k = (i &gt;&gt; 20) - 0x3ff;</span>
+<span class="fc" id="L758">        n = 0;</span>
+<span class="pc bpc" id="L759" title="1 of 2 branches missed.">        if (i &gt; 0x3fe00000) {    /* if |z| &gt; 0.5, set n = [z+0.5] */</span>
+<span class="fc" id="L760">            n = j + (0x00100000 &gt;&gt; (k + 1));</span>
+<span class="fc" id="L761">            k = ((n &amp; 0x7fffffff) &gt;&gt; 20) - 0x3ff; /* new k for n */</span>
+<span class="fc" id="L762">            t = zero;</span>
+            //__HI(t) = (n&amp;~(0x000fffff&gt;&gt;k));
+<span class="fc" id="L764">            t = Double.longBitsToDouble(((long) (n &amp; ~(0x000fffff &gt;&gt; k)) &lt;&lt; HI_SHIFT) | (Double.doubleToLongBits(t) &amp; LO_MASK));</span>
+<span class="fc" id="L765">            n = ((n &amp; 0x000fffff) | 0x00100000) &gt;&gt; (20 - k);</span>
+<span class="pc bpc" id="L766" title="1 of 2 branches missed.">            if (j &lt; 0) {</span>
+<span class="nc" id="L767">                n = -n;</span>
+            }
+<span class="fc" id="L769">            p_h -= t;</span>
+        }
+<span class="fc" id="L771">        t = p_l + p_h;</span>
+        //__LO(t) = 0; // keep high word
+<span class="fc" id="L773">        t = Double.longBitsToDouble(Double.doubleToLongBits(t) &amp; HI_MASK);</span>
+<span class="fc" id="L774">        u = t * lg2_h;</span>
+<span class="fc" id="L775">        v = (p_l - (t - p_h)) * lg2 + t * lg2_l;</span>
+<span class="fc" id="L776">        z = u + v;</span>
+<span class="fc" id="L777">        w = v - (z - u);</span>
+<span class="fc" id="L778">        t = z * z;</span>
+<span class="fc" id="L779">        t1 = z - t * (P1 + t * (P2 + t * (P3 + t * (P4 + t * P5))));</span>
+<span class="fc" id="L780">        r = (z * t1) / (t1 - two) - (w + z * w);</span>
+<span class="fc" id="L781">        z = one - (r - z);</span>
+<span class="fc" id="L782">        j = (int) (Double.doubleToLongBits(z) &gt;&gt;&gt; HI_SHIFT);</span>
+<span class="fc" id="L783">        j += (n &lt;&lt; 20);</span>
+<span class="pc bpc" id="L784" title="1 of 2 branches missed.">        if ((j &gt;&gt; 20) &lt;= 0) {</span>
+<span class="nc" id="L785">            z = scalb(z, n); /* subnormal output */</span>
+        } else //__HI(z) = j;
+        {
+<span class="fc" id="L788">            z = Double.longBitsToDouble(((long) j &lt;&lt; HI_SHIFT) | (Double.doubleToLongBits(z) &amp; LO_MASK));</span>
+        }
+<span class="fc" id="L790">        return s * z;</span>
+    }
+
+    /* __ieee754_acos(x)
+     * Method :
+     *  acos(x)  = pi/2 - asin(x)
+     *  acos(-x) = pi/2 + asin(x)
+     * For |x|&lt;=0.5
+     *  acos(x) = pi/2 - (x + x*x^2*R(x^2)) (see asin.c)
+     * For x&gt;0.5
+     *  acos(x) = pi/2 - (pi/2 - 2asin(sqrt((1-x)/2)))
+     *    = 2asin(sqrt((1-x)/2))
+     *    = 2s + 2s*z*R(z)  ...z=(1-x)/2, s=sqrt(z)
+     *    = 2f + (2c + 2s*z*R(z))
+     *     where f=hi part of s, and c = (z-f*f)/(s+f) is the correction term
+     *     for f so that f+c ~ sqrt(z).
+     * For x&lt;-0.5
+     *  acos(x) = pi - 2asin(sqrt((1-|x|)/2))
+     *    = pi - 0.5*(s+s*z*R(z)), where z=(1-|x|)/2,s=sqrt(z)
+     *
+     * Special cases:
+     *  if x is NaN, return x itself;
+     *  if |x|&gt;1, return NaN with invalid signal.
+     *
+     * Function needed: sqrt
+     */
+    private static final double ieee754_acos(double x) {
+        double z, p, q, r, w, s, c, df;
+        int hx, ix;
+<span class="fc" id="L819">        hx = (int) (Double.doubleToLongBits(x) &gt;&gt;&gt; HI_SHIFT);</span>
+<span class="fc" id="L820">        ix = hx &amp; 0x7fffffff;</span>
+<span class="fc bfc" id="L821" title="All 2 branches covered.">        if (ix &gt;= 0x3ff00000) {  /* |x| &gt;= 1 */</span>
+<span class="pc bpc" id="L822" title="1 of 2 branches missed.">            if (((ix - 0x3ff00000) | (int) (Double.doubleToLongBits(x) &amp; LO_MASK)) == 0) {  /* |x|==1 */</span>
+<span class="pc bpc" id="L823" title="1 of 2 branches missed.">                if (hx &gt; 0) {</span>
+<span class="fc" id="L824">                    return 0.0;    /* acos(1) = 0  */</span>
+                } else {
+<span class="nc" id="L826">                    return pi + 2.0 * pio2_lo; /* acos(-1)= pi */</span>
+                }
+            }
+<span class="nc" id="L829">            return 1.0;   /* acos(|x|&gt;1) is NaN */</span>
+        }
+<span class="pc bpc" id="L831" title="1 of 2 branches missed.">        if (ix &lt; 0x3fe00000) { /* |x| &lt; 0.5 */</span>
+<span class="pc bpc" id="L832" title="1 of 2 branches missed.">            if (ix &lt;= 0x3c600000) {</span>
+<span class="nc" id="L833">                return pio2_hi + pio2_lo;/*if|x|&lt;2**-57*/</span>
+            }
+<span class="fc" id="L835">            z = x * x;</span>
+<span class="fc" id="L836">            p = z * (pS0 + z * (pS1 + z * (pS2 + z * (pS3 + z * (pS4 + z * pS5)))));</span>
+<span class="fc" id="L837">            q = one + z * (qS1 + z * (qS2 + z * (qS3 + z * qS4)));</span>
+<span class="fc" id="L838">            r = p / q;</span>
+<span class="fc" id="L839">            return pio2_hi - (x - (pio2_lo - x * r));</span>
+<span class="nc bnc" id="L840" title="All 2 branches missed.">        } else if (hx &lt; 0) {   /* x &lt; -0.5 */</span>
+<span class="nc" id="L841">            z = (one + x) * 0.5;</span>
+<span class="nc" id="L842">            p = z * (pS0 + z * (pS1 + z * (pS2 + z * (pS3 + z * (pS4 + z * pS5)))));</span>
+<span class="nc" id="L843">            q = one + z * (qS1 + z * (qS2 + z * (qS3 + z * qS4)));</span>
+<span class="nc" id="L844">            s = Math.sqrt(z);</span>
+<span class="nc" id="L845">            r = p / q;</span>
+<span class="nc" id="L846">            w = r * s - pio2_lo;</span>
+<span class="nc" id="L847">            return pi - 2.0 * (s + w);</span>
+        } else {      /* x &gt; 0.5 */
+<span class="nc" id="L849">            z = (one - x) * 0.5;</span>
+<span class="nc" id="L850">            s = Math.sqrt(z);</span>
+<span class="nc" id="L851">            df = s;</span>
+            //__LO(df) = 0; // keep high word
+<span class="nc" id="L853">            df = Double.longBitsToDouble(Double.doubleToLongBits(df) &amp; HI_MASK);</span>
+<span class="nc" id="L854">            c = (z - df * df) / (s + df);</span>
+<span class="nc" id="L855">            p = z * (pS0 + z * (pS1 + z * (pS2 + z * (pS3 + z * (pS4 + z * pS5)))));</span>
+<span class="nc" id="L856">            q = one + z * (qS1 + z * (qS2 + z * (qS3 + z * qS4)));</span>
+<span class="nc" id="L857">            r = p / q;</span>
+<span class="nc" id="L858">            w = r * s + c;</span>
+<span class="nc" id="L859">            return 2.0 * (df + w);</span>
+        }
+    }
+
+    /* __ieee754_asin(x)
+     * Method :
+     *  Since  asin(x) = x + x^3/6 + x^5*3/40 + x^7*15/336 + ...
+     *  we approximate asin(x) on [0,0.5] by
+     *    asin(x) = x + x*x^2*R(x^2)
+     *  where
+     *    R(x^2) is a rational approximation of (asin(x)-x)/x^3
+     *  and its remez error is bounded by
+     *    |(asin(x)-x)/x^3 - R(x^2)| &lt; 2^(-58.75)
+     *
+     *  For x in [0.5,1]
+     *    asin(x) = pi/2-2*asin(sqrt((1-x)/2))
+     *  Let y = (1-x), z = y/2, s := sqrt(z), and pio2_hi+pio2_lo=pi/2;
+     *  then for x&gt;0.98
+     *    asin(x) = pi/2 - 2*(s+s*z*R(z))
+     *      = pio2_hi - (2*(s+s*z*R(z)) - pio2_lo)
+     *  For x&lt;=0.98, let pio4_hi = pio2_hi/2, then
+     *    f = hi part of s;
+     *    c = sqrt(z) - f = (z-f*f)/(s+f)   ...f+c=sqrt(z)
+     *  and
+     *    asin(x) = pi/2 - 2*(s+s*z*R(z))
+     *      = pio4_hi+(pio4-2s)-(2s*z*R(z)-pio2_lo)
+     *      = pio4_hi+(pio4-2f)-(2s*z*R(z)-(pio2_lo+2c))
+     *
+     * Special cases:
+     *  if x is NaN, return x itself;
+     *  if |x|&gt;1, return NaN with invalid signal.
+     *
+     */
+    private static final double ieee754_asin(double x) {
+        double t, w, p, q, c, r, s;
+        int hx, ix;
+<span class="fc" id="L895">        hx = (int) (Double.doubleToLongBits(x) &gt;&gt;&gt; HI_SHIFT);</span>
+<span class="fc" id="L896">        ix = hx &amp; 0x7fffffff;</span>
+<span class="pc bpc" id="L897" title="1 of 2 branches missed.">        if (ix &gt;= 0x3ff00000) {   /* |x|&gt;= 1 */</span>
+<span class="nc bnc" id="L898" title="All 2 branches missed.">            if (((ix - 0x3ff00000) | (int) (Double.doubleToLongBits(x) &amp; LO_MASK)) == 0) /* asin(1)=+-pi/2 with inexact */ {</span>
+<span class="nc" id="L899">                return x * pio2_hi + x * pio2_lo;</span>
+            }
+<span class="nc" id="L901">            return 1.0;   /* asin(|x|&gt;1) is NaN */</span>
+<span class="pc bpc" id="L902" title="1 of 2 branches missed.">        } else if (ix &lt; 0x3fe00000) { /* |x|&lt;0.5 */</span>
+<span class="fc bfc" id="L903" title="All 2 branches covered.">            if (ix &lt; 0x3e400000) {   /* if |x| &lt; 2**-27 */</span>
+<span class="pc bpc" id="L904" title="1 of 2 branches missed.">                if (huge + x &gt; one) {</span>
+<span class="fc" id="L905">                    return x;/* return x with inexact if x!=0*/</span>
+                }
+            } else {
+<span class="fc" id="L908">                t = x * x;</span>
+<span class="fc" id="L909">                p = t * (pS0 + t * (pS1 + t * (pS2 + t * (pS3 + t * (pS4 + t * pS5)))));</span>
+<span class="fc" id="L910">                q = one + t * (qS1 + t * (qS2 + t * (qS3 + t * qS4)));</span>
+<span class="fc" id="L911">                w = p / q;</span>
+<span class="fc" id="L912">                return x + x * w;</span>
+            }
+        }
+        /* 1&gt; |x|&gt;= 0.5 */
+<span class="nc" id="L916">        w = one - Math.abs(x);</span>
+<span class="nc" id="L917">        t = w * 0.5;</span>
+<span class="nc" id="L918">        p = t * (pS0 + t * (pS1 + t * (pS2 + t * (pS3 + t * (pS4 + t * pS5)))));</span>
+<span class="nc" id="L919">        q = one + t * (qS1 + t * (qS2 + t * (qS3 + t * qS4)));</span>
+<span class="nc" id="L920">        s = Math.sqrt(t);</span>
+<span class="nc bnc" id="L921" title="All 2 branches missed.">        if (ix &gt;= 0x3FEF3333) {  /* if |x| &gt; 0.975 */</span>
+<span class="nc" id="L922">            w = p / q;</span>
+<span class="nc" id="L923">            t = pio2_hi - (2.0 * (s + s * w) - pio2_lo);</span>
+        } else {
+<span class="nc" id="L925">            w = s;</span>
+            //__LO(w) = 0; // keep the high word
+<span class="nc" id="L927">            w = Double.longBitsToDouble(Double.doubleToLongBits(w) &amp; HI_MASK);</span>
+<span class="nc" id="L928">            c = (t - w * w) / (s + w);</span>
+<span class="nc" id="L929">            r = p / q;</span>
+<span class="nc" id="L930">            p = 2.0 * s * r - (pio2_lo - 2.0 * c);</span>
+<span class="nc" id="L931">            q = pio4_hi - 2.0 * w;</span>
+<span class="nc" id="L932">            t = pio4_hi - (p - q);</span>
+        }
+<span class="nc bnc" id="L934" title="All 2 branches missed.">        if (hx &gt; 0) {</span>
+<span class="nc" id="L935">            return t;</span>
+        } else {
+<span class="nc" id="L937">            return -t;</span>
+        }
+    }
+
+    private static final double ieee754_atan(double x) {
+        double w, s1, s2, z;
+        int ix, hx, id;
+
+<span class="fc" id="L945">        hx = (int) (Double.doubleToLongBits(x) &gt;&gt;&gt; HI_SHIFT);</span>
+<span class="fc" id="L946">        ix = hx &amp; 0x7fffffff;</span>
+<span class="pc bpc" id="L947" title="1 of 2 branches missed.">        if (ix &gt;= 0x44100000) {  /* if |x| &gt;= 2^66 */</span>
+<span class="nc bnc" id="L948" title="All 4 branches missed.">            if (ix &gt; 0x7ff00000</span>
+<span class="nc bnc" id="L949" title="All 2 branches missed.">                    || (ix == 0x7ff00000 &amp;&amp; ((int) (Double.doubleToLongBits(x) &amp; LO_MASK) != 0))) {</span>
+<span class="nc" id="L950">                return x + x;   /* NaN */</span>
+            }
+<span class="nc bnc" id="L952" title="All 2 branches missed.">            if (hx &gt; 0) {</span>
+<span class="nc" id="L953">                return atanhi[3] + atanlo[3];</span>
+            } else {
+<span class="nc" id="L955">                return -atanhi[3] - atanlo[3];</span>
+            }
+        }
+<span class="pc bpc" id="L958" title="1 of 2 branches missed.">        if (ix &lt; 0x3fdc0000) {  /* |x| &lt; 0.4375 */</span>
+<span class="nc bnc" id="L959" title="All 2 branches missed.">            if (ix &lt; 0x3e200000) {  /* |x| &lt; 2^-29 */</span>
+<span class="nc bnc" id="L960" title="All 2 branches missed.">                if (huge + x &gt; one) {</span>
+<span class="nc" id="L961">                    return x;  /* raise inexact */</span>
+                }
+            }
+<span class="nc" id="L964">            id = -1;</span>
+        } else {
+<span class="fc" id="L966">            x = Math.abs(x);</span>
+<span class="pc bpc" id="L967" title="1 of 2 branches missed.">            if (ix &lt; 0x3ff30000) {    /* |x| &lt; 1.1875 */</span>
+<span class="pc bpc" id="L968" title="1 of 2 branches missed.">                if (ix &lt; 0x3fe60000) {  /* 7/16 &lt;=|x|&lt;11/16 */</span>
+<span class="fc" id="L969">                    id = 0;</span>
+<span class="fc" id="L970">                    x = (2.0 * x - one) / (2.0 + x);</span>
+                } else {      /* 11/16&lt;=|x|&lt; 19/16 */
+<span class="nc" id="L972">                    id = 1;</span>
+<span class="nc" id="L973">                    x = (x - one) / (x + one);</span>
+                }
+            } else {
+<span class="nc bnc" id="L976" title="All 2 branches missed.">                if (ix &lt; 0x40038000) {  /* |x| &lt; 2.4375 */</span>
+<span class="nc" id="L977">                    id = 2;</span>
+<span class="nc" id="L978">                    x = (x - 1.5) / (one + 1.5 * x);</span>
+                } else {      /* 2.4375 &lt;= |x| &lt; 2^66 */
+<span class="nc" id="L980">                    id = 3;</span>
+<span class="nc" id="L981">                    x = -1.0 / x;</span>
+                }
+            }
+        }
+        /* end of argument reduction */
+<span class="fc" id="L986">        z = x * x;</span>
+<span class="fc" id="L987">        w = z * z;</span>
+        /* break sum from i=0 to 10 aT[i]z**(i+1) into odd and even poly */
+<span class="fc" id="L989">        s1 = z * (aT[0] + w * (aT[2] + w * (aT[4] + w * (aT[6] + w * (aT[8] + w * aT[10])))));</span>
+<span class="fc" id="L990">        s2 = w * (aT[1] + w * (aT[3] + w * (aT[5] + w * (aT[7] + w * aT[9]))));</span>
+<span class="pc bpc" id="L991" title="1 of 2 branches missed.">        if (id &lt; 0) {</span>
+<span class="nc" id="L992">            return x - x * (s1 + s2);</span>
+        } else {
+<span class="fc" id="L994">            z = atanhi[id] - ((x * (s1 + s2) - atanlo[id]) - x);</span>
+<span class="pc bpc" id="L995" title="1 of 2 branches missed.">            return (hx &lt; 0) ? -z : z;</span>
+        }
+    }
+
+    /* __ieee754_atan2(y,x)
+     * Method :
+     *  1. Reduce y to positive by atan2(y,x)=-atan2(-y,x).
+     *  2. Reduce x to positive by (if x and y are unexceptional):
+     *    ARG (x+iy) = arctan(y/x)       ... if x &gt; 0,
+     *    ARG (x+iy) = pi - arctan[y/(-x)]   ... if x &lt; 0,
+     *
+     * Special cases:
+     *
+     *  ATAN2((anything), NaN ) is NaN;
+     *  ATAN2(NAN , (anything) ) is NaN;
+     *  ATAN2(+-0, +(anything but NaN)) is +-0  ;
+     *  ATAN2(+-0, -(anything but NaN)) is +-pi ;
+     *  ATAN2(+-(anything but 0 and NaN), 0) is +-pi/2;
+     *  ATAN2(+-(anything but INF and NaN), +INF) is +-0 ;
+     *  ATAN2(+-(anything but INF and NaN), -INF) is +-pi;
+     *  ATAN2(+-INF,+INF ) is +-pi/4 ;
+     *  ATAN2(+-INF,-INF ) is +-3pi/4;
+     *  ATAN2(+-INF, (anything but,0,NaN, and INF)) is +-pi/2;
+     *
+     * Constants:
+     * The hexadecimal values are the intended ones for the following
+     * constants. The decimal values may be used, provided that the
+     * compiler will convert from decimal to binary accurately enough
+     * to produce the hexadecimal values shown.
+     */
+    private static final double ieee754_atan2(double x, double y) {
+        double z;
+        int k, m;
+        int hx, hy, ix, iy;
+        int lx, ly;
+
+        //i0 = (int)((Double.doubleToLongBits(one)) &gt;&gt; (29+HI_SHIFT))^1;
+        //i1 = 1-i0;
+<span class="fc" id="L1033">        hx = (int) (Double.doubleToLongBits(x) &gt;&gt;&gt; HI_SHIFT);</span>
+<span class="fc" id="L1034">        lx = (int) (Double.doubleToLongBits(x) &amp; LO_MASK);</span>
+<span class="fc" id="L1035">        hy = (int) (Double.doubleToLongBits(y) &gt;&gt;&gt; HI_SHIFT);</span>
+<span class="fc" id="L1036">        ly = (int) (Double.doubleToLongBits(y) &amp; LO_MASK);</span>
+<span class="fc" id="L1037">        ix = hx &amp; 0x7fffffff;</span>
+<span class="fc" id="L1038">        iy = hy &amp; 0x7fffffff;</span>
+
+<span class="pc bpc" id="L1040" title="2 of 4 branches missed.">        if (((ix | ((lx | -lx) &gt;&gt; 31)) &gt; 0x7ff00000)</span>
+                || ((iy | ((ly | -ly) &gt;&gt; 31)) &gt; 0x7ff00000)) /* x or y is NaN */ {
+<span class="nc" id="L1042">            return x + y;</span>
+        }
+<span class="pc bpc" id="L1044" title="1 of 2 branches missed.">        if ((hx - 0x3ff00000 | lx) == 0) {</span>
+<span class="nc" id="L1045">            return ieee754_atan(y);   /* x=1.0 */</span>
+        }
+<span class="fc" id="L1047">        m = ((hy &gt;&gt; 31) &amp; 1) | ((hx &gt;&gt; 30) &amp; 2);  /* 2*sign(x)+sign(y) */</span>
+
+        /* when y = 0 */
+<span class="fc bfc" id="L1050" title="All 2 branches covered.">        if ((iy | ly) == 0) {</span>
+<span class="pc bpc" id="L1051" title="3 of 4 branches missed.">            switch (m) {</span>
+                case 0:
+                case 1:
+<span class="fc" id="L1054">                    return y;   /* atan(+-0,+anything)=+-0 */</span>
+                case 2:
+<span class="nc" id="L1056">                    return pi + tiny;/* atan(+0,-anything) = pi */</span>
+                case 3:
+<span class="nc" id="L1058">                    return -pi - tiny;/* atan(-0,-anything) =-pi */</span>
+            }
+        }
+        /* when x = 0 */
+<span class="fc bfc" id="L1062" title="All 2 branches covered.">        if ((ix | lx) == 0) {</span>
+<span class="fc bfc" id="L1063" title="All 2 branches covered.">            return (hy &lt; 0) ? -pi_o_2 - tiny : pi_o_2 + tiny;</span>
+        }
+
+        /* when x is INF */
+<span class="pc bpc" id="L1067" title="1 of 2 branches missed.">        if (ix == 0x7ff00000) {</span>
+<span class="nc bnc" id="L1068" title="All 2 branches missed.">            if (iy == 0x7ff00000) {</span>
+<span class="nc bnc" id="L1069" title="All 5 branches missed.">                switch (m) {</span>
+                    case 0:
+<span class="nc" id="L1071">                        return pi_o_4 + tiny;/* atan(+INF,+INF) */</span>
+                    case 1:
+<span class="nc" id="L1073">                        return -pi_o_4 - tiny;/* atan(-INF,+INF) */</span>
+                    case 2:
+<span class="nc" id="L1075">                        return 3.0 * pi_o_4 + tiny;/*atan(+INF,-INF)*/</span>
+                    case 3:
+<span class="nc" id="L1077">                        return -3.0 * pi_o_4 - tiny;/*atan(-INF,-INF)*/</span>
+                }
+            } else {
+<span class="nc bnc" id="L1080" title="All 5 branches missed.">                switch (m) {</span>
+                    case 0:
+<span class="nc" id="L1082">                        return zero; /* atan(+...,+INF) */</span>
+                    case 1:
+<span class="nc" id="L1084">                        return -zero; /* atan(-...,+INF) */</span>
+                    case 2:
+<span class="nc" id="L1086">                        return pi + tiny;  /* atan(+...,-INF) */</span>
+                    case 3:
+<span class="nc" id="L1088">                        return -pi - tiny;  /* atan(-...,-INF) */</span>
+                }
+            }
+        }
+        /* when y is INF */
+<span class="pc bpc" id="L1093" title="1 of 2 branches missed.">        if (iy == 0x7ff00000) {</span>
+<span class="nc bnc" id="L1094" title="All 2 branches missed.">            return (hy &lt; 0) ? -pi_o_2 - tiny : pi_o_2 + tiny;</span>
+        }
+
+        /* compute y/x */
+<span class="fc" id="L1098">        k = (iy - ix) &gt;&gt; 20;</span>
+<span class="pc bpc" id="L1099" title="1 of 2 branches missed.">        if (k &gt; 60) {</span>
+<span class="nc" id="L1100">            z = pi_o_2 + 0.5 * pi_lo;  /* |y/x| &gt;  2**60 */</span>
+<span class="pc bpc" id="L1101" title="3 of 4 branches missed.">        } else if (hx &lt; 0 &amp;&amp; k &lt; -60) {</span>
+<span class="nc" id="L1102">            z = 0.0;   /* |y|/x &lt; -2**60 */</span>
+        } else {
+<span class="fc" id="L1104">            z = ieee754_atan(Math.abs(y / x));   /* safe to do y/x */</span>
+        }
+<span class="pc bpc" id="L1106" title="3 of 4 branches missed.">        switch (m) {</span>
+            case 0:
+<span class="fc" id="L1108">                return z; /* atan(+,+) */</span>
+            case 1:
+<span class="nc" id="L1110">                return -z; /* atan(-,+) */</span>
+            case 2:
+<span class="nc" id="L1112">                return pi - (z - pi_lo);/* atan(+,-) */</span>
+            default: /* case 3 */
+<span class="nc" id="L1114">                return (z - pi_lo) - pi;/* atan(-,-) */</span>
+        }
+    }
+
+    /**
+     * scalbn (double x, int n)
+     * scalbn(x,n) returns x* 2**n  computed by  exponent
+     * manipulation rather than by actually performing an
+     * exponentiation or a multiplication.
+     */
+    public static final double scalb(double x, int n) {
+        int k, hx, lx;
+<span class="fc" id="L1126">        hx = (int) (Double.doubleToLongBits(x) &gt;&gt;&gt; HI_SHIFT);</span>
+<span class="fc" id="L1127">        lx = (int) (Double.doubleToLongBits(x) &amp; LO_MASK);</span>
+<span class="fc" id="L1128">        k = (hx &amp; 0x7ff00000) &gt;&gt; 20;    /* extract exponent */</span>
+<span class="pc bpc" id="L1129" title="1 of 2 branches missed.">        if (k == 0) {       /* 0 or subnormal x */</span>
+<span class="nc bnc" id="L1130" title="All 2 branches missed.">            if ((lx | (hx &amp; 0x7fffffff)) == 0) {</span>
+<span class="nc" id="L1131">                return x; /* +-0 */</span>
+            }
+<span class="nc" id="L1133">            x *= two54;</span>
+<span class="nc" id="L1134">            hx = (int) (Double.doubleToLongBits(x) &gt;&gt;&gt; HI_SHIFT);</span>
+<span class="nc" id="L1135">            k = ((hx &amp; 0x7ff00000) &gt;&gt; 20) - 54;</span>
+<span class="nc bnc" id="L1136" title="All 2 branches missed.">            if (n &lt; -50000) {</span>
+<span class="nc" id="L1137">                return tiny * x;   /*underflow*/</span>
+            }
+        }
+<span class="pc bpc" id="L1140" title="1 of 2 branches missed.">        if (k == 0x7ff) {</span>
+<span class="nc" id="L1141">            return x + x;   /* NaN or Inf */</span>
+        }
+<span class="fc" id="L1143">        k = k + n;</span>
+<span class="pc bpc" id="L1144" title="1 of 2 branches missed.">        if (k &gt; 0x7fe) {</span>
+<span class="nc" id="L1145">            return huge * copySign(huge, x); /* overflow  */</span>
+        }
+<span class="pc bpc" id="L1147" title="1 of 2 branches missed.">        if (k &gt; 0) /* normal result */ {</span>
+            //__HI(x) = (hx&amp;0x800fffff)|(k&lt;&lt;20);
+<span class="fc" id="L1149">            x = Double.longBitsToDouble(((long) ((hx &amp; 0x800fffff) | (k &lt;&lt; 20)) &lt;&lt; HI_SHIFT) | (Double.doubleToLongBits(x) &amp; LO_MASK));</span>
+<span class="fc" id="L1150">            return x;</span>
+        }
+<span class="nc bnc" id="L1152" title="All 2 branches missed.">        if (k &lt;= -54) {</span>
+<span class="nc bnc" id="L1153" title="All 2 branches missed.">            if (n &gt; 50000) /* in case integer overflow in n+k */ {</span>
+<span class="nc" id="L1154">                return huge * copySign(huge, x); /*overflow*/</span>
+            } else {
+<span class="nc" id="L1156">                return tiny * copySign(tiny, x);  /*underflow*/</span>
+            }
+        }
+<span class="nc" id="L1159">        k += 54;        /* subnormal result */</span>
+        //__HI(x) = (hx&amp;0x800fffff)|(k&lt;&lt;20);
+<span class="nc" id="L1161">        x = Double.longBitsToDouble(((long) ((hx &amp; 0x800fffff) | (k &lt;&lt; 20)) &lt;&lt; HI_SHIFT) | (Double.doubleToLongBits(x) &amp; LO_MASK));</span>
+<span class="nc" id="L1162">        return x * twom54;</span>
+    }
+
+    /**
+     * Please update your code to use scalb
+     *
+     * @param x
+     * @param n
+     * @return scalb(x, n)
+     * @deprecated Please update your code to use scalb
+     */
+    public static final double scalbn(double x, int n) {
+<span class="nc" id="L1174">        return scalb(x, n);</span>
+    }
+
+    /*
+     * copySign(double x, double y)
+     * copySign(x,y) returns a value with the magnitude of x and
+     * with the sign bit of y.
+     */
+    public static final double copySign(final double x, final double y) {
+        //__HI(x) = (__HI(x)&amp;0x7fffffff)|(__HI(y)&amp;0x80000000);
+        // The below is actually about 30% faster than doing greater/less comparisons.
+<span class="nc" id="L1185">        return Double.longBitsToDouble((Double.doubleToLongBits(x) &amp; 0x7fffffffffffffffL)</span>
+<span class="nc" id="L1186">                | (Double.doubleToLongBits(y) &amp; 0x8000000000000000L));</span>
+    }
+    
+    
+    /*
+     * fabs(x) returns the absolute value of x.
+     * This is already handled by Java ME.
+    public static final double fabs(double x)
+    {
+    //__HI(x) &amp;= 0x7fffffff;
+    //return Double.longBitsToDouble(Double.doubleToLongBits(x) &amp; 0x7fffffffffffffffL);
+    }
+     */
+
+    /**
+     * Please update your code to use copySign
+     *
+     * @param x
+     * @param y
+     * @return copySign(x, y)
+     * @deprecated Please update your code to use copySign
+     */
+    public static final double copysign(final double x, final double y) {
+<span class="nc" id="L1209">        return copySign(x, y);</span>
+    }
+
+    /**
+     * Returns the size of an ulp (units in the last place) of the argument.
+     *
+     * @param d value whose ulp is to be returned
+     * @return size of an ulp for the argument
+     */
+    public static double ulp(double d) {
+<span class="nc bnc" id="L1219" title="All 2 branches missed.">        if (Double.isNaN(d)) {</span>
+            // If the argument is NaN, then the result is NaN.
+<span class="nc" id="L1221">            return Double.NaN;</span>
+        }
+
+<span class="nc bnc" id="L1224" title="All 2 branches missed.">        if (Double.isInfinite(d)) {</span>
+            // If the argument is positive or negative infinity, then the
+            // result is positive infinity.
+<span class="nc" id="L1227">            return Double.POSITIVE_INFINITY;</span>
+        }
+
+<span class="nc bnc" id="L1230" title="All 2 branches missed.">        if (d == 0.0) {</span>
+            // If the argument is positive or negative zero, then the result is Double.MIN_VALUE.
+<span class="nc" id="L1232">            return Double.MIN_VALUE;</span>
+        }
+
+<span class="nc" id="L1235">        d = Math.abs(d);</span>
+<span class="nc bnc" id="L1236" title="All 2 branches missed.">        if (d == Double.MAX_VALUE) {</span>
+            // If the argument is Double.MAX_VALUE, then the result is equal to 2^971.
+<span class="nc" id="L1238">            return MAX_ULP;</span>
+        }
+
+<span class="nc" id="L1241">        return nextAfter(d, Double.MAX_VALUE) - d;</span>
+    }
+
+    private static boolean isSameSign(double x, double y) {
+<span class="nc bnc" id="L1245" title="All 2 branches missed.">        return copySign(x, y) == x;</span>
+    }
+
+    /**
+     * Returns the next representable floating point number after the first
+     * argument in the direction of the second argument.
+     *
+     * @param start     starting value
+     * @param direction value indicating which of the neighboring representable
+     *                  floating point number to return
+     * @return The floating-point number next to {@code start} in the
+     * direction of {@direction}.
+     */
+    public static double nextAfter(final double start, final double direction) {
+<span class="nc bnc" id="L1259" title="All 4 branches missed.">        if (Double.isNaN(start) || Double.isNaN(direction)) {</span>
+            // If either argument is a NaN, then NaN is returned.
+<span class="nc" id="L1261">            return Double.NaN;</span>
+        }
+
+<span class="nc bnc" id="L1264" title="All 2 branches missed.">        if (start == direction) {</span>
+            // If both arguments compare as equal the second argument is returned.
+<span class="nc" id="L1266">            return direction;</span>
+        }
+
+<span class="nc" id="L1269">        final double absStart = Math.abs(start);</span>
+<span class="nc" id="L1270">        final double absDir = Math.abs(direction);</span>
+<span class="nc bnc" id="L1271" title="All 4 branches missed.">        final boolean toZero = !isSameSign(start, direction) || absDir &lt; absStart;</span>
+
+<span class="nc bnc" id="L1273" title="All 2 branches missed.">        if (toZero) {</span>
+            // we are reducing the magnitude, going toward zero.
+<span class="nc bnc" id="L1275" title="All 2 branches missed.">            if (absStart == Double.MIN_VALUE) {</span>
+<span class="nc" id="L1276">                return copySign(0.0, start);</span>
+            }
+<span class="nc bnc" id="L1278" title="All 2 branches missed.">            if (Double.isInfinite(absStart)) {</span>
+<span class="nc" id="L1279">                return copySign(Double.MAX_VALUE, start);</span>
+            }
+<span class="nc" id="L1281">            return copySign(Double.longBitsToDouble(Double.doubleToLongBits(absStart) - 1L), start);</span>
+        } else {
+            // we are increasing the magnitude, toward +-Infinity
+<span class="nc bnc" id="L1284" title="All 2 branches missed.">            if (start == 0.0) {</span>
+<span class="nc" id="L1285">                return copySign(Double.MIN_VALUE, direction);</span>
+            }
+<span class="nc bnc" id="L1287" title="All 2 branches missed.">            if (absStart == Double.MAX_VALUE) {</span>
+<span class="nc" id="L1288">                return copySign(Double.POSITIVE_INFINITY, start);</span>
+            }
+<span class="nc" id="L1290">            return copySign(Double.longBitsToDouble(Double.doubleToLongBits(absStart) + 1L), start);</span>
+        }
+    }
+
+    /**
+     * Rounds the number to the closest integer
+     *
+     * @param a the number
+     * @return the closest integer
+     */
+    public static int round(float a) {
+<span class="fc" id="L1301">        return Math.round(a);</span>
+    }
+
+    /**
+     * Rounds the number to the closest integer
+     *
+     * @param a the number
+     * @return the closest integer
+     */
+    public static long round(double a) {
+<span class="nc" id="L1311">        return Math.round(a);</span>
+    }
+
+    /**
+     * Rounds the number down
+     *
+     * @param a the number
+     * @return a rounded down number
+     */
+    public static int floor(float a) {
+<span class="nc" id="L1321">        return (int) a;</span>
+    }
+
+    /**
+     * Rounds the number down
+     *
+     * @param a the number
+     * @return a rounded down number
+     */
+    public static long floor(double a) {
+<span class="nc" id="L1331">        return (long) a;</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

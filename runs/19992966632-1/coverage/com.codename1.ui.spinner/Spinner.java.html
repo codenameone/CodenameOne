@@ -1,0 +1,624 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Spinner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.spinner</a> &gt; <span class="el_source">Spinner.java</span></div><h1>Spinner.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.spinner;
+
+import com.codename1.compat.java.util.Objects;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.List;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextField;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.list.DefaultListCellRenderer;
+import com.codename1.ui.list.ListCellRenderer;
+import com.codename1.ui.list.ListModel;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+import java.util.Calendar;
+import java.util.Date;
+
+/**
+ * A spinner allows us to select a numeric, date or time value using the arrow keys
+ * in a similar way to a list or a combo box.
+ *
+ * @author Shai Almog
+ * @deprecated use Picker instead
+ */
+class Spinner extends List {
+    /**
+     * Value for create date renderer represnting Day-Month-4 Digit Year
+     */
+    public static final int DATE_FORMAT_DD_MM_YYYY = 1;
+
+    /**
+     * Value for create date renderer represnting Month-Day-4 Digit Year
+     */
+    public static final int DATE_FORMAT_MM_DD_YYYY = 2;
+
+    /**
+     * Value for create date renderer represnting Day-Month-2 Digit Year
+     */
+    public static final int DATE_FORMAT_DD_MM_YY = 11;
+
+    /**
+     * Value for create date renderer represnting Month-Day-2 Digit Year
+     */
+    public static final int DATE_FORMAT_MM_DD_YY = 12;
+
+    /**
+     * Value for create date renderer represnting Day Of Week, Month, Day
+     */
+    public static final int DATE_FORMAT_DOW_MON_DD = 13;
+
+    /**
+     * Value for create date renderer represnting Day Of Week, Month, Day, Year
+     */
+    public static final int DATE_FORMAT_DOW_MON_DD_YY = 14;
+
+    /**
+     * The image appearing on the side of the spinner widget to indicate its &quot;spinnability&quot;
+     */
+    private static Image spinnerHandle;
+<span class="fc" id="L86">    private static int inputSkipDelay = 2000;</span>
+<span class="fc" id="L87">    private long lastKeyInteraction = -1;</span>
+<span class="fc" id="L88">    private final TextField quickType = new TextField();</span>
+    private boolean monthFirst;
+<span class="fc" id="L90">    private int currentInputAlign = LEFT;</span>
+    private final boolean ios7Mode;
+
+    /**
+     * Creates a new spinner instance with the given spinner model
+     *
+     * @param spinner model such as SpinnerDateModel or SpinnerNumberModel
+     */
+    Spinner(ListModel model, ListCellRenderer rendererInstance) {
+<span class="fc" id="L99">        super(model);</span>
+<span class="fc" id="L100">        ios7Mode = UIManager.getInstance().isThemeConstant(&quot;ios7SpinnerBool&quot;, false);</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">        if (ios7Mode) {</span>
+<span class="nc" id="L102">            super.setMinElementHeight(6);</span>
+        }
+<span class="fc" id="L104">        SpinnerRenderer.iOS7Mode = ios7Mode;</span>
+<span class="fc" id="L105">        setRenderer(rendererInstance);</span>
+<span class="fc" id="L106">        setUIID(&quot;Spinner&quot;);</span>
+<span class="fc" id="L107">        setFixedSelection(FIXED_CENTER);</span>
+<span class="fc" id="L108">        setOrientation(VERTICAL);</span>
+<span class="fc" id="L109">        setInputOnFocus(false);</span>
+<span class="fc" id="L110">        setIsScrollVisible(false);</span>
+<span class="fc" id="L111">        initSpinnerRenderer();</span>
+
+<span class="fc" id="L113">        quickType.setReplaceMenu(false);</span>
+<span class="fc" id="L114">        quickType.setInputModeOrder(new String[]{&quot;123&quot;});</span>
+<span class="fc" id="L115">        quickType.setFocus(true);</span>
+<span class="fc" id="L116">        quickType.setRTL(false);</span>
+<span class="fc" id="L117">        quickType.setAlignment(LEFT);</span>
+<span class="fc" id="L118">        quickType.setConstraint(TextField.NUMERIC);</span>
+<span class="fc" id="L119">        setIgnoreFocusComponentWhenUnfocused(true);</span>
+
+<span class="fc" id="L121">        setRenderingPrototype(model.getItemAt(model.getSize() - 1));</span>
+
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (getRenderer() instanceof DateTimeRenderer) {</span>
+<span class="nc" id="L124">            quickType.setColumns(2);</span>
+        }
+
+<span class="fc" id="L127">    }</span>
+
+    /**
+     * Creates a new time spinner instance, time is an integer represented in seconds
+     * since mindnight
+     *
+     * @param min             lowest value allowed in seconds since midnight
+     * @param max             maximum value allowed in seconds since midnight
+     * @param currentValue    the starting value in seconds since midnight
+     * @param step            increments in the spinner (in seconds)
+     * @param twentyFourHours show the value as 24 hour values or AM/PM
+     * @param showSeconds     show the value of the seconds as well or hide it
+     * @return new spinner instance
+     * @deprecated use TimeSpinner
+     */
+    public static Spinner createTime(int min, int max, int currentValue, int step, boolean twentyFourHours, boolean showSeconds) {
+<span class="nc" id="L143">        Spinner s = new Spinner(new SpinnerNumberModel(min, max, currentValue, step),</span>
+<span class="nc" id="L144">                DateTimeRenderer.createTimeRenderer(twentyFourHours, showSeconds));</span>
+<span class="nc" id="L145">        return s;</span>
+    }
+
+    /**
+     * Creates a new date spinner instance
+     *
+     * @param min           lowest value allowed
+     * @param max           maximum value allowed
+     * @param currentValue  the starting value for the mode
+     * @param separatorChar character to separate the entries during rendering
+     * @param format        formatting type for the field
+     * @return new spinner instance
+     * @deprecated use DateSpinner
+     */
+    public static Spinner createDate(long min, long max, long currentValue, char separatorChar, int format) {
+<span class="nc" id="L160">        Spinner s = new Spinner(new SpinnerDateModel(min, max, currentValue), DateTimeRenderer.createDateRenderer(separatorChar, format));</span>
+<span class="nc bnc" id="L161" title="All 4 branches missed.">        s.monthFirst = format == DATE_FORMAT_MM_DD_YY || format == DATE_FORMAT_MM_DD_YYYY;</span>
+<span class="nc" id="L162">        return s;</span>
+    }
+
+    /**
+     * Creates a new numeric spinner instance
+     *
+     * @param min          lowest value allowed
+     * @param max          maximum value allowed
+     * @param currentValue the starting value for the mode
+     * @param step         the value by which we increment the entries in the model
+     * @return new spinner instance
+     * @deprecated use NumericSpinner
+     */
+    public static Spinner create(int min, int max, int currentValue, int step) {
+<span class="fc" id="L176">        Spinner s = new Spinner(new SpinnerNumberModel(min, max, currentValue, step, 0), new SpinnerRenderer&lt;Object&gt;());</span>
+<span class="fc" id="L177">        s.setRenderingPrototype(Integer.valueOf(max * 10));</span>
+<span class="fc" id="L178">        return s;</span>
+    }
+
+    /**
+     * Creates a new numeric spinner instance
+     *
+     * @param min          lowest value allowed
+     * @param max          maximum value allowed
+     * @param currentValue the starting value for the mode
+     * @param step         the value by which we increment the entries in the model
+     * @return new spinner instance
+     * @deprecated use NumericSpinner
+     */
+    public static Spinner create(double min, double max, double currentValue, double step) {
+<span class="fc" id="L192">        Spinner s = new Spinner(new SpinnerNumberModel(min, max, currentValue, step), new SpinnerRenderer&lt;Object&gt;() {</span>
+            public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
+<span class="pc bpc" id="L194" title="2 of 4 branches missed.">                if (value != null &amp;&amp; value instanceof Double) {</span>
+                    // round the number in the spinner to two digits
+<span class="fc" id="L196">                    double d = ((Double) value).doubleValue();</span>
+<span class="fc" id="L197">                    long l = (long) d;</span>
+<span class="fc" id="L198">                    long r = (long) (d * 100);</span>
+<span class="fc" id="L199">                    r %= 100;</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">                    if (r == 0) {</span>
+<span class="fc" id="L201">                        value = &quot;&quot; + l;</span>
+                    } else {
+<span class="nc" id="L203">                        value = &quot;&quot; + l + &quot;.&quot; + r;</span>
+                    }
+                }
+<span class="fc" id="L206">                return super.getListCellRendererComponent(list, value, index, isSelected);</span>
+            }
+        });
+<span class="fc" id="L209">        s.setRenderingPrototype(new Double(max * 10));</span>
+<span class="fc" id="L210">        return s;</span>
+    }
+
+    /**
+     * The image appearing on the side of the spinner widget to indicate its &quot;spinnability&quot;
+     *
+     * @return the spinnerHandle
+     */
+    public static Image getSpinnerHandle() {
+<span class="nc" id="L219">        return spinnerHandle;</span>
+    }
+
+    /**
+     * The image appearing on the side of the spinner widget to indicate its &quot;spinnability&quot;
+     *
+     * @param aSpinnerHandle the spinnerHandle to set
+     */
+    public static void setSpinnerHandle(Image aSpinnerHandle) {
+<span class="nc" id="L228">        spinnerHandle = aSpinnerHandle;</span>
+<span class="nc" id="L229">    }</span>
+
+    /**
+     * Indicates the time after which the skip input area for entering spinner values manually will disappear
+     *
+     * @return the inputSkipDelay
+     */
+    public static int getInputSkipDelay() {
+<span class="nc" id="L237">        return inputSkipDelay;</span>
+    }
+
+    /**
+     * Indicates the time after which the skip input area for entering spinner values manually will disappear
+     *
+     * @param aInputSkipDelay the time for disappearing
+     */
+    public static void setInputSkipDelay(int aInputSkipDelay) {
+<span class="nc" id="L246">        inputSkipDelay = aInputSkipDelay;</span>
+<span class="nc" id="L247">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected boolean isStickyDrag() {
+<span class="nc" id="L253">        return true;</span>
+    }
+
+    void initSpinnerRenderer() {
+<span class="fc" id="L257">        DefaultListCellRenderer render = ((DefaultListCellRenderer) super.getRenderer());</span>
+<span class="fc" id="L258">        render.setRTL(false);</span>
+<span class="fc" id="L259">        setRTL(false);</span>
+<span class="fc" id="L260">        render.setShowNumbers(false);</span>
+<span class="fc" id="L261">        render.setUIID(&quot;SpinnerRenderer&quot;);</span>
+<span class="fc" id="L262">        Component bgFocus = render.getListFocusComponent(this);</span>
+<span class="fc" id="L263">        bgFocus.setUIID(&quot;SpinnerRendererFocus&quot;);</span>
+<span class="fc" id="L264">        bgFocus.getSelectedStyle().setBgTransparency(0);</span>
+<span class="fc" id="L265">        bgFocus.getUnselectedStyle().setBgTransparency(0);</span>
+<span class="fc" id="L266">        render.setAlwaysRenderSelection(true);</span>
+<span class="fc" id="L267">    }</span>
+
+    void updateToDefaultRTL() {
+<span class="fc" id="L270">        boolean r = getUIManager().getLookAndFeel().isRTL();</span>
+<span class="fc" id="L271">        DefaultListCellRenderer render = ((DefaultListCellRenderer) super.getRenderer());</span>
+<span class="fc" id="L272">        render.setRTL(r);</span>
+<span class="fc" id="L273">        setRTL(r);</span>
+<span class="fc" id="L274">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void initComponent() {
+<span class="fc" id="L280">        getComponentForm().registerAnimated(this);</span>
+<span class="fc" id="L281">        boolean n = UIManager.getInstance().isThemeConstant(&quot;spinnerFocusBool&quot;, false);</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">        setIgnoreFocusComponentWhenUnfocused(!n);</span>
+<span class="fc" id="L283">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void deinitialize() {
+<span class="nc" id="L289">        getComponentForm().deregisterAnimated(this);</span>
+<span class="nc" id="L290">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected Dimension calcScrollSize() {
+<span class="fc" id="L296">        return super.calcPreferredSize();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L303">        int boxWidth = 0;</span>
+<span class="fc" id="L304">        int verticalPadding = getStyle().getVerticalPadding();</span>
+<span class="fc" id="L305">        int horizontalPadding = getStyle().getHorizontalPadding();</span>
+<span class="fc" id="L306">        Object prototype = getRenderingPrototype();</span>
+        int selectedHeight;
+<span class="fc" id="L308">        ListCellRenderer renderer = getRenderer();</span>
+        Component cmp;
+<span class="fc bfc" id="L310" title="All 2 branches covered.">        if (prototype != null) {</span>
+<span class="fc" id="L311">            cmp = renderer.getListCellRendererComponent(this, prototype, 0, true);</span>
+        } else {
+<span class="pc bpc" id="L313" title="1 of 2 branches missed.">            if (getModel().getSize() &gt; 0) {</span>
+<span class="nc" id="L314">                cmp = renderer.getListCellRendererComponent(this, getModel().getItemAt(0), 0, true);</span>
+            } else {
+<span class="fc" id="L316">                cmp = renderer.getListCellRendererComponent(this, null, 0, true);</span>
+            }
+        }
+
+<span class="fc" id="L320">        selectedHeight = cmp.getPreferredH();</span>
+
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">        if (spinnerHandle != null) {</span>
+<span class="nc bnc" id="L323" title="All 2 branches missed.">            if (spinnerHandle.getHeight() &gt; selectedHeight) {</span>
+<span class="nc" id="L324">                selectedHeight = spinnerHandle.getHeight();</span>
+            }
+<span class="nc" id="L326">            boxWidth += spinnerHandle.getWidth();</span>
+        }
+
+        Dimension d;
+<span class="pc bpc" id="L330" title="1 of 2 branches missed.">        if (Display.getInstance().isTouchScreenDevice()) {</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">            if (ios7Mode) {</span>
+<span class="nc" id="L332">                d = new Dimension(cmp.getPreferredW() + boxWidth + horizontalPadding, (selectedHeight * 8 + verticalPadding));</span>
+            } else {
+<span class="fc" id="L334">                d = new Dimension(cmp.getPreferredW() + boxWidth + horizontalPadding, (selectedHeight * getUIManager().getThemeConstant(&quot;spinnerElementsInt&quot;, 3) + verticalPadding));</span>
+            }
+        } else {
+<span class="nc" id="L337">            d = new Dimension(cmp.getPreferredW() + boxWidth + horizontalPadding, (selectedHeight + verticalPadding));</span>
+        }
+<span class="fc" id="L339">        Style style = getStyle();</span>
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">        if (style.getBorder() != null) {</span>
+<span class="fc" id="L341">            d.setWidth(Math.max(style.getBorder().getMinimumWidth(), d.getWidth()));</span>
+<span class="fc" id="L342">            d.setHeight(Math.max(style.getBorder().getMinimumHeight(), d.getHeight()));</span>
+        }
+<span class="fc" id="L344">        return d;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void keyPressed(int code) {
+<span class="fc" id="L351">        int game = Display.getInstance().getGameAction(code);</span>
+<span class="pc bpc" id="L352" title="1 of 2 branches missed.">        if (game &gt; 0) {</span>
+<span class="fc" id="L353">            super.keyPressed(code);</span>
+        } else {
+<span class="nc" id="L355">            quickType.keyPressed(code);</span>
+<span class="nc" id="L356">            lastKeyInteraction = System.currentTimeMillis();</span>
+        }
+<span class="fc" id="L358">    }</span>
+
+    /**
+     * Returns the value of the spinner to a number or a date based on the spinner type
+     *
+     * @return a number or a date
+     */
+    public Object getValue() {
+<span class="fc" id="L366">        ListModel m = getModel();</span>
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">        if (m instanceof SpinnerDateModel) {</span>
+<span class="nc" id="L368">            return ((SpinnerDateModel) m).getValue();</span>
+        }
+<span class="fc" id="L370">        return ((SpinnerNumberModel) m).getValue();</span>
+    }
+
+    /**
+     * Set the value of the spinner to a number or a date based on the spinner type
+     *
+     * @param o a number or a date
+     */
+    public void setValue(Object o) {
+<span class="fc" id="L379">        ListModel m = getModel();</span>
+<span class="pc bpc" id="L380" title="1 of 2 branches missed.">        if (m instanceof SpinnerDateModel) {</span>
+<span class="nc" id="L381">            ((SpinnerDateModel) m).setValue((Date) o);</span>
+        } else {
+<span class="fc bfc" id="L383" title="All 2 branches covered.">            if (m instanceof SpinnerNumberModel) {</span>
+<span class="fc" id="L384">                ((SpinnerNumberModel) m).setValue(o);</span>
+            } else {
+<span class="fc" id="L386">                int size = m.getSize();</span>
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">                for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="fc" id="L388">                    Object c = m.getItemAt(iter);</span>
+<span class="fc bfc" id="L389" title="All 2 branches covered.">                    if (Objects.equals(c, o)) {</span>
+<span class="fc" id="L390">                        m.setSelectedIndex(iter);</span>
+<span class="fc" id="L391">                        return;</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L396">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void keyReleased(int code) {
+<span class="fc" id="L402">        int game = Display.getInstance().getGameAction(code);</span>
+<span class="pc bpc" id="L403" title="1 of 2 branches missed.">        if (game &gt; 0) {</span>
+<span class="fc" id="L404">            super.keyReleased(code);</span>
+        } else {
+            try {
+<span class="nc" id="L407">                quickType.keyReleased(code);</span>
+<span class="nc" id="L408">                lastKeyInteraction = System.currentTimeMillis();</span>
+<span class="nc" id="L409">                String t = quickType.getText();</span>
+<span class="nc bnc" id="L410" title="All 2 branches missed.">                if (t.length() == 0) {</span>
+<span class="nc" id="L411">                    return;</span>
+                }
+
+<span class="nc bnc" id="L414" title="All 2 branches missed.">                if (getRenderer() instanceof DateTimeRenderer) {</span>
+                    // is this is a time input or a date input?
+<span class="nc bnc" id="L416" title="All 2 branches missed.">                    if (getModel() instanceof SpinnerNumberModel) {</span>
+<span class="nc" id="L417">                        int time = ((Integer) getValue()).intValue();</span>
+<span class="nc" id="L418">                        int seconds = time % 60;</span>
+<span class="nc" id="L419">                        int minutes = time / 60;</span>
+<span class="nc" id="L420">                        int hours = minutes / 60;</span>
+<span class="nc" id="L421">                        minutes %= 60;</span>
+
+<span class="nc bnc" id="L423" title="All 4 branches missed.">                        switch (currentInputAlign) {</span>
+                            case LEFT:
+<span class="nc" id="L425">                                hours = Integer.parseInt(t);</span>
+<span class="nc bnc" id="L426" title="All 2 branches missed.">                                if (((DateTimeRenderer) getRenderer()).isTwentyFourHours()) {</span>
+<span class="nc bnc" id="L427" title="All 2 branches missed.">                                    if (hours &gt; 24) {</span>
+<span class="nc" id="L428">                                        return;</span>
+                                    }
+                                } else {
+<span class="nc bnc" id="L431" title="All 2 branches missed.">                                    if (hours &gt; 12) {</span>
+<span class="nc" id="L432">                                        return;</span>
+                                    }
+                                }
+                                break;
+                            case CENTER:
+<span class="nc" id="L437">                                minutes = Integer.parseInt(t);</span>
+<span class="nc bnc" id="L438" title="All 2 branches missed.">                                if (minutes &gt; 59) {</span>
+<span class="nc" id="L439">                                    return;</span>
+                                }
+                                break;
+                            case RIGHT:
+<span class="nc" id="L443">                                seconds = Integer.parseInt(t);</span>
+<span class="nc bnc" id="L444" title="All 2 branches missed.">                                if (seconds &gt; 59) {</span>
+<span class="nc" id="L445">                                    return;</span>
+                                }
+                                break;
+                        }
+
+<span class="nc" id="L450">                        int actual = seconds + minutes * 60 + hours * 60 * 60;</span>
+<span class="nc" id="L451">                        setValue(Integer.valueOf(actual));</span>
+
+                        // update the spinner positioning if we have two characters
+<span class="nc bnc" id="L454" title="All 2 branches missed.">                        if (quickType.getText().length() &gt; 1) {</span>
+<span class="nc" id="L455">                            quickType.setText(&quot;&quot;);</span>
+<span class="nc bnc" id="L456" title="All 4 branches missed.">                            switch (currentInputAlign) {</span>
+                                case LEFT:
+<span class="nc" id="L458">                                    currentInputAlign = CENTER;</span>
+<span class="nc" id="L459">                                    break;</span>
+                                case CENTER:
+<span class="nc bnc" id="L461" title="All 2 branches missed.">                                    if (((DateTimeRenderer) getRenderer()).isShowSeconds()) {</span>
+<span class="nc" id="L462">                                        currentInputAlign = RIGHT;</span>
+                                    } else {
+<span class="nc" id="L464">                                        currentInputAlign = LEFT;</span>
+<span class="nc" id="L465">                                        lastKeyInteraction = -1;</span>
+                                    }
+<span class="nc" id="L467">                                    break;</span>
+                                case RIGHT:
+<span class="nc" id="L469">                                    currentInputAlign = LEFT;</span>
+<span class="nc" id="L470">                                    lastKeyInteraction = -1;</span>
+                                    break;
+                            }
+                        }
+<span class="nc" id="L474">                    } else {</span>
+<span class="nc" id="L475">                        Calendar c = Calendar.getInstance();</span>
+<span class="nc" id="L476">                        c.setTime((Date) getValue());</span>
+
+<span class="nc bnc" id="L478" title="All 4 branches missed.">                        switch (currentInputAlign) {</span>
+                            case LEFT:
+<span class="nc bnc" id="L480" title="All 2 branches missed.">                                if (monthFirst) {</span>
+<span class="nc" id="L481">                                    c.set(Calendar.MONTH, Integer.parseInt(t) - 1);</span>
+                                } else {
+<span class="nc" id="L483">                                    c.set(Calendar.DAY_OF_MONTH, Integer.parseInt(t));</span>
+                                }
+<span class="nc" id="L485">                                break;</span>
+                            case CENTER:
+<span class="nc bnc" id="L487" title="All 2 branches missed.">                                if (monthFirst) {</span>
+<span class="nc" id="L488">                                    c.set(Calendar.DAY_OF_MONTH, Integer.parseInt(t));</span>
+                                } else {
+<span class="nc" id="L490">                                    c.set(Calendar.MONTH, Integer.parseInt(t) - 1);</span>
+                                }
+<span class="nc" id="L492">                                break;</span>
+                            case RIGHT:
+<span class="nc" id="L494">                                int y = c.get(Calendar.YEAR);</span>
+<span class="nc" id="L495">                                c.set(Calendar.YEAR, y - (y % 100) + Integer.parseInt(t));</span>
+                                break;
+                        }
+<span class="nc" id="L498">                        setValue(c.getTime());</span>
+
+                        // update the spinner positioning if we have two characters
+<span class="nc bnc" id="L501" title="All 2 branches missed.">                        if (quickType.getText().length() &gt; 1) {</span>
+<span class="nc" id="L502">                            quickType.setText(&quot;&quot;);</span>
+<span class="nc bnc" id="L503" title="All 4 branches missed.">                            switch (currentInputAlign) {</span>
+                                case LEFT:
+<span class="nc" id="L505">                                    currentInputAlign = CENTER;</span>
+<span class="nc" id="L506">                                    break;</span>
+                                case CENTER:
+<span class="nc" id="L508">                                    currentInputAlign = RIGHT;</span>
+<span class="nc" id="L509">                                    break;</span>
+                                case RIGHT:
+<span class="nc" id="L511">                                    currentInputAlign = LEFT;</span>
+<span class="nc" id="L512">                                    lastKeyInteraction = -1;</span>
+                                    break;
+                            }
+                        }
+                    }
+<span class="nc" id="L517">                    return;</span>
+                } else {
+<span class="nc" id="L519">                    SpinnerNumberModel n = (SpinnerNumberModel) getModel();</span>
+<span class="nc bnc" id="L520" title="All 2 branches missed.">                    if (n.realValues) {</span>
+<span class="nc" id="L521">                        double val = Double.parseDouble(t);</span>
+<span class="nc bnc" id="L522" title="All 2 branches missed.">                        if (val &gt; ((SpinnerNumberModel) getModel()).getMax() ||</span>
+<span class="nc bnc" id="L523" title="All 2 branches missed.">                                val &lt; ((SpinnerNumberModel) getModel()).getMin()) {</span>
+<span class="nc" id="L524">                            return;</span>
+                        }
+<span class="nc" id="L526">                        setValue(new Double(val));</span>
+<span class="nc" id="L527">                    } else {</span>
+<span class="nc" id="L528">                        int val = Integer.parseInt(t);</span>
+<span class="nc bnc" id="L529" title="All 2 branches missed.">                        if (val &gt; ((SpinnerNumberModel) getModel()).getMax() ||</span>
+<span class="nc bnc" id="L530" title="All 2 branches missed.">                                val &lt; ((SpinnerNumberModel) getModel()).getMin()) {</span>
+<span class="nc" id="L531">                            return;</span>
+                        }
+<span class="nc" id="L533">                        setValue(Integer.valueOf(val));</span>
+                    }
+                }
+
+<span class="nc" id="L537">                int modelSize = getModel().getSize();</span>
+<span class="nc bnc" id="L538" title="All 2 branches missed.">                for (int iter = 0; iter &lt; modelSize; iter++) {</span>
+<span class="nc" id="L539">                    String v = getModel().getItemAt(iter).toString();</span>
+<span class="nc bnc" id="L540" title="All 2 branches missed.">                    if (v.startsWith(t)) {</span>
+<span class="nc" id="L541">                        setSelectedIndex(iter);</span>
+<span class="nc" id="L542">                        return;</span>
+                    }
+                }
+                // easier to ignore exceptions than build &quot;proper&quot; error handling
+<span class="nc" id="L546">            } catch (IllegalArgumentException ignore) {</span>
+<span class="nc" id="L547">                ignore.printStackTrace();</span>
+<span class="nc" id="L548">            }</span>
+        }
+<span class="fc" id="L550">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void paint(Graphics g) {
+<span class="fc" id="L556">        super.paint(g);</span>
+<span class="pc bpc" id="L557" title="1 of 2 branches missed.">        if (spinnerHandle != null) {</span>
+<span class="nc" id="L558">            Style s = getStyle();</span>
+<span class="nc" id="L559">            g.drawImage(spinnerHandle, getX() + getWidth() - spinnerHandle.getWidth() - s.getHorizontalPadding(),</span>
+<span class="nc" id="L560">                    getY() + s.getPaddingTop());</span>
+        }
+<span class="pc bpc" id="L562" title="2 of 4 branches missed.">        if (System.currentTimeMillis() - inputSkipDelay &lt; lastKeyInteraction || quickType.isPendingCommit()) {</span>
+<span class="nc" id="L563">            quickType.setWidth(Math.min(getWidth(), quickType.getPreferredW()));</span>
+<span class="nc" id="L564">            quickType.setHeight(Math.min(getHeight(), quickType.getPreferredH()));</span>
+<span class="nc" id="L565">            Style s = quickType.getStyle();</span>
+<span class="nc" id="L566">            quickType.setY(getScrollY() + getY());</span>
+
+            // positioning based on date/time
+<span class="nc bnc" id="L569" title="All 2 branches missed.">            if (getRenderer() instanceof DateTimeRenderer) {</span>
+<span class="nc bnc" id="L570" title="All 3 branches missed.">                switch (currentInputAlign) {</span>
+                    case LEFT:
+<span class="nc" id="L572">                        quickType.setX(getX());</span>
+<span class="nc" id="L573">                        break;</span>
+                    case RIGHT:
+<span class="nc" id="L575">                        quickType.setX(getX() + quickType.getStyle().getFont().charWidth(TextArea.getWidestChar()) * 4 + s.getMarginRightNoRTL());</span>
+<span class="nc" id="L576">                        break;</span>
+                    default:
+<span class="nc" id="L578">                        quickType.setX(getX() + quickType.getStyle().getFont().charWidth(TextArea.getWidestChar()) * 2 + s.getMarginLeftNoRTL());</span>
+<span class="nc" id="L579">                        break;</span>
+                }
+            } else {
+<span class="nc" id="L582">                quickType.setX(getX());</span>
+            }
+<span class="nc" id="L584">            quickType.paintComponent(g, true);</span>
+        }
+<span class="fc" id="L586">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean animate() {
+<span class="fc" id="L592">        boolean val = super.animate();</span>
+<span class="pc bpc" id="L593" title="1 of 2 branches missed.">        if (lastKeyInteraction != -1) {</span>
+<span class="nc" id="L594">            quickType.animate();</span>
+<span class="nc bnc" id="L595" title="All 4 branches missed.">            if (System.currentTimeMillis() - inputSkipDelay &gt; lastKeyInteraction &amp;&amp; !quickType.isPendingCommit()) {</span>
+<span class="nc" id="L596">                lastKeyInteraction = -1;</span>
+<span class="nc" id="L597">                quickType.clear();</span>
+<span class="nc" id="L598">                currentInputAlign = LEFT;</span>
+            }
+<span class="nc" id="L600">            return true;</span>
+        }
+<span class="fc" id="L602">        return val;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected boolean shouldRenderSelection() {
+<span class="pc bpc" id="L609" title="1 of 2 branches missed.">        if (!isIgnoreFocusComponentWhenUnfocused()) {</span>
+<span class="nc" id="L610">            return true;</span>
+        }
+<span class="fc" id="L612">        return super.shouldRenderSelection();</span>
+    }
+
+    public void repaint() {
+<span class="fc bfc" id="L616" title="All 2 branches covered.">        if (getParent() instanceof BaseSpinner) {</span>
+<span class="fc" id="L617">            getParent().repaint();</span>
+        } else {
+<span class="fc" id="L619">            super.repaint();</span>
+        }
+<span class="fc" id="L621">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

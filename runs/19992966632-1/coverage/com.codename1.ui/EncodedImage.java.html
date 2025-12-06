@@ -1,0 +1,687 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EncodedImage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">EncodedImage.java</span></div><h1>EncodedImage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.io.Log;
+import com.codename1.io.Util;
+import com.codename1.ui.util.ImageIO;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+
+/**
+ * &lt;p&gt;{@code EncodedImage} is the workhorse of Codename One. Images returned from resource files are
+ * {@code EncodedImage} and many API's expect it.&lt;/p&gt;
+ *
+ * &lt;p&gt;{@code EncodedImage} is effectively a an image that is &quot;hidden&quot; and extracted as needed to remove the
+ * memory overhead associated with loaded image. When creating an {@code EncodedImage} only the PNG
+ * (or JPEG etc.) is loaded to an array in RAM. Normally such images are very small (relatively) so they can be
+ * kept in memory without much overhead.&lt;/p&gt;
+ *
+ * &lt;p&gt;When image information is needed (pixels) the image is decoded into RAM and kept in a weak/sort
+ * reference (see {@link com.codename1.ui.Display#createSoftWeakRef(java.lang.Object)}). This allows the
+ * image to be cached for performance and allows the garbage collector to reclaim it when the memory becomes
+ * scarce.&lt;/p&gt;
+ *
+ * &lt;p&gt;Since the fully decoded image can be pretty big ({@code width X height X 4}) the ability to store just the
+ * encoded image can be pretty stark. E.g. A standard 50x100 image will take up 20,000 bytes of RAM for a
+ * standard image but an {@code EncodedImage} can reduce that to 1kb-2kb of RAM.&lt;/p&gt;
+ *
+ * &lt;p&gt;When drawing an {@code EncodedImage} it checks the weak reference cache and if the image is cached then
+ * it is shown  otherwise the image is loaded the encoded image cache it then drawn.&lt;/p&gt;
+ *
+ * &lt;p&gt;{@code EncodedImage} is not final and can be derived to produce complex image fetching strategies
+ * e.g. the {@link com.codename1.ui.URLImage} class that can dynamically download its content from the web.&lt;/p&gt;
+ *
+ * &lt;p&gt;{@code EncodedImage} can be instantiated via the create methods in the class. Pretty much any image
+ * can be converted into an `EncodedImage` via the  {@link #createFromImage(com.codename1.ui.Image, boolean)}
+ * method.&lt;/p&gt;
+ *
+ * &lt;h3&gt;EncodedImage Locking&lt;/h3&gt;
+ * &lt;p&gt;Naturally loading the image is more expensive so we want the images that are on the current form to remain in
+ * cache (otherwise GC will thrash a lot). That's where {@link #lock()} kicks in, when {@link #lock()} is active we
+ * keep a hard reference to the actual native image so it won't get GC'd. This significantly improves performance!&lt;/p&gt;
+ *
+ * &lt;p&gt;Internally this is invoked automatically for background images, icons etc. which results in a huge performance
+ * boost. This makes sense since these images are currently showing and they will be in RAM anyway. However,
+ * if you use a complex renderer or custom drawing UI you should {@link #lock()} your images where possible!&lt;/p&gt;
+ *
+ * &lt;p&gt;To verify that locking might be a problem you can launch the performance monitor tool (accessible from
+ * the simulator menu), if you get log messages that indicate that an unlocked image was drawn you might
+ * have a problem.&lt;/p&gt;
+ *
+ * @author Shai Almog
+ */
+public class EncodedImage extends Image {
+    private byte[][] imageData;
+    private int[] dpis;
+<span class="fc" id="L82">    private int lastTestedDPI = -1;</span>
+<span class="fc" id="L83">    private int width = -1;</span>
+<span class="fc" id="L84">    private int height = -1;</span>
+<span class="fc" id="L85">    private boolean opaqueChecked = false;</span>
+<span class="fc" id="L86">    private boolean opaque = false;</span>
+    private Object cache;
+    private Image hardCache;
+    private int locked;
+
+    private EncodedImage(byte[][] imageData) {
+<span class="fc" id="L92">        super(null);</span>
+<span class="fc" id="L93">        this.imageData = imageData;</span>
+<span class="fc" id="L94">    }</span>
+
+    /**
+     * Allows subclasses to create more advanced variations of this class that
+     * lazily store the data in an arbitrary location.
+     *
+     * @param width  -1 if unknown ideally the width/height should be known in advance
+     * @param height -1 if unknown ideally the width/height should be known in advance
+     */
+    protected EncodedImage(int width, int height) {
+<span class="fc" id="L104">        super(null);</span>
+<span class="fc" id="L105">        this.width = width;</span>
+<span class="fc" id="L106">        this.height = height;</span>
+<span class="fc" id="L107">    }</span>
+
+    /**
+     * Creates an encoded image that acts as a multi-image, DO NOT USE THIS METHOD. Its for internal
+     * use to improve the user experience of the simulator
+     *
+     * @param dpis device DPI's
+     * @param data the data matching each multi-image DPI
+     * @return an encoded image that acts as a multi-image in runtime
+     * @deprecated this method is meant for internal use only, it would be very expensive to use
+     * this method for real applications. Its here for simulators and development purposes where
+     * screen DPI/resolution can vary significantly in runtime (something that just doesn't happen on devices).
+     */
+    public static EncodedImage createMulti(int[] dpis, byte[][] data) {
+<span class="fc" id="L121">        EncodedImage e = new EncodedImage(data);</span>
+<span class="fc" id="L122">        e.dpis = dpis;</span>
+<span class="fc" id="L123">        return e;</span>
+    }
+
+    /**
+     * Converts an image to encoded image
+     *
+     * @param i    image
+     * @param jpeg true to try and set jpeg, will do a best effort but this isn't guaranteed
+     * @return an encoded image or null
+     */
+    public static EncodedImage createFromImage(Image i, boolean jpeg) {
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (i instanceof EncodedImage) {</span>
+<span class="nc" id="L135">            return ((EncodedImage) i);</span>
+        }
+<span class="fc" id="L137">        ImageIO io = ImageIO.getImageIO();</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (io != null) {</span>
+            String format;
+<span class="fc bfc" id="L140" title="All 2 branches covered.">            if (jpeg) {</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">                if (!io.isFormatSupported(ImageIO.FORMAT_JPEG)) {</span>
+<span class="nc" id="L142">                    format = ImageIO.FORMAT_PNG;</span>
+                } else {
+<span class="fc" id="L144">                    format = ImageIO.FORMAT_JPEG;</span>
+                }
+            } else {
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">                if (!io.isFormatSupported(ImageIO.FORMAT_PNG)) {</span>
+<span class="nc" id="L148">                    format = ImageIO.FORMAT_JPEG;</span>
+                } else {
+<span class="fc" id="L150">                    format = ImageIO.FORMAT_PNG;</span>
+                }
+            }
+            try {
+<span class="fc" id="L154">                ByteArrayOutputStream bo = new ByteArrayOutputStream();</span>
+<span class="fc" id="L155">                io.save(i, bo, format, 0.9f);</span>
+<span class="fc" id="L156">                EncodedImage enc = EncodedImage.create(bo.toByteArray());</span>
+<span class="fc" id="L157">                Util.cleanup(bo);</span>
+<span class="fc" id="L158">                enc.width = i.getWidth();</span>
+<span class="fc" id="L159">                enc.height = i.getHeight();</span>
+<span class="fc bfc" id="L160" title="All 2 branches covered.">                if (format == ImageIO.FORMAT_JPEG) {</span>
+<span class="fc" id="L161">                    enc.opaque = true;</span>
+<span class="fc" id="L162">                    enc.opaqueChecked = true;</span>
+                }
+<span class="fc" id="L164">                enc.cache = Display.getInstance().createSoftWeakRef(i);</span>
+<span class="fc" id="L165">                return enc;</span>
+<span class="nc" id="L166">            } catch (IOException err) {</span>
+<span class="nc" id="L167">                Log.e(err);</span>
+            }
+        }
+<span class="nc" id="L170">        return null;</span>
+    }
+
+    /**
+     * Tries to create an encoded image from RGB which is more efficient,
+     * however if this fails it falls back to regular RGB image. This method
+     * is slower than creating an RGB image (not to be confused with the RGBImage class which is
+     * something ENTIRELY different!).
+     *
+     * @param argb   an argb array
+     * @param width  the width for the image
+     * @param height the height for the image
+     * @param jpeg   uses jpeg format internally which is opaque and could be faster/smaller
+     * @return an image which we hope is an encoded image
+     */
+    public static Image createFromRGB(int[] argb, int width, int height, boolean jpeg) {
+<span class="nc" id="L186">        Image i = Image.createImage(argb, width, height);</span>
+<span class="nc" id="L187">        ImageIO io = ImageIO.getImageIO();</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        if (io != null) {</span>
+            String format;
+<span class="nc bnc" id="L190" title="All 2 branches missed.">            if (jpeg) {</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">                if (!io.isFormatSupported(ImageIO.FORMAT_JPEG)) {</span>
+<span class="nc" id="L192">                    return i;</span>
+                }
+<span class="nc" id="L194">                format = ImageIO.FORMAT_JPEG;</span>
+            } else {
+<span class="nc bnc" id="L196" title="All 2 branches missed.">                if (!io.isFormatSupported(ImageIO.FORMAT_PNG)) {</span>
+<span class="nc" id="L197">                    return i;</span>
+                }
+<span class="nc" id="L199">                format = ImageIO.FORMAT_PNG;</span>
+            }
+            try {
+<span class="nc" id="L202">                ByteArrayOutputStream bo = new ByteArrayOutputStream();</span>
+<span class="nc" id="L203">                io.save(i, bo, format, 0.9f);</span>
+<span class="nc" id="L204">                EncodedImage enc = EncodedImage.create(bo.toByteArray());</span>
+<span class="nc" id="L205">                Util.cleanup(bo);</span>
+<span class="nc" id="L206">                enc.width = width;</span>
+<span class="nc" id="L207">                enc.height = height;</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">                if (jpeg) {</span>
+<span class="nc" id="L209">                    enc.opaque = true;</span>
+<span class="nc" id="L210">                    enc.opaqueChecked = true;</span>
+                }
+<span class="nc" id="L212">                enc.cache = Display.getInstance().createSoftWeakRef(i);</span>
+<span class="nc" id="L213">                return enc;</span>
+<span class="nc" id="L214">            } catch (IOException err) {</span>
+<span class="nc" id="L215">                Log.e(err);</span>
+            }
+
+        }
+<span class="nc" id="L219">        return i;</span>
+    }
+
+    /**
+     * Creates an image from the given byte array
+     *
+     * @param data the data of the image
+     * @return newly created encoded image
+     */
+    public static EncodedImage create(byte[] data) {
+<span class="pc bpc" id="L229" title="1 of 2 branches missed.">        if (data == null) {</span>
+<span class="nc" id="L230">            throw new NullPointerException();</span>
+        }
+<span class="fc" id="L232">        return new EncodedImage(new byte[][]{data});</span>
+    }
+
+    /**
+     * Creates an image from the given byte array with the variables set appropriately.
+     * This saves LWUIT allot of resources since it doesn't need to actually traverse the
+     * pixels of an image to find out details about it.
+     *
+     * @param data    the data of the image
+     * @param width   the width of the image
+     * @param height  the height of the image
+     * @param opacity true for an opaque image
+     * @return newly created encoded image
+     */
+    public static EncodedImage create(byte[] data, int width, int height, boolean opacity) {
+<span class="pc bpc" id="L247" title="1 of 2 branches missed.">        if (data == null) {</span>
+<span class="nc" id="L248">            throw new NullPointerException();</span>
+        }
+<span class="fc" id="L250">        EncodedImage e = new EncodedImage(new byte[][]{data});</span>
+<span class="fc" id="L251">        e.width = width;</span>
+<span class="fc" id="L252">        e.height = height;</span>
+<span class="fc" id="L253">        e.opaque = opacity;</span>
+<span class="fc" id="L254">        e.opaqueChecked = true;</span>
+<span class="fc" id="L255">        return e;</span>
+    }
+
+    /**
+     * Creates an image from the input stream
+     *
+     * @param i the input stream
+     * @return newly created encoded image
+     * @throws java.io.IOException if thrown by the input stream
+     */
+    public static EncodedImage create(InputStream i) throws IOException {
+<span class="nc" id="L266">        byte[] buffer = Util.readInputStream(i);</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">        if (buffer.length &gt; 200000) {</span>
+<span class="nc" id="L268">            Log.p(&quot;Warning: loading large images using EncodedImage.create(InputStream) might lead to memory issues, try using EncodedImage.create(InputStream, int)&quot;);</span>
+        }
+<span class="nc" id="L270">        return new EncodedImage(new byte[][]{buffer});</span>
+    }
+
+    /**
+     * Creates an image from the input stream, this version of the method is somewhat faster
+     * than the version that doesn't accept size
+     *
+     * @param i    the input stream
+     * @param size the size of the stream
+     * @return newly created encoded image
+     * @throws java.io.IOException if thrown by the input stream
+     */
+    public static EncodedImage create(InputStream i, int size) throws IOException {
+<span class="fc" id="L283">        byte[] buffer = new byte[size];</span>
+<span class="fc" id="L284">        Util.readFully(i, buffer);</span>
+<span class="fc" id="L285">        return new EncodedImage(new byte[][]{buffer});</span>
+    }
+
+    /**
+     * Creates an image from the input stream
+     *
+     * @param i the resource
+     * @return newly created encoded image
+     * @throws java.io.IOException if thrown by the input stream
+     */
+    public static EncodedImage create(String i) throws IOException {
+<span class="nc" id="L296">        return create(Display.getInstance().getResourceAsStream(EncodedImage.class, i));</span>
+    }
+
+    /**
+     * A subclass might choose to load asynchroniously and reset the cache when the image is ready.
+     */
+    protected void resetCache() {
+<span class="fc" id="L303">        cache = null;</span>
+<span class="fc" id="L304">        hardCache = null;</span>
+<span class="fc" id="L305">    }</span>
+
+    /**
+     * Returns the byte array data backing the image allowing the image to be stored
+     * and discarded completely from RAM.
+     *
+     * @return byte array used to create the image, e.g. encoded PNG, JPEG etc.
+     */
+    public byte[] getImageData() {
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        if (imageData.length == 1) {</span>
+<span class="fc" id="L315">            return imageData[0];</span>
+        }
+<span class="fc" id="L317">        int dpi = Display.getInstance().getDeviceDensity();</span>
+<span class="fc" id="L318">        int bestFitOffset = 0;</span>
+<span class="fc" id="L319">        int bestFitDPI = 0;</span>
+<span class="fc" id="L320">        int dlen = dpis.length;</span>
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        for (int iter = 0; iter &lt; dlen; iter++) {</span>
+<span class="fc" id="L322">            int currentDPI = dpis[iter];</span>
+<span class="fc bfc" id="L323" title="All 2 branches covered.">            if (dpi == currentDPI) {</span>
+<span class="fc" id="L324">                bestFitOffset = iter;</span>
+<span class="fc" id="L325">                break;</span>
+            }
+<span class="pc bpc" id="L327" title="2 of 6 branches missed.">            if (bestFitDPI != dpi &amp;&amp; dpi &gt;= currentDPI &amp;&amp; currentDPI &gt;= bestFitDPI) {</span>
+<span class="fc" id="L328">                bestFitDPI = currentDPI;</span>
+<span class="fc" id="L329">                bestFitOffset = iter;</span>
+            }
+        }
+<span class="fc" id="L332">        lastTestedDPI = dpi;</span>
+<span class="fc" id="L333">        return imageData[bestFitOffset];</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getImage() {
+<span class="nc" id="L340">        return getInternalImpl().getImage();</span>
+    }
+
+    private Image getInternalImpl() {
+
+<span class="nc bnc" id="L345" title="All 6 branches missed.">        if (imageData != null &amp;&amp; imageData.length &gt; 1 &amp;&amp; lastTestedDPI != Display.getInstance().getDeviceDensity()) {</span>
+<span class="nc" id="L346">            hardCache = null;</span>
+<span class="nc" id="L347">            cache = null;</span>
+<span class="nc" id="L348">            width = -1;</span>
+<span class="nc" id="L349">            height = -1;</span>
+        }
+<span class="nc bnc" id="L351" title="All 2 branches missed.">        if (hardCache != null) {</span>
+<span class="nc" id="L352">            return hardCache;</span>
+        }
+<span class="nc" id="L354">        Image i = getInternal();</span>
+<span class="nc bnc" id="L355" title="All 2 branches missed.">        if (locked &gt; 0) {</span>
+<span class="nc" id="L356">            hardCache = i;</span>
+        }
+<span class="nc" id="L358">        return i;</span>
+    }
+
+    /**
+     * Returns the actual image represented by the encoded image, this image will
+     * be cached in a weak/soft reference internally. This method is useful to detect
+     * when the system actually created an image instance. You shouldn't invoke this
+     * method manually!
+     *
+     * @return drawable image instance
+     */
+    protected Image getInternal() {
+<span class="nc bnc" id="L370" title="All 2 branches missed.">        if (cache != null) {</span>
+<span class="nc" id="L371">            Image i = (Image) Display.getInstance().extractHardRef(cache);</span>
+<span class="nc bnc" id="L372" title="All 2 branches missed.">            if (i != null) {</span>
+<span class="nc" id="L373">                return i;</span>
+            }
+        }
+        Image i;
+        try {
+<span class="nc" id="L378">            byte[] b = getImageData();</span>
+<span class="nc" id="L379">            i = Image.createImage(b, 0, b.length);</span>
+<span class="nc bnc" id="L380" title="All 2 branches missed.">            if (opaqueChecked) {</span>
+<span class="nc" id="L381">                i.setOpaque(opaque);</span>
+            }
+<span class="nc" id="L383">            CodenameOneImplementation impl = Display.impl;</span>
+<span class="nc" id="L384">            impl.setImageName(i.getImage(), getImageName());</span>
+<span class="nc" id="L385">        } catch (Exception err) {</span>
+<span class="nc" id="L386">            Log.e(err);</span>
+<span class="nc" id="L387">            i = Image.createImage(5, 5);</span>
+<span class="nc" id="L388">        }</span>
+<span class="nc" id="L389">        cache = Display.getInstance().createSoftWeakRef(i);</span>
+<span class="nc" id="L390">        return i;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean isLocked() {
+<span class="fc bfc" id="L397" title="All 2 branches covered.">        return locked &gt; 0;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void asyncLock(final Image internal) {
+<span class="nc bnc" id="L404" title="All 2 branches missed.">        if (locked &lt;= 0) {</span>
+<span class="nc" id="L405">            locked = 1;</span>
+<span class="nc bnc" id="L406" title="All 2 branches missed.">            if (cache != null) {</span>
+<span class="nc" id="L407">                hardCache = (Image) Display.getInstance().extractHardRef(cache);</span>
+<span class="nc bnc" id="L408" title="All 2 branches missed.">                if (hardCache != null) {</span>
+<span class="nc" id="L409">                    return;</span>
+                }
+            }
+<span class="nc" id="L412">            hardCache = internal;</span>
+<span class="nc" id="L413">            Display.getInstance().scheduleBackgroundTask(new Runnable() {</span>
+                public void run() {
+                    try {
+<span class="nc" id="L416">                        byte[] b = getImageData();</span>
+<span class="nc" id="L417">                        final Image i = Image.createImage(b, 0, b.length);</span>
+<span class="nc bnc" id="L418" title="All 2 branches missed.">                        if (opaqueChecked) {</span>
+<span class="nc" id="L419">                            i.setOpaque(opaque);</span>
+                        }
+<span class="nc" id="L421">                        CodenameOneImplementation impl = Display.impl;</span>
+<span class="nc" id="L422">                        impl.setImageName(i.getImage(), getImageName());</span>
+<span class="nc" id="L423">                        Display.getInstance().callSerially(new Runnable() {</span>
+                            public void run() {
+<span class="nc bnc" id="L425" title="All 2 branches missed.">                                if (locked &gt; 0) {</span>
+<span class="nc" id="L426">                                    hardCache = i;</span>
+                                }
+<span class="nc" id="L428">                                cache = Display.getInstance().createSoftWeakRef(i);</span>
+<span class="nc" id="L429">                                Display.getInstance().getCurrent().repaint();</span>
+<span class="nc" id="L430">                                width = i.getWidth();</span>
+<span class="nc" id="L431">                                height = i.getHeight();</span>
+<span class="nc" id="L432">                            }</span>
+                        });
+<span class="nc" id="L434">                    } catch (Exception err) {</span>
+<span class="nc" id="L435">                        Log.e(err);</span>
+<span class="nc" id="L436">                    }</span>
+<span class="nc" id="L437">                }</span>
+            });
+        }
+<span class="nc" id="L440">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void lock() {
+<span class="pc bpc" id="L446" title="1 of 2 branches missed.">        if (locked &lt; 1) {</span>
+<span class="fc" id="L447">            locked = 1;</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">            if (cache != null) {</span>
+<span class="fc" id="L449">                hardCache = (Image) Display.getInstance().extractHardRef(cache);</span>
+            }
+        } else {
+<span class="nc" id="L452">            locked++;</span>
+        }
+<span class="fc" id="L454">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void unlock() {
+<span class="fc" id="L460">        locked--;</span>
+<span class="pc bpc" id="L461" title="1 of 2 branches missed.">        if (locked &lt; 1) {</span>
+<span class="fc bfc" id="L462" title="All 2 branches covered.">            if (hardCache != null) {</span>
+<span class="pc bpc" id="L463" title="2 of 4 branches missed.">                if (cache == null || Display.getInstance().extractHardRef(cache) == null) {</span>
+<span class="nc" id="L464">                    cache = Display.getInstance().createSoftWeakRef(hardCache);</span>
+                }
+<span class="fc" id="L466">                hardCache = null;</span>
+            }
+<span class="fc" id="L468">            locked = 0;</span>
+        }
+<span class="fc" id="L470">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Image subImage(int x, int y, int width, int height, boolean processAlpha) {
+<span class="nc" id="L476">        return getInternalImpl().subImage(x, y, width, height, processAlpha);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Image rotate(int degrees) {
+<span class="nc" id="L483">        return getInternalImpl().rotate(degrees);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Image modifyAlpha(byte alpha) {
+<span class="nc" id="L490">        return getInternalImpl().modifyAlpha(alpha);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Image modifyAlpha(byte alpha, int removeColor) {
+<span class="nc" id="L497">        return getInternalImpl().modifyAlpha(alpha, removeColor);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Graphics getGraphics() {
+<span class="nc" id="L504">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getWidth() {
+<span class="pc bpc" id="L511" title="1 of 2 branches missed.">        if (width &gt; -1) {</span>
+<span class="fc" id="L512">            return width;</span>
+        }
+<span class="nc" id="L514">        width = getInternalImpl().getWidth();</span>
+<span class="nc" id="L515">        return width;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getHeight() {
+<span class="pc bpc" id="L522" title="1 of 2 branches missed.">        if (height &gt; -1) {</span>
+<span class="fc" id="L523">            return height;</span>
+        }
+<span class="nc" id="L525">        height = getInternalImpl().getHeight();</span>
+<span class="nc" id="L526">        return height;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
+<span class="nc" id="L533">        Display.impl.drawingEncodedImage(this);</span>
+<span class="nc" id="L534">        Image internal = getInternalImpl();</span>
+<span class="nc bnc" id="L535" title="All 8 branches missed.">        if (width &gt; -1 &amp;&amp; height &gt; -1 &amp;&amp; (internal.getWidth() != width || internal.getHeight() != height)) {</span>
+<span class="nc" id="L536">            internal.drawImage(g, nativeGraphics, x, y, width, height);</span>
+        } else {
+<span class="nc" id="L538">            internal.drawImage(g, nativeGraphics, x, y);</span>
+        }
+<span class="nc" id="L540">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
+<span class="nc" id="L546">        Display.impl.drawingEncodedImage(this);</span>
+<span class="nc" id="L547">        getInternalImpl().drawImage(g, nativeGraphics, x, y, w, h);</span>
+<span class="nc" id="L548">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    void getRGB(int[] rgbData,
+                int offset,
+                int x,
+                int y,
+                int width,
+                int height) {
+<span class="nc" id="L559">        getInternalImpl().getRGB(rgbData, offset, x, y, width, height);</span>
+<span class="nc" id="L560">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void toRGB(RGBImage image,
+                      int destX,
+                      int destY,
+                      int x,
+                      int y,
+                      int width,
+                      int height) {
+<span class="nc" id="L572">        getInternalImpl().toRGB(image, destX, destY, x, y, width, height);</span>
+<span class="nc" id="L573">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Image scaledWidth(int width) {
+<span class="nc" id="L579">        return getInternalImpl().scaledWidth(width);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Image scaledHeight(int height) {
+<span class="nc" id="L586">        return getInternalImpl().scaledHeight(height);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Image scaledSmallerRatio(int width, int height) {
+<span class="nc" id="L593">        return getInternalImpl().scaledSmallerRatio(width, height);</span>
+    }
+
+    /**
+     * Performs scaling using ImageIO to generate an encoded Image
+     *
+     * @param width  the width of the image, -1 to scale based on height and preserve aspect ratio
+     * @param height the height of the image, -1 to scale based on width and preserve aspect ratio
+     * @return new encoded image
+     */
+    public EncodedImage scaledEncoded(int width, int height) {
+<span class="pc bpc" id="L604" title="3 of 4 branches missed.">        if (width == getWidth() &amp;&amp; height == getHeight()) {</span>
+<span class="nc" id="L605">            return this;</span>
+        }
+
+<span class="pc bpc" id="L608" title="1 of 2 branches missed.">        if (width &lt; 0) {</span>
+<span class="nc" id="L609">            float ratio = ((float) height) / ((float) getHeight());</span>
+<span class="nc" id="L610">            width = Math.max(1, (int) (getWidth() * ratio));</span>
+<span class="nc" id="L611">        } else {</span>
+<span class="pc bpc" id="L612" title="1 of 2 branches missed.">            if (height &lt; 0) {</span>
+<span class="nc" id="L613">                float ratio = ((float) width) / ((float) getWidth());</span>
+<span class="nc" id="L614">                height = Math.max(1, (int) (getHeight() * ratio));</span>
+            }
+        }
+
+        try {
+<span class="fc" id="L619">            ImageIO io = ImageIO.getImageIO();</span>
+<span class="pc bpc" id="L620" title="1 of 2 branches missed.">            if (io != null) {</span>
+<span class="fc" id="L621">                String format = ImageIO.FORMAT_PNG;</span>
+<span class="pc bpc" id="L622" title="3 of 4 branches missed.">                if (isOpaque() || !io.isFormatSupported(ImageIO.FORMAT_PNG)) {</span>
+<span class="pc bpc" id="L623" title="1 of 2 branches missed.">                    if (io.isFormatSupported(ImageIO.FORMAT_JPEG)) {</span>
+<span class="fc" id="L624">                        format = ImageIO.FORMAT_JPEG;</span>
+                    }
+                }
+<span class="pc bpc" id="L627" title="1 of 2 branches missed.">                if (io.isFormatSupported(format)) {</span>
+                    // do an image IO scale which is more efficient
+<span class="fc" id="L629">                    ByteArrayOutputStream bo = new ByteArrayOutputStream();</span>
+<span class="fc" id="L630">                    io.save(new ByteArrayInputStream(getImageData()), bo, format, width, height, 0.9f);</span>
+<span class="fc" id="L631">                    EncodedImage img = EncodedImage.create(bo.toByteArray());</span>
+<span class="fc" id="L632">                    Util.cleanup(bo);</span>
+<span class="fc" id="L633">                    img.opaque = opaque;</span>
+<span class="fc" id="L634">                    img.opaqueChecked = opaqueChecked;</span>
+<span class="pc bpc" id="L635" title="2 of 4 branches missed.">                    if (width &gt; -1 &amp;&amp; height &gt; -1) {</span>
+<span class="fc" id="L636">                        img.width = width;</span>
+<span class="fc" id="L637">                        img.height = height;</span>
+                    }
+<span class="fc" id="L639">                    return img;</span>
+                }
+            }
+<span class="nc" id="L642">        } catch (IOException err) {</span>
+            // normally this shouldn't happen but this will keep falling back to the existing scaled code
+<span class="nc" id="L644">            Log.e(err);</span>
+<span class="nc" id="L645">        }</span>
+<span class="nc" id="L646">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Image scaled(int width, int height) {
+        // J2ME/RIM don't support image IO and Windows Phone doesn't support PNG which prevents
+        // scaling translucent images properly
+<span class="nc bnc" id="L655" title="All 2 branches missed.">        if (Display.getInstance().getProperty(&quot;encodedImageScaling&quot;, &quot;true&quot;).equals(&quot;true&quot;) &amp;&amp;</span>
+<span class="nc bnc" id="L656" title="All 4 branches missed.">                ImageIO.getImageIO() != null &amp;&amp; ImageIO.getImageIO().isFormatSupported(ImageIO.FORMAT_PNG)) {</span>
+<span class="nc" id="L657">            return scaledEncoded(width, height);</span>
+        }
+<span class="nc" id="L659">        return getInternalImpl().scaled(width, height);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void scale(int width, int height) {
+<span class="nc" id="L666">        getInternalImpl().scale(width, height);</span>
+<span class="nc" id="L667">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean isAnimation() {
+<span class="nc" id="L673">        return false;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean isOpaque() {
+<span class="pc bpc" id="L680" title="1 of 2 branches missed.">        if (opaqueChecked) {</span>
+<span class="fc" id="L681">            return opaque;</span>
+        }
+<span class="nc" id="L683">        opaque = getInternalImpl().isOpaque();</span>
+<span class="nc" id="L684">        return opaque;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

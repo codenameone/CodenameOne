@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PrettyPrinter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.processing</a> &gt; <span class="el_source">PrettyPrinter.java</span></div><h1>PrettyPrinter.java</h1><pre class="source lang-java linenums">/*
+Copyright (c) 2007, Sun Microsystems, Inc.
+ 
+All rights reserved.
+ 
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+ 
+ * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in
+      the documentation and/or other materials provided with the
+      distribution.
+ * Neither the name of Sun Microsystems, Inc. nor the names of its
+      contributors may be used to endorse or promote products derived
+      from this software without specific prior written permission.
+ 
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+&quot;AS IS&quot; AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Derivative Revision History:
+
+2012-03 - Pulled this code from Sun's JavaME JSON impl, JSONObject
+	and moved to separate utility class.
+ */
+package com.codename1.processing;
+
+import com.codename1.l10n.SimpleDateFormat;
+
+import java.util.Collections;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Private class, do not use.
+ * &lt;p&gt;
+ * An internal utility method used by toString() methods to produce a JSON document
+ * from a given Map or List.
+ *
+ * @author Eric Coolman (2012-03 - derivative work from original Sun source).
+ */
+class PrettyPrinter {
+    Map myHashMap;
+
+<span class="fc" id="L58">    private PrettyPrinter(Map h) {</span>
+<span class="fc" id="L59">        this.myHashMap = h;</span>
+<span class="fc" id="L60">    }</span>
+
+    public static String print(Map h) {
+<span class="fc" id="L63">        return print(h, 2, 0);</span>
+    }
+
+    public static String print(List v) {
+<span class="nc" id="L67">        return print(v, 2, 0);</span>
+    }
+
+    static String print(Map h, int indentFactor, int indent) {
+<span class="fc" id="L71">        PrettyPrinter printer = new PrettyPrinter(h);</span>
+<span class="fc" id="L72">        return printer.toString(indentFactor, indent);</span>
+    }
+
+    static String print(List v, int indentFactor, int indent) {
+<span class="fc" id="L76">        int len = v.size();</span>
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">        if (len == 0) {</span>
+<span class="nc" id="L78">            return &quot;[]&quot;;</span>
+        }
+        int i;
+<span class="fc" id="L81">        StringBuffer sb = new StringBuffer(&quot;[&quot;);</span>
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">        if (len == 1) {</span>
+<span class="fc" id="L83">            sb.append(valueToString(v.get(0),</span>
+                    indentFactor, indent));
+        } else {
+<span class="nc" id="L86">            int newindent = indent + indentFactor;</span>
+<span class="nc" id="L87">            sb.append('\n');</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">            for (i = 0; i &lt; len; i += 1) {</span>
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                if (i &gt; 0) {</span>
+<span class="nc" id="L90">                    sb.append(&quot;,\n&quot;);</span>
+                }
+<span class="nc bnc" id="L92" title="All 2 branches missed.">                for (int j = 0; j &lt; newindent; j += 1) {</span>
+<span class="nc" id="L93">                    sb.append(' ');</span>
+                }
+<span class="nc" id="L95">                sb.append(valueToString(v.get(i),</span>
+                        indentFactor, newindent));
+            }
+<span class="nc" id="L98">            sb.append('\n');</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            for (i = 0; i &lt; indent; i += 1) {</span>
+<span class="nc" id="L100">                sb.append(' ');</span>
+            }
+        }
+<span class="fc" id="L103">        sb.append(']');</span>
+<span class="fc" id="L104">        return sb.toString();</span>
+
+    }
+
+    /**
+     * Make a prettyprinted JSON text of an object value.
+     * &lt;p&gt;
+     * Warning: This method assumes that the data structure is acyclical.
+     *
+     * @param value        The value to be serialized.
+     * @param indentFactor The number of spaces to add to each level of
+     *                     indentation.
+     * @param indent       The indentation of the top level.
+     * @return a printable, displayable, transmittable
+     * representation of the object, beginning
+     * with &lt;code&gt;{&lt;/code&gt;&amp;nbsp;&lt;small&gt;(left brace)&lt;/small&gt; and ending
+     * with &lt;code&gt;}&lt;/code&gt;&amp;nbsp;&lt;small&gt;(right brace)&lt;/small&gt;.
+     */
+    static String valueToString(Object value, int indentFactor, int indent) {
+<span class="pc bpc" id="L123" title="2 of 4 branches missed.">        if (value == null || value.equals(null)) {</span>
+<span class="nc" id="L124">            return &quot;null&quot;;</span>
+        }
+        try {
+<span class="fc bfc" id="L127" title="All 2 branches covered.">            if (value instanceof String) {</span>
+<span class="fc" id="L128">                return quote((String) value);</span>
+            }
+<span class="nc" id="L130">        } catch (Exception e) {</span>
+            /* forget about it */
+<span class="fc" id="L132">        }</span>
+<span class="pc bpc" id="L133" title="5 of 12 branches missed.">        if (value instanceof Float || value instanceof Double ||</span>
+                value instanceof Byte || value instanceof Short ||
+                value instanceof Integer || value instanceof Long) {
+<span class="fc" id="L136">            return numberToString(value);</span>
+        }
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        if (value instanceof Boolean) {</span>
+<span class="nc" id="L139">            return value.toString();</span>
+        }
+<span class="fc bfc" id="L141" title="All 2 branches covered.">        if (value instanceof Map) {</span>
+<span class="fc" id="L142">            return print((Map) value, indentFactor, indent);</span>
+        }
+<span class="fc bfc" id="L144" title="All 2 branches covered.">        if (value instanceof List) {</span>
+<span class="fc" id="L145">            return print((List) value, indentFactor, indent);</span>
+        }
+<span class="pc bpc" id="L147" title="1 of 2 branches missed.">        if (value instanceof Date) {</span>
+<span class="fc" id="L148">            return quote(new SimpleDateFormat(&quot;yyyy-MM-dd'T'HH:mm:ss.SSS&quot;).format((Date) value));</span>
+        }
+<span class="nc" id="L150">        return quote(value.toString());</span>
+    }
+
+    /**
+     * Produce a string in double quotes with backslash sequences in all the
+     * right places. A backslash will be inserted within &lt;/, allowing JSON
+     * text to be delivered in HTML. In JSON text, a string cannot contain a
+     * control character or an unescaped quote or backslash.
+     *
+     * @param string A String
+     * @return A String correctly formatted for insertion in a JSON text.
+     */
+    public static String quote(String string) {
+<span class="pc bpc" id="L163" title="2 of 4 branches missed.">        if (string == null || string.length() == 0) {</span>
+<span class="nc" id="L164">            return &quot;\&quot;\&quot;&quot;;</span>
+        }
+
+        char b;
+<span class="fc" id="L168">        char c = 0;</span>
+        int i;
+<span class="fc" id="L170">        int len = string.length();</span>
+<span class="fc" id="L171">        StringBuffer sb = new StringBuffer(len + 4);</span>
+        String t;
+
+<span class="fc" id="L174">        sb.append('&quot;');</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        for (i = 0; i &lt; len; i += 1) {</span>
+<span class="fc" id="L176">            b = c;</span>
+<span class="fc" id="L177">            c = string.charAt(i);</span>
+<span class="pc bpc" id="L178" title="7 of 8 branches missed.">            switch (c) {</span>
+                case '\\':
+                case '&quot;':
+<span class="nc" id="L181">                    sb.append('\\');</span>
+<span class="nc" id="L182">                    sb.append(c);</span>
+<span class="nc" id="L183">                    break;</span>
+                case '/':
+<span class="nc bnc" id="L185" title="All 2 branches missed.">                    if (b == '&lt;') {</span>
+<span class="nc" id="L186">                        sb.append('\\');</span>
+                    }
+<span class="nc" id="L188">                    sb.append(c);</span>
+<span class="nc" id="L189">                    break;</span>
+                case '\b':
+<span class="nc" id="L191">                    sb.append(&quot;\\b&quot;);</span>
+<span class="nc" id="L192">                    break;</span>
+                case '\t':
+<span class="nc" id="L194">                    sb.append(&quot;\\t&quot;);</span>
+<span class="nc" id="L195">                    break;</span>
+                case '\n':
+<span class="nc" id="L197">                    sb.append(&quot;\\n&quot;);</span>
+<span class="nc" id="L198">                    break;</span>
+                case '\f':
+<span class="nc" id="L200">                    sb.append(&quot;\\f&quot;);</span>
+<span class="nc" id="L201">                    break;</span>
+                case '\r':
+<span class="nc" id="L203">                    sb.append(&quot;\\r&quot;);</span>
+<span class="nc" id="L204">                    break;</span>
+                default:
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                    if (c &lt; ' ') {</span>
+<span class="nc" id="L207">                        t = &quot;000&quot; + Integer.toHexString(c);</span>
+<span class="nc" id="L208">                        sb.append(&quot;\\u&quot; + t.substring(t.length() - 4));</span>
+                    } else {
+<span class="fc" id="L210">                        sb.append(c);</span>
+                    }
+            }
+        }
+<span class="fc" id="L214">        sb.append('&quot;');</span>
+<span class="fc" id="L215">        return sb.toString();</span>
+    }
+
+    /**
+     * Make a JSON text of an Object value. If the object has an
+     * value.toJSONString() method, then that method will be used to produce
+     * the JSON text. The method is required to produce a strictly
+     * conforming text. If the object does not contain a toJSONString
+     * method (which is the most common case), then a text will be
+     * produced by the rules.
+     * &lt;p&gt;
+     * Warning: This method assumes that the data structure is acyclical.
+     *
+     * @param value The value to be serialized.
+     * @return a printable, displayable, transmittable
+     * representation of the object, beginning
+     * with &lt;code&gt;{&lt;/code&gt;&amp;nbsp;&lt;small&gt;(left brace)&lt;/small&gt; and ending
+     * with &lt;code&gt;}&lt;/code&gt;&amp;nbsp;&lt;small&gt;(right brace)&lt;/small&gt;.
+     */
+    static String valueToString(Object value) {
+<span class="nc bnc" id="L235" title="All 4 branches missed.">        if (value == null || value.equals(null)) {</span>
+<span class="nc" id="L236">            return &quot;null&quot;;</span>
+        }
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        if (value instanceof String) {</span>
+<span class="nc" id="L239">            return (String) value;</span>
+        }
+<span class="nc bnc" id="L241" title="All 12 branches missed.">        if (value instanceof Float || value instanceof Double ||</span>
+                value instanceof Byte || value instanceof Short ||
+                value instanceof Integer || value instanceof Long) {
+<span class="nc" id="L244">            return numberToString(value);</span>
+        }
+<span class="nc bnc" id="L246" title="All 6 branches missed.">        if (value instanceof Boolean || value instanceof Map ||</span>
+                value instanceof List) {
+<span class="nc" id="L248">            return value.toString();</span>
+        }
+<span class="nc" id="L250">        return quote(value.toString());</span>
+    }
+
+    static public String trimNumber(String s) {
+<span class="pc bpc" id="L254" title="5 of 6 branches missed.">        if (s.indexOf('.') &gt; 0 &amp;&amp; s.indexOf('e') &lt; 0 &amp;&amp; s.indexOf('E') &lt; 0) {</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">            while (s.endsWith(&quot;0&quot;)) {</span>
+<span class="nc" id="L256">                s = s.substring(0, s.length() - 1);</span>
+            }
+<span class="nc bnc" id="L258" title="All 2 branches missed.">            if (s.endsWith(&quot;.&quot;)) {</span>
+<span class="nc" id="L259">                s = s.substring(0, s.length() - 1);</span>
+            }
+        }
+<span class="fc" id="L262">        return s;</span>
+    }
+
+    /**
+     * Produce a string from a Number.
+     *
+     * @param n A Number
+     * @return A String.
+     * @throws JSONException If n is a non-finite number.
+     */
+    static public String numberToString(Object n) {
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">        if (n == null) {</span>
+<span class="nc" id="L274">            return null;</span>
+        }
+<span class="fc" id="L276">        return trimNumber(n.toString());</span>
+    }
+
+    /**
+     * Get the number of keys stored in the Map.
+     *
+     * @return The number of keys in the Map.
+     */
+    public int length() {
+<span class="fc" id="L285">        return this.myHashMap.size();</span>
+    }
+
+    /**
+     * Get an enumeration of the keys of the Map.
+     *
+     * @return An iterator of the keys.
+     */
+    public Enumeration keys() {
+<span class="fc" id="L294">        return Collections.enumeration(this.myHashMap.keySet());</span>
+    }
+
+    /**
+     * Make a prettyprinted JSON text of this Map.
+     * &lt;p&gt;
+     * Warning: This method assumes that the data structure is acyclical.
+     *
+     * @param indentFactor The number of spaces to add to each level of
+     *                     indentation.
+     * @return a printable, displayable, portable, transmittable
+     * representation of the object, beginning
+     * with &lt;code&gt;{&lt;/code&gt;&amp;nbsp;&lt;small&gt;(left brace)&lt;/small&gt; and ending
+     * with &lt;code&gt;}&lt;/code&gt;&amp;nbsp;&lt;small&gt;(right brace)&lt;/small&gt;.
+     */
+    public String toString(int indentFactor) {
+<span class="nc" id="L310">        return toString(indentFactor, 0);</span>
+    }
+
+    /**
+     * Make a prettyprinted JSON text of this Map.
+     * &lt;p&gt;
+     * Warning: This method assumes that the data structure is acyclical.
+     *
+     * @param indentFactor The number of spaces to add to each level of
+     *                     indentation.
+     * @param indent       The indentation of the top level.
+     * @return a printable, displayable, transmittable
+     * representation of the object, beginning
+     * with &lt;code&gt;{&lt;/code&gt;&amp;nbsp;&lt;small&gt;(left brace)&lt;/small&gt; and ending
+     * with &lt;code&gt;}&lt;/code&gt;&amp;nbsp;&lt;small&gt;(right brace)&lt;/small&gt;.
+     */
+    String toString(int indentFactor, int indent) {
+        int i;
+<span class="fc" id="L328">        int n = length();</span>
+<span class="pc bpc" id="L329" title="1 of 2 branches missed.">        if (n == 0) {</span>
+<span class="nc" id="L330">            return &quot;{}&quot;;</span>
+        }
+<span class="fc" id="L332">        Enumeration keys = keys();</span>
+<span class="fc" id="L333">        StringBuffer sb = new StringBuffer(&quot;{&quot;);</span>
+<span class="fc" id="L334">        int newindent = indent + indentFactor;</span>
+        Object o;
+<span class="fc bfc" id="L336" title="All 2 branches covered.">        if (n == 1) {</span>
+<span class="fc" id="L337">            o = keys.nextElement();</span>
+<span class="fc" id="L338">            sb.append(quote(o.toString()));</span>
+<span class="fc" id="L339">            sb.append(&quot;: &quot;);</span>
+<span class="fc" id="L340">            sb.append(valueToString(this.myHashMap.get(o), indentFactor,</span>
+                    indent));
+        } else {
+<span class="fc bfc" id="L343" title="All 2 branches covered.">            while (keys.hasMoreElements()) {</span>
+<span class="fc" id="L344">                o = keys.nextElement();</span>
+<span class="fc bfc" id="L345" title="All 2 branches covered.">                if (sb.length() &gt; 1) {</span>
+<span class="fc" id="L346">                    sb.append(&quot;,\n&quot;);</span>
+                } else {
+<span class="fc" id="L348">                    sb.append('\n');</span>
+                }
+<span class="fc bfc" id="L350" title="All 2 branches covered.">                for (i = 0; i &lt; newindent; i += 1) {</span>
+<span class="fc" id="L351">                    sb.append(' ');</span>
+                }
+<span class="fc" id="L353">                sb.append(quote(o.toString()));</span>
+<span class="fc" id="L354">                sb.append(&quot;: &quot;);</span>
+<span class="fc" id="L355">                sb.append(valueToString(this.myHashMap.get(o), indentFactor,</span>
+                        newindent));
+            }
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">            if (sb.length() &gt; 1) {</span>
+<span class="fc" id="L359">                sb.append('\n');</span>
+<span class="fc bfc" id="L360" title="All 2 branches covered.">                for (i = 0; i &lt; indent; i += 1) {</span>
+<span class="fc" id="L361">                    sb.append(' ');</span>
+                }
+            }
+        }
+<span class="fc" id="L365">        sb.append('}');</span>
+<span class="fc" id="L366">        return sb.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

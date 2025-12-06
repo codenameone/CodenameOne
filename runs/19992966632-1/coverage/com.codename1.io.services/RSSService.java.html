@@ -1,0 +1,285 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>RSSService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.services</a> &gt; <span class="el_source">RSSService.java</span></div><h1>RSSService.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.io.services;
+
+import com.codename1.io.CharArrayReader;
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkEvent;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Image;
+import com.codename1.xml.Element;
+import com.codename1.xml.ParserCallback;
+import com.codename1.xml.XMLParser;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.util.Hashtable;
+import java.util.Vector;
+
+/**
+ * Simple RSS read and parse request, to handle errors just subclass this and override
+ * parsingError.
+ *
+ * @author Shai Almog
+ */
+public class RSSService extends ConnectionRequest implements ParserCallback {
+    private Vector results;
+<span class="nc" id="L50">    private int limit = -1;</span>
+<span class="nc" id="L51">    private int startOffset = -1;</span>
+    private boolean hasMore;
+<span class="nc" id="L53">    private boolean createPlainTextDetails = true;</span>
+    private Image iconPlaceholder;
+
+    /**
+     * Simple constructor accepting the RSS url
+     *
+     * @param url rss link
+     */
+<span class="nc" id="L61">    public RSSService(String url) {</span>
+<span class="nc" id="L62">        setUrl(url);</span>
+<span class="nc" id="L63">        setPost(false);</span>
+<span class="nc" id="L64">        setDuplicateSupported(true);</span>
+<span class="nc" id="L65">    }</span>
+
+    /**
+     * Simple constructor accepting the RSS url
+     *
+     * @param url   rss link
+     * @param limit the limit on the number of RSS entries supported
+     */
+    public RSSService(String url, int limit) {
+<span class="nc" id="L74">        this(url);</span>
+<span class="nc" id="L75">        this.limit = limit;</span>
+<span class="nc" id="L76">        setDuplicateSupported(true);</span>
+<span class="nc" id="L77">    }</span>
+
+    /**
+     * Simple constructor accepting the RSS url
+     *
+     * @param url         rss link
+     * @param limit       the limit on the number of RSS entries supported
+     * @param startOffset indicates the entry offset which we are interested
+     *                    in, this is useful if previously the limit for RSS entries was reached.
+     */
+    public RSSService(String url, int limit, int startOffset) {
+<span class="nc" id="L88">        this(url, limit);</span>
+<span class="nc" id="L89">        this.startOffset = startOffset;</span>
+<span class="nc" id="L90">        setDuplicateSupported(true);</span>
+<span class="nc" id="L91">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void readResponse(InputStream input) throws IOException {
+<span class="nc" id="L97">        results = new Vector();</span>
+<span class="nc" id="L98">        class FinishParsing extends RuntimeException {</span>
+        }
+<span class="nc" id="L100">        XMLParser p = new XMLParser() {</span>
+            private String lastTag;
+            private Hashtable current;
+            private String url;
+
+            protected boolean startTag(String tag) {
+<span class="nc bnc" id="L106" title="All 4 branches missed.">                if (&quot;item&quot;.equalsIgnoreCase(tag) || &quot;entry&quot;.equalsIgnoreCase(tag)) {</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">                    if (startOffset &gt; 0) {</span>
+<span class="nc" id="L108">                        return true;</span>
+                    }
+<span class="nc" id="L110">                    current = new Hashtable();</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">                    if (iconPlaceholder != null) {</span>
+<span class="nc" id="L112">                        current.put(&quot;icon&quot;, iconPlaceholder);</span>
+                    }
+                }
+<span class="nc" id="L115">                lastTag = tag;</span>
+<span class="nc" id="L116">                return true;</span>
+            }
+
+            protected void attribute(String tag, String attributeName, String value) {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">                if (current != null) {</span>
+<span class="nc bnc" id="L121" title="All 4 branches missed.">                    if (&quot;media:thumbnail&quot;.equalsIgnoreCase(tag) &amp;&amp; &quot;url&quot;.equalsIgnoreCase(attributeName)) {</span>
+<span class="nc" id="L122">                        current.put(&quot;thumb&quot;, value);</span>
+                    } else {
+<span class="nc bnc" id="L124" title="All 4 branches missed.">                        if (&quot;media:player&quot;.equalsIgnoreCase(tag) &amp;&amp; &quot;url&quot;.equalsIgnoreCase(attributeName)) {</span>
+<span class="nc" id="L125">                            current.put(&quot;player&quot;, value);</span>
+                        }
+                    }
+                }
+<span class="nc" id="L129">            }</span>
+
+            protected void textElement(String text) {
+<span class="nc bnc" id="L132" title="All 4 branches missed.">                if (lastTag != null &amp;&amp; current != null) {</span>
+                    // make &quot;ATOM&quot; seem like RSS
+<span class="nc bnc" id="L134" title="All 2 branches missed.">                    if (&quot;summary&quot;.equals(lastTag)) {</span>
+<span class="nc" id="L135">                        current.put(&quot;details&quot;, text);</span>
+                    } else {
+<span class="nc bnc" id="L137" title="All 2 branches missed.">                        if (&quot;content&quot;.equals(lastTag)) {</span>
+<span class="nc" id="L138">                            current.put(&quot;description&quot;, text);</span>
+                        } else {
+<span class="nc" id="L140">                            current.put(lastTag, text);</span>
+                        }
+                    }
+                }
+<span class="nc" id="L144">            }</span>
+
+            protected void endTag(String tag) {
+<span class="nc bnc" id="L147" title="All 4 branches missed.">                if (&quot;item&quot;.equalsIgnoreCase(tag) || &quot;entry&quot;.equalsIgnoreCase(tag)) {</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">                    if (startOffset &gt; 0) {</span>
+<span class="nc" id="L149">                        startOffset--;</span>
+<span class="nc" id="L150">                        return;</span>
+                    }
+<span class="nc" id="L152">                    results.addElement(current);</span>
+<span class="nc" id="L153">                    current = null;</span>
+<span class="nc bnc" id="L154" title="All 4 branches missed.">                    if (limit &gt; -1 &amp;&amp; results.size() &gt;= limit) {</span>
+<span class="nc" id="L155">                        throw new FinishParsing();</span>
+                    }
+                }
+<span class="nc bnc" id="L158" title="All 2 branches missed.">                if (tag.equals(lastTag)) {</span>
+<span class="nc" id="L159">                    lastTag = null;</span>
+                }
+<span class="nc" id="L161">            }</span>
+        };
+<span class="nc" id="L163">        p.setParserCallback(this);</span>
+<span class="nc" id="L164">        input.mark(10);</span>
+
+        // Skip the bom marking UTF-8 in some streams
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        while (input.read() != '&lt;') {</span>
+            //input.mark(4);
+        }
+<span class="nc" id="L170">        int question = input.read();</span>
+<span class="nc" id="L171">        String cType = &quot;UTF-8&quot;;</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (question == '?') {</span>
+            // we are in an XML header, check if the encoding section exists 
+<span class="nc" id="L174">            StringBuilder cs = new StringBuilder();</span>
+<span class="nc" id="L175">            question = input.read();</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">            while (question != '&gt;') {</span>
+<span class="nc" id="L177">                cs.append((char) question);</span>
+<span class="nc" id="L178">                question = input.read();</span>
+            }
+<span class="nc" id="L180">            String str = cs.toString();</span>
+<span class="nc" id="L181">            int index = str.indexOf(&quot;encoding=\&quot;&quot;) + 10;</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">            if (index &gt; -1) {</span>
+<span class="nc" id="L183">                cType = str.substring(index, Math.max(str.indexOf(&quot;\&quot;&quot;, index), str.indexOf(&quot;'&quot;, index)));</span>
+            }
+<span class="nc" id="L185">        } else {</span>
+            // oops, continue as usual
+<span class="nc" id="L187">            input.reset();</span>
+        }
+
+<span class="nc" id="L190">        String resultType = getResponseContentType();</span>
+<span class="nc bnc" id="L191" title="All 4 branches missed.">        if (resultType != null &amp;&amp; resultType.indexOf(&quot;charset=&quot;) &gt; -1) {</span>
+<span class="nc" id="L192">            cType = resultType.substring(resultType.indexOf(&quot;charset=&quot;) + 8);</span>
+        }
+        try {
+<span class="nc" id="L195">            int pos2 = cType.indexOf(';');</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">            if (pos2 &gt; 0) {</span>
+<span class="nc" id="L197">                cType = cType.substring(0, pos2);</span>
+            }
+<span class="nc" id="L199">            p.eventParser(new InputStreamReader(input, cType));</span>
+<span class="nc" id="L200">        } catch (FinishParsing ignor) {</span>
+<span class="nc" id="L201">            hasMore = true;</span>
+<span class="nc" id="L202">        }</span>
+
+<span class="nc bnc" id="L204" title="All 2 branches missed.">        if (isCreatePlainTextDetails()) {</span>
+<span class="nc" id="L205">            int elementCount = results.size();</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">            for (int iter = 0; iter &lt; elementCount; iter++) {</span>
+<span class="nc" id="L207">                Hashtable h = (Hashtable) results.elementAt(iter);</span>
+<span class="nc" id="L208">                String s = (String) h.get(&quot;description&quot;);</span>
+<span class="nc bnc" id="L209" title="All 4 branches missed.">                if (s != null &amp;&amp; !h.containsKey(&quot;details&quot;)) {</span>
+<span class="nc" id="L210">                    XMLParser x = new XMLParser();</span>
+<span class="nc" id="L211">                    Element e = x.parse(new CharArrayReader((&quot;&lt;xml&gt;&quot; + s + &quot;&lt;/xml&gt;&quot;).toCharArray()));</span>
+<span class="nc" id="L212">                    Vector results = e.getTextDescendants(null, false);</span>
+<span class="nc" id="L213">                    StringBuilder endResult = new StringBuilder();</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">                    for (int i = 0; i &lt; results.size(); i++) {</span>
+<span class="nc" id="L215">                        endResult.append(((Element) results.elementAt(i)).getText());</span>
+                    }
+<span class="nc" id="L217">                    h.put(&quot;details&quot;, endResult.toString());</span>
+                }
+            }
+        }
+
+<span class="nc" id="L222">        fireResponseListener(new NetworkEvent(this, results));</span>
+<span class="nc" id="L223">    }</span>
+
+
+    /**
+     * The results are presented as a vector of hashtables easily presentable in Codename One
+     *
+     * @return vector of hashtables
+     */
+    public Vector getResults() {
+<span class="nc" id="L232">        return results;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean parsingError(int errorId, String tag, String attribute, String value, String description) {
+<span class="nc" id="L239">        return Dialog.show(&quot;Parsing Error&quot;, description, &quot;Continue&quot;, &quot;Cancel&quot;);</span>
+    }
+
+    /**
+     * Indicates whether more entries might be available since the limt might have been reached
+     *
+     * @return the hasMore
+     */
+    public boolean hasMore() {
+<span class="nc" id="L248">        return hasMore;</span>
+    }
+
+    /**
+     * Creates an additional &quot;details&quot; attribute in the resulting hashtables
+     * which effectively contains a plain text version of the description tag.
+     *
+     * @return the createPlainTextDetails
+     */
+    public boolean isCreatePlainTextDetails() {
+<span class="nc" id="L258">        return createPlainTextDetails;</span>
+    }
+
+    /**
+     * Creates an additional &quot;details&quot; attribute in the resulting hashtables
+     * which effectively contains a plain text version of the description tag.
+     *
+     * @param createPlainTextDetails the createPlainTextDetails to set
+     */
+    public void setCreatePlainTextDetails(boolean createPlainTextDetails) {
+<span class="nc" id="L268">        this.createPlainTextDetails = createPlainTextDetails;</span>
+<span class="nc" id="L269">    }</span>
+
+    /**
+     * @return the iconPlaceholder
+     */
+    public Image getIconPlaceholder() {
+<span class="nc" id="L275">        return iconPlaceholder;</span>
+    }
+
+    /**
+     * @param iconPlaceholder the iconPlaceholder to set
+     */
+    public void setIconPlaceholder(Image iconPlaceholder) {
+<span class="nc" id="L282">        this.iconPlaceholder = iconPlaceholder;</span>
+<span class="nc" id="L283">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

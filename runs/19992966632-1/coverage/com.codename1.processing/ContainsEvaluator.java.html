@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ContainsEvaluator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.processing</a> &gt; <span class="el_source">ContainsEvaluator.java</span></div><h1>ContainsEvaluator.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Eric Coolman, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.processing;
+
+/**
+ * Internal class, do not use.
+ * &lt;p&gt;
+ * This evaluator handles expressions that test if rvalue is contained in lvalue. Examples:
+ *
+ * &lt;code&gt;
+ * Get all long name of the address component where the types array includes both values &quot;neighborhood&quot; and &quot;political&quot;
+ * &lt;p&gt;
+ * /results/address_components[types % (neighborhood, political)]/long_name
+ * &lt;p&gt;
+ * Get all long name of the address component where the types array includes a value of &quot;political&quot;
+ * &lt;p&gt;
+ * /results/address_components[types % (neighborhood, political)]/long_name
+ * &lt;p&gt;
+ * Get all long name of the address component where the short name contains &quot;ny&quot;
+ * &lt;p&gt;
+ * /results/address_components[short_name % ny]/long_name
+ * &lt;/code&gt;
+ *
+ * @author Eric Coolman
+ */
+class ContainsEvaluator extends AbstractEvaluator {
+    /**
+     * Construct with a full predicate expression.
+     *
+     * @param expr a full predicate expression.
+     */
+    public ContainsEvaluator(String expr) {
+<span class="fc" id="L53">        super(expr);</span>
+<span class="fc" id="L54">    }</span>
+
+    private String[] _getLeftValue(StructuredContent element, String lvalue) {
+        String[] v;
+        // getChild() is a bit of a hack here because the content object
+        // calls getParent()
+<span class="fc" id="L60">        StructuredContent child = element.getChild(0);</span>
+<span class="fc" id="L61">        Result result = Result.fromContent(child);</span>
+<span class="fc" id="L62">        v = result.getAsStringArray(lvalue);</span>
+<span class="fc" id="L63">        return v;</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see
+     * com.codename1.path.impl.AbstractEvaluator#evaluateLeftEqualsRight(com
+     * .codename1.path.impl.StructuredContent, java.lang.String,
+     * java.lang.String)
+     */
+    protected Object evaluateLeftContainsRight(StructuredContent element, String lvalue, String rvalue) {
+<span class="fc" id="L75">        String[] lvalues = _getLeftValue(element, lvalue);</span>
+<span class="pc bpc" id="L76" title="1 of 2 branches missed.">        if (lvalues == null) {</span>
+<span class="nc" id="L77">            return null;</span>
+        }
+        // if the rvalue is wrapped with &quot;()&quot;, the caller explicitly expects the lvalue to be an array of values,
+        // otherwise try to do a &quot;string contains&quot; match first if there's only one lvalue
+<span class="pc bpc" id="L81" title="1 of 4 branches missed.">        if (rvalue.indexOf(&quot;(&quot;) == -1 &amp;&amp; lvalues.length == 1) {</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">            if (lvalues[0].toLowerCase().indexOf(rvalue.toLowerCase()) != -1) {</span>
+<span class="fc" id="L83">                return element;</span>
+            }
+        }
+<span class="fc" id="L86">        String[] rvalues = explode(rvalue);</span>
+        int i;
+<span class="fc" id="L88">        int lvlen = lvalues.length;</span>
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        for (String r : rvalues) {</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            for (i = 0; i &lt; lvlen; i++) {</span>
+<span class="fc" id="L91">                String l = lvalues[i];</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">                if (l.equalsIgnoreCase(r)) {</span>
+<span class="fc" id="L93">                    break;</span>
+                }
+            }
+<span class="fc bfc" id="L96" title="All 2 branches covered.">            if (i == lvlen) {</span>
+<span class="fc" id="L97">                return null;</span>
+            }
+        }
+<span class="fc" id="L100">        return element;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,526 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BoxLayout.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts</a> &gt; <span class="el_source">BoxLayout.java</span></div><h1>BoxLayout.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.layouts;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Form;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.plaf.Style;
+
+/**
+ * &lt;p&gt;Layout manager that places elements in a row (&lt;code&gt;X_AXIS&lt;/code&gt;) or column (&lt;code&gt;Y_AXIS&lt;/code&gt;)
+ * according to box orientation. Box is a very simple and predictable layout that serves as the &quot;workhorse&quot; of
+ * component lists in Codename One&lt;br&gt;
+ * You can create a box layout Y UI using syntax such as this&lt;/p&gt;
+ *
+ * &lt;script src=&quot;https://gist.github.com/codenameone/99f5e43061b4c6413d16.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/box-layout-y.png&quot; alt=&quot;Box Layout Y&quot; /&gt;
+ *
+ * &lt;p&gt;
+ * This can also be expressed with more terse syntax e.g. an X axis layout like this:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/5d2908517241126b5803.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/box-layout-x.png&quot; alt=&quot;Box Layout X&quot; /&gt;
+ *
+ * &lt;p&gt;
+ * The &lt;code&gt;BoxLayout&lt;/code&gt; keeps the preferred size of its destination orientation and scales elements on the other axis.
+ * Specifically &lt;code&gt;X_AXIS&lt;/code&gt; will keep the preferred width of the component while growing all
+ * the components vertically to match in size. Its &lt;code&gt;Y_AXIS&lt;/code&gt; counterpart keeps the preferred height
+ * while growing the components horizontally.&lt;br&gt;
+ * This behavior is very useful since it allows elements to align as they would all have the same size.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * In some cases the growing behavior in the X axis is undesired, for these cases we can use the &lt;code&gt;X_AXIS_NO_GROW&lt;/code&gt;
+ * variant.
+ * &lt;/p&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/box-layout-x-no-grow.png&quot; alt=&quot;Box Layout X No Grow&quot; /&gt;
+ *
+ * &lt;h4&gt;FlowLayout vs. BoxLayout.X_AXIS/X_AXIS_NO_GROW&lt;/h4&gt;
+ * &lt;p&gt;
+ * There are quite a few differences between {@link FlowLayout} and &lt;code&gt;BoxLayout&lt;/code&gt;. When it doesn't
+ * matter to you we tend to recommend &lt;code&gt;BoxLayout&lt;/code&gt; as it acts more consistently in all situations since
+ * its far simpler. Another advantage of &lt;code&gt;BoxLayout&lt;/code&gt; is the fact that it grows and thus aligns nicely.
+ * &lt;/p&gt;
+ *
+ * @author Chen Fishbein
+ */
+public class BoxLayout extends Layout {
+
+    /**
+     * Horizontal layout where components are arranged from left to right
+     */
+    public static final int X_AXIS = 1;
+
+    /**
+     * Vertical layout where components are arranged from top to bottom
+     */
+    public static final int Y_AXIS = 2;
+
+    /**
+     * Horizontal layout where components are arranged from left to right but don't grow vertically beyond their preferred size
+     */
+    public static final int X_AXIS_NO_GROW = 3;
+
+    /**
+     * Same as Y_AXIS with a special case for the last component. The last
+     * component is glued to the end of the available space
+     */
+    public static final int Y_AXIS_BOTTOM_LAST = 4;
+
+    /**
+     * @since 7.0
+     */
+<span class="fc" id="L95">    private int align = Component.TOP;</span>
+
+    private final int axis;
+<span class="fc" id="L98">    private final Dimension dim = new Dimension(0, 0);</span>
+
+    /**
+     * Creates a new instance of BoxLayout
+     *
+     * @param axis the axis to lay out components along.
+     *             Can be: BoxLayout.X_AXIS or BoxLayout.Y_AXIS
+     */
+<span class="fc" id="L106">    public BoxLayout(int axis) {</span>
+<span class="fc" id="L107">        this.axis = axis;</span>
+<span class="fc" id="L108">    }</span>
+
+    /**
+     * Shorthand for {@code new BoxLayout(BoxLayout.Y_AXIS)}
+     *
+     * @return a new Y axis {@code BoxLayout}
+     */
+    public static BoxLayout y() {
+<span class="fc" id="L116">        return new BoxLayout(BoxLayout.Y_AXIS);</span>
+    }
+
+    /**
+     * Shorthand for {@code new BoxLayout(BoxLayout.Y_AXIS_BOTTOM_LAST)}
+     *
+     * @return a new Y bottom last axis {@code BoxLayout}
+     */
+    public static BoxLayout yLast() {
+<span class="fc" id="L125">        return new BoxLayout(BoxLayout.Y_AXIS_BOTTOM_LAST);</span>
+    }
+
+    /**
+     * Creates a new layout with {@link #Y_AXIS}, and align center.
+     *
+     * @return BoxLayout with center alignment on Y_AXIS.
+     * @since 7.0
+     */
+    public static BoxLayout yCenter() {
+<span class="fc" id="L135">        BoxLayout out = new BoxLayout(BoxLayout.Y_AXIS);</span>
+<span class="fc" id="L136">        out.setAlign(Component.CENTER);</span>
+<span class="fc" id="L137">        return out;</span>
+    }
+
+    /**
+     * Creates a new layout with {@link #Y_AXIS}, and align bottom.
+     *
+     * @return BoxLayout with bottom alignment on Y_AXIS.
+     * @since 7.0
+     */
+    public static BoxLayout yBottom() {
+<span class="fc" id="L147">        BoxLayout out = new BoxLayout(BoxLayout.Y_AXIS);</span>
+<span class="fc" id="L148">        out.setAlign(Component.BOTTOM);</span>
+<span class="fc" id="L149">        return out;</span>
+    }
+
+    /**
+     * Shorthand for {@code new BoxLayout(BoxLayout.X_AXIS)}
+     *
+     * @return a new X axis {@code BoxLayout}
+     */
+    public static BoxLayout x() {
+<span class="fc" id="L158">        return new BoxLayout(BoxLayout.X_AXIS);</span>
+    }
+
+    /**
+     * Creates a new layout with {@link #X_AXIS}, and align center.
+     *
+     * @return BoxLayout with center alignment on X_AXIS.
+     * @since 7.0
+     */
+    public static BoxLayout xCenter() {
+<span class="fc" id="L168">        BoxLayout out = new BoxLayout(BoxLayout.X_AXIS);</span>
+<span class="fc" id="L169">        out.setAlign(Component.CENTER);</span>
+<span class="fc" id="L170">        return out;</span>
+    }
+
+    /**
+     * Creates a new layout with {@link #X_AXIS}, and align right.
+     *
+     * @return BoxLayout with right alignment on X_AXIS.
+     * @since 7.0
+     */
+    public static BoxLayout xRight() {
+<span class="fc" id="L180">        BoxLayout out = new BoxLayout(BoxLayout.X_AXIS);</span>
+<span class="fc" id="L181">        out.setAlign(Component.RIGHT);</span>
+<span class="fc" id="L182">        return out;</span>
+    }
+
+    /**
+     * The equivalent of Container.enclose() with a box layout Y
+     * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/box-layout-y.png&quot; alt=&quot;Box Layout Y&quot; /&gt;
+     *
+     * @param cmps the set of components
+     * @return the newly created container
+     */
+    public static Container encloseY(Component... cmps) {
+<span class="fc" id="L193">        return Container.encloseIn(new BoxLayout(BoxLayout.Y_AXIS), cmps);</span>
+    }
+
+    /**
+     * The equivalent of Container.enclose() with a box layout Y, with center alignment.
+     *
+     * @param cmps the set of components
+     * @return the newly created container
+     * @since 7.0
+     */
+    public static Container encloseYCenter(Component... cmps) {
+<span class="fc" id="L204">        return Container.encloseIn(yCenter(), cmps);</span>
+    }
+
+    /**
+     * The equivalent of Container.enclose() with a box layout Y, with bottom alignment.
+     *
+     * @param cmps the set of components
+     * @return the newly created container
+     * @since 7.0
+     */
+    public static Container encloseYBottom(Component... cmps) {
+<span class="fc" id="L215">        return Container.encloseIn(yBottom(), cmps);</span>
+    }
+
+    /**
+     * The equivalent of Container.enclose() with a box layout Y in bottom
+     * last mode
+     *
+     * @param cmps the set of components
+     * @return the newly created container
+     */
+    public static Container encloseYBottomLast(Component... cmps) {
+<span class="fc" id="L226">        return Container.encloseIn(new BoxLayout(BoxLayout.Y_AXIS_BOTTOM_LAST), cmps);</span>
+    }
+
+    /**
+     * The equivalent of Container.enclose() with a box layout X
+     * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/box-layout-x.png&quot; alt=&quot;Box Layout X&quot; /&gt;
+     *
+     * @param cmps the set of components
+     * @return the newly created container
+     */
+    public static Container encloseX(Component... cmps) {
+<span class="fc" id="L237">        return Container.encloseIn(new BoxLayout(BoxLayout.X_AXIS), cmps);</span>
+    }
+
+    /**
+     * The equivalent of Container.enclose() with a box layout X no grow option
+     * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/box-layout-x.png&quot; alt=&quot;Box Layout X&quot; /&gt;
+     *
+     * @param cmps the set of components
+     * @return the newly created container
+     */
+    public static Container encloseXNoGrow(Component... cmps) {
+<span class="fc" id="L248">        return Container.encloseIn(new BoxLayout(BoxLayout.X_AXIS_NO_GROW), cmps);</span>
+    }
+
+    /**
+     * The equivalent of Container.enclose() with a box layout X, with center alignment.
+     *
+     * @param cmps the set of components
+     * @return the newly created container
+     * @since 7.0
+     */
+    public static Container encloseXCenter(Component... cmps) {
+<span class="fc" id="L259">        return Container.encloseIn(xCenter(), cmps);</span>
+    }
+
+    /**
+     * The equivalent of Container.enclose() with a box layout X, with right alignment.
+     *
+     * @param cmps the set of components
+     * @return the newly created container
+     * @since 7.0
+     */
+    public static Container encloseXRight(Component... cmps) {
+<span class="fc" id="L270">        return Container.encloseIn(xRight(), cmps);</span>
+    }
+
+    /**
+     * Gets the alignment of this layout.  By default Y_AXIS aligns top, and X_AXIS aligns left (RTL-aware).  You can specify an align value of {@link Component#CENTER} to align items vertically centered (for Y_AXIS), and horizontally centered (for X_AXIS),
+     * of {@link Component#BOTTOM} to align vertically bottom (Y_AXIS), and {@link Component#RIGHT} to align right (RTL-aware), for X_AXIS.
+     *
+     * @return The alignment.
+     * @since 7.0
+     */
+    public int getAlign() {
+<span class="fc" id="L281">        return this.align;</span>
+    }
+
+    /**
+     * Sets the alignment of this layout. By default Y_AXIS aligns top, and X_AXIS aligns left (RTL-aware).  You can specify an align value of {@link Component#CENTER} to align items vertically centered (for Y_AXIS), and horizontally centered (for X_AXIS),
+     * of {@link Component#BOTTOM} to align vertically bottom (Y_AXIS), and {@link Component#RIGHT} to align right (RTL-aware), for X_AXIS.
+     *
+     * @param align One of {@link Component#CENTER}, {@link Component#BOTTOM}, {@link Component#RIGHT}, to adjust the alignment of children.
+     * @since 7.0
+     */
+    public void setAlign(int align) {
+<span class="fc" id="L292">        this.align = align;</span>
+<span class="fc" id="L293">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void layoutContainer(Container parent) {
+<span class="fc" id="L299">        Style ps = parent.getStyle();</span>
+<span class="fc" id="L300">        int width = parent.getLayoutWidth() - parent.getSideGap() - ps.getHorizontalPadding();</span>
+<span class="fc" id="L301">        int height = parent.getLayoutHeight() - parent.getBottomGap() - ps.getVerticalPadding();</span>
+<span class="fc" id="L302">        int x = ps.getPaddingLeft(parent.isRTL());</span>
+<span class="fc" id="L303">        int y = ps.getPaddingTop();</span>
+<span class="fc" id="L304">        int numOfcomponents = parent.getComponentCount();</span>
+
+<span class="fc" id="L306">        boolean rtl = parent.isRTL();</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">        if (rtl) {</span>
+<span class="fc" id="L308">            x += parent.getSideGap();</span>
+        }
+<span class="fc" id="L310">        int initX = x;</span>
+
+<span class="fc bfc" id="L312" title="All 2 branches covered.">        for (int i = 0; i &lt; numOfcomponents; i++) {</span>
+<span class="fc" id="L313">            Component cmp = parent.getComponentAt(i);</span>
+<span class="fc" id="L314">            Style stl = cmp.getStyle();</span>
+
+<span class="fc bfc" id="L316" title="All 3 branches covered.">            switch (axis) {</span>
+                case Y_AXIS:
+                case Y_AXIS_BOTTOM_LAST:
+<span class="fc" id="L319">                    int cmpBottom = height;</span>
+<span class="fc" id="L320">                    cmp.setWidth(width - stl.getHorizontalMargins());</span>
+<span class="fc" id="L321">                    int cmpH = cmp.getPreferredH();</span>
+
+<span class="fc" id="L323">                    y += stl.getMarginTop();</span>
+
+<span class="pc bpc" id="L325" title="1 of 4 branches missed.">                    if (y - ps.getPaddingTop() &gt;= cmpBottom &amp;&amp; !parent.isScrollableY()) {</span>
+<span class="fc" id="L326">                        cmpH = 0;</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">                    } else if (y + cmpH - ps.getPaddingTop() &gt; cmpBottom) {</span>
+<span class="pc bpc" id="L328" title="1 of 2 branches missed.">                        if (!parent.isScrollableY()) {</span>
+<span class="fc" id="L329">                            cmpH = cmpBottom - y - stl.getMarginBottom();</span>
+                        }
+                    }
+<span class="fc" id="L332">                    cmp.setHeight(cmpH);</span>
+<span class="fc" id="L333">                    cmp.setX(x + stl.getMarginLeft(parent.isRTL()));</span>
+<span class="fc" id="L334">                    cmp.setY(y);</span>
+<span class="fc" id="L335">                    y += cmp.getHeight() + stl.getMarginBottom();</span>
+<span class="fc" id="L336">                    break;</span>
+                case X_AXIS_NO_GROW: {
+<span class="fc" id="L338">                    int cmpRight = width;</span>
+<span class="fc" id="L339">                    height = Math.min(getPreferredSize(parent).getHeight(), height);</span>
+<span class="fc" id="L340">                    int cmpW = cmp.getPreferredW();</span>
+
+<span class="fc" id="L342">                    x += stl.getMarginLeftNoRTL();</span>
+
+<span class="pc bpc" id="L344" title="3 of 4 branches missed.">                    if (x &gt;= cmpRight &amp;&amp; !parent.isScrollableX()) {</span>
+<span class="nc" id="L345">                        cmpW = 0;</span>
+                    } else {
+<span class="pc bpc" id="L347" title="1 of 2 branches missed.">                        if (x + cmpW - ps.getPaddingLeftNoRTL() &gt; cmpRight) {</span>
+<span class="nc" id="L348">                            cmpW = cmpRight - x - stl.getMarginRightNoRTL();</span>
+                        }
+                    }
+<span class="fc" id="L351">                    cmp.setWidth(cmpW);</span>
+<span class="fc" id="L352">                    cmp.setHeight(height - stl.getMarginTop() - stl.getMarginBottom());</span>
+<span class="pc bpc" id="L353" title="1 of 2 branches missed.">                    if (rtl) {</span>
+<span class="nc" id="L354">                        cmp.setX(width + initX - (x - initX) - cmpW);</span>
+                    } else {
+<span class="fc" id="L356">                        cmp.setX(x);</span>
+                    }
+<span class="fc" id="L358">                    cmp.setY(y + stl.getMarginTop());</span>
+<span class="fc" id="L359">                    x += cmp.getWidth() + stl.getMarginRightNoRTL();</span>
+<span class="fc" id="L360">                    break;</span>
+                }
+                default:
+<span class="fc" id="L363">                    int cmpRight = width;</span>
+<span class="fc" id="L364">                    int cmpW = cmp.getPreferredW();</span>
+
+<span class="fc" id="L366">                    x += stl.getMarginLeftNoRTL();</span>
+
+<span class="pc bpc" id="L368" title="3 of 4 branches missed.">                    if (x &gt;= cmpRight &amp;&amp; !parent.isScrollableX()) {</span>
+<span class="nc" id="L369">                        cmpW = 0;</span>
+                    } else {
+<span class="pc bpc" id="L371" title="1 of 2 branches missed.">                        if (x + cmpW - ps.getPaddingLeftNoRTL() &gt; cmpRight) {</span>
+<span class="nc" id="L372">                            cmpW = cmpRight - x - stl.getMarginRightNoRTL();</span>
+                        }
+                    }
+<span class="fc" id="L375">                    cmp.setWidth(cmpW);</span>
+<span class="fc" id="L376">                    cmp.setHeight(height - stl.getVerticalMargins());</span>
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">                    if (rtl) {</span>
+<span class="nc" id="L378">                        cmp.setX(width + initX - (x - initX) - cmpW);</span>
+                    } else {
+<span class="fc" id="L380">                        cmp.setX(x);</span>
+                    }
+<span class="fc" id="L382">                    cmp.setY(y + stl.getMarginTop());</span>
+<span class="fc" id="L383">                    x += cmp.getWidth() + stl.getMarginRightNoRTL();</span>
+                    break;
+            }
+        }
+
+<span class="pc bpc" id="L388" title="1 of 4 branches missed.">        if (axis == Y_AXIS_BOTTOM_LAST &amp;&amp; numOfcomponents &gt; 0) {</span>
+<span class="pc bpc" id="L389" title="1 of 2 branches missed.">            if (parent instanceof Form) {</span>
+<span class="nc" id="L390">                parent = ((Form) parent).getContentPane();</span>
+            }
+<span class="fc" id="L392">            Component cmp = parent.getComponentAt(numOfcomponents - 1);</span>
+<span class="pc bpc" id="L393" title="1 of 2 branches missed.">            if (cmp.getY() + cmp.getHeight() &lt; height) {</span>
+<span class="fc" id="L394">                cmp.setY(height - cmp.getHeight());</span>
+            }
+        }
+<span class="fc bfc" id="L397" title="All 2 branches covered.">        if (axis == Y_AXIS) {</span>
+
+<span class="fc bfc" id="L399" title="All 2 branches covered.">            if (numOfcomponents &gt; 0) {</span>
+<span class="fc" id="L400">                int containerBottomInner = parent.getLayoutHeight() - parent.getStyle().getPaddingBottom();</span>
+<span class="fc" id="L401">                Component lastCmp = parent.getComponentAt(numOfcomponents - 1);</span>
+<span class="fc" id="L402">                int lastCmpBottomOuter = lastCmp.getY() + lastCmp.getHeight() + lastCmp.getStyle().getMarginBottom();</span>
+<span class="fc" id="L403">                int dy = 0;</span>
+<span class="fc bfc" id="L404" title="All 3 branches covered.">                switch (align) {</span>
+                    case Component.CENTER: {
+<span class="fc" id="L406">                        dy = (containerBottomInner - lastCmpBottomOuter) / 2;</span>
+<span class="fc" id="L407">                        break;</span>
+                    }
+                    case Component.BOTTOM: {
+<span class="fc" id="L410">                        dy = (containerBottomInner - lastCmpBottomOuter);</span>
+                        break;
+                    }
+                }
+<span class="fc bfc" id="L414" title="All 2 branches covered.">                if (dy &gt; 0) {</span>
+<span class="fc bfc" id="L415" title="All 2 branches covered.">                    for (int i = 0; i &lt; numOfcomponents; i++) {</span>
+<span class="fc" id="L416">                        Component cmp = parent.getComponentAt(i);</span>
+<span class="fc" id="L417">                        cmp.setY(cmp.getY() + dy);</span>
+                    }
+                }
+<span class="fc" id="L420">            }</span>
+
+<span class="fc bfc" id="L422" title="All 2 branches covered.">        } else if (axis == X_AXIS) {</span>
+<span class="fc bfc" id="L423" title="All 2 branches covered.">            if (numOfcomponents &gt; 0) {</span>
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">                if (rtl) {</span>
+<span class="nc" id="L425">                    int containerLeftInner = parent.getStyle().getPaddingLeftNoRTL();</span>
+<span class="nc" id="L426">                    Component lastCmp = parent.getComponentAt(numOfcomponents - 1);</span>
+<span class="nc" id="L427">                    int lastCmpLeftOuter = lastCmp.getX() - lastCmp.getStyle().getMarginLeftNoRTL();</span>
+<span class="nc" id="L428">                    int dx = 0;</span>
+<span class="nc bnc" id="L429" title="All 3 branches missed.">                    switch (align) {</span>
+                        case Component.CENTER: {
+<span class="nc" id="L431">                            dx = (lastCmpLeftOuter - containerLeftInner) / 2;</span>
+<span class="nc" id="L432">                            break;</span>
+                        }
+                        case Component.RIGHT: {
+<span class="nc" id="L435">                            dx = (lastCmpLeftOuter - containerLeftInner);</span>
+                            break;
+                        }
+                    }
+<span class="nc bnc" id="L439" title="All 2 branches missed.">                    if (dx &gt; 0) {</span>
+<span class="nc bnc" id="L440" title="All 2 branches missed.">                        for (int i = 0; i &lt; numOfcomponents; i++) {</span>
+<span class="nc" id="L441">                            Component cmp = parent.getComponentAt(i);</span>
+<span class="nc" id="L442">                            cmp.setX(cmp.getX() - dx);</span>
+                        }
+                    }
+<span class="nc" id="L445">                } else {</span>
+<span class="fc" id="L446">                    int containerRightInner = parent.getLayoutWidth() - parent.getStyle().getPaddingRightNoRTL();</span>
+<span class="fc" id="L447">                    Component lastCmp = parent.getComponentAt(numOfcomponents - 1);</span>
+<span class="fc" id="L448">                    int lastCmpRightOuter = lastCmp.getX() + lastCmp.getWidth() + lastCmp.getStyle().getMarginRightNoRTL();</span>
+<span class="fc" id="L449">                    int dx = 0;</span>
+<span class="fc bfc" id="L450" title="All 3 branches covered.">                    switch (align) {</span>
+                        case Component.CENTER: {
+<span class="fc" id="L452">                            dx = (containerRightInner - lastCmpRightOuter) / 2;</span>
+<span class="fc" id="L453">                            break;</span>
+                        }
+                        case Component.RIGHT: {
+<span class="fc" id="L456">                            dx = (containerRightInner - lastCmpRightOuter);</span>
+                            break;
+                        }
+                    }
+<span class="fc bfc" id="L460" title="All 2 branches covered.">                    if (dx &gt; 0) {</span>
+<span class="fc bfc" id="L461" title="All 2 branches covered.">                        for (int i = 0; i &lt; numOfcomponents; i++) {</span>
+<span class="fc" id="L462">                            Component cmp = parent.getComponentAt(i);</span>
+<span class="fc" id="L463">                            cmp.setX(cmp.getX() + dx);</span>
+                        }
+                    }
+                }
+
+            }
+        }
+<span class="fc" id="L470">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Dimension getPreferredSize(Container parent) {
+<span class="fc" id="L476">        int width = 0;</span>
+<span class="fc" id="L477">        int height = 0;</span>
+
+<span class="fc" id="L479">        int numOfcomponents = parent.getComponentCount();</span>
+<span class="fc bfc" id="L480" title="All 2 branches covered.">        for (int i = 0; i &lt; numOfcomponents; i++) {</span>
+<span class="fc" id="L481">            Component cmp = parent.getComponentAt(i);</span>
+<span class="fc" id="L482">            Style stl = cmp.getStyle();</span>
+
+<span class="pc bpc" id="L484" title="1 of 4 branches missed.">            if (axis == Y_AXIS || axis == Y_AXIS_BOTTOM_LAST) {</span>
+<span class="fc" id="L485">                int cmpH = cmp.getPreferredH() + stl.getVerticalMargins();</span>
+<span class="fc" id="L486">                height += cmpH;</span>
+<span class="fc" id="L487">                width = Math.max(width, cmp.getPreferredW() + stl.getHorizontalMargins());</span>
+<span class="fc" id="L488">            } else {</span>
+<span class="fc" id="L489">                int cmpW = cmp.getPreferredW() + stl.getHorizontalMargins();</span>
+<span class="fc" id="L490">                width += cmpW;</span>
+<span class="fc" id="L491">                height = Math.max(height, cmp.getPreferredH() + stl.getVerticalMargins());</span>
+            }
+        }
+<span class="fc" id="L494">        Style s = parent.getStyle();</span>
+<span class="fc" id="L495">        dim.setWidth(width + s.getHorizontalPadding());</span>
+<span class="fc" id="L496">        dim.setHeight(height + s.getVerticalPadding());</span>
+<span class="fc" id="L497">        return dim;</span>
+    }
+
+    /**
+     * Returns the layout axis x/y
+     *
+     * @return the layout axis
+     */
+    public int getAxis() {
+<span class="fc" id="L506">        return axis;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String toString() {
+<span class="fc bfc" id="L513" title="All 2 branches covered.">        if (axis == X_AXIS) {</span>
+<span class="fc" id="L514">            return &quot;BoxLayout X&quot;;</span>
+        }
+<span class="fc" id="L516">        return &quot;BoxLayout Y&quot;;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean equals(Object o) {
+<span class="pc bpc" id="L523" title="1 of 4 branches missed.">        return super.equals(o) &amp;&amp; axis == ((BoxLayout) o).axis;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

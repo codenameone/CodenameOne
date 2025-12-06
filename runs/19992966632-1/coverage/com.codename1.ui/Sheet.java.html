@@ -1,0 +1,915 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Sheet.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">Sheet.java</span></div><h1>Sheet.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.ComponentSelector.ComponentClosure;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.FlowLayout;
+import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.plaf.Border;
+import com.codename1.ui.plaf.RoundRectBorder;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.EventDispatcher;
+
+import static com.codename1.ui.ComponentSelector.$;
+
+/**
+ * A light-weight dialog that slides up from the bottom of the screen on mobile devices.
+ * Sheets include a &quot;title&quot; bar, with a back/close button, a title label, and a &quot;commands container&quot; ({@link #getCommandsContainer() })
+ * which allows you to insert your own custom components (usually buttons) in the upper right.
+ *
+ * &lt;p&gt;Custom content should be placed inside the content pane which can be retrieved via {@link #getContentPane() }&lt;/p&gt;
+ *
+ * &lt;h3&gt;Usage&lt;/h3&gt;
+ *
+ * &lt;p&gt;The general usage is to create new Sheet instance (or subclass), then call {@link #show() }
+ * to make it appear over the current form.  If a different sheet that is currently being displayed, then
+ * calling {@link #show() } will replace it.&lt;/p&gt;
+ *
+ * &lt;h4&gt;Inter-Sheet Navigation&lt;/h4&gt;
+ *
+ * &lt;p&gt;The {@link #Sheet(com.codename1.ui.Sheet, java.lang.String) } constructor can take another
+ * Sheet object as a parameter, which will act as a &quot;parent&quot; sheet ({@link #getParentSheet() }.  If the parent
+ * sheet is not null, then {@literal this} sheet will have a &quot;Back&quot; button instead of a &quot;Close&quot; button.  THe
+ * &quot;Back&quot; button will navigate back to the parent sheet.&lt;/p&gt;
+ *
+ * &lt;p&gt;When navigating between sheets, the sheet will be resized with a smooth slide animation to the preferred
+ * height of the destination sheet.&lt;/p&gt;
+ *
+ * &lt;p&gt;&lt;strong&gt;Example&lt;/strong&gt;&lt;/p&gt;
+ *
+ * &lt;p&gt;&lt;pre&gt;{@code
+ *  public void start() {
+ * if(current != null){
+ * current.show();
+ * return;
+ * }
+ * Form hi = new Form(&quot;Hi World&quot;, new BorderLayout());
+ *
+ *
+ * Button b = new Button(&quot;Open Sheet&quot;);
+ * b.addActionListener(e-&amp;gt;{
+ * new MySheet(null).show();
+ *
+ *
+ * });
+ * hi.add(BorderLayout.NORTH, b);
+ * hi.show();
+ * }
+ *
+ * private class MySheet extends Sheet {
+ * MySheet(Sheet parent) {
+ * super(parent, &quot;My Sheet&quot;);
+ * Container cnt = getContentPane();
+ * cnt.setLayout(BoxLayout.y());
+ * Button gotoSheet2 = new Button(&quot;Goto Sheet 2&quot;);
+ * gotoSheet2.addActionListener(e-&amp;gt;{
+ * new MySheet2(this).show(300);
+ * });
+ * cnt.add(gotoSheet2);
+ * for (String t : new String[]{&quot;Red&quot;, &quot;Green&quot;, &quot;Blue&quot;, &quot;Orange&quot;}) {
+ * cnt.add(new Label(t));
+ * }
+ * }
+ * }
+ *
+ * private class MySheet2 extends Sheet {
+ * MySheet2(Sheet parent) {
+ * super(parent, &quot;Sheet 2&quot;);
+ * Container cnt = getContentPane();
+ * cnt.setLayout(BoxLayout.y());
+ * cnt.setScrollableY(true);
+ * for (int i=0; i&amp;lt;2; i++) {
+ * for (String t : new String[]{&quot;Red&quot;, &quot;Green&quot;, &quot;Blue&quot;, &quot;Orange&quot;}) {
+ * cnt.add(new Label(t));
+ * }
+ * }
+ * }
+ * }
+ *
+ * }&lt;/pre&gt;&lt;/p&gt;
+ *
+ * &lt;h4&gt;Video Sample&lt;/h4&gt;
+ *
+ * &lt;p&gt;&lt;a href=&quot;https://youtu.be/3okEj_JW3-k&quot;&gt;Screen cast of the SheetSample demo&lt;/a&gt;&lt;/p&gt;
+ * &lt;p&gt;View source for this sample &lt;a href=&quot;https://github.com/codenameone/CodenameOne/tree/master/Samples/samples/SheetSample&quot;&gt;here&lt;/a&gt;.
+ * This sample can be run directly in the &lt;a href=&quot;https://github.com/codenameone/CodenameOne/tree/master/Samples/&quot;&gt;SampleRunner&lt;/a&gt;.&lt;/p&gt;
+ *
+ * @author shannah
+ * @since 7.0
+ */
+public class Sheet extends Container {
+    private static final int N = 0;
+    private static final int S = 1;
+    private static final int E = 2;
+    private static final int W = 3;
+    private static final int C = 4;
+    private static final int DEFAULT_TRANSITION_DURATION = 300;
+    private final Sheet parentSheet;
+<span class="fc" id="L134">    private final Label title = new Label();</span>
+<span class="fc" id="L135">    private final EventDispatcher closeListeners = new EventDispatcher();</span>
+<span class="fc" id="L136">    private final EventDispatcher backListeners = new EventDispatcher();</span>
+<span class="fc" id="L137">    private final Button backButton = new Button(FontImage.MATERIAL_CLOSE);</span>
+<span class="fc" id="L138">    private final Container commandsContainer = new Container(BoxLayout.x());</span>
+<span class="fc" id="L139">    private boolean allowClose = true;</span>
+<span class="fc" id="L140">    private final Container titleBar = BorderLayout.center(LayeredLayout.encloseIn(</span>
+<span class="fc" id="L141">            BorderLayout.center(FlowLayout.encloseCenterMiddle(title)),</span>
+<span class="fc" id="L142">            BorderLayout.centerEastWest(null, commandsContainer, backButton)</span>
+    ));
+<span class="fc" id="L144">    private final Container contentPane = new Container(BoxLayout.y());</span>
+    /**
+     * The position on the screen where the sheet is displayed on phones.
+     * One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
+     * {@link BorderLayout#WEST}. {@link BorderLayout#EAST.  Default is {@link BorderLayout#SOUTH}.
+     *
+     * @see #setPosition(java.lang.String)
+     * @see #setPosition(java.lang.String, java.lang.String)
+     */
+<span class="fc" id="L153">    private String position = BorderLayout.SOUTH;</span>
+    /**
+     * The position on the screen where the sheet is displayed on tablets.
+     * One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
+     * {@link BorderLayout#WEST}. {@link BorderLayout#EAST.  Default is {@link BorderLayout#SOUTH}.
+     *
+     * @see #setPosition(java.lang.String)
+     * @see #setPosition(java.lang.String, java.lang.String)
+     */
+<span class="fc" id="L162">    private String tabletPosition = position;</span>
+    /**
+     * Original padding values to prevent accumulation when showing the sheet multiple times.
+     * These are set the first time the sheet is shown and used as the base for safe area calculations.
+     */
+<span class="fc" id="L167">    private int[] originalPadding = null;</span>
+<span class="fc" id="L168">    private final ActionListener formPointerListener = new ActionListener() {</span>
+        @Override
+        public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L171">            Form f = getComponentForm();</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">            if (f == null) {</span>
+<span class="nc" id="L173">                return;</span>
+            }
+<span class="nc bnc" id="L175" title="All 2 branches missed.">            if (Display.impl.isScrollWheeling()) {</span>
+<span class="nc" id="L176">                return;</span>
+            }
+<span class="nc" id="L178">            Component cmp = f.getComponentAt(evt.getX(), evt.getY());</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">            if (cmp == null) {</span>
+<span class="nc" id="L180">                return;</span>
+            }
+<span class="nc bnc" id="L182" title="All 6 branches missed.">            if (Sheet.this.contains(cmp) || Sheet.this == cmp || cmp.isOwnedBy(Sheet.this)) {</span>
+                // do nothing.
+            } else {
+<span class="nc" id="L185">                evt.consume();</span>
+<span class="nc" id="L186">                hide(DEFAULT_TRANSITION_DURATION);</span>
+            }
+<span class="nc" id="L188">        }</span>
+
+    };
+    private Form form;
+
+    /**
+     * Creates a new sheet with the specified parent and title.
+     *
+     * @param parent Optional parent sheet.  If non-null, then this sheet will have a &quot;back&quot; button instead of a &quot;close&quot; button.  The &quot;back&quot; button will return to the parent sheet.
+     * @param title  The title to display in the title bar of the sheet.
+     */
+    public Sheet(Sheet parent, String title) {
+<span class="fc" id="L200">        this(parent, title, &quot;Sheet&quot;);</span>
+<span class="fc" id="L201">    }</span>
+
+    /**
+     * Creates a new sheet with the specified parent and title.
+     *
+     * @param parent Optional parent sheet.  If non-null, then this sheet will have a &quot;back&quot; button instead of a &quot;close&quot; button.  The &quot;back&quot; button will return to the parent sheet.
+     * @param title  The title to display in the title bar of the sheet.
+     * @param uiid   Optional UIID for the sheet.  If non-null, then the Sheet's uiid will be {@literal uiid}, the title label's UIID will be {@literal uiid + &quot;Title&quot;},
+     *               the title bar's UIID will be {@literal uiid + &quot;TitleBar&quot;}, and the back/close button's UIID will be {@literal uiid + &quot;BackButton&quot;}.
+     */
+<span class="fc" id="L211">    public Sheet(Sheet parent, String title, String uiid) {</span>
+<span class="fc bfc" id="L212" title="All 2 branches covered.">        if (parent != null) {</span>
+<span class="fc" id="L213">            allowClose = parent.allowClose;</span>
+<span class="fc" id="L214">            position = parent.position;</span>
+<span class="fc" id="L215">            tabletPosition = parent.tabletPosition;</span>
+        }
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (uiid == null) {</span>
+<span class="nc" id="L218">            uiid = &quot;Sheet&quot;;</span>
+        }
+<span class="fc" id="L220">        $(this).addTags(&quot;Sheet&quot;);</span>
+<span class="fc" id="L221">        setGrabsPointerEvents(true);</span>
+<span class="fc" id="L222">        this.setUIID(uiid);</span>
+<span class="fc" id="L223">        this.title.setUIID(uiid + &quot;Title&quot;);</span>
+<span class="fc" id="L224">        titleBar.setUIID(uiid + &quot;TitleBar&quot;);</span>
+<span class="fc" id="L225">        backButton.setUIID(uiid + &quot;BackButton&quot;);</span>
+
+<span class="fc" id="L227">        this.parentSheet = parent;</span>
+<span class="fc" id="L228">        this.title.setText(title);</span>
+<span class="fc" id="L229">        initUI();</span>
+<span class="fc" id="L230">        updateBorderForPosition();</span>
+
+<span class="fc" id="L232">    }</span>
+
+    /**
+     * Gets the current sheet on the current form or null if no sheet is currently being displayed.
+     *
+     * @return The current sheet or null.
+     * @since 7.0
+     */
+    public static Sheet getCurrentSheet() {
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        if (CN.getCurrentForm() == null) {</span>
+<span class="nc" id="L242">            return null;</span>
+        }
+<span class="fc" id="L244">        Container cnt = CN.getCurrentForm().getFormLayeredPaneIfExists();</span>
+<span class="fc bfc" id="L245" title="All 2 branches covered.">        if (cnt == null) {</span>
+<span class="fc" id="L246">            return null;</span>
+        }
+<span class="nc" id="L248">        class Result {</span>
+            Sheet found;
+        }
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        for (Component cmp : $(&quot;.Sheet&quot;, cnt)) {</span>
+<span class="pc bpc" id="L252" title="1 of 2 branches missed.">            if (cmp instanceof Sheet) {</span>
+<span class="fc" id="L253">                return (Sheet) cmp;</span>
+            }
+<span class="nc" id="L255">        }</span>
+<span class="nc" id="L256">        return null;</span>
+    }
+
+    /**
+     * Finds Sheet containing this component if it is currently part of a Sheet.
+     *
+     * @param cmp The component to check.
+     * @return The sheet containing the component, or null if it is not on a sheet.
+     * @since 7.0
+     */
+    public static Sheet findContainingSheet(Component cmp) {
+<span class="fc" id="L267">        Container parent = cmp.getParent();</span>
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">        while (parent != null) {</span>
+<span class="fc bfc" id="L269" title="All 2 branches covered.">            if (parent instanceof Sheet) {</span>
+<span class="fc" id="L270">                return (Sheet) parent;</span>
+            }
+<span class="fc" id="L272">            parent = parent.getParent();</span>
+        }
+<span class="nc" id="L274">        return null;</span>
+    }
+
+    /**
+     * Checks whether the user is allowed to close this sheet.
+     *
+     * @return True if user can close the sheet.
+     */
+    public boolean isAllowClose() {
+<span class="fc" id="L283">        return allowClose;</span>
+    }
+
+    /**
+     * Sets whether the user is able to close this sheet.  Default is true.  If you set
+     * this value to false, then there will be no close button, and pressing outside of the sheet
+     * will have no effect.
+     *
+     * &lt;p&gt;Child sheets will assume the settings of the parent.  The back button will still work,
+     * but the top level sheet will not include a close button.&lt;/p&gt;
+     *
+     * @param allowClose True to allow user to close the sheet.  False to prevent it.
+     * @since 7.0
+     */
+    public void setAllowClose(boolean allowClose) {
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">        if (allowClose != this.allowClose) {</span>
+<span class="fc" id="L299">            this.allowClose = allowClose;</span>
+<span class="pc bpc" id="L300" title="1 of 4 branches missed.">            if (!allowClose &amp;&amp; isInitialized()) {</span>
+<span class="nc" id="L301">                form.removePointerPressedListener(formPointerListener);</span>
+<span class="pc bpc" id="L302" title="1 of 4 branches missed.">            } else if (allowClose &amp;&amp; isInitialized()) {</span>
+<span class="nc" id="L303">                form.addPointerPressedListener(formPointerListener);</span>
+            }
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">            if (parentSheet == null) {</span>
+<span class="fc" id="L306">                backButton.setVisible(allowClose);</span>
+<span class="fc" id="L307">                backButton.setEnabled(allowClose);</span>
+            }
+        }
+<span class="fc" id="L310">    }</span>
+
+    /**
+     * Gets the content pane of the sheet.  All sheet content should be added to the content pane
+     * and not directly to the sheet.
+     *
+     * @return The content pane.
+     */
+    public Container getContentPane() {
+<span class="fc" id="L319">        return contentPane;</span>
+    }
+
+    /**
+     * Hides the back button.
+     */
+    public void hideBackButton() {
+<span class="nc" id="L326">        backButton.setVisible(false);</span>
+<span class="nc" id="L327">    }</span>
+
+    /**
+     * Shows the back button.
+     */
+    public void showBackButton() {
+<span class="nc" id="L333">        backButton.setVisible(true);</span>
+<span class="nc" id="L334">    }</span>
+
+    /**
+     * Gets the container that is rendered on the top right bar of the sheet.  Use this
+     * to add buttons and other content you wish to appear in the title bar.  Best not to
+     * overload this with too many things.
+     *
+     * @return
+     */
+    public Container getCommandsContainer() {
+<span class="nc" id="L344">        return commandsContainer;</span>
+    }
+
+    private void initUI() {
+<span class="fc" id="L348">        setLayout(new BorderLayout());</span>
+<span class="fc" id="L349">        contentPane.setSafeArea(true);</span>
+<span class="fc" id="L350">        titleBar.setSafeArea(true);</span>
+<span class="fc" id="L351">        add(BorderLayout.NORTH, titleBar);</span>
+<span class="fc bfc" id="L352" title="All 2 branches covered.">        if (parentSheet != null) {</span>
+<span class="fc" id="L353">            FontImage.setMaterialIcon(backButton, FontImage.MATERIAL_ARROW_BACK);</span>
+        }
+<span class="fc" id="L355">        add(BorderLayout.CENTER, contentPane);</span>
+<span class="fc" id="L356">        backButton.addActionListener(new ActionListener() {</span>
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L358">                back(DEFAULT_TRANSITION_DURATION);</span>
+<span class="nc" id="L359">            }</span>
+        });
+
+<span class="fc" id="L362">    }</span>
+
+    /**
+     * Shows the sheet with the default (300ms) transition duration.
+     *
+     * @see #show(int)
+     */
+    public void show() {
+<span class="fc" id="L370">        show(DEFAULT_TRANSITION_DURATION);</span>
+<span class="fc" id="L371">    }</span>
+
+    /**
+     * Shows the sheet over the current form using a slide-up transition with given duration in milliseconds.
+     *
+     * &lt;p&gt;If another sheet is currently being shown, then this will replace that sheet, and use an appropriate slide
+     * animation to adjust the size.&lt;/p&gt;
+     *
+     * @param duration The duration of the slide transition in milliseconds.
+     * @see #show()
+     */
+    public void show(final int duration) {
+
+        // We need to add some margin to the title  to prevent overlap with the
+        // back button and the commaneds.
+<span class="fc" id="L386">        int titleMargin = Math.max(</span>
+<span class="fc" id="L387">                commandsContainer.getPreferredW() + commandsContainer.getStyle().getHorizontalMargins(),</span>
+<span class="fc" id="L388">                backButton.getPreferredW() + backButton.getStyle().getHorizontalMargins()</span>
+        );
+
+        // Set the padding in the content pane to match the corner radius
+<span class="fc" id="L392">        Style s = getStyle();</span>
+<span class="fc" id="L393">        Style titleParentStyle = title.getParent().getStyle();</span>
+<span class="fc" id="L394">        titleParentStyle.setMarginLeft(titleMargin);</span>
+<span class="fc" id="L395">        titleParentStyle.setMarginRight(titleMargin);</span>
+<span class="fc" id="L396">        Border border = s.getBorder();</span>
+<span class="pc bpc" id="L397" title="1 of 2 branches missed.">        if (border instanceof RoundRectBorder) {</span>
+<span class="fc" id="L398">            RoundRectBorder b = (RoundRectBorder) border;</span>
+
+<span class="fc" id="L400">            $(contentPane).setPaddingMillimeters(b.getCornerRadius());</span>
+        }
+
+        // Deal with iPhoneX notch.
+<span class="fc" id="L404">        UIManager uim = UIManager.getInstance();</span>
+
+        // Store original padding values on first show to prevent accumulation
+<span class="fc bfc" id="L407" title="All 2 branches covered.">        if (originalPadding == null) {</span>
+<span class="fc" id="L408">            originalPadding = new int[4];</span>
+<span class="fc" id="L409">            originalPadding[0] = s.getPaddingTop();        // top</span>
+<span class="fc" id="L410">            originalPadding[1] = s.getPaddingRightNoRTL(); // right</span>
+<span class="fc" id="L411">            originalPadding[2] = s.getPaddingBottom();     // bottom</span>
+<span class="fc" id="L412">            originalPadding[3] = s.getPaddingLeftNoRTL();  // left</span>
+        } else {
+            // Check if style was reset (current padding much smaller than stored original)
+            // This can happen if the component was removed and re-added with a new style
+<span class="fc" id="L416">            int currentBottom = s.getPaddingBottom();</span>
+<span class="pc bpc" id="L417" title="3 of 4 branches missed.">            if (currentBottom &lt; originalPadding[2] / 2 &amp;&amp; currentBottom &gt;= 0) {</span>
+                // Style appears to have been reset, update our cache
+<span class="nc" id="L419">                originalPadding[0] = s.getPaddingTop();</span>
+<span class="nc" id="L420">                originalPadding[1] = s.getPaddingRightNoRTL();</span>
+<span class="nc" id="L421">                originalPadding[2] = s.getPaddingBottom();</span>
+<span class="nc" id="L422">                originalPadding[3] = s.getPaddingLeftNoRTL();</span>
+            }
+        }
+
+<span class="fc" id="L426">        Style statusBarStyle = uim.getComponentStyle(&quot;StatusBar&quot;);</span>
+<span class="fc" id="L427">        Style titleAreaStyle = uim.getComponentStyle(&quot;TitleArea&quot;);</span>
+
+<span class="fc" id="L429">        int topPadding = statusBarStyle.getPaddingTop() + statusBarStyle.getPaddingBottom() + titleAreaStyle.getPaddingTop();</span>
+<span class="fc" id="L430">        int positionInt = getPositionInt();</span>
+<span class="fc" id="L431">        Rectangle displaySafeArea = new Rectangle();</span>
+<span class="fc" id="L432">        Display.getInstance().getDisplaySafeArea(displaySafeArea);</span>
+        // Use original bottom padding to prevent accumulation
+<span class="fc" id="L434">        int bottomPadding = originalPadding[2];</span>
+<span class="fc" id="L435">        int safeAreaBottomPadding = CN.getDisplayHeight() - (displaySafeArea.getY() + displaySafeArea.getHeight());</span>
+<span class="fc" id="L436">        bottomPadding = bottomPadding + safeAreaBottomPadding;</span>
+<span class="pc bpc" id="L437" title="3 of 4 branches missed.">        if (positionInt == S || positionInt == C) {</span>
+            // For Center and South position we use margin to
+            // prevent overlap with top notch.  This looks better as overlap is only
+            // an edge case that occurs when the sheet is the full screen height.
+<span class="fc" id="L441">            $(this).setMargin(topPadding, 0, 0, 0);</span>
+<span class="fc" id="L442">            $(this).setPadding(originalPadding[0], originalPadding[1], bottomPadding, originalPadding[3]);</span>
+        } else {
+            // For other cases we use padding to prevent overlap with top notch.  This looks
+            // better as it appears that the sheet bleeds all the way to the top edge of the screen,
+            // but the content is not obscured by the notch.
+
+<span class="nc" id="L448">            $(this).setPadding(topPadding, originalPadding[1], bottomPadding, originalPadding[3]);</span>
+        }
+
+        // END Deal with iPhoneX notch
+
+<span class="fc" id="L453">        Form f = CN.getCurrentForm();</span>
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">        if (f.getAnimationManager().isAnimating()) {</span>
+<span class="nc" id="L455">            f.getAnimationManager().flushAnimation(new Runnable() {</span>
+                public void run() {
+<span class="nc" id="L457">                    show(duration);</span>
+<span class="nc" id="L458">                }</span>
+            });
+<span class="nc" id="L460">            return;</span>
+        }
+<span class="pc bpc" id="L462" title="1 of 2 branches missed.">        if (getParent() != null) {</span>
+<span class="nc" id="L463">            remove();</span>
+        }
+<span class="fc" id="L465">        Container cnt = CN.getCurrentForm().getFormLayeredPane(Sheet.class, true);</span>
+<span class="fc bfc" id="L466" title="All 2 branches covered.">        if (!(cnt.getLayout() instanceof BorderLayout)) {</span>
+<span class="fc" id="L467">            cnt.setLayout(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE));</span>
+
+<span class="fc" id="L469">            cnt.getStyle().setBgPainter(new Painter() {</span>
+                @Override
+                public void paint(Graphics g, Rectangle rect) {
+<span class="fc" id="L472">                    int alph = g.getAlpha();</span>
+<span class="fc" id="L473">                    g.setAlpha((int) (alph * 30 / 100.0));</span>
+<span class="fc" id="L474">                    g.setColor(0x0);</span>
+<span class="fc" id="L475">                    g.fillRect(rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());</span>
+<span class="fc" id="L476">                    g.setAlpha(alph);</span>
+<span class="fc" id="L477">                }</span>
+
+            });
+
+<span class="fc" id="L481">            cnt.revalidate();</span>
+
+        }
+<span class="fc bfc" id="L484" title="All 2 branches covered.">        if (cnt.getComponentCount() &gt; 0) {</span>
+<span class="fc" id="L485">            $(&quot;.Sheet&quot;, cnt).each(new ComponentClosure() {</span>
+                @Override
+                public void call(Component c) {
+<span class="pc bpc" id="L488" title="1 of 2 branches missed.">                    if (c instanceof Sheet) {</span>
+<span class="fc" id="L489">                        Sheet s = (Sheet) c;</span>
+<span class="pc bpc" id="L490" title="1 of 4 branches missed.">                        if (s.isAncestorSheetOf(Sheet.this) || s == Sheet.this) {</span>
+                            // If the sheet is an ancestor of
+                            // ours then we don't need to fire a close event
+                            // yet.  We fire it when it is closed
+                            // without possibility of returning
+                            // via a back chain
+<span class="fc" id="L496">                            return;</span>
+                        }
+<span class="fc" id="L498">                        s.fireCloseEvent(false);</span>
+
+                        // Hiding this sheet may eliminate the possibility of
+                        // its parent sheets from being shown again,
+                        // so their close events should also be fired in this case.
+<span class="fc" id="L503">                        Sheet sp = s.getParentSheet();</span>
+<span class="pc bpc" id="L504" title="1 of 2 branches missed.">                        while (sp != null) {</span>
+<span class="pc bpc" id="L505" title="1 of 2 branches missed.">                            if (sp == Sheet.this) {</span>
+<span class="fc" id="L506">                                break;</span>
+                            }
+<span class="nc bnc" id="L508" title="All 2 branches missed.">                            if (!sp.isAncestorSheetOf(Sheet.this)) {</span>
+<span class="nc" id="L509">                                sp.fireCloseEvent(false);</span>
+                            }
+<span class="nc" id="L511">                            sp = sp.getParentSheet();</span>
+
+                        }
+                    }
+
+
+<span class="fc" id="L517">                }</span>
+
+            });
+<span class="fc" id="L520">            Component existing = cnt.getComponentAt(0);</span>
+<span class="fc" id="L521">            cnt.replace(existing, this, null);</span>
+<span class="fc" id="L522">            cnt.animateLayout(duration);</span>
+<span class="fc" id="L523">        } else {</span>
+<span class="fc" id="L524">            cnt.add(getPosition(), this);</span>
+
+<span class="fc" id="L526">            this.setWidth(getPreferredW(cnt));</span>
+<span class="fc" id="L527">            this.setHeight(getPreferredH(cnt));</span>
+<span class="fc" id="L528">            this.setX(getHiddenX(cnt));</span>
+<span class="fc" id="L529">            this.setY(getHiddenY(cnt));</span>
+<span class="fc" id="L530">            cnt.animateLayout(duration);</span>
+        }
+<span class="fc" id="L532">    }</span>
+
+    /**
+     * Gets the position where the Sheet is to be displayed.
+     * One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
+     * {@link BorderLayout#WEST}. {@link BorderLayout#EAST.  Default is {@link BorderLayout#SOUTH}.
+     *
+     * @see #setPosition(java.lang.String)
+     * @see #setPosition(java.lang.String, java.lang.String)
+     */
+    public String getPosition() {
+<span class="pc bpc" id="L543" title="1 of 2 branches missed.">        if (CN.isTablet()) {</span>
+<span class="nc" id="L544">            return tabletPosition;</span>
+        }
+<span class="fc" id="L546">        return position;</span>
+    }
+
+    /**
+     * Sets the position where the Sheet is to be displayed.
+     * One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
+     * {@link BorderLayout#WEST}. {@link BorderLayout#EAST.  Default is {@link BorderLayout#SOUTH}.
+     *
+     * @param position One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
+     *                 {@link BorderLayout#WEST}. {@link BorderLayout#EAST.
+     * @see #setPosition(java.lang.String)
+     * @see #setPosition(java.lang.String, java.lang.String)
+     * @since 7.0
+     */
+    public void setPosition(String position) {
+<span class="nc bnc" id="L561" title="All 2 branches missed.">        if (CN.isTablet()) {</span>
+<span class="nc bnc" id="L562" title="All 2 branches missed.">            if (!position.equals(tabletPosition)) {</span>
+<span class="nc" id="L563">                tabletPosition = position;</span>
+<span class="nc" id="L564">                updateBorderForPosition();</span>
+            }
+        } else {
+<span class="nc bnc" id="L567" title="All 2 branches missed.">            if (!position.equals(this.position)) {</span>
+<span class="nc" id="L568">                this.position = position;</span>
+<span class="nc" id="L569">                updateBorderForPosition();</span>
+            }
+        }
+<span class="nc" id="L572">    }</span>
+
+    private void updateBorderForPosition() {
+<span class="fc" id="L575">        Border border = getStyle().getBorder();</span>
+<span class="pc bpc" id="L576" title="1 of 2 branches missed.">        if (border instanceof RoundRectBorder) {</span>
+<span class="fc" id="L577">            RoundRectBorder b = (RoundRectBorder) border;</span>
+<span class="fc" id="L578">            RoundRectBorder nb = RoundRectBorder.create();</span>
+<span class="fc" id="L579">            nb.bezierCorners(b.isBezierCorners());</span>
+<span class="fc" id="L580">            nb.bottomLeftMode(b.isBottomLeft());</span>
+<span class="fc" id="L581">            nb.bottomRightMode(b.isBottomRight());</span>
+<span class="fc" id="L582">            nb.topRightMode(b.isTopRight());</span>
+<span class="fc" id="L583">            nb.topLeftMode(b.isTopLeft());</span>
+<span class="fc" id="L584">            nb.cornerRadius(b.getCornerRadius());</span>
+<span class="fc" id="L585">            nb.shadowBlur(b.getShadowBlur());</span>
+<span class="fc" id="L586">            nb.shadowColor(b.getShadowColor());</span>
+<span class="fc" id="L587">            nb.shadowOpacity(b.getShadowOpacity());</span>
+<span class="fc" id="L588">            nb.shadowSpread(b.getShadowSpread());</span>
+<span class="fc" id="L589">            nb.shadowX(b.getShadowX());</span>
+<span class="fc" id="L590">            nb.shadowY(b.getShadowY());</span>
+<span class="fc" id="L591">            nb.strokeColor(b.getStrokeColor());</span>
+<span class="fc" id="L592">            nb.strokeOpacity(b.getStrokeOpacity());</span>
+<span class="fc" id="L593">            nb.stroke(b.getStrokeThickness(), b.isStrokeMM());</span>
+<span class="fc" id="L594">            b = nb;</span>
+<span class="pc bpc" id="L595" title="5 of 6 branches missed.">            switch (getPositionInt()) {</span>
+                case C:
+<span class="nc" id="L597">                    b.bottomRightMode(true);</span>
+<span class="nc" id="L598">                    b.bottomLeftMode(true);</span>
+<span class="nc" id="L599">                    b.topLeftMode(true);</span>
+<span class="nc" id="L600">                    b.topRightMode(true);</span>
+<span class="nc" id="L601">                    break;</span>
+                case E:
+<span class="nc" id="L603">                    b.bottomLeftMode(true);</span>
+<span class="nc" id="L604">                    b.topLeftMode(true);</span>
+<span class="nc" id="L605">                    b.topRightMode(false);</span>
+<span class="nc" id="L606">                    b.bottomRightMode(false);</span>
+<span class="nc" id="L607">                    break;</span>
+                case W:
+<span class="nc" id="L609">                    b.bottomLeftMode(false);</span>
+<span class="nc" id="L610">                    b.bottomRightMode(true);</span>
+<span class="nc" id="L611">                    b.topLeftMode(false);</span>
+<span class="nc" id="L612">                    b.topRightMode(true);</span>
+<span class="nc" id="L613">                    break;</span>
+                case S:
+<span class="fc" id="L615">                    b.topLeftMode(true);</span>
+<span class="fc" id="L616">                    b.topRightMode(true);</span>
+<span class="fc" id="L617">                    b.bottomLeftMode(false);</span>
+<span class="fc" id="L618">                    b.bottomRightMode(false);</span>
+<span class="fc" id="L619">                    break;</span>
+
+                case N:
+<span class="nc" id="L622">                    b.topLeftMode(false);</span>
+<span class="nc" id="L623">                    b.topRightMode(false);</span>
+<span class="nc" id="L624">                    b.bottomLeftMode(true);</span>
+<span class="nc" id="L625">                    b.bottomRightMode(true);</span>
+                    break;
+
+            }
+<span class="fc" id="L629">            getStyle().setBorder(b);</span>
+
+        }
+
+<span class="fc" id="L633">    }</span>
+
+    /**
+     * Sets the position where the Sheet is to be displayed.
+     * One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
+     * {@link BorderLayout#WEST}. {@link BorderLayout#EAST.  Default is {@link BorderLayout#SOUTH}.
+     *
+     * @param phonePosition  Position to use on a phone (i.e. non-tablet). One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
+     *                       {@link BorderLayout#WEST}. {@link BorderLayout#EAST.
+     * @param tabletPosition Position to use on a tablet and desktop. One of {@link BorderLayout#CENTER}, {@link BorderLayout#NORTH}, {@link BorderLayout#SOUTH},
+     *                       {@link BorderLayout#WEST}. {@link BorderLayout#EAST.
+     * @see #setPosition(java.lang.String)
+     * @see #setPosition(java.lang.String, java.lang.String)
+     * @since 7.0
+     */
+    public void setPosition(String phonePosition, String tabletPosition) {
+<span class="nc" id="L649">        boolean changed = false;</span>
+<span class="nc bnc" id="L650" title="All 4 branches missed.">        if (CN.isTablet() &amp;&amp; !tabletPosition.equals(this.tabletPosition)) {</span>
+<span class="nc" id="L651">            changed = true;</span>
+<span class="nc bnc" id="L652" title="All 4 branches missed.">        } else if (!CN.isTablet() &amp;&amp; !phonePosition.equals(position)) {</span>
+<span class="nc" id="L653">            changed = true;</span>
+        }
+<span class="nc" id="L655">        position = phonePosition;</span>
+<span class="nc" id="L656">        this.tabletPosition = tabletPosition;</span>
+<span class="nc bnc" id="L657" title="All 2 branches missed.">        if (changed) {</span>
+<span class="nc" id="L658">            updateBorderForPosition();</span>
+        }
+<span class="nc" id="L660">    }</span>
+
+    /**
+     * Gets X-coordinate of the sheet when it is hidden off-screen.  This will be different
+     * depending on the position of the sheet.
+     *
+     * @param cnt The container in the FormLayeredPane where the sheet is to be rendered.
+     * @return
+     */
+    private int getHiddenX(Container cnt) {
+<span class="pc bpc" id="L670" title="4 of 5 branches missed.">        switch (getPositionInt()) {</span>
+            case S:
+            case N:
+<span class="fc" id="L673">                return 0;</span>
+            case C:
+<span class="nc" id="L675">                return (cnt.getWidth() - getPreferredW(cnt)) / 2;</span>
+            case E:
+<span class="nc" id="L677">                return cnt.getWidth();</span>
+            case W:
+<span class="nc" id="L679">                return -getPreferredW(cnt);</span>
+        }
+<span class="nc" id="L681">        return 0;</span>
+    }
+
+    /**
+     * Gets Y-coordinate of the sheet when it is hidden off-screen.  This will be different
+     * depending on the position of the sheet.
+     *
+     * @param cnt The container in the FormLayeredPane where the sheet is to be rendered.
+     * @return
+     */
+    private int getHiddenY(Container cnt) {
+<span class="pc bpc" id="L692" title="3 of 4 branches missed.">        switch (getPositionInt()) {</span>
+            case S:
+            case C:
+<span class="fc" id="L695">                return cnt.getHeight();</span>
+            case W:
+            case E:
+<span class="nc" id="L698">                return 0;</span>
+            case N:
+<span class="nc" id="L700">                return -getPreferredH(cnt);</span>
+        }
+<span class="nc" id="L702">        return 0;</span>
+    }
+
+    /**
+     * Gets the preferred width of the sheet.  Will depend on where it is rendered.  If position is CENTER,
+     * then the preferred width will be the natural preferred width of the sheet.  But NORTH or SOUTH,
+     * the preferred width will be the full container width.
+     *
+     * @param cnt The container in the FormLayeredPane where the sheet is to be rendered.
+     * @return
+     */
+    private int getPreferredW(Container cnt) {
+<span class="pc bpc" id="L714" title="2 of 3 branches missed.">        switch (getPositionInt()) {</span>
+            case N:
+            case S:
+<span class="fc" id="L717">                return cnt.getWidth();</span>
+            case C:
+            case W:
+            case E:
+<span class="nc" id="L721">                return Math.min(getPreferredW() + (backButton.getPreferredW() + backButton.getStyle().getHorizontalMargins()) * 2, cnt.getWidth());</span>
+
+
+        }
+<span class="nc" id="L725">        return getPreferredW();</span>
+
+    }
+
+    private int getPositionInt() {
+<span class="fc" id="L730">        String pos = getPosition();</span>
+<span class="pc bpc" id="L731" title="1 of 2 branches missed.">        if (BorderLayout.NORTH.equals(pos)) {</span>
+<span class="nc" id="L732">            return N;</span>
+        }
+<span class="pc bpc" id="L734" title="1 of 2 branches missed.">        if (BorderLayout.SOUTH.equals(pos)) {</span>
+<span class="fc" id="L735">            return S;</span>
+        }
+<span class="nc bnc" id="L737" title="All 2 branches missed.">        if (BorderLayout.EAST.equals(pos)) {</span>
+<span class="nc" id="L738">            return E;</span>
+        }
+<span class="nc bnc" id="L740" title="All 2 branches missed.">        if (BorderLayout.WEST.equals(pos)) {</span>
+<span class="nc" id="L741">            return W;</span>
+        }
+<span class="nc bnc" id="L743" title="All 2 branches missed.">        if (BorderLayout.CENTER.equals(pos)) {</span>
+<span class="nc" id="L744">            return C;</span>
+        }
+<span class="nc" id="L746">        return S;</span>
+    }
+
+    /**
+     * Gets the preferred height of the sheet.  Will depend on where it is rendered.  If position is CENTER, NORTH, or SOUTH
+     * then the preferred height will be the natural preferred width of the sheet.  But WEST or EAST,
+     * the preferred height will be the full container height.
+     *
+     * @param cnt The container in the FormLayeredPane where the sheet is to be rendered.
+     * @return
+     */
+    private int getPreferredH(Container cnt) {
+<span class="pc bpc" id="L758" title="1 of 2 branches missed.">        switch (getPositionInt()) {</span>
+            case W:
+            case E:
+<span class="nc" id="L761">                return cnt.getHeight();</span>
+            default:
+<span class="fc" id="L763">                return Math.min(getPreferredH(), cnt.getHeight());</span>
+        }
+    }
+
+    /**
+     * Goes back to the parent sheet with a default (300ms) slide animation.  If there
+     * is no parent sheet, then this will close the sheet.
+     *
+     * @see #back(int)
+     */
+    public void back() {
+<span class="nc" id="L774">        back(DEFAULT_TRANSITION_DURATION);</span>
+<span class="nc" id="L775">    }</span>
+
+    /**
+     * Goes back to the parent sheet with a slide animation of given duration.  If there
+     * is no parent sheet, then this will close the sheet.
+     *
+     * @param duration Duration of the slide transition in milliseconds.
+     */
+    public void back(int duration) {
+<span class="pc bpc" id="L784" title="1 of 2 branches missed.">        if (this.parentSheet != null) {</span>
+<span class="fc" id="L785">            fireBackEvent();</span>
+<span class="fc" id="L786">            this.parentSheet.show(duration);</span>
+        } else {
+<span class="nc" id="L788">            hide(duration);</span>
+        }
+<span class="fc" id="L790">    }</span>
+
+    private void hide(int duration) {
+<span class="nc" id="L793">        final Container cnt = CN.getCurrentForm().getFormLayeredPane(Sheet.class, true);</span>
+<span class="nc" id="L794">        setX(getHiddenX(cnt));</span>
+<span class="nc" id="L795">        setY(getHiddenY(cnt));</span>
+<span class="nc" id="L796">        cnt.animateUnlayout(duration, 255, new Runnable() {</span>
+            public void run() {
+<span class="nc" id="L798">                Container parent = cnt.getParent();</span>
+
+<span class="nc bnc" id="L800" title="All 4 branches missed.">                if (parent != null &amp;&amp; parent.getComponentForm() != null) {</span>
+<span class="nc" id="L801">                    cnt.remove();</span>
+<span class="nc" id="L802">                    parent.getComponentForm().revalidateLater();</span>
+<span class="nc" id="L803">                    fireCloseEvent(true);</span>
+
+
+                }
+
+<span class="nc" id="L808">            }</span>
+        });
+
+<span class="nc" id="L811">    }</span>
+
+    /**
+     * Gets the parent sheet or null if there is none.
+     *
+     * @return The parent sheet or null.
+     */
+    public Sheet getParentSheet() {
+<span class="fc" id="L819">        return parentSheet;</span>
+    }
+
+    @Override
+    protected void initComponent() {
+<span class="fc" id="L824">        super.initComponent();</span>
+<span class="fc" id="L825">        form = getComponentForm();</span>
+<span class="pc bpc" id="L826" title="2 of 4 branches missed.">        if (form != null &amp;&amp; allowClose) {</span>
+<span class="fc" id="L827">            form.addPointerPressedListener(formPointerListener);</span>
+        }
+<span class="fc" id="L829">    }</span>
+
+    @Override
+    protected void deinitialize() {
+<span class="pc bpc" id="L833" title="1 of 2 branches missed.">        if (form != null) {</span>
+<span class="fc" id="L834">            form.removePointerPressedListener(formPointerListener);</span>
+<span class="fc" id="L835">            form = null;</span>
+        }
+<span class="fc" id="L837">        super.deinitialize();</span>
+<span class="fc" id="L838">    }</span>
+
+    /**
+     * Checks if the current sheet is an ancestor sheet of the given sheet.
+     *
+     * @param sheet The sheet to check
+     * @return True if the current sheet is an ancestor of sheet.
+     * @since 7.0
+     */
+    public boolean isAncestorSheetOf(Sheet sheet) {
+<span class="fc" id="L848">        sheet = sheet.getParentSheet();</span>
+<span class="fc bfc" id="L849" title="All 2 branches covered.">        if (sheet == this) {</span>
+<span class="fc" id="L850">            return true;</span>
+<span class="pc bpc" id="L851" title="1 of 2 branches missed.">        } else if (sheet == null) {</span>
+<span class="fc" id="L852">            return false;</span>
+        } else {
+<span class="nc" id="L854">            return isAncestorSheetOf(sheet);</span>
+        }
+    }
+
+    /**
+     * Adds listener notified when the sheet is closed.  This event is only fired
+     * when the sheet is closed without the possibility of being reopened.  E.g. if a
+     * child sheet is opened (causing this sheet to be hidden), the close event won't be
+     * fired until either that child sheet is hidden (without going back),
+     * or the sheet itself is hidden, or goes back.
+     *
+     * @param l
+     * @since 7.0
+     */
+    public void addCloseListener(ActionListener l) {
+<span class="nc" id="L869">        closeListeners.addListener(l);</span>
+<span class="nc" id="L870">    }</span>
+
+    /**
+     * Removes a close listener.
+     *
+     * @param l The close listener
+     */
+    public void removeCloseListener(ActionListener l) {
+<span class="nc" id="L878">        closeListeners.removeListener(l);</span>
+<span class="nc" id="L879">    }</span>
+
+    private void fireCloseEvent(boolean parentsToo) {
+<span class="fc" id="L882">        closeListeners.fireActionEvent(new ActionEvent(this));</span>
+<span class="pc bpc" id="L883" title="3 of 4 branches missed.">        if (parentsToo &amp;&amp; parentSheet != null) {</span>
+<span class="nc" id="L884">            parentSheet.fireCloseEvent(true);</span>
+        }
+<span class="fc" id="L886">    }</span>
+
+    /**
+     * Adds listener to be notified when user goes back to the parent.  This is not
+     * fired if the sheet is simply closed.  Only if the &quot;back&quot; button is pressed,
+     *
+     * @param l Listener
+     * @since 7.0
+     */
+    public void addBackListener(ActionListener l) {
+<span class="nc" id="L896">        backListeners.addListener(l);</span>
+<span class="nc" id="L897">    }</span>
+
+    /**
+     * Removes a back listener.
+     *
+     * @param l The close listener
+     */
+    public void removeBackListener(ActionListener l) {
+<span class="nc" id="L905">        backListeners.removeListener(l);</span>
+<span class="nc" id="L906">    }</span>
+
+    private void fireBackEvent() {
+<span class="fc" id="L909">        backListeners.fireActionEvent(new ActionEvent(this));</span>
+
+<span class="fc" id="L911">    }</span>
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,649 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Font.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">Font.java</span></div><h1>Font.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.impl.CodenameOneImplementation;
+
+import java.util.HashMap;
+import java.util.Hashtable;
+
+/**
+ * &lt;p&gt;Codename One currently supports 3 font types:&lt;/p&gt;
+ * &lt;ul&gt;
+ *      &lt;li&gt;&lt;b&gt;System fonts&lt;/b&gt; - these are very simplistic builtin fonts. They work on all platforms and come
+ *                  in one of 3 sizes. However, they are ubiquitous and work in every platform in all languages.
+ *                    A system font can be created using {@link Font#createSystemFont(int, int, int)}.&lt;/li&gt;
+ *
+ *      &lt;li&gt;&lt;b&gt;TTF files&lt;/b&gt; - you can just place a TTF file in the src directory of the project and it will appear in
+ *                  the Codename One Designer as an option. You can load such a font using {@link Font#createTrueTypeFont(java.lang.String, java.lang.String)}.&lt;/li&gt;
+ *      &lt;li&gt;&lt;b&gt;Native fonts&lt;/b&gt; - these aren't supported on all platforms but generally they allow you to use a set
+ *                  of platform native good looking fonts. E.g. on Android the devices Roboto font will be used and on
+ *                  iOS Helvetica Neue will be used. You can load such a font using {@link Font#createTrueTypeFont(java.lang.String, java.lang.String)}.&lt;/li&gt;
+ * &lt;/ul&gt;
+ * &lt;p&gt;
+ *    &lt;b&gt;WARNING:&lt;/b&gt; If you use a TTF file &lt;b&gt;MAKE SURE&lt;/b&gt; not to delete the file when there &lt;b&gt;MIGHT&lt;/b&gt;
+ *          be a reference to it. This can cause hard to track down issues!&lt;br /&gt;
+ *   &lt;b&gt;IMPORTANT:&lt;/b&gt; due to copyright restrictions we cannot distribute Helvetica and thus can't simulate it.
+ *          In the simulator you will see Roboto as the fallback in some cases and not the device font unless you
+ *          are running on a Mac. Notice that the Roboto font from Google doesn't support all languages and thus
+ *          special characters might not work on the simulator but would work on the device.
+ * &lt;/p&gt;
+ *
+ * &lt;p&gt;
+ * The sample code below demonstrates a catalog of available fonts, the scr
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/1081b77246b8485856be.js&quot;&gt;&lt;/script&gt;
+ * &lt;h4&gt;The demo code on the iPad simulator on a Mac&lt;/h4&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/theme-font-catalog.png&quot; alt=&quot;The fonts running on the ipad simulator on a Mac, notice that this will look different on a PC&quot; /&gt;
+ *
+ * &lt;h4&gt;The demo code on an Android 5.1 OPO device (OnePlus One)&lt;/h4&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/theme-font-catalog-opo.png&quot; alt=&quot;The same demo running on a OnePlus One device with Android 5.1&quot; /&gt;
+ *
+ * &lt;p&gt;
+ *    The Font class also supports bitmap fonts but this support is strictly aimed at legacy applications. We no longer
+ * maintain that functionality.
+ * &lt;/p&gt;
+ */
+public class Font extends CN {
+
+<span class="fc" id="L70">    private static Font defaultFont = new Font(null);</span>
+
+<span class="fc" id="L72">    private static final Hashtable bitmapCache = new Hashtable();</span>
+
+<span class="fc" id="L74">    private static boolean enableBitmapFont = true;</span>
+<span class="fc" id="L75">    private static final HashMap&lt;String, Font&gt; derivedFontCache = new HashMap&lt;String, Font&gt;();</span>
+    private static float fontReturnedHeight;
+    private Object font;
+    private boolean ttf;
+<span class="pc" id="L79">    private float pixelSize = -1;    // for derived fonts only, the size that was requested</span>
+    private String fontUniqueId;
+
+    /**
+     * Creates a new Font
+     */
+<span class="nc" id="L85">    Font() {</span>
+<span class="nc" id="L86">    }</span>
+
+<span class="fc" id="L88">    Font(Object nativeFont) {</span>
+<span class="fc" id="L89">        font = nativeFont;</span>
+<span class="fc" id="L90">    }</span>
+
+<span class="fc" id="L92">    Font(int face, int style, int size) {</span>
+<span class="fc" id="L93">        Display d = Display.getInstance();</span>
+<span class="fc" id="L94">        CodenameOneImplementation i = d.getImplementation();</span>
+<span class="fc" id="L95">        font = i.createFont(face, style, size);</span>
+<span class="fc" id="L96">    }</span>
+
+    /**
+     * Returns a previously loaded bitmap font from cache
+     *
+     * @param fontName the font name is the logical name of the font
+     * @return the font object
+     * @see #clearBitmapCache
+     * @deprecated bitmap font functionality is now deprecated
+     */
+    public static Font getBitmapFont(String fontName) {
+<span class="nc" id="L107">        return (Font) bitmapCache.get(fontName);</span>
+    }
+
+
+    /**
+     * Bitmap fonts are cached this method allows us to flush the cache thus allows
+     * us to reload a font
+     *
+     * @deprecated bitmap font functionality is now deprecated
+     */
+    public static void clearBitmapCache() {
+<span class="nc" id="L118">        bitmapCache.clear();</span>
+<span class="nc" id="L119">    }</span>
+
+    /**
+     * Returns true if the underlying platform supports loading truetype fonts from
+     * a file.
+     *
+     * @return true if the underlying platform supports loading truetype fonts from
+     * a file
+     */
+    public static boolean isTrueTypeFileSupported() {
+<span class="fc" id="L129">        return Display.impl.isTrueTypeSupported();</span>
+    }
+
+    /**
+     * Returns true if the underlying platform allows creating a font based on a
+     * user submitted string.
+     *
+     * @return true if the underlying platform allows creating a font based on a
+     * user submitted string
+     */
+    public static boolean isCreationByStringSupported() {
+<span class="nc" id="L140">        return Display.impl.isLookupFontSupported();</span>
+    }
+
+    /**
+     * Indicates whether the implementation supports loading a font &quot;natively&quot; to handle one of the common
+     * native prefixes
+     *
+     * @return true if the &quot;native:&quot; prefix is supported by loadTrueTypeFont
+     */
+    public static boolean isNativeFontSchemeSupported() {
+<span class="fc" id="L150">        return Display.impl.isNativeFontSchemeSupported();</span>
+    }
+
+    /**
+     * Shorthand for {@code createTrueTypeFont(name, name)} which is useful
+     * for cases such as native: fonts. If a TTF file is passed this method will throw an exception!
+     *
+     * @param fontName the native font name. Notice that TTF file names are prohibited
+     * @return a font object
+     */
+    public static Font createTrueTypeFont(String fontName) {
+<span class="nc bnc" id="L161" title="All 4 branches missed.">        if (Display.getInstance().isSimulator() &amp;&amp; !fontName.startsWith(&quot;native:&quot;)) {</span>
+<span class="nc" id="L162">            throw new IllegalArgumentException(&quot;Only native: fonts are supported by this method. To load a TTF use createTrueTypeFont(String, String)&quot;);</span>
+        }
+<span class="nc" id="L164">        return createTrueTypeFont(fontName, fontName);</span>
+    }
+
+    /**
+     * Shorthand for {@code createTrueTypeFont(name, name)} &amp;amp;
+     * {@code derive(size)} which is useful for cases such as native: fonts.
+     *
+     * @param fontName the native font name
+     * @param sizeMm   the size in mm
+     * @return a font object
+     */
+    public static Font createTrueTypeFont(String fontName, float sizeMm) {
+<span class="fc" id="L176">        return createTrueTypeFont(fontName, fontName).</span>
+<span class="fc" id="L177">                derive(Display.getInstance().convertToPixels(sizeMm), STYLE_PLAIN);</span>
+    }
+
+    /**
+     * Shorthand for {@code createTrueTypeFont(name, name)} &amp;amp;
+     * {@code derive(size)} which is useful for cases such as native: fonts.
+     *
+     * @param fontName the native font name
+     * @param size     the size in the specified unit.
+     * @param sizeUnit The unit type of the size.  One of {@link com.codename1.ui.plaf.Style#UNIT_TYPE_DIPS},
+     *                 *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_PIXELS},
+     *                 *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_REM},
+     *                 *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_VW},
+     *                 *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_VH},
+     *                 *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_VMIN},
+     *                 *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_VMAX}.
+     * @return a font object
+     * @since 8.0
+     */
+    public static Font createTrueTypeFont(String fontName, float size, byte sizeUnit) {
+<span class="nc" id="L197">        return createTrueTypeFont(fontName, fontName).</span>
+<span class="nc" id="L198">                derive(Display.getInstance().convertToPixels(size, sizeUnit), STYLE_PLAIN);</span>
+    }
+
+    /**
+     * Creates a true type font with the given name/filename (font name might be different from the file name
+     * and is required by some devices e.g. iOS). The font file must reside in the src root of the project in
+     * order to be detectable. The file name should contain no slashes or any such value.&lt;br&gt;
+     * &lt;b&gt;Important&lt;/b&gt; some platforms e.g. iOS don't support changing the weight of the font and require you
+     * to use the font name matching the weight, so the weight argument to derive will be ignored!&lt;br&gt;
+     * This system also supports a special &quot;native:&quot; prefix that uses system native fonts e.g. HelveticaNeue
+     * on iOS and Roboto on Android. It supports the following types:
+     * native:MainThin, native:MainLight, native:MainRegular, native:MainBold, native:MainBlack,
+     * native:ItalicThin, native:ItalicLight, native:ItalicRegular, native:ItalicBold, native:ItalicBlack.
+     * &lt;b&gt;Important&lt;/b&gt; due to copyright restrictions we cannot distribute Helvetica and thus can't simulate it.
+     * In the simulator you will see Roboto and not the device font unless you are running on a Mac
+     *
+     * @param fontName the name of the font
+     * @param fileName the file name of the font as it appears in the src directory of the project, it MUST end with the .ttf extension!
+     * @return the font object created or null if true type fonts aren't supported on this platform
+     */
+    public static Font createTrueTypeFont(String fontName, String fileName) {
+<span class="fc" id="L219">        String alreadyLoaded = fileName + &quot;_&quot; + fontReturnedHeight + &quot;_&quot; + STYLE_PLAIN;</span>
+<span class="fc" id="L220">        Font f = derivedFontCache.get(alreadyLoaded);</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (f != null) {</span>
+<span class="fc" id="L222">            return f;</span>
+        }
+<span class="fc bfc" id="L224" title="All 2 branches covered.">        if (fontName.startsWith(&quot;native:&quot;)) {</span>
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">            if (!Display.impl.isNativeFontSchemeSupported()) {</span>
+<span class="nc" id="L226">                return null;</span>
+            }
+        } else {
+<span class="pc bpc" id="L229" title="2 of 8 branches missed.">            if (fileName != null &amp;&amp; (fileName.indexOf('/') &gt; -1 || fileName.indexOf('\\') &gt; -1 || !fileName.endsWith(&quot;.ttf&quot;))) {</span>
+<span class="fc" id="L230">                throw new IllegalArgumentException(&quot;The font file name must be relative to the root and end with ttf: &quot; + fileName);</span>
+            }
+        }
+<span class="fc" id="L233">        Object font = Display.impl.loadTrueTypeFont(fontName, fileName);</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">        if (font == null) {</span>
+<span class="fc" id="L235">            return null;</span>
+        }
+<span class="fc" id="L237">        f = new Font(font);</span>
+<span class="fc" id="L238">        f.ttf = true;</span>
+<span class="fc" id="L239">        f.fontUniqueId = fontName;</span>
+<span class="fc" id="L240">        float h = f.getHeight();</span>
+<span class="fc" id="L241">        fontReturnedHeight = h;</span>
+<span class="fc" id="L242">        derivedFontCache.put(fileName + &quot;_&quot; + h + &quot;_&quot; + Font.STYLE_PLAIN, f);</span>
+<span class="fc" id="L243">        return f;</span>
+    }
+
+    /**
+     * Creates a new font instance based on the platform specific string name of the
+     * font. This method isn't supported on some platforms.
+     *
+     * @param lookup a set of platform specific names delimited by commas, the first succefully
+     *               loaded font will be used
+     * @return newly created font or null if creation failed
+     */
+    public static Font create(String lookup) {
+        // for general convenience
+<span class="nc bnc" id="L256" title="All 2 branches missed.">        if (lookup.startsWith(&quot;native:&quot;)) {</span>
+<span class="nc" id="L257">            return createTrueTypeFont(lookup, lookup);</span>
+        }
+<span class="nc" id="L259">        Object n = Display.impl.loadNativeFont(lookup);</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">        if (n == null) {</span>
+<span class="nc" id="L261">            return null;</span>
+        }
+<span class="nc" id="L263">        return new Font(n);</span>
+    }
+
+    /**
+     * Creates a bitmap font with the given arguments and places said font in the cache
+     *
+     * @param name       the name for the font in the cache
+     * @param bitmap     a transparency map in red and black that indicates the characters
+     * @param cutOffsets character offsets matching the bitmap pixels and characters in the font
+     * @param charWidth  The width of the character when drawing... this should not be confused with
+     *                   the number of cutOffset[o + 1] - cutOffset[o]. They are completely different
+     *                   since a character can be &quot;wider&quot; and &quot;seep&quot; into the next region. This is
+     *                   especially true with italic characters all of which &quot;lean&quot; outside of their
+     *                   bounds.
+     * @param charsets   the set of characters in the font
+     * @return a font object to draw bitmap fonts
+     * @deprecated bitmap font functionality is now deprecated
+     */
+    public static Font createBitmapFont(String name, Image bitmap, int[] cutOffsets, int[] charWidth, String charsets) {
+<span class="nc" id="L282">        Font f = createBitmapFont(bitmap, cutOffsets, charWidth, charsets);</span>
+<span class="nc" id="L283">        bitmapCache.put(name, f);</span>
+<span class="nc" id="L284">        return f;</span>
+    }
+
+    /**
+     * Creates a bitmap font with the given arguments
+     *
+     * @param bitmap     a transparency map in red and black that indicates the characters
+     * @param cutOffsets character offsets matching the bitmap pixels and characters in the font
+     * @param charWidth  The width of the character when drawing... this should not be confused with
+     *                   the number of cutOffset[o + 1] - cutOffset[o]. They are completely different
+     *                   since a character can be &quot;wider&quot; and &quot;seep&quot; into the next region. This is
+     *                   especially true with italic characters all of which &quot;lean&quot; outside of their
+     *                   bounds.
+     * @param charsets   the set of characters in the font
+     * @return a font object to draw bitmap fonts
+     * @deprecated bitmap font functionality is now deprecated
+     */
+    public static Font createBitmapFont(Image bitmap, int[] cutOffsets, int[] charWidth, String charsets) {
+<span class="nc" id="L302">        return new CustomFont(bitmap, cutOffsets, charWidth, charsets);</span>
+    }
+
+    /**
+     * Creates a system native font in a similar way to common MIDP fonts
+     *
+     * @param face  One of FACE_SYSTEM, FACE_PROPORTIONAL, FACE_MONOSPACE
+     * @param style one of STYLE_PLAIN, STYLE_ITALIC, STYLE_BOLD
+     * @param size  One of SIZE_SMALL, SIZE_MEDIUM, SIZE_LARGE
+     * @return A newly created system font instance
+     */
+    public static Font createSystemFont(int face, int style, int size) {
+<span class="fc" id="L314">        return new Font(face, style, size);</span>
+    }
+
+    /**
+     * Return the global default font instance
+     *
+     * @return the global default font instance
+     */
+    public static Font getDefaultFont() {
+<span class="fc" id="L323">        return defaultFont;</span>
+    }
+
+    /**
+     * Sets the global default font instance
+     *
+     * @param f the global default font instance
+     */
+    public static void setDefaultFont(Font f) {
+<span class="nc bnc" id="L332" title="All 2 branches missed.">        if (f != null) {</span>
+<span class="nc" id="L333">            defaultFont = f;</span>
+        }
+<span class="nc" id="L335">    }</span>
+
+    /**
+     * Indicates whether bitmap fonts should be enabled when loading or
+     * the fallback system font should be used instead. This allows easy toggling
+     * of font loading.
+     *
+     * @return true by default indicating that bitmap font loading is enabled
+     */
+    public static boolean isBitmapFontEnabled() {
+<span class="nc" id="L345">        return enableBitmapFont;</span>
+    }
+
+    /**
+     * Indicates whether bitmap fonts should be enabled by default when loading or
+     * the fallback system font should be used instead. This allows easy toggling
+     * of font loading.
+     *
+     * @param enabled true to enable bitmap font loading (if they exist in the resource)
+     */
+    public static void setBitmapFontEnabled(boolean enabled) {
+<span class="nc" id="L356">        enableBitmapFont = enabled;</span>
+<span class="nc" id="L357">    }</span>
+
+    /**
+     * Creates a font based on this truetype font with the given pixel, &lt;b&gt;WARNING&lt;/b&gt;! This method
+     * will only work in the case of truetype fonts!&lt;br&gt;
+     * &lt;b&gt;Important&lt;/b&gt; some platforms e.g. iOS don't support changing the weight of the font and require you
+     * to use the font name matching the weight, so the weight argument to derive will be ignored!
+     *
+     * @param size     the size of the font in the specified unit type.
+     * @param weight   PLAIN, BOLD or ITALIC weight based on the constants in this class
+     * @param unitType The unit type of the size.  One of {@link com.codename1.ui.plaf.Style#UNIT_TYPE_DIPS},
+     *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_PIXELS},
+     *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_REM},
+     *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_VW},
+     *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_VH},
+     *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_VMIN},
+     *                 {@link com.codename1.ui.plaf.Style#UNIT_TYPE_VMAX}.
+     * @return scaled font instance
+     * @since 8.0
+     */
+    public Font derive(float size, int weight, byte unitType) {
+<span class="nc" id="L378">        return derive(Display.getInstance().convertToPixels(size, unitType), weight);</span>
+    }
+
+    /**
+     * Creates a font based on this truetype font with the given pixel, &lt;b&gt;WARNING&lt;/b&gt;! This method
+     * will only work in the case of truetype fonts!&lt;br&gt;
+     * &lt;b&gt;Important&lt;/b&gt; some platforms e.g. iOS don't support changing the weight of the font and require you
+     * to use the font name matching the weight, so the weight argument to derive will be ignored!
+     *
+     * @param sizePixels the size of the font in pixels
+     * @param weight     PLAIN, BOLD or ITALIC weight based on the constants in this class
+     * @return scaled font instance
+     */
+    public Font derive(float sizePixels, int weight) {
+<span class="fc bfc" id="L392" title="All 2 branches covered.">        if (fontUniqueId != null) {</span>
+            // derive should recycle instances of Font to allow smarter caching and logic on the native side of the fence
+<span class="fc" id="L394">            String key = fontUniqueId + &quot;_&quot; + sizePixels + &quot;_&quot; + weight;</span>
+<span class="fc" id="L395">            Font f = derivedFontCache.get(key);</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">            if (f != null) {</span>
+<span class="fc" id="L397">                return f;</span>
+            }
+<span class="fc" id="L399">            f = new Font(Display.impl.deriveTrueTypeFont(font, sizePixels, weight));</span>
+<span class="fc" id="L400">            f.pixelSize = sizePixels;</span>
+<span class="fc" id="L401">            f.fontUniqueId = fontUniqueId;</span>
+<span class="fc" id="L402">            f.ttf = true;</span>
+<span class="fc" id="L403">            derivedFontCache.put(key, f);</span>
+<span class="fc" id="L404">            return f;</span>
+        } else {
+            // not sure if this ever happens but don't want to break that code
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">            if (font != null) {</span>
+<span class="fc" id="L408">                Font f = new Font(Display.impl.deriveTrueTypeFont(font, sizePixels, weight));</span>
+<span class="fc" id="L409">                f.pixelSize = sizePixels;</span>
+<span class="fc" id="L410">                f.ttf = true;</span>
+<span class="fc" id="L411">                return f;</span>
+            } else {
+<span class="nc bnc" id="L413" title="All 2 branches missed.">                if (!ttf) {</span>
+<span class="nc" id="L414">                    throw new IllegalArgumentException(&quot;Cannot derive font &quot; + this + &quot; because it is not a truetype font&quot;);</span>
+                } else {
+<span class="nc" id="L416">                    throw new IllegalArgumentException(&quot;Cannot derive font &quot; + this + &quot; because its native font representation is null.&quot;);</span>
+                }
+            }
+
+        }
+    }
+
+    /**
+     * Indicates if this is a TTF native font that can be derived and manipulated. This is true for a font loaded from
+     * file (TTF) or using the native: font name
+     *
+     * @return true if this is a native font
+     */
+    public boolean isTTFNativeFont() {
+<span class="fc" id="L430">        return ttf;</span>
+    }
+
+    /**
+     * Increase the contrast of the bitmap font for rendering on top of a surface
+     * whose color is darker. This is useful when drawing anti-aliased bitmap fonts using a light color
+     * (e.g. white) on top of a dark surface (e.g. black), the font often breaks down if its contrast is not
+     * increased due to the way alpha blending appears to the eye.
+     * &lt;p&gt;Notice that this method only works in one way, contrast cannot be decreased
+     * properly in a font and it should be cleared and reloaed with a Look and Feel switch.
+     *
+     * @param value the value to increase
+     * @deprecated bitmap font functionality is now deprecated
+     */
+    public void addContrast(byte value) {
+<span class="nc" id="L445">    }</span>
+
+    /**
+     * Return the width of the given characters in this font instance
+     *
+     * @param ch     array of characters
+     * @param offset characters offsets
+     * @param length characters length
+     * @return the width of the given characters in this font instance
+     */
+    public int charsWidth(char[] ch, int offset, int length) {
+<span class="fc" id="L456">        return Display.impl.charsWidth(font, ch, offset, length);</span>
+    }
+
+    /**
+     * Return the width of the given string subset in this font instance
+     *
+     * @param str    the given string
+     * @param offset the string offset
+     * @param len    the len od string
+     * @return the width of the given string subset in this font instance
+     */
+    public int substringWidth(String str, int offset, int len) {
+<span class="fc" id="L468">        return Display.impl.stringWidth(font, str.substring(offset, offset + len));</span>
+    }
+
+    /**
+     * Return the width of the given string in this font instance
+     *
+     * @param str the given string     *
+     * @return the width of the given string in this font instance
+     */
+    public int stringWidth(String str) {
+        // this happens often for icons without text and can cost a bit more in the native platform
+<span class="fc bfc" id="L479" title="All 4 branches covered.">        if (str == null || str.length() == 0) {</span>
+<span class="fc" id="L480">            return 0;</span>
+        }
+        // Its common to use a space character to create a label that takes up space but the value
+        // of string width in this case becomes less important
+<span class="fc bfc" id="L484" title="All 2 branches covered.">        if (str == &quot; &quot;) {</span>
+<span class="fc" id="L485">            return 5;</span>
+        }
+<span class="fc" id="L487">        return Display.impl.stringWidth(font, str);</span>
+    }
+
+    /**
+     * Return the width of the specific character when rendered alone
+     *
+     * @param ch the specific character
+     * @return the width of the specific character when rendered alone
+     */
+    public int charWidth(char ch) {
+<span class="fc" id="L497">        return Display.impl.charWidth(font, ch);</span>
+    }
+
+    /**
+     * Return the total height of the font
+     *
+     * @return the total height of the font
+     */
+    public int getHeight() {
+<span class="fc" id="L506">        return Display.impl.getHeight(font);</span>
+    }
+
+    /**
+     * Draw the given char using the current font and color in the x,y
+     * coordinates.
+     *
+     * @param g         the graphics object
+     * @param character the given character
+     * @param x         the x coordinate to draw the char
+     * @param y         the y coordinate to draw the char
+     */
+    void drawChar(Graphics g, char character, int x, int y) {
+<span class="nc" id="L519">    }</span>
+
+    /**
+     * Draw the given char array using the current font and color in the x,y
+     * coordinates
+     *
+     * @param g   the graphics object
+     * @param str the given string
+     * @param x   the x coordinate to draw the string
+     * @param y   the y coordinate to draw the string
+     */
+    void drawString(Graphics g, String str, int x, int y) {
+<span class="nc" id="L531">    }</span>
+
+    /**
+     * Draw the given char array using the current font and color in the x,y
+     * coordinates
+     *
+     * @param g      the graphics object
+     * @param data   the given char array
+     * @param offset the offset in the given char array
+     * @param length the number of chars to draw
+     * @param x      the x coordinate to draw the char
+     * @param y      the y coordinate to draw the char
+     */
+    void drawChars(Graphics g, char[] data, int offset, int length, int x, int y) {
+<span class="nc" id="L545">    }</span>
+
+    /**
+     * Return Optional operation returning the font face for system fonts
+     *
+     * @return Optional operation returning the font face for system fonts
+     */
+    public int getFace() {
+<span class="fc" id="L553">        return Display.impl.getFace(font);</span>
+    }
+
+    /**
+     * Return Optional operation returning the font size for system fonts
+     *
+     * @return Optional operation returning the font size for system fonts
+     */
+    public int getSize() {
+<span class="fc" id="L562">        return Display.impl.getSize(font);</span>
+    }
+
+    /**
+     * Return Optional operation returning the font style for system fonts
+     *
+     * @return Optional operation returning the font style for system fonts
+     */
+    public int getStyle() {
+<span class="fc" id="L571">        return Display.impl.getStyle(font);</span>
+    }
+
+    /**
+     * Returns a string containing all the characters supported by this font.
+     * Will return null for system fonts.
+     *
+     * @return String containing the characters supported by a bitmap font or
+     * null otherwise.
+     */
+    public String getCharset() {
+<span class="fc" id="L582">        return null;</span>
+    }
+
+    /**
+     * Returns the internal implementation specific font object
+     *
+     * @return platform specific font object for use by implementation classes or native code
+     */
+    public Object getNativeFont() {
+<span class="fc" id="L591">        return font;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean equals(Object o) {
+<span class="fc bfc" id="L598" title="All 2 branches covered.">        if (this == o) {</span>
+<span class="fc" id="L599">            return true;</span>
+        }
+<span class="pc bpc" id="L601" title="1 of 2 branches missed.">        if (!(o instanceof Font)) {</span>
+<span class="nc" id="L602">            return false;</span>
+        }
+<span class="fc" id="L604">        Font f = (Font) o;</span>
+<span class="fc bfc" id="L605" title="All 4 branches covered.">        if (ttf || f.ttf) {</span>
+<span class="pc bpc" id="L606" title="1 of 4 branches missed.">            if (!ttf || !f.ttf) {</span>
+<span class="fc" id="L607">                return false;</span>
+            }
+<span class="pc bpc" id="L609" title="1 of 2 branches missed.">            if (font == null) {</span>
+<span class="nc bnc" id="L610" title="All 2 branches missed.">                return f.font == null;</span>
+            }
+<span class="fc" id="L612">            return font.equals(f.font);</span>
+        }
+<span class="pc bpc" id="L614" title="1 of 2 branches missed.">        if (f.getClass() != getClass()) {</span>
+<span class="nc" id="L615">            return false;</span>
+        }
+<span class="pc bpc" id="L617" title="3 of 6 branches missed.">        return f.getFace() == getFace() &amp;&amp; f.getSize() == getSize() &amp;&amp; f.getStyle() == getStyle();</span>
+    }
+
+    /**
+     * The ascent is the amount by which the character ascends above the baseline.
+     *
+     * @return the ascent in pixels
+     */
+    public int getAscent() {
+<span class="fc" id="L626">        return Display.impl.getFontAscent(font);</span>
+    }
+
+    /**
+     * The descent is the amount by which the character descends below the baseline
+     *
+     * @return the descent in pixels
+     */
+    public int getDescent() {
+<span class="nc" id="L635">        return Display.impl.getFontDescent(font);</span>
+    }
+
+    /**
+     * Returns the size with which the font object was created in case of truetype fonts/derived fonts. This
+     * is useful since a platform might change things slightly based on platform constraints but this value should
+     * be 100% consistent
+     *
+     * @return the size requested in the derive method
+     */
+    public float getPixelSize() {
+<span class="fc" id="L646">        return pixelSize;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

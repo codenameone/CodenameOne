@@ -1,0 +1,382 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CustomFont.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">CustomFont.java</span></div><h1>CustomFont.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui;
+
+import java.util.Hashtable;
+
+
+/**
+ * Implements a bitmap font that uses an image and sets of offsets to draw a font
+ * with a given character set.
+ *
+ * @author Shai Almog
+ */
+class CustomFont extends Font {
+    /**
+     * Keep five colors in cache by default to allow faster selection colors
+     */
+    private static final int COLOR_CACHE_SIZE = 5;
+    // package protected for the resource editor
+    Image cache;
+    /**
+     * The offset in which to cut the character from the bitmap
+     */
+    int[] cutOffsets;
+    /**
+     * The width of the character when drawing... this should not be confused with
+     * the number of cutOffset[o + 1] - cutOffset[o]. They are completely different
+     * since a character can be &quot;wider&quot; and &quot;seep&quot; into the next region. This is
+     * especially true with italic characters all of which &quot;lean&quot; outside of their
+     * bounds.
+     */
+    int[] charWidth;
+<span class="nc" id="L54">    private final Hashtable colorCache = new Hashtable();</span>
+    private final String charsets;
+    private int color;
+    private final int imageWidth;
+    private final int imageHeight;
+    private Object imageArrayRef;
+
+
+    /**
+     * Creates a bitmap font with the given arguments
+     *
+     * @param bitmap     a transparency map in red and black that indicates the characters
+     * @param cutOffsets character offsets matching the bitmap pixels and characters in the font
+     * @param charWidth  The width of the character when drawing... this should not be confused with
+     *                   the number of cutOffset[o + 1] - cutOffset[o]. They are completely different
+     *                   since a character can be &quot;wider&quot; and &quot;seep&quot; into the next region. This is
+     *                   especially true with italic characters all of which &quot;lean&quot; outside of their
+     *                   bounds.
+     * @param charsets   the set of characters in the font
+     * @return a font object to draw bitmap fonts
+     */
+<span class="nc" id="L75">    public CustomFont(Image bitmap, int[] cutOffsets, int[] charWidth, String charsets) {</span>
+<span class="nc" id="L76">        this.cutOffsets = cutOffsets;</span>
+<span class="nc" id="L77">        this.charWidth = charWidth;</span>
+<span class="nc" id="L78">        this.charsets = charsets;</span>
+<span class="nc" id="L79">        imageWidth = bitmap.getWidth();</span>
+<span class="nc" id="L80">        imageHeight = bitmap.getHeight();</span>
+<span class="nc" id="L81">        int[] imageArray = new int[imageWidth * imageHeight];</span>
+
+        // default to black colored font
+<span class="nc" id="L84">        bitmap.getRGB(imageArray, 0, 0, 0, imageWidth, imageHeight);</span>
+<span class="nc" id="L85">        int ilen = imageArray.length;</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        for (int iter = 0; iter &lt; ilen; iter++) {</span>
+            // extract the red component from the font image
+            // shift the alpha 8 bits to the left
+            // apply the alpha to the image
+<span class="nc" id="L90">            imageArray[iter] = ((imageArray[iter] &amp; 0xff0000) &lt;&lt; 8);</span>
+        }
+<span class="nc" id="L92">        cache = Image.createImage(imageArray, imageWidth, imageHeight);</span>
+<span class="nc" id="L93">        imageArrayRef = imageArray;</span>
+<span class="nc" id="L94">    }</span>
+
+    private int[] getImageArray() {
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (imageArrayRef != null) {</span>
+<span class="nc" id="L98">            return (int[]) imageArrayRef;</span>
+        }
+<span class="nc" id="L100">        int[] a = cache.getRGBCached();</span>
+
+<span class="nc" id="L102">        imageArrayRef = a;</span>
+<span class="nc" id="L103">        return a;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int charWidth(char ch) {
+<span class="nc" id="L110">        int i = charsets.indexOf(ch);</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        if (i &lt; 0) {</span>
+<span class="nc" id="L112">            return 0;</span>
+        }
+<span class="nc" id="L114">        return charWidth[i];</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getHeight() {
+<span class="nc" id="L121">        return imageHeight;</span>
+    }
+
+    private boolean checkCacheCurrentColor(int newColor) {
+        //TODO: perhaps instead of the need to create new Integers 
+        //use an IntHashTable class I have such class to donate or any other open source class
+<span class="nc" id="L127">        Integer currentColor = Integer.valueOf(color);</span>
+<span class="nc" id="L128">        Integer newColorKey = Integer.valueOf(newColor);</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (colorCache.get(currentColor) == null) {</span>
+<span class="nc" id="L130">            colorCache.put(currentColor, cache);</span>
+        }
+<span class="nc" id="L132">        color = newColor;</span>
+<span class="nc" id="L133">        Object newCache = colorCache.get(newColorKey);</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        if (newCache != null) {</span>
+<span class="nc" id="L135">            Image i = (Image) newCache;</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">            if (i != null) {</span>
+<span class="nc" id="L137">                cache = i;</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">                if (colorCache.size() &gt; COLOR_CACHE_SIZE) {</span>
+                    // remove a random cache element
+<span class="nc" id="L140">                    colorCache.remove(colorCache.keys().nextElement());</span>
+                }
+<span class="nc" id="L142">                return true;</span>
+            } else {
+<span class="nc" id="L144">                colorCache.remove(newColorKey);</span>
+            }
+        }
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        if (colorCache.size() &gt; COLOR_CACHE_SIZE) {</span>
+            // remove a random cache element
+<span class="nc" id="L149">            colorCache.remove(colorCache.keys().nextElement());</span>
+        }
+<span class="nc" id="L151">        return false;</span>
+    }
+
+    private void initColor(Graphics g) {
+<span class="nc" id="L155">        int newColor = g.getColor();</span>
+
+<span class="nc bnc" id="L157" title="All 4 branches missed.">        if (newColor != color &amp;&amp; !checkCacheCurrentColor(newColor)) {</span>
+<span class="nc" id="L158">            color = newColor &amp; 0xffffff;</span>
+<span class="nc" id="L159">            int[] imageArray = getImageArray();</span>
+<span class="nc" id="L160">            int ilen = imageArray.length;</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">            for (int iter = 0; iter &lt; ilen; iter++) {</span>
+                // extract the red component from the font image
+                // shift the alpha 8 bits to the left
+                // apply the alpha to the image
+<span class="nc" id="L165">                imageArray[iter] = color | (imageArray[iter] &amp; 0xff000000);</span>
+            }
+<span class="nc" id="L167">            cache = Image.createImage(imageArray, imageWidth, imageHeight);</span>
+        }
+<span class="nc" id="L169">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    void drawChar(Graphics g, char character, int x, int y) {
+<span class="nc" id="L175">        int clipX = g.getClipX();</span>
+<span class="nc" id="L176">        int clipY = g.getClipY();</span>
+<span class="nc" id="L177">        int clipWidth = g.getClipWidth();</span>
+<span class="nc" id="L178">        int clipHeight = g.getClipHeight();</span>
+        //g.pushClip();
+<span class="nc" id="L180">        int i = charsets.indexOf(character);</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        if (i &gt; -1) {</span>
+<span class="nc" id="L182">            initColor(g);</span>
+
+            // draw region is flaky on some devices, use setClip instead
+<span class="nc" id="L185">            g.clipRect(x, y, charWidth[i], imageHeight);</span>
+<span class="nc" id="L186">            g.drawImage(cache, x - cutOffsets[i], y);</span>
+            //g.drawRegion(cache, cutOffsets[i], 0, charWidth[i], imageHeight, x, y);
+        }
+
+        // restore the clip
+<span class="nc" id="L191">        g.setClip(clipX, clipY, clipWidth, clipHeight);</span>
+        //g.popClip();
+<span class="nc" id="L193">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addContrast(byte value) {
+<span class="nc" id="L199">        int[] imageArray = getImageArray();</span>
+<span class="nc" id="L200">        int ilen = imageArray.length;</span>
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        for (int iter = 0; iter &lt; ilen; iter++) {</span>
+<span class="nc" id="L202">            int alpha = (imageArray[iter] &gt;&gt; 24) &amp; 0xff;</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">            if (alpha != 0) {</span>
+<span class="nc" id="L204">                alpha = Math.min(alpha + value, 255);</span>
+<span class="nc" id="L205">                imageArray[iter] = ((alpha &lt;&lt; 24) &amp; 0xff000000) | color;</span>
+            }
+        }
+<span class="nc" id="L208">    }</span>
+
+    /**
+     * Draw the given char array using the current font and color in the x,y
+     * coordinates
+     *
+     * @param g   the graphics object
+     * @param str the given string
+     * @param x   the x coordinate to draw the string
+     * @param y   the y coordinate to draw the string
+     */
+    void drawString(Graphics g, String str, int x, int y) {
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        if (Display.getInstance().isBidiAlgorithm()) {</span>
+<span class="nc" id="L221">            int slen = str.length();</span>
+<span class="nc bnc" id="L222" title="All 2 branches missed.">            for (int i = 0; i &lt; slen; i++) {</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">                if (Display.getInstance().isRTL(str.charAt(i))) {</span>
+<span class="nc" id="L224">                    str = Display.getInstance().convertBidiLogicalToVisual(str);</span>
+<span class="nc" id="L225">                    break;</span>
+                }
+            }
+        }
+<span class="nc" id="L229">        initColor(g);</span>
+<span class="nc" id="L230">        int clipX = g.getClipX();</span>
+<span class="nc" id="L231">        int clipY = g.getClipY();</span>
+<span class="nc" id="L232">        int clipWidth = g.getClipWidth();</span>
+<span class="nc" id="L233">        int clipHeight = g.getClipHeight();</span>
+
+<span class="nc bnc" id="L235" title="All 4 branches missed.">        if (clipY &lt;= y + getHeight() &amp;&amp; clipY + clipHeight &gt;= y) {</span>
+            char c;
+<span class="nc" id="L237">            int slen = str.length();</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">            for (int i = 0; i &lt; slen; i++) {</span>
+<span class="nc" id="L239">                c = str.charAt(i);</span>
+<span class="nc" id="L240">                int position = charsets.indexOf(c);</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">                if (position &lt; 0) {</span>
+<span class="nc" id="L242">                    continue;</span>
+                }
+                // draw region is flaky on some devices, use setClip instead
+<span class="nc" id="L245">                g.clipRect(x, y, charWidth[position], imageHeight);</span>
+<span class="nc bnc" id="L246" title="All 4 branches missed.">                if (g.getClipWidth() &gt; 0 &amp;&amp; g.getClipHeight() &gt; 0) {</span>
+<span class="nc" id="L247">                    g.drawImage(cache, x - cutOffsets[position], y);</span>
+                }
+<span class="nc" id="L249">                x += charWidth[position];</span>
+<span class="nc" id="L250">                g.setClip(clipX, clipY, clipWidth, clipHeight);</span>
+            }
+        }
+<span class="nc" id="L253">    }</span>
+
+    /**
+     * Override this frequently used method for a slight performance boost...
+     *
+     * @param g      the component graphics
+     * @param data   the chars to draw
+     * @param offset the offset to draw the chars
+     * @param length the length of chars
+     * @param x      the x coordinate to draw the chars
+     * @param y      the y coordinate to draw the chars
+     */
+    void drawChars(Graphics g, char[] data, int offset, int length, int x, int y) {
+<span class="nc bnc" id="L266" title="All 2 branches missed.">        if (Display.getInstance().isBidiAlgorithm()) {</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">            for (int i = offset; i &lt; length; i++) {</span>
+<span class="nc bnc" id="L268" title="All 2 branches missed.">                if (Display.getInstance().isRTL(data[i])) {</span>
+<span class="nc" id="L269">                    String s = Display.getInstance().convertBidiLogicalToVisual(new String(data, offset, length));</span>
+<span class="nc" id="L270">                    data = s.toCharArray();</span>
+<span class="nc" id="L271">                    offset = 0;</span>
+<span class="nc" id="L272">                    length = s.length();</span>
+<span class="nc" id="L273">                    break;</span>
+                }
+            }
+        }
+<span class="nc" id="L277">        initColor(g);</span>
+<span class="nc" id="L278">        int clipX = g.getClipX();</span>
+<span class="nc" id="L279">        int clipY = g.getClipY();</span>
+<span class="nc" id="L280">        int clipWidth = g.getClipWidth();</span>
+<span class="nc" id="L281">        int clipHeight = g.getClipHeight();</span>
+<span class="nc bnc" id="L282" title="All 4 branches missed.">        if (clipY &lt;= y + getHeight() &amp;&amp; clipY + clipHeight &gt;= y) {</span>
+            char c;
+<span class="nc bnc" id="L284" title="All 2 branches missed.">            for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc" id="L285">                c = data[offset + i];</span>
+<span class="nc" id="L286">                int position = charsets.indexOf(c);</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">                if (position &lt; 0) {</span>
+<span class="nc" id="L288">                    continue;</span>
+                }
+                // draw region is flaky on some devices, use setClip instead
+                //g.pushClip();
+<span class="nc" id="L292">                g.clipRect(x, y, charWidth[position], imageHeight);</span>
+<span class="nc bnc" id="L293" title="All 4 branches missed.">                if (g.getClipWidth() &gt; 0 &amp;&amp; g.getClipHeight() &gt; 0) {</span>
+<span class="nc" id="L294">                    g.drawImage(cache, x - cutOffsets[position], y);</span>
+                }
+<span class="nc" id="L296">                x += charWidth[position];</span>
+                //g.popClip();
+<span class="nc" id="L298">                g.setClip(clipX, clipY, clipWidth, clipHeight);</span>
+
+            }
+        }
+<span class="nc" id="L302">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public String getCharset() {
+<span class="nc" id="L308">        return charsets;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int charsWidth(char[] ch, int offset, int length) {
+<span class="nc" id="L315">        int retVal = 0;</span>
+<span class="nc bnc" id="L316" title="All 2 branches missed.">        for (int i = 0; i &lt; length; i++) {</span>
+<span class="nc" id="L317">            retVal += charWidth(ch[i + offset]);</span>
+        }
+<span class="nc" id="L319">        return retVal;</span>
+    }
+
+
+    /**
+     * {@inheritDoc}
+     */
+    public int substringWidth(String str, int offset, int len) {
+<span class="nc" id="L327">        return charsWidth(str.toCharArray(), offset, len);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int stringWidth(String str) {
+<span class="nc bnc" id="L334" title="All 4 branches missed.">        if (str == null || str.length() == 0)</span>
+<span class="nc" id="L335">            return 0;</span>
+<span class="nc" id="L336">        return substringWidth(str, 0, str.length());</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getFace() {
+<span class="nc" id="L343">        return 0;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getSize() {
+<span class="nc" id="L350">        return 0;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getStyle() {
+<span class="nc" id="L357">        return 0;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L364" title="All 2 branches missed.">        if (o == this) {</span>
+<span class="nc" id="L365">            return true;</span>
+        }
+<span class="nc bnc" id="L367" title="All 4 branches missed.">        if (o != null &amp;&amp; o.getClass() == getClass()) {</span>
+<span class="nc" id="L368">            CustomFont f = (CustomFont) o;</span>
+<span class="nc bnc" id="L369" title="All 2 branches missed.">            if (charsets.equals(f.charsets)) {</span>
+<span class="nc" id="L370">                int clen = cutOffsets.length;</span>
+<span class="nc bnc" id="L371" title="All 2 branches missed.">                for (int iter = 0; iter &lt; clen; iter++) {</span>
+<span class="nc bnc" id="L372" title="All 2 branches missed.">                    if (cutOffsets[iter] != f.cutOffsets[iter]) {</span>
+<span class="nc" id="L373">                        return false;</span>
+                    }
+                }
+<span class="nc" id="L376">                return true;</span>
+            }
+        }
+<span class="nc" id="L379">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

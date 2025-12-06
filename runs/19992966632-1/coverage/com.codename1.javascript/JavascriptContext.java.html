@@ -1,0 +1,1021 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JavascriptContext.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.javascript</a> &gt; <span class="el_source">JavascriptContext.java</span></div><h1>JavascriptContext.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Steve Hannah/Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.javascript;
+
+import com.codename1.io.Log;
+import com.codename1.io.Util;
+import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.Display;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.BrowserNavigationCallback;
+import com.codename1.util.Callback;
+import com.codename1.util.CallbackAdapter;
+import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Map;
+import java.util.Random;
+
+/**
+ * Represents a Javascript context of a single BrowserComponent.  This provides
+ * support for executing Javascript in the BrowserComponent, registering Java
+ * callbacks to allow Javascript to call Java functions, and returning values
+ * from Javascript to Java.
+ *
+ * &lt;p&gt;
+ * &lt;strong&gt;NOTE:&lt;/strong&gt; The {@link com.codename1.javascript } package is now
+ * deprecated. The preferred method of Java/Javascript interop is to use {@link BrowserComponent#execute(java.lang.String) }, {@link BrowserComponent#execute(java.lang.String, com.codename1.util.SuccessCallback) },
+ * {@link BrowserComponent#executeAndWait(java.lang.String) }, etc.. as these
+ * work asynchronously (except in the XXXAndWait() variants, which use
+ * invokeAndBlock() to make the calls synchronously.&lt;/p&gt;
+ *
+ * &lt;p&gt;
+ * Typically you would obtain a context for a BrowserComponent via its constructor,
+ * passing the BrowserComponent to the context.&lt;/p&gt;
+ * &lt;p&gt;E.g.&lt;/p&gt;
+ * &lt;code&gt;&lt;pre&gt;
+ * WebBrowser b = new WebBrowser();
+ * BrowserComponent bc = (BrowserComponent)b.getInternal();
+ * JavascriptContext ctx = new JavascriptContext(bc);
+ * JSObject window = (JSObject)ctx.get(&quot;window&quot;);
+ * &lt;/pre&gt;&lt;/code&gt;
+ *
+ * @author shannah
+ * @deprecated Use {@link BrowserComponent#execute(java.lang.String) } directly.
+ */
+public class JavascriptContext {
+
+    /**
+     * A dummy javascript variable that is used occasionally to workaround some bugs.
+     */
+    static final String DUMMY_VAR = &quot;ca_weblite_codename1_js_JavascriptContext_DUMMY_VAR&quot;;
+    /**
+     * Javascript variable to store the return value of get() requests so that the value can be
+     * returned.
+     */
+    static final String RETURN_VAR = &quot;ca_weblite_codename1_js_JavascriptContext_RETURN_VAR&quot;;
+    /**
+     * The base name of the lookup table.  The actual name of the lookup table will have the
+     * contextId appended to it, and be stored as the member variable jsLookupTable.
+     */
+    static final String LOOKUP_TABLE = &quot;ca_weblite_codename1_js_JavascriptContext_LOOKUP_TABLE&quot;;
+    /**
+     * Flag to enable/disable logging to a debug log.
+     */
+<span class="fc" id="L89">    public static boolean DEBUG = false;</span>
+    /**
+     * Running counter to mark the context ID.  Each javascript context has its
+     * own lookup table, and this running counter allows us to generate a unique
+     * name for each lookup table.
+     */
+<span class="fc" id="L95">    private static int contextId = 0;</span>
+    /**
+     * The browser component on which this context operates.
+     *
+     * @see setBrowserComponent()
+     * @see getBrowserComponent()
+     */
+    BrowserComponent browser;
+    /**
+     * The name of the Javascript lookup table that is used to store and
+     * look up Javascript objects that have a JSObject proxy.
+     */
+    String jsLookupTable;
+
+    /**
+     * A running counter for the next object ID that is to be assigned to
+     * the next JSObject.  Each JSObject has an id associated with it which
+     * corresponds with its position in the Javascript lookup table.
+     */
+<span class="fc" id="L114">    int objectId = 0;</span>
+<span class="fc" id="L115">    long callId = 0;</span>
+<span class="fc" id="L116">    private int callbackId = 0;</span>
+    /**
+     * Listener that listens for JavascriptEvents.  A Javascript event
+     * is packaged by the JavascriptContext class in response to a
+     * BrowserNavigationCallback.
+     */
+    private final ActionListener scriptMessageListener;
+    /**
+     * A handler for navigation attempts.  This intercepts URLs of the
+     * form cn1command:... .  This is how Javascript communicates/calls
+     * methods in this context.
+     */
+    private final BrowserNavigationCallback browserNavigationCallback;
+    /**
+     * Stores the previous BrowserNavigationCallback object if one
+     * was registered on the BrowserComponent.
+     */
+    private BrowserNavigationCallback previousNavigationCallback;
+    /**
+     * Stores registered JSFunction callbacks which can be called in response
+     * to a JavascriptEvent.
+     */
+<span class="fc" id="L138">    private final Hashtable callbacks = new Hashtable();</span>
+    /**
+     * A map of JSObjects that is used for cleanup when they are no longer needed.
+     */
+<span class="fc" id="L142">    private final HashMap&lt;Integer, Object&gt; objectMap = new HashMap&lt;Integer, Object&gt;();</span>
+    /**
+     * Whenever the objectMap exceeds this size, cleanup will be called whenever retain()
+     * is called.
+     */
+<span class="fc" id="L147">    private final int objectMapThresholdSize = 500;</span>
+<span class="fc" id="L148">    private final Random cleanupRandomizer = new Random();</span>
+<span class="fc" id="L149">    private final double cleanupProbability = 0.1;</span>
+    private JSObject window;
+
+    /**
+     * Creates a Javascript context for the given BrowserComponent.
+     *
+     * @param c
+     */
+<span class="fc" id="L157">    public JavascriptContext(BrowserComponent c) {</span>
+<span class="fc" id="L158">        jsLookupTable = LOOKUP_TABLE + (contextId++);</span>
+<span class="fc" id="L159">        this.browserNavigationCallback = new NavigationCallback();</span>
+<span class="fc" id="L160">        this.scriptMessageListener = new ScriptMessageListener();</span>
+<span class="fc" id="L161">        this.setBrowserComponent(c);</span>
+<span class="fc" id="L162">    }</span>
+
+    /**
+     * Sets the BrowserComponent on which this javascript context runs.
+     *
+     * @param c The BrowserComponent on which the context runs.
+     */
+    public final void setBrowserComponent(BrowserComponent c) {
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (c != browser) {</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">            if (browser != null) {</span>
+<span class="fc" id="L172">                this.uninstall();</span>
+            }
+<span class="fc" id="L174">            browser = c;</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">            if (browser != null) {</span>
+<span class="fc" id="L176">                this.install();</span>
+
+            }
+        }
+<span class="fc" id="L180">    }</span>
+
+    /**
+     * Increments the reference count for a the javascript object wrapped by
+     * the given JSObject.  This may also trigger a cleanup of the object map if
+     * the map grows too big, or it randomly decided to perform cleanup.
+     *
+     * @param obj
+     */
+    void retain(JSObject obj) {
+<span class="fc" id="L190">        objectMap.put(Integer.valueOf(obj.objectId), Display.getInstance().createSoftWeakRef(obj));</span>
+<span class="pc bpc" id="L191" title="2 of 4 branches missed.">        if (objectMap.size() &gt; objectMapThresholdSize || cleanupRandomizer.nextDouble() &lt; cleanupProbability) {</span>
+<span class="nc" id="L192">            cleanup();</span>
+        }
+<span class="fc" id="L194">    }</span>
+
+    /**
+     * Decrements the reference count for the javascript object with the given id.
+     * This ID was assigned inside the JSObject constructor and refers to the javascript
+     * lookup table location for the javascript object.
+     *
+     * @param id The ID of the javascript object.
+     */
+    void release(int id) {
+<span class="fc" id="L204">        String ID_KEY = JSObject.ID_KEY;</span>
+<span class="fc" id="L205">        String PROP_REFCOUNT = JSObject.PROP_REFCOUNT;</span>
+<span class="fc" id="L206">        String lt = jsLookupTable;</span>
+<span class="fc" id="L207">        String p = lt + &quot;[&quot; + id + &quot;]&quot;;</span>
+<span class="fc" id="L208">        String js = &quot;var id = &quot; + id + &quot;; &quot; +</span>
+                &quot;if (typeof(id) != 'undefined' &amp;&amp; typeof(&quot; + lt + &quot;[id]) != 'undefined' &amp;&amp; &quot; + lt + &quot;[id].&quot; + ID_KEY + &quot;==id){&quot; +
+                p + &quot;.&quot; + PROP_REFCOUNT + &quot;--;&quot; +
+                &quot;if (&quot; + p + &quot;.&quot; + PROP_REFCOUNT + &quot;&lt;=0){&quot; +
+                &quot;delete &quot; + lt + &quot;[id];&quot; +
+                &quot;}&quot; +
+                &quot;}&quot;;
+<span class="fc" id="L215">        exec(js, true);</span>
+<span class="fc" id="L216">    }</span>
+
+    /**
+     * Cleans up stale references to Javascript objects.  This is triggered randomly whenever
+     * a JSObject is constructed (with a given probability threshold).  If this is never called
+     * then the JS GC won't be able to free any objects that have ever been wrapped by JSObject
+     * because they are stored in the global lookup table.
+     */
+    public void cleanup() {
+<span class="pc bpc" id="L225" title="1 of 2 branches missed.">        if (DEBUG) {</span>
+<span class="nc" id="L226">            Log.p(&quot;Cleaning up Javascript lookup table.&quot;);</span>
+        }
+<span class="fc" id="L228">        ArrayList&lt;Integer&gt; remove = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc bfc" id="L229" title="All 2 branches covered.">        for (Map.Entry&lt;Integer, Object&gt; entry : objectMap.entrySet()) {</span>
+<span class="fc" id="L230">            Integer i = entry.getKey();</span>
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">            if (Display.getInstance().extractHardRef(entry.getValue()) == null) {</span>
+<span class="fc" id="L232">                remove.add(i);</span>
+            }
+<span class="fc" id="L234">        }</span>
+
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">        if (DEBUG) {</span>
+<span class="nc" id="L237">            Log.p(&quot;Found &quot; + remove.size() + &quot; objects to remove from the Javascript lookup table.&quot;);</span>
+        }
+<span class="fc bfc" id="L239" title="All 2 branches covered.">        for (Integer i : remove) {</span>
+<span class="fc" id="L240">            release(i.intValue());</span>
+<span class="fc" id="L241">            objectMap.remove(i);</span>
+<span class="fc" id="L242">        }</span>
+<span class="fc" id="L243">    }</span>
+
+    private String exec(String js) {
+<span class="fc" id="L246">        synchronized (browser) {</span>
+<span class="fc" id="L247">            return exec(js, false);</span>
+        }
+    }
+
+    /**
+     * Executes a Javascript string and returns the string.  It is synchronized
+     * to disallow multiple threads from running javascript on the same BrowserComponent.
+     *
+     * &lt;p&gt;This is just a thin wrapper around the BrowserComponent.executeAndReturnString() method.&lt;/p&gt;
+     *
+     * @param js
+     * @return The string result of executing the Javascript string.
+     */
+    private String exec(String js, boolean async) {
+<span class="fc" id="L261">        synchronized (browser) {</span>
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">            if (DEBUG) {</span>
+<span class="nc" id="L263">                Log.p(&quot;About to execute(&quot; + async + &quot;) &quot; + js);</span>
+                //browser.execute(&quot;console.log(execute ca_weblite_codename1_js_JavascriptContext_LOOKUP_TABLE0[0])&quot;);
+            }
+<span class="fc bfc" id="L266" title="All 2 branches covered.">            if (async) {</span>
+
+<span class="fc" id="L268">                browser.execute(installCode() + &quot;;(&quot; + js + &quot;)&quot;);</span>
+<span class="fc" id="L269">                return null;</span>
+            } else {
+<span class="fc" id="L271">                return browser.executeAndReturnString(installCode() + &quot;;(&quot; + js + &quot;)&quot;);</span>
+            }
+        }
+    }
+
+    /**
+     * Uninstalls the context from the browser component.  This just includes
+     * the listeners that are registered with the BrowserComponent so that
+     * the context is informed of navigation callbacks and script message listeners.
+     *
+     * @see install()
+     */
+    private void uninstall() {
+        //browser.removeWebEventListener(&quot;shouldLoadURL&quot;, urlListener);
+<span class="fc" id="L285">        browser.setBrowserNavigationCallback(previousNavigationCallback);</span>
+<span class="fc" id="L286">        browser.removeWebEventListener(&quot;scriptMessageReceived&quot;, scriptMessageListener);</span>
+<span class="fc" id="L287">    }</span>
+
+    /**
+     * Installs the context in the current browser component.  This effectively
+     * installs listeners in the browser component so that the context can
+     * be notified of events like navigation callbacks and script message received
+     * events.
+     */
+    private void install() {
+        //browser.addWebEventListener(&quot;shouldLoadURL&quot;, urlListener);
+<span class="fc" id="L297">        previousNavigationCallback = browser.getBrowserNavigationCallback();</span>
+<span class="fc" id="L298">        browser.setBrowserNavigationCallback(browserNavigationCallback);</span>
+
+<span class="fc" id="L300">        browser.addWebEventListener(&quot;scriptMessageReceived&quot;, scriptMessageListener);</span>
+<span class="fc" id="L301">    }</span>
+
+    /**
+     * Executes a javascript string and returns the result of the execution as
+     * an appropriate object value depending on the type of value that was returned.
+     *
+     * &lt;p&gt;Return value types will depend on the Javascript type returned.  The following
+     * table shows the mappings:&lt;/p&gt;
+     * &lt;table&gt;
+     *  &lt;thead&gt;
+     *      &lt;tr&gt;&lt;th&gt;Javascript Type&lt;/th&gt;&lt;th&gt;Java Return Type&lt;/th&gt;&lt;/tr&gt;
+     *  &lt;/thead&gt;
+     *  &lt;tbody&gt;
+     *      &lt;tr&gt;&lt;td&gt;Number&lt;/td&gt;&lt;th&gt;java.lang.Double&lt;/td&gt;&lt;/tr&gt;
+     *      &lt;tr&gt;&lt;td&gt;String&lt;/td&gt;&lt;th&gt;java.lang.String&lt;/td&gt;&lt;tr&gt;
+     *      &lt;tr&gt;&lt;td&gt;Boolean&lt;/td&gt;&lt;td&gt;java.lang.Boolean&lt;/td&gt;&lt;/tr&gt;
+     *      &lt;tr&gt;&lt;td&gt;Object&lt;/td&gt;&lt;td&gt;JSObject&lt;/td&gt;&lt;/tr&gt;
+     *      &lt;tr&gt;&lt;td&gt;Function&lt;/td&gt;&lt;td&gt;JSObject&lt;/td&gt;&lt;/tr&gt;
+     *      &lt;tr&gt;&lt;td&gt;null&lt;/td&gt;&lt;td&gt;null&lt;/td&gt;&lt;/tr&gt;
+     *      &lt;tr&gt;&lt;td&gt;undefined&lt;/td&gt;&lt;td&gt;null&lt;/td&gt;&lt;/tr&gt;
+     *  &lt;/tbody&gt;
+     * &lt;/table&gt;
+     *
+     * &lt;h5&gt;Example&lt;/h5&gt;
+     * &lt;code&gt;&lt;pre&gt;
+     * //Get the window object
+     * JSObject window = (JSObject)ctx.get(&quot;window&quot;);
+     *
+     * // Create a new empty Javascript Object
+     * JSObject newObj = (JSObject)ctx.get(&quot;{}&quot;);
+     *
+     * // Get the current document body contents as a string.
+     * String html = (String)ctx.get(&quot;document.body.innerHTML&quot;);
+     *
+     * // Get a numerical result
+     * Double result = (Double)ctx.get(&quot;1+2&quot;);
+     *
+     * // Get a Javascript function object
+     * JSObject func = (JSObject)ctx.get(&quot;function(a,b){ return a+b }&quot;);
+     *
+     * // Get a boolean result
+     * Boolean res = (Boolean)ctx.get(&quot;1 &amp;lt; 2&quot;);
+     * &lt;/pre&gt;&lt;/code&gt;
+     *
+     * @param javascript The javascript to be executed.
+     * @return The result of the javascript expression.
+     */
+    public Object get(String javascript) {
+<span class="fc" id="L349">        synchronized (browser) {</span>
+
+<span class="fc" id="L351">            String returnVar = RETURN_VAR + &quot;_&quot; + (callId++);</span>
+            try {
+<span class="fc" id="L353">                String js2 = returnVar + &quot;=(&quot; + javascript + &quot;)&quot;;</span>
+<span class="fc" id="L354">                String res = exec(js2);</span>
+<span class="fc" id="L355">                String typeQuery = &quot;typeof(&quot; + returnVar + &quot;)&quot;;</span>
+<span class="fc" id="L356">                String type = browser.executeAndReturnString(typeQuery);</span>
+
+                try {
+<span class="pc bpc" id="L359" title="1 of 2 branches missed.">                    if (&quot;string&quot;.equals(type)) {</span>
+<span class="nc" id="L360">                        return res;</span>
+<span class="fc bfc" id="L361" title="All 2 branches covered.">                    } else if (&quot;number&quot;.equals(type)) {</span>
+<span class="fc" id="L362">                        return Double.valueOf(res);</span>
+<span class="fc bfc" id="L363" title="All 2 branches covered.">                    } else if (&quot;boolean&quot;.equals(type)) {</span>
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">                        return &quot;true&quot;.equals(res) ? Boolean.TRUE : Boolean.FALSE;</span>
+<span class="pc bpc" id="L365" title="3 of 4 branches missed.">                    } else if (&quot;object&quot;.equals(type) || &quot;function&quot;.equals(type)) {</span>
+<span class="fc" id="L366">                        return new JSObject(this, returnVar);</span>
+                    } else {
+<span class="nc" id="L368">                        return null;</span>
+                    }
+<span class="nc" id="L370">                } catch (Exception ex) {</span>
+
+<span class="nc" id="L372">                    Log.e(new RuntimeException(&quot;Failed to get javascript &quot; + js2 + &quot;.  The error was &quot; + ex.getMessage() + &quot;.  The result was &quot; + res + &quot;.  The type result was &quot; + type));</span>
+<span class="nc" id="L373">                    return null;</span>
+                }
+            } finally {
+<span class="pc" id="L376">                browser.execute(returnVar + &quot;=undefined&quot;);</span>
+            }
+        }
+    }
+
+    /**
+     * Returns a reference to the Javascript &quot;window&quot; object.
+     *
+     * @return The window object.
+     */
+    public JSObject getWindow() {
+<span class="pc bpc" id="L387" title="1 of 2 branches missed.">        if (window == null) {</span>
+<span class="nc" id="L388">            window = (JSObject) this.get(&quot;window&quot;);</span>
+        }
+<span class="fc" id="L390">        return window;</span>
+    }
+
+    /**
+     * Returns the result of the provided javascript expression asynchronously.
+     *
+     * @param javascript A javascript expression.
+     * @param callback   Callback to be called with the result of the expression.
+     */
+    public void getAsync(String javascript, final Callback callback) {
+<span class="fc" id="L400">        final String callbackMethod = &quot;callback$$&quot; + callbackId;</span>
+<span class="fc" id="L401">        callbackId++;</span>
+<span class="pc bpc" id="L402" title="1 of 2 branches missed.">        if (callbackId &gt; 1000) {</span>
+<span class="nc" id="L403">            callbackId = 0;</span>
+        }
+<span class="fc" id="L405">        getWindow().set(callbackMethod, new JSFunction() {</span>
+
+            public void apply(JSObject self, Object[] args) {
+<span class="fc" id="L408">                callback.onSucess(args[0]);</span>
+<span class="fc" id="L409">                getWindow().set(callbackMethod, null, true);</span>
+<span class="fc" id="L410">            }</span>
+        }, true);
+<span class="fc" id="L412">        String js2 = callbackMethod + &quot;(&quot; + javascript + &quot;)&quot;;</span>
+<span class="fc" id="L413">        exec(js2, true);</span>
+<span class="fc" id="L414">    }</span>
+
+    /**
+     * Returns the result of the provided javascript expression asynchronously.
+     *
+     * @param javascript A javascript expression.
+     * @param callback   Callback to be called with the result of the expression.
+     */
+    public void getAsync(String javascript, final SuccessCallback callback) {
+<span class="nc" id="L423">        getAsync(javascript, new CallbackAdapter() {</span>
+
+            @Override
+            public void onSucess(Object value) {
+<span class="nc" id="L427">                callback.onSucess(value);</span>
+<span class="nc" id="L428">            }</span>
+        });
+<span class="nc" id="L430">    }</span>
+
+    /**
+     * Sets a Javascript value given a compatible Java object value.  This is an abstraction
+     * upon javascript to execute &lt;code&gt;key = value&lt;/code&gt;.
+     *
+     * &lt;p&gt;The key is any Javascript expression whose result can be assigned. The value
+     * is a Java object that will be converted into a Javascript object as follows:&lt;/p&gt;
+     *
+     * &lt;table&gt;
+     *  &lt;thead&gt;
+     *      &lt;tr&gt;&lt;th&gt;Java type&lt;/th&gt;&lt;th&gt;Converted to&lt;/th&gt;&lt;/tr&gt;
+     *  &lt;/thead&gt;
+     *  &lt;tbody&gt;
+     *      &lt;tr&gt;&lt;td&gt;Double&lt;/td&gt;&lt;th&gt;Number&lt;/td&gt;&lt;/tr&gt;
+     *      &lt;tr&gt;&lt;td&gt;Integer&lt;/td&gt;&lt;th&gt;Number&lt;/td&gt;&lt;tr&gt;
+     *      &lt;tr&gt;&lt;td&gt;Float&lt;/td&gt;&lt;td&gt;Number&lt;/td&gt;&lt;/tr&gt;
+     *      &lt;tr&gt;&lt;td&gt;Long&lt;/td&gt;&lt;td&gt;Number&lt;/td&gt;&lt;/tr&gt;
+     *      &lt;tr&gt;&lt;td&gt;String&lt;/td&gt;&lt;td&gt;String&lt;/td&gt;&lt;/tr&gt;
+     *      &lt;tr&gt;&lt;td&gt;JSObject&lt;/td&gt;&lt;td&gt;Object by ref&lt;/td&gt;&lt;/tr&gt;
+     *      &lt;tr&gt;&lt;td&gt;null&lt;/td&gt;&lt;td&gt;null&lt;/td&gt;&lt;/tr&gt;
+     *  &lt;/tbody&gt;
+     * &lt;/table&gt;
+     *
+     * &lt;p&gt;Hence if you want to set a Javascript string value, you can just
+     * pass a Java string into this method and it will be converted. &lt;/p&gt;
+     *
+     * &lt;h5&gt;JSObject &quot;By Ref&quot;&lt;/h5&gt;
+     * &lt;p&gt;You may notice that if you pass a JSObject as the value parameter, the
+     * table above indicates that it is passed by reference.  A JSObject merely
+     * stores a reference to a Javascript object from a lookup table in the
+     * Javascript runtime environment.  It is this lookup that is ultimately
+     * assigned to the &quot;key&quot; when you pass a JSObject as the value.   This has
+     * the effect of setting the actual Javascript Object to this value, which
+     * is effectively a pass-by-reference scenario.&lt;/p&gt;
+     *
+     * &lt;h5&gt;Examples&lt;/h5&gt;
+     *
+     * &lt;code&gt;&lt;pre&gt;
+     * // Set the window.location.href to a new URL
+     * ctx.set(&quot;window.location.href&quot;, &quot;http://google.com&quot;);
+     *
+     * // Create a new JSObject, and set it as a property of another JSObject
+     * JSObject camera = (JSObject)ctx.get(&quot;{}&quot;);
+     * ctx.set(&quot;window.camera&quot;, camera);
+     *
+     * // Set the name of the camera via JSObject.set()
+     * camera.set(&quot;name&quot;, &quot;My Camera&quot;);
+     *
+     * // Get the camera's name via Javascript
+     * String cameraName = (String)ctx.get(&quot;window.camera.name&quot;);
+     *     // Should be &quot;My Camera&quot;
+     *
+     * // Set the camera name via context.set()
+     * ctx.set(&quot;camera.name&quot;, &quot;New name&quot;);
+     *
+     * String newName = (String)camera.get(&quot;name&quot;);
+     *     // Should be &quot;New name&quot;
+     *
+     * &lt;/pre&gt;&lt;/code&gt;
+     *
+     * @param key   A Javascript expression whose result is being assigned the value.
+     * @param value The object or value that is being assigned to the Javascript variable
+     *              on the left.
+     */
+    public void set(String key, Object value) {
+<span class="fc" id="L496">        synchronized (browser) {</span>
+
+
+<span class="fc" id="L499">            String lhs = key;</span>
+<span class="fc" id="L500">            String rhs = &quot;undefined&quot;;</span>
+<span class="fc bfc" id="L501" title="All 2 branches covered.">            if (value instanceof String) {</span>
+<span class="fc" id="L502">                String escaped = StringUtil.replaceAll((String) value, &quot;\\&quot;, &quot;\\\\&quot;);</span>
+<span class="fc" id="L503">                escaped = StringUtil.replaceAll(escaped, &quot;'&quot;, &quot;\\'&quot;);</span>
+<span class="fc" id="L504">                rhs = &quot;'&quot; + escaped + &quot;'&quot;;</span>
+<span class="pc bpc" id="L505" title="3 of 8 branches missed.">            } else if (value instanceof Integer || value instanceof Long || value instanceof Float || value instanceof Double) {</span>
+<span class="fc" id="L506">                rhs = value.toString();</span>
+<span class="pc bpc" id="L507" title="1 of 2 branches missed.">            } else if (value instanceof JSObject) {</span>
+<span class="fc" id="L508">                rhs = ((JSObject) value).toJSPointer();</span>
+<span class="nc bnc" id="L509" title="All 2 branches missed.">            } else if (value instanceof Boolean) {</span>
+<span class="nc bnc" id="L510" title="All 2 branches missed.">                rhs = ((Boolean) value).booleanValue() ? &quot;true&quot; : &quot;false&quot;;</span>
+            } else {
+<span class="nc" id="L512">                rhs = &quot;null&quot;;</span>
+            }
+
+<span class="fc" id="L515">            exec(lhs + &quot;=&quot; + rhs);</span>
+<span class="fc" id="L516">        }</span>
+<span class="fc" id="L517">    }</span>
+
+    /**
+     * Sets a Javascript value given a compatible Java object value.  This is an abstraction
+     * upon javascript to execute &lt;code&gt;key = value&lt;/code&gt;.  See  {@link #set(java.lang.String, java.lang.Object) for a full description.
+     *
+     * @param key   A Javascript expression whose result is being assigned the value.
+     * @param value The object or value that is being assigned to the Javascript variable
+     *              on the left.
+     * @param async If true, the call is made asynchronously.
+     * @see #set(java.lang.String, java.lang.Object)
+     * @see #setAsync(java.lang.String, java.lang.Object)
+     */
+    public void set(String key, Object value, boolean async) {
+<span class="nc bnc" id="L531" title="All 2 branches missed.">        if (async) {</span>
+<span class="nc" id="L532">            setAsync(key, value);</span>
+
+        } else {
+<span class="nc" id="L535">            set(key, value);</span>
+        }
+<span class="nc" id="L537">    }</span>
+
+    /**
+     * Sets a Javascript value given a compatible Java object value asynchronously.
+     *
+     * @param key   A Javascript expression whose result is being assigned the value.
+     * @param value The object or value that is being assigned to the Javascript variable
+     *              on the left.
+     * @see #set(java.lang.String, java.lang.Object)
+     */
+    public void setAsync(String key, Object value) {
+<span class="nc" id="L548">        String lhs = key;</span>
+<span class="nc" id="L549">        String rhs = &quot;undefined&quot;;</span>
+
+<span class="nc bnc" id="L551" title="All 2 branches missed.">        if (value instanceof String) {</span>
+<span class="nc" id="L552">            String escaped = StringUtil.replaceAll((String) value, &quot;\\&quot;, &quot;\\\\&quot;);</span>
+<span class="nc" id="L553">            escaped = StringUtil.replaceAll(escaped, &quot;'&quot;, &quot;\\'&quot;);</span>
+<span class="nc" id="L554">            rhs = &quot;'&quot; + escaped + &quot;'&quot;;</span>
+<span class="nc bnc" id="L555" title="All 8 branches missed.">        } else if (value instanceof Integer || value instanceof Long || value instanceof Float || value instanceof Double) {</span>
+<span class="nc" id="L556">            rhs = value.toString();</span>
+<span class="nc bnc" id="L557" title="All 2 branches missed.">        } else if (value instanceof JSObject) {</span>
+<span class="nc" id="L558">            rhs = ((JSObject) value).toJSPointer();</span>
+<span class="nc bnc" id="L559" title="All 2 branches missed.">        } else if (value instanceof Boolean) {</span>
+<span class="nc bnc" id="L560" title="All 2 branches missed.">            rhs = ((Boolean) value).booleanValue() ? &quot;true&quot; : &quot;false&quot;;</span>
+        } else {
+<span class="nc" id="L562">            rhs = &quot;null&quot;;</span>
+        }
+
+<span class="nc" id="L565">        exec(lhs + &quot;=&quot; + rhs, true);</span>
+<span class="nc" id="L566">    }</span>
+
+    /**
+     * Calls the appropriate callback method given a URL that was received
+     * from the NavigationCallback.  It is set up to accept URLs of the
+     * form cn1command:object.method?type1=value1&amp;amp;type2=value2&amp;amp;...&amp;amp;typen=valuen
+     *
+     * &lt;p&gt;This method parses the URL and converts all arguments (including the
+     * object and method) into their associated Java representations, then
+     * generates a JavascriptEvent to fire on the scriptMessageReceived
+     * browser event.&lt;/p&gt;
+     *
+     * &lt;p&gt;This method will usually be called on the native platform's GUI
+     * thread, but it dispatches the resulting JavascriptEvent on the EDT
+     * using Display.callSerially()&lt;/p&gt;
+     *
+     * @param request The URL representing the command that is being called.
+     */
+    private void dispatchCallback(final String request) {
+<span class="nc" id="L585">        Runnable r = new Runnable() {</span>
+            public void run() {
+<span class="nc" id="L587">                String command = request.substring(request.indexOf(&quot;/!cn1command/&quot;) + &quot;/!cn1command/&quot;.length());</span>
+                // Get the callback id
+<span class="nc" id="L589">                String objMethod = command.substring(0, command.indexOf(&quot;?&quot;));</span>
+<span class="nc" id="L590">                command = command.substring(command.indexOf(&quot;?&quot;) + 1);</span>
+
+<span class="nc" id="L592">                final String self = objMethod.substring(0, objMethod.indexOf(&quot;.&quot;));</span>
+<span class="nc" id="L593">                String method = objMethod.substring(objMethod.indexOf(&quot;.&quot;) + 1);</span>
+
+                // Now let's get the parameters
+<span class="nc" id="L596">                String[] keyValuePairs = Util.split(command, &quot;&amp;&quot;);</span>
+                //Vector params = new Vector();
+
+<span class="nc" id="L599">                int len = keyValuePairs.length;</span>
+<span class="nc" id="L600">                Object[] params = new Object[len];</span>
+<span class="nc bnc" id="L601" title="All 2 branches missed.">                for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L602">                    String[] parts = Util.split(keyValuePairs[i], &quot;=&quot;);</span>
+<span class="nc bnc" id="L603" title="All 2 branches missed.">                    if (parts.length &lt; 2) {</span>
+<span class="nc" id="L604">                        continue;</span>
+                    }
+<span class="nc" id="L606">                    String ptype = Util.decode(parts[0], null, true);</span>
+<span class="nc" id="L607">                    String pval = Util.decode(parts[1], null, true);</span>
+<span class="nc bnc" id="L608" title="All 4 branches missed.">                    if (&quot;object&quot;.equals(ptype) || &quot;function&quot;.equals(ptype)) {</span>
+<span class="nc" id="L609">                        params[i] = new JSObject(JavascriptContext.this, pval);</span>
+<span class="nc bnc" id="L610" title="All 2 branches missed.">                    } else if (&quot;number&quot;.equals(ptype)) {</span>
+<span class="nc" id="L611">                        params[i] = Double.valueOf(pval);</span>
+<span class="nc bnc" id="L612" title="All 2 branches missed.">                    } else if (&quot;string&quot;.equals(ptype)) {</span>
+<span class="nc" id="L613">                        params[i] = pval;</span>
+<span class="nc bnc" id="L614" title="All 2 branches missed.">                    } else if (&quot;boolean&quot;.equals(ptype)) {</span>
+<span class="nc bnc" id="L615" title="All 2 branches missed.">                        params[i] = &quot;true&quot;.equals(pval) ? Boolean.TRUE : Boolean.FALSE;</span>
+                    } else {
+<span class="nc" id="L617">                        params[i] = null;</span>
+                    }
+                }
+<span class="nc" id="L620">                JSObject selfObj = new JSObject(JavascriptContext.this, self);</span>
+
+<span class="nc" id="L622">                JavascriptEvent evt = new JavascriptEvent(selfObj, method, params);</span>
+<span class="nc" id="L623">                browser.fireWebEvent(&quot;scriptMessageReceived&quot;, evt);</span>
+<span class="nc" id="L624">            }</span>
+        };
+
+<span class="nc" id="L627">        Display.getInstance().callSerially(r);</span>
+
+
+<span class="nc" id="L630">    }</span>
+
+    /**
+     * Stock Javascript code that is included before all javascript requests to create
+     * a lookup table for the JS objects if one hasn't been created yet.
+     *
+     * @return
+     */
+    private String installCode() {
+<span class="fc" id="L639">        return &quot;if (typeof(&quot; + jsLookupTable + &quot;) == 'undefined'){&quot; + jsLookupTable + &quot;=[]}&quot;;</span>
+    }
+
+    /**
+     * Adds a JSFunction to handle calls to the specified Javascript object.  This
+     * essentially installed a Javascript proxy method that sends a message via
+     * a navigation callback to the JavascriptContext so that it can cause Java
+     * code to be executed.
+     *
+     * @param source   The Javascript object on which the callback is being registered
+     *                 as a member method.
+     * @param method   The name of the method that will be created to execute our callback.
+     * @param callback The callback that is to be executed when source.method() is
+     *                 executed in Javascript.
+     */
+    void addCallback(JSObject source, String method, JSFunction callback, boolean async) {
+<span class="fc" id="L655">        String key = source.toJSPointer() + &quot;.&quot; + method;</span>
+<span class="fc" id="L656">        callbacks.put(key, callback);</span>
+
+<span class="fc" id="L658">        String id = JSObject.ID_KEY;</span>
+        //String lookup = LOOKUP_TABLE;
+<span class="fc" id="L660">        String self = source.toJSPointer();</span>
+<span class="pc bpc" id="L661" title="1 of 2 branches missed.">        String isSimulator = Display.getInstance().isSimulator() ? &quot;true&quot; : &quot;false&quot;;</span>
+<span class="fc" id="L662">        String js = self + &quot;.&quot; + method + &quot;=function(){&quot; +</span>
+                &quot;var len=arguments.length;var url='https://www.codenameone.com/!cn1command/&quot; + self + &quot;.&quot; + method + &quot;?'; &quot; +
+                &quot;for (var i=0; i&lt;len; i++){&quot; +
+                &quot;var val = arguments[i]; var strval=val;&quot; +
+                &quot;if ( (typeof(val) == 'object') || (typeof(val) == 'function')){ &quot; +
+                &quot;var id = val.&quot; + id + &quot;; &quot; +
+                &quot;if (typeof(id)=='undefined' || typeof(&quot; + jsLookupTable + &quot;[id]) == 'undefined' || &quot; + jsLookupTable + &quot;[id].&quot; + id + &quot;!=id){&quot; +
+                jsLookupTable + &quot;.push(val); id=&quot; + jsLookupTable + &quot;.indexOf(val); Object.defineProperty(val,\&quot;&quot; + id + &quot;\&quot;,{value:id, enumerable:false});&quot; +
+                &quot;}&quot; +
+                &quot;strval='&quot; + jsLookupTable + &quot;['+id+']'&quot; +
+                &quot;}&quot; +
+                &quot;url += encodeURIComponent(typeof(val))+'='+encodeURIComponent(strval);&quot; +
+                &quot;if (i &lt; len-1){ url += '&amp;';}&quot; +
+                //&quot;} var iframe=document.createElement('iframe');iframe.src=url;document.body.appendChild(iframe)&quot;+
+                &quot;} if (window.cn1application &amp;&amp; window.cn1application.shouldNavigate) { window.cn1application.shouldNavigate(url) } else if (&quot; + isSimulator + &quot;) {window._cn1ready = window._cn1ready || []; window._cn1ready.push(function(){window.cn1application.shouldNavigate(url)});} else {window.location.href=url}&quot; +
+                //&quot;} return 56;&quot;+
+                //&quot;console.log('About to try to load '+url); var el = document.createElement('iframe'); el.setAttribute('src', url); document.body.appendChild(el); el.parentNode.removeChild(el); console.log(el); el = null&quot;+
+                &quot;}&quot;;
+        //String js2 = self+&quot;.&quot;+method+&quot;=function(){console.log('This is the alternate java native call method');}&quot;;
+<span class="fc" id="L681">        exec(js, async);</span>
+
+
+<span class="fc" id="L684">    }</span>
+
+    /**
+     * Removes a callback from a javascript object.
+     *
+     * @param source The Javascript object on which the callback is registered
+     *               as a method.
+     * @param method The name of the method that will be removed from the callback.
+     */
+    void removeCallback(JSObject source, String method, boolean async) {
+<span class="nc" id="L694">        String key = source.toJSPointer() + &quot;.&quot; + method;</span>
+<span class="nc" id="L695">        callbacks.remove(key);</span>
+<span class="nc" id="L696">        String js = &quot;delete &quot; + source.toJSPointer() + &quot;.&quot; + method;</span>
+<span class="nc" id="L697">        exec(js, async);</span>
+<span class="nc" id="L698">    }</span>
+
+    void removeCallback(JSObject source, String method) {
+<span class="nc" id="L701">        removeCallback(source, method, false);</span>
+<span class="nc" id="L702">    }</span>
+
+    /**
+     * Calls a Javascript function (encapsulated in a JSObject) with a specified
+     * Javascript Object as the &quot;this&quot; context for the function call.  Also passes
+     * a set of arguments to the method.
+     *
+     * &lt;p&gt;This operates almost exactly like the Javascript &lt;a href=&quot;https://developer.mozilla.org/en-US/docs/JavaScript/Reference/Global_Objects/Function/apply&quot;&gt;Function.apply() method&lt;/a&gt;.&lt;/p&gt;
+     *
+     * &lt;p&gt;Note that JSObject also has a couple of &lt;code&gt;call()&lt;/code&gt; methods
+     * that may be more convenient to use as they will automatically set the &quot;self&quot;
+     * parameter to the JSObject callee.  This version of the method is handy in cases
+     * where you have been passed a function (perhaps as a callback) and you need to
+     * execute that function in a particular context.&lt;/p&gt;
+     *
+     * &lt;h5&gt;Example&lt;/h5&gt;
+     *
+     * &lt;code&gt;&lt;pre&gt;
+     * // Get the Array.push method as an object
+     * JSObject push = (JSObject)ctx.get(&quot;Array.prototype.push&quot;);
+     *
+     * // Create a new array
+     * JSObject colors = (JSObject)ctx.get(&quot;['red', 'green', 'blue']&quot;);
+     *
+     * // &quot;Push&quot; a new color onto the array directly using the JSObject's call()
+     * // method
+     * colors.call(&quot;push&quot;, &quot;purple&quot;);
+     *
+     * // Alternate method using JavascriptContext.call()
+     * ctx.call(push, colors, &quot;orange&quot;);
+     *
+     * // Check size of colors array now
+     * Double size = (Double)colors.get(&quot;length&quot;);
+     *     // Should be 5.0
+     *
+     * // Get 4th color (should be purple)
+     * String purple = (String)colors.get(3);
+     *
+     * // Get 5th color (should be orange)
+     * String orange = (String)colors.get(4);
+     * &lt;/pre&gt;&lt;/code&gt;
+     *
+     * @param func   The Javascript function object that is being called.
+     * @param self   Javascript Object that should act as &quot;this&quot; for the function call.
+     * @param params The parameters that should be passed to the function.  These
+     *               parameters should be passed as Java objects but will be converted into their
+     *               associated Javascript version.
+     * @return The result of the function call.  Javascript results will be automatically
+     * converted to their associated Java types.
+     */
+    public Object call(JSObject func, JSObject self, Object[] params) {
+<span class="nc" id="L753">        return call(func.toJSPointer(), self, params);</span>
+    }
+
+    /**
+     * Calls a Javascript function (encapsulated in a JSObject) with a specified
+     * Javascript Object as the &quot;this&quot; context for the function call.
+     *
+     * @param func     The Javascript function object that is being called.
+     * @param self     Javascript Object that should act as &quot;this&quot; for the function call.
+     * @param params   The parameters that should be passed to the function.  These
+     *                 parameters should be passed as Java objects but will be converted into their
+     *                 associated Javascript version.
+     * @param callback The callback to pass the return value to.
+     */
+    public void callAsync(JSObject func, JSObject self, Object[] params, Callback callback) {
+<span class="nc" id="L768">        callAsync(func.toJSPointer(), self, params, callback);</span>
+<span class="nc" id="L769">    }</span>
+
+    /**
+     * Calls a Javascript function (encapsulated in a JSObject) with a specified
+     * Javascript Object as the &quot;this&quot; context for the function call.
+     *
+     * @param func     The Javascript function object that is being called.
+     * @param self     Javascript Object that should act as &quot;this&quot; for the function call.
+     * @param params   The parameters that should be passed to the function.  These
+     *                 parameters should be passed as Java objects but will be converted into their
+     *                 associated Javascript version.
+     * @param callback The callback to pass the return value to.
+     */
+    public void callAsync(JSObject func, JSObject self, Object[] params, final SuccessCallback callback) {
+<span class="nc" id="L783">        callAsync(func, self, params, new CallbackAdapter() {</span>
+
+            @Override
+            public void onSucess(Object value) {
+<span class="nc" id="L787">                callback.onSucess(value);</span>
+<span class="nc" id="L788">            }</span>
+        });
+<span class="nc" id="L790">    }</span>
+
+    /**
+     * Calls a Javascript function with the given parameters.  This would translate
+     * roughly into executing the following javascript:
+     *
+     * &lt;code&gt;jsFunc.call(self, param1, param1, ..., paramn)&lt;/code&gt;
+     *
+     * @param jsFunc A javascript expression that resolves to a function object that
+     *               is to be called.
+     * @param self   The Javascript object that is used as &quot;this&quot; for the method call.
+     * @param params Array of the Javascript parameters, as Java objects.  These use
+     *               the same conversions as are described in the docs for set().
+     * @return Returns the return value converted to the corresponding Java
+     * object type.
+     */
+    public Object call(String jsFunc, JSObject self, Object[] params) {
+<span class="nc" id="L807">        return call(jsFunc, self, params, false, null);</span>
+
+    }
+
+    /**
+     * Calls a Javascript function with the given parameters asynchronously.  This would translate
+     * roughly into executing the following javascript:
+     *
+     * &lt;code&gt;jsFunc.call(self, param1, param1, ..., paramn)&lt;/code&gt;
+     *
+     * @param jsFunc   A javascript expression that resolves to a function object that
+     *                 is to be called.
+     * @param self     The Javascript object that is used as &quot;this&quot; for the method call.
+     * @param params   Array of the Javascript parameters, as Java objects.  These use
+     *                 the same conversions as are described in the docs for set().
+     * @param callback Callback to pass the return value converted to the corresponding Java
+     *                 object type.
+     */
+    public void callAsync(String jsFunc, JSObject self, Object[] params, Callback callback) {
+<span class="nc" id="L826">        call(jsFunc, self, params, true, callback);</span>
+<span class="nc" id="L827">    }</span>
+
+    /**
+     * Calls a Javascript function with the given parameters asynchronously.  This would translate
+     * roughly into executing the following javascript:
+     *
+     * &lt;code&gt;jsFunc.call(self, param1, param1, ..., paramn)&lt;/code&gt;
+     *
+     * @param jsFunc   A javascript expression that resolves to a function object that
+     *                 is to be called.
+     * @param self     The Javascript object that is used as &quot;this&quot; for the method call.
+     * @param params   Array of the Javascript parameters, as Java objects.  These use
+     *                 the same conversions as are described in the docs for set().
+     * @param callback Callback to pass the return value converted to the corresponding Java
+     *                 object type.
+     */
+    public void callAsync(String jsFunc, JSObject self, Object[] params, final SuccessCallback callback) {
+<span class="nc" id="L844">        callAsync(jsFunc, self, params, new CallbackAdapter() {</span>
+
+            @Override
+            public void onSucess(Object value) {
+<span class="nc" id="L848">                callback.onSucess(value);</span>
+<span class="nc" id="L849">            }</span>
+
+        });
+<span class="nc" id="L852">    }</span>
+
+    /**
+     * Calls a Javascript function with the given parameters, and optionally to make the call asynchronously.  This would translate
+     * roughly into executing the following javascript:
+     *
+     * &lt;code&gt;jsFunc.call(self, param1, param1, ..., paramn)&lt;/code&gt;
+     *
+     * @param jsFunc   A javascript expression that resolves to a function object that
+     *                 is to be called.
+     * @param self     The Javascript object that is used as &quot;this&quot; for the method call.
+     * @param params   Array of the Javascript parameters, as Java objects.  These use
+     *                 the same conversions as are described in the docs for set().
+     * @param async    If true, the call will be made asynchronously.
+     * @param callback Used if {@code async} is true to pass the return value.
+     * @return Returns the return value converted to the corresponding Java
+     * object type.  This will always return null if {@code async} is {@code true}.
+     */
+    public Object call(String jsFunc, JSObject self, Object[] params, boolean async, Callback callback) {
+<span class="nc bnc" id="L871" title="All 2 branches missed.">        if (callId &gt; 10000000L) {</span>
+<span class="nc" id="L872">            callId = 0;</span>
+        }
+
+<span class="nc" id="L875">        String var = RETURN_VAR + &quot;_call_&quot; + (callId++);</span>
+<span class="nc" id="L876">        String js = var + &quot;=(&quot; + jsFunc + &quot;).call(&quot; + self.toJSPointer();</span>
+<span class="nc" id="L877">        int len = params.length;</span>
+<span class="nc bnc" id="L878" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L879">            Object param = params[i];</span>
+<span class="nc" id="L880">            js += &quot;, &quot;;</span>
+
+<span class="nc bnc" id="L882" title="All 8 branches missed.">            if (param instanceof Integer || param instanceof Long || param instanceof Double || param instanceof Float) {</span>
+<span class="nc" id="L883">                js += param.toString();</span>
+<span class="nc bnc" id="L884" title="All 2 branches missed.">            } else if (param instanceof Boolean) {</span>
+<span class="nc bnc" id="L885" title="All 2 branches missed.">                js += ((Boolean) param).booleanValue() ? &quot;true&quot; : &quot;false&quot;;</span>
+<span class="nc bnc" id="L886" title="All 2 branches missed.">            } else if (param instanceof String) {</span>
+<span class="nc" id="L887">                String escaped = StringUtil.replaceAll((String) param, &quot;\\&quot;, &quot;\\\\&quot;);</span>
+<span class="nc" id="L888">                escaped = StringUtil.replaceAll(escaped, &quot;'&quot;, &quot;\\'&quot;);</span>
+<span class="nc" id="L889">                js += &quot;'&quot; + escaped + &quot;'&quot;;</span>
+<span class="nc bnc" id="L890" title="All 2 branches missed.">            } else if (param instanceof JSObject) {</span>
+<span class="nc" id="L891">                js += ((JSObject) param).toJSPointer();</span>
+<span class="nc bnc" id="L892" title="All 2 branches missed.">            } else if (param instanceof JSFunction) {</span>
+                // We need to assign this JSFunction to something.
+<span class="nc" id="L894">                JSObject temp = (JSObject) this.get(&quot;{}&quot;);</span>
+<span class="nc" id="L895">                temp.set(&quot;callback&quot;, param);</span>
+<span class="nc" id="L896">                js += temp.toJSPointer() + &quot;.callback&quot;;</span>
+<span class="nc" id="L897">            } else {</span>
+<span class="nc" id="L898">                js += &quot;null&quot;;</span>
+            }
+
+        }
+<span class="nc" id="L902">        js += &quot;)&quot;;</span>
+
+        // We need to intialize the var to undefined in case the actual
+        // javascript adjusts the window.location or doesn't cause a
+        // result for some reason.
+<span class="nc" id="L907">        synchronized (browser) {</span>
+
+            try {
+<span class="nc" id="L910">                exec(js, async);</span>
+<span class="nc" id="L911">            } catch (Exception ex) {</span>
+<span class="nc" id="L912">                Log.e(new RuntimeException(&quot;Failed to execute javascript &quot; + js + &quot;.  The error was &quot; + ex.getMessage()));</span>
+<span class="nc" id="L913">                return null;</span>
+<span class="nc" id="L914">            }</span>
+            try {
+<span class="nc bnc" id="L916" title="All 2 branches missed.">                if (async) {</span>
+<span class="nc" id="L917">                    getAsync(var, callback);</span>
+<span class="nc" id="L918">                    return null;</span>
+                } else {
+<span class="nc" id="L920">                    Object out = get(var);</span>
+                    try {
+<span class="nc" id="L922">                        exec(var + &quot;=undefined&quot;, async);</span>
+<span class="nc" id="L923">                    } catch (Exception ex) {</span>
+<span class="nc" id="L924">                        Log.e(new RuntimeException(&quot;Failed to execute javascript &quot; + var + &quot;=undefined.  The error was &quot; + ex.getMessage()));</span>
+<span class="nc" id="L925">                        return null;</span>
+<span class="nc" id="L926">                    }</span>
+<span class="nc" id="L927">                    return out;</span>
+                }
+<span class="nc" id="L929">            } catch (Exception ex) {</span>
+<span class="nc" id="L930">                Log.e(new RuntimeException(&quot;Failed to get the javascript variable &quot; + var + &quot;.  The error was &quot; + ex.getMessage()));</span>
+<span class="nc" id="L931">                return null;</span>
+            }
+        }
+    }
+
+    /**
+     * Calls a Javascript function with the given parameters, and optionally to make the call asynchronously.  This would translate
+     * roughly into executing the following javascript:
+     *
+     * &lt;code&gt;jsFunc.call(self, param1, param1, ..., paramn)&lt;/code&gt;
+     *
+     * @param jsFunc   A javascript expression that resolves to a function object that
+     *                 is to be called.
+     * @param self     The Javascript object that is used as &quot;this&quot; for the method call.
+     * @param params   Array of the Javascript parameters, as Java objects.  These use
+     *                 the same conversions as are described in the docs for set().
+     * @param async    If true, the call will be made asynchronously.
+     * @param callback Used if {@code async} is true to pass the return value.
+     * @return Returns the return value converted to the corresponding Java
+     * object type.  This will always return null if {@code async} is {@code true}.
+     */
+    public Object call(String jsFunc, JSObject self, Object[] params, boolean async, final SuccessCallback callback) {
+<span class="nc" id="L953">        return call(jsFunc, self, params, async, new CallbackAdapter() {</span>
+
+            @Override
+            public void onSucess(Object value) {
+<span class="nc" id="L957">                callback.onSucess(value);</span>
+<span class="nc" id="L958">            }</span>
+
+        });
+    }
+
+    /**
+     * A navigation callback that handles navigations to urls of the form
+     * cn1command:...
+     * &lt;p&gt;
+     * An instance of this class is installed in the resident BrowserComponent.
+     */
+<span class="fc" id="L969">    private class NavigationCallback implements BrowserNavigationCallback {</span>
+
+        public boolean shouldNavigate(String url) {
+            //System.out.println(&quot;In shouldNavigate &quot;+url);
+<span class="nc bnc" id="L973" title="All 4 branches missed.">            if (!url.startsWith(&quot;javascript:&quot;) &amp;&amp; url.indexOf(&quot;/!cn1command/&quot;) != -1) {</span>
+                //.. Handle the cn1 callbacks
+<span class="nc" id="L975">                dispatchCallback(url);</span>
+<span class="nc" id="L976">                return false;</span>
+            }
+<span class="nc" id="L978">            return previousNavigationCallback.shouldNavigate(url);</span>
+        }
+
+    }
+
+    /**
+     * Handler for scriptMessageReceived events.  It processes
+     * JavascriptEvents that encapsulate commands received from Javascript
+     * to Java.  The dispatchCallback() method intercepts the requests using
+     * a Navigation callback, then builds the JavascriptEvent object that
+     * encapsulates a Javascript method call.  This event is ultimately fired
+     * and then processed by this listener.
+     *
+     * &lt;p&gt;This is intended to only process functions that are backed by
+     * a JSFunction object.  Prior to this call, it is assumed that a JSFunction
+     * has been registered as a callback at the Javascript address provided via
+     * the JSObject.addCallback() or JavascriptContext.addCallback() methods.&lt;/p&gt;
+     *
+     * &lt;p&gt;If there is no JSFunction registered to handle this command then nothing
+     * will happen as a result of the request.&lt;/p&gt;
+     *
+     * @see JSFunction
+     * @see addCallback()
+     * @see JSObject.addCallback()
+     */
+<span class="fc" id="L1003">    private class ScriptMessageListener implements ActionListener {</span>
+
+        public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L1006">            JavascriptEvent jevt = (JavascriptEvent) evt;</span>
+<span class="nc" id="L1007">            JSObject source = jevt.getSelf();</span>
+<span class="nc" id="L1008">            String method = jevt.getMethod();</span>
+<span class="nc" id="L1009">            String key = source.toJSPointer() + &quot;.&quot; + method;</span>
+<span class="nc" id="L1010">            JSFunction func = (JSFunction) callbacks.get(key);</span>
+<span class="nc bnc" id="L1011" title="All 2 branches missed.">            if (func == null) {</span>
+                // No callback is registered for this method.
+<span class="nc" id="L1013">                return;</span>
+            }
+<span class="nc" id="L1015">            func.apply(source, jevt.getArgs());</span>
+<span class="nc" id="L1016">            evt.consume();</span>
+<span class="nc" id="L1017">        }</span>
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Geofence.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.location</a> &gt; <span class="el_source">Geofence.java</span></div><h1>Geofence.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.location;
+
+import java.util.Comparator;
+
+/**
+ * &lt;p&gt;Metadata for geofencing support that allows tracking user location in the background while the app
+ * is inactive.&lt;br&gt;
+ * The sample below tracks location and posts a notification or shows a dialog based on the state of the app:&lt;/p&gt;
+ *
+ * &lt;script src=&quot;https://gist.github.com/shannah/a5592313da97e085822120af16518874.js&quot;&gt;&lt;/script&gt;
+ *
+ * &lt;p&gt;&lt;strong&gt;NOTE:&lt;/strong&gt; For iOS you must include the &lt;code&gt;ios.background_modes&lt;/code&gt; build hint with a value that includes &quot;location&quot; for geofencing to work.&lt;/p&gt;
+ *
+ * &lt;p&gt;Geofencing is not supported on all platforms, use {@link LocationManager#isGeofenceSupported() } to find out if the current
+ * platform supports it at runtime.&lt;/p&gt;
+ *
+ * &lt;p&gt;The maximum number of simulataneous Geofences allowed will vary by platform.  iOS currently has a maximum of 20, and Android has a maximum of 100.  If you need to
+ * track more than 20 at a time, consider using the {@link GeofenceManager} class to manage your Geofences, as it will allow you to
+ * effectively track an unlimited number of regions.
+ * &lt;/p&gt;
+ *
+ * @author Chen
+ * @see LocationManager#isGeofenceSupported()
+ * @see LocationManager#addGeoFencing(java.lang.Class, com.codename1.location.Geofence)
+ * @see LocationManager#removeGeoFencing(java.lang.String)
+ * @see GeofenceListener
+ */
+public class Geofence {
+
+    private final String id;
+
+    // Location of the geofence
+    private final Location loc;
+
+    // radius in metres.
+    private final int radius;
+
+    // Expiration in milliseconds .  Duration, not timestamp.  -1L to never expire.
+    private final long expiration;
+
+    /**
+     * Constructor
+     *
+     * @param id         unique identifier
+     * @param loc        the center location of this Geofence
+     * @param radius     the radius in meters. Note that the actual radius will vary
+     *                   on an actual device depending on the hardware and OS.  Typical android and iOS devices
+     *                   have a minimum radius of 100m.
+     * @param expiration the expiration time in milliseconds.  Note that this is a duration, not a timestamp.  Use {@literal -1} to never expire.
+     */
+<span class="fc" id="L73">    public Geofence(String id, Location loc, int radius, long expiration) {</span>
+<span class="fc" id="L74">        this.id = id;</span>
+<span class="fc" id="L75">        this.loc = loc;</span>
+<span class="fc" id="L76">        this.radius = radius;</span>
+<span class="fc" id="L77">        this.expiration = expiration;</span>
+<span class="fc" id="L78">    }</span>
+
+    /**
+     * Creates a comparator for sorting Geofences from the current Geofence.
+     *
+     * @return
+     */
+    public static Comparator&lt;Geofence&gt; createDistanceComparator(final Geofence refRegion) {
+<span class="nc" id="L86">        return new Comparator&lt;Geofence&gt;() {</span>
+
+            public int compare(Geofence o1, Geofence o2) {
+<span class="nc" id="L89">                double d1 = refRegion.getDistanceTo(o1);</span>
+<span class="nc" id="L90">                double d2 = refRegion.getDistanceTo(o2);</span>
+<span class="nc bnc" id="L91" title="All 4 branches missed.">                return d1 &lt; d2 ? -1 : d2 &lt; d1 ? 1 : 0;</span>
+            }
+
+        };
+    }
+
+    /**
+     * Creates a comparator for sorting Geofences from the given reference point.
+     *
+     * @return
+     */
+    public static Comparator&lt;Geofence&gt; createDistanceComparator(final Location refPoint) {
+<span class="fc" id="L103">        return new Comparator&lt;Geofence&gt;() {</span>
+
+            public int compare(Geofence o1, Geofence o2) {
+<span class="fc" id="L106">                double d1 = Math.max(0, refPoint.getDistanceTo(o1.getLoc()) - o1.getRadius());</span>
+<span class="fc" id="L107">                double d2 = Math.max(0, refPoint.getDistanceTo(o2.getLoc()) - o2.getRadius());</span>
+<span class="pc bpc" id="L108" title="3 of 4 branches missed.">                return d1 &lt; d2 ? -1 : d2 &lt; d1 ? 1 : 0;</span>
+            }
+
+        };
+    }
+
+    /**
+     * Gets the Geofence ID.
+     *
+     * @return the id
+     */
+    public String getId() {
+<span class="fc" id="L120">        return id;</span>
+    }
+
+    /**
+     * Gets the location of the Geofence.
+     *
+     * @return the center Location
+     */
+    public Location getLoc() {
+<span class="fc" id="L129">        return loc;</span>
+    }
+
+    /**
+     * Gets the expiration duration (from now) of the Geofence in milliseconds.
+     *
+     * @return the Geofence expiration
+     */
+    public long getExpiration() {
+<span class="fc" id="L138">        return expiration;</span>
+    }
+
+    /**
+     * Gets the radius of the geofence in metres.  Note that the actual radius will vary
+     * on an actual device depending on the hardware and OS.  Typical android and iOS devices
+     * have a minimum radius of 100m.
+     *
+     * @return Geofence radius
+     */
+    public int getRadius() {
+<span class="fc" id="L149">        return radius;</span>
+    }
+
+    /**
+     * Gets the distance between the current region and the given region.
+     *
+     * @param gf
+     * @return
+     */
+    public double getDistanceTo(Geofence gf) {
+<span class="nc" id="L159">        return Math.max(0, getLoc().getDistanceTo(gf.getLoc()) - gf.getRadius() - getRadius());</span>
+    }
+
+    /**
+     * Geofences are equal if their id, radius, and expiration are the same, and the location latitude
+     * and longitude are the same.
+     *
+     * @param o
+     * @return
+     */
+    @Override
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        if (o instanceof Geofence) {</span>
+<span class="nc" id="L172">            Geofence g = (Geofence) o;</span>
+<span class="nc bnc" id="L173" title="All 8 branches missed.">            return eq(id, g.id) &amp;&amp; g.radius == radius &amp;&amp; eq(loc, g.loc) &amp;&amp; g.expiration == expiration;</span>
+        }
+<span class="nc" id="L175">        return false;</span>
+    }
+
+    private boolean eq(Object o1, Object o2) {
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        if (o1 != null) {</span>
+<span class="nc" id="L180">            return o1.equals(o2);</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        } else if (o2 != null) {</span>
+<span class="nc" id="L182">            return o2.equals(o1);</span>
+        } else {
+<span class="nc" id="L184">            return true; // both null</span>
+        }
+    }
+
+    private boolean eq(Location l1, Location l2) {
+<span class="nc bnc" id="L189" title="All 2 branches missed.">        if (l1 != null) {</span>
+<span class="nc" id="L190">            return l1.equalsLatLng(l2);</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        } else if (l2 != null) {</span>
+<span class="nc" id="L192">            return l2.equalsLatLng(l1);</span>
+        } else {
+<span class="nc" id="L194">            return true; // both null</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

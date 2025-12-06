@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>LayoutCallback.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts.mig</a> &gt; <span class="el_source">LayoutCallback.java</span></div><h1>LayoutCallback.java</h1><pre class="source lang-java linenums">package com.codename1.ui.layouts.mig;
+
+/*
+ * License (BSD):
+ * ==============
+ *
+ * Copyright (c) 2004, Mikael Grev, MiG InfoCom AB. (miglayout (at) miginfocom (dot) com)
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * Neither the name of the MiG InfoCom AB nor the names of its contributors may be
+ * used to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ *
+ * @version 1.0
+ * @author Mikael Grev, MiG InfoCom AB
+ *         Date: 2006-sep-08
+ */
+
+/**
+ * A class to extend if you want to provide more control over where a component is placed or the size of it.
+ * &lt;p&gt;
+ * Note! Returned arrays from this class will never be altered. This means that caching of arrays in these methods
+ * is OK.
+ */
+<span class="nc" id="L43">public abstract class LayoutCallback {</span>
+    /**
+     * Returns a position similar to the &quot;pos&quot; the component constraint.
+     *
+     * @param comp The component wrapper that holds the actual component (JComponent is Swing and Control in SWT).
+     *             &lt;b&gt;Should not be altered.&lt;/b&gt;
+     * @return The [x, y, x2, y2] as explained in the documentation for &quot;pos&quot;. If &lt;code&gt;null&lt;/code&gt;
+     * is returned nothing is done and this is the default.
+     * @see UnitValue
+     * @see net.miginfocom.layout.ConstraintParser#parseUnitValue(String, boolean)
+     */
+    public UnitValue[] getPosition(ComponentWrapper comp) {
+<span class="nc" id="L55">        return null;</span>
+    }
+
+    /**
+     * Returns a size similar to the &quot;width&quot; and &quot;height&quot; in the component constraint.
+     *
+     * @param comp The component wrapper that holds the actual component (JComponent is Swing and Control in SWT).
+     *             &lt;b&gt;Should not be altered.&lt;/b&gt;
+     * @return The [width, height] as explained in the documentation for &quot;width&quot; and &quot;height&quot;. If &lt;code&gt;null&lt;/code&gt;
+     * is returned nothing is done and this is the default.
+     * @see net.miginfocom.layout.BoundSize
+     * @see net.miginfocom.layout.ConstraintParser#parseBoundSize(String, boolean, boolean)
+     */
+    public BoundSize[] getSize(ComponentWrapper comp) {
+<span class="nc" id="L69">        return null;</span>
+    }
+
+    /**
+     * A last minute change of the bounds. The bound for the layout cycle has been set and you can correct there
+     * after any set of rules you like.
+     *
+     * @param comp The component wrapper that holds the actual component (JComponent is Swing and Control in SWT).
+     */
+    public void correctBounds(ComponentWrapper comp) {
+<span class="nc" id="L79">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

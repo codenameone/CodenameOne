@@ -1,0 +1,804 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GenericListCellRenderer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.list</a> &gt; <span class="el_source">GenericListCellRenderer.java</span></div><h1>GenericListCellRenderer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.list;
+
+import com.codename1.cloud.CloudObject;
+import com.codename1.ui.Button;
+import com.codename1.ui.CheckBox;
+import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.List;
+import com.codename1.ui.RadioButton;
+import com.codename1.ui.Slider;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.URLImage;
+import com.codename1.ui.animations.Animation;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * &lt;p&gt;The generic list cell renderer can display containers or arbitrary Codename One components
+ * as items in a list, &lt;b&gt;notice&lt;/b&gt; that
+ * &lt;a href=&quot;https://www.codenameone.com/blog/avoiding-lists.html&quot;&gt;we strongly
+ * discourage usage of lists&lt;/a&gt;.. It relies on the source data being a {@code Map} object. It extracts values from
+ * the {@code Map} using the component name as an indication to the Map key lookup.&lt;br&gt;
+ * This renderer supports label tickering, check boxes/radio buttons etc. seamlessly.&lt;/p&gt;
+ * &lt;p&gt;
+ * Please notice that you must use at least two distinct instances of the component
+ * when passing them to the constructor, reusing the same instance &lt;b&gt;WILL NOT WORK!&lt;/b&gt;&lt;br&gt;
+ * Furthermore, the renderer instance cannot be reused for multiple lists, each list will need
+ * a new instance of this renderer!&lt;/p&gt;
+ * &lt;p&gt;
+ * Sample usage for this renderer follows:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/15a2370c500e07a8fcf8.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-generic-list-cell-renderer.png&quot; alt=&quot;Sample of using the generic list cell renderer&quot; /&gt;
+ *
+ * &lt;script src=&quot;https://gist.github.com/codenameone/15a2370c500e07a8fcf8.js&quot;&gt;&lt;/script&gt;
+ *
+ * @author Shai Almog
+ */
+public class GenericListCellRenderer&lt;T&gt; implements ListCellRenderer&lt;T&gt;, CellRenderer&lt;T&gt; {
+
+    /**
+     * If this flag exists in a Map of data the renderer will enable/disable
+     * the entries, the flag assumes either Boolean.TRUE or Boolean.FALSE.
+     * Notice that just setting it to false when necessary will not work, when its
+     * used it must be applied to all entries otherwise the reuse of the renderer
+     * component will break this feature.
+     */
+    public static final String ENABLED = &quot;$$ENABLED$$&quot;;
+    /**
+     * Put this flag as a Map key to indicate that a checkbox entry rendered by
+     * this renderer should act as a &quot;select all&quot; entry and toggle all other entries.
+     * The value for this entry is ignored
+     */
+    public static final String SELECT_ALL_FLAG = &quot;$$SELECTALL$$&quot;;
+<span class="fc" id="L89">    private static URLImage.ImageAdapter defaultAdapter = URLImage.RESIZE_SCALE;</span>
+    private Button lastClickedComponent;
+    private ArrayList&lt;Image&gt; pendingAnimations;
+<span class="fc" id="L92">    private final Label focusComponent = new Label();</span>
+    private final Component selected;
+    private final Component unselected;
+    private final Component[] selectedEntries;
+    private final Component[] unselectedEntries;
+    private Component selectedEven;
+    private Component unselectedEven;
+    private Component[] selectedEntriesEven;
+    private Component[] unselectedEntriesEven;
+<span class="fc" id="L101">    private final Monitor mon = new Monitor();</span>
+    private Component parentList;
+<span class="fc" id="L103">    private boolean selectionListener = true;</span>
+    private final boolean firstCharacterRTL;
+    private boolean fisheye;
+    private boolean waitingForRegisterAnimation;
+<span class="fc" id="L107">    private final HashMap&lt;String, EncodedImage&gt; placeholders = new HashMap&lt;String, EncodedImage&gt;();</span>
+<span class="fc" id="L108">    private URLImage.ImageAdapter adapter = defaultAdapter;</span>
+
+    /**
+     * Constructs a generic renderer with the given selected/unselected components
+     *
+     * @param selected   indicates the selected value for the renderer
+     * @param unselected indicates the unselected value for the renderer
+     */
+<span class="fc" id="L116">    public GenericListCellRenderer(Component selected, Component unselected) {</span>
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">        if (selected == unselected) {</span>
+<span class="nc" id="L118">            throw new IllegalArgumentException(&quot;Must use distinct instances for renderer!&quot;);</span>
+        }
+<span class="fc" id="L120">        this.selected = selected;</span>
+<span class="fc" id="L121">        this.unselected = unselected;</span>
+<span class="fc" id="L122">        focusComponent.setUIID(selected.getUIID() + &quot;Focus&quot;);</span>
+<span class="fc" id="L123">        focusComponent.setFocus(true);</span>
+
+<span class="fc" id="L125">        selectedEntries = initRenderer(selected);</span>
+<span class="fc" id="L126">        unselectedEntries = initRenderer(unselected);</span>
+<span class="fc" id="L127">        firstCharacterRTL = selected.getUIManager().isThemeConstant(&quot;firstCharRTLBool&quot;, false);</span>
+<span class="fc" id="L128">        addSelectedEntriesListener(selectedEntries);</span>
+<span class="fc" id="L129">        addSelectedEntriesListener(unselectedEntries);</span>
+<span class="fc" id="L130">    }</span>
+    /**
+     * Constructs a generic renderer with the given selected/unselected components for
+     * odd/even values allowing a &quot;pinstripe&quot; effect
+     *
+     * @param odd            indicates the selected value for the renderer
+     * @param oddUnselected  indicates the unselected value for the renderer
+     * @param even           indicates the selected value for the renderer
+     * @param evenUnselected indicates the unselected value for the renderer
+     */
+    public GenericListCellRenderer(Component odd, Component oddUnselected, Component even, Component evenUnselected) {
+<span class="nc" id="L141">        this(odd, oddUnselected);</span>
+<span class="nc" id="L142">        selectedEven = even;</span>
+<span class="nc" id="L143">        unselectedEven = evenUnselected;</span>
+<span class="nc" id="L144">        selectedEntriesEven = initRenderer(even);</span>
+<span class="nc" id="L145">        unselectedEntriesEven = initRenderer(evenUnselected);</span>
+<span class="nc" id="L146">        addSelectedEntriesListener(selectedEntriesEven);</span>
+<span class="nc" id="L147">        addSelectedEntriesListener(unselectedEntriesEven);</span>
+<span class="nc" id="L148">    }</span>
+
+    /**
+     * The default adapter to use for image URLs
+     *
+     * @return the defaultAdapter
+     */
+    public static URLImage.ImageAdapter getDefaultAdapter() {
+<span class="nc" id="L156">        return defaultAdapter;</span>
+    }
+
+    /**
+     * The default adapter to use for image URLs
+     *
+     * @param aDefaultAdapter the defaultAdapter to set
+     */
+    public static void setDefaultAdapter(URLImage.ImageAdapter aDefaultAdapter) {
+<span class="nc" id="L165">        defaultAdapter = aDefaultAdapter;</span>
+<span class="nc" id="L166">    }</span>
+
+    void deinitialize(List l) {
+<span class="fc" id="L169">        removeSelectedEntriesListener(selectedEntries);</span>
+<span class="fc" id="L170">        removeSelectedEntriesListener(unselectedEntries);</span>
+<span class="fc" id="L171">        l.removeActionListener(mon);</span>
+<span class="fc" id="L172">    }</span>
+
+    /**
+     * Updates the placeholder instances, this is useful for changing the URLImage placeholder in runtime as
+     * might happen in the designer
+     */
+    public void updateIconPlaceholders() {
+<span class="fc" id="L179">        updateIconPlaceholders(selectedEntries);</span>
+<span class="fc" id="L180">        updateIconPlaceholders(unselectedEntries);</span>
+<span class="fc" id="L181">    }</span>
+
+    private void updateIconPlaceholders(Component[] e) {
+<span class="fc" id="L184">        int elen = e.length;</span>
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        for (int iter = 0; iter &lt; elen; iter++) {</span>
+<span class="fc" id="L186">            String n = e[iter].getName();</span>
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">            if (n != null) {</span>
+<span class="pc bpc" id="L188" title="3 of 4 branches missed.">                if (n.endsWith(&quot;_URLImage&quot;) &amp;&amp; e[iter] instanceof Label) {</span>
+<span class="nc" id="L189">                    placeholders.put(n, (EncodedImage) ((Label) e[iter]).getIcon());</span>
+                }
+            }
+        }
+<span class="fc" id="L193">    }</span>
+
+    private void removeSelectedEntriesListener(Component[] e) {
+<span class="fc" id="L196">        int elen = e.length;</span>
+<span class="fc bfc" id="L197" title="All 2 branches covered.">        for (int iter = 0; iter &lt; elen; iter++) {</span>
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">            if (e[iter] instanceof Button) {</span>
+<span class="nc" id="L199">                ((Button) e[iter]).removeActionListener(mon);</span>
+            }
+        }
+<span class="fc" id="L202">    }</span>
+
+    private void addSelectedEntriesListener(Component[] e) {
+<span class="fc" id="L205">        int elen = e.length;</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        for (int iter = 0; iter &lt; elen; iter++) {</span>
+<span class="pc bpc" id="L207" title="1 of 2 branches missed.">            if (e[iter] instanceof Button) {</span>
+<span class="nc" id="L208">                ((Button) e[iter]).addActionListener(mon);</span>
+            }
+<span class="fc" id="L210">            String n = e[iter].getName();</span>
+<span class="pc bpc" id="L211" title="1 of 2 branches missed.">            if (n != null) {</span>
+<span class="pc bpc" id="L212" title="3 of 4 branches missed.">                if (n.endsWith(&quot;_URLImage&quot;) &amp;&amp; e[iter] instanceof Label) {</span>
+<span class="nc" id="L213">                    placeholders.put(n, (EncodedImage) ((Label) e[iter]).getIcon());</span>
+                }
+            }
+        }
+<span class="fc" id="L217">    }</span>
+
+    private Component[] initRenderer(Component r) {
+<span class="fc" id="L220">        r.setCellRenderer(true);</span>
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        if (r instanceof Container) {</span>
+<span class="fc" id="L222">            ArrayList selectedVector = new ArrayList();</span>
+<span class="fc" id="L223">            findComponentsOfInterest(r, selectedVector);</span>
+<span class="fc" id="L224">            return vectorToComponentArray(selectedVector);</span>
+        } else {
+<span class="fc" id="L226">            return new Component[]{r};</span>
+        }
+    }
+
+    /**
+     * Allows partitioning the renderer into &quot;areas&quot; that can be clicked. When
+     * receiving an action event in the list this method allows a developer to
+     * query the renderer to &quot;see&quot; whether a button within the component was &quot;touched&quot;
+     * by the user on a touch screen device.
+     * This method will reset the value to null after returning a none-null value!
+     *
+     * @return a button or null
+     */
+    public Button extractLastClickedComponent() {
+<span class="nc" id="L240">        Button c = lastClickedComponent;</span>
+<span class="nc" id="L241">        lastClickedComponent = null;</span>
+<span class="nc" id="L242">        return c;</span>
+    }
+
+    private Component[] vectorToComponentArray(ArrayList v) {
+<span class="fc" id="L246">        Component[] result = new Component[v.size()];</span>
+<span class="fc" id="L247">        int rlen = result.length;</span>
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        for (int iter = 0; iter &lt; rlen; iter++) {</span>
+<span class="fc" id="L249">            result[iter] = (Component) v.get(iter);</span>
+        }
+<span class="fc" id="L251">        return result;</span>
+    }
+
+    private void findComponentsOfInterest(Component cmp, ArrayList dest) {
+<span class="fc bfc" id="L255" title="All 2 branches covered.">        if (cmp instanceof Container) {</span>
+<span class="fc" id="L256">            Container c = (Container) cmp;</span>
+<span class="fc" id="L257">            int count = c.getComponentCount();</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">            for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="fc" id="L259">                findComponentsOfInterest(c.getComponentAt(iter), dest);</span>
+            }
+<span class="fc" id="L261">            return;</span>
+        }
+        // performance optimization for fixed images in lists
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">        if (cmp.getName() != null) {</span>
+<span class="fc bfc" id="L265" title="All 2 branches covered.">            if (cmp instanceof Label) {</span>
+<span class="fc" id="L266">                Label l = (Label) cmp;</span>
+<span class="pc bpc" id="L267" title="3 of 4 branches missed.">                if (l.getName().toLowerCase().endsWith(&quot;fixed&quot;) &amp;&amp; l.getIcon() != null) {</span>
+<span class="nc" id="L268">                    l.getIcon().lock();</span>
+                }
+<span class="fc" id="L270">                dest.add(cmp);</span>
+<span class="fc" id="L271">                return;</span>
+            }
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">            if (cmp instanceof TextArea) {</span>
+<span class="fc" id="L274">                dest.add(cmp);</span>
+            }
+        }
+<span class="fc" id="L277">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Component getCellRendererComponent(Component list, Object model, T value, int index, boolean isSelected) {
+        Component cmp;
+        Component[] entries;
+<span class="pc bpc" id="L285" title="3 of 4 branches missed.">        if (!fisheye &amp;&amp; !Display.getInstance().shouldRenderSelection(list)) {</span>
+<span class="nc" id="L286">            isSelected = false;</span>
+        }
+<span class="pc bpc" id="L288" title="3 of 6 branches missed.">        if (isSelected &amp;&amp; (fisheye || list.hasFocus())) {</span>
+<span class="fc" id="L289">            cmp = selected;</span>
+<span class="fc" id="L290">            entries = selectedEntries;</span>
+<span class="pc bpc" id="L291" title="3 of 4 branches missed.">            if (selectedEven != null &amp;&amp; index % 2 == 0) {</span>
+<span class="nc" id="L292">                cmp = selectedEven;</span>
+<span class="nc" id="L293">                entries = selectedEntriesEven;</span>
+
+                // prevent the list from over-optimizing the background painting
+<span class="nc bnc" id="L296" title="All 2 branches missed.">                if (list instanceof List) {</span>
+<span class="nc" id="L297">                    ((List) list).setMutableRendererBackgrounds(true);</span>
+                }
+            }
+<span class="fc" id="L300">            cmp.setFocus(true);</span>
+<span class="fc" id="L301">            boolean lead = false;</span>
+<span class="pc bpc" id="L302" title="1 of 2 branches missed.">            if (cmp instanceof Container) {</span>
+<span class="nc bnc" id="L303" title="All 2 branches missed.">                lead = ((Container) cmp).getLeadComponent() != null;</span>
+            }
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">            if (value instanceof Map) {</span>
+<span class="fc" id="L306">                Map h = (Map) value;</span>
+<span class="fc" id="L307">                Boolean enabled = (Boolean) h.get(ENABLED);</span>
+<span class="pc bpc" id="L308" title="1 of 2 branches missed.">                if (enabled != null) {</span>
+<span class="nc" id="L309">                    cmp.setEnabled(enabled.booleanValue());</span>
+                }
+<span class="fc" id="L311">                int elen = entries.length;</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">                for (int iter = 0; iter &lt; elen; iter++) {</span>
+<span class="fc" id="L313">                    String currentName = entries[iter].getName();</span>
+
+                    Object val;
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">                    if (currentName.equals(&quot;$number&quot;)) {</span>
+<span class="nc" id="L317">                        val = &quot;&quot; + (index + 1);</span>
+                    } else {
+                        // a selected entry might differ in its value to allow for
+                        // behavior such as rollover images
+<span class="fc" id="L321">                        val = h.get(&quot;#&quot; + currentName);</span>
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">                        if (val == null) {</span>
+<span class="fc" id="L323">                            val = h.get(currentName);</span>
+                        }
+<span class="fc" id="L325">                        val = updateModelValues(h, currentName, entries, iter, val);</span>
+                    }
+<span class="fc" id="L327">                    setComponentValueWithTickering(entries[iter], val, list, cmp);</span>
+<span class="pc bpc" id="L328" title="2 of 4 branches missed.">                    entries[iter].setFocus(lead || entries[iter].isFocusable());</span>
+                }
+<span class="fc" id="L330">            } else {</span>
+<span class="nc bnc" id="L331" title="All 2 branches missed.">                if (value instanceof CloudObject) {</span>
+<span class="nc" id="L332">                    CloudObject h = (CloudObject) value;</span>
+<span class="nc" id="L333">                    Boolean enabled = h.getBoolean(ENABLED);</span>
+<span class="nc bnc" id="L334" title="All 2 branches missed.">                    if (enabled != null) {</span>
+<span class="nc" id="L335">                        cmp.setEnabled(enabled.booleanValue());</span>
+                    }
+<span class="nc" id="L337">                    int elen = entries.length;</span>
+<span class="nc bnc" id="L338" title="All 2 branches missed.">                    for (int iter = 0; iter &lt; elen; iter++) {</span>
+<span class="nc" id="L339">                        String currentName = entries[iter].getName();</span>
+
+                        Object val;
+<span class="nc bnc" id="L342" title="All 2 branches missed.">                        if (currentName.equals(&quot;$number&quot;)) {</span>
+<span class="nc" id="L343">                            val = &quot;&quot; + (index + 1);</span>
+                        } else {
+                            // a selected entry might differ in its value to allow for
+                            // behavior such as rollover images
+<span class="nc" id="L347">                            val = h.getObject(&quot;#&quot; + currentName);</span>
+<span class="nc bnc" id="L348" title="All 2 branches missed.">                            if (val == null) {</span>
+<span class="nc" id="L349">                                val = h.getObject(currentName);</span>
+                            }
+                        }
+<span class="nc" id="L352">                        setComponentValueWithTickering(entries[iter], val, list, cmp);</span>
+<span class="nc" id="L353">                        entries[iter].setFocus(entries[iter].isFocusable());</span>
+                    }
+<span class="nc" id="L355">                } else {</span>
+<span class="nc" id="L356">                    setComponentValueWithTickering(entries[0], value, list, cmp);</span>
+<span class="nc" id="L357">                    entries[0].setFocus(entries[0].isFocusable());</span>
+                }
+            }
+<span class="fc" id="L360">            return cmp;</span>
+        } else {
+<span class="fc" id="L362">            cmp = unselected;</span>
+<span class="fc" id="L363">            entries = unselectedEntries;</span>
+<span class="pc bpc" id="L364" title="3 of 4 branches missed.">            if (unselectedEven != null &amp;&amp; index % 2 == 0) {</span>
+<span class="nc" id="L365">                cmp = unselectedEven;</span>
+<span class="nc" id="L366">                entries = unselectedEntriesEven;</span>
+
+                // prevent the list from over-optimizing the background painting
+<span class="nc bnc" id="L369" title="All 2 branches missed.">                if (list instanceof List) {</span>
+<span class="nc" id="L370">                    ((List) list).setMutableRendererBackgrounds(true);</span>
+                }
+            }
+<span class="fc" id="L373">            cmp.setFocus(false);</span>
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">            if (value instanceof Map) {</span>
+<span class="fc" id="L375">                Map h = (Map) value;</span>
+<span class="fc" id="L376">                Boolean enabled = (Boolean) h.get(ENABLED);</span>
+<span class="pc bpc" id="L377" title="1 of 2 branches missed.">                if (enabled != null) {</span>
+<span class="nc" id="L378">                    cmp.setEnabled(enabled.booleanValue());</span>
+                }
+<span class="fc" id="L380">                int elen = entries.length;</span>
+<span class="fc bfc" id="L381" title="All 2 branches covered.">                for (int iter = 0; iter &lt; elen; iter++) {</span>
+<span class="fc" id="L382">                    String currentName = entries[iter].getName();</span>
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">                    if (currentName.equals(&quot;$number&quot;)) {</span>
+<span class="nc" id="L384">                        setComponentValue(entries[iter], &quot;&quot; + (index + 1), list, cmp);</span>
+<span class="nc" id="L385">                        continue;</span>
+                    }
+<span class="fc" id="L387">                    Object val = h.get(currentName);</span>
+<span class="fc" id="L388">                    val = updateModelValues(h, currentName, entries, iter, val);</span>
+<span class="fc" id="L389">                    setComponentValue(entries[iter], val, list, cmp);</span>
+                }
+<span class="fc" id="L391">            } else {</span>
+<span class="nc bnc" id="L392" title="All 2 branches missed.">                if (value instanceof CloudObject) {</span>
+<span class="nc" id="L393">                    CloudObject h = (CloudObject) value;</span>
+<span class="nc" id="L394">                    Boolean enabled = h.getBoolean(ENABLED);</span>
+<span class="nc bnc" id="L395" title="All 2 branches missed.">                    if (enabled != null) {</span>
+<span class="nc" id="L396">                        cmp.setEnabled(enabled.booleanValue());</span>
+                    }
+<span class="nc" id="L398">                    int elen = entries.length;</span>
+<span class="nc bnc" id="L399" title="All 2 branches missed.">                    for (int iter = 0; iter &lt; elen; iter++) {</span>
+<span class="nc" id="L400">                        String currentName = entries[iter].getName();</span>
+<span class="nc bnc" id="L401" title="All 2 branches missed.">                        if (currentName.equals(&quot;$number&quot;)) {</span>
+<span class="nc" id="L402">                            setComponentValue(entries[iter], &quot;&quot; + (index + 1), list, cmp);</span>
+<span class="nc" id="L403">                            continue;</span>
+                        }
+<span class="nc" id="L405">                        setComponentValue(entries[iter], h.getObject(currentName), list, cmp);</span>
+                    }
+<span class="nc" id="L407">                } else {</span>
+<span class="nc bnc" id="L408" title="All 2 branches missed.">                    if (entries.length &gt; 0) {</span>
+<span class="nc" id="L409">                        setComponentValue(entries[0], value, list, cmp);</span>
+                    }
+                }
+            }
+<span class="fc" id="L413">            return cmp;</span>
+        }
+    }
+
+    private Object updateModelValues(Map h, String currentName, Component[] entries, int iter, Object val) {
+<span class="fc" id="L418">        String uiid = (String) h.get(currentName + &quot;_uiid&quot;);</span>
+<span class="pc bpc" id="L419" title="1 of 2 branches missed.">        if (uiid != null) {</span>
+<span class="nc" id="L420">            entries[iter].setUIID(uiid);</span>
+        }
+<span class="pc bpc" id="L422" title="1 of 2 branches missed.">        if (currentName.endsWith(&quot;_URLImage&quot;)) {</span>
+<span class="nc" id="L423">            URLImage img = (URLImage) h.get(currentName + &quot;Actual&quot;);</span>
+<span class="nc bnc" id="L424" title="All 2 branches missed.">            if (img != null) {</span>
+<span class="nc" id="L425">                val = img;</span>
+            } else {
+<span class="nc" id="L427">                String name = (String) h.get(currentName + &quot;Name&quot;);</span>
+<span class="nc bnc" id="L428" title="All 2 branches missed.">                if (name == null) {</span>
+<span class="nc" id="L429">                    name = val.toString();</span>
+<span class="nc" id="L430">                    name = name.substring(name.lastIndexOf('/'));</span>
+                }
+<span class="nc" id="L432">                val = URLImage.createToStorage(placeholders.get(currentName), name, val.toString(), adapter);</span>
+<span class="nc" id="L433">                h.put(currentName + &quot;Actual&quot;, val);</span>
+            }
+        }
+<span class="fc" id="L436">        return val;</span>
+    }
+
+
+    /**
+     * {@inheritDoc}
+     */
+    public Component getListCellRendererComponent(List list, T value, int index, boolean isSelected) {
+<span class="fc" id="L444">        return getCellRendererComponent(list, list.getModel(), value, index, isSelected);</span>
+    }
+
+
+    private boolean isSelectedValue(Object v) {
+<span class="nc bnc" id="L449" title="All 4 branches missed.">        return v != null &amp;&amp; &quot;true&quot;.equalsIgnoreCase(v.toString());</span>
+    }
+
+    private void setComponentValueWithTickering(Component cmp, Object value, Component l, Component rootRenderer) {
+<span class="fc" id="L453">        setComponentValue(cmp, value, l, rootRenderer);</span>
+<span class="pc bpc" id="L454" title="1 of 2 branches missed.">        if (cmp instanceof Label) {</span>
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">            if (selectionListener) {</span>
+<span class="pc bpc" id="L456" title="1 of 2 branches missed.">                if (l instanceof List) {</span>
+<span class="fc" id="L457">                    ((List) l).addActionListener(mon);</span>
+                }
+<span class="fc" id="L459">                parentList = l;</span>
+            }
+<span class="fc" id="L461">            Label label = (Label) cmp;</span>
+<span class="pc bpc" id="L462" title="3 of 4 branches missed.">            if (label.shouldTickerStart() &amp;&amp; Display.getInstance().shouldRenderSelection()) {</span>
+<span class="nc bnc" id="L463" title="All 2 branches missed.">                if (!label.isTickerRunning()) {</span>
+<span class="nc" id="L464">                    parentList = l;</span>
+<span class="nc bnc" id="L465" title="All 2 branches missed.">                    if (parentList != null) {</span>
+<span class="nc" id="L466">                        Form f = parentList.getComponentForm();</span>
+<span class="nc bnc" id="L467" title="All 2 branches missed.">                        if (f != null) {</span>
+<span class="nc" id="L468">                            f.registerAnimated(mon);</span>
+<span class="nc" id="L469">                            label.startTicker(cmp.getUIManager().getLookAndFeel().getTickerSpeed(), true);</span>
+                        }
+<span class="nc" id="L471">                    }</span>
+                }
+            } else {
+<span class="pc bpc" id="L474" title="1 of 2 branches missed.">                if (label.isTickerRunning()) {</span>
+<span class="nc" id="L475">                    label.stopTicker();</span>
+                }
+<span class="fc" id="L477">                label.setTextPosition(0);</span>
+            }
+        }
+<span class="fc" id="L480">    }</span>
+
+    /**
+     * Initializes the given component with the given value
+     *
+     * @param cmp   one of the components that is or is a part of the renderer
+     * @param value the value to install into the component
+     */
+    private void setComponentValue(Component cmp, Object value, Component parent, Component rootRenderer) {
+        // fixed components shouldn't be modified by the renderer, this allows for
+        // hardcoded properties in the renderer. We still want them to go through the
+        // process so renderer selected/unselected styles are applied
+<span class="pc bpc" id="L492" title="1 of 2 branches missed.">        if (cmp.getName().toLowerCase().endsWith(&quot;fixed&quot;)) {</span>
+<span class="nc" id="L493">            return;</span>
+        }
+<span class="pc bpc" id="L495" title="1 of 2 branches missed.">        if (cmp instanceof Label) {</span>
+<span class="pc bpc" id="L496" title="1 of 2 branches missed.">            if (value instanceof Image) {</span>
+<span class="nc" id="L497">                Image i = (Image) value;</span>
+<span class="nc bnc" id="L498" title="All 2 branches missed.">                if (i.isAnimation()) {</span>
+<span class="nc bnc" id="L499" title="All 2 branches missed.">                    if (pendingAnimations == null) {</span>
+<span class="nc" id="L500">                        pendingAnimations = new ArrayList&lt;Image&gt;();</span>
+                    }
+<span class="nc bnc" id="L502" title="All 2 branches missed.">                    if (!pendingAnimations.contains(i)) {</span>
+<span class="nc" id="L503">                        pendingAnimations.add(i);</span>
+<span class="nc bnc" id="L504" title="All 2 branches missed.">                        if (parentList == null) {</span>
+<span class="nc" id="L505">                            parentList = parent;</span>
+                        }
+<span class="nc bnc" id="L507" title="All 2 branches missed.">                        if (parentList != null) {</span>
+<span class="nc" id="L508">                            Form f = parentList.getComponentForm();</span>
+<span class="nc bnc" id="L509" title="All 2 branches missed.">                            if (f != null) {</span>
+<span class="nc" id="L510">                                f.registerAnimated(mon);</span>
+<span class="nc" id="L511">                                waitingForRegisterAnimation = false;</span>
+                            } else {
+<span class="nc" id="L513">                                waitingForRegisterAnimation = true;</span>
+                            }
+<span class="nc" id="L515">                        }</span>
+                    } else {
+<span class="nc bnc" id="L517" title="All 2 branches missed.">                        if (waitingForRegisterAnimation) {</span>
+<span class="nc bnc" id="L518" title="All 2 branches missed.">                            if (parentList != null) {</span>
+<span class="nc" id="L519">                                Form f = parentList.getComponentForm();</span>
+<span class="nc bnc" id="L520" title="All 2 branches missed.">                                if (f != null) {</span>
+<span class="nc" id="L521">                                    f.registerAnimated(mon);</span>
+<span class="nc" id="L522">                                    waitingForRegisterAnimation = false;</span>
+                                }
+                            }
+                        }
+                    }
+                }
+<span class="nc" id="L528">                Image oldImage = ((Label) cmp).getIcon();</span>
+<span class="nc" id="L529">                ((Label) cmp).setIcon(i);</span>
+<span class="nc" id="L530">                ((Label) cmp).setText(&quot;&quot;);</span>
+<span class="nc bnc" id="L531" title="All 6 branches missed.">                if (oldImage == null || oldImage.getWidth() != i.getWidth() || oldImage.getHeight() != i.getHeight()) {</span>
+<span class="nc" id="L532">                    ((Container) rootRenderer).revalidate();</span>
+                }
+<span class="nc" id="L534">                return;</span>
+            } else {
+<span class="fc" id="L536">                ((Label) cmp).setIcon(null);</span>
+            }
+<span class="pc bpc" id="L538" title="1 of 2 branches missed.">            if (cmp instanceof CheckBox) {</span>
+<span class="nc" id="L539">                ((CheckBox) cmp).setSelected(isSelectedValue(value));</span>
+<span class="nc" id="L540">                return;</span>
+            }
+<span class="pc bpc" id="L542" title="1 of 2 branches missed.">            if (cmp instanceof RadioButton) {</span>
+<span class="nc" id="L543">                ((RadioButton) cmp).setSelected(isSelectedValue(value));</span>
+<span class="nc" id="L544">                return;</span>
+            }
+<span class="pc bpc" id="L546" title="1 of 2 branches missed.">            if (cmp instanceof Slider) {</span>
+<span class="nc" id="L547">                ((Slider) cmp).setProgress(((Integer) value).intValue());</span>
+<span class="nc" id="L548">                return;</span>
+            }
+
+<span class="fc" id="L551">            Label l = (Label) cmp;</span>
+<span class="pc bpc" id="L552" title="1 of 2 branches missed.">            if (value == null) {</span>
+<span class="nc" id="L553">                l.setText(&quot;&quot;);</span>
+            } else {
+<span class="pc bpc" id="L555" title="1 of 2 branches missed.">                if (value instanceof Label) {</span>
+<span class="nc" id="L556">                    l.setText(((Label) value).getText());</span>
+<span class="nc" id="L557">                    l.setIcon(((Label) value).getIcon());</span>
+                } else {
+<span class="fc" id="L559">                    l.setText(value.toString());</span>
+                }
+            }
+<span class="pc bpc" id="L562" title="1 of 2 branches missed.">            if (firstCharacterRTL) {</span>
+<span class="nc" id="L563">                String t = l.getText();</span>
+<span class="nc bnc" id="L564" title="All 2 branches missed.">                if (t.length() &gt; 0) {</span>
+<span class="nc" id="L565">                    l.setRTL(Display.getInstance().isRTL(t.charAt(0)));</span>
+                }
+            }
+<span class="fc" id="L568">            return;</span>
+        }
+<span class="nc bnc" id="L570" title="All 2 branches missed.">        if (cmp instanceof TextArea) {</span>
+<span class="nc bnc" id="L571" title="All 2 branches missed.">            if (value == null) {</span>
+<span class="nc" id="L572">                ((TextArea) cmp).setText(&quot;&quot;);</span>
+            } else {
+<span class="nc" id="L574">                ((TextArea) cmp).setText(value.toString());</span>
+            }
+        }
+<span class="nc" id="L577">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Component getListFocusComponent(List list) {
+<span class="fc" id="L583">        return focusComponent;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Component getFocusComponent(Component list) {
+<span class="fc" id="L590">        return focusComponent;</span>
+    }
+
+    /**
+     * @return the selectionListener
+     */
+    public boolean isSelectionListener() {
+<span class="nc" id="L597">        return selectionListener;</span>
+    }
+
+    /**
+     * @param selectionListener the selectionListener to set
+     */
+    public void setSelectionListener(boolean selectionListener) {
+<span class="pc bpc" id="L604" title="1 of 2 branches missed.">        if (parentList != null) {</span>
+<span class="nc bnc" id="L605" title="All 2 branches missed.">            if (parentList instanceof List) {</span>
+<span class="nc" id="L606">                ((List) parentList).addActionListener(mon);</span>
+            }
+        }
+<span class="fc" id="L609">        this.selectionListener = selectionListener;</span>
+<span class="fc" id="L610">    }</span>
+
+    /**
+     * @return the selected
+     */
+    public Component getSelected() {
+<span class="nc" id="L616">        return selected;</span>
+    }
+
+    /**
+     * @return the unselected
+     */
+    public Component getUnselected() {
+<span class="nc" id="L623">        return unselected;</span>
+    }
+
+    /**
+     * @return the selectedEven
+     */
+    public Component getSelectedEven() {
+<span class="nc" id="L630">        return selectedEven;</span>
+    }
+
+    /**
+     * @return the unselectedEven
+     */
+    public Component getUnselectedEven() {
+<span class="nc" id="L637">        return unselectedEven;</span>
+    }
+
+    /**
+     * In fisheye rendering mode the renderer maintains selected component drawing
+     *
+     * @return the fisheye
+     */
+    public boolean isFisheye() {
+<span class="nc" id="L646">        return fisheye;</span>
+    }
+
+    /**
+     * In fisheye rendering mode the renderer maintains selected component drawing
+     *
+     * @param fisheye the fisheye to set
+     */
+    public void setFisheye(boolean fisheye) {
+<span class="fc" id="L655">        this.fisheye = fisheye;</span>
+<span class="fc" id="L656">    }</span>
+
+    /**
+     * The adapter used when dealing with image URL's
+     *
+     * @return the adapter
+     */
+    public URLImage.ImageAdapter getAdapter() {
+<span class="nc" id="L664">        return adapter;</span>
+    }
+
+    /**
+     * The adapter used when dealing with image URL's
+     *
+     * @param adapter the adapter to set
+     */
+    public void setAdapter(URLImage.ImageAdapter adapter) {
+<span class="nc" id="L673">        this.adapter = adapter;</span>
+<span class="nc" id="L674">    }</span>
+
+
+<span class="fc" id="L677">    class Monitor implements ActionListener, Animation {</span>
+        private boolean selectAllChecked;
+        private int selectAllOffset;
+
+        /**
+         * {@inheritDoc}
+         */
+        public boolean animate() {
+<span class="nc" id="L685">            boolean hasAnimations = false;</span>
+<span class="nc bnc" id="L686" title="All 2 branches missed.">            if (parentList != null) {</span>
+<span class="nc" id="L687">                boolean repaint = false;</span>
+<span class="nc bnc" id="L688" title="All 4 branches missed.">                if (pendingAnimations != null &amp;&amp; pendingAnimations.size() &gt; 0) {</span>
+<span class="nc" id="L689">                    int s = pendingAnimations.size();</span>
+<span class="nc" id="L690">                    hasAnimations = true;</span>
+<span class="nc bnc" id="L691" title="All 2 branches missed.">                    for (int iter = 0; iter &lt; s; iter++) {</span>
+<span class="nc" id="L692">                        Image i = pendingAnimations.get(iter);</span>
+<span class="nc bnc" id="L693" title="All 4 branches missed.">                        repaint = i.animate() || repaint;</span>
+                    }
+<span class="nc bnc" id="L695" title="All 2 branches missed.">                    if (repaint) {</span>
+<span class="nc" id="L696">                        pendingAnimations.clear();</span>
+                    } else {
+                        // flush the queue if we have too many animations
+<span class="nc bnc" id="L699" title="All 2 branches missed.">                        if (pendingAnimations.size() &gt; 20) {</span>
+<span class="nc" id="L700">                            repaint = true;</span>
+                        }
+                    }
+                }
+<span class="nc" id="L704">                Form f = parentList.getComponentForm();</span>
+<span class="nc bnc" id="L705" title="All 2 branches missed.">                if (f != null) {</span>
+<span class="nc bnc" id="L706" title="All 4 branches missed.">                    if (parentList.hasFocus() &amp;&amp; Display.getInstance().shouldRenderSelection(parentList)) {</span>
+<span class="nc" id="L707">                        int slen = selectedEntries.length;</span>
+<span class="nc bnc" id="L708" title="All 2 branches missed.">                        for (int iter = 0; iter &lt; slen; iter++) {</span>
+<span class="nc bnc" id="L709" title="All 2 branches missed.">                            if (selectedEntries[iter] instanceof Label) {</span>
+<span class="nc" id="L710">                                Label l = (Label) selectedEntries[iter];</span>
+<span class="nc bnc" id="L711" title="All 2 branches missed.">                                if (l.isTickerRunning()) {</span>
+<span class="nc" id="L712">                                    repaint = true;</span>
+<span class="nc" id="L713">                                    l.animate();</span>
+                                }
+                            }
+                        }
+<span class="nc" id="L717">                    } else {</span>
+<span class="nc" id="L718">                        int slen = selectedEntries.length;</span>
+<span class="nc bnc" id="L719" title="All 2 branches missed.">                        for (int iter = 0; iter &lt; slen; iter++) {</span>
+<span class="nc bnc" id="L720" title="All 2 branches missed.">                            if (selectedEntries[iter] instanceof Label) {</span>
+<span class="nc" id="L721">                                Label l = (Label) selectedEntries[iter];</span>
+<span class="nc bnc" id="L722" title="All 2 branches missed.">                                if (l.isTickerRunning()) {</span>
+<span class="nc" id="L723">                                    l.stopTicker();</span>
+<span class="nc" id="L724">                                    repaint = true;</span>
+                                }
+                            }
+                        }
+                    }
+<span class="nc bnc" id="L729" title="All 2 branches missed.">                    if (repaint) {</span>
+<span class="nc" id="L730">                        parentList.repaint();</span>
+                    } else {
+<span class="nc bnc" id="L732" title="All 2 branches missed.">                        if (!hasAnimations) {</span>
+<span class="nc" id="L733">                            f.deregisterAnimated(this);</span>
+                        }
+                    }
+<span class="nc" id="L736">                    return false;</span>
+                }
+<span class="nc bnc" id="L738" title="All 2 branches missed.">                if (repaint) {</span>
+<span class="nc" id="L739">                    parentList.repaint();</span>
+                }
+            }
+<span class="nc" id="L742">            return false;</span>
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        public void paint(Graphics g) {
+<span class="nc" id="L749">        }</span>
+
+        /**
+         * {@inheritDoc}
+         */
+        public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L755" title="All 2 branches missed.">            if (evt.getComponent() instanceof Button) {</span>
+<span class="nc" id="L756">                lastClickedComponent = (Button) evt.getComponent();</span>
+<span class="nc" id="L757">                return;</span>
+            }
+<span class="nc bnc" id="L759" title="All 2 branches missed.">            if (parentList instanceof List) {</span>
+                // prevent list from losing focus on action
+<span class="nc" id="L761">                parentList.setHandlesInput(true);</span>
+<span class="nc" id="L762">                Object selection = ((List) parentList).getSelectedItem();</span>
+<span class="nc bnc" id="L763" title="All 2 branches missed.">                if (selection instanceof Map) {</span>
+<span class="nc" id="L764">                    Map h = (Map) selection;</span>
+<span class="nc" id="L765">                    Command cmd = (Command) h.get(&quot;$navigation&quot;);</span>
+<span class="nc bnc" id="L766" title="All 2 branches missed.">                    if (cmd != null) {</span>
+<span class="nc" id="L767">                        parentList.getComponentForm().dispatchCommand(cmd, new ActionEvent(cmd, ActionEvent.Type.Command));</span>
+<span class="nc" id="L768">                        return;</span>
+                    }
+<span class="nc" id="L770">                    int slen = selectedEntries.length;</span>
+<span class="nc bnc" id="L771" title="All 2 branches missed.">                    for (int iter = 0; iter &lt; slen; iter++) {</span>
+<span class="nc bnc" id="L772" title="All 2 branches missed.">                        if (selectedEntries[iter] instanceof CheckBox ||</span>
+<span class="nc bnc" id="L773" title="All 2 branches missed.">                                selectedEntries[iter] instanceof RadioButton) {</span>
+<span class="nc bnc" id="L774" title="All 2 branches missed.">                            boolean sel = !isSelectedValue(h.get(selectedEntries[iter].getName()));</span>
+<span class="nc bnc" id="L775" title="All 2 branches missed.">                            if (h.get(SELECT_ALL_FLAG) != null) {</span>
+<span class="nc" id="L776">                                selectAllChecked = sel;</span>
+<span class="nc" id="L777">                                selectAllOffset = ((List) parentList).getSelectedIndex();</span>
+
+                                // we need to toggle all entries
+<span class="nc" id="L780">                                int count = ((List) parentList).getModel().getSize();</span>
+<span class="nc" id="L781">                                String selectionVal = &quot;&quot; + sel;</span>
+<span class="nc bnc" id="L782" title="All 2 branches missed.">                                for (int x = 0; x &lt; count; x++) {</span>
+<span class="nc" id="L783">                                    Object o = ((List) parentList).getModel().getItemAt(x);</span>
+<span class="nc bnc" id="L784" title="All 2 branches missed.">                                    if (o instanceof Map) {</span>
+<span class="nc" id="L785">                                        ((Map) o).put(selectedEntries[iter].getName(), selectionVal);</span>
+                                    }
+                                }
+<span class="nc" id="L788">                            } else {</span>
+<span class="nc bnc" id="L789" title="All 2 branches missed.">                                if (selectAllChecked) {</span>
+<span class="nc" id="L790">                                    selectAllChecked = false;</span>
+<span class="nc" id="L791">                                    Map selAll = (Map) ((List) parentList).getModel().getItemAt(selectAllOffset);</span>
+<span class="nc" id="L792">                                    selAll.put(selectedEntries[iter].getName(), &quot;false&quot;);</span>
+                                }
+<span class="nc" id="L794">                                h.put(selectedEntries[iter].getName(), &quot;&quot; + sel);</span>
+                            }
+<span class="nc" id="L796">                            return;</span>
+                        }
+                    }
+                }
+            }
+<span class="nc" id="L801">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

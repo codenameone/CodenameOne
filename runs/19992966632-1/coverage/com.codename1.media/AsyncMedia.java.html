@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AsyncMedia.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.media</a> &gt; <span class="el_source">AsyncMedia.java</span></div><h1>AsyncMedia.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.media;
+
+import com.codename1.io.Log;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.util.AsyncResource;
+
+/**
+ * An interface for media elements that provides asynchronous pause and play functionality
+ * as well as support for state change events, so that interested parties can register
+ * to be notified when state changes between play and pause.
+ * &lt;p&gt;
+ * You can convert any {@link Media} object into an AsyncMedia object using {@link MediaManager#getAsyncMedia(com.codename1.media.Media) }.
+ * In most cases this just casts the object to AsyncMedia, since most media returned from {@link MediaManager} already implement
+ * this interface.  In cases where the media doesn't already implement AsyncMedia, it will return an Async wrapper around the media.
+ *
+ * @author shannah
+ * @see MediaManager#getAsyncMedia(com.codename1.media.Media)
+ * @since 7.0
+ */
+public interface AsyncMedia extends Media {
+
+    /**
+     * Gets the current state of the media object.
+     *
+     * @return The state of the media object.
+     */
+    State getState();
+
+    /**
+     * Adds a listener to be notified when the state of the media changes.
+     *
+     * @param l Listener
+     */
+    void addMediaStateChangeListener(ActionListener&lt;MediaStateChangeEvent&gt; l);
+
+    /**
+     * Removes a listener so that it will no longer be notified of state changes.
+     *
+     * @param l Listener
+     */
+    void removeMediaStateChangeListener(ActionListener&lt;MediaStateChangeEvent&gt; l);
+
+    /**
+     * Adds a listener to be notified when an error occurs in the media.
+     *
+     * @param l Listener
+     */
+    void addMediaErrorListener(ActionListener&lt;MediaErrorEvent&gt; l);
+
+    /**
+     * Removes a listener so that it will no longer be notified of errors.
+     *
+     * @param l Listener
+     */
+    void removeMediaErrorListener(ActionListener&lt;MediaErrorEvent&gt; l);
+
+    /**
+     * Adds a callback to be run when the media has played to completion.
+     *
+     * @param onComplete
+     */
+    void addMediaCompletionHandler(Runnable onComplete);
+
+    /**
+     * Initiates a play request.  Returns immediately without blocking.  Caller can use
+     * the returned PlayRequest object to be notified when playing has actually started.
+     *
+     * @return
+     */
+    PlayRequest playAsync();
+
+    /**
+     * Initiates a pause request.  Returns immediately without blocking.  Caller can use
+     * the returned PauseRequest object to be notified when media has actually paused.
+     *
+     * @return
+     */
+    PauseRequest pauseAsync();
+
+    /**
+     * An enum to represent the state of a media object.
+     */
+<span class="fc" id="L106">    enum State {</span>
+<span class="fc" id="L107">        Playing,</span>
+<span class="fc" id="L108">        Paused</span>
+    }
+
+    /**
+     * Enum encapsulating the different types of media errors that can occur.
+     *
+     * @since type.
+     */
+<span class="nc" id="L116">    enum MediaErrorType {</span>
+        /**
+         * The fetching of the associated resource was aborted by the user's request.
+         */
+<span class="nc" id="L120">        Aborted(&quot;The fetching of the associated resource was aborted by the user's request&quot;),</span>
+
+        /**
+         * Some kind of network error occurred which prevented the media from being successfully fetched, despite having previously been available.
+         */
+<span class="nc" id="L125">        Network(&quot;Some kind of network error occurred which prevented the media from being successfully fetched, despite having previously been available.&quot;),</span>
+
+        /**
+         * Despite having previously been determined to be usable, an error occurred while trying to decode the media resource, resulting in an error.
+         */
+<span class="nc" id="L130">        Decode(&quot;Despite having previously been determined to be usable, an error occurred while trying to decode the media resource, resulting in an error.&quot;),</span>
+<span class="nc" id="L131">        Encode(&quot;Failed to encode media to given type&quot;),</span>
+        /**
+         * The associated resource has been found to be unsuitable.
+         */
+<span class="nc" id="L135">        SrcNotSupported(&quot;The associated resource has been found to be unsuitable.&quot;),</span>
+
+<span class="nc" id="L137">        Unknown(&quot;Unknown error&quot;),</span>
+<span class="nc" id="L138">        LineUnavailable(&quot;The associated input line is unavailable&quot;);</span>
+
+        private final String description;
+
+<span class="nc" id="L142">        MediaErrorType(String description) {</span>
+<span class="nc" id="L143">            this.description = description;</span>
+<span class="nc" id="L144">        }</span>
+    }
+
+    /**
+     * Encapsulates a state-change event on a Media object.
+     *
+     * @since 7.0
+     */
+    class MediaStateChangeEvent extends ActionEvent {
+
+        private final State oldState;
+        private final State newState;
+
+        /**
+         * Creates a new state change event for the given source.
+         *
+         * @param source   The media object whose state is changing.
+         * @param oldState The old state
+         * @param newState The new state
+         */
+        public MediaStateChangeEvent(AsyncMedia source, State oldState, State newState) {
+<span class="fc" id="L165">            super(source);</span>
+<span class="fc" id="L166">            this.oldState = oldState;</span>
+<span class="fc" id="L167">            this.newState = newState;</span>
+<span class="fc" id="L168">        }</span>
+
+        /**
+         * The previous state.
+         *
+         * @return the oldState
+         */
+        public State getOldState() {
+<span class="nc" id="L176">            return oldState;</span>
+        }
+
+        /**
+         * The new state.
+         *
+         * @return the newState
+         */
+        public State getNewState() {
+<span class="fc" id="L185">            return newState;</span>
+        }
+    }
+
+    /**
+     * Encapsulates a media exception.
+     *
+     * @since 7.0
+     */
+    class MediaException extends RuntimeException {
+        private final MediaErrorType mediaErrorType;
+
+        /**
+         * Creates an exception of the given type.
+         *
+         * @param type The type of exception
+         */
+        public MediaException(MediaErrorType type) {
+<span class="nc" id="L203">            super(type.description);</span>
+<span class="nc" id="L204">            this.mediaErrorType = type;</span>
+<span class="nc" id="L205">        }</span>
+
+        /**
+         * Creates an exception of the given type.
+         *
+         * @param type    THe type of error.
+         * @param message The error message.
+         */
+        public MediaException(MediaErrorType type, String message) {
+<span class="nc" id="L214">            super(message);</span>
+<span class="nc" id="L215">            this.mediaErrorType = type;</span>
+<span class="nc" id="L216">        }</span>
+
+        /**
+         * Creates an exception of the given type.
+         *
+         * @param type  The type of error
+         * @param cause An underlying exception that caused this error.
+         */
+        public MediaException(MediaErrorType type, Throwable cause) {
+<span class="nc" id="L225">            super(cause.getMessage());</span>
+<span class="nc" id="L226">            Log.e(cause);</span>
+<span class="nc" id="L227">            this.mediaErrorType = type;</span>
+<span class="nc" id="L228">        }</span>
+
+        /**
+         * Gets the error type.
+         *
+         * @return
+         */
+        public MediaErrorType getMediaErrorType() {
+<span class="nc" id="L236">            return mediaErrorType;</span>
+        }
+    }
+
+    /**
+     * Encapsulates a media error event.
+     *
+     * @since 7.0
+     */
+    class MediaErrorEvent extends ActionEvent {
+        private final MediaException mediaException;
+
+        /**
+         * Creates a new error event with the given exception.
+         *
+         * @param source
+         * @param error
+         */
+        public MediaErrorEvent(Media source, MediaException error) {
+<span class="nc" id="L255">            super(source);</span>
+<span class="nc" id="L256">            this.mediaException = error;</span>
+<span class="nc" id="L257">        }</span>
+
+        /**
+         * Gets the exception associated with this event.
+         *
+         * @return
+         */
+        public MediaException getMediaException() {
+<span class="nc" id="L265">            return mediaException;</span>
+        }
+    }
+
+    /**
+     * An async resource used to track the progress of a playAsync() request.  It will
+     * resolve when the media has started playing, or if an error occurs first.
+     *
+     * @see #playAsync()
+     * @since 7.0
+     */
+<span class="fc" id="L276">    class PlayRequest extends AsyncResource&lt;AsyncMedia&gt; {</span>
+
+    }
+
+    /**
+     * An async resource used to track the progress of a pauseAsync() request.  It will
+     * resolve when the media has paused, or if an error occurs first.
+     *
+     * @see #pauseAsync()
+     */
+<span class="fc" id="L286">    class PauseRequest extends AsyncResource&lt;AsyncMedia&gt; {</span>
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

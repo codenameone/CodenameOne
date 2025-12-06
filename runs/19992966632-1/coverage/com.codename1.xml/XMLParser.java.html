@@ -1,0 +1,983 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>XMLParser.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.xml</a> &gt; <span class="el_source">XMLParser.java</span></div><h1>XMLParser.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.xml;
+
+import com.codename1.io.Log;
+import com.codename1.ui.html.HTMLUtils;
+
+import java.io.IOException;
+import java.io.Reader;
+import java.util.Hashtable;
+
+/**
+ * &lt;p&gt;Parser class used to parse an XML document into a DOM object (Element). This code was originally
+ * developed to parse HTML and as a result isn't as strict as most XML parsers and can parse many HTML documents
+ * out of the box.  The parser is mostly stateful (although it does have an event callback API as well), its modeled closely
+ * to the Java DOM API's.
+ * &lt;/p&gt;
+ *
+ * &lt;p&gt;
+ * In this sample an XML hierarchy is displayed using a {@link com.codename1.ui.tree.Tree}:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/5361ad7339c1ae26e0b8.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-tree-xml.png&quot; alt=&quot;Tree with XML data&quot; /&gt;
+ *
+ * @author Ofir Leitner
+ */
+public class XMLParser {
+<span class="fc" id="L49">    private static final Element END_TAG = new Element();</span>
+    /**
+     * A constant containing the CDATA tag identifier (minus the C which is read anyway first)
+     * CDATA nodes will be converted to text nodes
+     */
+    private static final String CDATA_STR = &quot;DATA[&quot;;
+    private static char[] buffer;
+    private static int buffOffset;
+<span class="fc" id="L57">    private static int buffSize = -1;</span>
+    ParserCallback parserCallback;
+    boolean includeWhitespacesBetweenTags; // For HTML white spaces between tags are significant to seperate words, in XML less so and it mostly creates garbage elements (Text with one space)
+    private boolean eventParser;
+
+    /**
+     * The char entities strings supported in XML. When a char entity is found these will be compared against first.
+     *
+     private static final String[] XML_CHAR_ENTITIES = {
+     &quot;lt&quot;, // lesser-than
+     &quot;gt&quot;, // greater-than
+     &quot;amp&quot;, // ampersand
+     &quot;quot&quot;, //quotation mark
+     &quot;apos&quot;, // apostrophe
+     //&quot;bull&quot;, //bullet
+     //&quot;euro&quot; //euro
+     };
+
+     /**
+     * The numericals value of char entities strings above.
+     *
+     private static final int[] XML_CHAR_ENTITIES_VALS = {
+     60, // &quot;lt&quot;, // lesser-than
+     62, // &quot;gt&quot;, // greater-than
+     38, // &quot;amp&quot;, // ampersand
+     34, // &quot;quot&quot;, //quotation mark
+     39, // &quot;apos&quot;, // apostrophe
+     //8226, // &quot;bull&quot;, //bullet
+     //8364 // &quot;euro&quot;}; //euro
+     };*/
+    private boolean caseSensitive;
+    /**
+     * This hashtable contains user defined char entities
+     */
+    private Hashtable userDefinedCharEntities;
+
+    /**
+     * Constructs the XMLParser
+     */
+<span class="fc" id="L96">    public XMLParser() {</span>
+<span class="fc" id="L97">    }</span>
+
+    private static int read(Reader is) throws IOException {
+<span class="fc" id="L100">        int c = -1;</span>
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (buffer == null) {</span>
+<span class="fc" id="L102">            buffer = new char[8192];</span>
+        }
+
+<span class="fc bfc" id="L105" title="All 4 branches covered.">        if (buffSize &lt; 0 || buffOffset &gt;= buffSize) {</span>
+<span class="fc" id="L106">            buffSize = is.read(buffer, 0, buffer.length);</span>
+<span class="fc bfc" id="L107" title="All 2 branches covered.">            if (buffSize &lt; 0) {</span>
+<span class="fc" id="L108">                return -1;</span>
+            }
+<span class="fc" id="L110">            buffOffset = 0;</span>
+        }
+<span class="fc" id="L112">        c = buffer[buffOffset];</span>
+<span class="fc" id="L113">        buffOffset++;</span>
+
+<span class="fc" id="L115">        return c;</span>
+    }
+
+    /**
+     * Trims unneeded &amp;amp; and ; from the symbol if exist
+     *
+     * @param symbol The char entity symbol
+     * @return A trimmed char entity without &amp;amp; and ;
+     */
+    private static String trimCharEntity(String symbol) {
+<span class="fc" id="L125">        int start = 0;</span>
+<span class="fc" id="L126">        int end = symbol.length();</span>
+<span class="pc bpc" id="L127" title="1 of 2 branches missed.">        if (symbol.charAt(0) == '&amp;') {</span>
+<span class="nc" id="L128">            start = 1;</span>
+        }
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (symbol.charAt(end - 1) == ';') {</span>
+<span class="nc" id="L131">            end--;</span>
+        }
+<span class="fc" id="L133">        return symbol.substring(start, end);</span>
+    }
+
+    /**
+     * Returns a string identifying the document type this parser supports.
+     * This should be overriden by subclassing parsers.
+     *
+     * @return a string identifying the document type this parser supports.
+     */
+    protected String getSupportedStandardName() {
+<span class="nc" id="L143">        return &quot;XML&quot;;</span>
+    }
+
+    /**
+     * Adds the given symbol and code to the user defined char entities table
+     * &lt;a href=&quot;http://en.wikipedia.org/wiki/List_of_XML_and_HTML_character_entity_references&quot;&gt;http://en.wikipedia.org/wiki/List_of_XML_and_HTML_character_entity_references&lt;/a&gt;
+     *
+     * @param symbol The symbol to add
+     * @param code   The symbol's code
+     */
+    public void addCharEntity(String symbol, int code) {
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        if (userDefinedCharEntities == null) {</span>
+<span class="fc" id="L155">            userDefinedCharEntities = new Hashtable();</span>
+        }
+<span class="fc" id="L157">        userDefinedCharEntities.put(trimCharEntity(symbol), Integer.valueOf(code));</span>
+<span class="fc" id="L158">    }</span>
+
+    /**
+     * Adds the given symbols array  to the user defined char entities table with the startcode provided as the code of the first string, startcode+1 for the second etc.
+     * Some strings in the symbols array may be null thus skipping code numbers.
+     *
+     * @param symbols   The symbols to add
+     * @param startcode The symbol's code
+     */
+    public void addCharEntitiesRange(String[] symbols, int startcode) {
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        if (userDefinedCharEntities == null) {</span>
+<span class="nc" id="L169">            userDefinedCharEntities = new Hashtable();</span>
+        }
+<span class="nc" id="L171">        int slen = symbols.length;</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        for (int i = 0; i &lt; slen; i++) {</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            if (symbols[i] != null) {</span>
+<span class="nc" id="L174">                userDefinedCharEntities.put(trimCharEntity(symbols[i]), Integer.valueOf(startcode + i));</span>
+            }
+        }
+<span class="nc" id="L177">    }</span>
+
+
+    /**
+     * This method translates between a XML char entity string to the according char code.
+     * The string is first compared to the 5 XML supported strings: quot,apos,amp,lt and gt.
+     * If still not found it goes to look in the user defined char entities hashtable
+     *
+     * @param symbol The symbol to lookup
+     * @return The char code of the symbol, or -1 if none found
+     *
+    protected int getCharEntityCode(String symbol,Hashtable userDefined) {
+    // First tries the XML basic char entities
+    int val=-1;
+    for (int i=0;i&lt;XML_CHAR_ENTITIES.length;i++) {
+    if (symbol.equalsIgnoreCase(XML_CHAR_ENTITIES[i])) {
+    return XML_CHAR_ENTITIES_VALS[i];
+    }
+    }
+    if (val!=-1) {
+    return val;
+    } else {
+
+    // Not found in the standard symbol table, see if it is in the user defined symbols table
+    if (userDefined!=null) {
+    Object charObj=userDefined.get(symbol);
+    if (charObj!=null) {
+    return ((Integer)charObj).intValue();
+    }
+    }
+
+    // Not found anywhere
+    return -1;
+    }
+    }*/
+
+    /**
+     * Converts a char entity to the matching character.
+     * This handles both numbered and symbol char entities (The latter is done via getCharEntityCode)
+     *
+     * @param charEntity The char entity to convert
+     * @return A string containing a single char, or the original char entity string (with &amp;amp; and ;) if the char entity couldn't be resolved
+     */
+    protected String convertCharEntity(String charEntity) {
+        try {
+<span class="nc" id="L222">            return HTMLUtils.convertCharEntity(charEntity, false, userDefinedCharEntities);</span>
+<span class="nc" id="L223">        } catch (IllegalArgumentException iae) {</span>
+<span class="nc" id="L224">            notifyError(ParserCallback.ERROR_UNRECOGNIZED_CHAR_ENTITY, null, null, null, &quot;Unrecognized char entity: &quot; + charEntity);</span>
+            // Another option is to return an empty string, but returning the entity will unravel bugs and will also allow ignoring common mistakes such as using the &amp; char (instead of &amp;apos;)
+<span class="nc" id="L226">            return '&amp;' + charEntity + ';';</span>
+        }
+
+        /*int charCode=-1;
+        if (charEntity.startsWith(&quot;#&quot;)) { //numbered char entity
+            if (charEntity.startsWith(&quot;#x&quot;)) { //hex
+                try {
+                    charCode=Integer.parseInt(charEntity.substring(2),16);
+                } catch (NumberFormatException nfe) {
+                    //if not a number - simply ignore char entity
+                }
+            } else {
+                try {
+                    charCode=Integer.parseInt(charEntity.substring(1));
+                } catch (NumberFormatException nfe) {
+                    //if not a number - simply ignore char entity
+                }
+            }
+        } else { //not numbered, rather a symbol
+            charCode=getCharEntityCode(charEntity,userDefinedCharEntities);
+        }
+
+        if (charCode!=-1) {
+            return &quot;&quot;+(char)charCode;
+        } else {
+            notifyError(ParserCallback.ERROR_UNRECOGNIZED_CHAR_ENTITY,null,null,null, &quot;Unrecognized char entity: &quot;+charEntity);
+            return &quot;&amp;&quot;+charEntity+&quot;;&quot;; // Another option is to return an empty string, but returning the entity will unravel bugs and will also allow ignoring common mistakes such as using the &amp; char (instead of &amp;apos;)
+        }*/
+
+    }
+
+
+    /**
+     * This is the entry point for parsing a document and the only non-private member method in this class
+     *
+     * @param is The InputStream containing the XML
+     * @return an Element object describing the parsed document (Basically its DOM)
+     */
+    public Element parse(Reader is) {
+<span class="fc" id="L265">        buffOffset = 0;</span>
+<span class="fc" id="L266">        buffSize = -1;</span>
+<span class="fc" id="L267">        eventParser = false;</span>
+<span class="fc" id="L268">        Element rootElement = createNewElement(&quot;ROOT&quot;); // ROOT is a &quot;dummy&quot; element that all other document elements are added to</span>
+        try {
+<span class="fc" id="L270">            parseTagContent(rootElement, is);</span>
+<span class="nc" id="L271">        } catch (IOException ioe) {</span>
+<span class="nc" id="L272">            Log.e(ioe);</span>
+<span class="fc" id="L273">        }</span>
+<span class="pc bpc" id="L274" title="1 of 2 branches missed.">        if (rootElement.getNumChildren() == 0) {</span>
+<span class="nc" id="L275">            notifyError(ParserCallback.ERROR_NO_ROOTS, null, null, null, &quot;XML document contains no root element.&quot;);</span>
+<span class="nc" id="L276">            return null;</span>
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">        } else if (rootElement.getNumChildren() &gt; 1) {</span>
+<span class="nc" id="L278">            String roots = &quot;&quot;;</span>
+<span class="nc bnc" id="L279" title="All 2 branches missed.">            for (int i = 1; i &lt; rootElement.getNumChildren(); i++) {</span>
+<span class="nc" id="L280">                Element elem = rootElement.getChildAt(i);</span>
+<span class="nc bnc" id="L281" title="All 2 branches missed.">                if (elem.isTextElement()) {</span>
+<span class="nc" id="L282">                    roots += &quot;Text (&quot; + elem.getText() + &quot;),&quot;;</span>
+                } else {
+<span class="nc" id="L284">                    roots += elem.getTagName() + &quot;,&quot;;</span>
+                }
+            }
+<span class="nc bnc" id="L287" title="All 2 branches missed.">            if (roots.endsWith(&quot;,&quot;)) {</span>
+<span class="nc" id="L288">                roots = roots.substring(0, roots.length() - 1);</span>
+            }
+
+<span class="nc" id="L291">            Element firstRoot = rootElement.getChildAt(0);</span>
+<span class="nc" id="L292">            String str = null;</span>
+<span class="nc bnc" id="L293" title="All 2 branches missed.">            if (firstRoot.isTextElement()) {</span>
+<span class="nc" id="L294">                str = &quot;TEXT:&quot; + firstRoot.getText();</span>
+            } else {
+<span class="nc" id="L296">                str = firstRoot.getTagName();</span>
+            }
+<span class="nc" id="L298">            notifyError(ParserCallback.ERROR_MULTIPLE_ROOTS, null, null, null, &quot;XML document contains multiple root elements, only the first root (&quot; + str + &quot;) will be used. Excessive roots: &quot; + roots);</span>
+        }
+<span class="fc" id="L300">        rootElement = rootElement.getChildAt(0);</span>
+<span class="fc" id="L301">        return rootElement;</span>
+    }
+
+    /**
+     * Creates a new element. This should be overriden by parsers that use a subclass of Element.
+     *
+     * @param name The new element's name
+     * @return a new instance of the element
+     */
+    protected Element createNewElement(String name) {
+<span class="fc" id="L311">        Element e = new Element(name);</span>
+<span class="fc" id="L312">        e.caseSensitive = caseSensitive;</span>
+<span class="fc" id="L313">        return e;</span>
+    }
+
+    /**
+     * Creates a new text element. This should be overriden by parsers that use a subclass of Element.
+     *
+     * @param text The new element's text
+     * @return a new instance of the element
+     */
+    protected Element createNewTextElement(String text) {
+<span class="fc" id="L323">        Element e = new Element(text, true);</span>
+<span class="fc" id="L324">        e.caseSensitive = caseSensitive;</span>
+<span class="fc" id="L325">        return e;</span>
+    }
+
+    public void setIncludeWhitespacesBetweenTags(boolean include) {
+<span class="fc" id="L329">        includeWhitespacesBetweenTags = include;</span>
+<span class="fc" id="L330">    }</span>
+
+    /**
+     * The event parser requires deriving this class and overriding callback
+     * methods to work effectively. To stop the event parser in mid way a
+     * callback can simply throw an IOException on purpose.
+     *
+     * @param r the reader from which the data should be parsed
+     * @throws java.io.IOException if an exception is thrown by the reader
+     */
+    public void eventParser(Reader r) throws IOException {
+<span class="nc" id="L341">        eventParser = true;</span>
+<span class="nc" id="L342">        parseTagContent(null, r);</span>
+<span class="nc" id="L343">    }</span>
+
+    /**
+     * Invoked when the event parser encounters a text element.
+     * This callback method is invoked only on the eventParser.
+     *
+     * @param text the text encountered
+     */
+    protected void textElement(String text) {
+<span class="nc" id="L352">    }</span>
+
+    /**
+     * Invoked when a tag is opened, this method should return true to process
+     * the tag or return false to skip the tag.
+     * This callback method is invoked only on the eventParser.
+     *
+     * @param tag the tag name
+     * @return true to process the tag, false to skip the tag
+     */
+    protected boolean startTag(String tag) {
+<span class="nc" id="L363">        return true;</span>
+    }
+
+    /**
+     * Invoked when a tag ends
+     * This callback method is invoked only on the eventParser.
+     *
+     * @param tag the tag name
+     */
+    protected void endTag(String tag) {
+<span class="nc" id="L373">    }</span>
+
+    /**
+     * Invoked for every attribute value of the givne tag
+     * This callback method is invoked only on the eventParser.
+     *
+     * @param tag the tag name
+     */
+    protected void attribute(String tag, String attributeName, String value) {
+<span class="nc" id="L382">    }</span>
+
+
+    /**
+     * Checks if this character is a legal character for char entities
+     *
+     * @param c The character to check
+     * @return true if legal, false otherwise
+     */
+    private boolean isLegalCharEntityCharacter(char c) {
+<span class="nc bnc" id="L392" title="All 14 branches missed.">        return (((c &gt;= 'a') &amp;&amp; (c &lt;= 'z')) || ((c &gt;= 'A') &amp;&amp; (c &lt;= 'Z')) || ((c &gt;= '0') &amp;&amp; (c &lt;= '9')) || (c == '#'));</span>
+    }
+
+    /**
+     * Parses tags content, accumulating text and child elements .
+     * Upon bumping a start tag character it calls the parseTag method.
+     * This method is called at first from the parse method, and later on from parseTag (which creates the recursion).
+     *
+     * @param element The current parent element
+     * @param is      The InputStream containing the XML
+     * @throws IOException if an I/O error in the stream is encountered
+     */
+    protected void parseTagContent(Element element, Reader is) throws IOException {
+<span class="fc" id="L405">        StringBuilder text = null;</span>
+<span class="fc" id="L406">        boolean leadingSpace = false;</span>
+<span class="fc" id="L407">        int val = read(is);</span>
+<span class="fc" id="L408">        char c = (char) val;</span>
+<span class="fc" id="L409">        StringBuilder charEntity = null;</span>
+
+<span class="fc bfc" id="L411" title="All 2 branches covered.">        while (val != -1) {</span>
+<span class="fc bfc" id="L412" title="All 2 branches covered.">            if (c == '&lt;') {</span>
+<span class="pc bpc" id="L413" title="9 of 10 branches missed.">                if ((includeWhitespacesBetweenTags) &amp;&amp; (leadingSpace) &amp;&amp; (text == null) &amp;&amp; (element != null) &amp;&amp; (element.getNumChildren() &gt; 0)) {</span>
+<span class="nc" id="L414">                    leadingSpace = false;</span>
+<span class="nc" id="L415">                    text = new StringBuilder().append(' ');</span>
+                }
+
+<span class="fc bfc" id="L418" title="All 2 branches covered.">                if (text != null) {</span>
+                    // Mistakenly &quot;collected&quot; something that is not a char entity, perhaps
+                    // misuse of the &amp; character (instead of using &amp;apos;)
+<span class="pc bpc" id="L421" title="1 of 2 branches missed.">                    if (charEntity != null) {</span>
+<span class="nc" id="L422">                        text.append('&amp;').append(charEntity);</span>
+<span class="nc" id="L423">                        charEntity = null;</span>
+                    }
+<span class="pc bpc" id="L425" title="1 of 2 branches missed.">                    if (leadingSpace) {</span>
+<span class="nc" id="L426">                        text.insert(0, ' ');</span>
+                    }
+<span class="pc bpc" id="L428" title="1 of 2 branches missed.">                    if (element != null) {</span>
+<span class="fc" id="L429">                        Element textElement = createNewTextElement(text.toString());</span>
+<span class="fc" id="L430">                        element.addChild(textElement);</span>
+<span class="fc" id="L431">                    } else {</span>
+<span class="nc" id="L432">                        textElement(text.toString());</span>
+                    }
+<span class="fc" id="L434">                    text = null;</span>
+<span class="fc" id="L435">                    leadingSpace = false;</span>
+
+                }
+
+
+<span class="fc" id="L440">                Element childElement = parseTag(is);</span>
+<span class="fc bfc" id="L441" title="All 2 branches covered.">                if (childElement == END_TAG) {</span>
+                    //was actually an ending tag
+<span class="fc" id="L443">                    StringBuilder closingTag = new StringBuilder();</span>
+<span class="fc" id="L444">                    int i = read(is);</span>
+
+                    // Fix for http://code.google.com/p/codenameone/issues/detail?id=900
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">                    if (i == -1) {</span>
+<span class="nc" id="L448">                        childElement = END_TAG;</span>
+                    } else {
+<span class="fc" id="L450">                        c = (char) i;</span>
+<span class="fc bfc" id="L451" title="All 2 branches covered.">                        while ((c != '&gt;')) {</span>
+<span class="fc" id="L452">                            closingTag.append(c);</span>
+<span class="fc" id="L453">                            i = read(is);</span>
+<span class="fc" id="L454">                            c = (char) i;</span>
+<span class="pc bpc" id="L455" title="1 of 2 branches missed.">                            if (i == -1) {</span>
+<span class="nc" id="L456">                                childElement = END_TAG;</span>
+<span class="nc" id="L457">                                break;</span>
+                            }
+                        }
+                    }
+
+<span class="fc" id="L462">                    String ct = closingTag.toString();</span>
+<span class="pc bpc" id="L463" title="1 of 2 branches missed.">                    if (eventParser) {</span>
+<span class="nc" id="L464">                        endTag(ct);</span>
+<span class="nc bnc" id="L465" title="All 2 branches missed.">                        if (!isEmptyTag(ct)) {</span>
+                            // patch from http://code.google.com/p/codenameone/issues/detail?id=428
+                            // not really sure if this is the best approach but if it solves a bug...
+<span class="nc" id="L468">                            return;</span>
+                        }
+                    }
+
+<span class="pc bpc" id="L472" title="1 of 2 branches missed.">                    if (element != null) {</span>
+<span class="pc bpc" id="L473" title="1 of 2 branches missed.">                        if (ct.equalsIgnoreCase(element.getTagName())) {</span>
+<span class="fc" id="L474">                            return;</span>
+<span class="nc bnc" id="L475" title="All 2 branches missed.">                        } else if (isEmptyTag(ct)) {</span>
+                            // do nothing, someone chose to close an empty tag i.e. &lt;img ....&gt;&lt;/img&gt; or &lt;br&gt;&lt;/br&gt;
+                        } else {
+<span class="nc" id="L478">                            notifyError(ParserCallback.ERROR_NO_CLOSE_TAG, element.getTagName(), null, null, &quot;Malformed XML - no appropriate closing tag for &quot; + element.getTagName());</span>
+                        }
+                    }
+<span class="nc" id="L481">                } else {</span>
+<span class="pc bpc" id="L482" title="2 of 4 branches missed.">                    if (element != null &amp;&amp; !childElement.isComment) {</span>
+<span class="fc" id="L483">                        element.addChild(childElement);</span>
+                    }
+                }
+<span class="fc bfc" id="L486" title="All 2 branches covered.">            } else if (text != null) {</span>
+<span class="pc bpc" id="L487" title="1 of 2 branches missed.">                if (charEntity != null) {</span>
+<span class="nc bnc" id="L488" title="All 2 branches missed.">                    if (c == ';') { //end</span>
+<span class="nc" id="L489">                        text.append(convertCharEntity(charEntity.toString()));</span>
+<span class="nc" id="L490">                        charEntity = null;</span>
+<span class="nc bnc" id="L491" title="All 2 branches missed.">                    } else if (isLegalCharEntityCharacter(c)) {</span>
+<span class="nc" id="L492">                        charEntity.append(c);</span>
+                    } else {
+<span class="nc" id="L494">                        text.append('&amp;').append(charEntity).append(c);</span>
+<span class="nc" id="L495">                        charEntity = null;</span>
+                    }
+<span class="pc bpc" id="L497" title="1 of 2 branches missed.">                } else if (c == '&amp;') { //start char entity</span>
+<span class="nc" id="L498">                    charEntity = new StringBuilder();</span>
+                } else {
+<span class="fc" id="L500">                    text.append(c);</span>
+                }
+<span class="fc bfc" id="L502" title="All 2 branches covered.">            } else if (!isWhiteSpace(c)) {</span>
+<span class="pc bpc" id="L503" title="1 of 2 branches missed.">                if (c == '&amp;') { //text starts with a character entity (i.e. &amp;nbsp;)</span>
+<span class="nc" id="L504">                    charEntity = new StringBuilder(); // The &amp; is not included in the string we accumulate</span>
+<span class="nc" id="L505">                    text = new StringBuilder(); //Initalize text so it won't be null</span>
+                } else {
+<span class="fc" id="L507">                    text = new StringBuilder().append(c);</span>
+                }
+            } else { // leading space is relevant also for newline and other whitespaces //if (c==' ') {
+<span class="fc" id="L510">                leadingSpace = true;</span>
+            }
+<span class="fc" id="L512">            val = read(is);</span>
+<span class="fc" id="L513">            c = (char) val;</span>
+        }
+<span class="fc" id="L515">    }</span>
+
+    /**
+     * Checks if the specified character is a white space or not.
+     * Exposed to packaage since used by HTMLComponent as well
+     *
+     * @param ch The character to check
+     * @return true if the character is a white space, false otherwise
+     */
+    protected boolean isWhiteSpace(char ch) {
+<span class="pc bpc" id="L525" title="3 of 10 branches missed.">        return ((ch == ' ') || (ch == '\n') || (ch == '\t') || (ch == 10) || (ch == 13));</span>
+    }
+
+    /**
+     * This method collects the tag name and all of its attributes.
+     * For comments and XML declarations this will call the parseCommentOrXMLDeclaration method.
+     * Note that this method returns an Element with a name and attrbutes, but not its content/children which will be done by parseTagContent
+     *
+     * @param is The InputStream containing the XML
+     * @return The parsed element
+     * @throws IOException if an I/O error in the stream is encountered
+     */
+    protected Element parseTag(Reader is) throws IOException {
+<span class="fc" id="L538">        StringBuilder tagName = new StringBuilder();</span>
+<span class="fc" id="L539">        StringBuilder curAttribute = new StringBuilder();</span>
+<span class="fc" id="L540">        StringBuilder curValue = new StringBuilder();</span>
+        //boolean procInst=false; // Support for the styleshhet processing instruction was removed, as it is not supported in most browsers, and it causes problems by adding tags before the HTML element (Makign the document with multiple roots)
+
+<span class="fc" id="L543">        char c = (char) read(is);</span>
+<span class="fc bfc" id="L544" title="All 2 branches covered.">        if (c == '/') {</span>
+<span class="fc" id="L545">            return END_TAG; //end tag</span>
+<span class="pc bpc" id="L546" title="1 of 2 branches missed.">        } else if (c == '!') {</span>
+<span class="nc" id="L547">            c = (char) read(is);</span>
+<span class="nc" id="L548">            char c2 = (char) read(is);</span>
+<span class="nc bnc" id="L549" title="All 4 branches missed.">            if ((c == '-') &amp;&amp; (c2 == '-')) { //comment</span>
+<span class="nc" id="L550">                return parseCommentOrXMLDeclaration(is, &quot;--&gt;&quot;);</span>
+<span class="nc bnc" id="L551" title="All 4 branches missed.">            } else if ((c == '[') &amp;&amp; (c2 == 'C')) { // CDATA?</span>
+<span class="nc" id="L552">                c = (char) read(is);</span>
+<span class="nc" id="L553">                int idx = 0;</span>
+<span class="nc" id="L554">                int clen = CDATA_STR.length();</span>
+<span class="nc bnc" id="L555" title="All 4 branches missed.">                while ((idx &lt; clen) &amp;&amp; (c == CDATA_STR.charAt(idx))) {</span>
+<span class="nc" id="L556">                    idx++;</span>
+<span class="nc bnc" id="L557" title="All 2 branches missed.">                    if (idx &lt; clen) {</span>
+<span class="nc" id="L558">                        c = (char) read(is);</span>
+                    }
+                }
+<span class="nc bnc" id="L561" title="All 2 branches missed.">                if (idx == clen) { //found CDATA</span>
+<span class="nc" id="L562">                    return parseCommentOrXMLDeclaration(is, &quot;]]&gt;&quot;); //parse doctypes i.e. &lt;!DOCTYPE .... &gt; as comments as well - i.e. ignore them</span>
+                } else { // some other unknown tag
+<span class="nc" id="L564">                    return parseCommentOrXMLDeclaration(is, &quot;&gt;&quot;); //parse doctypes i.e. &lt;!DOCTYPE .... &gt; as comments as well - i.e. ignore them</span>
+                }
+
+            } else {
+<span class="nc" id="L568">                return parseCommentOrXMLDeclaration(is, &quot;&gt;&quot;); //parse doctypes i.e. &lt;!DOCTYPE .... &gt; as comments as well - i.e. ignore them</span>
+            }
+<span class="pc bpc" id="L570" title="1 of 2 branches missed.">        } else if (c == '?') {</span>
+            //procInst=true;
+            //c=(char)read(is);
+<span class="nc" id="L573">            return parseCommentOrXMLDeclaration(is, &quot;&gt;&quot;); //parse XML declaration i.e. &lt;?xml version=&quot;1.0&quot; encoding=&quot;ISO-8859-1&quot;?&gt; as comments as well - i.e. ignore them</span>
+        }
+
+        //read and ignore any whitespaces before tag name
+<span class="pc bpc" id="L577" title="1 of 2 branches missed.">        while (isWhiteSpace(c)) {</span>
+<span class="nc" id="L578">            c = (char) read(is);</span>
+        }
+
+        //collect tag name
+<span class="pc bpc" id="L582" title="2 of 6 branches missed.">        while ((!isWhiteSpace(c)) &amp;&amp; (c != '&gt;') &amp;&amp; (c != '/')) {</span>
+<span class="pc bpc" id="L583" title="1 of 2 branches missed.">            if (!eventParser) {</span>
+<span class="fc bfc" id="L584" title="All 2 branches covered.">                if (!caseSensitive) {</span>
+<span class="fc" id="L585">                    c = Character.toLowerCase(c);</span>
+                }
+            }
+<span class="fc" id="L588">            tagName.append(c);</span>
+<span class="fc" id="L589">            int i = read(is);</span>
+
+            // Fix for http://code.google.com/p/codenameone/issues/detail?id=900
+<span class="pc bpc" id="L592" title="1 of 2 branches missed.">            if (i == -1) {</span>
+<span class="nc" id="L593">                return END_TAG;</span>
+            }
+<span class="fc" id="L595">            c = (char) i;</span>
+<span class="fc" id="L596">        }</span>
+
+        //read and ignore any whitespaces after tag name
+<span class="fc bfc" id="L599" title="All 2 branches covered.">        while (isWhiteSpace(c)) {</span>
+<span class="fc" id="L600">            c = (char) read(is);</span>
+        }
+
+<span class="fc" id="L603">        boolean processTag = true;</span>
+<span class="fc" id="L604">        String tn = tagName.toString();</span>
+<span class="pc bpc" id="L605" title="1 of 2 branches missed.">        if (eventParser) {</span>
+<span class="nc" id="L606">            processTag = startTag(tn);</span>
+        }
+        // We do not support any processing instructions
+        /*if (procInst) {
+            if (tagName.equals(&quot;xml-stylesheet&quot;)) { // The XML processing instruction &lt;?xml-stylesheet ... ?&gt; has the same parameters as &lt;link .. &gt; and behaves the same way
+                tagName=&quot;link&quot;;
+            } else { // Processing instruction not supported - read till its end
+                c=(char)read(is);
+                while (c!='&gt;') {
+                    c=(char)read(is);
+                }
+                Element procInstElem=createNewElement(&quot;unsupported&quot;);
+                procInstElem.isComment=true;
+                return procInstElem;
+            }
+        }*/
+<span class="fc" id="L622">        Element element = null;</span>
+<span class="pc bpc" id="L623" title="1 of 2 branches missed.">        if (!eventParser) {</span>
+<span class="fc" id="L624">            element = createNewElement(tn);</span>
+        }
+
+<span class="pc bpc" id="L627" title="2 of 4 branches missed.">        if (!processTag || !isSupported(element)) {</span>
+<span class="nc" id="L628">            notifyError(ParserCallback.ERROR_TAG_NOT_SUPPORTED, tn, null, null, &quot;The tag '&quot; + tn + &quot;' is not supported in &quot; + getSupportedStandardName());</span>
+<span class="nc bnc" id="L629" title="All 4 branches missed.">            if (!processTag || !shouldEvaluate(element)) {</span>
+                // If tag is not supported we skip it all till the closing tag.
+                // This is especially important for the script tag which may contain '&lt;' and '&gt;' which might confuse the parser
+<span class="nc" id="L632">                char lastChar = c;</span>
+<span class="nc bnc" id="L633" title="All 2 branches missed.">                while (c != '&gt;') { // Read till the end of the tag</span>
+<span class="nc" id="L634">                    lastChar = c;</span>
+<span class="nc" id="L635">                    int i = read(is);</span>
+
+                    // Fix for http://code.google.com/p/codenameone/issues/detail?id=900
+<span class="nc bnc" id="L638" title="All 2 branches missed.">                    if (i == -1) {</span>
+<span class="nc" id="L639">                        return END_TAG;</span>
+                    }
+<span class="nc" id="L641">                    c = (char) i;</span>
+<span class="nc" id="L642">                }</span>
+<span class="nc bnc" id="L643" title="All 2 branches missed.">                if (lastChar != '/') { // If this is an empty tag, no need to search for its closing tag as there's none...</span>
+<span class="nc" id="L644">                    String endTag = new StringBuilder().append('&lt;').append('/').append(tagName).append('&gt;').toString();</span>
+<span class="nc" id="L645">                    int index = 0;</span>
+<span class="nc" id="L646">                    int elen = endTag.length();</span>
+<span class="nc bnc" id="L647" title="All 2 branches missed.">                    while (index &lt; elen) {</span>
+<span class="nc" id="L648">                        int i = read(is);</span>
+
+                        // Fix for http://code.google.com/p/codenameone/issues/detail?id=900
+<span class="nc bnc" id="L651" title="All 2 branches missed.">                        if (i == -1) {</span>
+<span class="nc" id="L652">                            return END_TAG;</span>
+                        }
+<span class="nc" id="L654">                        c = (char) i;</span>
+
+<span class="nc bnc" id="L656" title="All 4 branches missed.">                        if ((c &gt;= 'A') &amp;&amp; (c &lt;= 'Z')) {</span>
+<span class="nc" id="L657">                            c = (char) (c - 'A' + 'a');</span>
+                        }
+<span class="nc bnc" id="L659" title="All 2 branches missed.">                        if (c == endTag.charAt(index)) {</span>
+<span class="nc" id="L660">                            index++;</span>
+                        } else {
+<span class="nc" id="L662">                            index = 0;</span>
+                        }
+<span class="nc" id="L664">                    }</span>
+                }
+
+<span class="nc" id="L667">                return element;</span>
+            }
+        }
+
+<span class="pc bpc" id="L671" title="1 of 2 branches missed.">        if (c == '&gt;') { //tag declartion ended, process content</span>
+<span class="nc bnc" id="L672" title="All 2 branches missed.">            if (!isEmptyTag(tn)) {</span>
+<span class="nc" id="L673">                parseTagContent(element, is);</span>
+            }
+<span class="nc" id="L675">            return element;</span>
+<span class="pc bpc" id="L676" title="1 of 2 branches missed.">        } else if (c == '/') { // || ((procInst) &amp;&amp; (c=='?'))) { //closed tag - no content</span>
+<span class="nc" id="L677">            c = (char) read(is);</span>
+<span class="nc bnc" id="L678" title="All 2 branches missed.">            if (c == '&gt;') {</span>
+<span class="nc bnc" id="L679" title="All 2 branches missed.">                if (eventParser) {</span>
+<span class="nc" id="L680">                    endTag(tn);</span>
+                }
+<span class="nc" id="L682">                return element;</span>
+            } else {
+<span class="nc" id="L684">                notifyError(ParserCallback.ERROR_UNEXPECTED_CHARACTER, tn, null, null, &quot;XML malformed - no &gt; after /&quot;);</span>
+            }
+        }
+
+
+        while (true) {
+<span class="fc" id="L690">            curAttribute.delete(0, curAttribute.length()).append(c);</span>
+<span class="fc" id="L691">            c = (char) read(is);</span>
+<span class="pc bpc" id="L692" title="2 of 6 branches missed.">            while ((!isWhiteSpace(c)) &amp;&amp; (c != '=') &amp;&amp; (c != '&gt;')) {</span>
+<span class="pc bpc" id="L693" title="1 of 2 branches missed.">                if (!eventParser) {</span>
+<span class="fc bfc" id="L694" title="All 2 branches covered.">                    if (!caseSensitive) {</span>
+<span class="fc" id="L695">                        c = Character.toLowerCase(c);</span>
+                    }
+                }
+<span class="fc" id="L698">                curAttribute.append(c);</span>
+<span class="fc" id="L699">                c = (char) read(is);</span>
+            }
+
+<span class="pc bpc" id="L702" title="1 of 2 branches missed.">            if (c == '&gt;') { // tag close char shouldn't be found here, but if the XML is slightly malformed we return the element</span>
+<span class="nc" id="L703">                notifyError(ParserCallback.ERROR_UNEXPECTED_TAG_CLOSING, tn, curAttribute.toString(), null, &quot;Unexpected tag closing in tag &quot; + tagName + &quot;, attribute=&quot; + curAttribute);</span>
+<span class="nc bnc" id="L704" title="All 2 branches missed.">                if (!isEmptyTag(tn)) {</span>
+<span class="nc" id="L705">                    parseTagContent(element, is);</span>
+                }
+<span class="nc" id="L707">                return element;</span>
+            }
+
+            //read and ignore any whitespaces after attribute name
+<span class="pc bpc" id="L711" title="1 of 2 branches missed.">            while (isWhiteSpace(c)) {</span>
+<span class="nc" id="L712">                c = (char) read(is);</span>
+            }
+
+<span class="pc bpc" id="L715" title="1 of 2 branches missed.">            if (c != '=') {</span>
+<span class="nc" id="L716">                notifyError(ParserCallback.ERROR_UNEXPECTED_CHARACTER, tn, curAttribute.toString(), null, &quot;Unexpected character &quot; + c + &quot;, expected '=' after attribute &quot; + curAttribute + &quot; in tag &quot; + tagName);</span>
+<span class="nc bnc" id="L717" title="All 2 branches missed.">                if (c == '&gt;') { // tag close char shouldn't be found here, but if the XML is slightly malformed we return the element</span>
+<span class="nc bnc" id="L718" title="All 2 branches missed.">                    if (!isEmptyTag(tn)) {</span>
+<span class="nc" id="L719">                        parseTagContent(element, is);</span>
+                    }
+<span class="nc" id="L721">                    return element;</span>
+                }
+
+
+                continue; //if attribute is not followed by = then process the next attribute
+            }
+
+<span class="fc" id="L728">            c = (char) read(is);</span>
+            //read and ignore any whitespaces before attribute value
+<span class="pc bpc" id="L730" title="1 of 2 branches missed.">            while (isWhiteSpace(c)) {</span>
+<span class="nc" id="L731">                c = (char) read(is);</span>
+            }
+
+<span class="fc" id="L734">            char quote = ' ';</span>
+
+
+<span class="pc bpc" id="L737" title="1 of 4 branches missed.">            if ((c == '&quot;') || (c == '\'')) {</span>
+<span class="fc" id="L738">                quote = c;</span>
+            } else {
+<span class="nc" id="L740">                curValue.append(c);</span>
+            }
+
+<span class="fc" id="L743">            StringBuilder charEntity = null;</span>
+<span class="fc" id="L744">            boolean ended = false;</span>
+<span class="fc bfc" id="L745" title="All 2 branches covered.">            while (!ended) {</span>
+<span class="fc" id="L746">                int i = read(is);</span>
+<span class="pc bpc" id="L747" title="1 of 2 branches missed.">                if (i &lt; 0) {</span>
+<span class="nc" id="L748">                    return END_TAG;</span>
+                }
+<span class="fc" id="L750">                c = (char) i;</span>
+<span class="fc bfc" id="L751" title="All 2 branches covered.">                if (c == quote) {</span>
+<span class="fc" id="L752">                    ended = true;</span>
+<span class="fc" id="L753">                    i = read(is);</span>
+<span class="pc bpc" id="L754" title="1 of 2 branches missed.">                    if (i &lt; 0) {</span>
+<span class="nc" id="L755">                        return END_TAG;</span>
+                    }
+<span class="fc" id="L757">                    c = (char) i;</span>
+<span class="pc bpc" id="L758" title="7 of 8 branches missed.">                } else if ((quote == ' ') &amp;&amp; ((c == '/') || (c == '&gt;') || (isWhiteSpace(c)))) {</span>
+<span class="nc" id="L759">                    ended = true;</span>
+<span class="pc bpc" id="L760" title="1 of 2 branches missed.">                } else if (c == '&amp;') {</span>
+<span class="nc bnc" id="L761" title="All 2 branches missed.">                    if (charEntity != null) {</span>
+<span class="nc" id="L762">                        curValue.append('&amp;').append(charEntity); // Wasn't a char entit, probably a url as a parameter : i.e. param=&quot;/test?p=val&amp;pw=val2&amp;p3=val3</span>
+                    }
+<span class="nc" id="L764">                    charEntity = new StringBuilder();</span>
+                } else {
+<span class="pc bpc" id="L766" title="1 of 2 branches missed.">                    if (charEntity != null) {</span>
+<span class="nc bnc" id="L767" title="All 2 branches missed.">                        if (c == ';') {</span>
+<span class="nc" id="L768">                            curValue.append(convertCharEntity(charEntity.toString()));</span>
+<span class="nc" id="L769">                            charEntity = null;</span>
+<span class="nc bnc" id="L770" title="All 2 branches missed.">                        } else if (isLegalCharEntityCharacter(c)) {</span>
+<span class="nc" id="L771">                            charEntity.append(c);</span>
+                        } else {
+<span class="nc" id="L773">                            curValue.append('&amp;').append(charEntity).append(c);</span>
+<span class="nc" id="L774">                            charEntity = null;</span>
+                        }
+                    } else {
+<span class="fc" id="L777">                        curValue.append(c);</span>
+                    }
+                }
+<span class="fc" id="L780">            }</span>
+
+<span class="pc bpc" id="L782" title="1 of 2 branches missed.">            if (charEntity != null) { // Mistaken something else for a char entity - for example an action which is action=&quot;http://domain/test.html?param1=val1&amp;param2=val2&quot;</span>
+<span class="nc" id="L783">                curValue.append('&amp;').append(charEntity);</span>
+<span class="nc" id="L784">                charEntity = null;</span>
+            }
+
+<span class="pc bpc" id="L787" title="1 of 2 branches missed.">            if (eventParser) {</span>
+<span class="nc" id="L788">                attribute(tn, curAttribute.toString(), curValue.toString());</span>
+            } else {
+<span class="fc" id="L790">                int error = element.setAttribute(curAttribute.toString(), curValue.toString());</span>
+
+<span class="pc bpc" id="L792" title="1 of 2 branches missed.">                if (error == ParserCallback.ERROR_ATTRIBUTE_NOT_SUPPORTED) {</span>
+<span class="nc" id="L793">                    notifyError(error, tn, curAttribute.toString(), curValue.toString(), &quot;Attribute '&quot; + curAttribute + &quot;' is not supported for tag '&quot; + tagName + &quot;'.&quot;);</span>
+                    //notifyError(error, tagName, curAttribute, curValue, &quot;Attribute '&quot;+curAttribute+&quot;' is not supported for tag '&quot;+tagName+&quot;'. Supported attributes: &quot;+element.getSupportedAttributesList());
+<span class="pc bpc" id="L795" title="1 of 2 branches missed.">                } else if (error == ParserCallback.ERROR_ATTIBUTE_VALUE_INVALID) {</span>
+<span class="nc" id="L796">                    notifyError(error, tn, curAttribute.toString(), curValue.toString(), &quot;Attribute '&quot; + curAttribute + &quot;' in tag '&quot; + tn + &quot;' has an invalid value (&quot; + curValue + &quot;)&quot;);</span>
+                }
+            }
+
+            //read and ignore any whitespaces after attribute/value pair
+<span class="fc bfc" id="L801" title="All 2 branches covered.">            while (isWhiteSpace(c)) {</span>
+<span class="fc" id="L802">                int i = read(is);</span>
+<span class="pc bpc" id="L803" title="1 of 2 branches missed.">                if (i &lt; 0) {</span>
+<span class="nc" id="L804">                    return END_TAG;</span>
+                }
+<span class="fc" id="L806">                c = (char) i;</span>
+<span class="fc" id="L807">            }</span>
+
+<span class="fc bfc" id="L809" title="All 2 branches covered.">            if (c == '&gt;') { //tag declartion ended, process content</span>
+<span class="pc bpc" id="L810" title="1 of 2 branches missed.">                if (!isEmptyTag(tn)) {</span>
+<span class="fc" id="L811">                    parseTagContent(element, is);</span>
+                }
+<span class="fc" id="L813">                return element;</span>
+<span class="fc bfc" id="L814" title="All 2 branches covered.">            } else if (c == '/') { // || ((procInst) &amp;&amp; (c=='?'))) { //closed tag - no content</span>
+<span class="fc" id="L815">                int i = read(is);</span>
+<span class="pc bpc" id="L816" title="1 of 2 branches missed.">                if (i &lt; 0) {</span>
+<span class="nc" id="L817">                    return END_TAG;</span>
+                }
+<span class="fc" id="L819">                c = (char) i;</span>
+<span class="pc bpc" id="L820" title="1 of 2 branches missed.">                if (c == '&gt;') {</span>
+                    // Solves the case of &lt;a p=&quot;s&quot;/&gt; endTag(&quot;a&quot;) would not be called related to
+                    // http://code.google.com/p/codenameone/issues/detail?id=896
+<span class="pc bpc" id="L823" title="1 of 2 branches missed.">                    if (eventParser) {</span>
+<span class="nc" id="L824">                        endTag(tn);</span>
+                    }
+<span class="fc" id="L826">                    return element;</span>
+                } else {
+<span class="nc" id="L828">                    notifyError(ParserCallback.ERROR_UNEXPECTED_CHARACTER, tn, curAttribute.toString(), curValue.toString(), &quot;XML malformed - no &gt; after /&quot;);</span>
+                }
+            }
+<span class="fc" id="L831">            curValue = curValue.delete(0, curValue.length());</span>
+<span class="fc" id="L832">        }</span>
+
+    }
+
+    /**
+     * This utility method is used to parse comments and XML declarations in the XML.
+     * The comment/declaration is returned as an Element, but is flagged as a comment since both comments and XML declarations are not part of the XML DOM.
+     * This method can be overridden to process specific XML declarations
+     *
+     * @param is     The inputstream
+     * @param endTag The endtag to look for
+     * @return An Element representing the comment or XML declartaion
+     * @throws IOException
+     */
+    protected Element parseCommentOrXMLDeclaration(Reader is, String endTag) throws IOException {
+<span class="nc" id="L847">        char[] endTagChars = endTag.toCharArray();</span>
+<span class="nc" id="L848">        int endTagPos = 0;</span>
+<span class="nc" id="L849">        StringBuilder text = new StringBuilder();</span>
+<span class="nc" id="L850">        boolean ended = false;</span>
+<span class="nc bnc" id="L851" title="All 2 branches missed.">        while (!ended) {</span>
+<span class="nc" id="L852">            int in = read(is);</span>
+<span class="nc bnc" id="L853" title="All 2 branches missed.">            if (in == -1) {</span>
+                // input stream ended abruptly
+<span class="nc" id="L855">                break;</span>
+            }
+<span class="nc" id="L857">            char c = (char) in;</span>
+<span class="nc bnc" id="L858" title="All 2 branches missed.">            if (c == endTagChars[endTagPos]) {</span>
+<span class="nc" id="L859">                endTagPos++;</span>
+<span class="nc bnc" id="L860" title="All 2 branches missed.">                if (endTagPos == endTagChars.length) {</span>
+<span class="nc" id="L861">                    ended = true;</span>
+                }
+            } else {
+<span class="nc bnc" id="L864" title="All 2 branches missed.">                if (endTagPos != 0) { //add - or -- if it wasn't an end tag eventually</span>
+                    // with cdata it might end with ]]&gt; but we might have a string such as ]]]&gt;
+                    // which is valid and the first ] is just a part of the string... So we need to check
+                    // for that special case http://code.google.com/p/codenameone/issues/detail?id=865
+<span class="nc bnc" id="L868" title="All 4 branches missed.">                    if (c == endTagChars[0] &amp;&amp; endTagPos &gt; 1) {</span>
+<span class="nc" id="L869">                        text.append(c);</span>
+<span class="nc" id="L870">                        continue;</span>
+                    }
+
+<span class="nc" id="L873">                    text.append(endTagChars, 0, endTagPos);</span>
+<span class="nc" id="L874">                    endTagPos = 0;</span>
+                }
+<span class="nc" id="L876">                text.append(c);</span>
+            }
+<span class="nc" id="L878">        }</span>
+
+<span class="nc" id="L880">        String elementName = null;</span>
+<span class="nc bnc" id="L881" title="All 2 branches missed.">        if (endTag.equals(&quot;--&gt;&quot;)) {</span>
+<span class="nc" id="L882">            elementName = &quot;comment&quot;;</span>
+<span class="nc bnc" id="L883" title="All 2 branches missed.">        } else if (endTag.equals(&quot;&gt;&quot;)) {</span>
+<span class="nc" id="L884">            elementName = &quot;XML declaration&quot;;</span>
+        } else { //CDATA
+<span class="nc bnc" id="L886" title="All 2 branches missed.">            if (eventParser) {</span>
+<span class="nc" id="L887">                textElement(text.toString());</span>
+<span class="nc" id="L888">                return null;</span>
+            }
+<span class="nc" id="L890">            return createNewTextElement(text.toString());</span>
+        }
+
+<span class="nc bnc" id="L893" title="All 2 branches missed.">        if (eventParser) {</span>
+<span class="nc" id="L894">            return null;</span>
+        }
+<span class="nc" id="L896">        Element comment = createNewElement(elementName);</span>
+<span class="nc" id="L897">        comment.setAttribute(&quot;content&quot;, text.toString());</span>
+<span class="nc" id="L898">        comment.isComment = true;</span>
+<span class="nc" id="L899">        return comment;</span>
+    }
+
+    /**
+     * Checks whether the specified tag is an empty tag
+     *
+     * @param tagName The tag name to check
+     * @return true if that tag is defined as an empty tag, false otherwise
+     */
+    protected boolean isEmptyTag(String tagName) {
+<span class="fc" id="L909">        return false;</span>
+    }
+
+    /**
+     * A utility method used to notify an error to the ParserCallback and throw an IllegalArgumentException if parsingError returned false
+     *
+     * @param errorId     The error ID, one of the ERROR_* constants in ParserCallback
+     * @param tag         The tag in which the error occured (Can be null for non-tag related errors)
+     * @param attribute   The attribute in which the error occured (Can be null for non-attribute related errors)
+     * @param value       The value in which the error occured (Can be null for non-value related errors)
+     * @param description A verbal description of the error
+     * @throws IllegalArgumentException If the parser callback returned false on this error
+     */
+    protected void notifyError(int errorId, String tag, String attribute, String value, String description) {
+<span class="nc bnc" id="L923" title="All 2 branches missed.">        if (parserCallback != null) {</span>
+<span class="nc" id="L924">            boolean cont = parserCallback.parsingError(errorId, tag, attribute, value, description);</span>
+<span class="nc bnc" id="L925" title="All 2 branches missed.">            if (!cont) {</span>
+<span class="nc" id="L926">                throw new IllegalArgumentException(description);</span>
+            }
+        }
+<span class="nc" id="L929">    }</span>
+
+    /**
+     * Returns true if this element is supported, false otherwise
+     * In XMLParser this always returns true, but subclasses can determine if an element is supported in their context according to its name etc.
+     * Unsupported elements will be skipped by the parser and excluded from the resulting DOM object
+     *
+     * @param element The element to check
+     * @return true if the element is supported, false otherwise
+     */
+    protected boolean isSupported(Element element) {
+<span class="fc" id="L940">        return true;</span>
+    }
+
+    /**
+     * Checks if this element should be evaluated by the parser
+     * This can be overriden by subclasses to skip certain elements
+     *
+     * @param element The element to check
+     * @return true if this element should be evaluated by the parser, false to skip it completely
+     */
+    protected boolean shouldEvaluate(Element element) {
+<span class="nc" id="L951">        return true;</span>
+    }
+
+
+    /**
+     * Sets the specified callback to serve as the callback for parsing errors
+     *
+     * @param parserCallback The callback to use for parsing errors
+     */
+    public void setParserCallback(ParserCallback parserCallback) {
+<span class="fc" id="L961">        this.parserCallback = parserCallback;</span>
+<span class="fc" id="L962">    }</span>
+
+    /**
+     * Sets the parser to be case sensitive and retain case, otherwise it will convert all data to lower case
+     *
+     * @return the caseSensitive
+     */
+    public boolean isCaseSensitive() {
+<span class="nc" id="L970">        return caseSensitive;</span>
+    }
+
+    /**
+     * Sets the parser to be case sensitive and retain case, otherwise it will convert all data to lower case
+     *
+     * @param caseSensitive the caseSensitive to set
+     */
+    public void setCaseSensitive(boolean caseSensitive) {
+<span class="fc" id="L979">        this.caseSensitive = caseSensitive;</span>
+<span class="fc" id="L980">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

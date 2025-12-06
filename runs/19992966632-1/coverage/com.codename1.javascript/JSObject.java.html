@@ -1,0 +1,1083 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>JSObject.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.javascript</a> &gt; <span class="el_source">JSObject.java</span></div><h1>JSObject.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Steve Hannah/Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.javascript;
+
+
+import com.codename1.ui.BrowserComponent;
+import com.codename1.util.Callback;
+import com.codename1.util.CallbackAdapter;
+import com.codename1.util.StringUtil;
+import com.codename1.util.SuccessCallback;
+
+/**
+ * A Java Wrapper around a Javascript object. In Javascript there are only a few
+ * different types:  Number, String, Boolean, Null, Undefined, and Object.
+ *
+ * &lt;p&gt;&lt;strong&gt;NOTE:&lt;/strong&gt; The {@link com.codename1.javascript } package is now deprecated.  The preferred method of
+ * Java/Javascript interop is to use {@link BrowserComponent#execute(java.lang.String) }, {@link BrowserComponent#execute(java.lang.String, com.codename1.util.SuccessCallback) },
+ * {@link BrowserComponent#executeAndWait(java.lang.String) }, etc.. as these work asynchronously (except in the XXXAndWait() variants, which
+ * use invokeAndBlock() to make the calls synchronously.&lt;/p&gt;
+ * &lt;p&gt;
+ * Arrays and functions are objects also.
+ *
+ * &lt;p&gt;A JSObject is associated with a particular {@link JavascriptContext} and it is backed
+ * by a Javascript object inside the javascript context.  This object acts as a
+ * proxy to call methods and access properties of the actual javascript object.&lt;/p&gt;
+ *
+ * &lt;p&gt;All return values for Javascript calls in the {@link JavascriptContext} will be
+ * converted to the appropriate Java type.  Javascript objects will automatically
+ * be wrapped in a JSObject proxy.&lt;/p&gt;
+ *
+ * &lt;h5&gt;Getting and Setting Properties&lt;/h5&gt;
+ *
+ * &lt;p&gt;JSObject provides {@link #get(String)} and {@link #set(String, Object)} methods to get and set properties on the
+ * object. E.g.&lt;/p&gt;
+ * &lt;code&gt;&lt;pre&gt;
+ * obj.set(&quot;name&quot;, &quot;Steve&quot;);
+ * obj.set(&quot;age&quot;, 12);
+ * String name = (String)obj.get(&quot;name&quot;);  // Steve
+ * Double age = (Double)obj.get(&quot;age&quot;);    // 12.0
+ * &lt;/pre&gt;&lt;/code&gt;
+ *
+ * &lt;h5&gt;Typed Getters&lt;/h5&gt;
+ * &lt;p&gt;The return value of {@link #get(String)} will be one of Double, String, Boolean, or JSObject
+ * depending on the type of Javascript value that is being returned.   {@link #get(String)} requires
+ * you to cast the return value to the correct type, which is a bit a pain.  Luckily,
+ * JSObject provides a set of typed getter methods that will automatically cast to
+ * particular types:&lt;/p&gt;
+ *
+ * &lt;table border=&quot;1&quot;&gt;&lt;tbody&gt;
+ *  &lt;tr&gt;
+ *      &lt;td&gt;getInt()&lt;/td&gt;&lt;td&gt;Returns int&lt;/td&gt;
+ *  &lt;/tr&gt;
+ *  &lt;tr&gt;
+ *      &lt;td&gt;getString()&lt;/td&gt;&lt;td&gt;Returns String&lt;/td&gt;
+ *  &lt;/tr&gt;
+ *  &lt;tr&gt;
+ *      &lt;td&gt;getDouble()&lt;/td&gt;&lt;td&gt;Returns double&lt;/td&gt;
+ *  &lt;/tr&gt;
+ *  &lt;tr&gt;
+ *      &lt;td&gt;getObject()&lt;/td&gt;&lt;td&gt;Returns JSObject&lt;/td&gt;
+ *  &lt;/tr&gt;
+ *  &lt;tr&gt;
+ *      &lt;td&gt;getBoolean()&lt;/td&gt;&lt;td&gt;Returns boolean&lt;/td&gt;
+ * &lt;/tr&gt;
+ * &lt;/tbody&gt;
+ * &lt;/table&gt;
+ *
+ * &lt;h5&gt;Indexed Properties&lt;/h5&gt;
+ * &lt;p&gt;JSObject can wrap Javascript arrays also.  You can retrieve the indexed
+ * properties of the array using indexed versions of {@link #get(int)} and {@link #set(int, Object)} (i.e. they
+ * take an int as their first parameter instead of a String).  There are also
+ * typed versions of the indexed {@link #get(int)} method to allow directly returning
+ * values of the correct type without having to type cast&lt;/p&gt;
+ *
+ * &lt;h6&gt;Example, looping through array&lt;/h6&gt;
+ * &lt;code&gt;&lt;pre&gt;
+ * JSObject colors = ctx.get(&quot;['red','green','blue']&quot;);
+ * int len = colors.getInt(&quot;length&quot;);
+ * for ( int i=0; i&amp;lt; len; i++ ){
+ *     System.out.println(&quot;Color &quot;+i+&quot; is &quot;+colors.getString(i));
+ * }
+ * &lt;/pre&gt;&lt;/code&gt;
+ *
+ * &lt;h5&gt;Calling Object Methods&lt;/h5&gt;
+ *
+ * &lt;p&gt;JSObject allows you to call Javascript object methods on the wrapped
+ * Javascript object via the its {@link #call(String, Object[])} method.  It takes the name of the
+ * method (i.e. property name that stores the function), and an array of
+ * parameters to pass to the method.&lt;/p&gt;
+ *
+ * &lt;code&gt;&lt;pre&gt;
+ * JSObject document = (JSObject)context.get(&quot;document&quot;);
+ *
+ * // Call document.writeln(&quot;Hello world&quot;);
+ * document.call(&quot;writeln&quot;, new Object[]{&quot;Hello world&quot;});
+ * &lt;/pre&gt;&lt;/code&gt;
+ *
+ * &lt;h5&gt;Calling Wrapped Functions&lt;/h5&gt;
+ *
+ * &lt;p&gt;Since, in Javascript, functions are objects, it is possible to wrap a function
+ * with a JSObject object also.  You can then call the function using the alternate
+ * version of the {@link #call(JSObject, Object[])} method.&lt;/p&gt;
+ *
+ * &lt;code&gt;&lt;pre&gt;
+ * JSObject window = (JSObject)context.get(&quot;window&quot;);
+ *     // reference to the window object so that we can pass it as the context
+ *     // of the function call.
+ * JSObject myfunc = (JSObject)context.get(&quot;function(a,b){ return a+b}&quot;);
+ * Double result = (Double)myfunc.call(window, new Object[]{new Integer(1), new Integer(2)});
+ * &lt;/pre&gt;&lt;/code&gt;
+ *
+ * &lt;h5&gt;Calling Java Methods from Javascript&lt;/h5&gt;
+ *
+ * &lt;p&gt;The {@link JSFunction} interface allows you to implement functions in Java that can
+ * be called from Javascript.  You can assign any {@link JSFunction} object to be a member
+ * method of an existing JSObject via the {@link #set(String, Object) JSObject.set()} method.  Then the function
+ * can be called from javascript just like any other Javascript method.  {@link JSFunction}
+ * methods are called asynchronously from Javascript to prevent deadlocks.  If you
+ * require a return value to Javascript, you can do that by passing a callback
+ * function which is called by the JSFunction with some parameters.&lt;/p&gt;
+ *
+ * &lt;p&gt;The following example, adds a camera object to the Javascript environment
+ * that has a capture() method, which can be used to capture images using the
+ * device's camera:&lt;/p&gt;
+ *
+ * &lt;code&gt;&lt;pre&gt;
+ * // Create a new Javascript object &quot;camera&quot;
+ * final JSObject camera = (JSObject)ctx.get(&quot;{}&quot;);
+ *
+ * // Create a capture() method on the camera object
+ * // as a JSFunction callback.
+ * camera.set(&quot;capture&quot;, new JSFunction(){
+ *
+ *     public void apply(JSObject self, final Object[] args) {
+ *         Display.getInstance().capturePhoto(new ActionListener(){
+ *
+ *             public void actionPerformed(ActionEvent evt) {
+ *
+ *                 String imagePath = (String)evt.getSource();
+ *
+ *                 // Get the callback function that was provided
+ *                 // from javascript
+ *                 JSObject callback = (JSObject)args[0];
+ *
+ *                 ctx.call(
+ *                         callback, // The function
+ *                         camera,   // The &quot;this&quot; object
+ *                         new Object[]{&quot;file://&quot;+imagePath}  // Parameters
+ *                 );
+ *             }
+ *
+ *         });
+ *     }
+ *
+ * });
+ *
+ *
+ * // Add the camera object to the top-level window object
+ * ctx.set(&quot;window.camera&quot;, camera);
+ *
+ *
+ * &lt;/pre&gt;&lt;/code&gt;
+ * &lt;p&gt;We can then capture photos directly from Javascript using a function similar to the following:&lt;/p&gt;
+ * &lt;code&gt;&lt;pre&gt;
+ * camera.capture(function(url){
+ *     if ( url == null ){
+ *         // No image was captured
+ *         return;
+ *     }
+ *
+ *     // Fetch the preview &amp;lt;img&amp;gt; tag.
+ *     var image = document.getElementById('preview-image');
+ *     // Set the preview URL to the image that was taken.
+ *     image.src = url;
+ * });
+ * &lt;/pre&gt;&lt;/code&gt;
+ *
+ * @author shannah
+ * @deprecated Use {@link BrowserComponent#createJSProxy(java.lang.String) } to create a Javascript proxy object instead.
+ */
+public class JSObject {
+
+    /**
+     * The key, within a Javascript object that stores the ID of an object.
+     * When a JSObject is initially created for a javascript object, an ID
+     * is generated and used to store a reference to the javascript object
+     * in the Javascript lookup table - and this ID is stored in the object
+     * itself.  This &quot;ID_KEY&quot; variable is the name of the property that stores
+     * this ID within the object.
+     */
+    static final String ID_KEY = &quot;ca_weblite_codename1_js_JSObject_ID&quot;;
+    static final String PROP_REFCOUNT = &quot;ca_weblite_codename1_js_JSObject_REFCOUNT&quot;;
+    /**
+     * Javascript register variable 1.
+     */
+    private static final String R1 = &quot;ca_weblite_codename1_js_JSObject_R1&quot;;
+
+    /**
+     * Javascript register variable 2.
+     */
+    private static final String R2 = &quot;ca_weblite_codename1_js_JSObject_R2&quot;;
+    /**
+     * The ID of this object.  This is the ID within the Javascript lookup table
+     * that stores a reference to the actual Javascript object.
+     */
+<span class="fc" id="L226">    int objectId = 0;</span>
+    /**
+     * The Javascript context that this object belongs to.
+     */
+    private final JavascriptContext context;
+
+    /**
+     * Constructor for a JSObject.
+     *
+     * &lt;h5&gt;Example&lt;/h5&gt;
+     *
+     * &lt;code&gt;&lt;pre&gt;
+     * // Create a JavascriptContext for a browser component
+     * JavascriptContext ctx = new JavascriptContext(browserComponent);
+     *
+     * // Get reference to the window object
+     * JSObject window = new JSObject(ctx, &quot;window&quot;);
+     *
+     * // This is equivalent to
+     * window = (JSObject)ctx.get(&quot;window&quot;);
+     *
+     * &lt;/pre&gt;&lt;/code&gt;
+     *
+     * @param context The javascript context in which this object is being created.
+     * @param expr    A javascript expression that resolves to a Javascript Object.
+     */
+<span class="fc" id="L252">    public JSObject(JavascriptContext context, String expr) {</span>
+<span class="fc" id="L253">        this.context = context;</span>
+<span class="fc" id="L254">        synchronized (context.browser) {</span>
+<span class="fc" id="L255">            String escaped = StringUtil.replaceAll(expr, &quot;\\&quot;, &quot;\\\\&quot;);</span>
+<span class="fc" id="L256">            escaped = StringUtil.replaceAll(escaped, &quot;'&quot;, &quot;\\'&quot;);</span>
+<span class="fc" id="L257">            exec(R1 + &quot;=eval('&quot; + escaped + &quot;')&quot;);</span>
+<span class="fc" id="L258">            String type = exec(&quot;typeof(&quot; + R1 + &quot;)&quot;);</span>
+<span class="pc bpc" id="L259" title="1 of 4 branches missed.">            if (!&quot;object&quot;.equals(type) &amp;&amp; !&quot;function&quot;.equals(type)) {</span>
+<span class="fc" id="L260">                throw new JSException(&quot;Attempt to create JSObject for expression &quot; + expr + &quot; which does not evaluate to an object.&quot;);</span>
+            }
+
+<span class="fc" id="L263">            String lt = context.jsLookupTable;</span>
+<span class="fc" id="L264">            String js = &quot;var id = &quot; + R1 + &quot;.&quot; + ID_KEY + &quot;; &quot; +</span>
+                    &quot;if (typeof(id)=='undefined' || typeof(&quot; + lt + &quot;[id]) == 'undefined' || &quot; + lt + &quot;[id].&quot; + ID_KEY + &quot;!=id){&quot; +
+                    lt + &quot;.push(&quot; + R1 + &quot;); id=&quot; + lt + &quot;.indexOf(&quot; + R1 + &quot;); Object.defineProperty(&quot; + R1 + &quot;,\&quot;&quot; + ID_KEY + &quot;\&quot;,{value:id, enumerable:false});&quot; +
+                    &quot;Object.defineProperty(&quot; + R1 + &quot;,\&quot;&quot; + PROP_REFCOUNT + &quot;\&quot;,{value:1, enumerable:false});&quot; +
+                    &quot;} else { &quot; +
+                    R1 + &quot;.&quot; + PROP_REFCOUNT + &quot;++;&quot; +
+                    &quot;} id&quot;;
+
+
+<span class="fc" id="L273">            String id = exec(js);</span>
+<span class="fc" id="L274">            this.objectId = Integer.parseInt(id);</span>
+<span class="fc" id="L275">            context.retain(this);</span>
+<span class="fc" id="L276">        }</span>
+<span class="fc" id="L277">    }</span>
+
+    /**
+     * Returns a member variable of the Javascript object.
+     *
+     * &lt;p&gt;E.g., suppose you have a Javascript object myCar whose JSON representation
+     * is &lt;/p&gt;
+     * &lt;code&gt;
+     * { make : 'Ford', model : 'Escort', 'year' : 1989}
+     * &lt;/code&gt;
+     *
+     * &lt;p&gt;Then the JSObject proxy for this object could call:&lt;/p&gt;
+     * &lt;code&gt;
+     * String model = (String)myCar.get(&quot;model&quot;);
+     * &lt;/code&gt;
+     *
+     * &lt;p&gt;And this would return &quot;Ford&quot;.&lt;/p&gt;
+     *
+     * &lt;h5&gt;Example&lt;/h5&gt;
+     *
+     * &lt;code&gt;&lt;pre&gt;
+     * JSObject document = (JSObject)ctx.get(&quot;document&quot;);
+     *
+     * // Get document title
+     * String title = document.get(&quot;title&quot;);
+     *
+     * // Since the &quot;title&quot; property is a string, get() returns a String.
+     * // We could equivalently use
+     *
+     * title = document.getString(&quot;title&quot;);
+     *
+     * // Get a grandchild property
+     * Double titleLength = (Double)document.get(&quot;title.length&quot;);
+     *
+     * // Since length is an integer, it is probably easier to use getInt()
+     * int titleLengthInt = document.getInt(&quot;title.length&quot;);
+     *
+     * // Get a child object
+     * JSObject body = (JSObject)document.get(&quot;body&quot;);
+     *
+     * // Since &quot;body&quot; is a Javascript object, it is probably easier to use
+     * // getObject()
+     * JSObject body2 = document.getObject(&quot;body&quot;);
+     *
+     * // Get a method as a function object
+     * JSObject open = (JSObject) document.get(&quot;open&quot;);
+     *
+     * // Call the open() method, with document as &quot;this&quot;
+     * open.call(document, new Object[]{}); // Takes no parameters
+     *
+     * // Equivalently we could have called open via the document object
+     * document.call(&quot;open&quot;, new Object[]{});
+     *
+     * &lt;/code&gt;&lt;/pre&gt;
+     *
+     * @param key The name of the property to retrieve on this object.
+     * @return The value of the property specified converted to the appropriate
+     * Java value.  See @ref JavascriptContext.get() for a table of the Javascript
+     * to Java type conversions.
+     */
+    public Object get(String key) {
+<span class="pc bpc" id="L338" title="1 of 2 branches missed.">        if (key.indexOf(&quot;'&quot;) == 0) {</span>
+<span class="nc" id="L339">            return context.get(toJSPointer() + &quot;[&quot; + key + &quot;]&quot;);</span>
+        } else {
+<span class="fc" id="L341">            return context.get(toJSPointer() + &quot;.&quot; + key);</span>
+        }
+    }
+
+
+    /**
+     * Wrapper around get() to return a String.
+     *
+     * @param key The name of the property in the object to retrieve.  Value of this
+     *            property must be a string.
+     * @return The property value as a string.
+     */
+    public String getString(String key) {
+<span class="fc" id="L354">        return (String) get(key);</span>
+    }
+
+    /**
+     * Wrapper around get() to return an int
+     *
+     * @param key The name of the property in the object to retrieve.  Value of this
+     *            property must be an integer.
+     * @return The property value as an integer.
+     */
+    public int getInt(String key) {
+<span class="fc" id="L365">        return ((Double) get(key)).intValue();</span>
+    }
+
+    /**
+     * Wrapper around get() to return a double.
+     *
+     * @param key The name of the property in the object to retrieve. Value of this property
+     *            must be a number.
+     * @return The property value as a double.
+     */
+    public double getDouble(String key) {
+<span class="fc" id="L376">        return ((Double) get(key)).doubleValue();</span>
+    }
+
+    /**
+     * Wrapper around get() to return a boolean.
+     *
+     * @param key The name of the property in the object to retrieve.  Value of this property
+     *            must be a boolean.
+     * @return The property value as a boolean.
+     */
+    public boolean getBoolean(String key) {
+<span class="fc" id="L387">        return ((Boolean) get(key)).booleanValue();</span>
+    }
+
+    /**
+     * Wrapper around the get() method to return a JSObject.
+     *
+     * @param key The name of the property in the object to retrieve.  Value of this property
+     *            must be a Javascript object or function.
+     * @return The property value as a JSObject.
+     */
+    public JSObject getObject(String key) {
+<span class="fc" id="L398">        return (JSObject) get(key);</span>
+    }
+
+
+    /**
+     * This method is useful only for JSObjects that encapsulate Javascript arrays.  It
+     * provides a method to get indexed properties of the array.  E.g. to retrieve the
+     * 5th element of the wrapped array, you could use this method.
+     *
+     * &lt;h5&gt;Example&lt;/h5&gt;
+     * &lt;code&gt;&lt;pre&gt;
+     * JSObject colors = ctx.get(&quot;['red','green','blue']&quot;);
+     * String red = (String)colors.get(0);
+     * String green = (String)colors.get(1);
+     * String blue = (String)colors.get(2);
+     * &lt;/code&gt;&lt;/pre&gt;
+     *
+     * &lt;p&gt;It may be more convenient to use the typed wrapper methods so that you
+     * don't have to typecast the values. E.g.&lt;/p&gt;
+     *
+     * &lt;code&gt;&lt;pre&gt;
+     * String red = colors.getString(0);
+     * String green = colors.getString(1);
+     * String blue = colors.getString(2);
+     * &lt;/code&gt;&lt;/pre&gt;
+     *
+     * &lt;h5&gt;Example, looping through array&lt;/h5&gt;
+     * &lt;code&gt;&lt;pre&gt;
+     * JSObject colors = ctx.get(&quot;['red','green','blue']&quot;);
+     * int len = colors.getInt(&quot;length&quot;);
+     * for ( int i=0; i&amp;lt; len; i++ ){
+     *     System.out.println(&quot;Color &quot;+i+&quot; is &quot;+colors.getString(i));
+     * }
+     * &lt;/pre&gt;&lt;/code&gt;
+     *
+     * @param index The index of the entry within the array to return.
+     * @return The value of the specified indexed element.
+     */
+    public Object get(int index) {
+<span class="fc" id="L437">        return context.get(toJSPointer() + &quot;[&quot; + index + &quot;]&quot;);</span>
+    }
+
+    /**
+     * Wrapper for get(int) for indexed string values.
+     *
+     * @param index The index within an Array object whose value to retrieve.
+     * @return The value of the indexed element.  Must be a String.
+     */
+    public String getString(int index) {
+<span class="nc" id="L447">        return (String) get(index);</span>
+    }
+
+    /**
+     * Wrapper for get(int) for indexed int values.
+     *
+     * @param index The index within the Array object whose value to retrieve.
+     * @return The value of the indexed element.  Must be an integer.
+     */
+    public int getInt(int index) {
+<span class="fc" id="L457">        return ((Double) get(index)).intValue();</span>
+    }
+
+    /**
+     * Wrapper for get(int) for indexed double values.
+     *
+     * @param index The index within the Array object whose value to retrieve.
+     * @return The value of the indexed element. Must be a number.
+     */
+    public double getDouble(int index) {
+<span class="fc" id="L467">        return ((Double) get(index)).doubleValue();</span>
+    }
+
+    /**
+     * Wrapper for get(int) for indexed boolean values.
+     *
+     * @param index The index within the Array object whose value to retrieve.
+     * @return The value of the indexed element. Must be a boolean.
+     */
+    public boolean getBoolean(int index) {
+<span class="nc" id="L477">        return ((Boolean) get(index)).booleanValue();</span>
+    }
+
+    /**
+     * Wrapper for get(int) for indexed object values.
+     *
+     * @param index The index within the Array object whose value to retrieve.
+     * @return The value of the indexed element.  Must be an Object. (e.g. can
+     * be Object, Function, Array, or any other type of Javascript object).
+     */
+    public JSObject getObject(int index) {
+<span class="nc" id="L488">        return (JSObject) get(index);</span>
+    }
+
+
+    /**
+     * Sets a property on the underlying Javascript object. Equivalent of &lt;code&gt;this[key] = js;&lt;/code&gt;.
+     *
+     * @param key   The name of the property to set on the current object.
+     * @param js    The value of the property.  This value should be provided as a
+     *              Java value and it will be converted to the appropriate Javascript value.
+     *              See @ref JavascriptContext.set() for a conversion table of the Java to
+     *              Javascript type conversions.
+     * @param async If this flag is set, then the call will be asynchronous (will not wait for command to complete before continuing execution).
+     */
+    public void set(String key, Object js, boolean async) {
+<span class="fc bfc" id="L503" title="All 2 branches covered.">        if (js instanceof JSFunction) {</span>
+<span class="fc" id="L504">            this.addCallback(key, (JSFunction) js, async);</span>
+<span class="fc" id="L505">            return;</span>
+        }
+<span class="fc bfc" id="L507" title="All 2 branches covered.">        if (key.indexOf(&quot;'&quot;) == 0) {</span>
+<span class="fc" id="L508">            key = toJSPointer() + &quot;[&quot; + key + &quot;]&quot;;</span>
+        } else {
+<span class="fc" id="L510">            key = toJSPointer() + &quot;.&quot; + key;</span>
+        }
+
+<span class="fc" id="L513">        context.set(key, js);</span>
+<span class="fc" id="L514">    }</span>
+
+    /**
+     * Sets a property on this object.  This call is synchronous. Equivalent of &lt;code&gt;this[key] = value;&lt;/code&gt;.
+     *
+     * @param key The name of the property.
+     * @param js  A value for the property.  This may be a primitive type, a JSObject, or a JSFunction.
+     * @see #set(java.lang.String, java.lang.Object, boolean)
+     */
+    public void set(String key, Object js) {
+<span class="fc" id="L524">        set(key, js, false);</span>
+<span class="fc" id="L525">    }</span>
+
+    /**
+     * Sets a property on this object to an integer value. Equivalent of &lt;code&gt;this[key] = value;&lt;/code&gt;.
+     *
+     * @param key   The property name to set.
+     * @param value The value to assign to the property.
+     * @param async True if you want this call to be asynchronous.
+     */
+    public void setInt(String key, int value, boolean async) {
+<span class="nc" id="L535">        set(key, new Double(value), async);</span>
+<span class="nc" id="L536">    }</span>
+
+    /**
+     * Sets a property on this object to an integer value synchronously. Equivalent of &lt;code&gt;this[key] = value;&lt;/code&gt;.
+     *
+     * @param key   The name of the property to set.
+     * @param value The integer value of to set.
+     */
+    public void setInt(String key, int value) {
+<span class="nc" id="L545">        set(key, value, false);</span>
+<span class="nc" id="L546">    }</span>
+
+    /**
+     * Sets a property on this object to a double value. Equivalent of &lt;code&gt;this[key] = value;&lt;/code&gt;.
+     *
+     * @param key   The name of the property to set
+     * @param value The value to set.
+     * @param async True if you want this call to be asynchronous.
+     */
+    public void setDouble(String key, double value, boolean async) {
+<span class="nc" id="L556">        set(key, new Double(value), async);</span>
+<span class="nc" id="L557">    }</span>
+
+    /**
+     * Sets a property on this object to a double value synchronously. Equivalent of &lt;code&gt;this[key] = value;&lt;/code&gt;.
+     *
+     * @param key   The name of the property to set
+     * @param value The value to set.
+     */
+    public void setDouble(String key, double value) {
+<span class="fc" id="L566">        set(key, value, false);</span>
+<span class="fc" id="L567">    }</span>
+
+    /**
+     * Sets a property on this object to a boolean value. Equivalent of &lt;code&gt;this[key] = value;&lt;/code&gt;.
+     *
+     * @param key   The name of the property to set
+     * @param value The value to set.
+     * @param async True if you want this call to be asynchronous.
+     */
+    public void setBoolean(String key, boolean value, boolean async) {
+<span class="pc bpc" id="L577" title="1 of 2 branches missed.">        set(key, value ? Boolean.TRUE : Boolean.FALSE);</span>
+<span class="fc" id="L578">    }</span>
+
+    /**
+     * Sets a property on this object to a boolean value synchronously.  Equivalent of &lt;code&gt;this[key] = value;&lt;/code&gt;.
+     *
+     * @param key   The name of the property to set
+     * @param value The value to set.
+     */
+    public void setBoolean(String key, boolean value) {
+<span class="fc" id="L587">        setBoolean(key, value, false);</span>
+<span class="fc" id="L588">    }</span>
+
+    /**
+     * Sets an indexed value on this object (assuming this object is a Javascript array).  Equivalent of &lt;code&gt;this[index] = js;&lt;/code&gt;.
+     *
+     * @param index The index to set.
+     * @param js    The object to set.  This may be a primitive type, a String, a JSObject, or a JSFunction.
+     * @param async True to make this call asynchronously.
+     */
+    public void set(int index, Object js, boolean async) {
+<span class="fc" id="L598">        context.set(toJSPointer() + &quot;[&quot; + index + &quot;]&quot;, js, async);</span>
+<span class="fc" id="L599">    }</span>
+
+    /**
+     * Sets an indexed value on this object synchronously (assuming this object is a Javascript array).  Equivalent of &lt;code&gt;this[index] = js;&lt;/code&gt;.
+     *
+     * @param index The index to set.
+     * @param js    The object to set.  This may be a primitive type, a String, a JSObject, or a JSFunction.
+     */
+    public void set(int index, Object js) {
+<span class="nc" id="L608">        set(index, js, false);</span>
+<span class="nc" id="L609">    }</span>
+
+    /**
+     * Sets an indexed value on this array to an integer.  Assumes this object is a Javascript array. Equivalent of &lt;code&gt;this[index] = value;&lt;/code&gt;.
+     *
+     * @param index The index within this array to set.
+     * @param value The value to set.
+     * @param async True to make this call asynchronous.
+     */
+    public void setInt(int index, int value, boolean async) {
+<span class="nc" id="L619">        set(index, new Double(value), async);</span>
+<span class="nc" id="L620">    }</span>
+
+    /**
+     * Sets an indexed value on this array to an integer synchronously.  Assumes this object is a Javascript array. Equivalent of &lt;code&gt;this[index] = value;&lt;/code&gt;.
+     *
+     * @param index The index within this array to set.
+     * @param value The value to set.
+     */
+    public void setInt(int index, int value) {
+<span class="fc" id="L629">        set(index, value, false);</span>
+<span class="fc" id="L630">    }</span>
+
+    /**
+     * Sets an indexed value on this array to a double.  Assumes this object is a Javascript array. Equivalent of &lt;code&gt;this[index] = value;&lt;/code&gt;.
+     *
+     * @param index The index within this array to set.
+     * @param value The value to set.
+     * @param async True to make this call asynchronous.
+     */
+    public void setDouble(int index, double value, boolean async) {
+<span class="nc" id="L640">        set(index, new Double(value), async);</span>
+<span class="nc" id="L641">    }</span>
+
+    /**
+     * Sets an indexed value on this array to a double synchronously.  Assumes this object is a Javascript array. Equivalent of &lt;code&gt;this[index] = value;&lt;/code&gt;.
+     *
+     * @param index The index within this array to set.
+     * @param value The value to set.
+     */
+    public void setDouble(int index, double value) {
+<span class="nc" id="L650">        set(index, value, false);</span>
+<span class="nc" id="L651">    }</span>
+
+    /**
+     * Sets an indexed value on this array to a boolean.  Assumes this object is a Javascript array. Equivalent of &lt;code&gt;this[index] = value;&lt;/code&gt;.
+     *
+     * @param index The index within this array to set.
+     * @param value The value to set.
+     * @param async True to make this call asynchronous.
+     */
+    public void setBoolean(int index, boolean value, boolean async) {
+<span class="nc bnc" id="L661" title="All 2 branches missed.">        set(index, value ? Boolean.TRUE : Boolean.FALSE, async);</span>
+<span class="nc" id="L662">    }</span>
+
+    /**
+     * Sets an indexed value on this array to a boolean synchronously.  Assumes this object is a Javascript array. Equivalent of &lt;code&gt;this[index] = value;&lt;/code&gt;.
+     *
+     * @param index The index within this array to set.
+     * @param value The value to set.
+     */
+    public void setBoolean(int index, boolean value) {
+<span class="nc" id="L671">        setBoolean(index, value, false);</span>
+<span class="nc" id="L672">    }</span>
+
+    /**
+     * Returns a Javascript variable name for the underlying Javascript object.  This
+     * refers to the object inside the JavascriptContext's lookup table.
+     *
+     * @return
+     */
+    public String toJSPointer() {
+<span class="fc" id="L681">        return context.jsLookupTable + &quot;[&quot; + objectId + &quot;]&quot;;</span>
+    }
+
+    /**
+     * Convenience method.  A wrapper around BrowserComponent.executeAndReturnString()
+     *
+     * @param js
+     * @return
+     */
+    private String exec(String js, boolean async) {
+<span class="pc bpc" id="L691" title="1 of 2 branches missed.">        if (async) {</span>
+<span class="nc" id="L692">            context.browser.execute(js);</span>
+<span class="nc" id="L693">            return null;</span>
+        } else {
+<span class="fc" id="L695">            return context.browser.executeAndReturnString(js);</span>
+        }
+    }
+
+    private String exec(String js) {
+<span class="fc" id="L700">        return exec(js, false);</span>
+    }
+
+    /**
+     * Registers a {@link JSFunction} with the Javascript context so that it can handle
+     * calls from Javascript.  This installs a Javascript proxy method that
+     * sends a message, via the BrowserNavigationCallback mechanism to the
+     * JavascriptContext object so that the actual Java code in the JSFunction
+     * will be called.
+     *
+     * @param key  The name of the property on the underlying Javascript object
+     *             where the method proxy will be added in Javascript.
+     * @param func A JSFunction callback that will be called when the generated
+     *             Javascript proxy method is called.
+     */
+    void addCallback(String key, JSFunction func, boolean async) {
+<span class="fc" id="L716">        context.addCallback(this, key, func, async);</span>
+<span class="fc" id="L717">    }</span>
+
+    /**
+     * Removes a previously added JSFunction callback from the object.
+     *
+     * @param key The name of the property on the underlying Javascript object
+     *            that is to be deleted.
+     */
+    void removeCallback(String key, boolean async) {
+<span class="fc" id="L726">        context.removeCallback(this, key, async);</span>
+<span class="fc" id="L727">    }</span>
+
+    void removeCallback(String key) {
+<span class="fc" id="L730">        removeCallback(key, false);</span>
+<span class="fc" id="L731">    }</span>
+
+
+    /**
+     * Calls a method on the underlying Javascript object.
+     *
+     * @param key    The name of the method to call.
+     * @param params Array of parameters to pass to the method.  These will be
+     *               converted to corresponding Javascript types according to the translation
+     *               table specified in {@link JavascriptContext#set(String, Object)}
+     * @return The result of calling the method.  Javascript return values will
+     * be converted to corresponding Java types according to the rules described
+     * in {@link JavascriptContext#get(String)}
+     */
+    public Object call(String key, Object[] params) {
+<span class="fc" id="L746">        return context.call(toJSPointer() + &quot;.&quot; + key, this, params);</span>
+    }
+
+    /**
+     * Calls a method on the underlying Javascript object asynchronously.
+     *
+     * @param key      The name of the method to call.
+     * @param params   Array of parameters to pass to the method.  These will be
+     *                 converted to corresponding Javascript types according to the translation
+     *                 table specified in {@link JavascriptContext#set(String, Object)}
+     * @param callback Callback to be called when the method call is completed.
+     */
+    public void callAsync(String key, Object[] params, Callback callback) {
+<span class="fc" id="L759">        context.callAsync(this, this, params, callback);</span>
+<span class="fc" id="L760">    }</span>
+
+    /**
+     * Calls a method on the underlying Javascript object asynchronously.
+     *
+     * @param key      The name of the method to call.
+     * @param params   Array of parameters to pass to the method.  These will be
+     *                 converted to corresponding Javascript types according to the translation
+     *                 table specified in {@link JavascriptContext#set(String, Object)}
+     * @param callback Callback to be called when the method call is completed.
+     */
+    public void callAsync(String key, Object[] params, final SuccessCallback callback) {
+<span class="fc" id="L772">        this.callAsync(key, params, new CallbackAdapter() {</span>
+
+            @Override
+            public void onSucess(Object value) {
+<span class="fc" id="L776">                callback.onSucess(value);</span>
+<span class="fc" id="L777">            }</span>
+
+        });
+<span class="fc" id="L780">    }</span>
+
+    /**
+     * Calls a method on the underlying Javascript object synchronously with no arguments.
+     *
+     * @param key The name of the method.
+     * @return The return value of the method.
+     */
+    public Object call(String key) {
+<span class="nc" id="L789">        return call(key, new Object[]{});</span>
+    }
+
+    /**
+     * Calls a method on the underlying Javascript object asynchronously with no arguments.
+     *
+     * @param key      The name of the method.
+     * @param callback Callback to be called with the return value.
+     */
+    public void callAsync(String key, Callback callback) {
+<span class="nc" id="L799">        callAsync(key, new Object[]{}, callback);</span>
+<span class="nc" id="L800">    }</span>
+
+    /**
+     * Calls a method on the underlying Javascript object asynchronously with no arguments.
+     *
+     * @param key      The name of the method.
+     * @param callback Callback to be called with the return value.
+     */
+    public void callAsync(String key, final SuccessCallback callback) {
+<span class="nc" id="L809">        callAsync(key, new CallbackAdapter() {</span>
+
+            @Override
+            public void onSucess(Object value) {
+<span class="nc" id="L813">                callback.onSucess(value);</span>
+<span class="nc" id="L814">            }</span>
+
+        });
+<span class="nc" id="L817">    }</span>
+
+    /**
+     * Calls a method on the underlying Javascript object that returns an int.   Called synchronously with no arguments.
+     *
+     * @param key The name of the method.
+     * @return The return value of the method.
+     */
+    public int callInt(String key) {
+<span class="nc" id="L826">        Double d = (Double) call(key);</span>
+<span class="nc" id="L827">        return d.intValue();</span>
+    }
+
+    /**
+     * Calls a method on the underlying Javascript object that returns an int.  Call is asynchronous.  Return value or error is passed to the
+     * provided callback.
+     *
+     * @param key      The name of the method.
+     * @param callback Callback to handle the return value.
+     */
+    public void callIntAsync(String key, final Callback&lt;Integer&gt; callback) {
+<span class="nc" id="L838">        callDoubleAsync(key, new Callback&lt;Double&gt;() {</span>
+
+            public void onSucess(Double value) {
+<span class="nc" id="L841">                callback.onSucess(value.intValue());</span>
+<span class="nc" id="L842">            }</span>
+
+            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+<span class="nc" id="L845">                callback.onError(sender, err, errorCode, errorMessage);</span>
+<span class="nc" id="L846">            }</span>
+
+        });
+<span class="nc" id="L849">    }</span>
+
+    /**
+     * Calls a method on the underlying Javascript object that returns an int.  Call is asynchronous.  Return value or error is passed to the
+     * provided callback.
+     *
+     * @param key      The name of the method.
+     * @param callback Callback to handle the return value.
+     */
+    public void callIntAsync(String key, final SuccessCallback&lt;Integer&gt; callback) {
+<span class="nc" id="L859">        callIntAsync(key, new CallbackAdapter&lt;Integer&gt;() {</span>
+
+            @Override
+            public void onSucess(Integer value) {
+<span class="nc" id="L863">                callback.onSucess(value);</span>
+<span class="nc" id="L864">            }</span>
+
+        });
+<span class="nc" id="L867">    }</span>
+
+    /**
+     * Calls a method on the underlying Javascript object that returns a double.   Called synchronously with no arguments.
+     *
+     * @param key The name of the method.
+     * @return The return value of the method.
+     */
+    public double callDouble(String key) {
+<span class="nc" id="L876">        Double d = (Double) call(key);</span>
+<span class="nc" id="L877">        return d.doubleValue();</span>
+    }
+
+    /**
+     * Calls a method on the underlying Javascript object that returns a double.  Call is asynchronous.  Return value or error is passed to the
+     * provided callback.
+     *
+     * @param key      The name of the method.
+     * @param callback Callback to handle the return value.
+     */
+    public void callDoubleAsync(String key, Callback&lt;Double&gt; callback) {
+<span class="nc" id="L888">        callAsync(key, callback);</span>
+<span class="nc" id="L889">    }</span>
+
+    /**
+     * Calls a method on the underlying Javascript object that returns a double.  Call is asynchronous.  Return value or error is passed to the
+     * provided callback.
+     *
+     * @param key      The name of the method.
+     * @param callback Callback to handle the return value.
+     */
+    public void callDoubleAsync(String key, final SuccessCallback&lt;Double&gt; callback) {
+<span class="nc" id="L899">        callDoubleAsync(key, new CallbackAdapter&lt;Double&gt;() {</span>
+
+            @Override
+            public void onSucess(Double value) {
+<span class="nc" id="L903">                callback.onSucess(value);</span>
+<span class="nc" id="L904">            }</span>
+
+        });
+<span class="nc" id="L907">    }</span>
+
+    /**
+     * Calls a method on the underlying Javascript object that returns a String.   Called synchronously with no arguments.
+     *
+     * @param key The name of the method.
+     * @return The return value of the method.
+     */
+    public String callString(String key) {
+<span class="nc" id="L916">        return (String) call(key);</span>
+    }
+
+    /**
+     * Calls a method on the underlying Javascript object that returns a String.  Call is asynchronous.  Return value or error is passed to the
+     * provided callback.
+     *
+     * @param key      The name of the method.
+     * @param callback Callback to handle the return value.
+     */
+    public void callStringAsync(String key, Callback&lt;String&gt; callback) {
+<span class="nc" id="L927">        callAsync(key, callback);</span>
+<span class="nc" id="L928">    }</span>
+
+    /**
+     * Calls a method on the underlying Javascript object that returns a String.  Call is asynchronous.  Return value or error is passed to the
+     * provided callback.
+     *
+     * @param key      The name of the method.
+     * @param callback Callback to handle the return value.
+     */
+    public void callStringAsync(String key, final SuccessCallback&lt;String&gt; callback) {
+<span class="nc" id="L938">        callStringAsync(key, new CallbackAdapter&lt;String&gt;() {</span>
+
+            @Override
+            public void onSucess(String value) {
+<span class="nc" id="L942">                callback.onSucess(value);</span>
+<span class="nc" id="L943">            }</span>
+        });
+<span class="nc" id="L945">    }</span>
+
+    /**
+     * Calls a method on the underlying Javascript object that returns a Javascript object.   Called synchronously with no arguments.
+     *
+     * @param key The name of the method.
+     * @return The return value of the method.
+     */
+    public JSObject callObject(String key) {
+<span class="nc" id="L954">        return (JSObject) call(key);</span>
+    }
+
+    /**
+     * Calls a method on the underlying Javascript object that returns a Javascript object.  Call is asynchronous.  Return value or error is passed to the
+     * provided callback.
+     *
+     * @param key      The name of the method.
+     * @param callback Callback to handle the return value.
+     */
+    public void callObjectAsync(String key, Callback&lt;JSObject&gt; callback) {
+<span class="nc" id="L965">        callAsync(key, callback);</span>
+<span class="nc" id="L966">    }</span>
+
+    /**
+     * Calls a method on the underlying Javascript object that returns a Javascript object.  Call is asynchronous.  Return value or error is passed to the
+     * provided callback.
+     *
+     * @param key      The name of the method.
+     * @param callback Callback to handle the return value.
+     */
+    public void callObjectAsync(String key, final SuccessCallback&lt;JSObject&gt; callback) {
+<span class="nc" id="L976">        callObjectAsync(key, new CallbackAdapter&lt;JSObject&gt;() {</span>
+
+            @Override
+            public void onSucess(JSObject value) {
+<span class="nc" id="L980">                callback.onSucess(value);</span>
+<span class="nc" id="L981">            }</span>
+        });
+<span class="nc" id="L983">    }</span>
+
+    /**
+     * Calls the object as a function statically.  In this case &quot;this&quot; will
+     * be window.
+     *
+     * &lt;p&gt;E.g.&lt;/p&gt;
+     * &lt;code&gt;&lt;pre&gt;
+     * JSObject alert = (JSObject)ctx.get(&quot;window.alert&quot;);
+     * alert.call(new Object[]{&quot;An alert message&quot;});
+     * &lt;/pre&gt;&lt;/code&gt;
+     * &lt;p&gt;The above gets a reference to the alert() function (remember functions are
+     * objects in Javascript).  Then it calls
+     * it via Java, passing it a single string parameter.  This is equivalent
+     * to the following Javasript:&lt;/p&gt;
+     * &lt;p&gt;&lt;code&gt;&lt;pre&gt;
+     * alert(&quot;An alert message&quot;);
+     * &lt;/pre&gt;&lt;/code&gt;&lt;/p&gt;
+     *
+     * @param params The parameters to pass to the function.  These will be converted
+     *               to the appropriate Javascript type.
+     * @return The result of the javascript function call converted to the appropriate
+     * Java type.
+     */
+    public Object call(Object... params) {
+<span class="nc" id="L1008">        JSObject window = (JSObject) context.get(&quot;window&quot;);</span>
+<span class="nc" id="L1009">        return context.call(this, window, params);</span>
+    }
+
+    /**
+     * Calls the object as a function statically.  The call is made asynchronously  In this case &quot;this&quot; will
+     * be window.
+     *
+     * &lt;p&gt;E.g.&lt;/p&gt;
+     * &lt;code&gt;&lt;pre&gt;
+     * JSObject alert = (JSObject)ctx.get(&quot;window.alert&quot;);
+     * alert.call(new Object[]{&quot;An alert message&quot;});
+     * &lt;/pre&gt;&lt;/code&gt;
+     * &lt;p&gt;The above gets a reference to the alert() function (remember functions are
+     * objects in Javascript).  Then it calls
+     * it via Java, passing it a single string parameter.  This is equivalent
+     * to the following Javasript:&lt;/p&gt;
+     * &lt;p&gt;&lt;code&gt;&lt;pre&gt;
+     * alert(&quot;An alert message&quot;);
+     * &lt;/pre&gt;&lt;/code&gt;&lt;/p&gt;
+     *
+     * @param params   The parameters to pass to the function.  These will be converted
+     *                 to the appropriate Javascript type.
+     * @param callback The result of the javascript function call converted to the appropriate
+     *                 Java type and passed to the callback.
+     */
+    public void callAsync(Object[] params, Callback callback) {
+<span class="nc" id="L1035">        context.callAsync(this, context.getWindow(), params, callback);</span>
+<span class="nc" id="L1036">    }</span>
+
+    /**
+     * Calls the object as a function statically.  The call is made asynchronously  In this case &quot;this&quot; will
+     * be window.
+     *
+     * &lt;p&gt;E.g.&lt;/p&gt;
+     * &lt;code&gt;&lt;pre&gt;
+     * JSObject alert = (JSObject)ctx.get(&quot;window.alert&quot;);
+     * alert.call(new Object[]{&quot;An alert message&quot;});
+     * &lt;/pre&gt;&lt;/code&gt;
+     * &lt;p&gt;The above gets a reference to the alert() function (remember functions are
+     * objects in Javascript).  Then it calls
+     * it via Java, passing it a single string parameter.  This is equivalent
+     * to the following Javasript:&lt;/p&gt;
+     * &lt;p&gt;&lt;code&gt;&lt;pre&gt;
+     * alert(&quot;An alert message&quot;);
+     * &lt;/pre&gt;&lt;/code&gt;&lt;/p&gt;
+     *
+     * @param params   The parameters to pass to the function.  These will be converted
+     *                 to the appropriate Javascript type.
+     * @param callback The result of the javascript function call converted to the appropriate
+     *                 Java type and passed to the callback.
+     */
+    public void callAsync(Object[] params, final SuccessCallback callback) {
+<span class="nc" id="L1061">        callAsync(params, new CallbackAdapter() {</span>
+
+            @Override
+            public void onSucess(Object value) {
+<span class="nc" id="L1065">                callback.onSucess(value);</span>
+<span class="nc" id="L1066">            }</span>
+
+        });
+<span class="nc" id="L1069">    }</span>
+
+    /**
+     * Returns the toString from the JavaScript object effectively the equivalent of {@code callString(&quot;toString&quot;)}
+     *
+     * @return the String representation of the JavaScript object
+     */
+    @Override
+    public String toString() {
+<span class="nc" id="L1078">        return callString(&quot;toString&quot;);</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
