@@ -1313,6 +1313,29 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         dispatchPointerRelease(x, y);
     }
 
+    public void dispatchScrollToVisible(final Container container, final int scrollY) {
+        if (container == null) {
+            return;
+        }
+        final Display display = Display.getInstance();
+        if (display == null) {
+            return;
+        }
+
+        Runnable r = new Runnable() {
+            public void run() {
+                int height = Math.max(1, container.getHeight());
+                container.scrollRectToVisible(0, scrollY, container.getWidth(), height, container);
+            }
+        };
+
+        if (display.isEdt()) {
+            r.run();
+        } else {
+            display.callSeriallyAndWait(r);
+        }
+    }
+
     public void pressComponent(Component component) {
         if (component == null) {
             return;
