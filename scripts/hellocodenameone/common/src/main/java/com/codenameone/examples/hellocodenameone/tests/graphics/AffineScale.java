@@ -27,7 +27,7 @@ public class AffineScale extends AbstractGraphicsScreenshotTest {
         g.fillLinearGradient(0xff0000, 0xff, 0, 0, 100, 100, true);
 
         transform.scale(-1, 1);
-        g.fillLinearGradient(0xff0000, 0xff, 100, 100, 100, 100, true);
+        g.fillLinearGradient(0xff0000, 0xff, 0, 100, 100, 100, true);
         g.resetAffine();
     }
 
