@@ -1308,6 +1308,30 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         sendPointerEventToCurrentForm(false, x, y);
     }
 
+    public void dispatchPointerDrag(final int x, final int y) {
+        final Display display = Display.getInstance();
+        if (display == null) {
+            return;
+        }
+
+        Runnable r = new Runnable() {
+            public void run() {
+                Form current = display.getCurrent();
+                if (current == null) {
+                    return;
+                }
+
+                current.pointerDragged(x, y);
+            }
+        };
+
+        if (display.isEdt()) {
+            r.run();
+        } else {
+            display.callSeriallyAndWait(r);
+        }
+    }
+
     public void dispatchPointerPressAndRelease(int x, int y) {
         dispatchPointerPress(x, y);
         dispatchPointerRelease(x, y);
