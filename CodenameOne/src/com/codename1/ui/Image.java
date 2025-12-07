@@ -392,7 +392,7 @@ public class Image implements ActionSource {
         boolean isJpeg = isJPEG(fss.openInputStream(capturedImage));
         boolean isPNG = isPNG(fss.openInputStream(capturedImage));
         String format;
-        // IMPORTANT: we cannot relies on the file extension of the capturedImage path,
+        // IMPORTANT: we cannot rely on the file extension of the capturedImage path,
         // because some Android devices return images from the gallery without extension!
         if (!isJpeg && !isPNG) {
             // Only jpeg and png images are supported, but some devices can return also different formats from the gallery (like gif).
@@ -472,7 +472,7 @@ public class Image implements ActionSource {
 
     /**
      * <p>
-     * Gets the EXIF orientation tag of an image, if it's available.</p>
+     * Gets the EXIF orientation tag of an image if it's available.</p>
      * <p>
      * The Exif Orientation Tag is a number from 0 to 8, for the explanation of
      * each value see the

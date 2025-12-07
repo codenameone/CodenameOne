@@ -1,5 +1,6 @@
 package com.codenameone.examples.hellocodenameone;
 
+import com.codename1.system.Lifecycle;
 import com.codename1.testing.TestReporting;
 import com.codename1.ui.Button;
 import com.codename1.ui.BrowserComponent;
@@ -15,33 +16,15 @@ import com.codename1.ui.CN;
 import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunner;
 import com.codenameone.examples.hellocodenameone.tests.Cn1ssDeviceRunnerReporter;
 
-public class HelloCodenameOne {
-    private Form current;
-    private static boolean deviceRunnerExecuted;
-
+public class HelloCodenameOne extends Lifecycle {
+    @Override
     public void init(Object context) {
+        super.init(context);
         TestReporting.setInstance(new Cn1ssDeviceRunnerReporter());
     }
 
-    public void start() {
-        if (current != null) {
-            current.show();
-            return;
-        }
-        Form c = CN.getCurrentForm();
-        if (!deviceRunnerExecuted || c == null) {
-            deviceRunnerExecuted = true;
-            new Thread(() -> new Cn1ssDeviceRunner().runSuite()).start();
-            return;
-        }
-        c.show();
-    }
-
-    public void stop() {
-        current = Display.getInstance().getCurrent();
-    }
-
-    public void destroy() {
-        // Nothing to clean up for this sample
+    @Override
+    public void runApp() {
+        new Thread(() -> new Cn1ssDeviceRunner().runSuite()).start();
     }
 }

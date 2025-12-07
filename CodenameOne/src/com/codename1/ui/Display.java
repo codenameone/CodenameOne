@@ -2698,8 +2698,6 @@ public final class Display extends CN1Constants {
      * @since 8.0
      */
     public int convertToPixels(float value, byte unitType, boolean horizontal) {
-
-
         switch (unitType) {
             case Style.UNIT_TYPE_REM:
                 return Math.round(value * Font.getDefaultFont().getHeight());

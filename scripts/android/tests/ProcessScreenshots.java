@@ -335,7 +335,7 @@ public class ProcessScreenshots {
         byte[] data = Files.readAllBytes(path);
         for (int i = 0; i < PNG_SIGNATURE.length; i++) {
             if (data[i] != PNG_SIGNATURE[i]) {
-                throw new IOException(path + " is not a PNG file (missing signature)");
+                throw new IOException(path + " is not a PNG file (missing signature) on " + path);
             }
         }
         int offset = PNG_SIGNATURE.length;
@@ -350,7 +350,7 @@ public class ProcessScreenshots {
             byte[] type = java.util.Arrays.copyOfRange(data, offset + 4, offset + 8);
             offset += 8;
             if (offset + length + 4 > data.length) {
-                throw new IOException("PNG chunk truncated before CRC");
+                throw new IOException("PNG chunk truncated before CRC while processing: " + path);
             }
             byte[] chunkData = java.util.Arrays.copyOfRange(data, offset, offset + length);
             offset += length + 4; // skip data + CRC
@@ -364,7 +364,7 @@ public class ProcessScreenshots {
                 int filter = chunkData[11] & 0xFF;
                 interlace = chunkData[12] & 0xFF;
                 if (compression != 0 || filter != 0) {
-                    throw new IOException("Unsupported PNG compression or filter method");
+                    throw new IOException("Unsupported PNG compression or filter method on " + path);
                 }
             } else if ("IDAT".equals(chunkType)) {
                 idatChunks.add(chunkData);
@@ -373,10 +373,10 @@ public class ProcessScreenshots {
             }
         }
         if (width <= 0 || height <= 0) {
-            throw new IOException("Missing IHDR chunk");
+            throw new IOException("Missing IHDR chunk on " + path);
         }
         if (interlace != 0) {
-            throw new IOException("Interlaced PNGs are not supported");
+            throw new IOException("Interlaced PNGs are not supported " + path);
         }
         int bytesPerPixel = bytesPerPixel(bitDepth, colorType);
         byte[] combined = concat(idatChunks);
