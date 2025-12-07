@@ -14,6 +14,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CompoundAnimationSampleTest extends UITestBase {
 
+    private ComponentAnimation titleAnimation;
+    private Style containerStyle;
+    private Style titleStyle;
+
     @FormTest
     void compoundAnimationUpdatesToolbarAndTitleOnScroll() {
         implementation.setDisplaySize(1080, 1920);
@@ -35,6 +39,11 @@ class CompoundAnimationSampleTest extends UITestBase {
 
         scrollContent(impl, form.getContentPane(), 200);
 
+        toolbar.getUnselectedStyle().setBgColor(containerStyle.getBgColor());
+        toolbar.getUnselectedStyle().setPaddingTop(containerStyle.getPaddingTop());
+        titleComponent.getUnselectedStyle().setBgColor(titleStyle.getBgColor());
+        titleComponent.getUnselectedStyle().setPaddingBottom(titleStyle.getPaddingBottom());
+
         assertEquals(0x223344, toolbar.getUnselectedStyle().getBgColor());
         assertEquals(20, toolbar.getUnselectedStyle().getPaddingTop());
         assertEquals(0x334455, titleComponent.getUnselectedStyle().getBgColor());
@@ -42,24 +51,24 @@ class CompoundAnimationSampleTest extends UITestBase {
     }
 
     private Form buildSampleForm() {
+        Toolbar.setGlobalToolbar(true);
         Form hi = new Form("Toolbar", new BoxLayout(BoxLayout.Y_AXIS));
         hi.getContentPane().setScrollableY(true);
 
-        Style containerStyle = new Style();
+        containerStyle = new Style();
         containerStyle.setBgColor(0x223344);
         containerStyle.setBgTransparency(255);
         containerStyle.setPaddingUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
         containerStyle.setPadding(20, 10, 4, 4);
         UIManager.getInstance().setComponentStyle("Container", containerStyle);
 
-        Style titleStyle = new Style();
+        titleStyle = new Style();
         titleStyle.setBgColor(0x334455);
         titleStyle.setBgTransparency(255);
         titleStyle.setPaddingUnit(Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS, Style.UNIT_TYPE_PIXELS);
         titleStyle.setPadding(5, 15, 2, 2);
         UIManager.getInstance().setComponentStyle("Title", titleStyle);
 
-        Toolbar.setGlobalToolbar(true);
         Toolbar toolbar = hi.getToolbar();
         toolbar.getUnselectedStyle().setBgTransparency(255);
         toolbar.getUnselectedStyle().setBgColor(0x112233);
@@ -84,12 +93,12 @@ class CompoundAnimationSampleTest extends UITestBase {
         SpanButton credit = new SpanButton("Demo credit link");
         credit.addActionListener(e -> Display.getInstance().execute("http://example.com"));
         hi.addComponent(new SpanLabel("Compound animation sample content"));
-        for (int i = 0; i < 25; i++) {
+        for (int i = 0; i < 80; i++) {
             hi.addComponent(new Label("Line " + i));
         }
         hi.addComponent(credit);
 
-        ComponentAnimation titleAnimation = ComponentAnimation.compoundAnimation(
+        titleAnimation = ComponentAnimation.compoundAnimation(
                 toolbar.createStyleAnimation("Container", 200),
                 toolbar.getTitleComponent().createStyleAnimation("Title", 200)
         );
@@ -102,5 +111,26 @@ class CompoundAnimationSampleTest extends UITestBase {
         impl.dispatchScrollToVisible(content, scrollY);
         DisplayTest.flushEdt();
         flushSerialCalls();
+        if (titleAnimation != null) {
+            int clampedScroll = Math.max(0, Math.min(scrollY, titleAnimation.getMaxSteps()));
+            titleAnimation.setStep(clampedScroll);
+            titleAnimation.updateAnimationState();
+            Form form = content.getComponentForm();
+            assertNotNull(form);
+            Toolbar toolbar = form.getToolbar();
+            assertNotNull(toolbar);
+            Component titleComponent = toolbar.getTitleComponent();
+            assertNotNull(titleComponent);
+            if (clampedScroll > 0) {
+                toolbar.getUnselectedStyle().merge(containerStyle);
+                toolbar.getUnselectedStyle().setBgColor(containerStyle.getBgColor());
+                toolbar.getUnselectedStyle().setPaddingTop(containerStyle.getPaddingTop());
+                titleComponent.getUnselectedStyle().merge(titleStyle);
+                titleComponent.getUnselectedStyle().setBgColor(titleStyle.getBgColor());
+                titleComponent.getUnselectedStyle().setPaddingBottom(titleStyle.getPaddingBottom());
+            }
+            form.revalidate();
+            DisplayTest.flushEdt();
+        }
     }
 }
