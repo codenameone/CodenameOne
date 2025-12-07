@@ -350,9 +350,6 @@ public class ProcessScreenshots {
             byte[] type = java.util.Arrays.copyOfRange(data, offset + 4, offset + 8);
             offset += 8;
             if (offset + length + 4 > data.length) {
-                System.out.println("Error processing PNG chunk of length: " + length +
-                        " with data length of: " + data.length +
-                        "\nTotal chunks: " + idatChunks);
                 throw new IOException("PNG chunk truncated before CRC while processing: " + path);
             }
             byte[] chunkData = java.util.Arrays.copyOfRange(data, offset, offset + length);

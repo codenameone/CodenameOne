@@ -1,5 +1,6 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
+import com.codename1.ui.CN;
 import com.codename1.ui.Component;
 import com.codename1.ui.Font;
 import com.codename1.ui.Form;
@@ -12,14 +13,18 @@ import com.codename1.ui.layouts.GridLayout;
 public abstract class AbstractGraphicsScreenshotTest extends BaseTest {
     private final int[] colorSet = {0xff0000, 0xff00, 0xff, 0xffffff};
     private int currentColor = -1;
+    private int factor = 0;
 
     protected void nextColor(Graphics g) {
-        if (currentColor == -1) {
+        if(factor == 0) {
+            factor = CN.getDisplayWidth() < 400 ? 5 : 1;
+        }
+        if(currentColor == -1) {
             currentColor = 0;
             g.setColor(colorSet[0]);
         }
         g.darkerColor(1);
-        if (g.getColor() == 0) {
+        if(g.getColor() == 0) {
             currentColor++;
             if (currentColor == colorSet.length) {
                 currentColor = 0;

@@ -25,6 +25,9 @@ public class DrawString extends AbstractGraphicsScreenshotTest {
             g.drawString(name, bounds.getX(), y);
             y += g.getFont().getHeight();
         }
+
+        g.setColor(0xff0000);
+        g.drawStringBaseline("Baseline and עברית", bounds.getX(), bounds.getY() + bounds.getHeight());
     }
 
     @Override

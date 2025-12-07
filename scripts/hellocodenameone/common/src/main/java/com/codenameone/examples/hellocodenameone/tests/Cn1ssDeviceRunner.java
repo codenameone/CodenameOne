@@ -7,7 +7,9 @@ import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.util.StringUtil;
+import com.codenameone.examples.hellocodenameone.tests.graphics.AffineScale;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawArc;
+import com.codenameone.examples.hellocodenameone.tests.graphics.DrawGradient;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawImage;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawLine;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawRect;
@@ -15,8 +17,10 @@ import com.codenameone.examples.hellocodenameone.tests.graphics.DrawRoundRect;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawString;
 import com.codenameone.examples.hellocodenameone.tests.graphics.DrawStringDecorated;
 import com.codenameone.examples.hellocodenameone.tests.graphics.FillArc;
+import com.codenameone.examples.hellocodenameone.tests.graphics.FillPolygon;
 import com.codenameone.examples.hellocodenameone.tests.graphics.FillRect;
 import com.codenameone.examples.hellocodenameone.tests.graphics.FillRoundRect;
+import com.codenameone.examples.hellocodenameone.tests.graphics.Scale;
 
 public final class Cn1ssDeviceRunner extends DeviceRunner {
     private static final BaseTest[] TEST_CLASSES = new BaseTest[] {
@@ -31,6 +35,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new DrawString(),
             new DrawImage(),
             new DrawStringDecorated(),
+            new DrawGradient(),
+            new FillPolygon(),
+            new AffineScale(),
+            new Scale(),
             new BrowserComponentScreenshotTest(),
             new MediaPlaybackScreenshotTest()
     };

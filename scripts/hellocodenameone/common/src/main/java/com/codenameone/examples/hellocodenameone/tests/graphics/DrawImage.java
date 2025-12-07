@@ -1,6 +1,7 @@
 package com.codenameone.examples.hellocodenameone.tests.graphics;
 
 import com.codename1.ui.EncodedImage;
+import com.codename1.ui.FontImage;
 import com.codename1.ui.Graphics;
 import com.codename1.ui.Image;
 import com.codename1.ui.RGBImage;
@@ -14,10 +15,12 @@ public class DrawImage extends AbstractGraphicsScreenshotTest {
     private RGBImage rgbImage;
     private Image fromRgba;
     private Image fromBytes;
+    private FontImage fontImage;
+    private Image scaled;
 
     @Override
     protected void drawContent(Graphics g, Rectangle bounds) {
-        int size = bounds.getWidth() / 3;
+        int size = bounds.getWidth() / 4;
         if(mutable == null) {
             mutable = Image.createImage(size, size);
             Graphics mg = mutable.getGraphics();
@@ -30,6 +33,8 @@ public class DrawImage extends AbstractGraphicsScreenshotTest {
             rgbImage = new RGBImage(mutable);
             fromRgba = Image.createImage(rgbImage.getRGB(), size, size);
             fromBytes = Image.createImage(encoded.getImageData(), 0, encoded.getImageData().length);
+            fontImage = FontImage.createFixed("" + FontImage.MATERIAL_ALARM_ON, FontImage.getMaterialDesignFont(), 0xff0000, size, size, 2);
+            scaled = mutable.scaled(size * 2, size * 2).scaled(size, size);
         }
         int yBound = bounds.getY();
         g.drawImage(mutable, bounds.getX(), yBound);
@@ -39,10 +44,13 @@ public class DrawImage extends AbstractGraphicsScreenshotTest {
         g.drawImage(mutableWithAlpha, bounds.getX() + size, yBound);
 
         g.drawImage(encoded, bounds.getX() + size * 2, yBound);
+        g.drawImage(fontImage, bounds.getX() + size * 3, yBound);
+
         yBound = bounds.getY() + size;
         g.drawImage(rgbImage, bounds.getX(), yBound);
         g.drawImage(fromRgba, bounds.getX() + size, yBound);
         g.drawImage(fromBytes, bounds.getX() + size * 2, yBound);
+        g.drawImage(scaled, bounds.getX() + size * 3, yBound);
 
         int smallSize = size / 2;
         yBound = bounds.getY() + size * 2;
@@ -55,6 +63,8 @@ public class DrawImage extends AbstractGraphicsScreenshotTest {
         g.drawImage(rgbImage, bounds.getX() + smallSize * 3, yBound, smallSize, smallSize);
         g.drawImage(fromRgba, bounds.getX() + smallSize * 4, yBound, smallSize, smallSize);
         g.drawImage(fromBytes, bounds.getX() + smallSize * 5, yBound, smallSize, smallSize);
+        g.drawImage(fontImage, bounds.getX() + smallSize * 6, yBound, smallSize, smallSize);
+        g.drawImage(scaled, bounds.getX() + smallSize * 7, yBound, smallSize, smallSize);
         yBound += smallSize;
 
         int larger = bounds.getWidth() / 2;
@@ -70,6 +80,10 @@ public class DrawImage extends AbstractGraphicsScreenshotTest {
         yBound += larger;
         g.drawImage(fromRgba, bounds.getX(), yBound, larger, larger);
         g.drawImage(fromBytes, bounds.getX() + larger, yBound, larger, larger);
+
+        yBound += larger;
+        g.drawImage(fontImage, bounds.getX(), yBound, larger, larger);
+        g.drawImage(scaled, bounds.getX() + larger, yBound, larger, larger);
     }
 
     @Override
