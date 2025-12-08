@@ -1,6 +1,7 @@
 package com.codenameone.examples.hellocodenameone.tests.graphics;
 
 import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
 import com.codename1.ui.geom.Rectangle;
 import com.codenameone.examples.hellocodenameone.tests.AbstractGraphicsScreenshotTest;
 
@@ -20,7 +21,8 @@ public class DrawRGB extends AbstractGraphicsScreenshotTest {
             }
         }
 
-        g.drawRGB(rgbData, 0, bounds.getX(), bounds.getY(), w, h, true);
+        Image img = Image.createImage(rgbData, w, h);
+        g.drawImage(img, bounds.getX(), bounds.getY());
 
         // With transparency
         for (int i = 0; i < rgbData.length; i++) {
@@ -28,7 +30,8 @@ public class DrawRGB extends AbstractGraphicsScreenshotTest {
                 rgbData[i] = 0; // transparent
             }
         }
-        g.drawRGB(rgbData, 0, bounds.getX() + w + 10, bounds.getY(), w, h, true);
+        Image imgTransparent = Image.createImage(rgbData, w, h);
+        g.drawImage(imgTransparent, bounds.getX() + w + 10, bounds.getY());
     }
 
     @Override
