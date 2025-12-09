@@ -2187,7 +2187,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public String[] listFiles(String directory) {
         return fileSystem.keySet().stream()
-                .filter(path -> path.startsWith(directory))
+                .filter(path -> path.startsWith(directory) && !path.equals(directory))
                 .toArray(String[]::new);
     }
 
