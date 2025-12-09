@@ -40,6 +40,7 @@ import java.io.InputStream;
  */
 public class CachedDataService extends ConnectionRequest {
     private final CachedData data = new CachedData();
+    private boolean responseProcessed;
 
     private CachedDataService() {
         setReadResponseForErrors(false);
@@ -116,6 +117,10 @@ public class CachedDataService extends ConnectionRequest {
      * {@inheritDoc}
      */
     protected void readResponse(InputStream input) throws IOException {
+        if (responseProcessed) {
+            return;
+        }
+        responseProcessed = true;
         data.setData(Util.readInputStream(input));
         fireResponseListener(new NetworkEvent(this, data));
         data.setFetching(false);
