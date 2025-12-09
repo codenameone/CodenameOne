@@ -9,9 +9,7 @@ ra_log() { echo "[run-android-instrumentation-tests] $1"; }
 ensure_dir() { mkdir -p "$1" 2>/dev/null || true; }
 
 # CN1SS helpers are implemented in Java for easier maintenance
-CN1SS_MAIN_CLASS="Cn1ssChunkTools"
-PROCESS_SCREENSHOTS_CLASS="ProcessScreenshots"
-RENDER_SCREENSHOT_REPORT_CLASS="RenderScreenshotReport"
+# (Defaults for class names are provided by cn1ss.sh)
 
 # ---- Args & environment ----------------------------------------------------
 
@@ -25,13 +23,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
-CN1SS_HELPER_SOURCE_DIR="$SCRIPT_DIR/android/tests"
+CN1SS_HELPER_SOURCE_DIR="$SCRIPT_DIR/common/java"
+source "$SCRIPT_DIR/lib/cn1ss.sh"
+
 if [ ! -f "$CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java" ]; then
   ra_log "Missing CN1SS helper: $CN1SS_HELPER_SOURCE_DIR/$CN1SS_MAIN_CLASS.java" >&2
   exit 3
 fi
-
-source "$SCRIPT_DIR/lib/cn1ss.sh"
 cn1ss_log() { ra_log "$1"; }
 
 TMPDIR="${TMPDIR:-/tmp}"; TMPDIR="${TMPDIR%/}"
@@ -220,85 +218,36 @@ done
 
 # ---- Compare against stored references ------------------------------------
 
-COMPARE_ARGS=()
+COMPARE_ENTRIES=()
 for test in "${TEST_NAMES[@]}"; do
   dest="${TEST_OUTPUTS[$test]:-}"
   [ -n "$dest" ] || continue
-  COMPARE_ARGS+=("--actual" "${test}=${dest}")
+  COMPARE_ENTRIES+=("${test}=${dest}")
 done
 
 COMPARE_JSON="$SCREENSHOT_TMP_DIR/screenshot-compare.json"
-export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
-ra_log "STAGE:COMPARE -> Evaluating screenshots against stored references"
-if ! cn1ss_java_run "$PROCESS_SCREENSHOTS_CLASS" \
-  --reference-dir "$SCREENSHOT_REF_DIR" \
-  --emit-base64 \
-  --preview-dir "$SCREENSHOT_PREVIEW_DIR" \
-  "${COMPARE_ARGS[@]}" > "$COMPARE_JSON"; then
-  ra_log "FATAL: Screenshot comparison helper failed"
-  exit 13
-fi
-
 SUMMARY_FILE="$SCREENSHOT_TMP_DIR/screenshot-summary.txt"
 COMMENT_FILE="$SCREENSHOT_TMP_DIR/screenshot-comment.md"
 
-ra_log "STAGE:COMMENT_BUILD -> Rendering summary and PR comment markdown"
-render_args=(
-  --compare-json "$COMPARE_JSON"
-  --comment-out "$COMMENT_FILE"
-  --summary-out "$SUMMARY_FILE"
-  --coverage-summary "$COVERAGE_SUMMARY"
-)
-if [ -n "${ANDROID_COVERAGE_HTML_URL:-}" ]; then
-  render_args+=(--coverage-html-url "${ANDROID_COVERAGE_HTML_URL}")
-fi
-if ! cn1ss_java_run "$RENDER_SCREENSHOT_REPORT_CLASS" "${render_args[@]}"; then
-  ra_log "FATAL: Failed to render screenshot summary/comment"
-  exit 14
-fi
-
-if [ -s "$SUMMARY_FILE" ]; then
-  ra_log "  -> Wrote summary entries to $SUMMARY_FILE ($(wc -l < "$SUMMARY_FILE" 2>/dev/null || echo 0) line(s))"
-else
-  ra_log "  -> No summary entries generated (all screenshots matched stored baselines)"
-fi
-
-if [ -s "$COMMENT_FILE" ]; then
-  ra_log "  -> Prepared PR comment payload at $COMMENT_FILE (bytes=$(wc -c < "$COMMENT_FILE" 2>/dev/null || echo 0))"
-else
-  ra_log "  -> No PR comment content produced"
-fi
-
-if [ -s "$SUMMARY_FILE" ]; then
-  while IFS='|' read -r status test message copy_flag path preview_note; do
-    [ -n "${test:-}" ] || continue
-    ra_log "Test '${test}': ${message}"
-    if [ "$copy_flag" = "1" ] && [ -n "${path:-}" ] && [ -f "$path" ]; then
-      cp -f "$path" "$ARTIFACTS_DIR/${test}.png" 2>/dev/null || true
-      ra_log "  -> Stored PNG artifact copy at $ARTIFACTS_DIR/${test}.png"
-    fi
-    if [ "$status" = "equal" ] && [ -n "${path:-}" ]; then
-      rm -f "$path" 2>/dev/null || true
-    fi
-    if [ -n "${preview_note:-}" ]; then
-      ra_log "  Preview note: ${preview_note}"
-    fi
-  done < "$SUMMARY_FILE"
-fi
-
-cp -f "$COMPARE_JSON" "$ARTIFACTS_DIR/screenshot-compare.json" 2>/dev/null || true
-if [ -s "$COMMENT_FILE" ]; then
-  cp -f "$COMMENT_FILE" "$ARTIFACTS_DIR/screenshot-comment.md" 2>/dev/null || true
-fi
-
-ra_log "STAGE:COMMENT_POST -> Submitting PR feedback"
-comment_rc=0
+export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 export CN1SS_COMMENT_MARKER="<!-- CN1SS_ANDROID_COMMENT -->"
 export CN1SS_COMMENT_LOG_PREFIX="[run-android-device-tests]"
 export CN1SS_PREVIEW_SUBDIR="android"
-if ! cn1ss_post_pr_comment "$COMMENT_FILE" "$SCREENSHOT_PREVIEW_DIR"; then
-  comment_rc=$?
+export CN1SS_COVERAGE_SUMMARY="$COVERAGE_SUMMARY"
+if [ -n "${ANDROID_COVERAGE_HTML_URL:-}" ]; then
+    export CN1SS_COVERAGE_HTML_URL="${ANDROID_COVERAGE_HTML_URL}"
 fi
+
+cn1ss_process_and_report \
+  "Android screenshot updates" \
+  "$COMPARE_JSON" \
+  "$SUMMARY_FILE" \
+  "$COMMENT_FILE" \
+  "$SCREENSHOT_REF_DIR" \
+  "$SCREENSHOT_PREVIEW_DIR" \
+  "$ARTIFACTS_DIR" \
+  "${COMPARE_ENTRIES[@]}"
+comment_rc=$?
 
 # Copy useful artifacts for GH Actions
 cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner-logcat.txt" 2>/dev/null || true

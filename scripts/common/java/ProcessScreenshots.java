@@ -28,6 +28,8 @@ public class ProcessScreenshots {
     private static final byte[] PNG_SIGNATURE = new byte[]{
             (byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A
     };
+    private static final int MAX_RETRIES = 5;
+    private static final long RETRY_DELAY_MS = 2000;
 
     public static void main(String[] args) throws Exception {
         Arguments arguments = Arguments.parse(args);
@@ -71,8 +73,8 @@ public class ProcessScreenshots {
                 }
             } else {
                 try {
-                    PNGImage actual = loadPng(actualPath);
-                    PNGImage expected = loadPng(expectedPath);
+                    PNGImage actual = loadPngWithRetry(actualPath);
+                    PNGImage expected = loadPngWithRetry(expectedPath);
                     Map<String, Object> outcome = compareImages(expected, actual);
                     if (Boolean.TRUE.equals(outcome.get("equal"))) {
                         record.put("status", "equal");
@@ -107,7 +109,7 @@ public class ProcessScreenshots {
                 return external;
             }
         }
-        PNGImage image = cached != null ? cached : loadPng(actualPath);
+        PNGImage image = cached != null ? cached : loadPngWithRetry(actualPath);
         return buildCommentPayload(image, MAX_COMMENT_BASE64);
     }
 
@@ -329,6 +331,58 @@ public class ProcessScreenshots {
         result.put("bit_depth", actual.bitDepth);
         result.put("color_type", actual.colorType);
         return result;
+    }
+
+    private static PNGImage loadPngWithRetry(Path path) throws IOException {
+        int attempt = 0;
+        long lastSize = -1;
+        while (true) {
+            try {
+                // Stabilize check: if file size is changing, wait
+                if (Files.exists(path)) {
+                    long size = Files.size(path);
+                    if (size != lastSize) {
+                        lastSize = size;
+                        if (attempt > 0) {
+                            // If size changed, we should wait and retry
+                            Thread.sleep(RETRY_DELAY_MS);
+                            attempt++;
+                            if (attempt >= MAX_RETRIES) {
+                                break; // fall through to try loading anyway, will likely fail
+                            }
+                            continue;
+                        }
+                    }
+                }
+
+                return loadPng(path);
+            } catch (IOException e) {
+                // Only retry on truncated chunk or premature end of file
+                if (e.getMessage() != null &&
+                    (e.getMessage().contains("PNG chunk truncated") ||
+                     e.getMessage().contains("Premature end of file") ||
+                     e.getMessage().contains("Missing IHDR"))) {
+
+                    attempt++;
+                    if (attempt >= MAX_RETRIES) {
+                        throw e;
+                    }
+                    try {
+                        System.err.println("Retrying load of " + path + " (attempt " + (attempt + 1) + "/" + MAX_RETRIES + "): " + e.getMessage());
+                        Thread.sleep(RETRY_DELAY_MS);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new IOException("Interrupted while waiting to retry load of " + path, ie);
+                    }
+                } else {
+                    throw e;
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("Interrupted while loading " + path, e);
+            }
+        }
+        return loadPng(path); // Final attempt
     }
 
     private static PNGImage loadPng(Path path) throws IOException {
@@ -984,4 +1038,3 @@ class JsonUtil {
         }
     }
 }
-
