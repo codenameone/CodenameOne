@@ -36,7 +36,7 @@ public class LeadComponentScrollingTest3079Test extends UITestBase {
 
         // Assert layout
         assertNotNull(targetButton);
-        assertTrue(hi.contains(targetButton));
+        assertEquals(hi, targetButton.getComponentForm());
 
         // Click on a button (scrolling shouldn't prevent click if it's a tap)
         // Need to find where targetButton is.

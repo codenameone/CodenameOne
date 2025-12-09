@@ -83,7 +83,7 @@ public class InterFormContainerSampleTest extends UITestBase {
 
         // Assertions
         assertEquals(hi, Display.getInstance().getCurrent());
-        assertTrue(hi.contains(sharedButton));
+        assertEquals(hi, sharedButton.getComponentForm());
 
         // Simulate click on showTransition to show dest
         showTransition.pressed();
@@ -98,11 +98,11 @@ public class InterFormContainerSampleTest extends UITestBase {
 
         // In this case, we just fired an event that calls dest.show().
         assertEquals(dest, Display.getInstance().getCurrent());
-        assertTrue(dest.contains(sharedButton));
+        assertEquals(dest, sharedButton.getComponentForm());
 
         // Click back
         backCmd.actionPerformed(null);
         assertEquals(hi, Display.getInstance().getCurrent());
-        assertTrue(hi.contains(sharedButton));
+        assertEquals(hi, sharedButton.getComponentForm());
     }
 }
