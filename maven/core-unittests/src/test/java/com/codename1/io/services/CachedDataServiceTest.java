@@ -32,6 +32,13 @@ class CachedDataServiceTest extends UITestBase {
 
         final boolean[] callbackInvoked = new boolean[1];
         try {
+            TestCodenameOneImplementation.TestConnection connection = implementation.createConnection("http://example.com/data");
+            connection.setHeader("Last-Modified", "Sun, 02 Jan 2000 00:00:00 GMT");
+            connection.setHeader("ETag", "etag-2");
+            byte[] payload = "fresh".getBytes();
+            connection.setInputData(payload);
+            connection.setContentLength(payload.length);
+
             CachedDataService.updateData(data, new ActionListener() {
                 public void actionPerformed(ActionEvent evt) {
                     callbackInvoked[0] = true;
@@ -51,15 +58,7 @@ class CachedDataServiceTest extends UITestBase {
             assertEquals("http://example.com/data", request.getUrl());
             assertFalse(request.isPost());
 
-            TestCodenameOneImplementation.TestConnection connection = implementation.createConnection(request.getUrl());
-            connection.setHeader("Last-Modified", "Sun, 02 Jan 2000 00:00:00 GMT");
-            connection.setHeader("ETag", "etag-2");
-
             request.readHeaders(connection);
-
-            byte[] payload = "fresh".getBytes();
-            connection.setInputData(payload);
-            connection.setContentLength(payload.length);
 
             request.readResponse(new ByteArrayInputStream(payload));
             assertTrue(callbackInvoked[0]);
