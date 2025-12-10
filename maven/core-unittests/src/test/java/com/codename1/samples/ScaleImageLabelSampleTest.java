@@ -35,7 +35,7 @@ public class ScaleImageLabelSampleTest extends UITestBase {
             pressCount++;
             String message = "Pressed " + pressCount + " times";
             try {
-                loadTextImage(scaleLabel, (Image) scaleLabel.getIcon(), message, scaleLabel.getWidth(), scaleLabel.getHeight());
+                loadTextImage(scaleLabel, null, message, scaleLabel.getWidth(), scaleLabel.getHeight());
             } catch (Exception ex) {
                 fail("Unexpected exception while updating icon: " + ex.getMessage());
             }

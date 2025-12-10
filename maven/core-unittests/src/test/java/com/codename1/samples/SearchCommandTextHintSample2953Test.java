@@ -18,6 +18,7 @@ public class SearchCommandTextHintSample2953Test extends UITestBase {
 
     @FormTest
     public void testSearchCommandFiltersContent() {
+        Toolbar.setGlobalToolbar(true);
         final Form form = new Form("FormTitle");
         form.setLayout(BoxLayout.y());
         final Container content = form.getContentPane();
@@ -29,7 +30,7 @@ public class SearchCommandTextHintSample2953Test extends UITestBase {
 
         Toolbar toolbar = form.getToolbar();
         ActionListener listener = e -> {
-            String text = (String) e.getSource();
+            String text = e.getSource() == null ? "" : e.getSource().toString();
             for (Component c : form.getContentPane()) {
                 boolean hide = c instanceof Label && ((Label) c).getText().indexOf(text) < 0;
                 c.setHidden(hide);
