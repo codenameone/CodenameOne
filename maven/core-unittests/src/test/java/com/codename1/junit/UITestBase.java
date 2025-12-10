@@ -2,6 +2,7 @@ package com.codename1.junit;
 
 import com.codename1.impl.ImplementationFactory;
 import com.codename1.io.Util;
+import com.codename1.testing.SafeL10NManager;
 import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.Display;
 import com.codename1.ui.DisplayTest;
@@ -37,9 +38,14 @@ public abstract class UITestBase {
                     return implRef;
                 }
             });
+            // Setup SafeL10NManager before init if possible, or immediately after
+            // But L10NManager is fetched from implementation.
+            implementation.setLocalizationManager(new SafeL10NManager("en", "US"));
+
             Display.init(null);
         } else {
             implementation = TestCodenameOneImplementation.getInstance();
+            implementation.setLocalizationManager(new SafeL10NManager("en", "US"));
         }
         Util.setImplementation(implementation);
     }
