@@ -27,12 +27,10 @@ public class LoadingTextAnimationSampleTest extends UITestBase {
         waitForFormTitle("Hi World");
 
         TestCodenameOneImplementation.getInstance().tapComponent(b);
-        // waitForFormTitle("Hello"); // This might timeout if transition blocks or if EDT is single threaded simulation
 
-        // Wait for title with logic
         long start = System.currentTimeMillis();
         boolean found = false;
-        while(System.currentTimeMillis() - start < 5000) {
+        while(System.currentTimeMillis() - start < 2000) {
             Form f = CN.getCurrentForm();
             if (f != null && "Hello".equals(f.getTitle())) {
                 found = true;
@@ -41,15 +39,10 @@ public class LoadingTextAnimationSampleTest extends UITestBase {
             try { Thread.sleep(50); } catch(Exception e){}
         }
 
-        if (!found) {
-            // If transition is happening, maybe we need to wait/flush?
-            // But let's proceed to check form content anyway if it updated in background.
-        }
-
         Form helloForm = CN.getCurrentForm();
 
         try {
-            Thread.sleep(2500);
+            Thread.sleep(500);
         } catch (InterruptedException ex) {}
 
         Component c = findComponent(helloForm, SpanLabel.class);
@@ -64,7 +57,7 @@ public class LoadingTextAnimationSampleTest extends UITestBase {
         if (next != null) {
             TestCodenameOneImplementation.getInstance().tapComponent(next);
              try {
-                Thread.sleep(2500);
+                Thread.sleep(500);
             } catch (InterruptedException ex) {}
         }
     }
@@ -86,7 +79,7 @@ public class LoadingTextAnimationSampleTest extends UITestBase {
 
     private void waitForFormTitle(String title) {
         long start = System.currentTimeMillis();
-        while(System.currentTimeMillis() - start < 5000) {
+        while(System.currentTimeMillis() - start < 2000) {
             Form f = CN.getCurrentForm();
             if (f != null && title.equals(f.getTitle())) {
                 return;
@@ -140,7 +133,7 @@ public class LoadingTextAnimationSampleTest extends UITestBase {
                     com.codename1.ui.CommonProgressAnimations.LoadingTextAnimation.markComponentReady(l);
                 });
             }
-        }, 2000);
+        }, 100);
     }
 
     private class MyData {
@@ -159,7 +152,7 @@ public class LoadingTextAnimationSampleTest extends UITestBase {
                 out.complete(new MyData());
             }
 
-        }, 2000);
+        }, 100);
 
         return out;
     }

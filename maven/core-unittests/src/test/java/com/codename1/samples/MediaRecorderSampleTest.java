@@ -66,12 +66,14 @@ public class MediaRecorderSampleTest extends UITestBase {
                                     m.play();
                                 } catch (IOException err) {
                                     Log.e(err);
+                                    err.printStackTrace();
                                 }
                             });
                             hi.add(mb);
                             hi.revalidate();
                         } catch (IOException err) {
                             Log.e(err);
+                            err.printStackTrace();
                         }
                     }
                 });
@@ -80,7 +82,11 @@ public class MediaRecorderSampleTest extends UITestBase {
             Log.e(err);
         }
         hi.show();
-        waitForFormTitle("Capture");
+
+        // Wait for show
+        flushSerialCalls();
+        try { Thread.sleep(100); } catch(Exception e){}
+        flushSerialCalls();
 
         Component cmdButton = findComponentWithIcon(hi, icon);
         if (cmdButton != null) {
@@ -96,12 +102,11 @@ public class MediaRecorderSampleTest extends UITestBase {
              }
         }
 
-        // Wait/Check
+        // No loop, check immediately
         String[] files = impl.listFiles(recordingsDir);
+        assertTrue(files.length > 0, "Recording should be saved immediately in sync test env");
 
-        if (files.length > 0) {
-            assertTrue(files.length > 0, "Recording should be saved");
-
+        if (hi.getContentPane().getComponentCount() > 0) {
             Component c = hi.getContentPane().getComponentAt(hi.getContentPane().getComponentCount()-1);
             if (c instanceof MultiButton) {
                 impl.tapComponent(c);
@@ -122,17 +127,6 @@ public class MediaRecorderSampleTest extends UITestBase {
             }
         }
         return null;
-    }
-
-    private void waitForFormTitle(String title) {
-        long start = System.currentTimeMillis();
-        while(System.currentTimeMillis() - start < 5000) {
-            Form f = CN.getCurrentForm();
-            if (f != null && title.equals(f.getTitle())) {
-                return;
-            }
-            try { Thread.sleep(50); } catch(Exception e){}
-        }
     }
 
     class MockMedia implements Media {
