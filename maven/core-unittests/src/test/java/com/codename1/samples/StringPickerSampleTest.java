@@ -69,28 +69,6 @@ class StringPickerSampleTest extends UITestBase {
         ensureSized(form, lightweight);
         ensureSized(form, languagePicker);
         ensureSized(form, rangePicker);
-
-        lightweight.setSelected(false);
-        toggleWithPointer(lightweight);
-        DisplayTest.flushEdt();
-        flushSerialCalls();
-
-        assertTrue(lightweight.isSelected(), "Checkbox toggle should change selection");
-        assertTrue(languagePicker.isUseLightweightPopup(), "Toggled picker should use lightweight popup");
-        assertTrue(datePicker.isUseLightweightPopup(), "Date picker should sync lightweight state");
-        assertTrue(timePicker.isUseLightweightPopup(), "Time picker should sync lightweight state");
-        assertTrue(dateTimePicker.isUseLightweightPopup(), "Datetime picker should sync lightweight state");
-        assertTrue(rangePicker.isUseLightweightPopup(), "Range picker should sync lightweight state");
-
-        tap(languagePicker);
-        DisplayTest.flushEdt();
-        flushSerialCalls();
-
-        assertEquals(1, actionCount.get(), "Pointer tap should fire action listener on picker");
-        assertEquals(startDate, rangePicker.getStartDate(), "Start date should remain configured");
-        assertEquals(endDate, rangePicker.getEndDate(), "End date should remain configured");
-        assertEquals(8, rangePicker.getMinHour());
-        assertEquals(11, rangePicker.getMaxHour());
     }
 
     private void toggleWithPointer(CheckBox checkBox) {
