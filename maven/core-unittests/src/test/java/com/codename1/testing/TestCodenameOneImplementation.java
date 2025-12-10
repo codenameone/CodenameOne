@@ -188,6 +188,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private final List<AudioCaptureFrame> audioCaptureFrames = new ArrayList<AudioCaptureFrame>();
     private TextArea activeTextEditor;
     private Function<String, byte[]> connectionResponseProvider;
+    private final Map<String, String[]> sslCertificatesByUrl = new ConcurrentHashMap<String, String[]>();
+    private boolean sslCertificatesSupported;
 
 
     public TestCodenameOneImplementation() {
@@ -1959,6 +1961,42 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void setConnectionResponseProvider(Function<String, byte[]> provider) {
         this.connectionResponseProvider = provider;
+    }
+
+    @Override
+    public boolean canGetSSLCertificates() {
+        return sslCertificatesSupported;
+    }
+
+    @Override
+    public String[] getSSLCertificates(Object connection, String url) throws IOException {
+        if (!sslCertificatesSupported) {
+            return new String[0];
+        }
+        String[] values = sslCertificatesByUrl.get(url);
+        if (values == null) {
+            return new String[0];
+        }
+        return Arrays.copyOf(values, values.length);
+    }
+
+    public void setSslCertificates(String url, String... certificates) {
+        if (url == null) {
+            return;
+        }
+        if (certificates == null) {
+            sslCertificatesByUrl.remove(url);
+            return;
+        }
+        sslCertificatesByUrl.put(url, Arrays.copyOf(certificates, certificates.length));
+    }
+
+    public void clearSslCertificates() {
+        sslCertificatesByUrl.clear();
+    }
+
+    public void setSslCertificatesSupported(boolean supported) {
+        this.sslCertificatesSupported = supported;
     }
 
     public TestConnection getConnection(String url) {
