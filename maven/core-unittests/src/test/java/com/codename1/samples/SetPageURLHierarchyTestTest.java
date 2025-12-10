@@ -1,5 +1,7 @@
 package com.codename1.samples;
 
+import com.codename1.io.tar.TarEntry;
+import com.codename1.io.tar.TarOutputStream;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.BrowserComponent;
@@ -10,20 +12,30 @@ import com.codename1.ui.layouts.BorderLayout;
 import org.junit.jupiter.api.Assertions;
 
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 public class SetPageURLHierarchyTestTest extends UITestBase {
 
     @FormTest
-    public void testSetPageURLHierarchy() {
+    public void testSetPageURLHierarchy() throws IOException {
         Form wform = new Form("wform", new BorderLayout());
 
         // Setup mock peer
         TestPeerComponent mockPeer = new TestPeerComponent(new Object());
         implementation.setBrowserComponent(mockPeer);
 
+        byte[] data = "<html><body>Hello</body></html>".getBytes();
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        TarOutputStream tarOutputStream = new TarOutputStream(bos);
+        TarEntry entry = new TarEntry("Page.html", "Page.html");
+        entry.setSize(data.length);
+        tarOutputStream.putNextEntry(entry);
+        tarOutputStream.write(data);
+        tarOutputStream.close();
+
         // Provide dummy resource
-        implementation.putResource("/Page.html", new ByteArrayInputStream("<html><body>Hello</body></html>".getBytes()));
+        implementation.putResource("/html.tar", new ByteArrayInputStream(bos.toByteArray()));
 
         final BrowserComponent browser = new BrowserComponent();
 

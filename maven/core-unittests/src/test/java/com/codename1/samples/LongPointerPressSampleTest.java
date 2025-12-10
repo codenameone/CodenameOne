@@ -20,14 +20,12 @@ public class LongPointerPressSampleTest extends UITestBase {
         Container centerCnt = new Container(BoxLayout.y()) {
             @Override
             public void longPointerPress(int x, int y) {
-                System.out.println("In longPointerPress");
                 longPressTriggered = true;
             }
 
             @Override
             public void pointerPressed(int x, int y) {
                 super.pointerPressed(x, y);
-                System.out.println("In pointer press");
                 pointerPressedTriggered = true;
             }
         };

@@ -70,6 +70,7 @@ class StringPickerSampleTest extends UITestBase {
         ensureSized(form, languagePicker);
         ensureSized(form, rangePicker);
 
+        lightweight.setSelected(false);
         toggleWithPointer(lightweight);
         DisplayTest.flushEdt();
         flushSerialCalls();
