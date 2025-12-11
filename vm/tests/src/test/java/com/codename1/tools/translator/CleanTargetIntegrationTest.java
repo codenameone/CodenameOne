@@ -219,7 +219,58 @@ class CleanTargetIntegrationTest {
                 "    free(obj);\n" +
                 "}\n" +
                 "\n" +
-                "void initConstantPool() {}\n" +
+                "JAVA_OBJECT* constantPoolObjects = NULL;\n" +
+                "\n" +
+                "void initConstantPool() {\n" +
+                "    if (constantPoolObjects == NULL) {\n" +
+                "        constantPoolObjects = calloc(32, sizeof(JAVA_OBJECT));\n" +
+                "    }\n" +
+                "}\n" +
+                "\n" +
+                "void arrayFinalizerFunction(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array) {\n" +
+                "    (void)threadStateData;\n" +
+                "    free(array);\n" +
+                "}\n" +
+                "\n" +
+                "void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {\n" +
+                "    (void)threadStateData;\n" +
+                "    (void)obj;\n" +
+                "    (void)force;\n" +
+                "}\n" +
+                "\n" +
+                "void** initVtableForInterface() {\n" +
+                "    static void* table[1];\n" +
+                "    return (void**)table;\n" +
+                "}\n" +
+                "\n" +
+                "struct clazz class_array1__JAVA_INT = {0};\n" +
+                "struct clazz class_array2__JAVA_INT = {0};\n" +
+                "\n" +
+                "static JAVA_OBJECT allocArrayInternal(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim) {\n" +
+                "    struct JavaArrayPrototype* arr = (struct JavaArrayPrototype*)calloc(1, sizeof(struct JavaArrayPrototype));\n" +
+                "    arr->__codenameOneParentClsReference = type;\n" +
+                "    arr->length = length;\n" +
+                "    arr->dimensions = dim;\n" +
+                "    arr->primitiveSize = primitiveSize;\n" +
+                "    if (length > 0) {\n" +
+                "        int elementSize = primitiveSize > 0 ? primitiveSize : sizeof(JAVA_OBJECT);\n" +
+                "        arr->data = calloc((size_t)length, (size_t)elementSize);\n" +
+                "    }\n" +
+                "    return (JAVA_OBJECT)arr;\n" +
+                "}\n" +
+                "\n" +
+                "JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim) {\n" +
+                "    return allocArrayInternal(threadStateData, length, type, primitiveSize, dim);\n" +
+                "}\n" +
+                "\n" +
+                "JAVA_OBJECT alloc2DArray(CODENAME_ONE_THREAD_STATE, int length1, int length2, struct clazz* parentType, struct clazz* childType, int primitiveSize) {\n" +
+                "    struct JavaArrayPrototype* outer = (struct JavaArrayPrototype*)allocArrayInternal(threadStateData, length1, parentType, sizeof(JAVA_OBJECT), 2);\n" +
+                "    JAVA_OBJECT* rows = (JAVA_OBJECT*)outer->data;\n" +
+                "    for (int i = 0; i < length1; i++) {\n" +
+                "        rows[i] = allocArrayInternal(threadStateData, length2, childType, primitiveSize, 1);\n" +
+                "    }\n" +
+                "    return (JAVA_OBJECT)outer;\n" +
+                "}\n" +
                 "\n" +
                 "void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, int classNameId, int methodNameId) {\n" +
                 "    (void)__cn1ThisObject;\n" +

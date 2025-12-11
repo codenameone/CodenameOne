@@ -108,7 +108,7 @@ class BytecodeInstructionIntegrationTest {
 
         Path executable = buildDir.resolve("CustomBytecodeApp");
         String output = CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), buildDir);
-        assertTrue(output.contains("RESULT=54"), "Compiled program should print the expected arithmetic result");
+        assertTrue(output.contains("RESULT=293"), "Compiled program should print the expected arithmetic result");
     }
 
     private Set<String> snapshotArrayTypes() throws Exception {
@@ -312,7 +312,14 @@ class BytecodeInstructionIntegrationTest {
 
     private String appSource() {
         return "public class BytecodeInstructionApp {\n" +
+                "    private static final int STATIC_INCREMENT = 3;\n" +
                 "    private static native void report(int value);\n" +
+                "    private int instanceCounter = 7;\n" +
+                "    private int baseField = 11;\n" +
+                "    public BytecodeInstructionApp(int seed) {\n" +
+                "        instanceCounter = seed;\n" +
+                "        baseField = seed + 6;\n" +
+                "    }\n" +
                 "    private static int optimizedComputation(int a, int b) {\n" +
                 "        int counter = a;\n" +
                 "        counter++;\n" +
@@ -344,12 +351,73 @@ class BytecodeInstructionIntegrationTest {
                 "        }\n" +
                 "        return result;\n" +
                 "    }\n" +
+                "    private int loopArrays(int base) {\n" +
+                "        int[] values = { base, base + 1, base + 2, STATIC_INCREMENT };\n" +
+                "        int total = 0;\n" +
+                "        for (int i = 0; i < values.length; i++) {\n" +
+                "            total += values[i] * (i + 1);\n" +
+                "        }\n" +
+                "        return total + values.length;\n" +
+                "    }\n" +
+                "    private int multiArrayUsage(int factor) {\n" +
+                "        int[][] grid = new int[2][3];\n" +
+                "        int v = factor;\n" +
+                "        for (int i = 0; i < grid.length; i++) {\n" +
+                "            for (int j = 0; j < grid[i].length; j++) {\n" +
+                "                grid[i][j] = v++;\n" +
+                "            }\n" +
+                "        }\n" +
+                "        int total = 0;\n" +
+                "        for (int[] row : grid) {\n" +
+                "            for (int cell : row) {\n" +
+                "                total += cell;\n" +
+                "            }\n" +
+                "            total += row.length;\n" +
+                "        }\n" +
+                "        String[][] labels = new String[][] { { \"a\", \"b\" }, { \"c\", \"d\" } };\n" +
+                "        int labelLength = 0;\n" +
+                "        for (int i = 0; i < labels.length; i++) {\n" +
+                "            labelLength += labels[i].length;\n" +
+                "        }\n" +
+                "        return total + labelLength;\n" +
+                "    }\n" +
+                "    private int useFieldsAndMethods(int offset) {\n" +
+                "        instanceCounter += offset;\n" +
+                "        int[] mix = new int[] { offset, offset + baseField, instanceCounter };\n" +
+                "        int altSum = 0;\n" +
+                "        for (int i = 0; i < mix.length; i++) {\n" +
+                "            altSum += mix[i] + i;\n" +
+                "        }\n" +
+                "        int nestedLoop = loopArrays(offset);\n" +
+                "        int nestedMulti = multiArrayUsage(offset);\n" +
+                "        report(instanceCounter);\n" +
+                "        report(baseField);\n" +
+                "        report(altSum);\n" +
+                "        report(nestedLoop);\n" +
+                "        report(nestedMulti);\n" +
+                "        return nestedLoop + nestedMulti + instanceCounter + altSum + baseField;\n" +
+                "    }\n" +
                 "    public static void main(String[] args) {\n" +
+                "        BytecodeInstructionApp app = new BytecodeInstructionApp(4);\n" +
                 "        int first = optimizedComputation(1, 3);\n" +
                 "        int second = optimizedComputation(5, 2);\n" +
                 "        int switched = switchComputation(first) + switchComputation(second);\n" +
                 "        int synchronizedValue = synchronizedIncrement(second);\n" +
-                "        report(first + second + switched + synchronizedValue);\n" +
+                "        int arrays = app.loopArrays(2);\n" +
+                "        int multi = app.multiArrayUsage(3);\n" +
+                "        int arraysFive = app.loopArrays(5);\n" +
+                "        int multiFive = app.multiArrayUsage(5);\n" +
+                "        int fieldCalls = app.useFieldsAndMethods(5);\n" +
+                "        report(first);\n" +
+                "        report(second);\n" +
+                "        report(switched);\n" +
+                "        report(synchronizedValue);\n" +
+                "        report(arrays);\n" +
+                "        report(multi);\n" +
+                "        report(arraysFive);\n" +
+                "        report(multiFive);\n" +
+                "        report(fieldCalls);\n" +
+                "        report(first + second + switched + synchronizedValue + arrays + multi + fieldCalls);\n" +
                 "    }\n" +
                 "}\n";
     }
