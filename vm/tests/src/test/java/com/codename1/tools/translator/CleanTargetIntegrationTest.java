@@ -94,7 +94,7 @@ class CleanTargetIntegrationTest {
                 "Compiled program should print hello message, actual output was:\n" + output);
     }
 
-    private void runTranslator(Path classesDir, Path outputDir, String appName) throws Exception {
+    static void runTranslator(Path classesDir, Path outputDir, String appName) throws Exception {
         Path translatorResources = Paths.get("..", "ByteCodeTranslator", "src").normalize().toAbsolutePath();
         URLClassLoader systemLoader = (URLClassLoader) ClassLoader.getSystemClassLoader();
         URL[] systemUrls = systemLoader.getURLs();
@@ -138,7 +138,7 @@ class CleanTargetIntegrationTest {
         }
     }
 
-    private void replaceLibraryWithExecutableTarget(Path cmakeLists, String sourceDirName) throws IOException {
+    static void replaceLibraryWithExecutableTarget(Path cmakeLists, String sourceDirName) throws IOException {
         String content = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
         String globWithObjc = String.format("file(GLOB TRANSLATOR_SOURCES \"%s/*.c\" \"%s/*.m\")", sourceDirName, sourceDirName);
         String globCOnly = String.format("file(GLOB TRANSLATOR_SOURCES \"%s/*.c\")", sourceDirName);
@@ -150,7 +150,7 @@ class CleanTargetIntegrationTest {
         Files.write(cmakeLists, replacement.getBytes(StandardCharsets.UTF_8));
     }
 
-    private String runCommand(List<String> command, Path workingDir) throws Exception {
+    static String runCommand(List<String> command, Path workingDir) throws Exception {
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(workingDir.toFile());
         builder.redirectErrorStream(true);
@@ -164,7 +164,7 @@ class CleanTargetIntegrationTest {
         return output;
     }
 
-    private void patchCn1Globals(Path srcRoot) throws IOException {
+    static void patchCn1Globals(Path srcRoot) throws IOException {
         Path cn1Globals = srcRoot.resolve("cn1_globals.h");
         String content = new String(Files.readAllBytes(cn1Globals), StandardCharsets.UTF_8);
         if (!content.contains("@class NSString;")) {
@@ -173,7 +173,7 @@ class CleanTargetIntegrationTest {
         }
     }
 
-    private void writeRuntimeStubs(Path srcRoot) throws IOException {
+    static void writeRuntimeStubs(Path srcRoot) throws IOException {
         Path stubs = srcRoot.resolve("runtime_stubs.c");
         if (Files.exists(stubs)) {
             return;
@@ -243,7 +243,7 @@ class CleanTargetIntegrationTest {
         Files.write(stubs, content.getBytes(StandardCharsets.UTF_8));
     }
 
-    private String helloWorldSource() {
+    static String helloWorldSource() {
         return "public class HelloWorld {\n" +
                 "    private static native void nativeHello();\n" +
                 "    public static void main(String[] args) {\n" +
@@ -252,49 +252,49 @@ class CleanTargetIntegrationTest {
                 "}\n";
     }
 
-    private String javaLangObjectSource() {
+    static String javaLangObjectSource() {
         return "package java.lang;\n" +
                 "public class Object {\n" +
                 "}\n";
     }
 
-    private String javaLangStringSource() {
+    static String javaLangStringSource() {
         return "package java.lang;\n" +
                 "public class String extends Object {\n" +
                 "}\n";
     }
 
-    private String javaLangClassSource() {
+    static String javaLangClassSource() {
         return "package java.lang;\n" +
                 "public final class Class extends Object {\n" +
                 "}\n";
     }
 
-    private String javaLangThrowableSource() {
+    static String javaLangThrowableSource() {
         return "package java.lang;\n" +
                 "public class Throwable extends Object {\n" +
                 "}\n";
     }
 
-    private String javaLangExceptionSource() {
+    static String javaLangExceptionSource() {
         return "package java.lang;\n" +
                 "public class Exception extends Throwable {\n" +
                 "}\n";
     }
 
-    private String javaLangRuntimeExceptionSource() {
+    static String javaLangRuntimeExceptionSource() {
         return "package java.lang;\n" +
                 "public class RuntimeException extends Exception {\n" +
                 "}\n";
     }
 
-    private String javaLangNullPointerExceptionSource() {
+    static String javaLangNullPointerExceptionSource() {
         return "package java.lang;\n" +
                 "public class NullPointerException extends RuntimeException {\n" +
                 "}\n";
     }
 
-    private String nativeHelloSource() {
+    static String nativeHelloSource() {
         return "#include \"cn1_globals.h\"\n" +
                 "#include <stdio.h>\n" +
                 "void HelloWorld_nativeHello__(CODENAME_ONE_THREAD_STATE) {\n" +
