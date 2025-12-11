@@ -93,6 +93,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private Rectangle windowBounds = new Rectangle(0, 0, displayWidth, displayHeight);
     private int deviceDensity = Display.DENSITY_MEDIUM;
     private boolean portrait = true;
+    private boolean tablet = false;
     private boolean touchDevice = true;
     private boolean timeoutSupported;
     private boolean timeoutInvoked;
@@ -2365,6 +2366,15 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     @Override
     public boolean isPortrait() {
         return portrait;
+    }
+
+    public void setTablet(boolean tablet) {
+        this.tablet = tablet;
+    }
+
+    @Override
+    public boolean isTablet() {
+        return tablet;
     }
 
     @Override

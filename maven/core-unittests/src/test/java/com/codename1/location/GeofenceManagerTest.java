@@ -126,6 +126,27 @@ class GeofenceManagerTest extends UITestBase {
         assertFalse(manager.isBubble("not-bubble"));
     }
 
+    @FormTest
+    public void testGeofenceManagerListener() {
+        // Instantiate the listener
+        GeofenceManager.Listener listener = new GeofenceManager.Listener();
+
+        listener.onExit("test-id");
+        listener.onEntered("test-id");
+        listener.locationUpdated(new Location());
+        listener.providerStateChanged(LocationManager.AVAILABLE);
+
+        manager.setListenerClass(MyGeofenceListener.class);
+        MyGeofenceListener.calledExit = false;
+        MyGeofenceListener.calledEnter = false;
+
+        listener.onExit("test-id");
+        assertTrue(MyGeofenceListener.calledExit, "onExit should delegate to registered listener");
+
+        listener.onEntered("test-id");
+        assertTrue(MyGeofenceListener.calledEnter, "onEntered should delegate to registered listener");
+    }
+
     private Geofence createGeofence(String id, double lat, double lng, int radius, long expiration) {
         Location location = new Location(lat, lng);
         return new Geofence(id, location, radius, expiration);
@@ -249,6 +270,21 @@ class GeofenceManagerTest extends UITestBase {
 
         @Override
         public void onEntered(String id) {
+        }
+    }
+
+    public static class MyGeofenceListener implements GeofenceListener {
+        static boolean calledExit;
+        static boolean calledEnter;
+
+        @Override
+        public void onExit(String id) {
+            calledExit = true;
+        }
+
+        @Override
+        public void onEntered(String id) {
+            calledEnter = true;
         }
     }
 }
