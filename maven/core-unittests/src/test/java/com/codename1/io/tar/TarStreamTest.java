@@ -1,11 +1,9 @@
 package com.codename1.io.tar;
 
+import com.codename1.io.FileSystemStorage;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-
+import java.io.IOException;
 import static org.junit.jupiter.api.Assertions.*;
 
 class TarStreamTest extends UITestBase {
@@ -13,7 +11,7 @@ class TarStreamTest extends UITestBase {
     @FormTest
     void testTarEntryWriteAndReadRoundTrip() throws Exception {
         byte[] payload = "hello tar".getBytes("UTF-8");
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
         TarOutputStream tarOut = new TarOutputStream(out);
 
         TarEntry entry = new TarEntry(new byte[TarConstants.HEADER_BLOCK]);
@@ -25,7 +23,7 @@ class TarStreamTest extends UITestBase {
         tarOut.write(payload);
         tarOut.close();
 
-        TarInputStream tarIn = new TarInputStream(new ByteArrayInputStream(out.toByteArray()));
+        TarInputStream tarIn = new TarInputStream(new java.io.ByteArrayInputStream(out.toByteArray()));
         TarEntry read = tarIn.getNextEntry();
         assertNotNull(read);
         assertEquals("sample.txt", read.getName().trim());
@@ -56,5 +54,20 @@ class TarStreamTest extends UITestBase {
         Octal.getOctalBytes(493, octal, 0, octal.length);
         long parsedValue = Octal.parseOctal(octal, 0, octal.length);
         assertEquals(493, parsedValue);
+    }
+
+    @FormTest
+    void testTarUtilsSizeCalculation() throws IOException {
+        // Setup mock filesystem
+        String root = FileSystemStorage.getInstance().getAppHomePath();
+        String file = root + "test.txt";
+        String dir = root + "subdir";
+
+        FileSystemStorage.getInstance().openOutputStream(file).close();
+        FileSystemStorage.getInstance().mkdir(dir);
+
+        // Calculate size
+        long size = TarUtils.calculateTarSize(root);
+        assertTrue(size > 0);
     }
 }
