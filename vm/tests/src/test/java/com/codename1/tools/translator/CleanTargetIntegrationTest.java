@@ -171,6 +171,10 @@ class CleanTargetIntegrationTest {
             content = content.replace("#ifdef __OBJC__\n", "#ifdef __OBJC__\n@class NSString;\n");
             Files.write(cn1Globals, content.getBytes(StandardCharsets.UTF_8));
         }
+        if (!content.contains("#include <string.h>")) {
+            content = content.replace("#include <stdlib.h>\n", "#include <stdlib.h>\n#include <string.h>\n");
+            Files.write(cn1Globals, content.getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     static void writeRuntimeStubs(Path srcRoot) throws IOException {
@@ -187,11 +191,12 @@ class CleanTargetIntegrationTest {
                 "\n" +
                 "static void initThreadState() {\n" +
                 "    memset(&globalThreadData, 0, sizeof(globalThreadData));\n" +
-                "    globalThreadData.threadObjectStack = calloc(64, sizeof(struct elementStruct));\n" +
-                "    globalThreadData.pendingHeapAllocations = calloc(64, sizeof(void*));\n" +
-                "    globalThreadData.callStackClass = calloc(64, sizeof(int));\n" +
-                "    globalThreadData.callStackLine = calloc(64, sizeof(int));\n" +
-                "    globalThreadData.callStackMethod = calloc(64, sizeof(int));\n" +
+                "    globalThreadData.blocks = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(struct TryBlock));\n" +
+                "    globalThreadData.threadObjectStack = calloc(CN1_MAX_OBJECT_STACK_DEPTH, sizeof(struct elementStruct));\n" +
+                "    globalThreadData.pendingHeapAllocations = calloc(CN1_MAX_OBJECT_STACK_DEPTH, sizeof(void*));\n" +
+                "    globalThreadData.callStackClass = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));\n" +
+                "    globalThreadData.callStackLine = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));\n" +
+                "    globalThreadData.callStackMethod = calloc(CN1_MAX_STACK_CALL_DEPTH, sizeof(int));\n" +
                 "}\n" +
                 "\n" +
                 "struct ThreadLocalData* getThreadLocalData() {\n" +
@@ -236,6 +241,22 @@ class CleanTargetIntegrationTest {
                 "void monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { (void)obj; }\n" +
                 "\n" +
                 "void monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { (void)obj; }\n" +
+                "\n" +
+                "struct elementStruct* pop(struct elementStruct** sp) {\n" +
+                "    (*sp)--;\n" +
+                "    return *sp;\n" +
+                "}\n" +
+                "\n" +
+                "void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct** sp) {\n" +
+                "    while (count-- > 0) {\n" +
+                "        (*sp)--;\n" +
+                "    }\n" +
+                "}\n" +
+                "\n" +
+                "void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {\n" +
+                "    (void)obj;\n" +
+                "    exit(1);\n" +
+                "}\n" +
                 "\n" +
                 "struct clazz class__java_lang_Class = {0};\n" +
                 "int currentGcMarkValue = 1;\n";
