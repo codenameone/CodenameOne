@@ -4,6 +4,7 @@ import com.codename1.impl.ImplementationFactory;
 import com.codename1.io.Util;
 import com.codename1.testing.SafeL10NManager;
 import com.codename1.testing.TestCodenameOneImplementation;
+import com.codename1.testing.TestUtils;
 import com.codename1.ui.Display;
 import com.codename1.ui.DisplayTest;
 import com.codename1.ui.plaf.UIManager;
@@ -16,6 +17,9 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+
+import static org.junit.Assert.assertTrue;
 
 /**
  * Provides a minimal initialized {@link Display} environment for unit tests that instantiate UI components.
@@ -23,6 +27,18 @@ import java.util.List;
 public abstract class UITestBase {
     protected Display display;
     protected TestCodenameOneImplementation implementation;
+
+    protected void waitFor(CountDownLatch latch, int timeout) {
+        waitFor(latch, 0, timeout);
+    }
+
+    protected void waitFor(CountDownLatch latch, int count, int timeout) {
+        while(latch.getCount() > count) {
+            assertTrue(timeout > 0);
+            TestUtils.waitFor(5);
+            timeout -= 5;
+        }
+    }
 
     @BeforeEach
     protected void setUpDisplay() throws Exception {
