@@ -25,6 +25,8 @@ SOURCE_BASES = [
     Path("maven/core-unittests/src/test/java"),
 ]
 
+DEFAULT_REPORT_TITLE = "✅ Continuous Quality Report"
+
 
 def _load_target_dirs() -> List[Path]:
     env_value = os.environ.get("QUALITY_REPORT_TARGET_DIRS")
@@ -618,6 +620,7 @@ def build_report(
     html_urls: Dict[str, Optional[str]],
     coverage_html_url: Optional[str],
     coverage_archive_url: Optional[str],
+    title: str,
 ) -> str:
     if HTML_REPORT_DIR.exists():
         for child in HTML_REPORT_DIR.iterdir():
@@ -650,7 +653,7 @@ def build_report(
         blob_base = f"{server_url.rstrip('/')}/{repository}/blob/{ref}"
 
     lines = [
-        "## ✅ Continuous Quality Report",
+        f"## {title}",
         "",
         "### Test & Coverage",
         format_tests(tests),
@@ -714,7 +717,14 @@ def main() -> None:
     coverage_html_url = os.environ.get("JACOCO_HTML_URL")
     coverage_archive_url = os.environ.get("JACOCO_REPORT_URL")
     generate_html_only = os.environ.get("QUALITY_REPORT_GENERATE_HTML_ONLY") == "1"
-    report = build_report(archive_urls, html_urls, coverage_html_url, coverage_archive_url)
+    report_title = os.environ.get("QUALITY_REPORT_TITLE") or DEFAULT_REPORT_TITLE
+    report = build_report(
+        archive_urls,
+        html_urls,
+        coverage_html_url,
+        coverage_archive_url,
+        report_title,
+    )
     if not generate_html_only:
         REPORT_PATH.write_text(report + "\n", encoding="utf-8")
 
