@@ -70,6 +70,8 @@ class BytecodeInstructionIntegrationTest {
         assertTrue(generatedCode.contains("CustomJump */"), "Optimized comparisons should emit CustomJump code");
         assertTrue(generatedCode.contains("BC_IINC"), "Increment operations should translate to BC_IINC macro");
         assertTrue(generatedCode.contains("VarOp.assignFrom"), "Optimized stores should rely on CustomIntruction output");
+        assertTrue(generatedCode.contains("switch((*SP).data.i)"), "SwitchInstruction should emit a native switch statement");
+        assertTrue(generatedCode.contains("BC_DUP(); /* DUP */"), "DupExpression should translate DUP operations to BC_DUP");
 
         CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
 
@@ -88,7 +90,7 @@ class BytecodeInstructionIntegrationTest {
 
         Path executable = buildDir.resolve("CustomBytecodeApp");
         String output = CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), buildDir);
-        assertTrue(output.contains("RESULT=14"), "Compiled program should print the expected arithmetic result");
+        assertTrue(output.contains("RESULT=54"), "Compiled program should print the expected arithmetic result");
     }
 
     private Path findGeneratedSource(Path srcRoot) throws Exception {
@@ -116,10 +118,30 @@ class BytecodeInstructionIntegrationTest {
                 "        int result = min + counter;\n" +
                 "        return result;\n" +
                 "    }\n" +
+                "    private static int switchComputation(int value) {\n" +
+                "        switch (value) {\n" +
+                "            case 4:\n" +
+                "                return value + 10;\n" +
+                "            case 10:\n" +
+                "                return value + 5;\n" +
+                "            default:\n" +
+                "                return value - 1;\n" +
+                "        }\n" +
+                "    }\n" +
+                "    private static int synchronizedIncrement(int base) {\n" +
+                "        Object lock = new Object();\n" +
+                "        int result = base;\n" +
+                "        synchronized (lock) {\n" +
+                "            result++;\n" +
+                "        }\n" +
+                "        return result;\n" +
+                "    }\n" +
                 "    public static void main(String[] args) {\n" +
                 "        int first = optimizedComputation(1, 3);\n" +
                 "        int second = optimizedComputation(5, 2);\n" +
-                "        report(first + second);\n" +
+                "        int switched = switchComputation(first) + switchComputation(second);\n" +
+                "        int synchronizedValue = synchronizedIncrement(second);\n" +
+                "        report(first + second + switched + synchronizedValue);\n" +
                 "    }\n" +
                 "}\n";
     }
