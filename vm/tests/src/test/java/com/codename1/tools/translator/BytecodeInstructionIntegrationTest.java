@@ -1,12 +1,30 @@
 package com.codename1.tools.translator;
+import com.codename1.tools.translator.bytecodes.ArrayLengthExpression;
+import com.codename1.tools.translator.bytecodes.ArrayLoadExpression;
+import com.codename1.tools.translator.bytecodes.AssignableExpression;
+import com.codename1.tools.translator.bytecodes.Instruction;
+import com.codename1.tools.translator.bytecodes.MultiArray;
 import org.junit.jupiter.api.Test;
+import org.objectweb.asm.AnnotationVisitor;
+import org.objectweb.asm.Opcodes;
 
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FilenameFilter;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -91,6 +109,196 @@ class BytecodeInstructionIntegrationTest {
         Path executable = buildDir.resolve("CustomBytecodeApp");
         String output = CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), buildDir);
         assertTrue(output.contains("RESULT=54"), "Compiled program should print the expected arithmetic result");
+    }
+
+    private Set<String> snapshotArrayTypes() throws Exception {
+        Field arrayTypesField = ByteCodeClass.class.getDeclaredField("arrayTypes");
+        arrayTypesField.setAccessible(true);
+        return new TreeSet<>((Set<String>) arrayTypesField.get(null));
+    }
+
+    private void restoreArrayTypes(Set<String> snapshot) throws Exception {
+        Field arrayTypesField = ByteCodeClass.class.getDeclaredField("arrayTypes");
+        arrayTypesField.setAccessible(true);
+        arrayTypesField.set(null, new TreeSet<>(snapshot));
+    }
+
+    private static class StubAssignableExpression extends Instruction implements AssignableExpression {
+        private final String expression;
+        int dependencyCalls;
+
+        private StubAssignableExpression(int opcode, String expression) {
+            super(opcode);
+            this.expression = expression;
+        }
+
+        @Override
+        public void addDependencies(List<String> dependencyList) {
+            dependencyCalls++;
+            dependencyList.add(expression);
+        }
+
+        @Override
+        public void appendInstruction(StringBuilder b) {
+            b.append(expression);
+        }
+
+        @Override
+        public boolean assignTo(String varName, StringBuilder sb) {
+            if (varName != null) {
+                sb.append(varName).append(" = ").append(expression).append(";\n");
+            } else {
+                sb.append(expression);
+            }
+            return true;
+        }
+    }
+
+    @Test
+    void annotationVisitorWrapperDelegatesAndHandlesNullVisitor() {
+        Parser parser = new Parser();
+
+        Parser.AnnotationVisitorWrapper wrapperWithNull = parser.new AnnotationVisitorWrapper(null);
+        assertNull(wrapperWithNull.visitArray("values"));
+        assertNull(wrapperWithNull.visitAnnotation("name", "LExample;"));
+        assertDoesNotThrow(() -> wrapperWithNull.visit("flag", true));
+        assertDoesNotThrow(() -> wrapperWithNull.visitEnum("choice", "LExample;", "VALUE"));
+
+        AtomicBoolean delegated = new AtomicBoolean(false);
+        AnnotationVisitor delegate = new AnnotationVisitor(Opcodes.ASM5) {
+            @Override
+            public AnnotationVisitor visitArray(String name) {
+                delegated.set(true);
+                return this;
+            }
+        };
+
+        Parser.AnnotationVisitorWrapper wrapperWithDelegate = parser.new AnnotationVisitorWrapper(delegate);
+        AnnotationVisitor result = wrapperWithDelegate.visitArray("values");
+        assertSame(delegate, result);
+        assertTrue(delegated.get(), "AnnotationVisitorWrapper should forward to the underlying visitor");
+    }
+
+    @Test
+    void byteCodeTranslatorFilenameFilterMatchesExpectedFiles() throws Exception {
+        Class<?> filterClass = Class.forName("com.codename1.tools.translator.ByteCodeTranslator$3");
+        Constructor<?> ctor = filterClass.getDeclaredConstructor();
+        ctor.setAccessible(true);
+
+        FilenameFilter filter = (FilenameFilter) ctor.newInstance();
+        File directory = Files.createTempDirectory("bytecode-filter").toFile();
+
+        assertTrue(filter.accept(directory, "assets.bundle"));
+        assertTrue(filter.accept(directory, "model.xcdatamodeld"));
+        assertTrue(filter.accept(directory, "VisibleSource.m"));
+        assertFalse(filter.accept(directory, ".hidden"));
+        assertFalse(filter.accept(directory, "Images.xcassets"));
+    }
+
+    @Test
+    void concatenatingFileOutputStreamWritesShardedOutputs() throws Exception {
+        Path outputDir = Files.createTempDirectory("concatenating-output");
+        ByteCodeTranslator.OutputType original = ByteCodeTranslator.output;
+        ByteCodeTranslator.output = ByteCodeTranslator.OutputType.OUTPUT_TYPE_CLEAN;
+        try {
+            ConcatenatingFileOutputStream stream = new ConcatenatingFileOutputStream(outputDir.toFile());
+            stream.beginNextFile("first");
+            stream.write("abc".getBytes(StandardCharsets.UTF_8));
+            stream.close();
+
+            stream.beginNextFile("second");
+            stream.write("123".getBytes(StandardCharsets.UTF_8));
+            stream.close();
+
+            Field destField = ConcatenatingFileOutputStream.class.getDeclaredField("dest");
+            destField.setAccessible(true);
+            ByteArrayOutputStream[] buffers = (ByteArrayOutputStream[]) destField.get(stream);
+            for (int i = 0; i < buffers.length; i++) {
+                if (buffers[i] == null) {
+                    buffers[i] = new ByteArrayOutputStream();
+                }
+            }
+            destField.set(stream, buffers);
+
+            stream.realClose();
+
+            Path first = outputDir.resolve("concatenated_" + Math.abs("first".hashCode() % ConcatenatingFileOutputStream.MODULO) + ".c");
+            Path second = outputDir.resolve("concatenated_" + Math.abs("second".hashCode() % ConcatenatingFileOutputStream.MODULO) + ".c");
+
+            assertTrue(Files.exists(first));
+            assertEquals("abc\n", new String(Files.readAllBytes(first), StandardCharsets.UTF_8));
+
+            assertTrue(Files.exists(second));
+            assertEquals("123\n", new String(Files.readAllBytes(second), StandardCharsets.UTF_8));
+        } finally {
+            ByteCodeTranslator.output = original;
+        }
+    }
+
+    @Test
+    void multiArrayAddsDependenciesAndRegistersArrayTypes() throws Exception {
+        List<String> dependencies = new ArrayList<>();
+        MultiArray multiArray = new MultiArray("[[Ljava/lang/String;", 2);
+
+        Set<String> snapshot = snapshotArrayTypes();
+        try {
+            multiArray.addDependencies(dependencies);
+
+            assertTrue(dependencies.contains("java_lang_String"));
+            assertTrue(snapshotArrayTypes().contains("2_java_lang_String"));
+        } finally {
+            restoreArrayTypes(snapshot);
+        }
+    }
+
+    @Test
+    void arrayLengthExpressionReducesAndAssigns() throws Exception {
+        List<Instruction> instructions = new ArrayList<>();
+        StubAssignableExpression arrayRef = new StubAssignableExpression(Opcodes.ALOAD, "myArray");
+        Instruction arrayLength = new Instruction(Opcodes.ARRAYLENGTH) { };
+        instructions.add(arrayRef);
+        instructions.add(arrayLength);
+
+        int reducedIndex = ArrayLengthExpression.tryReduce(instructions, 1);
+        assertEquals(0, reducedIndex);
+        assertEquals(1, instructions.size());
+        ArrayLengthExpression reduced = (ArrayLengthExpression) instructions.get(0);
+
+        StringBuilder assignment = new StringBuilder();
+        assertTrue(reduced.assignTo("len", assignment));
+        assertEquals("len = CN1_ARRAY_LENGTH(myArray);\n", assignment.toString());
+
+        List<String> deps = new ArrayList<>();
+        reduced.addDependencies(deps);
+        assertEquals(1, arrayRef.dependencyCalls);
+        assertEquals("myArray", deps.get(0));
+    }
+
+    @Test
+    void arrayLoadExpressionReducesAndAssigns() {
+        List<Instruction> instructions = new ArrayList<>();
+        StubAssignableExpression arrayRef = new StubAssignableExpression(Opcodes.ALOAD, "items");
+        StubAssignableExpression index = new StubAssignableExpression(Opcodes.ILOAD, "index");
+        Instruction loadInstr = new Instruction(Opcodes.IALOAD) { };
+        instructions.add(arrayRef);
+        instructions.add(index);
+        instructions.add(loadInstr);
+
+        int reducedIndex = ArrayLoadExpression.tryReduce(instructions, 2);
+        assertEquals(0, reducedIndex);
+        assertEquals(1, instructions.size());
+        ArrayLoadExpression reduced = (ArrayLoadExpression) instructions.get(0);
+
+        StringBuilder assignment = new StringBuilder();
+        assertTrue(reduced.assignTo("value", assignment));
+        assertEquals("value=CN1_ARRAY_ELEMENT_INT(items, index);\n", assignment.toString());
+
+        List<String> deps = new ArrayList<>();
+        reduced.addDependencies(deps);
+        assertEquals(1, arrayRef.dependencyCalls);
+        assertEquals(1, index.dependencyCalls);
+        assertTrue(deps.contains("items"));
+        assertTrue(deps.contains("index"));
     }
 
     private Path findGeneratedSource(Path srcRoot) throws Exception {
