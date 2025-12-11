@@ -29,6 +29,11 @@ jobs:
           java-version: '8'
           cache: 'maven'
 
+      - name: Install native build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang
+
       - name: Run ParparVM JVM tests
         working-directory: vm/tests
         run: mvn -B test
