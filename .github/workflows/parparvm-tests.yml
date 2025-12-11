@@ -37,3 +37,27 @@ jobs:
       - name: Run ParparVM JVM tests
         working-directory: vm/tests
         run: mvn -B test
+
+      - name: Generate ByteCodeTranslator quality report
+        if: ${{ always() }}
+        env:
+          QUALITY_REPORT_TARGET_DIRS: vm/tests/target
+          QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
+          QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
+          QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+          QUALITY_REPORT_TITLE: "✅ ByteCodeTranslator Quality Report"
+        run: python3 .github/scripts/generate-quality-report.py
+
+      - name: Publish ByteCodeTranslator quality comment
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { publishQualityComment } = require('./.github/scripts/publish-quality-comment.js');
+            await publishQualityComment({
+              github,
+              context,
+              core,
+              marker: '<!-- bytecode-quality-report -->',
+              reportPath: 'quality-report.md',
+            });
