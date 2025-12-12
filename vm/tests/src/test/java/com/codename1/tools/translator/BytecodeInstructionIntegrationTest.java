@@ -40,13 +40,7 @@ class BytecodeInstructionIntegrationTest {
 
         Files.createDirectories(sourceDir.resolve("java/lang"));
         Files.write(sourceDir.resolve("BytecodeInstructionApp.java"), appSource().getBytes(StandardCharsets.UTF_8));
-        Files.write(sourceDir.resolve("java/lang/Object.java"), CleanTargetIntegrationTest.javaLangObjectSource().getBytes(StandardCharsets.UTF_8));
-        Files.write(sourceDir.resolve("java/lang/String.java"), CleanTargetIntegrationTest.javaLangStringSource().getBytes(StandardCharsets.UTF_8));
-        Files.write(sourceDir.resolve("java/lang/Class.java"), CleanTargetIntegrationTest.javaLangClassSource().getBytes(StandardCharsets.UTF_8));
-        Files.write(sourceDir.resolve("java/lang/Throwable.java"), CleanTargetIntegrationTest.javaLangThrowableSource().getBytes(StandardCharsets.UTF_8));
-        Files.write(sourceDir.resolve("java/lang/Exception.java"), CleanTargetIntegrationTest.javaLangExceptionSource().getBytes(StandardCharsets.UTF_8));
-        Files.write(sourceDir.resolve("java/lang/RuntimeException.java"), CleanTargetIntegrationTest.javaLangRuntimeExceptionSource().getBytes(StandardCharsets.UTF_8));
-        Files.write(sourceDir.resolve("java/lang/NullPointerException.java"), CleanTargetIntegrationTest.javaLangNullPointerExceptionSource().getBytes(StandardCharsets.UTF_8));
+        writeJavaLangSources(sourceDir);
 
         Path nativeReport = sourceDir.resolve("native_report.c");
         Files.write(nativeReport, nativeReportSource().getBytes(StandardCharsets.UTF_8));
@@ -54,19 +48,16 @@ class BytecodeInstructionIntegrationTest {
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         assertNotNull(compiler, "A JDK is required to compile test sources");
 
+        List<String> compileArgs = new ArrayList<>(Arrays.asList(
+                "-d", classesDir.toString(),
+                sourceDir.resolve("BytecodeInstructionApp.java").toString()
+        ));
+        compileArgs.addAll(javaLangStubPaths(sourceDir));
         int compileResult = compiler.run(
                 null,
                 null,
                 null,
-                "-d", classesDir.toString(),
-                sourceDir.resolve("BytecodeInstructionApp.java").toString(),
-                sourceDir.resolve("java/lang/Object.java").toString(),
-                sourceDir.resolve("java/lang/String.java").toString(),
-                sourceDir.resolve("java/lang/Class.java").toString(),
-                sourceDir.resolve("java/lang/Throwable.java").toString(),
-                sourceDir.resolve("java/lang/Exception.java").toString(),
-                sourceDir.resolve("java/lang/RuntimeException.java").toString(),
-                sourceDir.resolve("java/lang/NullPointerException.java").toString()
+                compileArgs.toArray(new String[0])
         );
         assertEquals(0, compileResult, "BytecodeInstructionApp should compile");
 
@@ -109,6 +100,136 @@ class BytecodeInstructionIntegrationTest {
         Path executable = buildDir.resolve("CustomBytecodeApp");
         String output = CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), buildDir);
         assertTrue(output.contains("RESULT=293"), "Compiled program should print the expected arithmetic result");
+    }
+
+    private String invokeLdcLocalVarsAppSource() {
+        return "public class InvokeLdcLocalVarsApp {\n" +
+                "    private static native void report(int value);\n" +
+                "    private interface Multiplier { int multiply(int a, int b); }\n" +
+                "    private static class MultiplierImpl implements Multiplier {\n" +
+                "        public int multiply(int a, int b) { return a * b; }\n" +
+                "    }\n" +
+                "    private final int seed;\n" +
+                "    public InvokeLdcLocalVarsApp(int seed) {\n" +
+                "        this.seed = seed;\n" +
+                "    }\n" +
+                "    private int constantsAndLocals(int extra) {\n" +
+                "        int intVal = 21;\n" +
+                "        long min = Long.MIN_VALUE;\n" +
+                "        float nan = Float.NaN;\n" +
+                "        double posInf = Double.POSITIVE_INFINITY;\n" +
+                "        String label = \"TranslatorLdc\";\n" +
+                "        Class objectType = java.util.ArrayList.class;\n" +
+                "        Class arrayType = String[][].class;\n" +
+                "        int[] counts = new int[] { seed, extra, 12 };\n" +
+                "        int labelBonus = label != null ? 4 : 0;\n" +
+                "        int classTally = (objectType != null ? 9 : 0) + (arrayType != null ? 20 : 0);\n" +
+                "        byte small = 2;\n" +
+                "        short shorty = 12;\n" +
+                "        boolean flag = Double.isInfinite(posInf);\n" +
+                "        char initial = 'Z';\n" +
+                "        float nanFallback = nan;\n" +
+                "        double sum = posInf;\n" +
+                "        if (nan != nanFallback) {\n" +
+                "            return -1;\n" +
+                "        }\n" +
+                "        return intVal + counts.length + labelBonus + classTally + (flag ? 5 : 0) + small + shorty + initial + (min == Long.MIN_VALUE ? 7 : 0) + extra + seed + (sum > 0 ? 3 : 0);\n" +
+                "    }\n" +
+                "    private static int staticInvoke(int value) {\n" +
+                "        return value * 3;\n" +
+                "    }\n" +
+                "    private int instanceInvoke(int value) {\n" +
+                "        return value + seed;\n" +
+                "    }\n" +
+                "    private static int interfaceInvoke(Multiplier multiplier, int a, int b) {\n" +
+                "        return multiplier.multiply(a, b);\n" +
+                "    }\n" +
+                "    public static void main(String[] args) {\n" +
+                "        InvokeLdcLocalVarsApp app = new InvokeLdcLocalVarsApp(4);\n" +
+                "        Multiplier multiplier = new MultiplierImpl();\n" +
+                "        int combined = staticInvoke(5)\n" +
+                "                + app.instanceInvoke(6)\n" +
+                "                + interfaceInvoke(multiplier, 2, 7)\n" +
+                "                + app.constantsAndLocals(3);\n" +
+                "        report(combined);\n" +
+                "    }\n" +
+                "}\n";
+    }
+
+    @Test
+    void translatesInvokeAndLdcBytecodeToLLVMExecutable() throws Exception {
+        Parser.cleanup();
+
+        Path sourceDir = Files.createTempDirectory("invoke-ldc-sources");
+        Path classesDir = Files.createTempDirectory("invoke-ldc-classes");
+
+        Files.createDirectories(sourceDir.resolve("java/lang"));
+        Files.write(sourceDir.resolve("InvokeLdcLocalVarsApp.java"), invokeLdcLocalVarsAppSource().getBytes(StandardCharsets.UTF_8));
+        writeJavaLangSources(sourceDir);
+
+        Path nativeReport = sourceDir.resolve("native_report.c");
+        Files.write(nativeReport, nativeReportSource().getBytes(StandardCharsets.UTF_8));
+
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        assertNotNull(compiler, "A JDK is required to compile test sources");
+
+        List<String> compileArgs = new ArrayList<>(Arrays.asList(
+                "-d", classesDir.toString(),
+                sourceDir.resolve("InvokeLdcLocalVarsApp.java").toString()
+        ));
+        compileArgs.addAll(javaLangStubPaths(sourceDir));
+        int compileResult = compiler.run(
+                null,
+                null,
+                null,
+                compileArgs.toArray(new String[0])
+        );
+        assertEquals(0, compileResult, "InvokeLdcLocalVarsApp should compile");
+
+        Files.copy(nativeReport, classesDir.resolve("native_report.c"));
+
+        Path outputDir = Files.createTempDirectory("invoke-ldc-output");
+        CleanTargetIntegrationTest.runTranslator(classesDir, outputDir, "InvokeLdcLocalVars");
+
+        Path distDir = outputDir.resolve("dist");
+        Path cmakeLists = distDir.resolve("CMakeLists.txt");
+        assertTrue(Files.exists(cmakeLists), "Translator should emit a CMake project for Invoke/Ldc sample");
+
+        Path srcRoot = distDir.resolve("InvokeLdcLocalVars-src");
+        CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
+        CleanTargetIntegrationTest.writeRuntimeStubs(srcRoot);
+        writeInvokeLdcRuntimeStubs(srcRoot);
+
+        Path generatedSource = findGeneratedSource(srcRoot, "InvokeLdcLocalVarsApp");
+        String generatedCode = new String(Files.readAllBytes(generatedSource), StandardCharsets.UTF_8);
+        assertTrue(generatedCode.contains("0.0/0.0"), "NaN constants should translate through Ldc");
+        assertTrue(generatedCode.contains("1.0 / 0.0"), "Infinite double constants should translate through Ldc");
+        assertTrue(generatedCode.contains("LLONG_MIN"), "Long minimum value should pass through Ldc handling");
+        assertTrue(generatedCode.contains("class_array2__java_lang_String"), "Array class literals should be emitted via Ldc");
+        assertTrue(generatedCode.contains("class__java_util_ArrayList"), "Object class literals should be emitted via Ldc");
+        assertTrue(generatedCode.contains("llocals_3_"), "Local variable generation should declare long locals");
+        assertTrue(generatedCode.contains("locals[9].data.o"), "Local variable generation should declare object locals");
+        assertTrue(generatedCode.contains("InvokeLdcLocalVarsApp_instanceInvoke"), "Virtual invokes should be routed through Invoke helper");
+        assertTrue(generatedCode.contains("InvokeLdcLocalVarsApp_interfaceInvoke"), "Static invokes should include helper method routing");
+
+        CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
+
+        Path buildDir = distDir.resolve("build");
+        Files.createDirectories(buildDir);
+
+        CleanTargetIntegrationTest.runCommand(Arrays.asList(
+                "cmake",
+                "-S", distDir.toString(),
+                "-B", buildDir.toString(),
+                "-DCMAKE_C_COMPILER=clang",
+                "-DCMAKE_OBJC_COMPILER=clang"
+        ), distDir);
+
+        CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
+
+        Path executable = buildDir.resolve("InvokeLdcLocalVars");
+        String output = CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), buildDir);
+        assertTrue(output.contains("RESULT="), "Compiled program should print the expected Invoke/Ldc result");
     }
 
     private Set<String> snapshotArrayTypes() throws Exception {
@@ -302,11 +423,58 @@ class BytecodeInstructionIntegrationTest {
     }
 
     private Path findGeneratedSource(Path srcRoot) throws Exception {
+        return findGeneratedSource(srcRoot, "BytecodeInstructionApp");
+    }
+
+    private Path findGeneratedSource(Path srcRoot, String classPrefix) throws Exception {
         try (Stream<Path> paths = Files.walk(srcRoot)) {
             return paths
-                    .filter(p -> p.getFileName().toString().startsWith("BytecodeInstructionApp") && p.getFileName().toString().endsWith(".c"))
+                    .filter(p -> p.getFileName().toString().startsWith(classPrefix) && p.getFileName().toString().endsWith(".c"))
+                    .sorted((a, b) -> Integer.compare(a.getFileName().toString().length(), b.getFileName().toString().length()))
                     .findFirst()
                     .orElseThrow(() -> new AssertionError("Translated source for BytecodeInstructionApp not found"));
+        }
+    }
+
+    private List<String> javaLangStubPaths(Path sourceDir) {
+        return Arrays.asList(
+                sourceDir.resolve("java/lang/Object.java").toString(),
+                sourceDir.resolve("java/lang/String.java").toString(),
+                sourceDir.resolve("java/lang/Class.java").toString(),
+                sourceDir.resolve("java/lang/Throwable.java").toString(),
+                sourceDir.resolve("java/lang/Exception.java").toString(),
+                sourceDir.resolve("java/lang/RuntimeException.java").toString(),
+                sourceDir.resolve("java/lang/NullPointerException.java").toString()
+        );
+    }
+
+    private void writeJavaLangSources(Path sourceDir) throws Exception {
+        Files.write(sourceDir.resolve("java/lang/Object.java"), CleanTargetIntegrationTest.javaLangObjectSource().getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve("java/lang/String.java"), CleanTargetIntegrationTest.javaLangStringSource().getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve("java/lang/Class.java"), CleanTargetIntegrationTest.javaLangClassSource().getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve("java/lang/Throwable.java"), CleanTargetIntegrationTest.javaLangThrowableSource().getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve("java/lang/Exception.java"), CleanTargetIntegrationTest.javaLangExceptionSource().getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve("java/lang/RuntimeException.java"), CleanTargetIntegrationTest.javaLangRuntimeExceptionSource().getBytes(StandardCharsets.UTF_8));
+        Files.write(sourceDir.resolve("java/lang/NullPointerException.java"), CleanTargetIntegrationTest.javaLangNullPointerExceptionSource().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private void writeInvokeLdcRuntimeStubs(Path srcRoot) throws Exception {
+        Path doubleHeader = srcRoot.resolve("java_lang_Double.h");
+        Path doubleSource = srcRoot.resolve("java_lang_Double.c");
+        if (!Files.exists(doubleHeader)) {
+            Files.write(doubleHeader, javaLangDoubleHeader().getBytes(StandardCharsets.UTF_8));
+        }
+        if (!Files.exists(doubleSource)) {
+            Files.write(doubleSource, javaLangDoubleSource().getBytes(StandardCharsets.UTF_8));
+        }
+
+        Path arrayListHeader = srcRoot.resolve("java_util_ArrayList.h");
+        Path arrayListSource = srcRoot.resolve("java_util_ArrayList.c");
+        if (!Files.exists(arrayListHeader)) {
+            Files.write(arrayListHeader, javaUtilArrayListHeader().getBytes(StandardCharsets.UTF_8));
+        }
+        if (!Files.exists(arrayListSource)) {
+            Files.write(arrayListSource, javaUtilArrayListSource().getBytes(StandardCharsets.UTF_8));
         }
     }
 
@@ -422,10 +590,37 @@ class BytecodeInstructionIntegrationTest {
                 "}\n";
     }
 
+    private String javaLangDoubleHeader() {
+        return "#include \"cn1_globals.h\"\n" +
+                "#include <limits.h>\n" +
+                "JAVA_BOOLEAN java_lang_Double_isInfinite___double_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE value);\n";
+    }
+
+    private String javaLangDoubleSource() {
+        return "#include \"java_lang_Double.h\"\n" +
+                "JAVA_BOOLEAN java_lang_Double_isInfinite___double_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE value) {\n" +
+                "    (void)threadStateData;\n" +
+                "    return value == (JAVA_DOUBLE)(1.0 / 0.0) || value == (JAVA_DOUBLE)(-1.0 / 0.0);\n" +
+                "}\n";
+    }
+
+    private String javaUtilArrayListHeader() {
+        return "#include \"cn1_globals.h\"\n" +
+                "extern struct clazz class__java_util_ArrayList;\n";
+    }
+
+    private String javaUtilArrayListSource() {
+        return "#include \"java_util_ArrayList.h\"\n" +
+                "struct clazz class__java_util_ArrayList = {0};\n";
+    }
+
     private String nativeReportSource() {
         return "#include \"cn1_globals.h\"\n" +
                 "#include <stdio.h>\n" +
                 "void BytecodeInstructionApp_report___int(CODENAME_ONE_THREAD_STATE, JAVA_INT value) {\n" +
+                "    printf(\"RESULT=%d\\n\", value);\n" +
+                "}\n" +
+                "void InvokeLdcLocalVarsApp_report___int(CODENAME_ONE_THREAD_STATE, JAVA_INT value) {\n" +
                 "    printf(\"RESULT=%d\\n\", value);\n" +
                 "}\n";
     }
