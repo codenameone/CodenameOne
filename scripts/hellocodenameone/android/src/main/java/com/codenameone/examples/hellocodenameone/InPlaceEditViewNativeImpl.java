@@ -5,29 +5,22 @@ import com.codename1.ui.Form;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BoxLayout;
-import java.lang.reflect.Method;
+import com.codename1.impl.android.InPlaceEditView;
+import com.codename1.impl.android.AndroidImplementation;
 
 public class InPlaceEditViewNativeImpl {
-    public void runReproductionTest() {
+    public void runReproductionTest(final ReproductionCallback callback) {
         Display.getInstance().callSerially(() -> {
             try {
-                Method getImplMethod = Display.class.getDeclaredMethod("getImplementation");
+                java.lang.reflect.Method getImplMethod = Display.class.getDeclaredMethod("getImplementation");
                 getImplMethod.setAccessible(true);
                 final Object impl = getImplMethod.invoke(Display.getInstance());
-                Class<?> implClass = impl.getClass();
 
-                if (!implClass.getName().equals("com.codename1.impl.android.AndroidImplementation")) {
-                     System.out.println("Implementation is not AndroidImplementation: " + implClass.getName());
+                if (!(impl instanceof AndroidImplementation)) {
+                     Display.getInstance().callSerially(() -> callback.onResult(false, "Implementation is not AndroidImplementation: " + impl.getClass().getName()));
                      return;
                 }
-
-                // Get InPlaceEditView class
-                Class<?> inPlaceEditViewClass = Class.forName("com.codename1.impl.android.InPlaceEditView");
-
-                // Get methods
-                final Method editMethod = inPlaceEditViewClass.getMethod("edit", implClass, com.codename1.ui.Component.class, int.class);
-                final Method reLayoutEditMethod = inPlaceEditViewClass.getMethod("reLayoutEdit");
-                final Method stopEditMethod = inPlaceEditViewClass.getMethod("stopEdit");
+                final AndroidImplementation androidImpl = (AndroidImplementation) impl;
 
                 Form f = new Form("Test NPE", new BoxLayout(BoxLayout.Y_AXIS));
                 final TextArea ta = new TextField("Test");
@@ -35,16 +28,14 @@ public class InPlaceEditViewNativeImpl {
                 f.show();
                 f.revalidate();
 
-                // We need to simulate the race condition.
                 new Thread(() -> {
                     try {
                         for (int i = 0; i < 50; i++) {
                             // Start editing
                             Display.getInstance().callSeriallyAndWait(() -> {
                                 try {
-                                    editMethod.invoke(null, impl, ta, ta.getConstraint());
+                                    InPlaceEditView.edit(androidImpl, ta, ta.getConstraint());
                                 } catch (Exception e) {
-                                    System.out.println("Failed to invoke edit: " + e);
                                     e.printStackTrace();
                                 }
                             });
@@ -52,7 +43,7 @@ public class InPlaceEditViewNativeImpl {
                             // Schedule reLayoutEdit calls
                             for (int j = 0; j < 5; j++) {
                                 try {
-                                    reLayoutEditMethod.invoke(null);
+                                    InPlaceEditView.reLayoutEdit();
                                     Thread.sleep(10);
                                 } catch (Exception ex) {}
                             }
@@ -60,21 +51,22 @@ public class InPlaceEditViewNativeImpl {
                             // Stop editing
                             Display.getInstance().callSeriallyAndWait(() -> {
                                 try {
-                                    stopEditMethod.invoke(null);
+                                    InPlaceEditView.stopEdit();
                                 } catch (Exception e) {
-                                    System.out.println("Failed to invoke stopEdit: " + e);
                                     e.printStackTrace();
                                 }
                             });
                         }
+                        Display.getInstance().callSerially(() -> callback.onResult(true, null));
                     } catch (Throwable t) {
                         t.printStackTrace();
+                        Display.getInstance().callSerially(() -> callback.onResult(false, t.toString()));
                     }
                 }).start();
 
             } catch (Throwable t) {
-                System.out.println("InPlaceEditViewNativeImpl error: " + t);
                 t.printStackTrace();
+                Display.getInstance().callSerially(() -> callback.onResult(false, t.toString()));
             }
         });
     }
