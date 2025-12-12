@@ -169,6 +169,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private ActionListener logListener;
     private final List<Object> cleanupCalls = new ArrayList<Object>();
     private int flushStorageCacheInvocations;
+    private Boolean[] nativePickerTypeSupported = null;
+    private int nativePickerTypeSupportedIndex = 0;
     private boolean socketAvailable = true;
     private boolean serverSocketAvailable;
     private String appHomePath = "file://app/";
@@ -3710,6 +3712,25 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         public void setContentLength(int contentLength) {
             this.contentLength = contentLength;
         }
+    }
+
+    @Override
+    public boolean isNativePickerTypeSupported(int type) {
+        if (nativePickerTypeSupported != null && nativePickerTypeSupported.length > 0) {
+            boolean val;
+            if (nativePickerTypeSupportedIndex < nativePickerTypeSupported.length) {
+                val = nativePickerTypeSupported[nativePickerTypeSupportedIndex++];
+            } else {
+                val = nativePickerTypeSupported[nativePickerTypeSupported.length - 1]; // sticky last value
+            }
+            return val;
+        }
+        return super.isNativePickerTypeSupported(type);
+    }
+
+    public void setNativePickerTypeSupported(Boolean... supported) {
+        this.nativePickerTypeSupported = supported;
+        this.nativePickerTypeSupportedIndex = 0;
     }
 
     @Override
