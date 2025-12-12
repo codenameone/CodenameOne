@@ -62,7 +62,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new TransformPerspective(),
             new TransformCamera(),
             new BrowserComponentScreenshotTest(),
-            new MediaPlaybackScreenshotTest()
+            new MediaPlaybackScreenshotTest(),
+            new InPlaceEditViewTest()
     };
 
     public void runSuite() {
@@ -98,6 +99,12 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             testClass.cleanup();
             if(timeout == 0) {
                 log("CN1SS:ERR:suite test=" + testClass + " failed due to timeout waiting for DONE");
+            } else if (testClass.isFailed()) {
+                log("CN1SS:ERR:suite test=" + testClass + " failed: " + testClass.getFailMessage());
+            } else {
+                if (!testClass.shouldTakeScreenshot()) {
+                    log("CN1SS:INFO:test=" + testClass + " screenshot=none");
+                }
             }
             log("CN1SS:INFO:suite finished test=" + testClass);
         }
