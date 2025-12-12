@@ -15,6 +15,7 @@ import java.io.File;
 import java.io.FilenameFilter;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -623,5 +624,174 @@ class BytecodeInstructionIntegrationTest {
                 "void InvokeLdcLocalVarsApp_report___int(CODENAME_ONE_THREAD_STATE, JAVA_INT value) {\n" +
                 "    printf(\"RESULT=%d\\n\", value);\n" +
                 "}\n";
+    }
+
+    @Test
+    void handleDefaultOutputWritesOutput() throws Exception {
+        Parser.cleanup();
+        resetByteCodeClass();
+        Path sourceDir = Files.createTempDirectory("default-output-source");
+        Path outputDir = Files.createTempDirectory("default-output-dest");
+
+        Files.write(sourceDir.resolve("resource.txt"), "data".getBytes(StandardCharsets.UTF_8));
+        compileDummyMainClass(sourceDir, "com.example", "MyAppDefault");
+
+        String[] args = new String[] {
+                "csharp",
+                sourceDir.toAbsolutePath().toString(),
+                outputDir.toAbsolutePath().toString(),
+                "MyAppDefault", "com.example", "My App", "1.0", "ios", "none"
+        };
+
+        ByteCodeTranslator.OutputType originalOutput = ByteCodeTranslator.output;
+        try {
+            ByteCodeTranslator.main(args);
+
+            assertTrue(Files.exists(outputDir.resolve("resource.txt")), "Default output handler should copy resources");
+        } finally {
+            ByteCodeTranslator.output = originalOutput;
+            Parser.cleanup();
+            resetByteCodeClass();
+        }
+    }
+
+    @Test
+    void readFileAsStringBuilderReadsContent() throws Exception {
+        File temp = File.createTempFile("readfile", ".txt");
+        Files.write(temp.toPath(), "Hello World".getBytes(StandardCharsets.UTF_8));
+
+        Method m = ByteCodeTranslator.class.getDeclaredMethod("readFileAsStringBuilder", File.class);
+        m.setAccessible(true);
+        StringBuilder sb = (StringBuilder) m.invoke(null, temp);
+
+        assertEquals("Hello World", sb.toString());
+        temp.delete();
+    }
+
+    @Test
+    void replaceInFileModifiesContent() throws Exception {
+        File temp = File.createTempFile("replace", ".txt");
+        Files.write(temp.toPath(), "Hello World".getBytes(StandardCharsets.UTF_8));
+
+        Method m = ByteCodeTranslator.class.getDeclaredMethod("replaceInFile", File.class, String[].class);
+        m.setAccessible(true);
+        m.invoke(null, temp, new String[]{"World", "Universe"});
+
+        String content = new String(Files.readAllBytes(temp.toPath()), StandardCharsets.UTF_8);
+        assertEquals("Hello Universe", content);
+        temp.delete();
+    }
+
+    @Test
+    void getFileTypeReturnsCorrectTypes() throws Exception {
+        Method m = ByteCodeTranslator.class.getDeclaredMethod("getFileType", String.class);
+        m.setAccessible(true);
+
+        assertEquals("wrapper.framework", m.invoke(null, "foo.framework"));
+        assertEquals("sourcecode.c.objc", m.invoke(null, "foo.m"));
+        assertEquals("file", m.invoke(null, "foo.txt"));
+        assertEquals("wrapper.plug-in", m.invoke(null, "foo.bundle"));
+    }
+
+    @Test
+    void copyDirRecursivelyCopies() throws Exception {
+        Path src = Files.createTempDirectory("copydir-src");
+        Path dest = Files.createTempDirectory("copydir-dest");
+
+        Files.createDirectories(src.resolve("subdir"));
+        Files.write(src.resolve("file1.txt"), "content1".getBytes());
+        Files.write(src.resolve("subdir/file2.txt"), "content2".getBytes());
+
+        Method m = ByteCodeTranslator.class.getDeclaredMethod("copyDir", File.class, File.class);
+        m.setAccessible(true);
+        ByteCodeTranslator instance = new ByteCodeTranslator();
+        m.invoke(instance, src.toFile(), dest.toFile());
+
+        Path copiedRoot = dest.resolve(src.getFileName());
+        assertTrue(Files.exists(copiedRoot));
+        assertTrue(Files.exists(copiedRoot.resolve("file1.txt")));
+        assertTrue(Files.exists(copiedRoot.resolve("subdir/file2.txt")));
+    }
+
+    @Test
+    void handleIosOutputGeneratesProjectStructure() throws Exception {
+        Parser.cleanup();
+        resetByteCodeClass();
+        Path sourceDir = Files.createTempDirectory("ios-output-source");
+        Path outputDir = Files.createTempDirectory("ios-output-dest");
+
+        Files.write(sourceDir.resolve("resource.txt"), "data".getBytes(StandardCharsets.UTF_8));
+        compileDummyMainClass(sourceDir, "com.example", "MyAppIOS");
+
+        // Add a bundle to test copyDir invocation in execute loop
+        Path bundleDir = sourceDir.resolve("test.bundle");
+        Files.createDirectories(bundleDir);
+        Files.write(bundleDir.resolve("info.txt"), "bundle info".getBytes(StandardCharsets.UTF_8));
+
+        String[] args = new String[] {
+                "ios",
+                sourceDir.toAbsolutePath().toString(),
+                outputDir.toAbsolutePath().toString(),
+                "MyAppIOS", "com.example", "My App", "1.0", "ios", "none"
+        };
+
+        ByteCodeTranslator.OutputType originalOutput = ByteCodeTranslator.output;
+        try {
+            ByteCodeTranslator.main(args);
+
+            Path dist = outputDir.resolve("dist");
+            assertTrue(Files.exists(dist));
+            Path srcRoot = dist.resolve("MyAppIOS-src");
+            assertTrue(Files.exists(srcRoot));
+            assertTrue(Files.exists(srcRoot.resolve("resource.txt")));
+            assertTrue(Files.exists(srcRoot.resolve("Images.xcassets")));
+            assertTrue(Files.exists(dist.resolve("MyAppIOS.xcodeproj")));
+            assertTrue(Files.exists(srcRoot.resolve("MyAppIOS-Info.plist")));
+
+            // Verify bundle copied
+            assertTrue(Files.exists(srcRoot.resolve("test.bundle")));
+            assertTrue(Files.exists(srcRoot.resolve("test.bundle/info.txt")));
+
+        } finally {
+            ByteCodeTranslator.output = originalOutput;
+            Parser.cleanup();
+            resetByteCodeClass();
+        }
+    }
+
+    private void resetByteCodeClass() throws Exception {
+        Field mainClassField = ByteCodeClass.class.getDeclaredField("mainClass");
+        mainClassField.setAccessible(true);
+        mainClassField.set(null, null);
+
+        Field arrayTypesField = ByteCodeClass.class.getDeclaredField("arrayTypes");
+        arrayTypesField.setAccessible(true);
+        ((Set<?>) arrayTypesField.get(null)).clear();
+
+        Field writableFieldsField = ByteCodeClass.class.getDeclaredField("writableFields");
+        writableFieldsField.setAccessible(true);
+        ((Set<?>) writableFieldsField.get(null)).clear();
+    }
+
+    private void compileDummyMainClass(Path sourceDir, String packageName, String className) throws Exception {
+        Path packageDir = sourceDir;
+        for (String part : packageName.split("\\.")) {
+            packageDir = packageDir.resolve(part);
+        }
+        Files.createDirectories(packageDir);
+        Path javaFile = packageDir.resolve(className + ".java");
+        String content = "package " + packageName + ";\n" +
+                "public class " + className + " {\n" +
+                "    public static void main(String[] args) {}\n" +
+                "}\n";
+        Files.write(javaFile, content.getBytes(StandardCharsets.UTF_8));
+
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        int result = compiler.run(null, null, null,
+                "-source", "1.8",
+                "-target", "1.8",
+                "-d", sourceDir.toString(),
+                javaFile.toString());
+        assertEquals(0, result, "Compilation failed");
     }
 }
