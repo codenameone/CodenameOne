@@ -38,6 +38,19 @@ public class PickerCoverageTest extends UITestBase {
         Assertions.fail("Form did not become current in time");
     }
 
+    private void runAnimations(Form f) {
+        // Drive the animation loop to ensure AnimationManager processes flushAnimation queue
+        long start = System.currentTimeMillis();
+        while (System.currentTimeMillis() - start < 1000) {
+            f.animate();
+            DisplayTest.flushEdt();
+            f.revalidate();
+            try {
+                Thread.sleep(20);
+            } catch (InterruptedException e) {}
+        }
+    }
+
     @FormTest
     public void testPickerNextPrevButtons() {
         cleanup();
@@ -61,12 +74,13 @@ public class PickerCoverageTest extends UITestBase {
         picker.pressed();
         picker.released();
         DisplayTest.flushEdt();
+        runAnimations(f);
 
         // Find InteractionDialog
         InteractionDialog dlg = findInteractionDialog(f);
-        Assertions.assertNotNull(dlg, "Should show InteractionDialog");
+        Assertions.assertNotNull(dlg, "Should show InteractionDialog in LayeredPane");
 
-        // Find Next Button (Material Keyboard Arrow Down)
+        // Find Next Button
         Button nextButton = findButtonWithIcon(dlg, FontImage.MATERIAL_KEYBOARD_ARROW_DOWN);
         Assertions.assertNotNull(nextButton, "Next button should be present");
 
@@ -81,11 +95,12 @@ public class PickerCoverageTest extends UITestBase {
         picker.pressed();
         picker.released();
         DisplayTest.flushEdt();
+        runAnimations(f);
 
         dlg = findInteractionDialog(f);
         Assertions.assertNotNull(dlg, "Should show InteractionDialog");
 
-        // Find Prev Button (Material Keyboard Arrow Up)
+        // Find Prev Button
         Button prevButton = findButtonWithIcon(dlg, FontImage.MATERIAL_KEYBOARD_ARROW_UP);
         Assertions.assertNotNull(prevButton, "Prev button should be present");
 
@@ -95,11 +110,46 @@ public class PickerCoverageTest extends UITestBase {
         DisplayTest.flushEdt();
 
         Assertions.assertTrue(prevTf.hasFocus() || prevTf.isEditing(), "Prev component should have focus/editing");
+
+        // Re-open picker to test Done/Cancel
+        picker.pressed();
+        picker.released();
+        DisplayTest.flushEdt();
+        runAnimations(f);
+
+        dlg = findInteractionDialog(f);
+        Assertions.assertNotNull(dlg, "Should show InteractionDialog");
+
+        Button doneButton = findButtonWithText(dlg, "Done");
+        if (doneButton != null) {
+            doneButton.pressed();
+            doneButton.released();
+            DisplayTest.flushEdt();
+            // Dialog should close
+            runAnimations(f);
+            Assertions.assertNull(findInteractionDialog(f), "Dialog should close after Done");
+        }
+
+        // Re-open for Cancel
+        picker.pressed();
+        picker.released();
+        DisplayTest.flushEdt();
+        runAnimations(f);
+
+        dlg = findInteractionDialog(f);
+        Button cancelButton = findButtonWithText(dlg, "Cancel");
+        if (cancelButton != null) {
+            cancelButton.pressed();
+            cancelButton.released();
+            DisplayTest.flushEdt();
+            // Dialog should close
+            runAnimations(f);
+            Assertions.assertNull(findInteractionDialog(f), "Dialog should close after Cancel");
+        }
     }
 
     private InteractionDialog findInteractionDialog(Form f) {
         if (f == null) return null;
-        // In some cases, InteractionDialog logic adds directly to layered pane
         Container lp = f.getLayeredPane();
         return findInteractionDialog(lp);
     }
@@ -156,6 +206,7 @@ public class PickerCoverageTest extends UITestBase {
         picker.pressed();
         picker.released();
         DisplayTest.flushEdt();
+        runAnimations(f);
 
         InteractionDialog dlg = findInteractionDialog(f);
         Assertions.assertNotNull(dlg, "Should show InteractionDialog on Tablet");
@@ -171,7 +222,12 @@ public class PickerCoverageTest extends UITestBase {
         picker.setUseLightweightPopup(false);
 
         // Setup sequence: first true (to skip lightweight block), then false (to skip native block)
+        // See Picker.java logic:
+        // 1. ((useLightweight || !isNative) && isLightweightSupported) -> false requires isNative=true.
+        // 2. isNative -> false.
         TestCodenameOneImplementation.getInstance().setNativePickerTypeSupported(true, false);
+
+        final AtomicBoolean dialogFound = new AtomicBoolean(false);
 
         try {
             Form f = new Form("Legacy Test");
@@ -182,12 +238,16 @@ public class PickerCoverageTest extends UITestBase {
             // Schedule interaction
             Display.getInstance().callSerially(() -> {
                 Form current = Display.getInstance().getCurrent();
-                // Legacy dialog is a Dialog
+                // Legacy dialog is a Dialog (extends Form)
                 if (current instanceof Dialog) {
+                    dialogFound.set(true);
                     Button cancelButton = findButtonWithText(current, "Cancel");
                     if (cancelButton != null) {
                         cancelButton.pressed();
                         cancelButton.released();
+                    } else {
+                        // Fallback
+                        ((Dialog)current).dispose();
                     }
                 }
             });
@@ -197,6 +257,7 @@ public class PickerCoverageTest extends UITestBase {
             picker.released();
             DisplayTest.flushEdt();
 
+            Assertions.assertTrue(dialogFound.get(), "Should have found the legacy Dialog");
             // Should close dialog
             Assertions.assertNotEquals(Dialog.class, Display.getInstance().getCurrent().getClass(), "Dialog should close");
 
@@ -241,10 +302,12 @@ public class PickerCoverageTest extends UITestBase {
         picker.pressed();
         picker.released();
         DisplayTest.flushEdt();
+        runAnimations(f);
 
         // Picker dialog is open.
         TestCodenameOneImplementation.getInstance().setWindowSize(800, 1200);
         DisplayTest.flushEdt();
+        runAnimations(f);
     }
 
     @FormTest
@@ -264,6 +327,7 @@ public class PickerCoverageTest extends UITestBase {
         picker.pressed();
         picker.released();
         DisplayTest.flushEdt();
+        runAnimations(f);
 
         // Picker is open. It sets current input device.
         VirtualInputDevice vid = f.getCurrentInputDevice();
@@ -276,8 +340,7 @@ public class PickerCoverageTest extends UITestBase {
 
         // Wait for animation delay if necessary, but flushEdt should handle pending runnables.
         // There might be animation delays.
-        Thread.sleep(100);
-        DisplayTest.flushEdt();
+        runAnimations(f);
 
         Assertions.assertTrue(callbackRan.get(), "Stop editing callback should run, implying Picker$4$1 ran");
     }

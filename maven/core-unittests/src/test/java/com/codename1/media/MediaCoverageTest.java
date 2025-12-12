@@ -9,10 +9,10 @@ import org.junit.jupiter.api.BeforeEach;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Component;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MediaCoverageTest extends UITestBase {
 
-    // Usually cleanup is done in tearDownDisplay of UITestBase, but we can add specific cleanup here
     private void cleanup() {
         MediaManager.setRemoteControlListener(null);
     }
@@ -20,25 +20,25 @@ public class MediaCoverageTest extends UITestBase {
     @FormTest
     public void testRemoteControlCallback() {
         cleanup();
-        final boolean[] pauseCalled = new boolean[1];
-        final boolean[] toggleCalled = new boolean[1];
-        final boolean[] seekCalled = new boolean[1];
+        final AtomicBoolean pauseCalled = new AtomicBoolean(false);
+        final AtomicBoolean toggleCalled = new AtomicBoolean(false);
+        final AtomicBoolean seekCalled = new AtomicBoolean(false);
         final long[] seekPos = new long[1];
 
         RemoteControlListener listener = new RemoteControlListener() {
             @Override
             public void pause() {
-                pauseCalled[0] = true;
+                pauseCalled.set(true);
             }
 
             @Override
             public void togglePlayPause() {
-                toggleCalled[0] = true;
+                toggleCalled.set(true);
             }
 
             @Override
             public void seekTo(long pos) {
-                seekCalled[0] = true;
+                seekCalled.set(true);
                 seekPos[0] = pos;
             }
         };
@@ -47,37 +47,34 @@ public class MediaCoverageTest extends UITestBase {
 
         RemoteControlCallback.pause();
         DisplayTest.flushEdt();
-        Assertions.assertTrue(pauseCalled[0], "RemoteControlCallback.pause() should call listener.pause()");
+        Assertions.assertTrue(pauseCalled.get(), "RemoteControlCallback.pause() should call listener.pause()");
 
         RemoteControlCallback.togglePlayPause();
         DisplayTest.flushEdt();
-        Assertions.assertTrue(toggleCalled[0], "RemoteControlCallback.togglePlayPause() should call listener.togglePlayPause()");
+        Assertions.assertTrue(toggleCalled.get(), "RemoteControlCallback.togglePlayPause() should call listener.togglePlayPause()");
 
         RemoteControlCallback.seekTo(12345L);
         DisplayTest.flushEdt();
-        Assertions.assertTrue(seekCalled[0], "RemoteControlCallback.seekTo() should call listener.seekTo()");
+        Assertions.assertTrue(seekCalled.get(), "RemoteControlCallback.seekTo() should call listener.seekTo()");
         Assertions.assertEquals(12345L, seekPos[0], "RemoteControlCallback.seekTo() should pass correct position");
     }
 
     @FormTest
     public void testMediaManagerAsyncMediaTimer() throws InterruptedException {
-        // Test MediaManager$1$1: TimerTask inside AbstractMedia returned by getAsyncMedia
 
-        // Mock media object
-        final boolean[] playing = new boolean[1];
-        final boolean[] playCalled = new boolean[1];
+        final AtomicBoolean playing = new AtomicBoolean(false);
+        final AtomicBoolean playCalled = new AtomicBoolean(false);
 
         Media mockMedia = new Media() {
             @Override
             public void prepare() {}
             @Override
             public void play() {
-                playCalled[0] = true;
-                // Don't set playing to true immediately to allow the timer to run
+                playCalled.set(true);
             }
             @Override
             public void pause() {
-                playing[0] = false;
+                playing.set(false);
             }
             @Override
             public void cleanup() {}
@@ -93,7 +90,7 @@ public class MediaCoverageTest extends UITestBase {
             public void setVolume(int vol) {}
             @Override
             public boolean isPlaying() {
-                return playing[0];
+                return playing.get();
             }
             @Override
             public Component getVideoComponent() { return null; }
@@ -115,33 +112,27 @@ public class MediaCoverageTest extends UITestBase {
 
         AsyncMedia asyncMedia = MediaManager.getAsyncMedia(mockMedia);
 
-        final boolean[] stateChangedToPlaying = new boolean[1];
+        final AtomicBoolean stateChangedToPlaying = new AtomicBoolean(false);
         asyncMedia.addMediaStateChangeListener(evt -> {
             if (evt.getNewState() == AsyncMedia.State.Playing) {
-                stateChangedToPlaying[0] = true;
+                stateChangedToPlaying.set(true);
             }
         });
 
-        // Call play on async media. This calls playImpl in the anonymous class (MediaManager$1).
-        // playImpl calls media.play().
-        // If media.isPlaying() is false (which it is), it starts a Timer.
-        // The TimerTask (MediaManager$1$1) runs periodically and checks if media.isPlaying().
-        // If it becomes true, it fires state change.
         asyncMedia.play();
 
-        Assertions.assertTrue(playCalled[0], "Underlying media.play() should be called");
-        Assertions.assertFalse(stateChangedToPlaying[0], "State should not be Playing yet");
+        Assertions.assertTrue(playCalled.get(), "Underlying media.play() should be called");
+        Assertions.assertFalse(stateChangedToPlaying.get(), "State should not be Playing yet");
 
         // Now simulate media starting to play after a delay
         Thread.sleep(100);
-        playing[0] = true;
+        playing.set(true);
 
-        // Wait for timer to pick it up. Increase timeout to 5s.
         long start = System.currentTimeMillis();
-        while (!stateChangedToPlaying[0] && System.currentTimeMillis() - start < 5000) {
+        while (!stateChangedToPlaying.get() && System.currentTimeMillis() - start < 5000) {
             Thread.sleep(50);
         }
 
-        Assertions.assertTrue(stateChangedToPlaying[0], "Timer should detect playing state and fire event");
+        Assertions.assertTrue(stateChangedToPlaying.get(), "Timer should detect playing state and fire event");
     }
 }
