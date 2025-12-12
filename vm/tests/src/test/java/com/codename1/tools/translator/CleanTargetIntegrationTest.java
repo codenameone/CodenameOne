@@ -96,8 +96,19 @@ class CleanTargetIntegrationTest {
 
     static void runTranslator(Path classesDir, Path outputDir, String appName) throws Exception {
         Path translatorResources = Paths.get("..", "ByteCodeTranslator", "src").normalize().toAbsolutePath();
-        URLClassLoader systemLoader = (URLClassLoader) ClassLoader.getSystemClassLoader();
-        URL[] systemUrls = systemLoader.getURLs();
+        ClassLoader systemLoader = ClassLoader.getSystemClassLoader();
+        URL[] systemUrls;
+        if (systemLoader instanceof URLClassLoader) {
+            systemUrls = ((URLClassLoader) systemLoader).getURLs();
+        } else {
+             // For Java 9+, we need to get the classpath from the system property
+             String[] paths = System.getProperty("java.class.path").split(System.getProperty("path.separator"));
+             systemUrls = new URL[paths.length];
+             for (int i=0; i<paths.length; i++) {
+                 systemUrls[i] = Paths.get(paths[i]).toUri().toURL();
+             }
+        }
+
         URL[] urls = Arrays.copyOf(systemUrls, systemUrls.length + 1);
         urls[systemUrls.length] = translatorResources.toUri().toURL();
         URLClassLoader loader = new URLClassLoader(urls, null);
