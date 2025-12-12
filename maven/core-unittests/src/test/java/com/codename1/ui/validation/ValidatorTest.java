@@ -3,9 +3,13 @@ package com.codename1.ui.validation;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
+import com.codename1.ui.Component;
 import com.codename1.ui.Form;
+import com.codename1.ui.Label;
+import com.codename1.ui.TextComponent;
 import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.plaf.UIManager;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -145,5 +149,58 @@ class ValidatorTest extends UITestBase {
 
         // This test mainly ensures no exception is thrown when the focus listener runs.
         // Verifying the actual popup is hard as it is UI side effect.
+    }
+
+    @FormTest
+    public void testValidationErrorMessage() {
+        // Enable option
+        java.util.Hashtable<String, Object> props = new java.util.Hashtable<>();
+        props.put("@showValidationErrorsIfNotOnTopMode", "true");
+        UIManager.getInstance().addThemeProps(props);
+
+        // Setup Validator
+        Validator v = new Validator();
+        TextComponent tc = new TextComponent().label("Field");
+        tc.getField().setName("MyField");
+
+        // Ensure not on top mode
+        tc.onTopMode(false);
+
+        // Add constraint that fails
+        v.addConstraint(tc, new LengthConstraint(5, "Too short"));
+
+        Form f = new Form("Form", new BoxLayout(BoxLayout.Y_AXIS));
+        f.add(tc);
+        f.show();
+
+        // Ensure sufficient width for label
+        f.setWidth(1000);
+        f.setHeight(1000);
+        f.revalidate();
+        flushSerialCalls();
+
+        // Set invalid text
+        tc.text("Abc"); // Length 3 < 5
+
+        // Trigger validation by focus lost
+        Component field = tc.getField();
+        field.requestFocus();
+        // Now lose focus by focusing another component
+        Button other = new Button("Other");
+        f.add(other);
+        other.requestFocus();
+
+        // Verify label changed to "Too short"
+        Label label = tc.getField().getLabelForComponent();
+        assertTrue(label.getText().startsWith("Too"), "Label text should start with 'Too' but was '" + label.getText() + "'");
+        assertEquals("ErrorLabel", label.getUIID());
+
+        // Wait for timer (2000ms) - attempting to cover restore logic
+        try {
+            Thread.sleep(2500);
+        } catch (InterruptedException e) {}
+
+        // Flush EDT to run the timer runnable
+        flushSerialCalls();
     }
 }
