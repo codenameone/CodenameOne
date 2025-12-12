@@ -18,8 +18,13 @@ import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextField;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.layouts.BoxLayout;
+
+import com.codename1.impl.android.AndroidImplementation;
+import com.codename1.impl.android.InPlaceEditView;
 
 import org.junit.Assert;
 import org.junit.Assume;
@@ -378,5 +383,79 @@ public class HelloCodenameOneInstrumentedTest {
         }
 
         emitScreenshot(capture, BROWSER_TEST);
+    }
+
+    @Test
+    public void testInPlaceEditViewNPE() throws Exception {
+        Context ctx = ApplicationProvider.getApplicationContext();
+        try (ActivityScenario<Activity> scenario = launchMainActivity(ctx)) {
+            final CountDownLatch latch = new CountDownLatch(1);
+            final Throwable[] error = new Throwable[1];
+
+            scenario.onActivity(activity -> Display.getInstance().callSerially(() -> {
+                try {
+                    if (!(Display.getInstance().getImplementation() instanceof AndroidImplementation)) {
+                        println("CN1SS:WARN: Not running on AndroidImplementation, skipping InPlaceEditView test");
+                        return;
+                    }
+
+                    final AndroidImplementation impl = (AndroidImplementation) Display.getInstance().getImplementation();
+
+                    Form f = new Form("Test NPE", new BoxLayout(BoxLayout.Y_AXIS));
+                    final TextArea ta = new TextField("Test");
+                    f.add(ta);
+                    f.show();
+                    f.revalidate();
+
+                    // We need to simulate the race condition.
+                    // The race is between InPlaceEditView.reLayoutEdit() (specifically the runnable it posts)
+                    // and InPlaceEditView.releaseEdit() (which sets sInstance = null).
+
+                    // Run a loop attempting to trigger the crash
+                    new Thread(() -> {
+                        try {
+                            for (int i = 0; i < 50; i++) {
+                                final int iter = i;
+                                // Start editing
+                                Display.getInstance().callSeriallyAndWait(() -> {
+                                    InPlaceEditView.edit(impl, ta, ta.getConstraint());
+                                });
+
+                                // Schedule reLayoutEdit calls
+                                for (int j = 0; j < 5; j++) {
+                                    InPlaceEditView.reLayoutEdit();
+                                    try {
+                                        Thread.sleep(10);
+                                    } catch (InterruptedException ex) {}
+                                }
+
+                                // Stop editing (this triggers releaseEdit asynchronously)
+                                Display.getInstance().callSeriallyAndWait(() -> {
+                                    InPlaceEditView.stopEdit();
+                                });
+                            }
+                        } catch (Throwable t) {
+                            error[0] = t;
+                        } finally {
+                            latch.countDown();
+                        }
+                    }).start();
+
+                } catch (Throwable t) {
+                    error[0] = t;
+                    latch.countDown();
+                }
+            }));
+
+            if (!latch.await(30, TimeUnit.SECONDS)) {
+                Assert.fail("Test timed out");
+            }
+
+            if (error[0] != null) {
+                // If the error is the NPE we expect, then we reproduced it (if we haven't fixed it yet).
+                // If we fixed it, we shouldn't get an error.
+                throw new Exception("Exception during test", error[0]);
+            }
+        }
     }
 }
