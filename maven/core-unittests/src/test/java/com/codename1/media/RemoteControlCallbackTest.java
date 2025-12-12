@@ -2,6 +2,7 @@ package com.codename1.media;
 
 import com.codename1.junit.UITestBase;
 import com.codename1.junit.FormTest;
+import com.codename1.ui.DisplayTest;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class RemoteControlCallbackTest extends UITestBase {
@@ -14,22 +15,30 @@ public class RemoteControlCallbackTest extends UITestBase {
 
         // Call callbacks
         RemoteControlCallback.skipToNext();
-        flushSerialCalls();
+        DisplayTest.flushEdt();
         assertTrue(listener.nextCalled, "skipToNext should be called");
 
         RemoteControlCallback.skipToPrevious();
-        flushSerialCalls();
+        DisplayTest.flushEdt();
         assertTrue(listener.prevCalled, "skipToPrevious should be called");
 
         RemoteControlCallback.play();
-        flushSerialCalls();
+        DisplayTest.flushEdt();
         assertTrue(listener.playCalled, "play should be called");
+
+        // Add test for setVolume (RemoteControlCallback$10)
+        RemoteControlCallback.setVolume(0.5f, 0.8f);
+        DisplayTest.flushEdt();
+        assertEquals(0.5f, listener.leftVol, 0.01f);
+        assertEquals(0.8f, listener.rightVol, 0.01f);
     }
 
     static class MyRemoteControlListener extends RemoteControlListener {
         boolean nextCalled;
         boolean prevCalled;
         boolean playCalled;
+        float leftVol = -1f;
+        float rightVol = -1f;
 
         @Override
         public void play() {
@@ -44,6 +53,12 @@ public class RemoteControlCallbackTest extends UITestBase {
         @Override
         public void skipToPrevious() {
             prevCalled = true;
+        }
+
+        @Override
+        public void setVolume(float left, float right) {
+            leftVol = left;
+            rightVol = right;
         }
     }
 }
