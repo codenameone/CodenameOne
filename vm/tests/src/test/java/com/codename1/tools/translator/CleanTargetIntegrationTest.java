@@ -156,7 +156,7 @@ class CleanTargetIntegrationTest {
         content = content.replace(globWithObjc, globCOnly);
         String replacement = content.replace(
                 "add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})",
-                "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})"
+                "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m)"
         );
         Files.write(cmakeLists, replacement.getBytes(StandardCharsets.UTF_8));
     }
@@ -196,6 +196,7 @@ class CleanTargetIntegrationTest {
         String content = "#include \"cn1_globals.h\"\n" +
                 "#include <stdlib.h>\n" +
                 "#include <string.h>\n" +
+                "#include <math.h>\n" +
                 "\n" +
                 "static struct ThreadLocalData globalThreadData;\n" +
                 "static int runtimeInitialized = 0;\n" +
@@ -256,6 +257,13 @@ class CleanTargetIntegrationTest {
                 "\n" +
                 "struct clazz class_array1__JAVA_INT = {0};\n" +
                 "struct clazz class_array2__JAVA_INT = {0};\n" +
+                "struct clazz class_array1__JAVA_BOOLEAN = {0};\n" +
+                "struct clazz class_array1__JAVA_CHAR = {0};\n" +
+                "struct clazz class_array1__JAVA_FLOAT = {0};\n" +
+                "struct clazz class_array1__JAVA_DOUBLE = {0};\n" +
+                "struct clazz class_array1__JAVA_BYTE = {0};\n" +
+                "struct clazz class_array1__JAVA_SHORT = {0};\n" +
+                "struct clazz class_array1__JAVA_LONG = {0};\n" +
                 "\n" +
                 "static JAVA_OBJECT allocArrayInternal(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim) {\n" +
                 "    struct JavaArrayPrototype* arr = (struct JavaArrayPrototype*)calloc(1, sizeof(struct JavaArrayPrototype));\n" +
@@ -303,6 +311,10 @@ class CleanTargetIntegrationTest {
                 "void monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { (void)obj; }\n" +
                 "\n" +
                 "void monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { (void)obj; }\n" +
+                "\n" +
+                "void monitorEnterBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { (void)obj; }\n" +
+                "\n" +
+                "void monitorExitBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { (void)obj; }\n" +
                 "\n" +
                 "struct elementStruct* pop(struct elementStruct** sp) {\n" +
                 "    (*sp)--;\n" +
