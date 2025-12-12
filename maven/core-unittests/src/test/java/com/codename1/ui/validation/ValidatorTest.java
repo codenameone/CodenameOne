@@ -8,6 +8,7 @@ import com.codename1.ui.Form;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextComponent;
 import com.codename1.ui.TextField;
+import com.codename1.ui.TextArea;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.plaf.UIManager;
 
@@ -149,6 +150,34 @@ class ValidatorTest extends UITestBase {
 
         // This test mainly ensures no exception is thrown when the focus listener runs.
         // Verifying the actual popup is hard as it is UI side effect.
+    }
+
+    @FormTest
+    void testShowErrorMessageScrollListener() {
+        Form form = new Form(new BoxLayout(BoxLayout.Y_AXIS));
+        TextArea ta = new TextArea("abc"); // Invalid content
+        ta.setSingleLineTextArea(false);
+        ta.setRows(5);
+        form.add(ta);
+        form.show();
+
+        Validator validator = new Validator();
+        validator.setShowErrorMessageForFocusedComponent(true);
+        // Force highlight mode to EMBLEM to trigger the scroll listener addition logic
+        validator.setValidationFailureHighlightMode(Validator.HighlightMode.EMBLEM);
+
+        validator.addConstraint(ta, new LengthConstraint(5, "Too short"));
+
+        // Trigger focus gained on the component
+        ta.requestFocus();
+
+        // This should show the popup message and add ScrollListener.
+
+        // Now simulate scroll
+        Component scrollable = ta.getScrollable();
+        if (scrollable != null) {
+            scrollable.scrollRectToVisible(10, 0, 10, 10, ta);
+        }
     }
 
     @FormTest

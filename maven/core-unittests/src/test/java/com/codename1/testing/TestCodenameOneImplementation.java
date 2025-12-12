@@ -193,6 +193,27 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private Function<String, byte[]> connectionResponseProvider;
     private final Map<String, String[]> sslCertificatesByUrl = new ConcurrentHashMap<String, String[]>();
     private boolean sslCertificatesSupported;
+    private final Map<String, MockResponse> mockResponses = new ConcurrentHashMap<String, MockResponse>();
+
+    public static class MockResponse {
+        int code;
+        String message;
+        byte[] body;
+
+        public MockResponse(int code, String message, byte[] body) {
+            this.code = code;
+            this.message = message;
+            this.body = body;
+        }
+    }
+
+    public void addNetworkMockResponse(String url, int code, String message, byte[] body) {
+        mockResponses.put(url, new MockResponse(code, message, body));
+    }
+
+    public void clearNetworkMocks() {
+        mockResponses.clear();
+    }
 
 
     public TestCodenameOneImplementation() {
@@ -1957,6 +1978,17 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             if (response != null) {
                 connection.setInputData(response);
                 connection.setContentLength(response.length);
+            }
+        }
+        for (Map.Entry<String, MockResponse> entry : mockResponses.entrySet()) {
+            if (url.startsWith(entry.getKey())) {
+                 MockResponse r = entry.getValue();
+                 connection.setResponseCode(r.code);
+                 connection.setResponseMessage(r.message);
+                 if (r.body != null) {
+                     connection.setInputData(r.body);
+                     connection.setContentLength(r.body.length);
+                 }
             }
         }
         return connection;
