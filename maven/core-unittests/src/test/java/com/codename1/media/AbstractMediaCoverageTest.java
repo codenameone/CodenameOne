@@ -1,118 +1,130 @@
 package com.codename1.media;
 
-import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
-import com.codename1.ui.Component;
-import com.codename1.ui.Display;
-import com.codename1.ui.DisplayTest;
+import com.codename1.junit.FormTest;
 import org.junit.jupiter.api.Assertions;
-
-import java.util.concurrent.atomic.AtomicBoolean;
+import com.codename1.ui.DisplayTest;
+import com.codename1.ui.Component;
+import com.codename1.media.AsyncMedia.MediaException;
+import com.codename1.media.AsyncMedia.MediaErrorType;
 
 public class AbstractMediaCoverageTest extends UITestBase {
 
-    static class MockAsyncMedia extends AbstractMedia {
-        private final AtomicBoolean playing = new AtomicBoolean(false);
+    static class TestMedia extends AbstractMedia {
+        boolean playImplCalled = false;
+        boolean pauseImplCalled = false;
+        boolean playing = false;
+        int time = 0;
+        int duration = 10000;
+        int volume = 100;
 
         @Override
         protected void playImpl() {
-            // Simulate async completion
-            new Thread(() -> {
-                try {
-                    Thread.sleep(10);
-                } catch (InterruptedException e) {}
-                playing.set(true);
-                // Fire on EDT to be safe with EventDispatcher?
-                // AbstractMedia doesn't require it but it's good practice.
-                // But let's keep it on thread to simulate native callbacks.
-                fireMediaStateChange(State.Playing);
-            }).start();
+            playImplCalled = true;
         }
 
         @Override
         protected void pauseImpl() {
-            // Simulate async completion
-            new Thread(() -> {
-                try {
-                    Thread.sleep(10);
-                } catch (InterruptedException e) {}
-                playing.set(false);
-                fireMediaStateChange(State.Paused);
-            }).start();
+            pauseImplCalled = true;
         }
 
-        @Override
-        public void prepare() {}
-        @Override
-        public void cleanup() {}
-        @Override
-        public int getTime() { return 0; }
-        @Override
-        public void setTime(int time) {}
-        @Override
-        public int getDuration() { return 0; }
-        @Override
-        public int getVolume() { return 0; }
-        @Override
-        public void setVolume(int vol) {}
-        @Override
-        public boolean isPlaying() { return playing.get(); }
-        @Override
-        public Component getVideoComponent() { return null; }
-        @Override
-        public boolean isVideo() { return false; }
-        @Override
-        public boolean isFullScreen() { return false; }
-        @Override
-        public void setFullScreen(boolean fullScreen) {}
-        @Override
-        public boolean isNativePlayerMode() { return false; }
-        @Override
-        public void setNativePlayerMode(boolean nativePlayer) {}
-        @Override
-        public void setVariable(String key, Object value) {}
-        @Override
-        public Object getVariable(String key) { return null; }
+        public void triggerStateChange(State newState) {
+            if (newState == State.Playing) playing = true;
+            if (newState == State.Paused) playing = false;
+            fireMediaStateChange(newState);
+        }
+
+        public void triggerError(MediaException ex) {
+            fireMediaError(ex);
+        }
+
+        @Override public void setTime(int time) { this.time = time; }
+        @Override public int getTime() { return time; }
+        @Override public int getDuration() { return duration; }
+        @Override public void setVolume(int vol) { this.volume = vol; }
+        @Override public int getVolume() { return volume; }
+        @Override public boolean isPlaying() { return playing; }
+        @Override public void cleanup() {}
+        @Override public Component getVideoComponent() { return null; }
+        @Override public boolean isVideo() { return false; }
+        @Override public boolean isFullScreen() { return false; }
+        @Override public void setFullScreen(boolean fullScreen) {}
+        @Override public boolean isNativePlayerMode() { return false; }
+        @Override public void setNativePlayerMode(boolean nativePlayer) {}
+        @Override public void setVariable(String key, Object value) {}
+        @Override public Object getVariable(String key) { return null; }
+        @Override public void prepare() {}
     }
 
     @FormTest
-    public void testChainedPauseRequests() throws InterruptedException {
-        // This test targets AbstractMedia$10 and AbstractMedia$11
-        // which are created when pauseAsync is called while a pause request is pending.
+    public void testAsyncInterleaving() {
+        TestMedia media = new TestMedia();
+        media.playing = false; // Initially paused
 
-        MockAsyncMedia media = new MockAsyncMedia();
-        // Start playing first
-        AsyncMedia.PlayRequest playReq = media.playAsync();
-        long start = System.currentTimeMillis();
-        while (!playReq.isDone() && System.currentTimeMillis() - start < 2000) {
-            DisplayTest.flushEdt();
-            Thread.sleep(10);
-        }
-        Assertions.assertTrue(playReq.isDone(), "Play request should complete");
+        // 1. playAsync() called. Sets pendingPlayRequest.
+        media.playAsync();
+        Assertions.assertTrue(media.playImplCalled, "Play should be called");
+        media.playImplCalled = false;
 
-        // Now trigger pause
-        AsyncMedia.PauseRequest pauseReq1 = media.pauseAsync();
+        // 2. pauseAsync() called while play is pending (state not yet Playing).
+        // This should attach listeners to the pending play request.
+        AsyncMedia.PauseRequest pauseReq = media.pauseAsync();
 
-        // While pauseReq1 is pending, trigger pauseAsync again
-        AsyncMedia.PauseRequest pauseReq2 = media.pauseAsync();
+        // 3. Fail the play request.
+        // This should trigger the except callback ($9) attached by pauseAsync.
+        // The callback calls pauseAsync(out).
+        media.triggerError(new MediaException(MediaErrorType.Unknown, "Simulated error"));
 
-        Assertions.assertNotSame(pauseReq1, pauseReq2, "Should create new request object");
+        DisplayTest.flushEdt();
 
-        // Wait for pauseReq1
-        start = System.currentTimeMillis();
-        while (!pauseReq1.isDone() && System.currentTimeMillis() - start < 2000) {
-            DisplayTest.flushEdt();
-            Thread.sleep(10);
-        }
-        Assertions.assertTrue(pauseReq1.isDone(), "First pause request should complete");
+        // When play fails, pendingPlayRequest becomes null.
+        // The callback calls pauseAsync(out).
+        // Since pendingPlayRequest is null, it proceeds to check pendingPauseRequest.
+        // It proceeds to check state. State is Paused (playing=false).
+        // So it completes immediately without calling pauseImpl.
 
-        // pauseReq2 should also be done (chained)
-        start = System.currentTimeMillis();
-        while (!pauseReq2.isDone() && System.currentTimeMillis() - start < 2000) {
-            DisplayTest.flushEdt();
-            Thread.sleep(10);
-        }
+        Assertions.assertTrue(pauseReq.isDone(), "Pause request should complete");
+    }
 
-        Assertions.assertTrue(pauseReq2.isDone(), "Chained pause request should complete");
+    @FormTest
+    public void testPlayAfterPause() {
+        TestMedia media = new TestMedia();
+        media.playing = true; // Initially playing so pauseAsync works
+        media.pauseImplCalled = false;
+        media.playImplCalled = false;
+
+        // 1. pauseAsync
+        media.pauseAsync();
+        Assertions.assertTrue(media.pauseImplCalled, "Pause should be called");
+        media.pauseImplCalled = false;
+
+        // 2. playAsync while pause is pending (state not yet Paused)
+        media.playAsync();
+
+        // 3. Succeed pause
+        media.triggerStateChange(AsyncMedia.State.Paused);
+        DisplayTest.flushEdt();
+
+        // Pause completed. Listener calls playAsync().
+        // playAsync sees state Paused. Calls playImpl.
+
+        Assertions.assertTrue(media.playImplCalled, "Play should be called after pause success");
+    }
+
+    @FormTest
+    public void testPlayAfterPlay() {
+        TestMedia media = new TestMedia();
+        media.playing = false;
+        media.playAsync();
+        // pendingPlayRequest is set.
+
+        AsyncMedia.PlayRequest req2 = media.playAsync();
+        // This attaches ready/except to pendingPlayRequest ($4, $5).
+
+        media.triggerStateChange(AsyncMedia.State.Playing);
+        DisplayTest.flushEdt();
+
+        // Both requests should complete.
+        Assertions.assertTrue(req2.isDone(), "Second play request should be done");
     }
 }

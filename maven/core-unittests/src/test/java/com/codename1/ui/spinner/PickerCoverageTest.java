@@ -8,6 +8,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.geom.Dimension;
 import org.junit.jupiter.api.Assertions;
 
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -395,5 +396,32 @@ public class PickerCoverageTest extends UITestBase {
         f.keyReleased(9);
         DisplayTest.flushEdt();
         runAnimations(f);
+    }
+
+    // New test added for Picker$3$1 explicitly (already covered by testSizeChangedListenerRunnable but duplicating logic for safety)
+    @FormTest
+    public void testSizeChangedListenerExplicit() {
+        cleanup();
+        TestCodenameOneImplementation.getInstance().setTablet(false);
+
+        Picker p = new Picker();
+        p.setUseLightweightPopup(true);
+        p.setType(Display.PICKER_TYPE_STRINGS);
+        p.setStrings("A", "B", "C");
+
+        Form f = new Form("Test", new com.codename1.ui.layouts.BorderLayout());
+        f.add(com.codename1.ui.layouts.BorderLayout.CENTER, p);
+        f.show();
+        waitForForm(f);
+
+        p.pointerPressed(p.getAbsoluteX() + p.getWidth()/2, p.getAbsoluteY() + p.getHeight()/2);
+        p.pointerReleased(p.getAbsoluteX() + p.getWidth()/2, p.getAbsoluteY() + p.getHeight()/2);
+        DisplayTest.flushEdt();
+        runAnimations(f);
+
+        // Trigger size change
+        f.setSize(new Dimension(500, 500));
+        DisplayTest.flushEdt();
+        f.animate();
     }
 }
