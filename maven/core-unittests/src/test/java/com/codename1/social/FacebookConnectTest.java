@@ -6,6 +6,7 @@ import com.codename1.io.Preferences;
 import com.codename1.io.Storage;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.testing.TestCodenameOneImplementation.TestConnection;
 
 import org.junit.jupiter.api.AfterEach;
@@ -35,6 +36,7 @@ class FacebookConnectTest extends UITestBase {
     void tearDownFacebookConnect() {
         clearStoredCredentials();
         implementation.clearConnections();
+        implementation.clearNetworkMocks();
         FaceBookAccess.setToken(null);
     }
 
@@ -121,6 +123,18 @@ class FacebookConnectTest extends UITestBase {
         assertThrows(RuntimeException.class, new FacebookConnect()::isLoggedIn);
         assertThrows(RuntimeException.class, () -> new FacebookConnect().askPublishPermissions(null));
         assertThrows(RuntimeException.class, new FacebookConnect()::hasPublishPermissions);
+    }
+
+    @FormTest
+    public void testValidateToken() {
+        TestCodenameOneImplementation.getInstance().addNetworkMockResponse("https://graph.facebook.com/v2.4/me", 400, "Bad Request", null);
+
+        boolean result = connect.validateToken("invalid_token");
+        assertFalse(result, "Should return false on 400 response");
+
+        TestCodenameOneImplementation.getInstance().addNetworkMockResponse("https://graph.facebook.com/v2.4/me", 200, "OK", null);
+        result = connect.validateToken("valid_token");
+        assertTrue(result, "Should return true on 200 response");
     }
 
     private void clearStoredCredentials() {

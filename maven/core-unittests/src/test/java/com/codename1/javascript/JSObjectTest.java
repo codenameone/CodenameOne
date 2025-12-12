@@ -211,6 +211,45 @@ class JSObjectTest extends UITestBase {
     }
 
     @Test
+    void callStringAsyncDelegatesToJavascriptContext() {
+        responses.add("ignored");
+        responses.add("object");
+        responses.add("11");
+        RecordingJavascriptContext context = createContextSpy();
+        JSObject object = new JSObject(context, "window");
+
+        SuccessCallback<String> successCallback = mock(SuccessCallback.class);
+
+        object.callStringAsync("action", successCallback);
+
+        verify(context).callAsync(eq(object), eq(object), any(Object[].class), any(Callback.class));
+
+        Callback callback = context.removeNextCallback();
+        callback.onSucess("result");
+        verify(successCallback).onSucess("result");
+    }
+
+    @Test
+    void callObjectAsyncDelegatesToJavascriptContext() {
+        responses.add("ignored");
+        responses.add("object");
+        responses.add("12");
+        RecordingJavascriptContext context = createContextSpy();
+        JSObject object = new JSObject(context, "window");
+
+        SuccessCallback<JSObject> successCallback = mock(SuccessCallback.class);
+
+        object.callObjectAsync("action", successCallback);
+
+        verify(context).callAsync(eq(object), eq(object), any(Object[].class), any(Callback.class));
+
+        Callback callback = context.removeNextCallback();
+        JSObject result = mock(JSObject.class);
+        callback.onSucess(result);
+        verify(successCallback).onSucess(result);
+    }
+
+    @Test
     void removeCallbackDelegatesToContext() {
         responses.add("ignored");
         responses.add("object");
