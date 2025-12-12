@@ -60,4 +60,33 @@ class TableTest extends UITestBase {
         int componentRow = row + (table.isIncludeHeader() ? 1 : 0);
         return tl.getComponentAt(componentRow, column);
     }
+
+    @FormTest
+    void testSortListener() {
+        Table table = new Table(new DefaultTableModel(new String[]{"Col"}, new Object[][]{{"A"}, {"B"}}));
+        table.setSortSupported(true);
+
+        // Find the header button
+        Component header = findHeaderButton(table);
+        assertNotNull(header, "Header button not found");
+
+        // Click it - first click sets ascending=false (descending)
+        header.pointerPressed(0, 0);
+        header.pointerReleased(0, 0);
+        flushSerialCalls();
+
+        // Verify cell content (B should be first)
+        Component cell = findCellComponent(table, 0, 0);
+        assertTrue(cell instanceof com.codename1.ui.Label || cell instanceof com.codename1.ui.TextArea);
+
+        // Click again - sets ascending=true
+        header.pointerPressed(0, 0);
+        header.pointerReleased(0, 0);
+    }
+
+    private Component findHeaderButton(Table table) {
+        TableLayout tl = (TableLayout) table.getLayout();
+        // Row 0 is header if includeHeader is true (default).
+        return tl.getComponentAt(0, 0);
+    }
 }

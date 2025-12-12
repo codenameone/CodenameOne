@@ -238,4 +238,30 @@ class GeneralPathTest extends UITestBase {
         assertFalse(path.intersect(outside));
         assertNull(path.getCurrentPoint());
     }
+
+    @Test
+    void testIsConvexPolygonLogic() {
+        // Triangle (convex)
+        float[] x = {0, 10, 0};
+        float[] y = {0, 0, 10};
+        assertTrue(GeneralPath.isConvexPolygon(x, y));
+
+        // Concave shape
+        // (0,0) -> (10,0) -> (10,10) -> (5,5) -> (0,10)
+        float[] x2 = {0, 10, 10, 5, 0};
+        float[] y2 = {0, 0, 10, 5, 10};
+        assertFalse(GeneralPath.isConvexPolygon(x2, y2));
+    }
+
+    @Test
+    void testCubicCurveContains() {
+        GeneralPath path = new GeneralPath();
+        path.moveTo(0, 0);
+        path.curveTo(10, 0, 10, 10, 0, 10);
+        path.closePath();
+
+        // Center of the loop should be inside
+        assertTrue(path.contains(2, 5));
+        assertFalse(path.contains(-2, 5));
+    }
 }

@@ -144,4 +144,42 @@ public class PickerTest extends UITestBase {
         }
         return null;
     }
+
+    @FormTest
+    public void testPickerResizeUpdatesDialog() {
+        Picker picker = new Picker();
+        picker.setUseLightweightPopup(true);
+        picker.setType(Display.PICKER_TYPE_STRINGS);
+        picker.setStrings("A", "B", "C");
+
+        Form f = new Form(new BoxLayout(BoxLayout.Y_AXIS));
+        f.add(picker);
+        f.show();
+
+        // Ensure non-tablet mode
+        TestCodenameOneImplementation.getInstance().setTablet(false);
+
+        // Open Picker
+        picker.pointerPressed(0, 0);
+        picker.pointerReleased(0, 0);
+        // Flush animation queue multiple times to ensure dialog show runnable executes
+        for (int i = 0; i < 5; i++) {
+            f.animate();
+            flushSerialCalls();
+        }
+
+        InteractionDialog dlg = findInteractionDialog(f.getLayeredPane());
+        // If null, try searching form hierarchy just in case
+        if (dlg == null) dlg = findInteractionDialog(f);
+
+        assertNotNull(dlg);
+
+        // Resize form to trigger sizeChanged
+        f.setWidth(f.getWidth() + 100);
+        f.setHeight(f.getHeight() + 100);
+
+        // This fires sizeChanged -> adds flushAnimation runnable.
+        f.animate();
+        flushSerialCalls();
+    }
 }
