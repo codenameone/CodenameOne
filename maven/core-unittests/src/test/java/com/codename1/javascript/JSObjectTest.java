@@ -4,6 +4,8 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.CN;
+import com.codename1.ui.DisplayTest;
 import com.codename1.ui.TestPeerComponent;
 import com.codename1.util.Callback;
 import com.codename1.util.SuccessCallback;
@@ -27,9 +29,13 @@ public class JSObjectTest extends UITestBase {
         impl.getBrowserExecuted().clear();
 
         BrowserComponent browser = new BrowserComponent();
+        CN.getCurrentForm().add(browser);
         JavascriptContext context = new JavascriptContext(browser);
 
         impl.setBrowserScriptResponder(script -> {
+            if(script.contains("ca_weblite_codename1_js_JSObject_R1.ca_weblite_codename1_js_JSObject_ID")) {
+                return "1";
+            }
             if (script.contains("typeof")) {
                 return "object";
             }
@@ -38,6 +44,7 @@ public class JSObjectTest extends UITestBase {
             }
             return null;
         });
+        DisplayTest.flushEdt();
         JSObject obj = new JSObject(context, "myObj");
 
         // --- Test JSObject$2 (callAsync(String, SuccessCallback)) ---

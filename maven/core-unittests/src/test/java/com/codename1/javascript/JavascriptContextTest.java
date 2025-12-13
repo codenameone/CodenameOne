@@ -29,12 +29,20 @@ public class JavascriptContextTest extends UITestBase {
         JavascriptContext context = new JavascriptContext(browser);
 
         impl.setBrowserScriptResponder(script -> {
-            if (script.contains("typeof")) return "object";
-            if (script.contains("var id = ")) return "1";
+            if(script.contains("ca_weblite_codename1_js_JSObject_R1.ca_weblite_codename1_js_JSObject_ID")) {
+                return "1";
+            }
+            if (script.contains("typeof")) {
+                return "object";
+            }
+            if (script.contains("var id = ")) {
+                return "1";
+            }
             return null;
         });
 
         JSObject self = (JSObject) context.get("{}");
+        assertNotNull(self);
 
         AtomicReference<Object> resultRef = new AtomicReference<Object>();
         SuccessCallback callback = new SuccessCallback() {

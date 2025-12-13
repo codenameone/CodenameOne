@@ -685,6 +685,11 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean supportsBrowserExecuteAndReturnString(PeerComponent internal) {
+        return true;
+    }
+
+    @Override
     public String browserExecuteAndReturnString(PeerComponent internal, String javaScript) {
         browserExecuted.add(javaScript);
         if (browserScriptResponder != null) {
