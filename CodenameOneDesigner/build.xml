@@ -121,17 +121,8 @@
       <copy file="../../cn1-binaries/svg/batik-util.jar" todir="dist/lib" />
       <copy file="../../cn1-binaries/svg/batik-xml.jar" todir="dist/lib" />
       <copy file="../../cn1-binaries/designer/flute.jar" todir="dist/lib" />
-      <copy file="../../cn1-binaries/designer/jetty-continuation-8.0.4.v20111024.jar" todir="dist/lib" />
-      <copy file="../../cn1-binaries/designer/jetty-http-8.0.4.v20111024.jar" todir="dist/lib" />
-      <copy file="../../cn1-binaries/designer/jetty-io-8.0.4.v20111024.jar" todir="dist/lib" />
-      <copy file="../../cn1-binaries/designer/jetty-security-8.0.4.v20111024.jar" todir="dist/lib" />
-      <copy file="../../cn1-binaries/designer/jetty-server-8.0.4.v20111024.jar" todir="dist/lib" />
-      <copy file="../../cn1-binaries/designer/jetty-servlet-8.0.4.v20111024.jar" todir="dist/lib" />
-      <copy file="../../cn1-binaries/designer/jetty-servlets-8.0.4.v20111024.jar" todir="dist/lib" />
-      <copy file="../../cn1-binaries/designer/jetty-util-8.0.4.v20111024.jar" todir="dist/lib" />
       <copy file="../../cn1-binaries/svg/js.jar" todir="dist/lib" />
       <copy file="../../cn1-binaries/designer/sac-1.3.jar" todir="dist/lib" />
-      <copy file="../../cn1-binaries/designer/servlet-api-3.0.jar" todir="dist/lib" />
       <copy file="../../cn1-binaries/designer/swing-layout-1.0.3.jar" todir="dist/lib" />
       <copy file="../../cn1-binaries/designer/swing-layout/swing-layout-1.0.4.jar" todir="dist/lib" />
       <copy file="../../cn1-binaries/designer/swing-app-framework/swing-worker-1.1.jar" todir="dist/lib" />
