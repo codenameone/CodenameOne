@@ -1,6 +1,7 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.Display;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.UITimer;
@@ -21,9 +22,29 @@ public class BrowserComponentScreenshotTest extends BaseTest {
         return true;
     }
 
+    @Override
     protected void registerReadyCallback(Form parent, final Runnable run) {
-        browser.addWebEventListener(BrowserComponent.onLoad, evt ->
-                UITimer.timer(200, false, parent, run));
+        browser.addWebEventListener(BrowserComponent.onLoad, evt -> {
+            new Thread(() -> {
+                int attempts = 0;
+                while (attempts < 50) { // 10 seconds (50 * 200ms)
+                    try {
+                        String text = browser.executeAndReturnString("document.body.innerText");
+                        if (text != null && text.contains("Codename One")) {
+                            Display.getInstance().callSerially(run);
+                            return;
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException e) {}
+                    attempts++;
+                }
+                Display.getInstance().callSerially(run);
+            }).start();
+        });
     }
 
     private static String buildHtml() {
