@@ -4016,6 +4016,17 @@ UIPopoverController* popoverControllerInstance;
     return sectionWidth;
 }
 
+NSString* CN1LastAccessibilityAnnouncement = nil;
+
+void Java_com_codename1_impl_ios_IOSImplementation_nativeAnnounceAccessibilityImpl(CN1_THREAD_STATE_MULTI_ARG const char* text) {
+    if (text == NULL) {
+        return;
+    }
+    NSString* str = [NSString stringWithUTF8String:text];
+    CN1LastAccessibilityAnnouncement = str;
+    UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, str);
+}
+
 
 
 - (void)documentInteractionControllerDidEndPreview:(UIDocumentInteractionController *)controller

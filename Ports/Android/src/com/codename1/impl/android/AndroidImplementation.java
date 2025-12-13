@@ -10952,7 +10952,9 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
+    public static String testLastAccessibilityAnnouncement;
     public void announceForAccessibility(final Component cmp, final String text) {
+        testLastAccessibilityAnnouncement = text;
         final Activity act = getActivity();
         if (act == null) {
             return;

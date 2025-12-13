@@ -63,7 +63,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new TransformCamera(),
             new BrowserComponentScreenshotTest(),
             new MediaPlaybackScreenshotTest(),
-            new InPlaceEditViewTest()
+            new InPlaceEditViewTest(),
+            new com.codename1.examples.hellocodenameone.tests.accessibility.AccessibilityTest()
     };
 
     public void runSuite() {
