@@ -10315,3 +10315,13 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isRTLString___java_lang_String_R_b
     POOL_END();
     return NO;
 }
+
+void com_codename1_impl_ios_IOSNative_announceForAccessibility___java_lang_String(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT text) {
+    if (text == JAVA_NULL) {
+        return;
+    }
+    POOL_BEGIN();
+    NSString *nsText = toNSString(CN1_THREAD_STATE_PASS_ARG text);
+    UIAccessibilityPostNotification(UIAccessibilityAnnouncementNotification, nsText);
+    POOL_END();
+}

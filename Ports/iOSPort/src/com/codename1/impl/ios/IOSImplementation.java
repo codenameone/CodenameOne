@@ -9494,6 +9494,11 @@ public class IOSImplementation extends CodenameOneImplementation {
         Boolean b = canExecute("cydia://package/com.example.package");
         return b != null && b.booleanValue();
     }
+
+    @Override
+    public void announceForAccessibility(final Component cmp, final String text) {
+        IOSNative.announceForAccessibility(text);
+    }
 }
 
 

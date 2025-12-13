@@ -721,5 +721,7 @@ public final class IOSNative {
     native int getDisplaySafeInsetBottom();
 
     native boolean isRTLString(String javaString);
+
+    public static native void announceForAccessibility(String text);
     
 }
