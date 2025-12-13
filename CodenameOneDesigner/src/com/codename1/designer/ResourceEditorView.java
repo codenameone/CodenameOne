@@ -268,9 +268,6 @@ public class ResourceEditorView extends FrameView {
         initNativeTheme();
 
 
-        if (LocalServer.isSupported()) {
-            LocalServer.startServer(mainPanel);
-        }
         if(ResourceEditorApp.IS_MAC) {
             fileMenu.remove(exitMenuItem);
             fileMenu.remove(jSeparator1);
