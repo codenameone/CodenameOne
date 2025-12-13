@@ -344,7 +344,7 @@ public class CEFBrowserComponent extends Peer implements IBrowserComponent  {
             
             String id = BrowserPanel.getStreamRegistry().registerStream(stream);
             
-            String url = "https://cn1app/streams/"+id;
+            String url = "cn1stream://stream/"+id;
             setURL(url);
         } catch (Exception ex) {
             setURL("data:text/html,"+com.codename1.io.Util.encodeUrl(html));

@@ -614,7 +614,7 @@ public class JavaCEFSEPort extends JavaSEPort {
         
         StreamWrapper stream = new StreamWrapper(inputStream, mimeType , -1);
         String id = BrowserPanel.getStreamRegistry().registerStream(stream);
-        String uriAddress = "https://cn1app/streams/"+id;
+        String uriAddress = "cn1stream://streams/"+id;
         try {
             new CodenameOneMediaPlayer(uriAddress, mimeType.startsWith("video/"), (JFrame)cnt, onCompletion, out);
         } catch (IOException ex) {
@@ -660,7 +660,7 @@ public class JavaCEFSEPort extends JavaSEPort {
                     StreamWrapper stream = new StreamWrapper(fis, getMimetype(f), f.length());
                     String id = BrowserPanel.getStreamRegistry().registerStream(stream);
                     //uriAddress = InputStreamSchemeHandler.getURL(id);
-                    uriAddress = "https://cn1app/streams/"+id;
+                    uriAddress = "cn1stream://streams/"+id;
                     //new CodenameOneMediaPlayer(stream, ((JFrame)cnt), onCompletion, out);
                 } catch (IOException ex) {
                     out.error(ex);
