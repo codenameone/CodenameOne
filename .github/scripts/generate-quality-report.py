@@ -83,6 +83,7 @@ class AnalysisReport:
 class CoverageEntry:
     name: str
     coverage: float
+    total_lines: int
     path: Optional[str] = None
 
 
@@ -140,6 +141,16 @@ def _relative_path(raw_path: Optional[str]) -> str:
     return potential[0] if potential else normalized
 
 
+def is_anonymous(class_name: str) -> bool:
+    if "$" not in class_name:
+        return False
+    parts = class_name.split("$")
+    for part in parts[1:]:
+        if part.isdigit():
+            return True
+    return False
+
+
 def parse_surefire() -> Optional[Dict[str, int]]:
     totals = {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
     found = False
@@ -179,6 +190,8 @@ def parse_jacoco() -> Tuple[Optional[float], List[CoverageEntry]]:
             package_name = package.attrib.get("name", "").rstrip("/")
             for class_elem in package.findall("class"):
                 class_name = class_elem.attrib.get("name", "")
+                if is_anonymous(class_name):
+                    continue
                 source_filename = class_elem.attrib.get("sourcefilename")
                 line_counter = None
                 for counter in class_elem.findall("counter"):
@@ -206,6 +219,7 @@ def parse_jacoco() -> Tuple[Optional[float], List[CoverageEntry]]:
                     CoverageEntry(
                         name=dotted_name,
                         coverage=coverage,
+                        total_lines=class_total,
                         path=relative_path,
                     )
                 )
@@ -470,7 +484,7 @@ def format_coverage(
     suffix = _format_link_suffix(html_url, archive_url)
     lines = [f"- 📊 **Line coverage:** {coverage:.2f}%{suffix}"]
     if entries_list:
-        sorted_entries = sorted(entries_list, key=lambda item: item.coverage)
+        sorted_entries = sorted(entries_list, key=lambda item: (item.coverage, -item.total_lines))
         highlights = sorted_entries[:10]
         if highlights:
             lines.append("  - **Lowest covered classes**")
