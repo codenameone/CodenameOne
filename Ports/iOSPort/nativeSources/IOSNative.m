@@ -1982,8 +1982,24 @@ void com_codename1_impl_ios_IOSNative_lockOrientation___boolean(CN1_THREAD_STATE
     //XMLVM_BEGIN_WRAPPER[com_codename1_impl_ios_IOSNative_lockOrientation___boolean]
     if(n1) {
         orientationLock = 1;
+        dispatch_async(dispatch_get_main_queue(), ^{
+             UIInterfaceOrientation currentOrientation = [[UIApplication sharedApplication] statusBarOrientation];
+             if (currentOrientation != UIInterfaceOrientationPortrait && currentOrientation != UIInterfaceOrientationPortraitUpsideDown) {
+                 NSNumber *value = [NSNumber numberWithInt:UIInterfaceOrientationPortrait];
+                 [[UIDevice currentDevice] setValue:value forKey:@"orientation"];
+                 [UIViewController attemptRotationToDeviceOrientation];
+             }
+        });
     } else {
         orientationLock = 2;
+        dispatch_async(dispatch_get_main_queue(), ^{
+             UIInterfaceOrientation currentOrientation = [[UIApplication sharedApplication] statusBarOrientation];
+             if (currentOrientation != UIInterfaceOrientationLandscapeLeft && currentOrientation != UIInterfaceOrientationLandscapeRight) {
+                 NSNumber *value = [NSNumber numberWithInt:UIInterfaceOrientationLandscapeRight];
+                 [[UIDevice currentDevice] setValue:value forKey:@"orientation"];
+                 [UIViewController attemptRotationToDeviceOrientation];
+             }
+        });
     }
     //XMLVM_END_WRAPPER
 }

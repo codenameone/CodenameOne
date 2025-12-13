@@ -65,7 +65,8 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new BrowserComponentScreenshotTest(),
             new MediaPlaybackScreenshotTest(),
             new InPlaceEditViewTest(),
-            new AccessibilityTest()
+            new AccessibilityTest(),
+            new OrientationLockScreenshotTest()
     };
 
     public void runSuite() {
