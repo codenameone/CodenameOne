@@ -5,7 +5,7 @@ import com.codename1.charts.compat.Canvas;
 import com.codename1.charts.compat.Paint;
 import com.codename1.charts.renderers.SimpleSeriesRenderer;
 import com.codename1.charts.views.AbstractChart;
-import com.codename1.test.UITestBase;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Form;
 import com.codename1.ui.animations.Animation;
 import com.codename1.ui.animations.Motion;

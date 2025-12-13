@@ -121,17 +121,8 @@
       <copy file="../../cn1-binaries/svg/batik-util.jar" todir="dist/lib" />
       <copy file="../../cn1-binaries/svg/batik-xml.jar" todir="dist/lib" />
       <copy file="../../cn1-binaries/designer/flute.jar" todir="dist/lib" />
-      <copy file="../../cn1-binaries/designer/jetty-continuation-8.0.4.v20111024.jar" todir="dist/lib" />
-      <copy file="../../cn1-binaries/designer/jetty-http-8.0.4.v20111024.jar" todir="dist/lib" />
-      <copy file="../../cn1-binaries/designer/jetty-io-8.0.4.v20111024.jar" todir="dist/lib" />
-      <copy file="../../cn1-binaries/designer/jetty-security-8.0.4.v20111024.jar" todir="dist/lib" />
-      <copy file="../../cn1-binaries/designer/jetty-server-8.0.4.v20111024.jar" todir="dist/lib" />
-      <copy file="../../cn1-binaries/designer/jetty-servlet-8.0.4.v20111024.jar" todir="dist/lib" />
-      <copy file="../../cn1-binaries/designer/jetty-servlets-8.0.4.v20111024.jar" todir="dist/lib" />
-      <copy file="../../cn1-binaries/designer/jetty-util-8.0.4.v20111024.jar" todir="dist/lib" />
       <copy file="../../cn1-binaries/svg/js.jar" todir="dist/lib" />
       <copy file="../../cn1-binaries/designer/sac-1.3.jar" todir="dist/lib" />
-      <copy file="../../cn1-binaries/designer/servlet-api-3.0.jar" todir="dist/lib" />
       <copy file="../../cn1-binaries/designer/swing-layout-1.0.3.jar" todir="dist/lib" />
       <copy file="../../cn1-binaries/designer/swing-layout/swing-layout-1.0.4.jar" todir="dist/lib" />
       <copy file="../../cn1-binaries/designer/swing-app-framework/swing-worker-1.1.jar" todir="dist/lib" />
@@ -143,9 +134,9 @@
       <copy file="../../cn1-binaries/designer/jaxb-api-2.2.3.jar" todir="dist/lib" />
       <copy file="../../cn1-binaries/designer/jaxb-impl-2.3.0.1.jar" todir="dist/lib" />
       <copy file="../Ports/JavaSE/dist/JavaSE.jar" todir="dist/lib" />
-      
+      <copy file="../Ports/JavaSEWithSVGSupport/dist/JavaSEWithSVGSupport.jar" todir="dist/lib" />
       <jar destfile="dist/tempJar.jar">
-        <zipgroupfileset dir="dist/lib" excludes="META-INF/**"/>          
+        <zipgroupfileset dir="dist/lib" excludes="META-INF/**"/>
       </jar>
       <jar destfile="dist/designer.jar" compress="false">
         <zipfileset src="dist/CodenameOneDesigner.jar" excludes="META-INF/**" />
@@ -162,5 +153,20 @@
     </target>
     <target name="mac_os">
         <copy file="dist/designer.jar" todir="Designer.app/Contents/Resources/Java" />
+    </target>
+    <target name="test-css-localization" depends="compile">
+        <mkdir dir="${build.test.classes.dir}"/>
+        <javac srcdir="${test.src.dir}" destdir="${build.test.classes.dir}"
+               encoding="${source.encoding}" source="${javac.source}" target="${javac.target}"
+               includeantruntime="false">
+            <classpath>
+                <path path="${javac.test.classpath}"/>
+            </classpath>
+        </javac>
+        <java classname="com.codename1.designer.css.CSSLocalizationTest" fork="true" failonerror="true">
+            <classpath>
+                <path path="${run.test.classpath}"/>
+            </classpath>
+        </java>
     </target>
 </project>

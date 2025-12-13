@@ -24,6 +24,7 @@
 package com.codename1.ui.util;
 
 import com.codename1.analytics.AnalyticsService;
+import com.codename1.io.Log;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.ComboBox;
@@ -945,7 +946,7 @@ public class UIBuilder { //implements Externalizable {
                 if (destination == null) {
                     destination = findEmptyContainer(base.getContentPane());
                     if (destination == null) {
-                        System.out.println("Couldn't find appropriate 'destination' container in base form: " + baseFormName);
+                        Log.p("Couldn't find appropriate 'destination' container in base form: " + baseFormName);
                         return null;
                     }
                 }
@@ -1415,7 +1416,7 @@ public class UIBuilder { //implements Externalizable {
                         items[iter] = in.readUTF();
                     }
                     if (!setListModel(((List) cmp))) {
-                        ((List) cmp).setModel(new DefaultListModel(items));
+                        ((List) cmp).setModel(new DefaultListModel((Object[]) items));
                     }
                     break;
 

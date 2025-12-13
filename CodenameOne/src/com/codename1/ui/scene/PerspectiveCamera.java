@@ -22,6 +22,7 @@
  */
 package com.codename1.ui.scene;
 
+import com.codename1.io.Log;
 import com.codename1.properties.Property;
 import com.codename1.ui.Display;
 import com.codename1.ui.Transform;
@@ -93,10 +94,10 @@ public class PerspectiveCamera extends Camera {
         currTransform.transformPoint(new float[]{x + w, y, 0}, tr);
         currTransform.transformPoint(new float[]{x + w, y + h, 0}, br);
         currTransform.transformPoint(new float[]{x, y + h, 0}, bl);
-        System.out.println("Camera transform " + x + ", " + y + ", " + 0 + "->" + Arrays.toString(tl));
-        System.out.println("Camera transform " + (x + w) + ", " + y + ", " + 0 + "->" + Arrays.toString(tr));
-        System.out.println("Camera transform " + (x + w) + ", " + (y + h) + ", " + 0 + "->" + Arrays.toString(br));
-        System.out.println("Camera transform " + (x) + ", " + (y + h) + ", " + 0 + "->" + Arrays.toString(bl));
+        Log.p("Camera transform " + x + ", " + y + ", " + 0 + "->" + Arrays.toString(tl));
+        Log.p("Camera transform " + (x + w) + ", " + y + ", " + 0 + "->" + Arrays.toString(tr));
+        Log.p("Camera transform " + (x + w) + ", " + (y + h) + ", " + 0 + "->" + Arrays.toString(br));
+        Log.p("Camera transform " + (x) + ", " + (y + h) + ", " + 0 + "->" + Arrays.toString(bl));
 
         return currTransform;
     }

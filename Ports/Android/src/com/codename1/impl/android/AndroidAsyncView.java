@@ -409,7 +409,10 @@ public class AndroidAsyncView extends ViewGroup implements CodenameOneSurface {
         pendingRenderingOperations = tmp;
         try {
             for (AsyncOp o : renderingOperations) {
-                o.prepare();
+                // can happen due to synchronization issues see: https://www.reddit.com/r/cn1/comments/1oo43in/error_while_using_app/
+                if (o != null) {
+                    o.prepare();
+                }
             }
         } catch (java.util.ConcurrentModificationException ex) {
             // This is a race condition that sometimes occurs

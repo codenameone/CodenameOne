@@ -46,7 +46,7 @@ public class ContactsModel extends DefaultListModel {
      * @param ids the contact ids we would like this model to handle
      */
     public ContactsModel(String... ids) {
-        super(ids);
+        super((Object[]) ids);
     }
 
     /**

@@ -5,18 +5,24 @@ on:
     branches:
       - master
     paths-ignore:
+      - '.github/workflows/scripts-android.yml'
+      - '.github/workflows/scripts-ios.yml'
       - 'scripts/**'
       - 'docs/**'
       - '**/*.md'
       - '.github/workflows/developer-guide-docs.yml'
+      - 'CodenameOneDesigner/**'
   push:
     branches:
       - master
     paths-ignore:
+      - '.github/workflows/scripts-android.yml'
+      - '.github/workflows/scripts-ios.yml'
       - 'scripts/**'
       - 'docs/**'
       - '**/*.md'
       - '.github/workflows/developer-guide-docs.yml'
+      - 'CodenameOneDesigner/**'
 
 permissions:
   contents: write
@@ -47,6 +53,21 @@ jobs:
         cd maven
         mvn clean verify -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true -Plocal-dev-javase
         cd ..
+    - name: Prepare Codename One binaries for Maven plugin tests
+      run: |
+        set -euo pipefail
+        rm -rf maven/target/cn1-binaries
+        git clone --depth=1 --filter=blob:none https://github.com/codenameone/cn1-binaries maven/target/cn1-binaries
+    - name: Run Maven plugin tests
+      working-directory: maven
+      env:
+        CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
+      run: |
+        mvn -B -Dmaven.javadoc.skip=true \
+          -DunitTests=true \
+          -Dcodename1.platform=javase \
+          -Dcn1.binaries="${CN1_BINARIES}" \
+          -pl codenameone-maven-plugin -am -Plocal-dev-javase test
     - name: Generate static analysis HTML summaries
       if: ${{ always() }}
       env:
@@ -184,40 +205,8 @@ jobs:
       uses: actions/github-script@v7
       with:
         script: |
-          const fs = require('fs');
-          const marker = '<!-- quality-report -->';
-          const reportPath = 'quality-report.md';
-          if (!fs.existsSync(reportPath)) {
-            core.warning('quality-report.md was not generated.');
-            return;
-          }
-          const body = `${marker}\n${fs.readFileSync(reportPath, 'utf8')}`;
-          const { owner, repo } = context.repo;
-          const issue_number = context.issue.number;
-          const { data: comments } = await github.rest.issues.listComments({
-            owner,
-            repo,
-            issue_number,
-            per_page: 100,
-          });
-          const existing = comments.find(
-            (comment) => comment.user?.type === 'Bot' && comment.body?.includes(marker),
-          );
-          if (existing) {
-            await github.rest.issues.updateComment({
-              owner,
-              repo,
-              comment_id: existing.id,
-              body,
-            });
-          } else {
-            await github.rest.issues.createComment({
-              owner,
-              repo,
-              issue_number,
-              body,
-            });
-          }
+          const { publishQualityComment } = require('./.github/scripts/publish-quality-comment.js');
+          await publishQualityComment({ github, context, core });
     - name: Install dependencies
       run: |
         sudo apt-get update && sudo apt-get install xvfb

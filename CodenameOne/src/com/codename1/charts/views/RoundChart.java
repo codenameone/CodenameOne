@@ -25,7 +25,13 @@ import com.codename1.charts.renderers.SimpleSeriesRenderer;
 import com.codename1.ui.Component;
 
 /**
- * An abstract class to be extended by round like chart rendering classes.
+ * Base class for charts that render circular data representations such as pie
+ * charts, doughnut charts or gauges.
+ * <p>
+ * Subclasses operate on {@link CategorySeries} data and share common
+ * functionality for drawing the chart title, legend entries and handling
+ * layout. Developers typically work with concrete subclasses such as
+ * {@link PieChart} or {@link DoughnutChart} directly.
  */
 public abstract class RoundChart extends AbstractChart {
     /** The legend shape width. */

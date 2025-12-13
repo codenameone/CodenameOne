@@ -2,15 +2,9 @@
 
 === Troubleshooting iOS Debug Build installs
 
-In 9 cases out of 10 if you have a problem installing an app make sure your device is a 64 bit device. If not you will need to add the build hint `ios.debug.archs=armv7`. Notice that a 32 bit app will still work on a 64 bit device it will just display a performance warning.
-
-If you have access to a Mac you can connect a cable and open xcode where you can use the device explorer console to look at messages which sometimes give a clue about what went wrong. If not here is a laundry list of a few things that might fail:
+If you have access to a Mac you can connect a cable and open Xcode where you can use the device explorer console to look at messages which sometimes give a clue about what went wrong. If not, here is a laundry list of a few things that might fail:
 
 - Make sure you built the debug version and not the appstore version. The appstore version won't install on the device and can only be distributed via Apple's store or testflight
-
-- Verify that you are sending a 32 bit build in the build hints using the build hint `ios.debug.archs=armv7`. It's only necessary if you have an older 32 bit device, see https://www.codenameone.com/blog/moving-to-64bit-by-default.html[this]. Notice that this only applies for debug builds, release builds include both 32 and 64 bit versions
-
-TIP: Devices prior to iPad Air & iPhone 5s were 32 bit devices so iPhone 5s won't need that flag but iPhone 5 or iPhone 5c will need it
 
 - Check the the UDID is correct - if you got the UDID from an app then it's probably wrong as apps don't have access to the device UDID anymore. The way to get the UDID is either thru iOS Settings app or itunes
 
@@ -19,150 +13,65 @@ TIP: Devices prior to iPad Air & iPhone 5s were 32 bit devices so iPhone 5s won'
 - Check that you "own" the package name. E.g. if you previously installed an app with the same package name but a different certificate a new install will fail (this is true for Android too). So if you installed the kitchen sink from the store then built one of your own and installed it there will be a collision. +
 Notice that this might be problematic if you use overly generic package names as someone else might have used them which is why you must always use your own domain
 
-- Make sure the device has a modern enough version of iOS for the dependencies. I think the current minimum for hello world is 6.0.1 but some apps might require a newer version e.g. Intercom requires OS 8 or newer
+- Make sure the device has a modern enough version of iOS for the dependencies. As of 2024, Codename One builds target iOS 12.0 or newer by default. You can raise the requirement with the `ios.deployment_target` build hint if a library needs a newer version.
 
 - Verify that you are using Safari when installing on the device (if you tried via cable that's not a problem), some developers had issues with firefox not launching the install process
 
 - Check that the build hint `ios.includePush` is set in a way that matches your iOS provisioning. So it must be false if you don't have push within the provisioning profile
 
-[[section-ios-screenshots]]
-=== The iOS Screenshot/Splash Screen Process
+[[section-ios-launch-screen]]
+=== Launch Screen Storyboard Best Practices
 
-NOTE: As of version 5.0 (September 2018), screenshot generation is no longer enabled by default.  Instead, the launch storyboard is used.  Therefore much of the following section is no longer relevant.
+Launch screen storyboards are the default approach for Codename One iOS builds. Apple requires a storyboard-based launch experience for modern devices, so the legacy screenshot generator was removed in favour of a single, adaptive layout. You can still opt back into the old behaviour by setting the `ios.generateSplashScreens=true` build hint, but we recommend adopting a storyboard unless you have a very specific use case that can't be expressed with Auto Layout.
 
-iOS apps seem to start almost instantly in comparison to Android apps. +
-There is a trick to that, iOS applications have a file traditionally called `Default.png` that includes a `320x480` pixel
-image of the first screen of the application. This creates an "illusion" of the application instantly coming to life and
-filling up with data, this is rather clever but is a source trouble as the platform grows footnote:[Apple provided
-another trick with XIB files starting with iOS 8 but that doesn't apply to games or Codename One. It has its own set of problems].
+==== Key Files
 
-TIP: You can disable the screenshot process entirely with the `ios.fastBuild=true` build hint. This will only apply for debug builds so you don't need to worry about accidentally forgetting it in production.
+The build server provides a minimal launch storyboard automatically. Customise it by adding any of the following files under your project's `native/ios` directory:
 
-The screenshot process was a pretty clever workaround but as Apple introduced the retina display `640x960` it required
-a higher resolution `Default@2x.png` file, then it added the iPad, iPad Retina and iPhone 5 footnote:[slightly larger screen and different aspect ratio] iPhone 6 & 6+ all of which required images of their own.
-
-To make matters worse iPad apps (and iPhone 6+ apps) can be launched in landscape mode so that's two more resolutions for the horizontal orientation iPad. Overall as of this writing (or until Apple adds more resolutions) we need 16 screenshots for a typical iOS app:
-
-.iOS Device Screenshot Resolutions
-|===
-|Resolution	|File Name	|Devices
-
-|320x480
-|`Default.png`
-|iPhone 3gs
-
-|640x960
-|`Default@2x.png`
-|iPhone 4x
-
-|640x1136
-|`Default-568h@2x.png`
-|iPhone 5x
-
-|1024x768
-|`Default-Portrait.png`
-|Non-retina ipads in portrait mode
-
-|768x1024
-|`Default-Landscape.png`
-|Non-retina ipads in landscape mode
-
-|2048x1536
-|`Default-Portrait@2x.png`
-|Retina ipads in portrait mode
-
-|1536x2048
-|`Default-Landscape@2x.png`
-|Retina ipads in landscape mode
-
-|750x1334
-|`Default-667h@2x.png`
-|iPhone 6
-
-|1242x2208
-|`Default-736h@3x.png`
-|iPhone 6 Plus Portrait
-
-|2208x1242
-|`Default-736h-Landscape@3x.png`
-|iPhone 6 Plus Landscape
-
-|2048×2732
-|`Default-iPadPro@2.png`
-|iPad Pro Portrait
-
-|2732x2048
-|`Default-iPadPro-Landscape@2.png`
-|iPad Pro Landscape
-
-|1668×2224
-|`Default-iPadProSmall@2.png`
-|10.5" iPad Pro Portrait
-
-|2224x1668
-|`Default-iPadProSmall-Landscape@2.png`
-|10.5" iPad Pro Landscape
-
-|1125×2436
-|`Default-iPhoneX@3.png`
-|iPhone X Portrait
-
-|2436x1125
-|`Default-iPhoneX-Landscape@3.png`
-|iPhone X Landscape
-|===
-
-TIP: You can predefine any of these files within the `native/ios` directory in your project. If the build server sees a file matching that exact name it will not generate a screenshot for that resolution
-
-Native iOS developers can run their applications 16 times with blank data to grab these screenshots every time they change something in the first view of their application!
-
-With Codename One this will not be feasible since the fonts and behavior might not match the device. Thus Codename One runs the application 16 times in the build servers, grabs the right sized screenshots in the simulator and then builds the app!
-
-This means the process of the iPhone splash screen is almost seamless to the developer, however like every abstraction this too leaks.
-
-The biggest problem developers have with this approach is for apps that use a web browser or native maps in the first screen of their app. This won't work well as those are native widgets. They will look different during the screenshot process.
-
-Another problem is with applications that require a connection immediately on startup, this can fail for the build process.
-
-A solution to both problems is to create a special case for the first launch of the app where no data exists. This will setup the screenshot process correctly and let you proceed with the app as usual.
-
-==== Size
-
-One of the first things we ran into when building one of our demos was a case where an app that wasn't very big
-in terms of functionality took up 30mb!
-
-After inspecting the app we discovered that the iPad retina PNG files were close to 5mb in size... +
-Since we had 2 of them (landscape and portrait) this was the main problem.
-
-The iPad retina is a 2048x1536 device and with the leather theme the PNG images are almost impossible to compress because of the richness of details within that theme. This produced the huge screenshots that ballooned the application.
-
-==== Mutable first screen
-
-A very common use case is to have an application that pops up a login dialog on first run. This doesn't work well since the server takes a picture of the login screen and the login screen will appear briefly for future loads and will never appear again.
-
-==== Unsupported component
-
-One of the biggest obstacles is with heavyweight components, e.g. if you use a browser or maps on the first
-screen of the app you will see a partially loaded/distorted https://www.codenameone.com/javadoc/com/codename1/maps/MapComponent.html[MapComponent] and the native webkit browser
-obviously can't be rendered properly by our servers.
-
-The workaround for such issues is to have a splash screen that doesn't include any of the above. Its OK to show it for a very brief amount of time since the screenshot process is pretty fast.
-
-=== Launch Screen Storyboards
-
-With the shift to Xcode 9, which is the default version on the Codename One build servers as of https://www.codenameone.com/blog/xcode-9-on-by-default.html[February 2018], it is now possible to use a launch-screen storyboard as the splash screen instead of launch images.  This will potentially solve the issue of the proliferation of screenshots, as you can supply a single storyboard which will work on all devices.  Launch screen storyboards are enabled by default (as of version 5.0/September 2018).  You can disable them by adding the `ios.generateSplashScreens=true` build hint.
-
-==== Launch Storyboard vs Launch Images
-
-The key benefit of using a launch storyboard right now is that it allows your app to be used in split-screen mode.  Storyboards, however, work a little bit differently than launch images.  They don't show a screenshot of the first page of your app.  The default Codename One launch storyboard simply shows your app's icon in the middle of the screen. You can customize the launch screen by providing one or more of the following files in your project's native/ios directory
-
-. `Launch.Foreground.png` - Will be shown instead of your app's icon in the center of the screen.
-. `Launch.Background.png` - Will fill the background of the screen.
-. `LaunchScreen.storyboard` - A custom storyboard developed in Xcode, that will be used instead of the default storyboard.
+. `Launch.Foreground.png` - Shown in the centre of the screen instead of your app icon.
+. `Launch.Background.png` - Drawn behind the content to provide a colour or illustration.
+. `LaunchScreen.storyboard` - A custom storyboard created in Xcode that replaces the default layout entirely.
 
 IMPORTANT: Make sure to add the `ios.multitasking=true` build hint, or your launch storyboard will not be used.
 
-NOTE: Changes to the launch screen will not take effect until the device has been restarted.  I.e. If you install your app on a device, then you make changes to the launch screen and update the app, the launch screen won't change until the device is restarted.
+==== Designing a Flexible Layout
+
+Keep the launch storyboard simple and static. The layout is rendered before your app code runs, so avoid views that depend on live data or animation. Follow these guidelines when editing `LaunchScreen.storyboard` in Xcode:
+
+* Use Auto Layout constraints and safe-area guides so the design scales to every device, including split view on iPad.
+* Prefer system colours or vector/PDF assets for logos so the result stays crisp on high-density screens and supports Dark Mode.
+* Reserve text for short taglines or status messages that do not need localisation at launch. Dynamic localisation is not available.
+* Avoid referencing application delegate outlets or custom classes. Only design-time UIKit elements are supported.
+
+==== Asset Reference
+
+The default storyboard expects PNG assets with the following characteristics. All sizes are specified in points (pt); supply @2x and @3x variants for Retina displays when possible.
+
+.Launch Screen Asset Reference
+|===
+|Asset | Purpose | Suggested 1x dimensions | Notes
+
+|`Launch.Foreground.png`
+|Brand mark centred on screen
+|152×152
+|Provide optional `Launch.Foreground@2x.png` (304×304) and `Launch.Foreground@3x.png` (456×456) for sharper output. Use transparency to let the background show through.
+
+|`Launch.Background.png`
+|Full-screen backdrop
+|1024×1024
+|Supply complementary `Launch.Background@2x.png` (2048×2048) and `Launch.Background@3x.png` (3072×3072) if you rely on artwork instead of a flat colour. Keep file sizes small (<2 MB) to avoid slowing startup.
+
+|`LaunchScreen.storyboard`
+|Complete custom layout
+|N/A
+|Target iOS 12.0 and later, enable Auto Layout, and include constraints for every view. Avoid timers or code connections.
+|===
+
+==== Testing Changes
+
+NOTE: Changes to the launch screen will not take effect until the device has been restarted. I.e. If you install your app on a device, then you make changes to the launch screen and update the app, the launch screen won't change until the device is restarted.
+
+When iterating locally with a Mac, open the generated Xcode project and run it on device or Simulator to verify that the layout adapts correctly. On Windows or Linux, submit a TestFlight or Ad Hoc build and validate on hardware before shipping.
 
 === Local Notifications on iOS and Android
 
@@ -199,7 +108,7 @@ Display.getInstance().scheduleLocalNotification(
 The resulting notification will look like
 
 .Resulting notification in iOS
-image::img/developer-guide/f7200840-677e-11e5-8fd7-41eb027f8a6c.png[Resulting notification in iOS,scaledwidth=20%]
+image::img/f7200840-677e-11e5-8fd7-41eb027f8a6c.png[Resulting notification in iOS,scaledwidth=20%]
 
 
 ==== Receiving Notifications

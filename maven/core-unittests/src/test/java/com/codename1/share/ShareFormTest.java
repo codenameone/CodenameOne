@@ -1,6 +1,8 @@
 package com.codename1.share;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.Button;
 import com.codename1.ui.Command;
 import com.codename1.ui.Component;
@@ -27,10 +29,10 @@ class ShareFormTest extends UITestBase {
 
     @BeforeEach
     void setUpImageIO() {
-        when(implementation.getImageIO()).thenReturn(null);
+        TestCodenameOneImplementation.getInstance().setImageIO(null);
     }
 
-    @Test
+    @FormTest
     void testConstructorWithoutRecipientAddsMessageOnly() throws Exception {
         AtomicInteger postClicks = new AtomicInteger();
         Form contacts = new Form();
@@ -53,7 +55,7 @@ class ShareFormTest extends UITestBase {
         assertEquals(BorderLayout.class, form.getContentPane().getLayout().getClass());
     }
 
-    @Test
+    @FormTest
     void testRecipientFieldIsAddedWhenProvided() throws Exception {
         Form contacts = new Form();
         ShareForm form = new ShareForm(contacts, "Share", "friend@example.com", "Message", new RecordingListener(new AtomicInteger()));
@@ -63,7 +65,7 @@ class ShareFormTest extends UITestBase {
         assertSame(form.getContentPane(), toField.getParent());
     }
 
-    @Test
+    @FormTest
     void testImageFallbackDisplaysPathTextWhenScalingUnavailable() throws Exception {
         Form contacts = new Form();
         String imagePath = "missing-image.jpg";
@@ -80,7 +82,7 @@ class ShareFormTest extends UITestBase {
         assertSame(body, imageLabel.getParent());
     }
 
-    @Test
+    @FormTest
     void testBackCommandInvokesContactsShowBack() {
         final AtomicInteger backCalls = new AtomicInteger();
         Form contacts = new Form() {

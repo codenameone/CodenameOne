@@ -65,6 +65,8 @@ When an action event is fired it is given a type, however this type might change
 
 You can get the event type from https://www.codenameone.com/javadoc/com/codename1/ui/events/ActionEvent.html#getEventType--[getEventType()], this also gives you a rather exhaustive list of the possible event types for the action event.
 
+Modern gesture components also publish custom action types. For example, https://www.codenameone.com/javadoc/com/codename1/ui/SwipeableContainer.html[SwipeableContainer] dispatches https://www.codenameone.com/javadoc/com/codename1/ui/events/ActionEvent.Type.html#Swipe-[ActionEvent.Type.Swipe] when the top component is fully opened, allowing code to react to swipe gestures without monitoring low-level drags. Listening for these higher level events keeps gesture handling portable across touch and desktop targets.
+
 ===== Source Of Event
 
 `ActionEvent` has a source object, what that source is depends heavily on the event type. For most component based events this is the component but there are some nuances.
@@ -149,6 +151,10 @@ r.addResponseListener((e) -> {
 
 These seem very similar but they have one important distinction. The latter code is invoked on the EDT, so if `data` is big it might slow down processing significantly. The `ConnectionRequest` is invoked on the network thread and so can process any amount of data without slowing down the UI significantly.
 
+===== MessageEvent And The Cross-Platform Message Bus
+
+Bridging to native code often means passing messages between Codename One Java and platform specific code.  The cross-platform message bus provides a high level abstraction for that by letting you post messages to the native layer and subscribe for messages that originate there.  Use https://www.codenameone.com/javadoc/com/codename1/ui/Display.html#postMessage-com.codename1.ui.events.MessageEvent-[Display.postMessage()] to send an https://www.codenameone.com/javadoc/com/codename1/ui/events/MessageEvent.html[MessageEvent] to the platform, and https://www.codenameone.com/javadoc/com/codename1/ui/Display.html#addMessageListener-com.codename1.ui.events.ActionListener-[Display.addMessageListener()] to receive events that arrive from native code, JavaScript bridges, or background services.  Message events include helpers like `isPromptForAudioRecorder()`, `isPromptForAudioPlayer()`, and `getPromptPromise()` that allow you to hook into permission prompts emitted by the JavaScript port so custom UI can respond to platform requests while keeping the event dispatch on the EDT.  This API complements `NetworkEvent` by covering native-to-Java messaging without requiring direct low level callbacks.
+
 ==== DataChangeListener
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/events/DataChangedListener.html[DataChangedListener] is used in several places to indicate that the underlying model data has changed:
@@ -230,6 +236,10 @@ cmp.getUnselectedStyle().setFgColor(0xffffff);
 
 This will trigger a style event that will eventually lead to the component being repainted. This is quite important
 for the component class but not a very important event for general user code. It is recommended that developers don't bind a style listener.
+
+==== Component State Change Events
+
+Component instances now publish lifecycle hooks that fire when they become initialized on a form and when they are removed. You can subscribe with https://www.codenameone.com/javadoc/com/codename1/ui/Component.html#addStateChangeListener-com.codename1.ui.events.ActionListener-[Component.addStateChangeListener()] to receive https://www.codenameone.com/javadoc/com/codename1/ui/events/ComponentStateChangeEvent.html[ComponentStateChangeEvent] instances that indicate whether the component is transitioning to the initialized state. This is especially useful for running setup or teardown logic alongside focus, scroll, and selection listeners.
 
 ==== Event Dispatcher
 
@@ -314,13 +324,20 @@ public void pointerPressed(int[] x, int[] y)
 public void pointerPressed(int x, int y)
 public void pointerReleased(int[] x, int[] y)
 public void pointerReleased(int x, int y)
+public void pointerHover(int[] x, int[] y)
+public void pointerHoverPressed(int[] x, int[] y)
+public void pointerHoverReleased(int[] x, int[] y)
 public void longPointerPress(int x, int y)
 public void keyPressed(int keyCode)
 public void keyReleased(int keyCode)
 public void keyRepeated(int keyCode)
 ----
 
-Notice that most pointer events have a version that accepts an array as an argument, this allows for multi-touch event handling by sending all the currently touched coordinates.
+Notice that most pointer events have a version that accepts an array as an argument, this allows for multi-touch event handling by sending all the currently touched coordinates. Desktop and pen-enabled devices can also trigger hover events without a press. To respond to those you can override the `pointerHover*` callbacks on `Form` or `Component`, which are invoked before a button receives focus or a drag begins on those platforms.
+
+While you can override `longPointerPress`, there is usually no need. The dedicated https://www.codenameone.com/javadoc/com/codename1/ui/Component.html#addLongPressListener-com.codename1.ui.events.ActionListener-[Component.addLongPressListener()] helper wires long press detection into an action listener so you can keep gesture logic in the high-level API.
+
+Drag and drop lifecycles also expose a completion hook. When `Component.addDragFinishedListener()` is registered it receives https://www.codenameone.com/javadoc/com/codename1/ui/events/ActionEvent.Type.html#DragFinished-[ActionEvent.Type.DragFinished] once the framework has completed its cleanup, allowing you to reset state or trigger follow-up actions that should only occur after the drag image is hidden.
 
 ==== Drag Event Sanitation
 

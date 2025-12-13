@@ -515,7 +515,8 @@ public class EventDispatcher {
          * as an implementation detail
          */
         public final void run() {
-            if (!Display.getInstance().isEdt()) {
+            // We might not be running during a suspend/resume cycle
+            if (Display.isInitialized() && !Display.getInstance().isEdt()) {
                 throw new IllegalStateException("This method should not be invoked by external code!");
             }
 

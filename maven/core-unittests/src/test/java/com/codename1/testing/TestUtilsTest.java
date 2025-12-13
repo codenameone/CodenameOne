@@ -1,6 +1,9 @@
 package com.codename1.testing;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.EdtTest;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.TestLogger;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Form;
@@ -9,34 +12,12 @@ import com.codename1.ui.List;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.layouts.BoxLayout;
 import com.codename1.ui.list.DefaultListModel;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.when;
 
 class TestUtilsTest extends UITestBase {
-    private Form currentForm;
 
-    @BeforeEach
-    void configureDisplay() throws Exception {
-        currentForm = null;
-        when(implementation.getCurrentForm()).thenAnswer(invocation -> currentForm);
-        doAnswer(invocation -> {
-            currentForm = invocation.getArgument(0);
-            return null;
-        }).when(implementation).setCurrentForm(any(Form.class));
-    }
-
-    @AfterEach
-    void clearForm() {
-        currentForm = null;
-    }
-
-    @Test
+    @FormTest
     void findersAndClicksLocateComponents() {
         SpyForm form = new SpyForm();
         form.setLayout(BoxLayout.y());
@@ -46,7 +27,7 @@ class TestUtilsTest extends UITestBase {
         label.setName("helloLabel");
         form.add(button);
         form.add(label);
-        currentForm = form;
+        form.show();
 
         Component located = TestUtils.findByName("actionButton");
         assertSame(button, located);
@@ -59,7 +40,7 @@ class TestUtilsTest extends UITestBase {
         assertEquals(2, button.getReleasedCount());
     }
 
-    @Test
+    @FormTest
     void selectionAndVisibilityHelpersWork() {
         SpyForm form = new SpyForm();
         form.setLayout(BoxLayout.y());
@@ -69,7 +50,7 @@ class TestUtilsTest extends UITestBase {
         label.setName("targetLabel");
         form.add(list);
         form.add(label);
-        currentForm = form;
+        form.show();
 
         TestUtils.selectInList("options", 2);
         assertEquals(2, list.getSelectedIndex());
@@ -84,7 +65,7 @@ class TestUtilsTest extends UITestBase {
         assertSame(label, form.lastScrolled);
     }
 
-    @Test
+    @FormTest
     void setTextUpdatesLabelsAndTextAreas() {
         SpyForm form = new SpyForm();
         form.setLayout(BoxLayout.y());
@@ -94,8 +75,7 @@ class TestUtilsTest extends UITestBase {
         area.setName("field");
         form.add(label);
         form.add(area);
-        currentForm = form;
-
+        form.show();
         TestUtils.setText("label", "Updated");
         assertEquals("Updated", label.getText());
 
@@ -109,26 +89,31 @@ class TestUtilsTest extends UITestBase {
         assertEquals("Replaced", area.getText());
     }
 
-    @Test
+    @FormTest
     void assertionHelpersValidateExpectations() {
-        TestUtils.assertEqual(5, 5);
-        RuntimeException mismatch = assertThrows(RuntimeException.class, () -> TestUtils.assertEqual(5, 4));
-        assertTrue(mismatch.getMessage().contains("Expected [5], Actual [4]"));
+        TestLogger.install();
+        try {
+            TestUtils.assertEqual(5, 5);
+            RuntimeException mismatch = assertThrows(RuntimeException.class, () -> TestUtils.assertEqual(5, 4));
+            assertTrue(mismatch.getMessage().contains("Expected [5], Actual [4]"));
 
-        TestUtils.assertNotEqual("a", "b");
-        assertThrows(RuntimeException.class, () -> TestUtils.assertNotEqual("a", "a"));
+            TestUtils.assertNotEqual("a", "b");
+            assertThrows(RuntimeException.class, () -> TestUtils.assertNotEqual("a", "a"));
 
-        TestUtils.assertTrue(true);
-        assertThrows(RuntimeException.class, () -> TestUtils.assertTrue(false));
+            TestUtils.assertTrue(true);
+            assertThrows(RuntimeException.class, () -> TestUtils.assertTrue(false));
 
-        TestUtils.assertFalse(false);
-        assertThrows(RuntimeException.class, () -> TestUtils.assertFalse(true));
+            TestUtils.assertFalse(false);
+            assertThrows(RuntimeException.class, () -> TestUtils.assertFalse(true));
 
-        TestUtils.assertNull(null);
-        assertThrows(RuntimeException.class, () -> TestUtils.assertNull("value"));
+            TestUtils.assertNull(null);
+            assertThrows(RuntimeException.class, () -> TestUtils.assertNull("value"));
 
-        TestUtils.assertNotNull("value");
-        assertThrows(RuntimeException.class, () -> TestUtils.assertNotNull(null));
+            TestUtils.assertNotNull("value");
+            assertThrows(RuntimeException.class, () -> TestUtils.assertNotNull(null));
+        } finally {
+            TestLogger.remove();
+        }
     }
 
     private static class RecordingButton extends Button {

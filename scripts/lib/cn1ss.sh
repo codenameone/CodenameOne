@@ -28,11 +28,18 @@ cn1ss_setup() {
   CN1SS_SOURCE_PATH="$2"
   local cache_override="${3:-}" tmp_root
 
+  if [ -z "$CN1SS_SOURCE_PATH" ]; then
+    # Default to common/java if not provided or empty
+    local script_dir
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    CN1SS_SOURCE_PATH="$script_dir/common/java"
+  fi
+
   if [ -z "$CN1SS_JAVA_BIN" ] || [ ! -x "$CN1SS_JAVA_BIN" ]; then
     cn1ss_log "CN1SS setup failed: java binary not executable ($CN1SS_JAVA_BIN)"
     return 1
   fi
-  if [ -z "$CN1SS_SOURCE_PATH" ] || [ ! -d "$CN1SS_SOURCE_PATH" ]; then
+  if [ ! -d "$CN1SS_SOURCE_PATH" ]; then
     cn1ss_log "CN1SS setup failed: source directory missing ($CN1SS_SOURCE_PATH)"
     return 1
   fi
@@ -135,7 +142,7 @@ cn1ss_count_chunks() {
   if [ -n "$channel" ]; then
     args+=("--channel" "$channel")
   fi
-  cn1ss_java_run "$CN1SS_MAIN_CLASS" "${args[@]}" 2>/dev/null || echo 0
+  cn1ss_java_run "$CN1SS_MAIN_CLASS" "${args[@]}"
 }
 
 cn1ss_extract_base64() {
@@ -178,6 +185,14 @@ cn1ss_list_tests() {
     return 1
   fi
   cn1ss_java_run "$CN1SS_MAIN_CLASS" tests "$file"
+}
+
+cn1ss_print_log() {
+  local file="$1"
+  if [ -z "$file" ] || [ ! -r "$file" ]; then
+    return 1
+  fi
+  cn1ss_java_run "$CN1SS_MAIN_CLASS" check "$file"
 }
 
 cn1ss_verify_png() {
@@ -271,9 +286,20 @@ cn1ss_post_pr_comment() {
   fi
   body_size=$(wc -c < "$body_file" 2>/dev/null || echo 0)
   cn1ss_log "Attempting to post PR comment (payload bytes=${body_size})"
+  local -a extra_args=()
+  if [ -n "${CN1SS_COMMENT_MARKER:-}" ]; then
+    extra_args+=(--marker "${CN1SS_COMMENT_MARKER}")
+  fi
+  if [ -n "${CN1SS_COMMENT_LOG_PREFIX:-}" ]; then
+    extra_args+=(--log-prefix "${CN1SS_COMMENT_LOG_PREFIX}")
+  fi
+  if [ -n "${CN1SS_PREVIEW_SUBDIR:-}" ]; then
+    extra_args+=(--preview-subdir "${CN1SS_PREVIEW_SUBDIR}")
+  fi
   GITHUB_TOKEN="$comment_token" cn1ss_java_run "$CN1SS_POST_COMMENT_CLASS" \
     --body "$body_file" \
-    --preview-dir "$preview_dir"
+    --preview-dir "$preview_dir" \
+    "${extra_args[@]}"
   local rc=$?
   if [ $rc -eq 0 ]; then
     cn1ss_log "Posted screenshot comparison comment to PR"
@@ -285,4 +311,95 @@ cn1ss_post_pr_comment() {
     fi
   fi
   return $rc
+}
+
+# Shared function to generate report, compare screenshots, and post PR comment
+cn1ss_process_and_report() {
+  local platform_title="$1"
+  local compare_json_out="$2"
+  local summary_out="$3"
+  local comment_out="$4"
+  local ref_dir="$5"
+  local preview_dir="$6"
+  local artifacts_dir="$7"
+  # Optional: array of actual entries in format "testName=path"
+  shift 7
+  local actual_entries=("$@")
+
+  local rc=0
+
+  # Run ProcessScreenshots
+  local -a compare_args=("--reference-dir" "$ref_dir" "--emit-base64" "--preview-dir" "$preview_dir")
+  for entry in "${actual_entries[@]}"; do
+    compare_args+=("--actual" "$entry")
+  done
+
+  cn1ss_log "STAGE:COMPARE -> Evaluating screenshots against stored references"
+  if ! cn1ss_java_run "$CN1SS_PROCESS_CLASS" "${compare_args[@]}" > "$compare_json_out"; then
+    cn1ss_log "FATAL: Screenshot comparison helper failed"
+    return 13
+  fi
+
+  # Run RenderScreenshotReport
+  cn1ss_log "STAGE:COMMENT_BUILD -> Rendering summary and PR comment markdown"
+  local -a render_args=(
+    --title "$platform_title"
+    --compare-json "$compare_json_out"
+    --comment-out "$comment_out"
+    --summary-out "$summary_out"
+  )
+  if [ -n "${CN1SS_COVERAGE_SUMMARY:-}" ]; then
+    render_args+=(--coverage-summary "$CN1SS_COVERAGE_SUMMARY")
+  fi
+  if [ -n "${CN1SS_COVERAGE_HTML_URL:-}" ]; then
+    render_args+=(--coverage-html-url "$CN1SS_COVERAGE_HTML_URL")
+  fi
+
+  if ! cn1ss_java_run "$CN1SS_RENDER_CLASS" "${render_args[@]}"; then
+    cn1ss_log "FATAL: Failed to render screenshot summary/comment"
+    return 14
+  fi
+
+  if [ -s "$summary_out" ]; then
+    cn1ss_log "  -> Wrote summary entries to $summary_out ($(wc -l < "$summary_out" 2>/dev/null || echo 0) line(s))"
+  else
+    cn1ss_log "  -> No summary entries generated (all screenshots matched stored baselines)"
+  fi
+
+  if [ -s "$comment_out" ]; then
+    cn1ss_log "  -> Prepared PR comment payload at $comment_out (bytes=$(wc -c < "$comment_out" 2>/dev/null || echo 0))"
+  else
+    cn1ss_log "  -> No PR comment content produced"
+  fi
+
+  # Process summary entries (copy artifacts, clean up)
+  if [ -s "$summary_out" ]; then
+    while IFS='|' read -r status test message copy_flag path preview_note; do
+      [ -n "${test:-}" ] || continue
+      cn1ss_log "Test '${test}': ${message}"
+      if [ "$copy_flag" = "1" ] && [ -n "${path:-}" ] && [ -f "$path" ]; then
+        cp -f "$path" "$artifacts_dir/${test}.png" 2>/dev/null || true
+        cn1ss_log "  -> Stored PNG artifact copy at $artifacts_dir/${test}.png"
+      fi
+      if [ "$status" = "equal" ] && [ -n "${path:-}" ]; then
+        rm -f "$path" 2>/dev/null || true
+      fi
+      if [ -n "${preview_note:-}" ]; then
+        cn1ss_log "  Preview note: ${preview_note}"
+      fi
+    done < "$summary_out"
+  fi
+
+  cp -f "$compare_json_out" "$artifacts_dir/screenshot-compare.json" 2>/dev/null || true
+  if [ -s "$comment_out" ]; then
+    cp -f "$comment_out" "$artifacts_dir/screenshot-comment.md" 2>/dev/null || true
+  fi
+
+  cn1ss_log "STAGE:COMMENT_POST -> Submitting PR feedback"
+  local comment_rc=0
+  if ! cn1ss_post_pr_comment "$comment_out" "$preview_dir"; then
+    comment_rc=$?
+  fi
+
+  return $comment_rc
 }

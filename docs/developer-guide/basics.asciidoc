@@ -8,20 +8,20 @@ Let's start with a brief overview of the ideas within Codename One. We'll dig de
 Every button, label or element you see on the screen in a Codename One application is a https://www.codenameone.com/javadoc/com/codename1/ui/Component.html[Component]. This is a highly simplified version of this class hierarchy:
 
 .The Core Component Class Hierarchy
-image::img/developer-guide/codenameone-class-diagram.png[The Core Component Class Hierarchy]
+image::img/codenameone-class-diagram.png[The Core Component Class Hierarchy]
 
 
 The https://www.codenameone.com/javadoc/com/codename1/ui/Form.html[Form] is a special case `Component`. It's the root component that you can show to the user. `Container` is a `Component` type that can hold other components within it. This lets us create elaborate hierarchies by nesting `Container` instances.
 
 [[component-uml]]
 .Component UML
-image::img/developer-guide/component-uml.png[Component UML,scaledwidth=50%]
+image::img/component-uml.png[Component UML,scaledwidth=50%]
 
 A Codename One application is effectively a series of forms, only one Form can be shown at a time. The Form includes everything we see on the screen. Under the hood the `Form` is comprised of a few separate pieces:
 
 [id=StructureOfForm, reftext={chapter}.{counter:figure}]
 .Structure of a Form
-image::img/developer-guide/codenameone-form.png[Structure of a Form,scaledwidth=50%]
+image::img/codenameone-form.png[Structure of a Form,scaledwidth=50%]
 
 * Content Pane - this is literally the body of the `Form`. When we `add` a `Component` into the `Form` it goes into the content pane. Notice that Content Pane is scrollable by default on the Y axis!
 
@@ -74,10 +74,10 @@ A layout manager places a component based on its own logic and the preferred siz
 TIP: `FlowLayout` is great for simple things but has issues when components change their sizes dynamically (like a text field). In those cases it can make bad decisions about line breaks and take up too much space
 
 .Layout Manager Primer Part I
-image::img/developer-guide/codenameone-layout-managers-1.png[Layout Manager Primer Part I]
+image::img/codenameone-layout-managers-1.png[Layout Manager Primer Part I]
 
 .Layout Manager Primer Part II
-image::img/developer-guide/codenameone-layout-managers-2.png[Layout Manager Primer Part II]
+image::img/codenameone-layout-managers-2.png[Layout Manager Primer Part II]
 
 Scrolling doesn't work well for all types of layouts as the positioning algorithm within the layout might break. Scrolling on the Y axis works great for `BoxLayout` Y  which is why I picked it for the `TodoForm`:
 
@@ -223,7 +223,7 @@ To sum this up, we can use layout managers and nesting to create elaborate UI's 
 
 [[flow-layout]]
 .Flow Layout
-image::img/developer-guide/flow-layout.png[Flow Layout,scaledwidth=20%]
+image::img/flow-layout.png[Flow Layout,scaledwidth=20%]
 
 link:https://www.codenameone.com/javadoc/com/codename1/ui/layouts/FlowLayout.html[Flow layout] lets the components “flow” horizontally and break a line when reaching the edge of the container. It's the default layout manager for containers. Because it's so flexible it's also problematic as it can result in incorrect preferred size values for the parent https://www.codenameone.com/javadoc/com/codename1/ui/Container.html[Container].  This can create a reflow issue, as a result we recommend using flow layout only for trivial cases. Avoid it for things such as text input etc. As the size of the text input can vary in runtime.
 
@@ -254,15 +254,15 @@ Flow layout can be aligned to the left (the default), to the <<flow-layout-cente
 
 [[flow-layout-center]]
 .Flow layout aligned to the center
-image::img/developer-guide/flow-layout-center.png[Flow layout aligned to the center,scaledwidth=20%]
+image::img/flow-layout-center.png[Flow layout aligned to the center,scaledwidth=20%]
 
 [[flow-layout-right]]
 .Flow layout aligned to the right
-image::img/developer-guide/flow-layout-right.png[Flow layout aligned to the right,scaledwidth=20%]
+image::img/flow-layout-right.png[Flow layout aligned to the right,scaledwidth=20%]
 
 [[flow-layout-center-middle]]
 .Flow layout aligned to the center horizontally & the middle vertically
-image::img/developer-guide/flow-layout-center-middle.png[Flow layout aligned to the center horizontally & the middle vertically,scaledwidth=20%]
+image::img/flow-layout-center-middle.png[Flow layout aligned to the center horizontally & the middle vertically,scaledwidth=20%]
 
 Components within the flow layout get their natural preferred size by default and are not stretched in any axis.
 
@@ -288,7 +288,7 @@ Which results in <<box-layout-y,this>>
 
 [[box-layout-y]]
 .BoxLayout Y
-image::img/developer-guide/box-layout-y.png[BoxLayout Y,scaledwidth=20%]
+image::img/box-layout-y.png[BoxLayout Y,scaledwidth=20%]
 
 Box layout also supports a shorter terse notation which we use here to <<box-layout-x,demonstrate the X axis box>>.
 
@@ -303,7 +303,7 @@ Container box = BoxLayout.encloseX(new Label("First"),
 
 [[box-layout-x]]
 .BoxLayout X
-image::img/developer-guide/box-layout-x.png[BoxLayout X,scaledwidth=20%]
+image::img/box-layout-x.png[BoxLayout X,scaledwidth=20%]
 
 The box layout keeps the preferred size of its destination orientation and scales elements on the other axis. Specifically `X_AXIS` will keep the preferred width of the component while growing all the components vertically to match in size. Its `Y_AXIS` counterpart keeps the preferred height
 while growing the components horizontally.
@@ -313,7 +313,7 @@ This behavior is very useful since it allows elements to align as they would all
 In some cases the growing behavior in the X axis is undesired, for these cases we can use the `X_AXIS_NO_GROW` variant.
 
 .BoxLayout X_AXIS_NO_GROW
-image::img/developer-guide/box-layout-x-no-grow.png[BoxLayout X_AXIS_NO_GROW,scaledwidth=20%]
+image::img/box-layout-x-no-grow.png[BoxLayout X_AXIS_NO_GROW,scaledwidth=20%]
 
 .`FlowLayout` vs. `BoxLayout.X_AXIS`
 TIP: When applicable we recommend `BoxLayout` over `FlowLayout` as it acts more consistently in all situations. Another advantage of `BoxLayout` is the fact that it grows and thus aligns nicely
@@ -321,7 +321,7 @@ TIP: When applicable we recommend `BoxLayout` over `FlowLayout` as it acts more 
 ===== Border Layout
 
 .Border Layout
-image::img/developer-guide/border-layout.png[Border Layout,scaledwidth=20%]
+image::img/border-layout.png[Border Layout,scaledwidth=20%]
 
 link:https://www.codenameone.com/javadoc/com/codename1/ui/layouts/BorderLayout.html[Border layout] is quite unique. `BorderLayout` is a constraint-based layout that can place up to five components in one of the five positions: `NORTH`, `SOUTH`,
 `EAST`, `WEST` or `CENTER`.
@@ -359,7 +359,7 @@ hi.show();
 Results in:
 
 .Border Layout with CENTER_BEHAVIOR_CENTER
-image::img/developer-guide/border-layout-center.png[Border Layout with CENTER_BEHAVIOR_CENTER,scaledwidth=20%]
+image::img/border-layout-center.png[Border Layout with CENTER_BEHAVIOR_CENTER,scaledwidth=20%]
 
 .Scrolling is Disabled in Border Layout
 NOTE: Because of its scaling behavior scrolling a border
@@ -368,7 +368,7 @@ layout makes no sense. `Container` implicitly blocks scrolling on a border layou
 In the case of RTL the EAST and WEST values are implicitly reversed as shown in this image:
 
 .Border Layout in RTL mode
-image::img/developer-guide/border-layout-RTL.png[Border Layout in RTL mode,scaledwidth=20%]
+image::img/border-layout-RTL.png[Border Layout in RTL mode,scaledwidth=20%]
 
 .RTL and Bidi
 ****
@@ -402,12 +402,12 @@ hi.add(new Label("First")).
 ----
 
 .Grid Layout 2x2
-image::img/developer-guide/grid-layout-2x2.png[Grid Layout 2x2,scaledwidth=20%]
+image::img/grid-layout-2x2.png[Grid Layout 2x2,scaledwidth=20%]
 
 When we use a 2x4 size ratio we would see elements getting cropped as we do here. The grid layout uses the grid size first and doesn't pay too much attention to the preferred size of the components it holds.
 
 .Grid Layout 2x4
-image::img/developer-guide/grid-layout-2x4.png[Grid Layout 2x4,scaledwidth=20%]
+image::img/grid-layout-2x4.png[Grid Layout 2x4,scaledwidth=20%]
 
 Grid also has an autoFit attribute that can be used to automatically calculate the column count based on
 available space and preferred width. This is really useful for working with UI's where the device orientation
@@ -427,10 +427,10 @@ GridLayout.encloseIn(new Label("First"),
 ----
 
 .Grid Layout autofit portrait
-image::img/developer-guide/grid-layout-autofit-portrait.png[Grid Layout autofit portrait,scaledwidth=20%]
+image::img/grid-layout-autofit-portrait.png[Grid Layout autofit portrait,scaledwidth=20%]
 
 .Grid Layout autofit landscape
-image::img/developer-guide/grid-layout-autofit-landscape.png[Grid Layout autofit landscape,scaledwidth=20%]
+image::img/grid-layout-autofit-landscape.png[Grid Layout autofit landscape,scaledwidth=20%]
 
 [[table-layout-section]]
 ==== Table Layout
@@ -457,7 +457,7 @@ hi.show();
 ----
 
 .2x2 TableLayout with 5 elements, notice that the last element is missing
-image::img/developer-guide/table-layout-2x2.png[2x2 TableLayout with 5 elements, notice that the last element is missing,scaledwidth=20%]
+image::img/table-layout-2x2.png[2x2 TableLayout with 5 elements, notice that the last element is missing,scaledwidth=20%]
 
 `TableLayout` supports the ability to grow the last column which can be enabled using the `setGrowHorizontally` method. You can also use a shortened terse syntax to construct a `TableLayout` however since the `TableLayout` is a constraint based layout you won't be able to utilize its full power with this syntax.
 
@@ -473,7 +473,7 @@ Container tl = TableLayout.encloseIn(2, new Label("First"),
 ----
 
 .`TableLayout.encloseIn()` with default behavior of growing the last column
-image::img/developer-guide/table-layout-enclose.png[TableLayout.encloseIn() with default behavior of growing the last column,scaledwidth=20%]
+image::img/table-layout-enclose.png[TableLayout.encloseIn() with default behavior of growing the last column,scaledwidth=20%]
 
 ===== The Full Potential
 
@@ -550,7 +550,7 @@ hi.add(cn, new Label("AAA")).
 
 [[table-layout-constraints]]
 .TableLayout constraints can be used to create very elaborate UI's
-image::img/developer-guide/table-layout-constraints.png[TableLayout constraints can be used to create very elaborate UI's,scaledwidth=20%]
+image::img/table-layout-constraints.png[TableLayout constraints can be used to create very elaborate UI's,scaledwidth=20%]
 
 ===== TextMode Layout
 
@@ -576,10 +576,10 @@ f.show();
 ----
 
 .TextModeLayout on iOS
-image::img/developer-guide/pixel-perfect-text-field-reasonable-on-ios.png[TextModeLayout on iOS,scaledwidth=30%]
+image::img/pixel-perfect-text-field-reasonable-on-ios.png[TextModeLayout on iOS,scaledwidth=30%]
 
 .TextModeLayout on Android with the same code
-image::img/developer-guide/pixel-perfect-text-field-android-codenameone-font.png[TextModeLayout on Android with the same code,scaledwidth=30%]
+image::img/pixel-perfect-text-field-android-codenameone-font.png[TextModeLayout on Android with the same code,scaledwidth=30%]
 
 As you can see from the code and samples above there is a lot going on under the hood. On Android we want a layout that's similar to `TableLayout` so we can "`pack`" the entries. On iOS we want a box layout Y type of layout but we also want the labels/text to align properly...
 
@@ -598,7 +598,7 @@ When working in the non-android environment we use a `BoxLayout` on the Y axis a
 When used without constraints, the https://www.codenameone.com/javadoc/com/codename1/ui/layouts/LayeredLayout.html[LayeredLayout] places the components in order one on top of the other and sizes them all to the size of the largest component. This is useful when trying to create an overlay on top of an existing component. E.g. an “x” button to allow removing the component.
 
 .The X on this button was placed there using the layered layout code below
-image::img/developer-guide/layered-layout.png[The X on this button was placed there using the layered layout code below,scaledwidth=20%]
+image::img/layered-layout.png[The X on this button was placed there using the layered layout code below,scaledwidth=20%]
 
 The code to generate this UI is slightly complex and contains very few relevant pieces. The only truly relevant piece is this block:
 
@@ -662,7 +662,7 @@ ll.setInsets(btn, "auto 0 0 auto");
 
 The result is:
 
-image::img/developer-guide/guibuilder-2-insets-1.png[Button positioned in bottom right using insets,scaledwidth=20%]
+image::img/guibuilder-2-insets-1.png[Button positioned in bottom right using insets,scaledwidth=20%]
 
 The only thing new here is this line:
 
@@ -694,7 +694,7 @@ ll.setInsets(btn, "auto auto auto 5mm");
 Resulting in:
 
 .Button vertically centered 5mm from left edge
-image::img/developer-guide/guibuilder-2-insets-2.png[Button vertically centered 5mm from left edge,scaledwidth=20%]
+image::img/guibuilder-2-insets-2.png[Button vertically centered 5mm from left edge,scaledwidth=20%]
 
 Move it to the right edge with:
 
@@ -744,7 +744,7 @@ ll.setInsets(tf, "auto")
 This would result in:
 
 .Button's left inset linked to text field
-image::img/developer-guide/guibuilder-2-insets-3.png[Button's left inset linked to text field,scaledwidth=50%]
+image::img/guibuilder-2-insets-3.png[Button's left inset linked to text field,scaledwidth=50%]
 
 The two active lines here are the last two:
 
@@ -756,7 +756,7 @@ The two active lines here are the last two:
 <1> Sets the left inset on `btn` to 0.
 <2> Links `btn`'s left inset to `tf` so that it is measured from the text field.  The third parameter (`1.0`) is the reference position.  This will generally either be `0` (meaning the reference point is the left edge of the text field), or `1` (meaning the reference point is the right edge of the text field).  In this case we set a reference position of `1.0` because we want the button to be aligned to the text field's right edge.
 
-NOTE: The reference position is defined as the distance, expressed as a fraction of the reference component's length on the inset's axis, between the reference component's leading (outer) edge and the point from which the inset is measured.  A reference position of 0 means that the inset is measured from the leading edge of the reference component.  A value of 1.0 means that the inset is measured from the trailing edge of the reference component.  A value of 0.5 means that the inset is measured from the center of the reference component.  Etc...  Any floating point value can be used.  The designer currently only makes use of 0 and 1.
+NOTE: The reference position is defined as the distance, expressed as a fraction of the reference component's length on the inset's axis, between the reference component's leading (outer) edge and the point from which the inset is measured.  A reference position of 0 means that the inset is measured from the leading edge of the reference component.  A value of 1.0 means that the inset is measured from the trailing edge of the reference component.  A value of 0.5 means that the inset is measured from the center of the reference component.  Etc...  Any floating point value can be used, though the most common values are 0 and 1.
 
 The definition above may make reference components and reference position seem more complex than it is.  Some examples:
 
@@ -787,7 +787,7 @@ The glass pane is the top most layer, unlike the layered pane it's purely a grap
 ****
 
 .The Layered Pane
-image::img/developer-guide/layers.png["The Layered Pane",scaledwidth=80%]
+image::img/layers.png["The Layered Pane",scaledwidth=80%]
 
 
 ==== GridBag Layout
@@ -850,7 +850,7 @@ hi.addComponent(c, button);
 Notice that because of the way gridbag works we didn't provide any terse syntax API for it although it should be possible.
 
 .GridbagLayout sample from the Java tutorial running on Codename One
-image::img/developer-guide/gridbag-layout.png[GridbagLayout sample from the Java tutorial running on Codename One,scaledwidth=20%]
+image::img/gridbag-layout.png[GridbagLayout sample from the Java tutorial running on Codename One,scaledwidth=20%]
 
 ==== Group Layout
 
@@ -931,7 +931,7 @@ layout.setVerticalGroup(
 ----
 
 .GroupLayout Matisse generated UI running in Codename One
-image::img/developer-guide/group-layout.png[GroupLayout Matisse generated UI running in Codename One,scaledwidth=20%]
+image::img/group-layout.png[GroupLayout Matisse generated UI running in Codename One,scaledwidth=20%]
 
 If you are porting newer Matisse code there are simple changes you can do:
 
@@ -963,7 +963,7 @@ hi.show();
 ----
 
 .MiG layout sample ported to Codename One
-image::img/developer-guide/mig-layout.png[MiG layout sample ported to Codename One,scaledwidth=20%]
+image::img/mig-layout.png[MiG layout sample ported to Codename One,scaledwidth=20%]
 
 It should be reasonably easy to port MiG code but you should notice the following:
 
@@ -1023,13 +1023,9 @@ As you can see, it's a bit of a hassle to change styles from code which is why t
 
 ==== Theme
 
-A theme allows the designer to define the styles externally via a set of UIID’s (User Interface ID’s), the themes are created from CSS or using the Codename One Designer tool. The theme lets us separate the look of the component from the application logic.
-
-TIP: The preferred way for customizing the theme is CSS which we'll discuss a bit later
+A theme allows you to define the styles externally via a set of UIID’s (User Interface ID’s). Themes can be authored directly in CSS and then compiled into the Codename One resource file, which keeps styling concerns separate from application logic.
 
 The theme is stored in the `theme.res` file in the project.
-
-TIP: You can use the designer tool to open a css generated theme resource file. This is useful to inspect how the css code translated to low level styles
 
 We load the theme file using this line of code in the `init(Object)` method in the main class of the application:
 
@@ -1038,7 +1034,7 @@ We load the theme file using this line of code in the `init(Object)` method in t
 theme = UIManager.initFirstTheme("/theme");
 ----
 
-In a CSS project this file is generated automatically from the CSS file. In legacy projects you can edit it directly with the designer tool.
+In a CSS project this file is generated automatically from the stylesheet. Legacy applications that still edit the resource file by hand can continue to do so, but new projects should prefer the CSS workflow described below.
 
 This code is shorthand for resource file loading and for the installation of theme. You could technically have more than one theme in a resource file at which point you could use `initNamedTheme()` instead. The resource file is a special file format that includes inside it several features:
 
@@ -1047,134 +1043,11 @@ This code is shorthand for resource file loading and for the installation of the
 * Localization Bundles
 * Data files
 
-The designer also includes some legacy features such as the old GUI builder. The old GUI builder is no longer supported and code should be migrated to the current GUI builder.
+==== Working with CSS Themes
 
-NOTE: We're mentioning the legacy GUI builder for reference only we won't discuss the old GUI builders in this guide
+Modern Codename One projects ship with a `src/main/css/theme.css` file (or an equivalent stylesheet). Editing this file allows you to define UIIDs using standard CSS syntax together with Codename One–specific extensions such as `cn1-derive` for inheritance and the `#Constants` block for theme constants. Each time you build or run the project, the build tool compiles the CSS into the `theme.res` resource file automatically. Saving the CSS while the simulator is running will also trigger a refresh so you can iterate on styling quickly.
 
-We can open the designer tool by double clicking the res file in the legacy ant project. For maven projects you would need to run it manually using code like this:
-
-[source,bash,title='Launch Designer Mac/Linux']
-----
-java -jar ~/.codenameone/designer_1.jar
-----
-
-For Windows you would need to use something similar, notice you would need to replace `MY_HOME_DIRECTORY` with your user directory:
-
-[source,cmd,title='Launch Designer Windows']
-----
-java -jar MY_HOME_DIRECTORY\.codenameone\designer_1.jar
-----
-
-NOTE: If this doesn't work run the "Update Codename One" maven target.
-
-The UI can be a bit overwhelming at first so I'll try to walk slowly through the steps.
-
-.Codename One Designer Feature Map
-image::img/developer-guide/codenameone-designer-feature-map.png[Codename One Designer Feature Map]
-
-TIP: If you end up using CSS this section isn't crucial but it's worth browsing through as using the designer tool helps in tracking CSS issues
-
-There are two crucial features in this tool: theming and images.
-
-.Add a New Image
-image::img/developer-guide/codenameone-add-image.png[Add a New Image]
-
-You will notice there is more than one type of image. We'll discuss multi-images later.
-
-Now we can go back to the theme view in the designer tool and press the Add button in the #Unselected# tab. Notice we have tabs for every state of `Style` as well as a special tabl for theme constants that we will discuss later.
-
-.The Add Button
-image::img/developer-guide/codenameone-add-theme-entry-button.png[The Add Button, scaledwidth=50%]
-
-After pressing that button we should see something that looks like this:
-
-.Add the Theme Entry for the Toolbar
-image::img/developer-guide/codenameone-add-theme-entry.png[Add the Theme Entry for the Toolbar]
-
-TIP: Don't forget to press the save button in the designer after making changes
-
-There are several other options in the add theme entry dialog. Lets go over them and review what we should do for each tab in this UI:
-
-.The Rest of the Add Theme Entry Dialog - Part I
-image::img/developer-guide/codenameone-add-theme-entry-dialog-options-1.png[The Rest of the Add Theme Entry Dialog]
-
-.The Rest of the Add Theme Entry Dialog - Part II
-image::img/developer-guide/codenameone-add-theme-entry-dialog-options-2.png[The Rest of the Add Theme Entry Dialog]
-
-We'll cover these options in-depth in the theming chapters.
-
-===== Native Theme
-
-By default Codename One applications are created with a theme
-that derives from the builtin OS native theme. You can add
-additional themes into the resource file by pressing the #Add
-A New Theme# button. You can also create multiple themes and
-ship them with your app or download them dynamically.
-
-You can create a theme from scratch or customize one of the Codename one themes to any look you desire.
-
-TIP: To preview the look of your theme in the various platforms use the #Native Theme# <<designer-native-theme-menu,menu option>> in the designer
-
-[[designer-native-theme-menu]]
-.The native theme menu option
-image::img/developer-guide/designer-native-theme-menu.png[The native theme menu option,scaledwidth=30%]
-
-You can easily create deep customizations that span across
-all themes by adding a UIID or changing an existing UIID.
-E.g. looking at the getting started application that ships with the plugin you will notice a green button. This button is defined using the "GetStarted" UIID which is defined within the designer as:
-
-- A green background
-- White foreground
-- A thin medium sized font
-- Center aligned text
-- A small amount of spacing between the text and the edges
-
-To achieve the colors we <<get-started-theme-color,define them in the color tab>>.
-
-IMPORTANT: We define the transparency to 255 which means the
-background will be a solid green color. This is important since
-the native OS's might vary with the default value for background
-transparency so this should be defined explicitly
-
-[[get-started-theme-color]]
-.The Color tab for the get started button theme settings
-image::img/developer-guide/get-started-theme-color.png[The Color tab for the get started button theme settings]
-
-The alignment of the text is pretty simple, notice that the
-alignment style attribute applies to text and doesn't apply
-to other elements. To align other elements we use layout manager logic.
-
-.The alignment tab for the get started button theme settings
-image::img/developer-guide/get-started-theme-alignment.png[The alignment tab for the get started button theme settings]
-
-Padding can be expressed in pixels, millimeters (approximate)
-or percentages of the screen size.
-
-TIP: We recommend using millimeters for all measurements to
-keep the code portable for various device DPI's.
-
-.The padding tab for the get started button theme settings
-image::img/developer-guide/get-started-theme-padding.png[The padding tab for the get started button theme settings]
-
-The font uses native OS light font but has a fallback for
-older OS's that don't support truetype fonts. The "True Type"
-font will be applicable for most modern OS's. In the case of
-the "native:" fonts Android devices will use #Roboto# whereas
-iOS devices will use #Helvetica Neue#. You can supply your
-own TTF and work with that.
-
-IMPORTANT: Since Codename One cannot legally ship
-#Helvetica Neue# fonts the simulator will fallback to #Roboto#
-on PC's.
-
-WARNING: At the time of this writing the desktop/simulator
-version of the Roboto font doesn't support many common character
-sets (languages). This will have no effect on an Android
-device where thenative font works properly.
-
-.The font tab for the get started button theme settings
-image::img/developer-guide/get-started-theme-font.png[The font tab for the get started button theme settings]
-
+Because the CSS compiler produces the final resource file, you should treat the generated `theme.res` as an output artifact and keep your changes in the CSS source. Images referenced from CSS rules (e.g. background images or multi-images) should be placed alongside the stylesheet so that they are picked up by the compiler. Additional details about the supported selectors and properties are covered in the dedicated CSS chapter later in this guide.
 
 === GUI Builder
 
@@ -1182,26 +1055,7 @@ The GUI builder allows us to arrange components visually within a UI using drag 
 
 .Why two GUI Builders?
 ****
-The original old GUI builder has its roots in our work at Sun Microsystems, it was developed directly into the designer tool and stores it's data as part of the resource file. When creating an application for the old GUI builder you must define it as a "visual application" which will make it use the old GUI builder.
-
-The roots of this GUI builder are pretty old. When we initially built it we still had to support feature phones with 2mb of RAM and the iPad wasn't announced yet. Due to that we picked an architecture that made sense for those phones with a greater focus on navigation and resource usage. Newer mobile applications are rivaling desktop applications in complexity and in those situations the old GUI builder doesn't make as much sense
-
-The old GUI builder is in the designer tool, it's a Swing application that includes the theme design etc. +
-It generates a `Statemachine` class that contains all the main user GUI interaction code.
-
-The new GUI builder is a standalone application that you launch from the right click menu by selecting a form as explained below. Here are screenshots of both to help you differentiate:
-
-.The old GUI builder
-image::img/developer-guide/old-gui-builder-sample.png[The old GUI builder,scaledwidth=50%]
-
-.The same UI in the new GUI builder
-image::img/developer-guide/new-gui-builder-sample.png[The new GUI builder,scaledwidth=50%]
-
-As of version 3.7, the new GUI Builder also supports an auto layout mode which allows you to freely position and resize components on a canvas.  This mode is now the default for new GUI forms, and it always uses LayeredLayout as the root layout manager.
-
-.The new GUI builder in auto-layout mode
-image::img/developer-guide/guibuilder-2-screenshot.png[The new GUI builder auto layout mode,scaledwidth=50%]
-
+Codename One originally shipped with a GUI builder that generated a `Statemachine` class and stored its data directly inside the resource file. That legacy tool targeted very constrained devices and has since been deprecated. Modern projects should rely on the standalone GUI builder launched from the IDE, which is the focus of the remainder of this section. The current builder includes an auto layout mode (introduced in version 3.7) that lets you freely position and resize components on a canvas while using `LayeredLayout` behind the scenes.
 ****
 
 ==== Hello World
@@ -1220,45 +1074,45 @@ application.
 In NetBeans you need to follow these 4 steps:
 
 .Right click the package select #New# -> #Other#
-image::img/developer-guide/netbeans-gui-builder-step-1.png[Right click the package select New -> Other,scaledwidth=50%]
+image::img/netbeans-gui-builder-step-1.png[Right click the package select New -> Other,scaledwidth=50%]
 
 .In the Codename One section select the GUI builder form
-image::img/developer-guide/netbeans-gui-builder-step-2.png[In the Codename One section select the GUI builder form,scaledwidth=50%]
+image::img/netbeans-gui-builder-step-2.png[In the Codename One section select the GUI builder form,scaledwidth=50%]
 
 .Type in the name of the form and click finish, you can change the type to be a Container or Dialog
-image::img/developer-guide/netbeans-gui-builder-step-3.png[Type in the name of the form and click finish, you can change the type to be a Container or Dialog,scaledwidth=50%]
+image::img/netbeans-gui-builder-step-3.png[Type in the name of the form and click finish, you can change the type to be a Container or Dialog,scaledwidth=50%]
 
 .Launch the GUI builder thru the right click menu on the newly created file
-image::img/developer-guide/netbeans-gui-builder-step-4.png[Launch the GUI builder thru the right click menu on the newly created file,scaledwidth=50%]
+image::img/netbeans-gui-builder-step-4.png[Launch the GUI builder thru the right click menu on the newly created file,scaledwidth=50%]
 
 ===== IntelliJ/IDEA
 
 In IntelliJ you need to follow these 3 steps:
 
 .Right click the package select #New# -> #Codename One AutoLayout Form# (or Dialog/Container)
-image::img/developer-guide/intellij-gui-builder-step-1.png[Right click the package select New -> Codename One Form (or Dialog/Container),scaledwidth=50%]
+image::img/intellij-gui-builder-step-1.png[Right click the package select New -> Codename One Form (or Dialog/Container),scaledwidth=50%]
 
 .Type in a name for the new form
-image::img/developer-guide/intellij-gui-builder-step-2.png[Type in a name for the new form,scaledwidth=50%]
+image::img/intellij-gui-builder-step-2.png[Type in a name for the new form,scaledwidth=50%]
 
 .Launch the GUI builder thru the right click menu on the newly created file
-image::img/developer-guide/intellij-gui-builder-step-3.png[Launch the GUI builder thru the right click menu on the newly created file,scaledwidth=50%]
+image::img/intellij-gui-builder-step-3.png[Launch the GUI builder thru the right click menu on the newly created file,scaledwidth=50%]
 
 ===== Eclipse
 
 In Eclipse you need to follow these 4 steps:
 
 .Right click the package select #New# -> #Other#
-image::img/developer-guide/eclipse-gui-builder-step-1.png[Right click the package select New -> Other,scaledwidth=50%]
+image::img/eclipse-gui-builder-step-1.png[Right click the package select New -> Other,scaledwidth=50%]
 
 .In the Codename One section select the GUI builder option
-image::img/developer-guide/eclipse-gui-builder-step-2.png[In the Codename One section select the GUI builder option,scaledwidth=50%]
+image::img/eclipse-gui-builder-step-2.png[In the Codename One section select the GUI builder option,scaledwidth=50%]
 
 .Type in the name of the form and click finish, you can change the type to be a Container or Dialog
-image::img/developer-guide/eclipse-gui-builder-step-3.png[Type in the name of the form and click finish, you can change the type to be a Container or Dialog,scaledwidth=50%]
+image::img/eclipse-gui-builder-step-3.png[Type in the name of the form and click finish, you can change the type to be a Container or Dialog,scaledwidth=50%]
 
 .Launch the GUI builder thru the right click menu on the newly created file
-image::img/developer-guide/eclipse-gui-builder-step-4.png[Launch the GUI builder thru the right click menu on the newly created file,scaledwidth=50%]
+image::img/eclipse-gui-builder-step-4.png[Launch the GUI builder thru the right click menu on the newly created file,scaledwidth=50%]
 
 
 ===== Basic Usage
@@ -1270,10 +1124,10 @@ The GUI builder is controlled via it's main toolbar, notice that your changes wi
 the #Save# button on the right:
 
 .The features of the left toolbar
-image::img/developer-guide/new-gui-builder-left-toolbar.png[The features of the left toolbar,scaledwidth=50%]
+image::img/new-gui-builder-left-toolbar.png[The features of the left toolbar,scaledwidth=50%]
 
 .The features of the right toolbar
-image::img/developer-guide/new-gui-builder-right-toolbar.png[The features of the right toolbar,scaledwidth=50%]
+image::img/new-gui-builder-right-toolbar.png[The features of the right toolbar,scaledwidth=50%]
 
 The main UI includes four important parts:
 
@@ -1287,19 +1141,19 @@ The main UI includes four important parts:
 
 
 .The four parts of the GUI builder
-image::img/developer-guide/new-gui-builder-component-tree-palette-inspector.png[The four parts of the GUI builder,scaledwidth=50%]
+image::img/new-gui-builder-component-tree-palette-inspector.png[The four parts of the GUI builder,scaledwidth=50%]
 
 We'll start by selecting the #Component Palette# and dragging a button into the UI:
 
 .You can drag any component you want from the palette to the main UI
-image::img/developer-guide/new-gui-builder-drag-button.png[You can drag any component you want from the palette to the main UI,scaledwidth=50%]
+image::img/new-gui-builder-drag-button.png[You can drag any component you want from the palette to the main UI,scaledwidth=50%]
 
 By default the auto-layout mode of the GUI builder uses layered layout to position components. Sides can be bound to a component or to the `Form`. We then use distance units to determine the binding behavior. The GUI builder tries to be "smart" and guesses your intention as you drag the components along.
 
 When you select the component you placed you can edit the properties of that component:
 
 .Properties allow you to customize everything about a component
-image::img/developer-guide/new-gui-builder-property-sheet.png[Properties allow you to customize everything about a component,scaledwidth=50%]
+image::img/new-gui-builder-property-sheet.png[Properties allow you to customize everything about a component,scaledwidth=50%]
 
 There are five property sheets per component:
 
@@ -1317,7 +1171,7 @@ For things like setting the text on the component we can use a convenient "long 
 edit the text in place as such:
 
 .Use the long click to edit the text "in place"
-image::img/developer-guide/gui-builder-in-place-edit.png[Use the long click to edit the text "in place",scaledwidth=50%]
+image::img/gui-builder-in-place-edit.png[Use the long click to edit the text "in place",scaledwidth=50%]
 
 ===== Events
 
@@ -1327,7 +1181,7 @@ When a component supports broadcasting events you can bind such events by select
 the events tab and clicking the button matching the event type
 
 .The events tab is listed below supported event types can be bound above
-image::img/developer-guide/gui-builder-events.png[The events tab is listed below supported event types can be bound above,scaledwidth=50%]
+image::img/gui-builder-events.png[The events tab is listed below supported event types can be bound above,scaledwidth=50%]
 
 Once an event is bound the IDE will open to the event code e.g.:
 
@@ -1352,7 +1206,7 @@ private com.codename1.ui.Button gui_Button_1 = new com.codename1.ui.Button();
 Saving the project generates an XML file representing the UI into the res directory in the project, the GUI file is created in a matching hierarchy in the project under the `res/guibuilder` directory:
 
 .The java and GUI files in the hierarchy
-image::img/developer-guide/gui-builder-java-and-gui-files.png[The java and GUI files in the hierarchy,scaledwidth=50%]
+image::img/gui-builder-java-and-gui-files.png[The java and GUI files in the hierarchy,scaledwidth=50%]
 
 IMPORTANT: If you refactor (rename or move) the java file it's connection with the GUI file will break. You need
 to move/rename both
@@ -1461,10 +1315,9 @@ As of version 3.7, new forms created with the GUI Builder will use auto-layout m
 .All forms designed in auto-layout mode use `LayeredLayout`
 NOTE: Auto-Layout Mode is built upon the inset support in LayeredLayout.  Component positioning uses <<insets-and-reference-components,insets and reference components>>, not absolute positioning
 
-As an example, let's drag a button onto a blank form and see what happens.  The button will be "selected" initially after adding, it so you'll see its outline, and resize handles for adjusting its size and position.  You'll also see four floating labels (above, below, to the left, and to the right) that show the corresponding side's inset values and allow you to adjust them.
+As an example, let's drag a button onto a blank form and see what happens.  The button will be "selected" initially after adding it, so you'll see its outline and resize handles for adjusting its size and position.  You'll also see four floating labels (above, below, to the left, and to the right) that show the corresponding side's inset values and allow you to adjust them.
 
-.A button selected on the canvas in auto-layout mode.  You can drag it to reposition it, or resize it using the resize handles.
-image::img/developer-guide/guibuilder-2-designer-selected-cmp.png[Selected component in designer allows you to freely drag it to a new position, or resize using the resize handles.,scaledwidth=20%]
+When a component is selected you can drag it to reposition it or use the resize handles to change its size.  The floating inset labels update as you drag so you can fine tune spacing without leaving the canvas.
 
 Press the mouse inside the bounds of the button and drag it around to reposition it.  You will notice that the inset labels change to reflect the new inset values.  If you drag the button close to the edge of the form, the corresponding inset value will change to millimetres.  If you move farther away from the edge, it will change to percentage values.
 
@@ -1473,22 +1326,22 @@ Press the mouse inside the bounds of the button and drag it around to reposition
 Let's take a closer look at the inset control (the inset controls are the black buttons that appear to the top, bottom, left, and right of the selected component).
 
 .The inset control allows you to change the inset size and units, toggle it between fixed and flexible, and link it to another component.
-image::img/developer-guide/guibuilder-2-inset-control.png[Inset control,scaledwidth=5%]
+image::img/guibuilder-2-inset-control.png[Inset control,scaledwidth=5%]
 
 Each control has three sections:
 
 1. **The inset value drop-down menu**.  This shows the current value of the inset (e.g. 0mm, 25%, auto, etc...).  If you click on this, it will open a menu that will allow you to change the units.  If the inset is currently in millimetres, it will have options for pixels, and percent.  If the inset is in percent, it will have options for pixels and millimetres. Etc..  It also includes a text field to enter a an inset value explicitly.
 +
-image::img/developer-guide/guibuilder-2-insets-dropdown-menu.png[Inset drop-down menu,scaledwidth=6%]
-2. **The "Link" Button** image:img/developer-guide/guibuilder-2-link-button-unselected.png[Link button,scaledwidth=6%] - If the inset is linked to a reference component, then this button will be highlighted "blue", and hovering over it will highlight the reference component in the UI so that you can clearly see which component it is linked to.  Clicking on this button will open a dialog that will allow you to "break" this link.   You can drag this button over any component in the form to "link".
-3. **The "Lock" Button"** image:img/developer-guide/guibuilder-2-inset-fixed-button.png[Inset fixed button,scaledwidth=6%] - This button allows you to toggle the inset between "flexible" (i.e. auto) and "fixed" (i.e. millimetres or percent).
+image::img/guibuilder-2-insets-dropdown-menu.png[Inset drop-down menu,scaledwidth=6%]
+2. **The "Link" Button** image:img/guibuilder-2-link-button-unselected.png[Link button,scaledwidth=6%] - If the inset is linked to a reference component, then this button will be highlighted "blue", and hovering over it will highlight the reference component in the UI so that you can clearly see which component it is linked to.  Clicking on this button will open a dialog that will allow you to "break" this link.   You can drag this button over any component in the form to "link".
+3. **The "Lock" Button"** image:img/guibuilder-2-inset-fixed-button.png[Inset fixed button,scaledwidth=6%] - This button allows you to toggle the inset between "flexible" (i.e. auto) and "fixed" (i.e. millimetres or percent).
 
 ===== Auto Snap
 
-Notice the "auto-snap" checkbox that appears in the top-right corner of the designer.
+Notice the "auto-snap" checkbox that appears in the top-right corner of the GUI builder window.
 
 .Auto-snap checkbox
-image::img/developer-guide/guibuilder-2-smart-insets-auto-snap-checkboxes.png[Auto-snap checkbox,scaledwidth=10%]
+image::img/guibuilder-2-smart-insets-auto-snap-checkboxes.png[Auto-snap checkbox,scaledwidth=10%]
 
 Auto-snap does exactly what it sounds like:  It automatically snaps two components together when you drag them near each other.  This is handy for linking components together without having to explicitly link them (using the "link" button).  This feature is turned on by default.  If auto-snap is turned off, you can still initiate a "snap" by holding down the ALT/Option key on your keyboard during the drag.
 
@@ -1497,14 +1350,14 @@ Auto-snap does exactly what it sounds like:  It automatically snaps two componen
 Beside the "auto-snap" checkbox is another checkbox named "Smart Insets".
 
 .Smart insets checkbox
-image::img/developer-guide/guibuilder-2-smart-insets-auto-snap-checkboxes.png[Smart insets checkbox,scaledwidth=10%]
+image::img/guibuilder-2-smart-insets-auto-snap-checkboxes.png[Smart insets checkbox,scaledwidth=10%]
 
-Smart Inset uses some heuristics during a drag to try to determine how the insets should be linked.  Currently the heuristics are quite basic (it tries to link to the nearest neighbor component in most cases), but we will be working on improving this for future releases.  This feature is turned off by default while it is still being refined.  The goal is to improve this to the point where it *always* makes the correct link choices - at which time you will be able to use the designer without having any knowledge of insets or reference components.
+Smart Inset uses some heuristics during a drag to try to determine how the insets should be linked.  Currently the heuristics are quite basic (it tries to link to the nearest neighbor component in most cases), but we will be working on improving this for future releases.  This feature is turned off by default while it is still being refined.  The goal is to improve this to the point where it *always* makes the correct link choices - at which time you will be able to use the GUI builder without having any knowledge of insets or reference components.
 
 ===== The Widget Control Pad
 
 .Widget control pad
-image::img/developer-guide/guibuilder-2-widget-control-pad.png[Widget control pad,scaledwidth=10%]
+image::img/guibuilder-2-widget-control-pad.png[Widget control pad,scaledwidth=10%]
 
 When a component is selected, you should see a black floating panel appear in the lower right of the screen.
 
@@ -1522,18 +1375,18 @@ This control pad also includes game-pad-like controls (up, down, left, right), t
 
 In some cases, you may need to add sub-containers to your form to aid in grouping your components together.  You can drag a container onto your form using the "Container" palette item (under "Core Components").  The default layout the subcontainer will be LayeredLayout so that you are able to position components within the sub-container with precision, just like on the root container.
 
-You can also change the layout of subcontainers to another classical layout manager (e.g. grid layout, box layout, etc..) and drag components directly into it just as you did with the old designer.  This is very useful if parts of your form lend themselves.  As an example, let's drag a container onto the canvas that uses BoxLayout Y.  (You can find this under the "Containers" section of the component palette).
+You can also change the layout of subcontainers to another classical layout manager (e.g. grid layout, box layout, etc..) and drag components directly into it just as you did with the old GUI builder.  This is very useful if parts of your form lend themselves.  As an example, let's drag a container onto the canvas that uses BoxLayout Y.  (You can find this under the "Containers" section of the component palette).
 
 Drag the button (that was previously on the form) over that container, and you should see a drop-zone become highlighted.
 
 .Dropping container on child container with box layout y
-image::img/developer-guide/guibuilder-2-subcontainer-add-child.png[Dropping container on child container with box layout y,scaledwidth=25%]
+image::img/guibuilder-2-subcontainer-add-child.png[Dropping container on child container with box layout y,scaledwidth=25%]
 
 You can drop the button directly there.  You can As you drag more components into the sub-container, you'll see them automatically laid out vertically.
 
 .Box Layout Y dropping 2nd child
-image::img/developer-guide/guibuilder-2-subcontainer-add-child-2.png[Box Layout Y dropping 2nd child,scaledwidth=25%]
+image::img/guibuilder-2-subcontainer-add-child-2.png[Box Layout Y dropping 2nd child,scaledwidth=25%]
 
 ===== The Canvas Resize Tool
 
-When designing a UI with the new designer it is *very* important that you periodically test the form's "resizing" behavior so that you know how it will behave on different devices.  Components may appear to be positioned correctly when the canvas is one size, but become out of whack when the container is resized.  After nearly every manipulation you perform, it is good practice to drag the canvas resize tool (the button in the lower right corner of the designer) smaller and bigger so you can see how the positions are changed.  If things grow out of whack, you may need to toggle an inset between fixed and auto, or add a link between some of the components so that the resizing behavior matches your expectations.
+When designing a UI with the new GUI builder it is *very* important that you periodically test the form's "resizing" behavior so that you know how it will behave on different devices.  Components may appear to be positioned correctly when the canvas is one size, but become out of whack when the container is resized.  After nearly every manipulation you perform, it is good practice to drag the canvas resize tool (the button in the lower right corner of the GUI builder) smaller and bigger so you can see how the positions are changed.  If things grow out of whack, you may need to toggle an inset between fixed and auto, or add a link between some of the components so that the resizing behavior matches your expectations.

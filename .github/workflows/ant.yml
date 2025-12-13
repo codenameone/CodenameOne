@@ -1,9 +1,11 @@
 name: Java CI
 
-on: 
+on:
   push:
     branches:
       - master
+    paths-ignore:
+      - 'CodenameOneDesigner/**'
 
 jobs:
   build-linux-jdk8:

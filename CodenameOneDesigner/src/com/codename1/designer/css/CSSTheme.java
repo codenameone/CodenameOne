@@ -1601,7 +1601,38 @@ public class CSSTheme {
         }
         return num+unitText;
     }
-    
+
+    public void applyLocalizationBundles(Map<String, Map<String, Map<String, String>>> bundles) {
+        if (bundles == null || bundles.isEmpty()) {
+            return;
+        }
+        if (res == null) {
+            res = new EditableResourcesForCSS(resourceFile);
+        }
+        for (Map.Entry<String, Map<String, Map<String, String>>> entry : bundles.entrySet()) {
+            String bundleName = entry.getKey();
+            Map<String, Map<String, String>> locales = entry.getValue();
+            if (bundleName == null || bundleName.isEmpty() || locales == null || locales.isEmpty()) {
+                continue;
+            }
+            res.setL10N(bundleName, new Hashtable());
+            for (Map.Entry<String, Map<String, String>> localeEntry : locales.entrySet()) {
+                String locale = localeEntry.getKey();
+                if (locale == null) {
+                    locale = "";
+                }
+                res.addLocale(bundleName, locale);
+                Map<String, String> translations = localeEntry.getValue();
+                if (translations == null) {
+                    continue;
+                }
+                for (Map.Entry<String, String> translation : translations.entrySet()) {
+                    res.setLocaleProperty(bundleName, locale, translation.getKey(), translation.getValue());
+                }
+            }
+        }
+    }
+
     public Map<String, CacheStatus> calculateSelectorCacheStatus(File cachedFile) throws IOException {
         try {
             Map<String,String> current = calculateSelectorChecksums();

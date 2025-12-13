@@ -85,27 +85,27 @@ This is a step-by-step guide with explanations on how to achieve this. Again, yo
 Start by creating a new GUI form, set its scrollable Y to false, and set its layout to border layout.
 
 .Set border layout
-image::img/developer-guide/gb-create-list-1.png[Set border layout,scaledwidth=40%]
+image::img/gb-create-list-1.png[Set border layout,scaledwidth=40%]
 
 Next, drag a list into the center of the layout and you should now have a functioning basic list with 3 items.
 
 .Drag list onto form
-image::img/developer-guide/gb-create-list-2.png[Drag list onto form,scaledwidth=40%]
+image::img/gb-create-list-2.png[Drag list onto form,scaledwidth=40%]
 
 Next, we will create the Renderer, which indicates how an individual item in the list appears, start by pressing the Add New GUI Element button and select the “Blank Container” option!  Fill the name as “MyRenderer” or anything like that.
 
 .Set list renderer
-image::img/developer-guide/gb-create-list3.png[Set list renderer,scaledwidth=40%]
+image::img/gb-create-list3.png[Set list renderer,scaledwidth=40%]
 
 Within the renderer you can drag any component you would like to appear, labels, checkboxes, etc. You can nest them in containers and layouts as you desire. Give them names that are representative of what you are trying to accomplish, e.g. firstName, selected, etc.
 
 .Add to renderer
-image::img/developer-guide/gb-create-list-4.png[Add to renderer,scaledwidth=30%]
+image::img/gb-create-list-4.png[Add to renderer,scaledwidth=30%]
 
 You can now go back to the list, select it and click the Renderer property in order to select the render container you created previously, resulting in something like this.
 
 .Preview list
-image::img/developer-guide/gb-create-list5.png[Preview list,scaledwidth=20%]
+image::img/gb-create-list5.png[Preview list,scaledwidth=20%]
 
 You’ll notice that the data doesn’t match the original content of the list, that is because the list contains strings instead of Hashtables. To fix this we must edit the list data.
 
@@ -116,11 +116,11 @@ If you wish to populate your list from code, just click the events tab and press
 To populate the list via the GUI builder, click the properties of the list, and within them, click the ListItems entry. The entries within can be Strings or Hashtables, however in order to be customizable in the rendering stage, we will need them all to be Hashtables. Remove all the current entries and add a new entry:
 
 .Add to list
-image::img/developer-guide/gb-create-list-6.png[Add to list,scaledwidth=40%]
+image::img/gb-create-list-6.png[Add to list,scaledwidth=40%]
 
 After adding two entries as such:
 
 .Add items to list
-image::img/developer-guide/gb-create-list-7.png[Add items to list,scaledwidth=40%]
+image::img/gb-create-list-7.png[Add items to list,scaledwidth=40%]
 
 We now have a customized list that’s adapted to its renderer.

@@ -466,7 +466,7 @@ public class Parser extends ClassVisitor {
         File[] mFiles = outputDirectory.listFiles(new FileFilter() {
             @Override
             public boolean accept(File file) {
-                return file.getName().endsWith(".m");
+                return file.getName().endsWith(".m") || file.getName().endsWith("." + ByteCodeTranslator.output.extension());
             }
         });
         nativeSources = new String[mFiles.length];
@@ -633,18 +633,18 @@ public class Parser extends ClassVisitor {
         if (outMain instanceof ConcatenatingFileOutputStream) {
             ((ConcatenatingFileOutputStream)outMain).beginNextFile(cls.getClsName());
         }
-        if(ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_IOS) {
+        if(ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_CSHARP) {
+            outMain.write(cls.generateCSharpCode().getBytes());
+            outMain.close();
+        } else {
             outMain.write(cls.generateCCode(classes).getBytes());
             outMain.close();
 
-            // we also need to write the header file for iOS
+            // we also need to write the header file for C outputs
             String headerName = cls.getClsName() + ".h";
             FileOutputStream outHeader = new FileOutputStream(new File(outputDir, headerName));
             outHeader.write(cls.generateCHeader().getBytes());
             outHeader.close();
-        } else {
-            outMain.write(cls.generateCSharpCode().getBytes());
-            outMain.close();        
         }
     }
     

@@ -25,6 +25,8 @@ SOURCE_BASES = [
     Path("maven/core-unittests/src/test/java"),
 ]
 
+DEFAULT_REPORT_TITLE = "✅ Continuous Quality Report"
+
 
 def _load_target_dirs() -> List[Path]:
     env_value = os.environ.get("QUALITY_REPORT_TARGET_DIRS")
@@ -81,6 +83,7 @@ class AnalysisReport:
 class CoverageEntry:
     name: str
     coverage: float
+    total_lines: int
     path: Optional[str] = None
 
 
@@ -138,6 +141,16 @@ def _relative_path(raw_path: Optional[str]) -> str:
     return potential[0] if potential else normalized
 
 
+def is_anonymous(class_name: str) -> bool:
+    if "$" not in class_name:
+        return False
+    parts = class_name.split("$")
+    for part in parts[1:]:
+        if part.isdigit():
+            return True
+    return False
+
+
 def parse_surefire() -> Optional[Dict[str, int]]:
     totals = {"tests": 0, "failures": 0, "errors": 0, "skipped": 0}
     found = False
@@ -177,6 +190,8 @@ def parse_jacoco() -> Tuple[Optional[float], List[CoverageEntry]]:
             package_name = package.attrib.get("name", "").rstrip("/")
             for class_elem in package.findall("class"):
                 class_name = class_elem.attrib.get("name", "")
+                if is_anonymous(class_name):
+                    continue
                 source_filename = class_elem.attrib.get("sourcefilename")
                 line_counter = None
                 for counter in class_elem.findall("counter"):
@@ -204,6 +219,7 @@ def parse_jacoco() -> Tuple[Optional[float], List[CoverageEntry]]:
                     CoverageEntry(
                         name=dotted_name,
                         coverage=coverage,
+                        total_lines=class_total,
                         path=relative_path,
                     )
                 )
@@ -468,7 +484,7 @@ def format_coverage(
     suffix = _format_link_suffix(html_url, archive_url)
     lines = [f"- 📊 **Line coverage:** {coverage:.2f}%{suffix}"]
     if entries_list:
-        sorted_entries = sorted(entries_list, key=lambda item: item.coverage)
+        sorted_entries = sorted(entries_list, key=lambda item: (item.coverage, -item.total_lines))
         highlights = sorted_entries[:10]
         if highlights:
             lines.append("  - **Lowest covered classes**")
@@ -618,6 +634,7 @@ def build_report(
     html_urls: Dict[str, Optional[str]],
     coverage_html_url: Optional[str],
     coverage_archive_url: Optional[str],
+    title: str,
 ) -> str:
     if HTML_REPORT_DIR.exists():
         for child in HTML_REPORT_DIR.iterdir():
@@ -650,7 +667,7 @@ def build_report(
         blob_base = f"{server_url.rstrip('/')}/{repository}/blob/{ref}"
 
     lines = [
-        "## ✅ Continuous Quality Report",
+        f"## {title}",
         "",
         "### Test & Coverage",
         format_tests(tests),
@@ -714,7 +731,14 @@ def main() -> None:
     coverage_html_url = os.environ.get("JACOCO_HTML_URL")
     coverage_archive_url = os.environ.get("JACOCO_REPORT_URL")
     generate_html_only = os.environ.get("QUALITY_REPORT_GENERATE_HTML_ONLY") == "1"
-    report = build_report(archive_urls, html_urls, coverage_html_url, coverage_archive_url)
+    report_title = os.environ.get("QUALITY_REPORT_TITLE") or DEFAULT_REPORT_TITLE
+    report = build_report(
+        archive_urls,
+        html_urls,
+        coverage_html_url,
+        coverage_archive_url,
+        report_title,
+    )
     if not generate_html_only:
         REPORT_PATH.write_text(report + "\n", encoding="utf-8")
 

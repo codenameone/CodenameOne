@@ -12,21 +12,26 @@ workflows to build and validate Codename One ports.
 - `build-android-app.sh` / `build-ios-app.sh` – generate a "Hello Codename One"
   sample application and build it against the freshly compiled port.
 - `run-android-instrumentation-tests.sh` – launches the Android emulator,
-  executes instrumentation tests, and prepares screenshot reports for pull
-  requests.
+  drives the Codename One DeviceRunner suite, and prepares screenshot
+  reports for pull requests.
+- `run-ios-ui-tests.sh` – runs the Codename One DeviceRunner suite on the iOS
+  simulator and emits matching screenshot reports.
 
 ## Subdirectories
 
-- `android/` – Python helpers, baseline screenshots, and utilities that power
-  the Android instrumentation test workflow.
-  - `android/lib/` – library-style Python modules shared across Android
-    automation scripts.
+- `android/` – Java helpers, baseline screenshots, and utilities that power the
+  Android DeviceRunner test workflow.
+  - `android/lib/` – standalone Java sources invoked directly by the shell
+    scripts for Gradle patching and similar tasks.
   - `android/tests/` – command-line tools used by CI for processing screenshots
     and posting feedback to pull requests.
   - `android/screenshots/` – reference images used when comparing emulator
     output.
-- `templates/` – code templates consumed by the sample app builders.
+- `ios/` – Helpers and screenshot baselines used by the iOS DeviceRunner
+  workflow.
+- `device-runner-app/` – Java sources for the shared sample application and its
+  DeviceRunner UI tests.
 
 These scripts are designed so that shell logic focuses on orchestration, while
-Python modules encapsulate the heavier data processing steps. This separation
-keeps the entry points easy to follow and simplifies maintenance.
+small Java utilities encapsulate the heavier data processing steps. This
+separation keeps the entry points easy to follow and simplifies maintenance.

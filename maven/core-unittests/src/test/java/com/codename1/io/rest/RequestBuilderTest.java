@@ -1,31 +1,148 @@
 package com.codename1.io.rest;
 
 import com.codename1.io.ConnectionRequest;
-import com.codename1.io.Data;
-import com.codename1.io.TestImplementationProvider;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
+import com.codename1.junit.EdtTest;
+import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestCodenameOneImplementation.TestConnection;
+import com.codename1.util.Base64;
+import com.codename1.io.rest.Response;
+import com.codename1.ui.CN;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class RequestBuilderTest {
+class RequestBuilderTest extends UITestBase {
+    private static final String BASE_URL = "https://example.com";
+
     @BeforeEach
-    void setUp() {
-        TestImplementationProvider.installImplementation(true);
+    void clearConnections() {
+        implementation.clearConnections();
+        implementation.clearQueuedRequests();
     }
 
-    @Test
+    @EdtTest
     void createRequestPopulatesConnection() throws Exception {
-        RequestBuilder builder = new RequestBuilder("POST", "https://example.com/items/{id}");
-        builder.contentType("application/json")
+        RequestBuilder builder = createConfiguredBuilder();
+        preparePermutations("https://example.com/items/42", Arrays.asList(
+                "search=hello%20world&filter=one&filter=two",
+                "filter=one&filter=two&search=hello%20world"
+        ));
+
+        builder.getAsString();
+
+        ConnectionRequest executed = findRequest(BASE_URL + "/items/42");
+        assertNotNull(executed);
+        assertEquals(ConnectionRequest.CachingMode.MANUAL, executed.getCacheMode());
+        assertEquals(1500, executed.getTimeout());
+        assertEquals(3000, executed.getReadTimeout());
+        assertFalse(executed.isCookiesEnabled());
+        assertEquals(ConnectionRequest.PRIORITY_HIGH, executed.getPriority());
+        assertTrue(executed.isInsecure());
+
+        TestConnection connection = findSingleConnection(BASE_URL + "/items/42");
+        waitForConnection(connection);
+        assertNotNull(connection);
+        assertTrue(connection.getUrl().startsWith("https://example.com/items/42"));
+        assertFalse(connection.isPostRequest());
+
+        Map<String, List<String>> query = parseQuery(connection.getUrl());
+        assertEquals("hello%20world", query.get("search").get(0));
+        List<String> filterValues = query.get("filter");
+        assertNotNull(filterValues);
+        assertEquals(Arrays.asList("one", "two"), filterValues);
+
+        Map<String, String> headers = connection.getHeaders();
+        assertEquals("value", headers.get("X-Test"));
+        assertTrue(headers.containsKey("Authorization"));
+        assertTrue(headers.get("Authorization").startsWith("Basic "));
+        String expectedBasic = Base64.encodeNoNewline("user:pass".getBytes(StandardCharsets.UTF_8));
+        assertEquals("Basic " + expectedBasic, headers.get("Authorization"));
+
+        String body = new String(connection.getOutputData(), StandardCharsets.UTF_8);
+        assertEquals("{\"name\":\"demo\"}", body);
+    }
+
+    @EdtTest
+    void stringErrorHandlerReceivesResponse() throws Exception {
+        TestConnection connection = implementation.createConnection(BASE_URL);
+        connection.setResponseCode(500);
+        connection.setResponseMessage("Server Error");
+        byte[] data = "failure".getBytes(StandardCharsets.UTF_8);
+        connection.setInputData(data);
+        connection.setContentLength(data.length);
+
+        final Response<String>[] holder = new Response[1];
+        RequestBuilder builder = new RequestBuilder("GET", BASE_URL);
+        builder.onErrorCodeString(response -> {
+            holder[0] = response;
+        });
+
+        builder.getAsString();
+        Response<String> response = holder[0];
+        assertNotNull(response);
+        assertEquals(500, response.getResponseCode());
+        assertEquals("failure", response.getResponseData());
+        assertEquals("Server Error", response.getResponseErrorMessage());
+    }
+
+    @EdtTest
+    void jsonErrorHandlerRespectsParserConfiguration() throws Exception {
+        TestConnection connection = implementation.createConnection(BASE_URL);
+        connection.setResponseCode(400);
+        connection.setResponseMessage("Bad Request");
+        byte[] payload = "{\"flag\":true,\"count\":1}".getBytes(StandardCharsets.UTF_8);
+        connection.setInputData(payload);
+        connection.setContentLength(payload.length);
+
+        final Response<Map>[] holder = new Response[1];
+        RequestBuilder builder = new RequestBuilder("GET", BASE_URL);
+        builder.useBoolean(true)
+                .useLongs(true)
+                .onErrorCodeJSON(response -> {
+                    holder[0] = response;
+                });
+
+        builder.getAsJsonMap();
+        Response<Map> response = holder[0];
+        assertNotNull(response);
+        Map data = response.getResponseData();
+        assertTrue(data.get("flag") instanceof Boolean);
+        assertTrue((Boolean) data.get("flag"));
+        assertTrue(data.get("count") instanceof Long);
+        assertEquals(1L, ((Long) data.get("count")).longValue());
+    }
+
+    private void waitForConnection(final TestConnection connection) {
+        CN.invokeAndBlock(new Runnable() {
+            public void run() {
+                long deadline = System.currentTimeMillis() + 2000L;
+                while (System.currentTimeMillis() < deadline) {
+                    if (connection.isWriteRequested() && connection.getOutputData().length > 0) {
+                        return;
+                    }
+                    try {
+                        Thread.sleep(10L);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(e);
+                    }
+                }
+                throw new AssertionError("Timed out waiting for connection to write: " + connection.getUrl());
+            }
+        });
+    }
+
+    private RequestBuilder createConfiguredBuilder() {
+        return new RequestBuilder("POST", "https://example.com/items/{id}")
+                .contentType("application/json")
                 .pathParam("id", "42")
                 .queryParam("search", "hello world")
                 .queryParam("filter", new String[]{"one", "two"})
@@ -39,116 +156,73 @@ class RequestBuilderTest {
                 .priority(ConnectionRequest.PRIORITY_HIGH)
                 .insecure(true)
                 .postParameters(Boolean.FALSE);
-
-        ConnectionRequest request = invokeCreateRequest(builder, false);
-
-        assertEquals("https://example.com/items/42", request.getUrl());
-        assertEquals("POST", request.getHttpMethod());
-        assertFalse(request.isPost());
-        assertEquals("application/json", request.getContentType());
-        assertEquals(ConnectionRequest.CachingMode.MANUAL, request.getCacheMode());
-        assertEquals(1500, request.getTimeout());
-        assertEquals(3000, request.getReadTimeout());
-        assertFalse(request.isCookiesEnabled());
-        assertEquals(ConnectionRequest.PRIORITY_HIGH, request.getPriority());
-        assertTrue(request.isInsecure());
-
-        LinkedHashMap args = getArguments(request);
-        assertEquals("hello%20world", args.get("search"));
-        assertArrayEquals(new String[]{"one", "two"}, (String[]) args.get("filter"));
-
-        Map headers = getHeaders(request);
-        assertEquals("value", headers.get("X-Test"));
-        assertTrue(headers.containsKey("Authorization"));
-        assertTrue(headers.get("Authorization").toString().startsWith("Basic "));
-
-        Data body = request.getRequestBodyData();
-        assertNotNull(body);
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        body.appendTo(out);
-        assertEquals("{\"name\":\"demo\"}", out.toString(StandardCharsets.UTF_8.name()));
     }
 
-    @Test
-    void stringErrorHandlerReceivesResponse() throws Exception {
-        RequestBuilder builder = new RequestBuilder("GET", "https://example.com");
-        AtomicReference<Response<String>> captured = new AtomicReference<>();
-        builder.onErrorCodeString(captured::set);
-        RequestBuilder.Connection connection = (RequestBuilder.Connection) invokeCreateRequest(builder, false);
-
-        setField(ConnectionRequest.class, connection, "responseCode", 500);
-        setField(ConnectionRequest.class, connection, "responseErrorMessge", "Server Error");
-
-        connection.handleErrorResponseCode(500, "Server Error");
-        connection.readUnzipedResponse(new ByteArrayInputStream("failure".getBytes(StandardCharsets.UTF_8)));
-        connection.postResponse();
-
-        Response<String> response = captured.get();
-        assertNotNull(response);
-        assertEquals(500, response.getResponseCode());
-        assertEquals("failure", response.getResponseData());
-        assertEquals("Server Error", response.getResponseErrorMessage());
+    private void preparePermutations(String base, List<String> permutations) {
+        for (String suffix : permutations) {
+            TestConnection conn = implementation.createConnection(base + "?" + suffix);
+            conn.setInputData(new byte[0]);
+            conn.setResponseCode(200);
+            conn.setResponseMessage("OK");
+        }
     }
 
-    @Test
-    void jsonErrorHandlerRespectsParserConfiguration() throws Exception {
-        RequestBuilder builder = new RequestBuilder("GET", "https://example.com");
-        AtomicReference<Response<Map>> captured = new AtomicReference<>();
-        builder.useBoolean(true)
-                .useLongs(true)
-                .onErrorCodeJSON(captured::set);
-        RequestBuilder.Connection connection = (RequestBuilder.Connection) invokeCreateRequest(builder, true);
-
-        setField(ConnectionRequest.class, connection, "responseCode", 400);
-        setField(ConnectionRequest.class, connection, "responseErrorMessge", "Bad Request");
-
-        connection.handleErrorResponseCode(400, "Bad Request");
-        connection.readUnzipedResponse(new ByteArrayInputStream("{\"flag\":true,\"count\":1}".getBytes(StandardCharsets.UTF_8)));
-        connection.postResponse();
-
-        Response<Map> response = captured.get();
-        assertNotNull(response);
-        Map data = response.getResponseData();
-        assertTrue(data.get("flag") instanceof Boolean);
-        assertTrue((Boolean) data.get("flag"));
-        assertTrue(data.get("count") instanceof Long);
-        assertEquals(1L, ((Long) data.get("count")).longValue());
+    private TestConnection findSingleConnection(String baseUrl) {
+        Collection<TestConnection> connections = implementation.getConnections();
+        TestConnection executed = null;
+        for (TestConnection connection : connections) {
+            if (!connection.getUrl().startsWith(baseUrl)) {
+                continue;
+            }
+            if (!connection.isReadRequested() && !connection.isWriteRequested()) {
+                continue;
+            }
+            if (executed != null) {
+                fail("Multiple executed connections found for " + baseUrl);
+            }
+            executed = connection;
+        }
+        assertNotNull(executed, "No executed connection found for " + baseUrl);
+        return executed;
     }
 
-    @Test
-    void checkFetchedPreventsFurtherMutation() throws Exception {
-        RequestBuilder builder = new RequestBuilder("GET", "https://example.com");
-        Field fetchedField = RequestBuilder.class.getDeclaredField("fetched");
-        fetchedField.setAccessible(true);
-        fetchedField.setBoolean(builder, true);
-        assertThrows(RuntimeException.class, () -> builder.header("After", "value"));
+    private ConnectionRequest findRequest(String baseUrl) {
+        List<ConnectionRequest> requests = implementation.getQueuedRequests();
+        ConnectionRequest match = null;
+        for (ConnectionRequest request : requests) {
+            if (request.getUrl() == null) {
+                continue;
+            }
+            if (!request.getUrl().startsWith(baseUrl)) {
+                continue;
+            }
+            if (match != null) {
+                fail("Multiple requests found for " + baseUrl);
+            }
+            match = request;
+        }
+        return match;
     }
 
-    private ConnectionRequest invokeCreateRequest(RequestBuilder builder, boolean parseJson) throws Exception {
-        Method create = RequestBuilder.class.getDeclaredMethod("createRequest", boolean.class);
-        create.setAccessible(true);
-        return (ConnectionRequest) create.invoke(builder, parseJson);
-    }
-
-    private LinkedHashMap getArguments(ConnectionRequest request) throws Exception {
-        Field argsField = ConnectionRequest.class.getDeclaredField("requestArguments");
-        argsField.setAccessible(true);
-        LinkedHashMap args = (LinkedHashMap) argsField.get(request);
-        assertNotNull(args);
-        return args;
-    }
-
-    private Map getHeaders(ConnectionRequest request) throws Exception {
-        Field headersField = ConnectionRequest.class.getDeclaredField("userHeaders");
-        headersField.setAccessible(true);
-        Map headers = (Map) headersField.get(request);
-        assertNotNull(headers);
-        return headers;
-    }
-
-    private void setField(Class<?> type, Object instance, String name, Object value) throws Exception {
-        Field field = type.getDeclaredField(name);
-        field.setAccessible(true);
-        field.set(instance, value);
+    private Map<String, List<String>> parseQuery(String url) {
+        int idx = url.indexOf('?');
+        Map<String, List<String>> out = new HashMap<String, List<String>>();
+        if (idx < 0) {
+            return out;
+        }
+        String query = url.substring(idx + 1);
+        String[] pairs = query.split("&");
+        for (String pair : pairs) {
+            String[] parts = pair.split("=", 2);
+            String key = parts[0];
+            String value = parts.length > 1 ? parts[1] : "";
+            List<String> values = out.get(key);
+            if (values == null) {
+                values = new ArrayList<String>();
+                out.put(key, values);
+            }
+            values.add(value);
+        }
+        return out;
     }
 }

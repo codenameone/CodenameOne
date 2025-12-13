@@ -129,6 +129,10 @@ public class FileEncodedImageAsync extends EncodedImage {
                 public void run() {
                     InputStream i = null;
                     try {
+                        if (!FileSystemStorage.getInstance().exists(fileName)) {
+                            Log.p(fileName + " doesn't exist");
+                            return;
+                        }
                         final byte[] imageDataLocal = new byte[(int) FileSystemStorage.getInstance().getLength(fileName)];
                         i = FileSystemStorage.getInstance().openInputStream(fileName);
                         Util.readFully(i, imageDataLocal);

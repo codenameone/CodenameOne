@@ -214,7 +214,7 @@ public class JSONParser implements JSONParseCallback {
                                 } catch (NumberFormatException err) {
                                     // problem in parsing the u notation!
                                     Log.e(err);
-                                    System.out.println("Error in parsing \\u" + unicode);
+                                    Log.p("Error in parsing \\u" + unicode);
                                 }
                             } else {
                                 switch (c) {

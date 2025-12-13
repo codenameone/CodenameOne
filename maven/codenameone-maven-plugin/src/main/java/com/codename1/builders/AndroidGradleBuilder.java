@@ -120,6 +120,12 @@ public class AndroidGradleBuilder extends Executor {
     // A flag to indicate whether we should use 'implementation' or 'compile' for dependencies
     private boolean useArrImplementation = false;
 
+    // R8 configuration flags to control optimization behavior
+    // Setting disableR8FullMode=true puts R8 in compatibility mode (less aggressive optimization)
+    // which prevents issues with reflection-based code like CommonProgressAnimations
+    private boolean disableR8FullMode = true;
+    private boolean disableR8 = false;
+
     public static final String[] ANDROID_PERMISSIONS = new String[]{
             "android.permission.ACCESS_BACKGROUND_LOCATION",
             "android.permission.ACCESS_CHECKIN_PROPERTIES",
@@ -287,6 +293,7 @@ public class AndroidGradleBuilder extends Executor {
     private boolean contactsPermission;
     private boolean wakeLock;
     private boolean recordAudio;
+    private boolean mediaPlaybackPermission;
     private boolean phonePermission;
     private boolean purchasePermissions;
     private boolean accessNetworkStatePermission;
@@ -501,6 +508,10 @@ public class AndroidGradleBuilder extends Executor {
         // When using gradle 8 we need to strip kotlin files from user classes otherwise we get duplicate class errors
         stripKotlinFromUserClasses = useGradle8;
         useJava8SourceLevel = request.getArg("android.java8", ""+useJava8SourceLevel).equals("true");
+
+        // R8 configuration - disable full mode by default to prevent issues with reflection
+        disableR8 = request.getArg("android.disableR8", "false").equals("true");
+        disableR8FullMode = request.getArg("android.disableR8FullMode", "true").equals("true");
         if (useGradle8) {
             getGradleJavaHome(); // will throw build exception if JAVA17_HOME is not set
             MIN_GRADLE_VERSION = 8;
@@ -1152,6 +1163,7 @@ public class AndroidGradleBuilder extends Executor {
         playFlag = "true";
 
         gpsPermission = request.getArg("android.gpsPermission", "false").equals("true");
+        mediaPlaybackPermission = false;
         try {
             scanClassesForPermissions(dummyClassesDir, new Executor.ClassScanner() {
 
@@ -1277,6 +1289,12 @@ public class AndroidGradleBuilder extends Executor {
                     }
                     if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("createMediaRecorder") > -1) {
                         recordAudio = true;
+                    }
+                    if (cls.indexOf("com/codename1/media/MediaManager") == 0 && method.indexOf("createMedia") > -1 && method.indexOf("createMediaRecorder") < 0) {
+                        mediaPlaybackPermission = true;
+                    }
+                    if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("createMedia") > -1 && method.indexOf("createMediaRecorder") < 0) {
+                        mediaPlaybackPermission = true;
                     }
                     if (cls.indexOf("com/codename1/ui/Display") == 0 && method.indexOf("createContact") > -1) {
                         contactsWritePermission = true;
@@ -2193,9 +2211,18 @@ public class AndroidGradleBuilder extends Executor {
         if (request.getArg("android.removeBasePermissions", "false").equals("true")) {
             basePermissions = "";
         }
-        String externalStoragePermission = "    <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\" android:required=\"false\" android:maxSdkVersion=\"32\" />\n";
-        if (request.getArg("android.blockExternalStoragePermission", "false").equals("true")) {
-            externalStoragePermission = "";
+        boolean blockExternalStoragePermission = request.getArg("android.blockExternalStoragePermission", "false").equals("true");
+        String externalStoragePermission = "";
+        if (!blockExternalStoragePermission) {
+            externalStoragePermission = "    <uses-permission android:name=\"android.permission.WRITE_EXTERNAL_STORAGE\" android:required=\"false\" android:maxSdkVersion=\"32\" />\n";
+        }
+        boolean blockReadMediaPermissions = request.getArg("android.blockReadMediaPermissions", blockExternalStoragePermission ? "true" : "false").equals("true");
+        boolean requestReadMediaPermissions = request.getArg("android.requestReadMediaPermissions", "false").equals("true");
+        String readMediaPermissions = "";
+        if (!blockReadMediaPermissions && targetSDKVersionInt >= 33 && (mediaPlaybackPermission || requestReadMediaPermissions)) {
+            readMediaPermissions += permissionAdd(request, "\"android.permission.READ_MEDIA_IMAGES\"", "    <uses-permission android:name=\"android.permission.READ_MEDIA_IMAGES\" android:required=\"false\" />\n");
+            readMediaPermissions += permissionAdd(request, "\"android.permission.READ_MEDIA_VIDEO\"", "    <uses-permission android:name=\"android.permission.READ_MEDIA_VIDEO\" android:required=\"false\" />\n");
+            readMediaPermissions += permissionAdd(request, "\"android.permission.READ_MEDIA_AUDIO\"", "    <uses-permission android:name=\"android.permission.READ_MEDIA_AUDIO\" android:required=\"false\" />\n");
         }
         String xmlizedDisplayName = xmlize(request.getDisplayName());
 
@@ -2346,6 +2373,7 @@ public class AndroidGradleBuilder extends Executor {
                 + "    <uses-feature android:name=\"android.hardware.touchscreen\" android:required=\"false\" />\n"
                 + basePermissions
                 + externalStoragePermission
+                + readMediaPermissions
                 + permissions
                 + "  " + xPermissions
                 + "  " + xQueries
@@ -3770,6 +3798,15 @@ public class AndroidGradleBuilder extends Executor {
             gradlePropertiesObject.setProperty("android.useAndroidX", "true");
             gradlePropertiesObject.setProperty("android.enableJetifier", "true");
         }
+
+        // Configure R8 optimization mode to prevent reflection issues
+        if (disableR8) {
+            gradlePropertiesObject.setProperty("android.enableR8", "false");
+            gradlePropertiesObject.setProperty("android.enableR8.libraries", "false");
+        } else if (disableR8FullMode) {
+            gradlePropertiesObject.setProperty("android.enableR8.fullMode", "false");
+        }
+
         try {
             FileOutputStream antPropertiesOutputStream = new FileOutputStream(gradlePropertiesFile);
             gradlePropertiesObject.store(antPropertiesOutputStream, "Gradle properties for android build generated by Codename One");

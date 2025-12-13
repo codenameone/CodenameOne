@@ -855,6 +855,13 @@ void codenameOneGCSweep() {
 }
 
 JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
+    // Initialize allObjectsInHeap if it hasn't been initialized yet
+    // This can happen if GC runs before any objects are allocated
+    if(allObjectsInHeap == 0) {
+        allObjectsInHeap = malloc(sizeof(JAVA_OBJECT) * sizeOfAllObjectsInHeap);
+        memset(allObjectsInHeap, 0, sizeof(JAVA_OBJECT) * sizeOfAllObjectsInHeap);
+    }
+
     int pos = findPointerPosInHeap(o);
 
     // double deletion might occur when the GC and the reference counting collide

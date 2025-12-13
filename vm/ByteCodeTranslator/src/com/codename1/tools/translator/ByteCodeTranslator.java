@@ -57,7 +57,14 @@ public class ByteCodeTranslator {
             public String extension() {
                 return "cs";
             }
-        
+
+        },
+        OUTPUT_TYPE_CLEAN {
+            @Override
+            public String extension() {
+                return "c";
+            }
+
         };
 
         public abstract String extension();
@@ -164,7 +171,7 @@ public class ByteCodeTranslator {
         }
         
         if(args.length != 9) {
-            System.out.println("We accept 9 arguments output type (ios, csharp), input directory, output directory, app name, package name, app dispaly name, version, type (ios/iphone/ipad) and additional frameworks");
+            System.out.println("We accept 9 arguments output type (ios, csharp, clean), input directory, output directory, app name, package name, app dispaly name, version, type (ios/iphone/ipad) and additional frameworks");
             System.exit(1);
             return;
         }
@@ -181,6 +188,8 @@ public class ByteCodeTranslator {
         }
         if(args[0].equalsIgnoreCase("csharp")) {
             output = OutputType.OUTPUT_TYPE_CSHARP;
+        } else if(args[0].equalsIgnoreCase("clean")) {
+            output = OutputType.OUTPUT_TYPE_CLEAN;
         }
         String[] sourceDirectories = args[1].split(";");
         File[] sources = new File[sourceDirectories.length];
@@ -200,305 +209,359 @@ public class ByteCodeTranslator {
         }
         
         ByteCodeTranslator b = new ByteCodeTranslator();
-        if(output == OutputType.OUTPUT_TYPE_IOS) {
-            File root = new File(dest, "dist");
-            root.mkdirs();
-             System.out.println("Root is: " + root.getAbsolutePath());
-            File srcRoot = new File(root, appName + "-src");
-            srcRoot.mkdirs();
-            //cleanDir(srcRoot);
-  
-            System.out.println("srcRoot is: " + srcRoot.getAbsolutePath() );
-            
-            File imagesXcassets = new File(srcRoot, "Images.xcassets");
-            imagesXcassets.mkdirs();
-            //cleanDir(imagesXcassets);
+        switch (output) {
+            case OUTPUT_TYPE_IOS:
+                handleIosOutput(b, sources, dest, appName, appPackageName, appDisplayName, appVersion, appType, addFrameworks);
+                break;
+            case OUTPUT_TYPE_CLEAN:
+                handleCleanOutput(b, sources, dest, appName);
+                break;
+            default:
+                handleDefaultOutput(b, sources, dest);
+        }
+    }
 
-            File  launchImageLaunchimage = new File(imagesXcassets, "LaunchImage.launchimage");
-            launchImageLaunchimage.mkdirs();
-            //cleanDir(launchImageLaunchimage);
-            
-            copy(ByteCodeTranslator.class.getResourceAsStream("/LaunchImages.json"), new FileOutputStream(new File(launchImageLaunchimage, "Contents.json")));
+    private static void handleDefaultOutput(ByteCodeTranslator b, File[] sources, File dest) throws Exception {
+        b.execute(sources, dest);
+        Parser.writeOutput(dest);
+    }
 
-            File appIconAppiconset = new File(imagesXcassets, "AppIcon.appiconset");
-            appIconAppiconset.mkdirs();
-            //cleanDir(appIconAppiconset);
+    private static void handleCleanOutput(ByteCodeTranslator b, File[] sources, File dest, String appName) throws Exception {
+        File root = new File(dest, "dist");
+        root.mkdirs();
+        System.out.println("Root is: " + root.getAbsolutePath());
+        File srcRoot = new File(root, appName + "-src");
+        srcRoot.mkdirs();
 
-            copy(ByteCodeTranslator.class.getResourceAsStream("/Icons.json"), new FileOutputStream(new File(appIconAppiconset, "Contents.json")));
-            
-            
-            File xcproj = new File(root, appName + ".xcodeproj");
-            xcproj.mkdirs();
-            //cleanDir(xcproj);
-           
-            File projectXCworkspace = new File(xcproj, "project.xcworkspace");
-            projectXCworkspace.mkdirs();
-            //cleanDir(projectXCworkspace);
-            
-            /*File xcsharedData = new File(projectXCworkspace, "xcshareddata");
-            xcsharedData.mkdirs();*/
-            
-            b.execute(sources, srcRoot);
+        b.execute(sources, srcRoot);
 
-            File cn1Globals = new File(srcRoot, "cn1_globals.h");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), new FileOutputStream(cn1Globals));
-            if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
-                replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
+        File cn1Globals = new File(srcRoot, "cn1_globals.h");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), new FileOutputStream(cn1Globals));
+        if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
+            replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
+        }
+        File xmlvm = new File(srcRoot, "xmlvm.h");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), new FileOutputStream(xmlvm));
+        File nativeMethods = new File(srcRoot, "nativeMethods.m");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethods));
+
+        Parser.writeOutput(srcRoot);
+
+        writeCmakeProject(root, srcRoot, appName);
+    }
+
+    private static void handleIosOutput(ByteCodeTranslator b, File[] sources, File dest, String appName, String appPackageName, String appDisplayName, String appVersion, String appType, String addFrameworks) throws Exception {
+        File root = new File(dest, "dist");
+        root.mkdirs();
+         System.out.println("Root is: " + root.getAbsolutePath());
+        File srcRoot = new File(root, appName + "-src");
+        srcRoot.mkdirs();
+        //cleanDir(srcRoot);
+
+        System.out.println("srcRoot is: " + srcRoot.getAbsolutePath() );
+
+        File imagesXcassets = new File(srcRoot, "Images.xcassets");
+        imagesXcassets.mkdirs();
+        //cleanDir(imagesXcassets);
+
+        File  launchImageLaunchimage = new File(imagesXcassets, "LaunchImage.launchimage");
+        launchImageLaunchimage.mkdirs();
+        //cleanDir(launchImageLaunchimage);
+
+        copy(ByteCodeTranslator.class.getResourceAsStream("/LaunchImages.json"), new FileOutputStream(new File(launchImageLaunchimage, "Contents.json")));
+
+        File appIconAppiconset = new File(imagesXcassets, "AppIcon.appiconset");
+        appIconAppiconset.mkdirs();
+        //cleanDir(appIconAppiconset);
+
+        copy(ByteCodeTranslator.class.getResourceAsStream("/Icons.json"), new FileOutputStream(new File(appIconAppiconset, "Contents.json")));
+
+
+        File xcproj = new File(root, appName + ".xcodeproj");
+        xcproj.mkdirs();
+        //cleanDir(xcproj);
+
+        File projectXCworkspace = new File(xcproj, "project.xcworkspace");
+        projectXCworkspace.mkdirs();
+        //cleanDir(projectXCworkspace);
+
+        /*File xcsharedData = new File(projectXCworkspace, "xcshareddata");
+        xcsharedData.mkdirs();*/
+
+        b.execute(sources, srcRoot);
+
+        File cn1Globals = new File(srcRoot, "cn1_globals.h");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), new FileOutputStream(cn1Globals));
+        if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
+            replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
+        }
+        File cn1GlobalsM = new File(srcRoot, "cn1_globals.m");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new FileOutputStream(cn1GlobalsM));
+        File nativeMethods = new File(srcRoot, "nativeMethods.m");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethods));
+
+        if (System.getProperty("USE_RPMALLOC", "false").equals("true")) {
+            File malloc = new File(srcRoot, "malloc.c");
+            copy(ByteCodeTranslator.class.getResourceAsStream("/malloc.c"), new FileOutputStream(malloc));
+            File rpmalloc = new File(srcRoot, "rpmalloc.c");
+            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.c"), new FileOutputStream(rpmalloc));
+            File rpmalloch = new File(srcRoot, "rpmalloc.h");
+            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.h"), new FileOutputStream(rpmalloch));
+        }
+
+        Parser.writeOutput(srcRoot);
+
+        File templateInfoPlist = new File(srcRoot, appName + "-Info.plist");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/template/template/template-Info.plist"), new FileOutputStream(templateInfoPlist));
+
+        File templatePch = new File(srcRoot, appName + "-Prefix.pch");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/template/template/template-Prefix.pch"), new FileOutputStream(templatePch));
+
+        File xmlvm = new File(srcRoot, "xmlvm.h");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), new FileOutputStream(xmlvm));
+
+        File projectWorkspaceData = new File(projectXCworkspace, "contents.xcworkspacedata");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/template/template.xcodeproj/project.xcworkspace/contents.xcworkspacedata"), new FileOutputStream(projectWorkspaceData));
+        replaceInFile(projectWorkspaceData, "KitchenSink", appName);
+
+
+        File projectPbx = new File(xcproj, "project.pbxproj");
+        copy(ByteCodeTranslator.class.getResourceAsStream("/template/template.xcodeproj/project.pbxproj"), new FileOutputStream(projectPbx));            
+
+        String[] sourceFiles = srcRoot.list(new FilenameFilter() {
+            @Override
+            public boolean accept(File pathname, String string) {
+                return string.endsWith(".bundle") || string.endsWith(".xcdatamodeld") || !pathname.isHidden() && !string.startsWith(".") && !"Images.xcassets".equals(string);
             }
-            File cn1GlobalsM = new File(srcRoot, "cn1_globals.m");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new FileOutputStream(cn1GlobalsM));
-            File nativeMethods = new File(srcRoot, "nativeMethods.m");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethods));
+        });
 
-            if (System.getProperty("USE_RPMALLOC", "false").equals("true")) {
-                File malloc = new File(srcRoot, "malloc.c");
-                copy(ByteCodeTranslator.class.getResourceAsStream("/malloc.c"), new FileOutputStream(malloc));
-                File rpmalloc = new File(srcRoot, "rpmalloc.c");
-                copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.c"), new FileOutputStream(rpmalloc));
-                File rpmalloch = new File(srcRoot, "rpmalloc.h");
-                copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.h"), new FileOutputStream(rpmalloch));
+        StringBuilder fileOneEntry = new StringBuilder();
+        StringBuilder fileTwoEntry = new StringBuilder();
+        StringBuilder fileListEntry = new StringBuilder();
+        StringBuilder fileThreeEntry = new StringBuilder();
+        StringBuilder frameworks = new StringBuilder();
+        StringBuilder frameworks2 = new StringBuilder();
+        StringBuilder resources = new StringBuilder();
+
+        List<String> noArcFiles = new ArrayList<String>();
+        noArcFiles.add("CVZBarReaderViewController.m");
+        noArcFiles.add("OpenUDID.m");
+
+        List<String> includeFrameworks = new ArrayList<String>();
+        Set<String> optionalFrameworks = new HashSet<String>();
+        for (String optionalFramework : System.getProperty("optional.frameworks", "").split(";")) {
+            optionalFramework = optionalFramework.trim();
+            if (!optionalFramework.isEmpty()) {
+                optionalFrameworks.add(optionalFramework);
             }
-            
-            Parser.writeOutput(srcRoot);
-            
-            File templateInfoPlist = new File(srcRoot, appName + "-Info.plist");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/template/template/template-Info.plist"), new FileOutputStream(templateInfoPlist));
-            
-            File templatePch = new File(srcRoot, appName + "-Prefix.pch");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/template/template/template-Prefix.pch"), new FileOutputStream(templatePch));
+        }
+        optionalFrameworks.add("UserNotifications.framework");
+        includeFrameworks.add("libiconv.dylib");
+        //includeFrameworks.add("AdSupport.framework");
+        includeFrameworks.add("AddressBookUI.framework");
+        includeFrameworks.add("SystemConfiguration.framework");
+        includeFrameworks.add("MapKit.framework");
+        includeFrameworks.add("AudioToolbox.framework");
+        includeFrameworks.add("libxml2.dylib");
+        includeFrameworks.add("QuartzCore.framework");
+        includeFrameworks.add("AddressBook.framework");
+        includeFrameworks.add("libsqlite3.dylib");
+        includeFrameworks.add("libsqlite3.0.dylib");
+        includeFrameworks.add("GameKit.framework");
+        includeFrameworks.add("Security.framework");
+        //includeFrameworks.add("StoreKit.framework");
+        includeFrameworks.add("CoreMotion.framework");
+        includeFrameworks.add("CoreLocation.framework");
+        includeFrameworks.add("MessageUI.framework");
+        includeFrameworks.add("MediaPlayer.framework");
+        includeFrameworks.add("AVFoundation.framework");
+        includeFrameworks.add("CoreVideo.framework");
+        includeFrameworks.add("QuickLook.framework");
+        //includeFrameworks.add("iAd.framework");
+        includeFrameworks.add("CoreMedia.framework");
+        includeFrameworks.add("libz.dylib");
+        includeFrameworks.add("MobileCoreServices.framework");
+        includeFrameworks.add("AVKit.framework");
+        if(!addFrameworks.equalsIgnoreCase("none")) {
+            includeFrameworks.addAll(Arrays.asList(addFrameworks.split(";")));
+        }
 
-            File xmlvm = new File(srcRoot, "xmlvm.h");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), new FileOutputStream(xmlvm));
-            
-            File projectWorkspaceData = new File(projectXCworkspace, "contents.xcworkspacedata");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/template/template.xcodeproj/project.xcworkspace/contents.xcworkspacedata"), new FileOutputStream(projectWorkspaceData));
-            replaceInFile(projectWorkspaceData, "KitchenSink", appName);
-            
-            
-            File projectPbx = new File(xcproj, "project.pbxproj");
-            copy(ByteCodeTranslator.class.getResourceAsStream("/template/template.xcodeproj/project.pbxproj"), new FileOutputStream(projectPbx));            
-            
-            String[] sourceFiles = srcRoot.list(new FilenameFilter() {
-                @Override
-                public boolean accept(File pathname, String string) {
-                    return string.endsWith(".bundle") || string.endsWith(".xcdatamodeld") || !pathname.isHidden() && !string.startsWith(".") && !"Images.xcassets".equals(string);
-                }
-            });
+        int currentValue = 0xF63EAAA;
 
-            StringBuilder fileOneEntry = new StringBuilder();
-            StringBuilder fileTwoEntry = new StringBuilder();
-            StringBuilder fileListEntry = new StringBuilder();
-            StringBuilder fileThreeEntry = new StringBuilder();
-            StringBuilder frameworks = new StringBuilder();
-            StringBuilder frameworks2 = new StringBuilder();
-            StringBuilder resources = new StringBuilder();
-            
-            List<String> noArcFiles = new ArrayList<String>();
-            noArcFiles.add("CVZBarReaderViewController.m");
-            noArcFiles.add("OpenUDID.m");
-            
-            List<String> includeFrameworks = new ArrayList<String>();
-            Set<String> optionalFrameworks = new HashSet<String>();
-            for (String optionalFramework : System.getProperty("optional.frameworks", "").split(";")) {
-                optionalFramework = optionalFramework.trim();
-                if (!optionalFramework.isEmpty()) {
-                    optionalFrameworks.add(optionalFramework);
-                }
-            }
-            optionalFrameworks.add("UserNotifications.framework");
-            includeFrameworks.add("libiconv.dylib");
-            //includeFrameworks.add("AdSupport.framework");
-            includeFrameworks.add("AddressBookUI.framework");
-            includeFrameworks.add("SystemConfiguration.framework");
-            includeFrameworks.add("MapKit.framework");
-            includeFrameworks.add("AudioToolbox.framework");
-            includeFrameworks.add("libxml2.dylib");
-            includeFrameworks.add("QuartzCore.framework");
-            includeFrameworks.add("AddressBook.framework");
-            includeFrameworks.add("libsqlite3.dylib");
-            includeFrameworks.add("libsqlite3.0.dylib");
-            includeFrameworks.add("GameKit.framework");
-            includeFrameworks.add("Security.framework");
-            //includeFrameworks.add("StoreKit.framework");
-            includeFrameworks.add("CoreMotion.framework");
-            includeFrameworks.add("CoreLocation.framework");
-            includeFrameworks.add("MessageUI.framework");
-            includeFrameworks.add("MediaPlayer.framework");
-            includeFrameworks.add("AVFoundation.framework");
-            includeFrameworks.add("CoreVideo.framework");
-            includeFrameworks.add("QuickLook.framework");
-            //includeFrameworks.add("iAd.framework");
-            includeFrameworks.add("CoreMedia.framework");
-            includeFrameworks.add("libz.dylib");
-            includeFrameworks.add("MobileCoreServices.framework");
-            includeFrameworks.add("AVKit.framework");
-            if(!addFrameworks.equalsIgnoreCase("none")) {
-                includeFrameworks.addAll(Arrays.asList(addFrameworks.split(";")));
-            }
-            
-            int currentValue = 0xF63EAAA;
+        ArrayList<String> arr = new ArrayList<String>();
+        arr.addAll(includeFrameworks);
+        arr.addAll(Arrays.asList(sourceFiles));
 
-            ArrayList<String> arr = new ArrayList<String>();
-            arr.addAll(includeFrameworks);
-            arr.addAll(Arrays.asList(sourceFiles));
-            
-            for(String file : arr) {
-                fileListEntry.append("		0");
-                currentValue++;
-                String fileOneValue = Integer.toHexString(currentValue).toUpperCase();
-                fileListEntry.append(fileOneValue);
-                fileListEntry.append("18E9ABBC002F3D1D /* ");
+        for(String file : arr) {
+            fileListEntry.append("		0");
+            currentValue++;
+            String fileOneValue = Integer.toHexString(currentValue).toUpperCase();
+            fileListEntry.append(fileOneValue);
+            fileListEntry.append("18E9ABBC002F3D1D /* ");
+            fileListEntry.append(file);
+            fileListEntry.append(" */ = {isa = PBXFileReference; lastKnownFileType = ");
+            fileListEntry.append(getFileType(file));
+            if(file.endsWith(".framework") || file.endsWith(".dylib") || file.endsWith(".a")) {
+                fileListEntry.append("; name = \"");
                 fileListEntry.append(file);
-                fileListEntry.append(" */ = {isa = PBXFileReference; lastKnownFileType = ");
-                fileListEntry.append(getFileType(file));
-                if(file.endsWith(".framework") || file.endsWith(".dylib") || file.endsWith(".a")) {
-                    fileListEntry.append("; name = \"");
+                if(file.endsWith(".dylib")) {
+                    fileListEntry.append("\"; path = \"usr/lib/");
                     fileListEntry.append(file);
-                    if(file.endsWith(".dylib")) {
-                        fileListEntry.append("\"; path = \"usr/lib/");
-                        fileListEntry.append(file);
-                        fileListEntry.append("\"; sourceTree = SDKROOT; };\n");
-                    } else {
-                        if(file.endsWith(".a")) {
-                            fileListEntry.append("\"; path = \"");
-                            fileListEntry.append(appName);
-                            fileListEntry.append("-src/");
-                            fileListEntry.append(file);
-                            fileListEntry.append("\"; sourceTree = \"<group>\"; };\n");
-                        } else {
-                            fileListEntry.append("\"; path = System/Library/Frameworks/");
-                            fileListEntry.append(file);
-                            fileListEntry.append("; sourceTree = SDKROOT; };\n");
-                        }
-                    }
+                    fileListEntry.append("\"; sourceTree = SDKROOT; };\n");
                 } else {
-                    fileListEntry.append("; path = \"");
-                    if(file.endsWith(".m") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".mm") || file.endsWith(".h") || 
-                            file.endsWith(".bundle") || file.endsWith(".xcdatamodeld") || file.endsWith(".hh") || file.endsWith(".hpp") || file.endsWith(".xib")) {
-                        fileListEntry.append(file);
-                    } else {
+                    if(file.endsWith(".a")) {
+                        fileListEntry.append("\"; path = \"");
                         fileListEntry.append(appName);
                         fileListEntry.append("-src/");
                         fileListEntry.append(file);
-                    }
-                    fileListEntry.append("\"; sourceTree = \"<group>\"; };\n");
-                }
-                currentValue++;
-                fileOneEntry.append("		0");
-                String referenceValue = Integer.toHexString(currentValue).toUpperCase();
-                fileOneEntry.append(referenceValue);
-                fileOneEntry.append("18E9ABBC002F3D1D /* ");
-                fileOneEntry.append(file);
-                fileOneEntry.append(" */ = {isa = PBXBuildFile; fileRef = 0");
-                fileOneEntry.append(fileOneValue);
-                fileOneEntry.append("18E9ABBC002F3D1D /* ");
-                fileOneEntry.append(file);
-                String injectFileSettings = "";
-                if (optionalFrameworks.contains(file)) {
-                    injectFileSettings += " ATTRIBUTES = (Weak, );";
-                }
-                String fileSettingsDefault = "settings = {"+injectFileSettings.trim()+" }; ";
-                if(noArcFiles.contains(file)) {
-                    fileOneEntry.append(" */; settings = {COMPILER_FLAGS = \"-fno-objc-arc\";"+injectFileSettings+" }; };\n");                
-                } else {
-                    fileOneEntry.append(" */;"+fileSettingsDefault+" };\n");                
-                }
-                
-                if(file.endsWith(".m") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".hh") || file.endsWith(".hpp") || 
-                        file.endsWith(".mm") || file.endsWith(".h") || file.endsWith(".bundle") || file.endsWith(".xcdatamodeld") || file.endsWith(".xib")) {
-                    
-                    // bundle also needs to be a runtime resource
-                    if(file.endsWith(".bundle") || file.endsWith(".xcdatamodeld")) {
-                        resources.append("\n				0");
-                        resources.append(referenceValue);
-                        resources.append("18E9ABBC002F3D1D /* ");
-                        resources.append(file);
-                        resources.append(" */,");                        
-                    }
-                    
-                    fileTwoEntry.append("				0");
-                    fileTwoEntry.append(fileOneValue);
-                    fileTwoEntry.append("18E9ABBC002F3D1D /* ");
-                    fileTwoEntry.append(file);
-                    fileTwoEntry.append(" */,\n");
-
-                    if(!file.endsWith(".h") && !file.endsWith(".hpp") && !file.endsWith(".hh") && !file.endsWith(".bundle")) {
-                        fileThreeEntry.append("				0");
-                        fileThreeEntry.append(referenceValue);
-                        fileThreeEntry.append("18E9ABBC002F3D1D /* ");
-                        fileThreeEntry.append(file);
-                        fileThreeEntry.append(" */,\n");
-                    }
-                } else {
-                    if(file.endsWith(".a") || file.endsWith(".framework") || file.endsWith(".dylib") || (file.endsWith("Info.plist") && !"GoogleService-Info.plist".equals(file)) || file.endsWith(".pch")) {
-                        frameworks.append("				0");
-                        frameworks.append(referenceValue);
-                        frameworks.append("18E9ABBC002F3D1D /* ");
-                        frameworks.append(file);
-                        frameworks.append(" */,\n");
-
-                        frameworks2.append("				0");
-                        frameworks2.append(fileOneValue);
-                        frameworks2.append("18E9ABBC002F3D1D /* ");
-                        frameworks2.append(file);
-                        frameworks2.append(" */,\n");
-                        
-                        
-                            
-                        /*
-                        
-                        // Removing this because it causes crashes in cocoapods.
-                        // Why was it necessary to add .a files to the same group
-                        // as the sources, if we've already added it to frameworks.
-                        // Related to https://stackoverflow.com/questions/47210585/codename-one-issue-devilering-binary-for-ios
-                        if(file.endsWith(".a")) {
-                            fileTwoEntry.append("				0");
-                            fileTwoEntry.append(fileOneValue);
-                            fileTwoEntry.append("18E9ABBC002F3D1D /* ");
-                            fileTwoEntry.append(file);
-                            fileTwoEntry.append(" *").append("/,\n");
-
-                            if(!file.endsWith(".h") && !file.endsWith(".bundle") && !file.endsWith(".xcdatamodeld")) {
-                                fileThreeEntry.append("				0");
-                                fileThreeEntry.append(referenceValue);
-                                fileThreeEntry.append("18E9ABBC002F3D1D /* ");
-                                fileThreeEntry.append(file);
-                                fileThreeEntry.append(" *").append("/,\n");
-                            }
-                        }*/
+                        fileListEntry.append("\"; sourceTree = \"<group>\"; };\n");
                     } else {
-                        // standard resource file
-                        resources.append("\n				0");
-                        resources.append(referenceValue);
-                        resources.append("18E9ABBC002F3D1D /* ");
-                        resources.append(file);
-                        resources.append(" */,");
+                        fileListEntry.append("\"; path = System/Library/Frameworks/");
+                        fileListEntry.append(file);
+                        fileListEntry.append("; sourceTree = SDKROOT; };\n");
                     }
                 }
+            } else {
+                fileListEntry.append("; path = \"");
+                if(file.endsWith(".m") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".mm") || file.endsWith(".h") || 
+                        file.endsWith(".bundle") || file.endsWith(".xcdatamodeld") || file.endsWith(".hh") || file.endsWith(".hpp") || file.endsWith(".xib")) {
+                    fileListEntry.append(file);
+                } else {
+                    fileListEntry.append(appName);
+                    fileListEntry.append("-src/");
+                    fileListEntry.append(file);
+                }
+                fileListEntry.append("\"; sourceTree = \"<group>\"; };\n");
+            }
+            currentValue++;
+            fileOneEntry.append("		0");
+            String referenceValue = Integer.toHexString(currentValue).toUpperCase();
+            fileOneEntry.append(referenceValue);
+            fileOneEntry.append("18E9ABBC002F3D1D /* ");
+            fileOneEntry.append(file);
+            fileOneEntry.append(" */ = {isa = PBXBuildFile; fileRef = 0");
+            fileOneEntry.append(fileOneValue);
+            fileOneEntry.append("18E9ABBC002F3D1D /* ");
+            fileOneEntry.append(file);
+            String injectFileSettings = "";
+            if (optionalFrameworks.contains(file)) {
+                injectFileSettings += " ATTRIBUTES = (Weak, );";
+            }
+            String fileSettingsDefault = "settings = {"+injectFileSettings.trim()+" }; ";
+            if(noArcFiles.contains(file)) {
+                fileOneEntry.append(" */; settings = {COMPILER_FLAGS = \"-fno-objc-arc\";"+injectFileSettings+" }; };\n");                
+            } else {
+                fileOneEntry.append(" */;"+fileSettingsDefault+" };\n");                
             }
             
-            if(!appType.equalsIgnoreCase("ios")) {
-                String devFamily = "TARGETED_DEVICE_FAMILY = \"2\";";
-                if(appType.equalsIgnoreCase("iphone")) {
-                    devFamily = "TARGETED_DEVICE_FAMILY = \"1\";";
-                } 
-                replaceInFile(projectPbx, "template", appName, "**ACTUAL_FILES**", fileListEntry.toString(),
-                        "**FILE_LIST**", fileOneEntry.toString(), "** FILE_LIST_2 **", fileTwoEntry.toString(),
-                        "**FILES_3**", fileThreeEntry.toString(), "***FRAMEWORKS***", frameworks.toString(),
-                        "***FRAMEWORKS2***", frameworks2.toString(), "TARGETED_DEVICE_FAMILY = \"1,2\";", devFamily,
-                        "***RESOURCES***", resources.toString());
-            } else {
-                replaceInFile(projectPbx, "template", appName, "**ACTUAL_FILES**", fileListEntry.toString(),
-                        "**FILE_LIST**", fileOneEntry.toString(), "** FILE_LIST_2 **", fileTwoEntry.toString(),
-                        "**FILES_3**", fileThreeEntry.toString(), "***FRAMEWORKS***", frameworks.toString(),
-                        "***FRAMEWORKS2***", frameworks2.toString(), "***RESOURCES***", resources.toString());
-            }
+            if(file.endsWith(".m") || file.endsWith(".c") || file.endsWith(".cpp") || file.endsWith(".hh") || file.endsWith(".hpp") || 
+                    file.endsWith(".mm") || file.endsWith(".h") || file.endsWith(".bundle") || file.endsWith(".xcdatamodeld") || file.endsWith(".xib")) {
+                
+                // bundle also needs to be a runtime resource
+                if(file.endsWith(".bundle") || file.endsWith(".xcdatamodeld")) {
+                    resources.append("\n				0");
+                    resources.append(referenceValue);
+                    resources.append("18E9ABBC002F3D1D /* ");
+                    resources.append(file);
+                    resources.append(" */,");                        
+                }
+                
+                fileTwoEntry.append("				0");
+                fileTwoEntry.append(fileOneValue);
+                fileTwoEntry.append("18E9ABBC002F3D1D /* ");
+                fileTwoEntry.append(file);
+                fileTwoEntry.append(" */,\n");
 
-            String bundleVersion = System.getProperty("bundleVersionNumber", appVersion);
-            replaceInFile(templateInfoPlist, "com.codename1pkg", appPackageName, "${PRODUCT_NAME}", appDisplayName, "VERSION_VALUE", appVersion, "VERSION_BUNDLE_VALUE", bundleVersion);
+                if(!file.endsWith(".h") && !file.endsWith(".hpp") && !file.endsWith(".hh") && !file.endsWith(".bundle")) {
+                    fileThreeEntry.append("				0");
+                    fileThreeEntry.append(referenceValue);
+                    fileThreeEntry.append("18E9ABBC002F3D1D /* ");
+                    fileThreeEntry.append(file);
+                    fileThreeEntry.append(" */,\n");
+                }
+            } else {
+                if(file.endsWith(".a") || file.endsWith(".framework") || file.endsWith(".dylib") || (file.endsWith("Info.plist") && !"GoogleService-Info.plist".equals(file)) || file.endsWith(".pch")) {
+                    frameworks.append("				0");
+                    frameworks.append(referenceValue);
+                    frameworks.append("18E9ABBC002F3D1D /* ");
+                    frameworks.append(file);
+                    frameworks.append(" */,\n");
+
+                    frameworks2.append("				0");
+                    frameworks2.append(fileOneValue);
+                    frameworks2.append("18E9ABBC002F3D1D /* ");
+                    frameworks2.append(file);
+                    frameworks2.append(" */,\n");
+                    
+                    
+                        
+                    /*
+                    
+                    // Removing this because it causes crashes in cocoapods.
+                    // Why was it necessary to add .a files to the same group
+                    // as the sources, if we've already added it to frameworks.
+                    // Related to https://stackoverflow.com/questions/47210585/codename-one-issue-devilering-binary-for-ios
+                    if(file.endsWith(".a")) {
+                        fileTwoEntry.append("				0");
+                        fileTwoEntry.append(fileOneValue);
+                        fileTwoEntry.append("18E9ABBC002F3D1D /* ");
+                        fileTwoEntry.append(file);
+                        fileTwoEntry.append(" *").append("/,\n");
+
+                        if(!file.endsWith(".h") && !file.endsWith(".bundle") && !file.endsWith(".xcdatamodeld")) {
+                            fileThreeEntry.append("				0");
+                            fileThreeEntry.append(referenceValue);
+                            fileThreeEntry.append("18E9ABBC002F3D1D /* ");
+                            fileThreeEntry.append(file);
+                            fileThreeEntry.append(" *").append("/,\n");
+                        }
+                    }*/
+                } else {
+                    // standard resource file
+                    resources.append("\n				0");
+                    resources.append(referenceValue);
+                    resources.append("18E9ABBC002F3D1D /* ");
+                    resources.append(file);
+                    resources.append(" */,");
+                }
+            }
+        }
+
+        if(!appType.equalsIgnoreCase("ios")) {
+            String devFamily = "TARGETED_DEVICE_FAMILY = \"2\";";
+            if(appType.equalsIgnoreCase("iphone")) {
+                devFamily = "TARGETED_DEVICE_FAMILY = \"1\";";
+            } 
+            replaceInFile(projectPbx, "template", appName, "**ACTUAL_FILES**", fileListEntry.toString(),
+                    "**FILE_LIST**", fileOneEntry.toString(), "** FILE_LIST_2 **", fileTwoEntry.toString(),
+                    "**FILES_3**", fileThreeEntry.toString(), "***FRAMEWORKS***", frameworks.toString(),
+                    "***FRAMEWORKS2***", frameworks2.toString(), "TARGETED_DEVICE_FAMILY = \"1,2\";", devFamily,
+                    "***RESOURCES***", resources.toString());
         } else {
-            b.execute(sources, dest);
-            Parser.writeOutput(dest);
+            replaceInFile(projectPbx, "template", appName, "**ACTUAL_FILES**", fileListEntry.toString(),
+                    "**FILE_LIST**", fileOneEntry.toString(), "** FILE_LIST_2 **", fileTwoEntry.toString(),
+                    "**FILES_3**", fileThreeEntry.toString(), "***FRAMEWORKS***", frameworks.toString(),
+                    "***FRAMEWORKS2***", frameworks2.toString(), "***RESOURCES***", resources.toString());
+        }
+
+        String bundleVersion = System.getProperty("bundleVersionNumber", appVersion);
+        replaceInFile(templateInfoPlist, "com.codename1pkg", appPackageName, "${PRODUCT_NAME}", appDisplayName, "VERSION_VALUE", appVersion, "VERSION_BUNDLE_VALUE", bundleVersion);
+    }
+
+    private static void writeCmakeProject(File projectRoot, File srcRoot, String appName) throws IOException {
+        File cmakeLists = new File(projectRoot, "CMakeLists.txt");
+        FileWriter writer = new FileWriter(cmakeLists);
+        try {
+            writer.append("cmake_minimum_required(VERSION 3.10)\n");
+            writer.append("project(").append(appName).append(" LANGUAGES C OBJC)\n");
+            writer.append("enable_language(OBJC OPTIONAL)\n");
+            writer.append("set(CMAKE_C_STANDARD 99)\n");
+            writer.append("file(GLOB TRANSLATOR_SOURCES \"").append(srcRoot.getName()).append("/*.c\" \"").append(srcRoot.getName()).append("/*.m\")\n");
+            writer.append("file(GLOB TRANSLATOR_HEADERS \"").append(srcRoot.getName()).append("/*.h\")\n");
+            writer.append("add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\n");
+            writer.append("target_include_directories(${PROJECT_NAME} PUBLIC ").append(srcRoot.getName()).append(")\n");
+        } finally {
+            writer.close();
         }
     }
     

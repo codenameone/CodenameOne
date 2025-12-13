@@ -32,7 +32,12 @@ import java.util.TimeZone;
 
 
 /**
- * The time chart rendering class.
+ * Specialised {@link LineChart} that formats the X axis as dates or times.
+ * <p>
+ * Populate the chart with an {@link XYMultipleSeriesDataset} where X values are
+ * expressed as milliseconds since the epoch. Configure the desired date format
+ * using {@link #setDateFormat(String)} or let the chart choose an appropriate
+ * format automatically.
  */
 public class TimeChart extends LineChart {
     /**

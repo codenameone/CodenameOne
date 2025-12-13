@@ -643,7 +643,7 @@ public class UIManager {
         }
 
         if (installedTheme == null || !installedTheme.containsKey("SignatureButtonBox.derive")) {
-            themeProps.put("SignatureButtonBox.fgColor", centerAlign);
+            themeProps.put("SignatureButtonBox.fgColor", foreground);
             themeProps.put("SignatureButtonBox.sel#derive", "SignatureButtonBox");
             themeProps.put("SignatureButtonBox.press#derive", "SignatureButtonBox");
             themeProps.put("SignatureButtonBox.dis#derive", "SignatureButtonBox");
@@ -1957,7 +1957,7 @@ public class UIManager {
                         }
                         themeProps.put(id + Style.BG_IMAGE, im);
                     } catch (IOException ex) {
-                        System.out.println("failed to parse image for id = " + id + Style.BG_IMAGE);
+                        Log.p("failed to parse image for id = " + id + Style.BG_IMAGE);
                     }
                 } else {
                     // we shouldn't normally but we might get a multi-image from the resource editor

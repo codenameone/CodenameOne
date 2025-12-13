@@ -1,6 +1,7 @@
 package com.codename1.maven;
 
 
+import org.apache.maven.artifact.Artifact;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Execute;
@@ -77,10 +78,32 @@ public class GenerateNativeInterfaces extends AbstractCN1Mojo {
 
         if (classFile.exists()) {
 
+            // Build a comprehensive classpath including all dependencies
+            List<URL> classpathUrls = new ArrayList<>();
+
+            // Add project output directory
+            classpathUrls.add(new File(project.getBuild().getOutputDirectory()).toURI().toURL());
+
+            // Add codenameone-core
             File cn1CoreJar = getJar("com.codenameone", "codenameone-core");
-            URLClassLoader cl = new URLClassLoader(new URL[]{
-                    new File(project.getBuild().getOutputDirectory()).toURI().toURL(),
-                    cn1CoreJar.toURI().toURL()});
+            if (cn1CoreJar != null) {
+                classpathUrls.add(cn1CoreJar.toURI().toURL());
+            }
+
+            // Add all project dependencies (including cn1libs with classifiers)
+            for (Artifact artifact : project.getArtifacts()) {
+                // Skip provided and test scoped dependencies
+                if ("provided".equals(artifact.getScope()) || "test".equals(artifact.getScope())) {
+                    continue;
+                }
+
+                File artifactFile = getJar(artifact);
+                if (artifactFile != null && artifactFile.exists()) {
+                    classpathUrls.add(artifactFile.toURI().toURL());
+                }
+            }
+
+            URLClassLoader cl = new URLClassLoader(classpathUrls.toArray(new URL[0]));
             String classPath = relativePath
                     .replace("\\", ".")
                     .replace("/", ".")

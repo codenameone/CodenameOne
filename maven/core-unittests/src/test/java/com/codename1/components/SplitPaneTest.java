@@ -1,6 +1,7 @@
 package com.codename1.components;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.EdtTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Image;
@@ -12,18 +13,14 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.when;
 
 class SplitPaneTest extends UITestBase {
     @BeforeEach
     void configureDisplay() {
-        when(implementation.animateImage(any(), anyLong())).thenReturn(false);
-        when(implementation.isAnimation(any())).thenReturn(false);
+        implementation.setAnimation(false);
     }
 
-    @Test
+    @EdtTest
     void testComponentGettersAndSetters() {
         Label top = new Label("Top");
         Label bottom = new Label("Bottom");
@@ -43,7 +40,7 @@ class SplitPaneTest extends UITestBase {
         assertSame(newTop, pane.getTop());
     }
 
-    @Test
+    @EdtTest
     void testExpandCollapseAndToggleStates() throws Exception {
         SplitPane pane = new SplitPane(SplitPane.HORIZONTAL_SPLIT, new Label("Top"), new Label("Bottom"), "0px", "0px", "100px");
         setComponentSize(pane, 400, 400);
@@ -76,7 +73,7 @@ class SplitPaneTest extends UITestBase {
         assertFalse(isCollapsed(pane));
     }
 
-    @Test
+    @EdtTest
     void testSetInsetWithoutClamp() throws Exception {
         SplitPane pane = new SplitPane(SplitPane.HORIZONTAL_SPLIT, new Label("Top"), new Label("Bottom"), "0px", "0px", "100px");
         pane.setInset("25%", false);
@@ -89,7 +86,7 @@ class SplitPaneTest extends UITestBase {
         assertFalse(isExpanded(pane));
     }
 
-    @Test
+    @EdtTest
     void testSettingsAppliedToDivider() throws Exception {
         TestImage icon = new TestImage(10, 10);
         SplitPane.Settings settings = new SplitPane.Settings()

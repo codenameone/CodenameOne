@@ -174,6 +174,7 @@ public abstract class CodenameOneImplementation {
      */
     private final Rectangle paintDirtyTmpRect = new Rectangle();
     private BrowserComponent sharedJavascriptContext;
+    private Dimension initialWindowSizeHintPercent;
 
     static void setOnCurrentFormChange(Runnable on) {
         onCurrentFormChange = on;
@@ -465,6 +466,54 @@ public abstract class CodenameOneImplementation {
      */
     public int getActualDisplayHeight() {
         return getDisplayHeight();
+    }
+
+    /**
+     * Returns the size of the desktop area hosting the application window when running on a desktop
+     * platform. Implementations that do not support windows may return {@code null}.
+     *
+     * @return the desktop size or {@code null}
+     */
+    public Dimension getDesktopSize() {
+        return null;
+    }
+
+    /**
+     * Returns the bounds of the application window when running on a desktop platform.
+     *
+     * @return the window bounds, defaults to the current display size
+     */
+    public Rectangle getWindowBounds() {
+        return new Rectangle(0, 0, getDisplayWidth(), getDisplayHeight());
+    }
+
+    /**
+     * Requests a resize of the application window when supported by the platform.
+     *
+     * @param width  the desired window width in pixels
+     * @param height the desired window height in pixels
+     */
+    public void setWindowSize(int width, int height) {
+    }
+
+    /**
+     * Stores an optional window size hint (in percent values) for desktop environments. Implementations
+     * that do not support windows may ignore this value.
+     *
+     * @param hint a {@link Dimension} whose width/height represent percentages of the desktop to use for
+     *             the initial window size, or {@code null} to clear a previously stored hint
+     */
+    public void setInitialWindowSizeHintPercent(Dimension hint) {
+        initialWindowSizeHintPercent = hint;
+    }
+
+    /**
+     * Returns the optional desktop window size hint provided by the first form.
+     *
+     * @return the stored hint or {@code null}
+     */
+    public Dimension getInitialWindowSizeHintPercent() {
+        return initialWindowSizeHintPercent;
     }
 
     /**
@@ -1199,6 +1248,19 @@ public abstract class CodenameOneImplementation {
         }
 
         return EncodedImage.createFromRGB(newRGB, width, height, !maintainOpacity);
+    }
+
+    /**
+     * Tries to grab an OS native screenshot which would include peer components etc.
+     * On fallback draws the current Form object.
+     *
+     * @param callback invoked with the screenshot
+     */
+    public void screenshot(SuccessCallback<Image> callback) {
+        Form current = getCurrentForm();
+        Image img = Image.createImage(current.getWidth(), current.getHeight());
+        current.paintComponent(img.getGraphics(), true);
+        callback.onSucess(img);
     }
 
     /**
@@ -5686,6 +5748,7 @@ public abstract class CodenameOneImplementation {
      *
      * @return An image of the screen, or null if it failed.
      * @since 7.0
+     * @deprecated replaced by screenshot()
      */
     public Image captureScreen() {
         Form form = getCurrentForm();
@@ -8708,6 +8771,23 @@ public abstract class CodenameOneImplementation {
     public void announceForAccessibility(Component cmp, String text) {
         // No-op by default. Platforms that support accessibility announcements
         // should override this method.
+    }
+
+    /**
+     * Returns the stack trace from the exception on the given
+     * thread. This API isn't supported on all platforms and may
+     * return a blank string when unavailable.
+     *
+     * @param parentThread the thread in which the exception was thrown
+     * @param t the exception
+     * @return a stack trace string that might be blank
+     */
+    public String getStackTrace(Thread parentThread, Throwable t) {
+        System.out.println("CN1SS:ERR:Invoking getStackTrace in CodenameOneImplementation");
+        if (parentThread instanceof CodenameOneThread && ((CodenameOneThread) parentThread).hasStackFrame()) {
+            return ((CodenameOneThread) parentThread).getStack(t);
+        }
+        return "";
     }
 
     class RPush implements Runnable {

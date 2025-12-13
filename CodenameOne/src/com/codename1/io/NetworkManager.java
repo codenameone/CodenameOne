@@ -565,7 +565,7 @@ public class NetworkManager {
             if (!retry) {
                 if (!request.isDuplicateSupported()) {
                     if (pending.contains(request)) {
-                        System.out.println("Duplicate entry in the queue: " + request.getClass().getName() + ": " + request);
+                        Log.p("Duplicate entry in the queue: " + request.getClass().getName() + ": " + request);
                         return;
                     }
                     ConnectionRequest currentRequest = networkThreads[0].getCurrentRequest();

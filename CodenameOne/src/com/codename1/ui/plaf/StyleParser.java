@@ -22,6 +22,7 @@
  */
 package com.codename1.ui.plaf;
 
+import com.codename1.io.Log;
 import com.codename1.io.Util;
 import com.codename1.l10n.L10NManager;
 import com.codename1.ui.Component;
@@ -618,7 +619,7 @@ public class StyleParser {
 
 
         } catch (IOException ex) {
-            System.out.println("failed to parse image");
+            Log.p("failed to parse image");
         }
         return im;
     }

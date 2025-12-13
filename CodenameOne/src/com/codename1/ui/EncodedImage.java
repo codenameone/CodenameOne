@@ -265,7 +265,7 @@ public class EncodedImage extends Image {
     public static EncodedImage create(InputStream i) throws IOException {
         byte[] buffer = Util.readInputStream(i);
         if (buffer.length > 200000) {
-            System.out.println("Warning: loading large images using EncodedImage.create(InputStream) might lead to memory issues, try using EncodedImage.create(InputStream, int)");
+            Log.p("Warning: loading large images using EncodedImage.create(InputStream) might lead to memory issues, try using EncodedImage.create(InputStream, int)");
         }
         return new EncodedImage(new byte[][]{buffer});
     }

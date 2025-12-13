@@ -1,25 +1,22 @@
 package com.codename1.components;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.events.ActionListener;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.when;
 
 class SwitchTest extends UITestBase {
     @BeforeEach
     void configureDisplay() {
-        when(implementation.isBuiltinSoundsEnabled()).thenReturn(false);
-        doNothing().when(implementation).playBuiltinSound(org.mockito.ArgumentMatchers.anyString());
+        implementation.setBuiltinSoundsEnabled(false);
     }
 
-    @Test
+    @FormTest
     void testSetValueFiresChangeOnlyOnStateChange() {
         Switch sw = new Switch();
         AtomicInteger changeCount = new AtomicInteger();
@@ -32,7 +29,7 @@ class SwitchTest extends UITestBase {
         assertEquals(2, changeCount.get());
     }
 
-    @Test
+    @FormTest
     void testSetValueWithFireEventTriggersAction() throws Exception {
         Switch sw = new Switch();
         AtomicInteger changeCount = new AtomicInteger();
@@ -53,7 +50,7 @@ class SwitchTest extends UITestBase {
         assertEquals(2, actionCount.get());
     }
 
-    @Test
+    @FormTest
     void testPropertyInterface() {
         Switch sw = new Switch();
         assertArrayEquals(new String[]{"value"}, sw.getPropertyNames());
@@ -63,7 +60,7 @@ class SwitchTest extends UITestBase {
         assertTrue(sw.isValue());
     }
 
-    @Test
+    @FormTest
     void testToggleHelpersUpdateState() {
         Switch sw = new Switch();
         sw.setOn();
@@ -75,7 +72,7 @@ class SwitchTest extends UITestBase {
         assertTrue(sw.isOff());
     }
 
-    @Test
+    @FormTest
     void testReleasableComponentDefaults() {
         Switch sw = new Switch();
         assertFalse(sw.isAutoRelease());
@@ -87,7 +84,7 @@ class SwitchTest extends UITestBase {
         assertEquals(0, sw.getReleaseRadius());
     }
 
-    @Test
+    @FormTest
     void testListenersCanBeRemoved() {
         Switch sw = new Switch();
         AtomicInteger actionCount = new AtomicInteger();

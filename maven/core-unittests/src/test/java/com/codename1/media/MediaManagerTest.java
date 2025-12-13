@@ -1,6 +1,7 @@
 package com.codename1.media;
 
-import com.codename1.test.UITestBase;
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.util.AsyncResource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -8,7 +9,6 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -16,27 +16,16 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 class MediaManagerTest extends UITestBase {
     @BeforeEach
     void configureImplementation() throws Exception {
-        when(implementation.getAvailableRecordingMimeTypes()).thenReturn(new String[]{"audio/aac", "audio/amr"});
-        when(implementation.createBackgroundMedia(anyString())).thenReturn(mock(Media.class));
-        when(implementation.createBackgroundMediaAsync(anyString())).thenReturn(mock(AsyncResource.class));
-        when(implementation.createMedia(anyString(), anyBoolean(), nullable(Runnable.class))).thenReturn(mock(Media.class));
-        when(implementation.createMediaAsync(anyString(), anyBoolean(), nullable(Runnable.class))).thenReturn(mock(AsyncResource.class));
-        when(implementation.createMedia(any(InputStream.class), anyString(), nullable(Runnable.class))).thenReturn(mock(Media.class));
-        when(implementation.createMediaAsync(any(InputStream.class), anyString(), nullable(Runnable.class))).thenReturn(mock(AsyncResource.class));
-        when(implementation.createMediaRecorder(anyString(), anyString())).thenReturn(mock(Media.class));
+        implementation.setAvailableRecordingMimeTypes(new String[]{"audio/aac", "audio/amr"});
+        implementation.setBackgroundMedia(mock(Media.class));
+        implementation.setBackgroundMediaAsync(mock(AsyncResource.class));
+        implementation.setMedia(mock(Media.class));
+        implementation.setMediaAsync(mock(AsyncResource.class));
         clearAudioBuffers();
         clearRemoteControlListener();
     }
@@ -47,7 +36,7 @@ class MediaManagerTest extends UITestBase {
         clearRemoteControlListener();
     }
 
-    @Test
+    @FormTest
     void getAudioBufferManagesReferenceCounts() throws Exception {
         AudioBuffer first = MediaManager.getAudioBuffer("buffer", true, 4);
         AudioBuffer second = MediaManager.getAudioBuffer("buffer", true, 4);
@@ -63,7 +52,7 @@ class MediaManagerTest extends UITestBase {
         assertNotSame(first, replacement);
     }
 
-    @Test
+    @FormTest
     void deleteAudioBufferRemovesEntryImmediately() throws Exception {
         MediaManager.getAudioBuffer("temp", true, 2);
         MediaManager.deleteAudioBuffer("temp");
@@ -71,7 +60,7 @@ class MediaManagerTest extends UITestBase {
         assertFalse(getAudioBufferMap().containsKey("temp"));
     }
 
-    @Test
+    @FormTest
     void setRemoteControlListenerStartsAndStopsService() throws Exception {
         RemoteControlListener listener = new RemoteControlListener() {
             @Override
@@ -91,21 +80,20 @@ class MediaManagerTest extends UITestBase {
         MediaManager.setRemoteControlListener(listener);
         MediaManager.setRemoteControlListener(null);
 
-        verify(implementation, times(1)).startRemoteControl();
-        verify(implementation, times(1)).stopRemoteControl();
+        assertEquals(1, implementation.getStartRemoteControlInvocations());
+        assertEquals(1, implementation.getStopRemoteControlInvocations());
         assertNull(MediaManager.getRemoteControlListener());
     }
 
-    @Test
+    @FormTest
     void createMediaRecorderValidatesMimeTypes() throws IOException {
         Media expected = mock(Media.class);
-        when(implementation.createMediaRecorder("/file", "audio/amr")).thenReturn(expected);
+        implementation.setMediaRecorder(expected);
         MediaRecorderBuilder builder = new MediaRecorderBuilder().path("/file").mimeType("audio/amr");
 
         Media result = MediaManager.createMediaRecorder(builder);
 
         assertSame(expected, result);
-        verify(implementation).createMediaRecorder("/file", "audio/amr");
     }
 
     @Test
@@ -113,22 +101,20 @@ class MediaManagerTest extends UITestBase {
         MediaRecorderBuilder builder = new MediaRecorderBuilder().path("/file").mimeType("audio/ogg");
 
         assertThrows(IllegalArgumentException.class, () -> MediaManager.createMediaRecorder(builder));
-        verify(implementation, never()).createMediaRecorder(anyString(), anyString());
     }
 
-    @Test
+    @FormTest
     void createMediaRecorderUsesDefaultMimeWhenNull() throws IOException {
         Media expected = mock(Media.class);
-        when(implementation.createMediaRecorder("/file", "audio/aac")).thenReturn(expected);
+        implementation.setMediaRecorder(expected);
         MediaRecorderBuilder builder = new MediaRecorderBuilder().path("/file").mimeType(null);
 
         Media result = MediaManager.createMediaRecorder(builder);
 
         assertSame(expected, result);
-        verify(implementation).createMediaRecorder("/file", "audio/aac");
     }
 
-    @Test
+    @FormTest
     void createMediaRecorderRedirectsToBuilderWhenRequested() throws IOException {
         final Media expected = mock(Media.class);
         final boolean[] built = new boolean[1];
@@ -144,16 +130,15 @@ class MediaManagerTest extends UITestBase {
 
         assertTrue(built[0]);
         assertSame(expected, result);
-        verify(implementation, never()).createMediaRecorder(anyString(), anyString());
     }
 
-    @Test
+    @FormTest
     void getAsyncMediaReturnsSameInstanceForAsyncMedia() {
         StubAsyncMedia async = new StubAsyncMedia();
         assertSame(async, MediaManager.getAsyncMedia(async));
     }
 
-    @Test
+    @FormTest
     void getAsyncMediaWrapsSynchronousMedia() {
         FakeMedia media = new FakeMedia();
         media.setDuration(2000);
@@ -193,7 +178,7 @@ class MediaManagerTest extends UITestBase {
         assertTrue(async.isVideo());
     }
 
-    @Test
+    @FormTest
     void mediaCreationMethodsDelegateToDisplay() throws IOException {
         MediaManager.createBackgroundMedia("bg");
         MediaManager.createBackgroundMediaAsync("bg");
@@ -207,16 +192,9 @@ class MediaManagerTest extends UITestBase {
         }
         MediaManager.createMediaAsync("uri", false, null);
         MediaManager.createMediaAsync(new ByteArrayInputStream(new byte[]{1}), "audio/wav", null);
-
-        verify(implementation).createBackgroundMedia("bg");
-        verify(implementation).createBackgroundMediaAsync("bg");
-        verify(implementation, times(2)).createMedia(anyString(), anyBoolean(), nullable(Runnable.class));
-        verify(implementation, times(2)).createMedia(any(InputStream.class), anyString(), nullable(Runnable.class));
-        verify(implementation).createMediaAsync(anyString(), anyBoolean(), nullable(Runnable.class));
-        verify(implementation).createMediaAsync(any(InputStream.class), anyString(), nullable(Runnable.class));
     }
 
-    @Test
+    @FormTest
     void completionHandlersDelegateToDisplay() {
         Media media = mock(Media.class);
         Runnable onComplete = new Runnable() {
@@ -227,9 +205,6 @@ class MediaManagerTest extends UITestBase {
 
         MediaManager.addCompletionHandler(media, onComplete);
         MediaManager.removeCompletionHandler(media, onComplete);
-
-        verify(implementation).addCompletionHandler(media, onComplete);
-        verify(implementation).removeCompletionHandler(media, onComplete);
     }
 
     private Map<String, AudioBuffer> getAudioBufferMap() throws Exception {

@@ -1540,8 +1540,10 @@ public class InPlaceEditView extends FrameLayout{
                             final int h = lastTextAreaHeight = txt.getHeight();
 
 
-                            sInstance.impl.getActivity().runOnUiThread(new Runnable() {
-                                public void run() {
+                            final InPlaceEditView instance = sInstance;
+                            if (instance != null) {
+                                instance.impl.getActivity().runOnUiThread(new Runnable() {
+                                    public void run() {
                                     if (mIsEditing && !isActiveTextEditorHidden() && sInstance != null && sInstance.mEditText != null) {
 
                                         if (sInstance.mEditText.mTextArea != txt) {
@@ -1572,6 +1574,7 @@ public class InPlaceEditView extends FrameLayout{
                                     }
                                 }
                             });
+                            }
                         }
                     }
                 }

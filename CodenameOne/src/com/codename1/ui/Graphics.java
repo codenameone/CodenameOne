@@ -383,6 +383,9 @@ public final class Graphics {
         impl.fillRect(nativeGraphics, xTranslate + x, yTranslate + y, width, height);
     }
 
+    /**
+     * @deprecated this method should have been internals
+     */
     public void drawShadow(Image img, int x, int y, int offsetX, int offsetY, int blurRadius, int spreadRadius, int color, float opacity) {
         impl.drawShadow(nativeGraphics, img.getImage(), xTranslate + x, yTranslate + y, offsetX, offsetY, blurRadius, spreadRadius, color, opacity);
     }
@@ -633,6 +636,7 @@ public final class Graphics {
      * @param character - the character to be drawn
      * @param x         the x coordinate of the baseline of the text
      * @param y         the y coordinate of the baseline of the text
+     * @deprecated use drawString instead, this method is inefficient
      */
     public void drawChar(char character, int x, int y) {
         drawString("" + character, x, y);
@@ -647,6 +651,7 @@ public final class Graphics {
      * @param length the number of characters to be drawn
      * @param x      the x coordinate of the baseline of the text
      * @param y      the y coordinate of the baseline of the text
+     * @deprecated use drawString instead, this method is inefficient
      */
     public void drawChars(char[] data, int offset, int length, int x, int y) {
         if (!(current instanceof CustomFont)) {
@@ -1086,9 +1091,9 @@ public final class Graphics {
      * Draws a closed polygon defined by arrays of x and y coordinates.
      * Each pair of (x, y) coordinates defines a point.
      *
-     * @param xPoints - a an array of x coordinates.
-     * @param yPoints - a an array of y coordinates.
-     * @param nPoints - a the total number of points.
+     * @param xPoints - an array of x coordinates.
+     * @param yPoints - an array of y coordinates.
+     * @param nPoints - the total number of points.
      */
     public void drawPolygon(int[] xPoints, int[] yPoints, int nPoints) {
         int[] cX = xPoints;
@@ -1146,7 +1151,7 @@ public final class Graphics {
     }
 
     /**
-     * Returnes the alpha as a value between 0-255 (0 - 0xff) where 255 is completely opaque
+     * Returns the alpha as a value between 0-255 (0 - 0xff) where 255 is completely opaque
      * and 0 is completely transparent
      *
      * @return the alpha value
@@ -1166,20 +1171,20 @@ public final class Graphics {
     }
 
     /**
-     * Returns true if anti-aliasing for standard rendering operations is supported,
-     * notice that text anti-aliasing is a separate attribute.
+     * Returns true if antialiasing for standard rendering operations is supported,
+     * notice that text antialiasing is a separate attribute.
      *
-     * @return true if anti aliasing is supported
+     * @return true if antialiasing is supported
      */
     public boolean isAntiAliasingSupported() {
         return impl.isAntiAliasingSupported(nativeGraphics);
     }
 
     /**
-     * Returns true if anti-aliasing for text is supported,
-     * notice that text anti-aliasing is a separate attribute from standard anti-alisaing.
+     * Returns true if antialiasing for text is supported,
+     * notice that text antialiasing is a separate attribute from standard anti-alisaing.
      *
-     * @return true if text anti aliasing is supported
+     * @return true if text antialiasing is supported
      */
     public boolean isAntiAliasedTextSupported() {
         return impl.isAntiAliasedTextSupported(nativeGraphics);
@@ -1187,38 +1192,38 @@ public final class Graphics {
 
 
     /**
-     * Returns true if anti-aliasing for standard rendering operations is turned on.
+     * Returns true if antialiasing for standard rendering operations is turned on.
      *
-     * @return true if anti aliasing is active
+     * @return true if antialiasing is active
      */
     public boolean isAntiAliased() {
         return impl.isAntiAliased(nativeGraphics);
     }
 
     /**
-     * Set whether anti-aliasing for standard rendering operations is turned on.
+     * Set whether antialiasing for standard rendering operations is turned on.
      *
-     * @param a true if anti aliasing is active
+     * @param a true if antialiasing is active
      */
     public void setAntiAliased(boolean a) {
         impl.setAntiAliased(nativeGraphics, a);
     }
 
     /**
-     * Indicates whether anti-aliasing for text is active,
-     * notice that text anti-aliasing is a separate attribute from standard anti-alisaing.
+     * Indicates whether antialiasing for text is active,
+     * notice that text antialiasing is a separate attribute from standard anti-alisaing.
      *
-     * @return true if text anti aliasing is supported
+     * @return true if text antialiasing is supported
      */
     public boolean isAntiAliasedText() {
         return impl.isAntiAliasedText(nativeGraphics);
     }
 
     /**
-     * Set whether anti-aliasing for text is active,
-     * notice that text anti-aliasing is a separate attribute from standard anti-alisaing.
+     * Set whether antialiasing for text is active,
+     * notice that text antialiasing is a separate attribute from standard anti-alisaing.
      *
-     * @param a true if text anti aliasing is supported
+     * @param a true if text antialiasing is supported
      */
     public void setAntiAliasedText(boolean a) {
         impl.setAntiAliasedText(nativeGraphics, a);

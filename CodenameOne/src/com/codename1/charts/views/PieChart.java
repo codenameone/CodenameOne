@@ -33,7 +33,11 @@ import java.util.List;
 
 
 /**
- * The pie chart rendering class.
+ * Shows each value from a {@link CategorySeries} as a slice of a circle.
+ * <p>
+ * Combine this chart with a {@link DefaultRenderer} to control colours, labels
+ * and gradients. The resulting {@code PieChart} can be embedded in a form via a
+ * {@link com.codename1.charts.ChartComponent}.
  */
 public class PieChart extends RoundChart {
     /** Handles returning values when tapping on PieChart. */

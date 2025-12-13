@@ -3,7 +3,7 @@ package com.codename1.components;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkEvent;
 import com.codename1.io.NetworkManager;
-import com.codename1.test.UITestBase;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Slider;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.util.EventDispatcher;

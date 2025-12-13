@@ -42,9 +42,9 @@ public class StorageImageAsync extends EncodedImage {
     private final String fileName;
     private boolean changePending;
     private boolean imageCreated;
-    private byte[] imageData;
+    private volatile byte[] imageData;
     private final Image placeholderImage;
-    private boolean queued;
+    private volatile boolean queued;
 
     private StorageImageAsync(String fileName, Image placeholderImage) {
         super(placeholderImage.getWidth(), placeholderImage.getHeight());
@@ -111,12 +111,12 @@ public class StorageImageAsync extends EncodedImage {
                                 resetCache();
                                 changePending = true;
                                 imageCreated = false;
+                                queued = false;
                             }
                         });
                     } catch (Throwable ex) {
                         Log.e(ex);
                     } finally {
-                        queued = false;
                         Util.cleanup(i);
                     }
                 }

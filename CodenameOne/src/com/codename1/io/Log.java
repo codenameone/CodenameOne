@@ -24,6 +24,7 @@
 package com.codename1.io;
 
 import com.codename1.compat.java.util.Objects;
+import com.codename1.impl.CodenameOneImplementation;
 import com.codename1.impl.CodenameOneThread;
 import com.codename1.ui.Command;
 import com.codename1.ui.Dialog;
@@ -165,7 +166,7 @@ public class Log {
             }
 
             protected void handleErrorResponseCode(int code, String message) {
-                System.out.print("Error in sending log to server: " + code + " " + message);
+                Log.p("Error in sending log to server: " + code + " " + message);
             }
 
             protected void handleException(Exception err) {
@@ -480,7 +481,12 @@ public class Log {
         }
         logDirty = true;
         text = getThreadAndTimeStamp() + " - " + text;
-        Util.getImplementation().systemOut(text);
+        CodenameOneImplementation impl = Util.getImplementation();
+        if(impl != null) {
+            impl.systemOut(text);
+        } else {
+            System.out.println(text);
+        }
         try {
             synchronized (this) {
                 Writer w = getWriter();

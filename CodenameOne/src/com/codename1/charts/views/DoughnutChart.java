@@ -29,7 +29,13 @@ import java.util.List;
 
 
 /**
- * The doughnut chart rendering class.
+ * Visualises a {@link MultipleCategorySeries} as concentric rings that share a
+ * common centre (also known as a doughnut chart).
+ * <p>
+ * Each category in the dataset is drawn as a separate ring, making it suitable
+ * for representing hierarchical proportions. Construct the chart with the
+ * dataset and a {@link DefaultRenderer} and wrap it in a
+ * {@link com.codename1.charts.ChartComponent} to place it on screen.
  */
 public class DoughnutChart extends RoundChart {
     /** The series dataset. */

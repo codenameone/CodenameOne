@@ -1,5 +1,6 @@
 package com.codename1.components;
 
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
@@ -13,7 +14,7 @@ import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class FloatingHintTest extends ComponentTestBase {
+class FloatingHintTest extends UITestBase {
 
     @Test
     void constructorConfiguresHintComponents() throws Exception {

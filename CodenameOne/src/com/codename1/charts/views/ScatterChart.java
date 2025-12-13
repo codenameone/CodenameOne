@@ -27,7 +27,12 @@ import java.util.List;
 
 
 /**
- * The scatter chart rendering class.
+ * Renders discrete X/Y points without connecting lines.
+ * <p>
+ * Configure the marker style through {@link XYSeriesRenderer#setPointStyle} and
+ * related options on the {@link XYMultipleSeriesRenderer}. As with other
+ * charts, wrap the instance in a {@link com.codename1.charts.ChartComponent} to
+ * place it on a form.
  */
 public class ScatterChart extends XYChart {
     /** The constant to identify this chart type. */

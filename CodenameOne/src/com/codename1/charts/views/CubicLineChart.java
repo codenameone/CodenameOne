@@ -28,7 +28,13 @@ import java.util.List;
 
 
 /**
- * The interpolated (cubic) line chart rendering class.
+ * Draws smooth curves through XY series values using cubic interpolation.
+ * <p>
+ * Use this chart when you want to emphasise the trend between points rather
+ * than the raw straight-line segments of {@link LineChart}. Supply the
+ * {@link XYMultipleSeriesDataset} and {@link XYMultipleSeriesRenderer} as usual
+ * and pass an optional smoothness factor to control how tightly the curve
+ * follows the provided data points.
  */
 public class CubicLineChart extends LineChart {
     /** The chart type. */

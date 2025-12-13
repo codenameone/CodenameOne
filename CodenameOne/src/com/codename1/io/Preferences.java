@@ -82,7 +82,7 @@ public class Preferences {
     private synchronized static Hashtable<String, Object> get() {
         if (p == null) {
             if (Storage.getInstance().exists(preferencesLocation)) {
-                p = (Hashtable<String, Object>) Storage.getInstance().readObject(preferencesLocation);
+                p = (Hashtable<String, Object>) Storage.getInstance().readObject(preferencesLocation, false);
             }
             if (p == null) {
                 p = new Hashtable<String, Object>();
@@ -92,7 +92,7 @@ public class Preferences {
     }
 
     private static synchronized void save() {
-        Storage.getInstance().writeObject(preferencesLocation, p);
+        Storage.getInstance().writeObject(preferencesLocation, p, false);
     }
 
     /**

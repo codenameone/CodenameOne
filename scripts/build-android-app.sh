@@ -4,14 +4,13 @@ set -euo pipefail
 
 ba_log() { echo "[build-android-app] $1"; }
 
+REPO_ROOT="$(pwd)"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
 
 TMPDIR="${TMPDIR:-/tmp}"; TMPDIR="${TMPDIR%/}"
 DOWNLOAD_DIR="${TMPDIR%/}/codenameone-tools"
 ENV_DIR="$DOWNLOAD_DIR/tools"
-EXTRA_MVN_ARGS=("$@")
 
 ENV_FILE="$ENV_DIR/env.sh"
 ba_log "Loading workspace environment from $ENV_FILE"
@@ -74,189 +73,21 @@ fi
 export ANDROID_SDK_ROOT ANDROID_HOME="$ANDROID_SDK_ROOT"
 ba_log "Using Android SDK at $ANDROID_SDK_ROOT"
 
-CN1_VERSION=$(awk -F'[<>]' '/<version>/{print $3; exit}' maven/pom.xml)
-ba_log "Detected Codename One version $CN1_VERSION"
-
-WORK_DIR="$TMPDIR/cn1-hello-android"
-rm -rf "$WORK_DIR"; mkdir -p "$WORK_DIR"
-
-GROUP_ID="com.codenameone.examples"
-ARTIFACT_ID="hello-codenameone"
-MAIN_NAME="HelloCodenameOne"
-
-SOURCE_PROJECT="$REPO_ROOT/Samples/SampleProjectTemplate"
-if [ ! -d "$SOURCE_PROJECT" ]; then
-  ba_log "Source project template not found at $SOURCE_PROJECT" >&2
-  exit 1
-fi
-ba_log "Using source project template at $SOURCE_PROJECT"
-
-LOCAL_MAVEN_REPO="${LOCAL_MAVEN_REPO:-$HOME/.m2/repository}"
-ba_log "Using local Maven repository at $LOCAL_MAVEN_REPO"
-mkdir -p "$LOCAL_MAVEN_REPO"
-MAVEN_CMD=(
-  "$MAVEN_HOME/bin/mvn" -B -ntp
-  -Dmaven.repo.local="$LOCAL_MAVEN_REPO"
-  -Dorg.slf4j.simpleLogger.log.org.apache.maven.cli.transfer.Slf4jMavenTransferListener=warn
-)
-
-# --- Generate app skeleton ---
-ba_log "Generating Codename One application skeleton via codenameone-maven-plugin"
-(
-  cd "$WORK_DIR"
-  xvfb-run -a "${MAVEN_CMD[@]}" -q \
-    com.codenameone:codenameone-maven-plugin:7.0.204:generate-app-project \
-    -DgroupId="$GROUP_ID" \
-    -DartifactId="$ARTIFACT_ID" \
-    -Dversion=1.0-SNAPSHOT \
-    -DsourceProject="$SOURCE_PROJECT" \
-    -Dcn1Version="7.0.204" \
-    "${EXTRA_MVN_ARGS[@]}"
-)
-
-APP_DIR="$WORK_DIR/$ARTIFACT_ID"
-
-# --- Namespace-aware CN1 normalization (xmlstarlet) ---
-ROOT_POM="$APP_DIR/pom.xml"
-NS="mvn=http://maven.apache.org/POM/4.0.0"
-
-if ! command -v xmlstarlet >/dev/null 2>&1; then
-  sudo apt-get update -y && sudo apt-get install -y xmlstarlet
-fi
-
-# Helper to run xmlstarlet with Maven namespace
-x() { xmlstarlet ed -L -N "$NS" "$@"; }
-q() { xmlstarlet sel -N "$NS" "$@"; }
-
-# 1) Ensure <properties><codenameone.version> exists/updated (root pom)
-if [ "$(q -t -v 'count(/mvn:project/mvn:properties)' "$ROOT_POM" 2>/dev/null || echo 0)" = "0" ]; then
-  x -s "/mvn:project" -t elem -n properties -v "" "$ROOT_POM"
-fi
-if [ "$(q -t -v 'count(/mvn:project/mvn:properties/mvn:codenameone.version)' "$ROOT_POM" 2>/dev/null || echo 0)" = "0" ]; then
-  x -s "/mvn:project/mvn:properties" -t elem -n codenameone.version -v "$CN1_VERSION" "$ROOT_POM"
-else
-  x -u "/mvn:project/mvn:properties/mvn:codenameone.version" -v "$CN1_VERSION" "$ROOT_POM"
-fi
-
-# 2) Parent must be a LITERAL version (no property allowed)
-while IFS= read -r -d '' P; do
-  x -u "/mvn:project[mvn:parent/mvn:groupId='com.codenameone' and mvn:parent/mvn:artifactId='codenameone-maven-parent']/mvn:parent/mvn:version" -v "$CN1_VERSION" "$P" || true
-done < <(find "$APP_DIR" -type f -name pom.xml -print0)
-
-# 3) Point com.codenameone deps/plugins to ${codenameone.version}
-while IFS= read -r -d '' P; do
-  # Dependencies
-  x -u "/mvn:project//mvn:dependencies/mvn:dependency[starts-with(mvn:groupId,'com.codenameone')]/mvn:version" -v '${codenameone.version}' "$P" 2>/dev/null || true
-  # Plugins (regular)
-  x -u "/mvn:project//mvn:build/mvn:plugins/mvn:plugin[starts-with(mvn:groupId,'com.codenameone')]/mvn:version" -v '${codenameone.version}' "$P" 2>/dev/null || true
-  # Plugins (pluginManagement)
-  x -u "/mvn:project//mvn:build/mvn:pluginManagement/mvn:plugins/mvn:plugin[starts-with(mvn:groupId,'com.codenameone')]/mvn:version" -v '${codenameone.version}' "$P" 2>/dev/null || true
-done < <(find "$APP_DIR" -type f -name pom.xml -print0)
-
-# 4) Ensure common Maven plugins have a version (Maven requires it even if parent not yet resolved)
-declare -A PIN=(
-  [org.apache.maven.plugins:maven-compiler-plugin]=3.11.0
-  [org.apache.maven.plugins:maven-resources-plugin]=3.3.1
-  [org.apache.maven.plugins:maven-surefire-plugin]=3.2.5
-  [org.apache.maven.plugins:maven-failsafe-plugin]=3.2.5
-  [org.apache.maven.plugins:maven-jar-plugin]=3.3.0
-  [org.apache.maven.plugins:maven-clean-plugin]=3.3.2
-  [org.apache.maven.plugins:maven-deploy-plugin]=3.1.2
-  [org.apache.maven.plugins:maven-install-plugin]=3.1.2
-  [org.apache.maven.plugins:maven-assembly-plugin]=3.6.0
-  [org.apache.maven.plugins:maven-site-plugin]=4.0.0-M15
-  [com.codenameone:codenameone-maven-plugin]='${codenameone.version}'
-)
-
-add_version_if_missing() {
-  local pom="$1" g="$2" a="$3" v="$4"
-  # build/plugins
-  if [ "$(q -t -v "count(/mvn:project/mvn:build/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a']/mvn:version)" "$pom" 2>/dev/null || echo 0)" = "0" ] &&
-     [ "$(q -t -v "count(/mvn:project/mvn:build/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a'])" "$pom" 2>/dev/null || echo 0)" != "0" ]; then
-    x -s "/mvn:project/mvn:build/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a']" -t elem -n version -v "$v" "$pom" || true
-  fi
-  # pluginManagement/plugins
-  if [ "$(q -t -v "count(/mvn:project/mvn:build/mvn:pluginManagement/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a']/mvn:version)" "$pom" 2>/dev/null || echo 0)" = "0" ] &&
-     [ "$(q -t -v "count(/mvn:project/mvn:build/mvn:pluginManagement/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a'])" "$pom" 2>/dev/null || echo 0)" != "0" ]; then
-    x -s "/mvn:project/mvn:build/mvn:pluginManagement/mvn:plugins/mvn:plugin[mvn:groupId='$g' and mvn:artifactId='$a']" -t elem -n version -v "$v" "$pom" || true
-  fi
-}
-
-while IFS= read -r -d '' P; do
-  for ga in "${!PIN[@]}"; do
-    add_version_if_missing "$P" "${ga%%:*}" "${ga##*:}" "${PIN[$ga]}"
-  done
-done < <(find "$APP_DIR" -type f -name pom.xml -print0)
-
-# 5) Build with the property set so any lingering refs resolve to the local snapshot
-EXTRA_MVN_ARGS+=("-Dcodenameone.version=${CN1_VERSION}")
-
-# (Optional) quick non-fatal checks
-xmlstarlet sel -N "$NS" -t -v "/mvn:project/mvn:properties/mvn:codenameone.version" -n "$ROOT_POM" || true
-xmlstarlet sel -N "$NS" -t -c "/mvn:project/mvn:build/mvn:plugins" -n "$ROOT_POM" | head -n 60 || true
-
-
+APP_DIR="scripts/hellocodenameone"
 
 [ -d "$APP_DIR" ] || { ba_log "Failed to create Codename One application project" >&2; exit 1; }
 [ -f "$APP_DIR/build.sh" ] && chmod +x "$APP_DIR/build.sh"
 
-SETTINGS_FILE="$APP_DIR/common/codenameone_settings.properties"
-echo "codename1.arg.android.useAndroidX=true" >> "$SETTINGS_FILE"
-[ -f "$SETTINGS_FILE" ] || { ba_log "codenameone_settings.properties not found at $SETTINGS_FILE" >&2; exit 1; }
-
-# --- Read settings ---
-read_prop() { grep -E "^$1=" "$SETTINGS_FILE" | head -n1 | cut -d'=' -f2- | sed 's/^[[:space:]]*//'; }
-
-PACKAGE_NAME="$(read_prop 'codename1.packageName' || true)"
-CURRENT_MAIN_NAME="$(read_prop 'codename1.mainName' || true)"
-
-if [ -z "$PACKAGE_NAME" ]; then
-  PACKAGE_NAME="$GROUP_ID"
-  ba_log "Package name not found in settings. Falling back to groupId $PACKAGE_NAME"
-fi
-if [ -z "$CURRENT_MAIN_NAME" ]; then
-  CURRENT_MAIN_NAME="$MAIN_NAME"
-  ba_log "Main class name not found in settings. Falling back to target $CURRENT_MAIN_NAME"
-fi
-
-# --- Generate Java from external template ---
-PACKAGE_PATH="${PACKAGE_NAME//.//}"
-JAVA_DIR="$APP_DIR/common/src/main/java/${PACKAGE_PATH}"
-mkdir -p "$JAVA_DIR"
-MAIN_FILE="$JAVA_DIR/${MAIN_NAME}.java"
-
-TEMPLATE="$SCRIPT_DIR/templates/HelloCodenameOne.java.tmpl"
-if [ ! -f "$TEMPLATE" ]; then
-  ba_log "Template not found: $TEMPLATE" >&2
-  exit 1
-fi
-
-sed -e "s|@PACKAGE@|$PACKAGE_NAME|g" \
-    -e "s|@MAIN_NAME@|$MAIN_NAME|g" \
-    "$TEMPLATE" > "$MAIN_FILE"
-
-# --- Ensure codename1.mainName is set ---
-ba_log "Setting codename1.mainName to $MAIN_NAME"
-if grep -q '^codename1.mainName=' "$SETTINGS_FILE"; then
-  # GNU sed in CI: in-place edit without backup
-  sed -E -i 's|^codename1\.mainName=.*$|codename1.mainName='"$MAIN_NAME"'|' "$SETTINGS_FILE"
-else
-  printf '\ncodename1.mainName=%s\n' "$MAIN_NAME" >> "$SETTINGS_FILE"
-fi
-# Ensure trailing newline
-tail -c1 "$SETTINGS_FILE" | read -r _ || echo >> "$SETTINGS_FILE"
-
-# --- Normalize Codename One versions (use Maven Versions Plugin) ---
-ba_log "Normalizing Codename One Maven coordinates to $CN1_VERSION"
-
 # --- Build Android gradle project ---
 ba_log "Building Android gradle project using Codename One port"
-xvfb-run -a "${MAVEN_CMD[@]}" -q -f "$APP_DIR/pom.xml" package \
+cd $APP_DIR
+xvfb-run -a ./mvnw package \
   -DskipTests \
   -Dcodename1.platform=android \
   -Dcodename1.buildTarget=android-source \
   -Dopen=false \
-  "${EXTRA_MVN_ARGS[@]}"
+  -U -e
+cd ../..
 
 GRADLE_PROJECT_DIR=$(find "$APP_DIR/android/target" -maxdepth 2 -type d -name "*-android-source" | head -n 1 || true)
 if [ -z "$GRADLE_PROJECT_DIR" ]; then
@@ -266,7 +97,23 @@ if [ -z "$GRADLE_PROJECT_DIR" ]; then
   exit 1
 fi
 
-ba_log "Configuring instrumentation test sources in $GRADLE_PROJECT_DIR"
+ba_log "Normalizing Android Gradle project in $GRADLE_PROJECT_DIR"
+
+# --- Install Android instrumentation harness for coverage ---
+ANDROID_TEST_SOURCE_DIR="$SCRIPT_DIR/device-runner-app/androidTest"
+ANDROID_TEST_ROOT="$GRADLE_PROJECT_DIR/app/src/androidTest"
+ANDROID_TEST_JAVA_DIR="$ANDROID_TEST_ROOT/java/com/codenameone/examples/hellocodenameone"
+if [ -d "$ANDROID_TEST_ROOT" ]; then
+  ba_log "Removing template Android instrumentation tests from $ANDROID_TEST_ROOT"
+  rm -rf "$ANDROID_TEST_ROOT"
+fi
+mkdir -p "$ANDROID_TEST_JAVA_DIR"
+if [ ! -d "$ANDROID_TEST_SOURCE_DIR" ]; then
+  ba_log "Android instrumentation test sources not found: $ANDROID_TEST_SOURCE_DIR" >&2
+  exit 1
+fi
+cp "$ANDROID_TEST_SOURCE_DIR"/*.java "$ANDROID_TEST_JAVA_DIR"/
+ba_log "Installed Android instrumentation tests in $ANDROID_TEST_JAVA_DIR"
 
 # Ensure AndroidX flags in gradle.properties
 # --- BEGIN: robust Gradle patch for AndroidX tests ---
@@ -301,30 +148,6 @@ echo "----- app/build.gradle tail -----"
 tail -n 80 "$APP_BUILD_GRADLE" | sed 's/^/| /'
 echo "---------------------------------"
 
-TEST_SRC_DIR="$GRADLE_PROJECT_DIR/app/src/androidTest/java/${PACKAGE_PATH}"
-mkdir -p "$TEST_SRC_DIR"
-TEST_CLASS="$TEST_SRC_DIR/HelloCodenameOneInstrumentedTest.java"
-TEST_TEMPLATE="$SCRIPT_DIR/android/tests/HelloCodenameOneInstrumentedTest.java"
-
-if [ ! -f "$TEST_TEMPLATE" ]; then
-  ba_log "Missing instrumentation test template: $TEST_TEMPLATE" >&2
-  exit 1
-fi
-
-sed "s|@PACKAGE@|$PACKAGE_NAME|g" "$TEST_TEMPLATE" > "$TEST_CLASS"
-ba_log "Created instrumentation test at $TEST_CLASS"
-
-DEFAULT_ANDROID_TEST="$GRADLE_PROJECT_DIR/app/src/androidTest/java/com/example/myapplication2/ExampleInstrumentedTest.java"
-if [ -f "$DEFAULT_ANDROID_TEST" ]; then
-  rm -f "$DEFAULT_ANDROID_TEST"
-  ba_log "Removed default instrumentation stub at $DEFAULT_ANDROID_TEST"
-  DEFAULT_ANDROID_TEST_DIR="$(dirname "$DEFAULT_ANDROID_TEST")"
-  DEFAULT_ANDROID_TEST_PARENT="$(dirname "$DEFAULT_ANDROID_TEST_DIR")"
-  rmdir "$DEFAULT_ANDROID_TEST_DIR" 2>/dev/null || true
-  rmdir "$DEFAULT_ANDROID_TEST_PARENT" 2>/dev/null || true
-  rmdir "$(dirname "$DEFAULT_ANDROID_TEST_PARENT")" 2>/dev/null || true
-fi
-
 ba_log "Invoking Gradle build in $GRADLE_PROJECT_DIR"
 chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 ORIGINAL_JAVA_HOME="$JAVA_HOME"
@@ -348,7 +171,6 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
   {
     echo "gradle_project_dir=$GRADLE_PROJECT_DIR"
     echo "apk_path=$APK_PATH"
-    echo "instrumentation_test_class=$PACKAGE_NAME.HelloCodenameOneInstrumentedTest"
   } >> "$GITHUB_OUTPUT"
   ba_log "Published GitHub Actions outputs for downstream steps"
 fi

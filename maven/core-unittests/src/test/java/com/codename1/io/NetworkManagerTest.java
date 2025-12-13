@@ -1,31 +1,41 @@
 package com.codename1.io;
 
-import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.junit.EdtTest;
+import com.codename1.junit.FormTest;
+import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionListener;
+import com.codename1.io.Storage;
+import com.codename1.io.Util;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.reset;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 class NetworkManagerTest {
     private NetworkManager manager;
-    private CodenameOneImplementation implementation;
+    private TestCodenameOneImplementation implementation;
 
     @BeforeEach
     void setUp() throws Exception {
-        implementation = TestImplementationProvider.installImplementation(true);
+        Storage.setStorageInstance(null);
+        implementation = new TestCodenameOneImplementation(true);
+        Util.setImplementation(implementation);
         manager = NetworkManager.getInstance();
         resetManagerState();
-        bootstrapDisplayThread();
+    }
+
+    @AfterEach
+    void tearDown() throws Exception {
+        resetManagerState();
+        Util.setImplementation(null);
+        Storage.setStorageInstance(null);
     }
 
     @Test
@@ -44,8 +54,9 @@ class NetworkManagerTest {
         assertEquals("value", ((java.util.Hashtable) headers).get("X-Test"));
     }
 
-    @Test
+    @FormTest
     void errorListenersReceiveEvents() {
+        Util.setImplementation(implementation);
         AtomicInteger invocations = new AtomicInteger();
         ActionListener<NetworkEvent> listener = evt -> {
             invocations.incrementAndGet();
@@ -57,7 +68,7 @@ class NetworkManagerTest {
         assertEquals(1, invocations.get());
     }
 
-    @Test
+    @FormTest
     void progressListenersTrackUpdates() {
         AtomicInteger lengths = new AtomicInteger();
         ActionListener<NetworkEvent> listener = evt -> lengths.addAndGet(evt.getLength());
@@ -81,13 +92,14 @@ class NetworkManagerTest {
     @Test
     void setTimeoutDelegatesWhenSupported() {
         manager.setTimeout(1234);
-        verify(implementation).setTimeout(1234);
+        assertTrue(implementation.wasTimeoutInvoked());
+        assertEquals(1234, implementation.getTimeoutValue());
     }
 
     @Test
     void setTimeoutStoresValueWhenUnsupported() throws Exception {
-        reset(implementation);
-        implementation = TestImplementationProvider.installImplementation(false);
+        implementation = new TestCodenameOneImplementation(false);
+        Util.setImplementation(implementation);
         manager = NetworkManager.getInstance();
         resetManagerState();
 
@@ -143,10 +155,9 @@ class NetworkManagerTest {
 
     @Test
     void apDelegatesToImplementation() {
-        when(implementation.isAPSupported()).thenReturn(true);
-        when(implementation.getAPIds()).thenReturn(new String[]{"wifi"});
-        when(implementation.getAPType("wifi")).thenReturn(NetworkManager.ACCESS_POINT_TYPE_WLAN);
-        when(implementation.getAPName("wifi")).thenReturn("WiFi");
+        implementation.setAccessPoints(new String[]{"wifi"},
+                Collections.singletonMap("wifi", NetworkManager.ACCESS_POINT_TYPE_WLAN),
+                Collections.singletonMap("wifi", "WiFi"));
         manager.setCurrentAccessPoint("wifi");
         assertTrue(manager.isAPSupported());
         assertArrayEquals(new String[]{"wifi"}, manager.getAPIds());
@@ -190,13 +201,6 @@ class NetworkManagerTest {
         timeoutField.setInt(manager, 300000);
 
         getPendingQueue().clear();
-    }
-
-    private void bootstrapDisplayThread() throws Exception {
-        Display display = Display.getInstance();
-        Field edtField = Display.class.getDeclaredField("edt");
-        edtField.setAccessible(true);
-        edtField.set(display, Thread.currentThread());
     }
 
     private static class MockConnectionRequest extends ConnectionRequest {

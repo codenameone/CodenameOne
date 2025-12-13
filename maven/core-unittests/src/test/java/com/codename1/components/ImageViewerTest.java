@@ -1,25 +1,25 @@
 package com.codename1.components;
 
+import com.codename1.junit.FormTest;
+import com.codename1.junit.UITestBase;
 import com.codename1.ui.Image;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListModel;
 
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.when;
 
-class ImageViewerTest extends ComponentTestBase {
+class ImageViewerTest extends UITestBase {
 
     @BeforeEach
     void stubOrientation() {
-        when(implementation.isPortrait()).thenReturn(true);
+        implementation.setPortrait(true);
     }
 
-    @Test
+    @FormTest
     void setImageResetsZoomAndPan() throws Exception {
         Image image = Image.createImage(40, 20, 0xff0000ff);
         ImageViewer viewer = new ImageViewer();
@@ -31,7 +31,7 @@ class ImageViewerTest extends ComponentTestBase {
         assertEquals(0.5f, getPrivateField(viewer, "panPositionY", Float.class));
     }
 
-    @Test
+    @FormTest
     void setImageNoRepositionKeepsState() throws Exception {
         Image first = Image.createImage(10, 10, 0xff00ff00);
         ImageViewer viewer = new ImageViewer(first);
@@ -45,7 +45,7 @@ class ImageViewerTest extends ComponentTestBase {
         assertEquals(0f, getPrivateField(viewer, "panPositionY", Float.class));
     }
 
-    @Test
+    @FormTest
     void setImageListRespondsToSelectionChanges() {
         Image first = Image.createImage(12, 12, 0xff112233);
         Image second = Image.createImage(12, 12, 0xff445566);
@@ -59,7 +59,7 @@ class ImageViewerTest extends ComponentTestBase {
         assertSame(second, viewer.getImage());
     }
 
-    @Test
+    @FormTest
     void setZoomClampsPanPositionsWhenAnimationDisabled() throws Exception {
         ImageViewer viewer = new ImageViewer(Image.createImage(16, 16, 0xff223344));
         viewer.setAnimateZoom(false);
@@ -69,7 +69,7 @@ class ImageViewerTest extends ComponentTestBase {
         assertEquals(0f, getPrivateField(viewer, "panPositionY", Float.class));
     }
 
-    @Test
+    @FormTest
     void propertyAccessorsExposeConfiguration() {
         Image placeholder = Image.createImage(5, 5, 0xffabcdef);
         Image first = Image.createImage(6, 6, 0xffaabbcc);

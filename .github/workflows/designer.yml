@@ -1,0 +1,75 @@
+name: Codename One Designer CI
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'CodenameOneDesigner/**'
+      - '.github/workflows/designer.yml'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'CodenameOneDesigner/**'
+      - '.github/workflows/designer.yml'
+
+jobs:
+  build-designer:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v1
+        with:
+          java-version: 1.8
+          java-package: jdk
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb unzip
+
+      - name: Fetch cn1 binaries
+        run: |
+          wget https://github.com/codenameone/cn1-binaries/archive/refs/heads/master.zip
+          unzip master.zip -d ..
+          mv ../cn1-binaries-master ../cn1-binaries
+
+      - name: Build core dependencies
+        run: |
+          xvfb-run -a ant -noinput -buildfile Ports/JavaSE/build.xml jar
+          xvfb-run -a ant -noinput -buildfile Ports/JavaSEWithSVGSupport/build.xml jar
+          xvfb-run -a ant -noinput -buildfile CodenameOne/build.xml jar
+
+      - name: Run designer CSS localization tests
+        run: xvfb-run -a ant -noinput -buildfile CodenameOneDesigner/build.xml test-css-localization
+
+      - name: Build designer release jar
+        run: xvfb-run -a ant -noinput -buildfile CodenameOneDesigner/build.xml release
+
+      - name: Verify designer CLI CSS compilation
+        run: |
+          tmp_dir="CodenameOneDesigner/tmp-cli-test"
+          css_file="$tmp_dir/test.css"
+          l10n_dir="$tmp_dir/localization"
+          output_file="$tmp_dir/output.res"
+          mkdir -p "$l10n_dir"
+          cat <<'EOF' > "$css_file"
+          Label {
+              color: rgb(255, 0, 0);
+          }
+          EOF
+          cat <<'EOF' > "$l10n_dir/Strings.properties"
+          greeting=Hello from CLI
+          EOF
+          xvfb-run -a java -Dcli=true -jar CodenameOneDesigner/dist/designer.jar \
+            -css -stateless -input "$css_file" -output "$output_file" -localization "$l10n_dir"
+          test -s "$output_file"
+
+      - name: Upload designer jar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: designer-jar
+          path: CodenameOneDesigner/dist/designer.jar
