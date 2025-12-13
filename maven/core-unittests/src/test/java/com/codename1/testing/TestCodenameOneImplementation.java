@@ -191,6 +191,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private final List<AudioCaptureFrame> audioCaptureFrames = new ArrayList<AudioCaptureFrame>();
     private TextArea activeTextEditor;
     private Function<String, byte[]> connectionResponseProvider;
+    private Function<String, String> browserScriptResponder;
     private final Map<String, String[]> sslCertificatesByUrl = new ConcurrentHashMap<String, String[]>();
     private boolean sslCertificatesSupported;
     private final Map<String, MockResponse> mockResponses = new ConcurrentHashMap<String, MockResponse>();
@@ -684,9 +685,24 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     @Override
+    public boolean supportsBrowserExecuteAndReturnString(PeerComponent internal) {
+        return true;
+    }
+
+    @Override
     public String browserExecuteAndReturnString(PeerComponent internal, String javaScript) {
         browserExecuted.add(javaScript);
+        if (browserScriptResponder != null) {
+            String resp = browserScriptResponder.apply(javaScript);
+            if (resp != null) {
+                return resp;
+            }
+        }
         return javaScript;
+    }
+
+    public void setBrowserScriptResponder(Function<String, String> responder) {
+        this.browserScriptResponder = responder;
     }
 
     @Override

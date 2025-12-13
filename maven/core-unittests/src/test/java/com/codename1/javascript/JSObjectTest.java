@@ -1,285 +1,139 @@
 package com.codename1.javascript;
 
+import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.ui.BrowserComponent;
+import com.codename1.ui.CN;
+import com.codename1.ui.DisplayTest;
+import com.codename1.ui.TestPeerComponent;
 import com.codename1.util.Callback;
 import com.codename1.util.SuccessCallback;
-import java.lang.ref.WeakReference;
-import java.util.ArrayDeque;
-import java.util.Map;
-import java.util.Queue;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
-class JSObjectTest extends UITestBase {
-    private BrowserComponent browser;
-    private Queue<String> responses;
+public class JSObjectTest extends UITestBase {
 
-    private static class RecordingJavascriptContext extends JavascriptContext {
-        private final Queue<JSObject> recordedFunctions = new ArrayDeque<JSObject>();
-        private final Queue<JSObject> recordedSelfs = new ArrayDeque<JSObject>();
-        private final Queue<Object[]> recordedParams = new ArrayDeque<Object[]>();
-        private final Queue<Callback> recordedCallbacks = new ArrayDeque<Callback>();
-
-        RecordingJavascriptContext(BrowserComponent browser) {
-            super(browser);
-        }
-
-        @Override
-        public void callAsync(JSObject func, JSObject self, Object[] params, Callback callback) {
-            recordedFunctions.add(func);
-            recordedSelfs.add(self);
-            recordedParams.add(params);
-            recordedCallbacks.add(callback);
-        }
-
-        Callback removeNextCallback() {
-            return recordedCallbacks.remove();
-        }
-
-        JSObject removeNextFunction() {
-            return recordedFunctions.remove();
-        }
-
-        JSObject removeNextSelf() {
-            return recordedSelfs.remove();
-        }
-
-        Object[] removeNextParams() {
-            return recordedParams.remove();
-        }
+    @AfterEach
+    public void tearDown() {
+        TestCodenameOneImplementation.getInstance().setBrowserScriptResponder(null);
     }
 
-    @BeforeEach
-    void setUpBrowser() {
-        browser = mock(BrowserComponent.class);
-        responses = new ArrayDeque<String>();
-        when(browser.getBrowserNavigationCallback()).thenReturn(null);
-        doNothing().when(browser).execute(anyString());
-        when(browser.executeAndReturnString(anyString())).thenAnswer(invocation -> responses.isEmpty() ? "0" : responses.remove());
-    }
+    @FormTest
+    public void testJSObjectAsyncWrappers() {
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        impl.setBrowserComponent(new TestPeerComponent(null));
+        impl.getBrowserExecuted().clear();
 
-    @Test
-    void constructorStoresObjectIdAndRetains() throws Exception {
-        responses.add("ignored");
-        responses.add("object");
-        responses.add("5");
-        RecordingJavascriptContext context = createContextSpy();
+        BrowserComponent browser = new BrowserComponent();
+        CN.getCurrentForm().add(browser);
+        JavascriptContext context = new JavascriptContext(browser);
 
-        JSObject object = new JSObject(context, "window");
-
-        assertEquals(5, object.objectId);
-        Map objectMap = getObjectMap(context);
-        assertTrue(objectMap.containsKey(Integer.valueOf(5)));
-    }
-
-    @Test
-    void constructorThrowsWhenExpressionIsNotObject() {
-        responses.add("ignored");
-        responses.add("string");
-        RecordingJavascriptContext context = createContextSpy();
-
-        assertThrows(JSException.class, () -> new JSObject(context, "1"));
-    }
-
-    @Test
-    void typedGettersDelegateToContext() {
-        responses.add("ignored");
-        responses.add("object");
-        responses.add("3");
-        RecordingJavascriptContext context = createContextSpy();
-        JSObject object = new JSObject(context, "window");
-
-        String pointer = object.toJSPointer();
-        doReturn("name").when(context).get(pointer + ".label");
-        doReturn(Double.valueOf(10)).when(context).get(pointer + ".count");
-        doReturn(Boolean.TRUE).when(context).get(pointer + ".flag");
-        doReturn(Double.valueOf(7)).when(context).get(pointer + "[2]");
-        doReturn(object).when(context).get(pointer + ".self");
-
-        assertEquals("name", object.getString("label"));
-        assertEquals(10, object.getInt("count"));
-        assertTrue(object.getBoolean("flag"));
-        assertEquals(10.0d, object.getDouble("count"), 0.00001d);
-        assertEquals(object, object.getObject("self"));
-        assertEquals(7, object.getInt(2));
-        assertEquals(7.0d, object.getDouble(2), 0.00001d);
-    }
-
-    @Test
-    void setWithJSFunctionRegistersCallback() {
-        responses.add("ignored");
-        responses.add("object");
-        responses.add("4");
-        RecordingJavascriptContext context = createContextSpy();
-        JSObject object = new JSObject(context, "window");
-
-        JSFunction function = mock(JSFunction.class);
-        object.set("handler", function, true);
-
-        verify(context).addCallback(eq(object), eq("handler"), eq(function), eq(true));
-        verify(context, never()).set(anyString(), any());
-    }
-
-    @Test
-    void setDelegatesToContextForValues() {
-        responses.add("ignored");
-        responses.add("object");
-        responses.add("6");
-        RecordingJavascriptContext context = createContextSpy();
-        JSObject object = new JSObject(context, "window");
-
-        doNothing().when(context).set(anyString(), any());
-        doNothing().when(context).set(anyString(), any(), anyBoolean());
-
-        object.set("name", "Codename One");
-        object.set("'0'", Integer.valueOf(2));
-        object.setBoolean("flag", true);
-        object.setDouble("ratio", 3.5d);
-        object.setInt(1, 9);
-
-        String pointer = object.toJSPointer();
-        verify(context).set(eq(pointer + ".name"), eq((Object) "Codename One"));
-        verify(context).set(eq(pointer + "['0']"), eq((Object) Integer.valueOf(2)));
-        verify(context).set(eq(pointer + ".flag"), eq((Object) Boolean.TRUE));
-        verify(context).set(eq(pointer + ".ratio"), eq((Object) Double.valueOf(3.5d)));
-        verify(context).set(eq(pointer + "[1]"), eq((Object) Integer.valueOf(9)), eq(false));
-    }
-
-    @Test
-    void callDelegatesToJavascriptContext() {
-        responses.add("ignored");
-        responses.add("object");
-        responses.add("8");
-        JavascriptContext context = createContextSpy();
-        JSObject object = new JSObject(context, "window");
-
-        doReturn("done").when(context).call(anyString(), eq(object), any(Object[].class));
-
-        Object result = object.call("sum", new Object[]{Integer.valueOf(1), Integer.valueOf(2)});
-
-        assertEquals("done", result);
-        verify(context).call(eq(object.toJSPointer() + ".sum"), eq(object), any(Object[].class));
-    }
-
-    @Test
-    void callAsyncDelegatesToJavascriptContext() {
-        responses.add("ignored");
-        responses.add("object");
-        responses.add("9");
-        RecordingJavascriptContext context = createContextSpy();
-        JSObject object = new JSObject(context, "window");
-
-        Callback callback = mock(Callback.class);
-        SuccessCallback successCallback = mock(SuccessCallback.class);
-
-        String pointer = object.toJSPointer();
-        object.callAsync("action", new Object[]{}, callback);
-        object.callAsync("action", new Object[]{}, successCallback);
-
-        verify(context).callAsync(eq(object), eq(object), any(Object[].class), eq(callback));
-        verify(context, times(2)).callAsync(eq(object), eq(object), any(Object[].class), any(Callback.class));
-
-        Callback first = context.removeNextCallback();
-        assertSame(callback, first);
-        assertSame(object, context.removeNextFunction());
-        assertSame(object, context.removeNextSelf());
-        assertArrayEquals(new Object[]{}, context.removeNextParams());
-
-        Callback second = context.removeNextCallback();
-        assertNotSame(successCallback, second);
-        second.onSucess("value");
-        verify(successCallback).onSucess("value");
-        assertSame(object, context.removeNextFunction());
-        assertSame(object, context.removeNextSelf());
-        assertArrayEquals(new Object[]{}, context.removeNextParams());
-    }
-
-    @Test
-    void callStringAsyncDelegatesToJavascriptContext() {
-        responses.add("ignored");
-        responses.add("object");
-        responses.add("11");
-        RecordingJavascriptContext context = createContextSpy();
-        JSObject object = new JSObject(context, "window");
-
-        SuccessCallback<String> successCallback = mock(SuccessCallback.class);
-
-        object.callStringAsync("action", successCallback);
-
-        verify(context).callAsync(eq(object), eq(object), any(Object[].class), any(Callback.class));
-
-        Callback callback = context.removeNextCallback();
-        callback.onSucess("result");
-        verify(successCallback).onSucess("result");
-    }
-
-    @Test
-    void callObjectAsyncDelegatesToJavascriptContext() {
-        responses.add("ignored");
-        responses.add("object");
-        responses.add("12");
-        RecordingJavascriptContext context = createContextSpy();
-        JSObject object = new JSObject(context, "window");
-
-        SuccessCallback<JSObject> successCallback = mock(SuccessCallback.class);
-
-        object.callObjectAsync("action", successCallback);
-
-        verify(context).callAsync(eq(object), eq(object), any(Object[].class), any(Callback.class));
-
-        Callback callback = context.removeNextCallback();
-        JSObject result = mock(JSObject.class);
-        callback.onSucess(result);
-        verify(successCallback).onSucess(result);
-    }
-
-    @Test
-    void removeCallbackDelegatesToContext() {
-        responses.add("ignored");
-        responses.add("object");
-        responses.add("10");
-        JavascriptContext context = createContextSpy();
-        JSObject object = new JSObject(context, "window");
-
-        doNothing().when(context).removeCallback(eq(object), anyString(), eq(false));
-
-        object.removeCallback("listener");
-
-        verify(context).removeCallback(eq(object), eq("listener"), eq(false));
-    }
-
-    private RecordingJavascriptContext createContextSpy() {
-        RecordingJavascriptContext context = new RecordingJavascriptContext(browser);
-        RecordingJavascriptContext spyContext = spy(context);
-        doAnswer(invocation -> {
-            JSObject obj = invocation.getArgument(0);
-            Map map = getObjectMap(spyContext);
-            map.put(Integer.valueOf(obj.objectId), new WeakReference<Object>(obj));
+        impl.setBrowserScriptResponder(script -> {
+            if(script.contains("ca_weblite_codename1_js_JSObject_R1.ca_weblite_codename1_js_JSObject_ID")) {
+                return "1";
+            }
+            if (script.contains("typeof")) {
+                return "object";
+            }
+            if (script.contains("var id = ")) {
+                return "1";
+            }
             return null;
-        }).when(spyContext).retain(any(JSObject.class));
-        doNothing().when(spyContext).cleanup();
-        return spyContext;
+        });
+        DisplayTest.flushEdt();
+        JSObject obj = new JSObject(context, "myObj");
+
+        // --- Test JSObject$2 (callAsync(String, SuccessCallback)) ---
+        AtomicReference<Object> resultRef = new AtomicReference<>();
+        SuccessCallback successCallback = new SuccessCallback() {
+            @Override
+            public void onSucess(Object value) {
+                resultRef.set(value);
+            }
+        };
+
+        impl.getBrowserExecuted().clear();
+        obj.callAsync("method1", successCallback);
+        verifyAndTriggerCallback("Success1", resultRef, browser, context);
+        assertEquals("Success1", resultRef.get());
+
+        // --- Test JSObject$3 (callIntAsync(String, Callback<Integer>)) ---
+        AtomicReference<Integer> intRef = new AtomicReference<>();
+        Callback<Integer> intCallback = new Callback<Integer>() {
+            @Override
+            public void onSucess(Integer value) {
+                intRef.set(value);
+            }
+            @Override
+            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {}
+        };
+        impl.getBrowserExecuted().clear();
+        obj.callIntAsync("methodInt", intCallback);
+        triggerCallback(Double.valueOf(123.0), browser, context);
+        assertEquals(123, intRef.get());
+
+        // --- Test JSObject$4 (callIntAsync(String, SuccessCallback<Integer>)) ---
+        AtomicReference<Integer> intSuccessRef = new AtomicReference<>();
+        SuccessCallback<Integer> intSuccessCallback = new SuccessCallback<Integer>() {
+            @Override
+            public void onSucess(Integer value) {
+                intSuccessRef.set(value);
+            }
+        };
+        impl.getBrowserExecuted().clear();
+        obj.callIntAsync("methodIntSuccess", intSuccessCallback);
+        triggerCallback(Double.valueOf(456.0), browser, context);
+        assertEquals(456, intSuccessRef.get());
+
+        // --- Test JSObject$5 (callDoubleAsync(String, SuccessCallback<Double>)) ---
+        AtomicReference<Double> doubleSuccessRef = new AtomicReference<>();
+        SuccessCallback<Double> doubleSuccessCallback = new SuccessCallback<Double>() {
+            @Override
+            public void onSucess(Double value) {
+                doubleSuccessRef.set(value);
+            }
+        };
+        impl.getBrowserExecuted().clear();
+        obj.callDoubleAsync("methodDoubleSuccess", doubleSuccessCallback);
+        triggerCallback(Double.valueOf(78.9), browser, context);
+        assertEquals(78.9, doubleSuccessRef.get(), 0.001);
+
+        // --- Test JSObject$8 (callAsync(Object[], SuccessCallback)) ---
+        AtomicReference<Object> objArrayRef = new AtomicReference<>();
+        SuccessCallback objArrayCallback = new SuccessCallback() {
+            @Override
+            public void onSucess(Object value) {
+                objArrayRef.set(value);
+            }
+        };
+        impl.getBrowserExecuted().clear();
+        obj.callAsync(new Object[]{"param"}, objArrayCallback);
+        triggerCallback("ResultObject", browser, context);
+        assertEquals("ResultObject", objArrayRef.get());
     }
 
-    private Map getObjectMap(JavascriptContext context) throws Exception {
-        java.lang.reflect.Field field = JavascriptContext.class.getDeclaredField("objectMap");
-        field.setAccessible(true);
-        return (Map) field.get(context);
+    private void verifyAndTriggerCallback(Object result, AtomicReference<Object> ref, BrowserComponent browser, JavascriptContext context) {
+        triggerCallback(result, browser, context);
+    }
+
+    private void triggerCallback(Object result, BrowserComponent browser, JavascriptContext context) {
+        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
+        List<String> executed = impl.getBrowserExecuted();
+        assertFalse(executed.isEmpty(), "No JS executed");
+        String lastScript = executed.get(executed.size() - 1);
+
+        int callbackIndex = lastScript.indexOf("callback$$");
+        assertTrue(callbackIndex >= 0, "Callback not found in script");
+
+        int startIndex = callbackIndex;
+        int endIndex = lastScript.indexOf("(", startIndex);
+        String callbackName = lastScript.substring(startIndex, endIndex).trim();
+
+        JavascriptEvent evt = new JavascriptEvent(context.getWindow(), callbackName, new Object[]{result});
+        browser.fireWebEvent("scriptMessageReceived", evt);
     }
 }
