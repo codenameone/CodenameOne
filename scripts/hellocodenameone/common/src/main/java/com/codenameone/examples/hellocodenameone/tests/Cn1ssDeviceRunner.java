@@ -32,6 +32,7 @@ import com.codenameone.examples.hellocodenameone.tests.graphics.TransformCamera;
 import com.codenameone.examples.hellocodenameone.tests.graphics.TransformPerspective;
 import com.codenameone.examples.hellocodenameone.tests.graphics.TransformRotation;
 import com.codenameone.examples.hellocodenameone.tests.graphics.TransformTranslation;
+import com.codename1.examples.hellocodenameone.tests.accessibility.AccessibilityTest;
 
 public final class Cn1ssDeviceRunner extends DeviceRunner {
     private static final BaseTest[] TEST_CLASSES = new BaseTest[] {
@@ -64,7 +65,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new BrowserComponentScreenshotTest(),
             new MediaPlaybackScreenshotTest(),
             new InPlaceEditViewTest(),
-            new com.codename1.examples.hellocodenameone.tests.accessibility.AccessibilityTest()
+            new AccessibilityTest()
     };
 
     public void runSuite() {
