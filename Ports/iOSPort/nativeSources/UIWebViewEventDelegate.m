@@ -100,7 +100,9 @@ extern int connections;
          // SUCKS!!  WKWebView is out of process so we can't access Javascript context directly anymore.
          // So we have to do browser navigation callbacks the old fashioned way.
 #endif
-    com_codename1_impl_ios_IOSImplementation_fireWebViewDidFinishLoad___com_codename1_ui_BrowserComponent_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG webView.URL.absoluteString.UTF8String));
+    [webView evaluateJavaScript:@"document.body.offsetHeight" completionHandler:^(id result, NSError *error) {
+        com_codename1_impl_ios_IOSImplementation_fireWebViewDidFinishLoad___com_codename1_ui_BrowserComponent_java_lang_String(CN1_THREAD_GET_STATE_PASS_ARG c, xmlvm_create_java_string(CN1_THREAD_GET_STATE_PASS_ARG webView.URL.absoluteString.UTF8String));
+    }];
 }
 
 
