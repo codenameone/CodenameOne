@@ -11,4 +11,9 @@ public class AccessibilityTest extends BaseTest {
         Display.getInstance().announceForAccessibility(expected);
         return true;
     }
+
+    @Override
+    public boolean shouldTakeScreenshot() {
+        return false;
+    }
 }
