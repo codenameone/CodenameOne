@@ -49,21 +49,6 @@ public class Parser extends ClassVisitor {
     private String clsName;
     private static String[] nativeSources;
     private static List<ByteCodeClass> classes = new ArrayList<ByteCodeClass>();
-    private static int ASM_VERSION;
-    static {
-        try {
-            java.lang.reflect.Field f = Opcodes.class.getField("ASM9");
-            ASM_VERSION = f.getInt(null);
-        } catch(Throwable t) {
-            try {
-                java.lang.reflect.Field f = Opcodes.class.getField("ASM5");
-                ASM_VERSION = f.getInt(null);
-            } catch(Throwable t2) {
-                ASM_VERSION = Opcodes.ASM4;
-            }
-        }
-    }
-
     public static void cleanup() {
     	nativeSources = null;
     	classes.clear();
@@ -664,7 +649,7 @@ public class Parser extends ClassVisitor {
     }
     
     public Parser() {
-        super(ASM_VERSION);
+        super(Opcodes.ASM5);
     }
 
     @Override
@@ -753,7 +738,7 @@ public class Parser extends ClassVisitor {
     class MethodVisitorWrapper extends MethodVisitor {
         private BytecodeMethod mtd;
         public MethodVisitorWrapper(MethodVisitor mv, BytecodeMethod mtd) {
-            super(ASM_VERSION, mv);
+            super(Opcodes.ASM5, mv);
             this.mtd = mtd;
         }
 
@@ -945,7 +930,7 @@ public class Parser extends ClassVisitor {
     class FieldVisitorWrapper extends FieldVisitor {
 
         public FieldVisitorWrapper(FieldVisitor fv) {
-            super(ASM_VERSION, fv);
+            super(Opcodes.ASM5, fv);
         }
 
         @Override
@@ -973,7 +958,7 @@ public class Parser extends ClassVisitor {
     class AnnotationVisitorWrapper extends AnnotationVisitor {
 
         public AnnotationVisitorWrapper(AnnotationVisitor av) {
-            super(ASM_VERSION, av);
+            super(Opcodes.ASM5, av);
         }
 
         @Override
