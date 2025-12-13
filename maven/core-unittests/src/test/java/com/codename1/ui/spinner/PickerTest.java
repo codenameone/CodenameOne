@@ -182,7 +182,4 @@ public class PickerTest extends UITestBase {
         f.animate();
         flushSerialCalls();
     }
-
-    // Note: Picker$3$1 (runnable in sizeChanged listener) is covered by testPickerResizeUpdatesDialog
-    // Picker$1$8 (Cancel command in showDialog) is unreachable dead code for standard types.
 }
