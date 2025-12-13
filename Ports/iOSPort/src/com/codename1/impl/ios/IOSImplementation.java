@@ -9495,7 +9495,6 @@ public class IOSImplementation extends CodenameOneImplementation {
         return b != null && b.booleanValue();
     }
 
-    public static String testLastAccessibilityAnnouncement;
     @Override
     public void announceForAccessibility(final Component cmp, final String text) {
         IOSNative.announceForAccessibility(text);

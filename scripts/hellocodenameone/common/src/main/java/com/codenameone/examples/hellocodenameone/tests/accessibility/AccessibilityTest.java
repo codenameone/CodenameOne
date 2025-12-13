@@ -1,4 +1,4 @@
-package com.codename1.examples.hellocodenameone.tests.accessibility;
+package com.codenameone.examples.hellocodenameone.tests.accessibility;
 
 import com.codename1.ui.Display;
 import com.codenameone.examples.hellocodenameone.tests.BaseTest;
