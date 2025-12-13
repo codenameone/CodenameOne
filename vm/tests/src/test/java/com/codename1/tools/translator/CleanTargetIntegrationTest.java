@@ -96,8 +96,19 @@ class CleanTargetIntegrationTest {
 
     static void runTranslator(Path classesDir, Path outputDir, String appName) throws Exception {
         Path translatorResources = Paths.get("..", "ByteCodeTranslator", "src").normalize().toAbsolutePath();
-        URLClassLoader systemLoader = (URLClassLoader) ClassLoader.getSystemClassLoader();
-        URL[] systemUrls = systemLoader.getURLs();
+        ClassLoader systemLoader = ClassLoader.getSystemClassLoader();
+        URL[] systemUrls;
+        if (systemLoader instanceof URLClassLoader) {
+            systemUrls = ((URLClassLoader) systemLoader).getURLs();
+        } else {
+             // For Java 9+, we need to get the classpath from the system property
+             String[] paths = System.getProperty("java.class.path").split(System.getProperty("path.separator"));
+             systemUrls = new URL[paths.length];
+             for (int i=0; i<paths.length; i++) {
+                 systemUrls[i] = Paths.get(paths[i]).toUri().toURL();
+             }
+        }
+
         URL[] urls = Arrays.copyOf(systemUrls, systemUrls.length + 1);
         urls[systemUrls.length] = translatorResources.toUri().toURL();
         URLClassLoader loader = new URLClassLoader(urls, null);
@@ -145,7 +156,7 @@ class CleanTargetIntegrationTest {
         content = content.replace(globWithObjc, globCOnly);
         String replacement = content.replace(
                 "add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})",
-                "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})"
+                "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m)"
         );
         Files.write(cmakeLists, replacement.getBytes(StandardCharsets.UTF_8));
     }
@@ -172,12 +183,21 @@ class CleanTargetIntegrationTest {
             Files.write(cn1Globals, content.getBytes(StandardCharsets.UTF_8));
         }
         if (!content.contains("#include <string.h>")) {
-            content = content.replace("#include <stdlib.h>\n", "#include <stdlib.h>\n#include <string.h>\n");
+            content = content.replace("#include <stdlib.h>\n", "#include <stdlib.h>\n#include <string.h>\n#include <math.h>\n#include <limits.h>\n");
             Files.write(cn1Globals, content.getBytes(StandardCharsets.UTF_8));
         }
     }
 
     static void writeRuntimeStubs(Path srcRoot) throws IOException {
+        Path objectHeader = srcRoot.resolve("java_lang_Object.h");
+        if (!Files.exists(objectHeader)) {
+            String headerContent = "#ifndef __JAVA_LANG_OBJECT_H__\n" +
+                    "#define __JAVA_LANG_OBJECT_H__\n" +
+                    "#include \"cn1_globals.h\"\n" +
+                    "#endif\n";
+            Files.write(objectHeader, headerContent.getBytes(StandardCharsets.UTF_8));
+        }
+
         Path stubs = srcRoot.resolve("runtime_stubs.c");
         if (Files.exists(stubs)) {
             return;
@@ -185,6 +205,8 @@ class CleanTargetIntegrationTest {
         String content = "#include \"cn1_globals.h\"\n" +
                 "#include <stdlib.h>\n" +
                 "#include <string.h>\n" +
+                "#include <math.h>\n" +
+                "#include <limits.h>\n" +
                 "\n" +
                 "static struct ThreadLocalData globalThreadData;\n" +
                 "static int runtimeInitialized = 0;\n" +
@@ -245,6 +267,13 @@ class CleanTargetIntegrationTest {
                 "\n" +
                 "struct clazz class_array1__JAVA_INT = {0};\n" +
                 "struct clazz class_array2__JAVA_INT = {0};\n" +
+                "struct clazz class_array1__JAVA_BOOLEAN = {0};\n" +
+                "struct clazz class_array1__JAVA_CHAR = {0};\n" +
+                "struct clazz class_array1__JAVA_FLOAT = {0};\n" +
+                "struct clazz class_array1__JAVA_DOUBLE = {0};\n" +
+                "struct clazz class_array1__JAVA_BYTE = {0};\n" +
+                "struct clazz class_array1__JAVA_SHORT = {0};\n" +
+                "struct clazz class_array1__JAVA_LONG = {0};\n" +
                 "\n" +
                 "static JAVA_OBJECT allocArrayInternal(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim) {\n" +
                 "    struct JavaArrayPrototype* arr = (struct JavaArrayPrototype*)calloc(1, sizeof(struct JavaArrayPrototype));\n" +
@@ -292,6 +321,10 @@ class CleanTargetIntegrationTest {
                 "void monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { (void)obj; }\n" +
                 "\n" +
                 "void monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { (void)obj; }\n" +
+                "\n" +
+                "void monitorEnterBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { (void)obj; }\n" +
+                "\n" +
+                "void monitorExitBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { (void)obj; }\n" +
                 "\n" +
                 "struct elementStruct* pop(struct elementStruct** sp) {\n" +
                 "    (*sp)--;\n" +
@@ -363,6 +396,52 @@ class CleanTargetIntegrationTest {
     static String javaLangNullPointerExceptionSource() {
         return "package java.lang;\n" +
                 "public class NullPointerException extends RuntimeException {\n" +
+                "}\n";
+    }
+
+    static String javaLangLongSource() {
+        return "package java.lang;\n" +
+                "public final class Long extends Number {\n" +
+                "    public static final long MIN_VALUE = 0x8000000000000000L;\n" +
+                "}\n";
+    }
+
+    static String javaLangFloatSource() {
+        return "package java.lang;\n" +
+                "public final class Float extends Number {\n" +
+                "    public static final float NaN = 0.0f / 0.0f;\n" +
+                "}\n";
+    }
+
+    static String javaLangDoubleSource() {
+        return "package java.lang;\n" +
+                "public final class Double extends Number {\n" +
+                "    public static final double POSITIVE_INFINITY = 1.0 / 0.0;\n" +
+                "    public static boolean isInfinite(double v) { return v == POSITIVE_INFINITY || v == -POSITIVE_INFINITY; }\n" +
+                "}\n";
+    }
+
+    static String javaLangBooleanSource() {
+        return "package java.lang;\n" +
+                "public final class Boolean implements java.io.Serializable {\n" +
+                "}\n";
+    }
+
+    static String javaLangNumberSource() {
+        return "package java.lang;\n" +
+                "public abstract class Number implements java.io.Serializable {\n" +
+                "}\n";
+    }
+
+    static String javaIoSerializableSource() {
+        return "package java.io;\n" +
+                "public interface Serializable {\n" +
+                "}\n";
+    }
+
+    static String javaUtilArrayListSource() {
+        return "package java.util;\n" +
+                "public class ArrayList {\n" +
                 "}\n";
     }
 
