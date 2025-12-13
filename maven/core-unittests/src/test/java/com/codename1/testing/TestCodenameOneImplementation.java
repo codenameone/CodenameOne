@@ -844,6 +844,12 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         this.displayHeight = height;
     }
 
+    public void setDisplaySizeAndFireEvent(int width, int height) {
+        this.displayWidth = width;
+        this.displayHeight = height;
+        super.sizeChanged(width, height);
+    }
+
     public void setDeviceDensity(int density) {
         this.deviceDensity = density;
     }

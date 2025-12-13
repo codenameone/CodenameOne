@@ -158,8 +158,10 @@ class ValidatorTest extends UITestBase {
         TextArea ta = new TextArea("abc"); // Invalid content
         ta.setSingleLineTextArea(false);
         ta.setRows(5);
-        form.add(ta);
+        Button dummy = new Button("Focus");
+        form.addAll(ta, dummy);
         form.show();
+        dummy.requestFocus();
 
         Validator validator = new Validator();
         validator.setShowErrorMessageForFocusedComponent(true);
@@ -199,13 +201,12 @@ class ValidatorTest extends UITestBase {
         v.addConstraint(tc, new LengthConstraint(5, "Too short"));
 
         Form f = new Form("Form", new BoxLayout(BoxLayout.Y_AXIS));
-        f.add(tc);
+        Button dummy = new Button("focus");
+        f.addAll(tc, dummy);
         f.show();
 
-        // Ensure sufficient width for label
-        f.setWidth(1000);
-        f.setHeight(1000);
-        f.revalidate();
+        tc.requestFocus();
+        dummy.requestFocus();
         flushSerialCalls();
 
         // Set invalid text

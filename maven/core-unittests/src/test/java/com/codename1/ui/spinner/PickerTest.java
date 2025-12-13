@@ -35,6 +35,8 @@ public class PickerTest extends UITestBase {
 
         flushSerialCalls();
 
+        implementation.setDisplaySizeAndFireEvent(1024, 769);
+
         Form current = Display.getInstance().getCurrent();
         Container layeredPane = current.getLayeredPane();
         InteractionDialog dlg = findInteractionDialog(layeredPane);
