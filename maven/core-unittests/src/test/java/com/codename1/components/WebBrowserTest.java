@@ -36,4 +36,20 @@ class WebBrowserTest extends UITestBase {
         assertNotNull(types);
         assertEquals(browser.getPropertyNames().length, types.length);
     }
+
+    @FormTest
+    void testLoadingInnerClass() {
+        WebBrowser browser = new WebBrowser();
+        com.codename1.ui.Form f = new com.codename1.ui.Form();
+        WebBrowser.Loading loading = browser.new Loading(f);
+
+        assertTrue(loading.animate());
+
+        // Verify install/uninstall
+        loading.install();
+        assertTrue(f.getGlassPane() == loading);
+
+        loading.unInstall();
+        assertNull(f.getGlassPane());
+    }
 }

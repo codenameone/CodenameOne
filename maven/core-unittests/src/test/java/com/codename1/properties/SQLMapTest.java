@@ -123,4 +123,5 @@ public class SQLMapTest extends UITestBase {
             map.selectBuild();
         });
     }
+
 }

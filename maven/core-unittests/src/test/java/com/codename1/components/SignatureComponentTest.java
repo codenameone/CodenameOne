@@ -4,6 +4,8 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Form;
 import com.codename1.ui.Dialog;
 import com.codename1.ui.Display;
 import com.codename1.ui.DisplayTest;
@@ -96,6 +98,61 @@ class SignatureComponentTest extends UITestBase {
         Field leadField = SignatureComponent.class.getDeclaredField("lead");
         leadField.setAccessible(true);
         return (Button) leadField.get(component);
+    }
+
+    @FormTest
+    public void testDialogInteraction() throws Exception {
+        SignatureComponent cmp = new SignatureComponent();
+
+        // Use reflection to instantiate SignatureDialogBody directly, bypassing Dialog.show() issues
+        Class<?>[] innerClasses = SignatureComponent.class.getDeclaredClasses();
+        Class<?> dialogBodyClass = null;
+        for (Class<?> cls : innerClasses) {
+            if (cls.getSimpleName().equals("SignatureDialogBody")) {
+                dialogBodyClass = cls;
+                break;
+            }
+        }
+        assertNotNull(dialogBodyClass, "SignatureDialogBody inner class not found");
+
+        java.lang.reflect.Constructor<?> ctor = dialogBodyClass.getDeclaredConstructor(SignatureComponent.class);
+        ctor.setAccessible(true);
+        Container body = (Container) ctor.newInstance(cmp);
+
+        Form f = new Form("Test Form", new com.codename1.ui.layouts.BorderLayout());
+        f.addComponent(com.codename1.ui.layouts.BorderLayout.CENTER, body);
+        f.show();
+
+        // Now find buttons in the body
+        Button doneButton = findButtonByText(body, "Save");
+        Button resetButton = findButtonByText(body, "Reset");
+        Button cancelButton = findButtonByText(body, "Cancel");
+
+        assertNotNull(doneButton, "Save button not found");
+        assertNotNull(resetButton, "Reset button not found");
+        assertNotNull(cancelButton, "Cancel button not found");
+
+        // Test Reset
+        resetButton.pointerReleased(0, 0);
+
+        // Test Cancel
+        cancelButton.pointerReleased(0, 0);
+    }
+
+    private Button findButtonByText(Container cnt, String text) {
+        for(int i=0; i<cnt.getComponentCount(); i++) {
+            Component c = cnt.getComponentAt(i);
+            if(c instanceof Button) {
+                if(((Button)c).getText().equals(text)) {
+                    return (Button)c;
+                }
+            }
+            if(c instanceof Container) {
+                Button b = findButtonByText((Container)c, text);
+                if(b != null) return b;
+            }
+        }
+        return null;
     }
 
     private static class StubImage extends Image {

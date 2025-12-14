@@ -6,6 +6,7 @@ import com.codename1.junit.UITestBase;
 import com.codename1.ui.Command;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.plaf.UIManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
@@ -63,6 +64,8 @@ class SideMenuBarTest extends UITestBase {
             TestLogger.remove();
         }
     }
+
+
 
     @FormTest
     void closeCurrentMenuRunsCallbackWhenNoMenuShowing() {
