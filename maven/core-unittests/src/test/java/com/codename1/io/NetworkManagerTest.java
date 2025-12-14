@@ -25,24 +25,13 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class NetworkManagerTest {
+class NetworkManagerTest extends com.codename1.junit.UITestBase {
     private NetworkManager manager;
-    private TestCodenameOneImplementation implementation;
 
     @BeforeEach
     void setUp() throws Exception {
+        super.setUpDisplay();
         Storage.setStorageInstance(null);
-        implementation = new TestCodenameOneImplementation(true);
-        Util.setImplementation(implementation);
-        // Ensure Display is initialized for addToQueueAndWait
-        if (!Display.isInitialized()) {
-            com.codename1.impl.ImplementationFactory.setInstance(new com.codename1.impl.ImplementationFactory() {
-                public Object createImplementation() {
-                    return implementation;
-                }
-            });
-            Display.init(null);
-        }
         manager = NetworkManager.getInstance();
         resetManagerState();
     }
@@ -50,9 +39,9 @@ class NetworkManagerTest {
     @AfterEach
     void tearDown() throws Exception {
         resetManagerState();
-        Util.setImplementation(null);
         Storage.setStorageInstance(null);
         implementation.clearNetworkMocks();
+        super.tearDownDisplay();
     }
 
     @Test

@@ -113,6 +113,7 @@ class SideMenuBarTest extends UITestBase {
 
         // Setup parent form interaction
         smb.initMenuBar(f);
+        smb.installMenuBar();
 
         f.putClientProperty("cn1$sideMenuParent", smb);
         Display.getInstance().setCurrent(f, false);

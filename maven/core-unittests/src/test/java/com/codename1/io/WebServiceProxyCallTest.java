@@ -308,10 +308,16 @@ public class WebServiceProxyCallTest extends UITestBase {
         );
 
         // Wait for async
-        long start = System.currentTimeMillis();
-        while (!successCalled.get() && !failureCalled.get() && System.currentTimeMillis() - start < 2000) {
-            Thread.sleep(50);
-        }
+        com.codename1.ui.Display.getInstance().invokeAndBlock(() -> {
+            long start = System.currentTimeMillis();
+            while (!successCalled.get() && !failureCalled.get() && System.currentTimeMillis() - start < 2000) {
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
 
         Assertions.assertTrue(successCalled.get(), "Success callback should be called");
         Assertions.assertEquals("Success", resultRef.get());
