@@ -5,6 +5,7 @@ import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Command;
 import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.events.ActionEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
@@ -89,6 +90,7 @@ class SideMenuBarTest extends UITestBase {
             TestLogger.remove();
         }
     }
+
 
     private boolean formContainsCommand(Form form, Command command) {
         for (int i = 0; i < form.getCommandCount(); i++) {

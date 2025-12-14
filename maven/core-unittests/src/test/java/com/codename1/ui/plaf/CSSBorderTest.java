@@ -67,4 +67,34 @@ public class CSSBorderTest extends UITestBase {
 
         Assertions.assertTrue(border.toCSSString().contains("border-image"));
     }
+
+    @FormTest
+    public void testBoxShadow() {
+        CSSBorder border = new CSSBorder();
+        border.boxShadow("5px 5px 5px 5px #000000"); // h v blur spread color
+
+        Component c = new Component() {};
+        c.setSize(new com.codename1.ui.geom.Dimension(100, 100));
+        c.getStyle().setBorder(border);
+
+        Image buffer = Image.createImage(100, 100);
+        // This will trigger BoxShadow.paint
+        border.paintBorderBackground(buffer.getGraphics(), c);
+
+        // We can't easily verify the pixels painted, but we ensure no exception occurs
+        // and exercise the BoxShadow logic.
+
+        // Test parsing variants
+        CSSBorder border2 = new CSSBorder();
+        border2.boxShadow("inset 2px 2px 2px #ff0000");
+        border2.paintBorderBackground(buffer.getGraphics(), c);
+
+        CSSBorder border3 = new CSSBorder();
+        border3.boxShadow("none");
+        // Should be null shadow
+
+        Assertions.assertThrows(RuntimeException.class, () -> {
+            border.toCSSString(); // BoxShadow toCSSString throws RuntimeException as per source
+        });
+    }
 }
