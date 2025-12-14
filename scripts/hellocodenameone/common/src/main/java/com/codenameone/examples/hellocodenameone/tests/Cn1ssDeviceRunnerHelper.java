@@ -13,7 +13,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 final class Cn1ssDeviceRunnerHelper {
-    private static final int CHUNK_SIZE = 900;
+    private static final int CHUNK_SIZE_ANDROID = 500;
+    private static final int CHUNK_SIZE_DEFAULT = 900;
+    private static final int DELAY_ANDROID = 20;
     private static final int MAX_PREVIEW_BYTES = 20 * 1024;
     private static final String PREVIEW_CHANNEL = "PREVIEW";
     private static final int[] PREVIEW_QUALITIES = new int[] {60, 50, 40, 35, 30, 25, 20, 18, 16, 14, 12, 10, 8, 6, 5, 4, 3, 2, 1};
@@ -124,13 +126,25 @@ final class Cn1ssDeviceRunnerHelper {
         }
         String base64 = Base64.encodeNoNewline(bytes);
         int count = 0;
-        for (int pos = 0; pos < base64.length(); pos += CHUNK_SIZE) {
-            int end = Math.min(pos + CHUNK_SIZE, base64.length());
+
+        boolean isAndroid = "and".equals(Display.getInstance().getPlatformName());
+        int chunkSize = isAndroid ? CHUNK_SIZE_ANDROID : CHUNK_SIZE_DEFAULT;
+        int delay = isAndroid ? DELAY_ANDROID : 0;
+
+        for (int pos = 0; pos < base64.length(); pos += chunkSize) {
+            int end = Math.min(pos + chunkSize, base64.length());
             String chunk = base64.substring(pos, end);
             println(prefix + ":" + safeName + ":" + zeroPad(pos, 6) + ":" + chunk);
             count++;
+            // Slow down to prevent logcat buffer overflow/truncation
+            if (delay > 0) {
+                Util.sleep(delay);
+            }
         }
         println("CN1SS:INFO:test=" + safeName + " chunks=" + count + " total_b64_len=" + base64.length());
+        if (delay > 0) {
+            Util.sleep(50);
+        }
         println(prefix + ":END:" + safeName);
         System.out.flush();
     }
