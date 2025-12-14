@@ -198,7 +198,7 @@ class NetworkManagerTest extends com.codename1.junit.UITestBase {
             latch.countDown();
         });
 
-        assertTrue(latch.await(5, TimeUnit.SECONDS), "Timed out waiting for async request");
+        waitFor(latch, 5000);
         assertNull(error.get());
         assertSame(req, result.get());
         assertTrue(req.complete);

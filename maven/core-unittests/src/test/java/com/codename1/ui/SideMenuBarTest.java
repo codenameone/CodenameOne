@@ -108,6 +108,11 @@ class SideMenuBarTest extends UITestBase {
 
     @FormTest
     public void testSideMenuBarCommandWrapperAndShowWaiter() throws Exception {
+        // Disable shadow to prevent resource loading error
+        java.util.Hashtable theme = new java.util.Hashtable();
+        theme.put("sideMenuShadowBool", Boolean.FALSE);
+        UIManager.getInstance().addThemeProps(theme);
+
         Form f = new Form("Main", new BorderLayout());
         SideMenuBar smb = new SideMenuBar();
 
