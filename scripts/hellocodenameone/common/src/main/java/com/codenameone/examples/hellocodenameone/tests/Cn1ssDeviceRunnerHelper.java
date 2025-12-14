@@ -13,7 +13,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
 final class Cn1ssDeviceRunnerHelper {
-    private static final int CHUNK_SIZE = 900;
+    private static final int CHUNK_SIZE = 500;
     private static final int MAX_PREVIEW_BYTES = 20 * 1024;
     private static final String PREVIEW_CHANNEL = "PREVIEW";
     private static final int[] PREVIEW_QUALITIES = new int[] {60, 50, 40, 35, 30, 25, 20, 18, 16, 14, 12, 10, 8, 6, 5, 4, 3, 2, 1};
@@ -129,8 +129,11 @@ final class Cn1ssDeviceRunnerHelper {
             String chunk = base64.substring(pos, end);
             println(prefix + ":" + safeName + ":" + zeroPad(pos, 6) + ":" + chunk);
             count++;
+            // Slow down to prevent logcat buffer overflow/truncation
+            Util.sleep(20);
         }
         println("CN1SS:INFO:test=" + safeName + " chunks=" + count + " total_b64_len=" + base64.length());
+        Util.sleep(50);
         println(prefix + ":END:" + safeName);
         System.out.flush();
     }
