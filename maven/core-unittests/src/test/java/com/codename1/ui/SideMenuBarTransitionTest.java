@@ -19,24 +19,22 @@ public class SideMenuBarTransitionTest extends UITestBase {
         }
     }
 
-    @Disabled("Fails due to NPE in headless environment")
     @FormTest
     public void testMenuTransition() throws Exception {
         Hashtable theme = new Hashtable();
-        theme.put("sideMenuShadowBool", Boolean.FALSE);
+        theme.put("@sideMenuShadowBool", "false");
         UIManager.getInstance().addThemeProps(theme);
 
         Form f1 = new Form("Source");
-        f1.show();
-
         SideMenuBar bar = new TestSideMenuBar();
-        bar.initMenuBar(f1);
+        f1.show();
+        f1.setMenuBar(bar);
 
         Command cmd = new Command("Test");
         cmd.putClientProperty(SideMenuBar.COMMAND_PLACEMENT_KEY, SideMenuBar.COMMAND_PLACEMENT_VALUE_TOP);
-        bar.addCommand(cmd);
+        f1.addCommand(cmd);
 
-        bar.openMenu(SideMenuBar.COMMAND_PLACEMENT_VALUE_TOP);
+        bar.openMenu(SideMenuBar.COMMAND_SIDE_COMPONENT);
 
         Transition t = f1.getTransitionOutAnimator();
         Assertions.assertNotNull(t);
