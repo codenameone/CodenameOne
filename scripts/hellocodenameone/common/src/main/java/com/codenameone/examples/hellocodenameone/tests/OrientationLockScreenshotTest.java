@@ -1,5 +1,6 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
+import com.codename1.testing.TestUtils;
 import com.codename1.ui.CN;
 import com.codename1.ui.Form;
 import com.codename1.ui.Label;
@@ -15,6 +16,8 @@ public class OrientationLockScreenshotTest extends BaseTest {
         hi.show();
 
         CN.lockOrientation(false);
+
+        TestUtils.waitFor(250);
 
         return true;
     }
