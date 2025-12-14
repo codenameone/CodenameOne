@@ -16,11 +16,11 @@ public class OrientationLockScreenshotTest extends BaseTest {
         hi.show();
 
         // Wait for show
-        UITimer.timer(1000, false, () -> {
+        UITimer.timer(500, false, () -> {
             // Lock to Landscape
             CN.lockOrientation(false);
 
-            UITimer.timer(2000, false, () -> {
+            UITimer.timer(1000, false, () -> {
                 if (CN.getDisplayWidth() < CN.getDisplayHeight()) {
                     fail("Failed to lock to landscape. Width=" + CN.getDisplayWidth() + ", Height=" + CN.getDisplayHeight());
                     return;

@@ -94,10 +94,10 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
                     t.printStackTrace();
                 }
             });
-            int timeout = 9000;
+            int timeout = 30000;
             while (!testClass.isDone() && timeout > 0) {
                 Util.sleep(3);
-                timeout--;
+                timeout -= 3;
             }
             testClass.cleanup();
             if(timeout == 0) {
