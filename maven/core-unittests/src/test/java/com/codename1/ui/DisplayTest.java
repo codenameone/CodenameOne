@@ -65,4 +65,28 @@ public class DisplayTest extends UITestBase {
         display.setProperty("Component.revalidateOnStyleChange", "TRUE");
         assertTrue(Component.revalidateOnStyleChange);
     }
+
+    @Test
+    void testDebugRunnable() {
+        Display display = Display.getInstance();
+        boolean oldEnable = display.isEnableAsyncStackTraces();
+        try {
+            display.setEnableAsyncStackTraces(true);
+            assertTrue(display.isEnableAsyncStackTraces());
+
+            final boolean[] executed = {false};
+            display.callSeriallyAndWait(new Runnable() {
+                public void run() {
+                    executed[0] = true;
+                }
+            });
+            assertTrue(executed[0]);
+
+            // Testing exception propagation behavior is tricky as it just logs.
+            // But running callSerially with async traces enabled exercises DebugRunnable construction and run.
+
+        } finally {
+            display.setEnableAsyncStackTraces(oldEnable);
+        }
+    }
 }

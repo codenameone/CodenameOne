@@ -3,6 +3,10 @@ package com.codename1.components;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Display;
+import com.codename1.ui.DisplayTest;
 import com.codename1.ui.Image;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.events.ActionListener;
@@ -80,6 +84,7 @@ class SignatureComponentTest extends UITestBase {
         invokeFireActionEvent(component);
         assertEquals(1, counter.get(), "Removed listener should no longer fire");
     }
+
 
     private void invokeFireActionEvent(SignatureComponent component) throws Exception {
         Method fire = SignatureComponent.class.getDeclaredMethod("fireActionEvent");
