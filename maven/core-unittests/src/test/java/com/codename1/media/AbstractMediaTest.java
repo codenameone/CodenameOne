@@ -1,5 +1,6 @@
 package com.codename1.media;
 
+import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
 import com.codename1.junit.FormTest;
 import com.codename1.ui.Display;
@@ -104,19 +105,40 @@ public class AbstractMediaTest extends UITestBase {
 
     @FormTest
     public void testConcurrentPauseAsyncError() {
-        TestMedia media = new TestMedia();
-        media.playing = true;
+        TestLogger.install();
+        try {
+            TestMedia media = new TestMedia();
+            media.playing = true;
 
-        AsyncMedia.PauseRequest req1 = media.pauseAsync();
-        AsyncMedia.PauseRequest req2 = media.pauseAsync();
+            AsyncMedia.PauseRequest req1 = media.pauseAsync();
+            AsyncMedia.PauseRequest req2 = media.pauseAsync();
 
-        Exception ex = new RuntimeException("Fail");
-        media.fireMediaError(new AsyncMedia.MediaException(AsyncMedia.MediaErrorType.Unknown, ex));
+            Exception ex = new RuntimeException("Fail");
+            media.fireMediaError(new AsyncMedia.MediaException(AsyncMedia.MediaErrorType.Unknown, ex));
 
-        assertTrue(req1.isDone());
-        assertTrue(req2.isDone());
+            assertTrue(req1.isDone());
+            assertTrue(req2.isDone());
 
-        assertThrows(AsyncResource.AsyncExecutionException.class, () -> req1.get());
-        assertThrows(AsyncResource.AsyncExecutionException.class, () -> req2.get());
+            assertThrows(AsyncResource.AsyncExecutionException.class, () -> req1.get());
+            assertThrows(AsyncResource.AsyncExecutionException.class, () -> req2.get());
+
+            // Check if TestLogger caught the exception
+            boolean exceptionCaught = false;
+            for (Throwable t : TestLogger.getThrowables()) {
+                if (t.getMessage() != null && t.getMessage().contains("Fail")) {
+                    exceptionCaught = true;
+                    break;
+                }
+                // Check cause too
+                if (t.getCause() != null && t.getCause().getMessage() != null && t.getCause().getMessage().contains("Fail")) {
+                    exceptionCaught = true;
+                    break;
+                }
+            }
+            assertTrue(exceptionCaught, "The expected exception should have been logged");
+            TestLogger.getThrowables().clear();
+        } finally {
+            TestLogger.remove();
+        }
     }
 }
