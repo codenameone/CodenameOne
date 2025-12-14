@@ -41,4 +41,42 @@ public class UiBindingTest extends UITestBase {
         // Picker.addActionListener is public.
         // We verified bindListener calls addActionListener.
     }
+
+    public static class BindableObject implements PropertyBusinessObject {
+        public final Property<String, BindableObject> selection = new Property<>("selection", String.class);
+        public final PropertyIndex idx = new PropertyIndex(this, "BindableObject", selection);
+        @Override public PropertyIndex getPropertyIndex() { return idx; }
+    }
+
+    @FormTest
+    public void testRadioListAdapter() {
+        BindableObject obj = new BindableObject();
+        com.codename1.ui.RadioButton r1 = new com.codename1.ui.RadioButton("A");
+        com.codename1.ui.RadioButton r2 = new com.codename1.ui.RadioButton("B");
+        com.codename1.ui.ButtonGroup bg = new com.codename1.ui.ButtonGroup();
+        bg.add(r1);
+        bg.add(r2);
+
+        UiBinding binding = new UiBinding();
+        binding.setAutoCommit(true);
+        // bindGroup(prop, values, components)
+        binding.bindGroup(obj.selection, new String[]{"A", "B"}, r1, r2);
+
+        // Test component -> property
+        r1.setSelected(true);
+        // Simulate user interaction to trigger listeners
+        r1.pointerPressed(0, 0);
+        r1.pointerReleased(0, 0);
+        Assertions.assertEquals("A", obj.selection.get());
+
+        r2.setSelected(true);
+        r2.pointerPressed(0, 0);
+        r2.pointerReleased(0, 0);
+        Assertions.assertEquals("B", obj.selection.get());
+
+        // Test property -> component
+        obj.selection.set("A");
+        Assertions.assertTrue(r1.isSelected());
+        Assertions.assertFalse(r2.isSelected());
+    }
 }
