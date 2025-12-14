@@ -124,4 +124,18 @@ public class SQLMapTest extends UITestBase {
         });
     }
 
+    @FormTest
+    public void testSqlTypes() throws Exception {
+        Database db = TestCodenameOneImplementation.getInstance().openOrCreateDB("test.db");
+        SQLMap map = SQLMap.create(db);
+        MyData p = new MyData();
+
+        // Cover getSqlType
+        SQLMap.SqlType type = map.getSqlType(p.name);
+        Assertions.assertEquals(SQLMap.SqlType.SQL_TEXT, type);
+
+        type = map.getSqlType(p.age);
+        Assertions.assertEquals(SQLMap.SqlType.SQL_INTEGER, type);
+    }
+
 }

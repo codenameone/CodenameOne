@@ -2,14 +2,24 @@ package com.codename1.io;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
-import com.codename1.util.Callback;
+import com.codename1.testing.TestCodenameOneImplementation;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class WebServiceProxyCallTest extends UITestBase {
+
+    @AfterEach
+    public void cleanup() {
+        if (implementation != null) {
+            implementation.clearNetworkMocks();
+        }
+    }
 
     @FormTest
     public void testWSConnectionVoid() throws Exception {
@@ -121,6 +131,40 @@ public class WebServiceProxyCallTest extends UITestBase {
     }
 
     @FormTest
+    public void testWSConnectionOtherArrays() throws Exception {
+        // Test byte array
+        WebServiceProxyCall.WSDefinition def = new WebServiceProxyCall.WSDefinition();
+        def.url = "http://example.com/bytearray";
+        def.name = "byteMethod";
+        def.returnType = WebServiceProxyCall.TYPE_BYTE_ARRAY;
+        def.arguments = new int[]{WebServiceProxyCall.TYPE_BYTE_ARRAY};
+
+        WebServiceProxyCall.WSConnection conn = new WebServiceProxyCall.WSConnection(def, null, new byte[]{1, 2});
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutputStream dos = new DataOutputStream(baos);
+        dos.writeInt(2);
+        dos.writeByte(3);
+        dos.writeByte(4);
+        dos.flush();
+
+        conn.readResponse(new ByteArrayInputStream(baos.toByteArray()));
+        byte[] res = (byte[]) conn.returnValue;
+        Assertions.assertArrayEquals(new byte[]{3, 4}, res);
+
+        // Check request body
+        ByteArrayOutputStream req = new ByteArrayOutputStream();
+        conn.buildRequestBody(req);
+        DataOutputStream dis = new DataOutputStream(new ByteArrayOutputStream());
+        // We need to parse req
+        java.io.DataInputStream in = new java.io.DataInputStream(new ByteArrayInputStream(req.toByteArray()));
+        Assertions.assertEquals("byteMethod", in.readUTF());
+        Assertions.assertEquals(2, in.readInt());
+        Assertions.assertEquals(1, in.readByte());
+        Assertions.assertEquals(2, in.readByte());
+    }
+
+    @FormTest
     public void testWSConnectionMissingTypes() throws Exception {
         WebServiceProxyCall.WSDefinition def = new WebServiceProxyCall.WSDefinition();
         def.url = "http://example.com/missing";
@@ -189,5 +233,67 @@ public class WebServiceProxyCallTest extends UITestBase {
         // Float Object
         Assertions.assertTrue(dis.readBoolean());
         Assertions.assertEquals(10.0f, dis.readFloat(), 0.001);
+    }
+
+    @FormTest
+    public void testInvokeWebserviceSync() throws Exception {
+        WebServiceProxyCall.WSDefinition def = WebServiceProxyCall.defineWebService(
+                "http://example.com/apiSync", "myMethod", WebServiceProxyCall.TYPE_INT, WebServiceProxyCall.TYPE_INT);
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutputStream dos = new DataOutputStream(baos);
+        dos.writeInt(42);
+        dos.flush();
+
+        TestCodenameOneImplementation.getInstance().addNetworkMockResponse(
+                "http://example.com/apiSync", 200, "OK", baos.toByteArray());
+
+        // invokeWebserviceSync uses NetworkManager.addToQueueAndWait
+        // TestCodenameOneImplementation handles this if using UITestBase setup?
+        // UITestBase sets up implementation.
+        // We need to ensure NetworkManager uses the correct instance.
+        // But TestCodenameOneImplementation.connect() handles the mock response.
+
+        Object result = WebServiceProxyCall.invokeWebserviceSync(def, 10);
+        Assertions.assertEquals(42, result);
+    }
+
+    @FormTest
+    public void testInvokeWebserviceASync() throws Exception {
+        WebServiceProxyCall.WSDefinition def = WebServiceProxyCall.defineWebService(
+                "http://example.com/apiAsync", "myAsyncMethod", WebServiceProxyCall.TYPE_STRING, WebServiceProxyCall.TYPE_BOOLEAN);
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        DataOutputStream dos = new DataOutputStream(baos);
+        dos.writeBoolean(true); // present
+        dos.writeUTF("Success");
+        dos.flush();
+
+        TestCodenameOneImplementation.getInstance().addNetworkMockResponse(
+                "http://example.com/apiAsync", 200, "OK", baos.toByteArray());
+
+        final AtomicReference<Object> resultRef = new AtomicReference<>();
+        final AtomicBoolean successCalled = new AtomicBoolean(false);
+        final AtomicBoolean failureCalled = new AtomicBoolean(false);
+
+        WebServiceProxyCall.invokeWebserviceASync(def,
+            res -> {
+                resultRef.set(res);
+                successCalled.set(true);
+            },
+            (req, err, code, msg) -> {
+                failureCalled.set(true);
+            },
+            true
+        );
+
+        // Wait for async
+        long start = System.currentTimeMillis();
+        while (!successCalled.get() && !failureCalled.get() && System.currentTimeMillis() - start < 2000) {
+            Thread.sleep(50);
+        }
+
+        Assertions.assertTrue(successCalled.get(), "Success callback should be called");
+        Assertions.assertEquals("Success", resultRef.get());
     }
 }

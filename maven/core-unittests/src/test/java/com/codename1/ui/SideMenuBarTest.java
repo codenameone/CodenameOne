@@ -4,11 +4,13 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Command;
+import com.codename1.ui.Button;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.plaf.UIManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -102,5 +104,46 @@ class SideMenuBarTest extends UITestBase {
             }
         }
         return false;
+    }
+
+    @FormTest
+    public void testSideMenuBarCommandWrapperAndShowWaiter() throws Exception {
+        Form f = new Form("Main", new BorderLayout());
+        SideMenuBar smb = new SideMenuBar();
+
+        // Setup parent form interaction
+        smb.initMenuBar(f);
+
+        f.putClientProperty("cn1$sideMenuParent", smb);
+        Display.getInstance().setCurrent(f);
+
+        AtomicBoolean executed = new AtomicBoolean(false);
+        Command cmd = new Command("Test") {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                executed.set(true);
+            }
+        };
+
+        // Create wrapper
+        Button b = smb.createTouchCommandButton(cmd);
+        Command wrapper = b.getCommand();
+        assertTrue(wrapper.getClass().getName().contains("CommandWrapper"));
+
+        // Trigger action
+        // This should start ShowWaiter
+        wrapper.actionPerformed(new ActionEvent(wrapper, ActionEvent.Type.Command));
+
+        // ShowWaiter runs in background then callSerially.
+        // Wait for it.
+        long start = System.currentTimeMillis();
+        while (!executed.get() && System.currentTimeMillis() - start < 2000) {
+            Thread.sleep(50);
+            com.codename1.ui.DisplayTest.flushEdt();
+        }
+
+        assertTrue(executed.get(), "Command should be executed by ShowWaiter");
+
+        smb.openMenu(null);
     }
 }

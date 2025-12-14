@@ -2077,6 +2077,23 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         return socket;
     }
 
+    private final java.util.Map<Integer, java.util.concurrent.BlockingQueue<Object>> incomingConnections = new java.util.concurrent.ConcurrentHashMap<>();
+
+    public void simulateIncomingConnection(int port, Object connection) {
+        incomingConnections.computeIfAbsent(port, k -> new java.util.concurrent.LinkedBlockingQueue<>()).add(connection);
+    }
+
+    @Override
+    public Object listenSocket(int port) {
+        try {
+            java.util.concurrent.BlockingQueue<Object> q = incomingConnections.computeIfAbsent(port, k -> new java.util.concurrent.LinkedBlockingQueue<>());
+            Object conn = q.poll(100, java.util.concurrent.TimeUnit.MILLISECONDS);
+            return conn;
+        } catch (InterruptedException e) {
+            return null;
+        }
+    }
+
     @Override
     public void disconnectSocket(Object socket) {
         if (socket instanceof TestSocket) {
