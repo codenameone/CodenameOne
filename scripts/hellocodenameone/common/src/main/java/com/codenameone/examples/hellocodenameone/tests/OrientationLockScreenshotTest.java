@@ -33,10 +33,6 @@ public class OrientationLockScreenshotTest extends BaseTest {
             });
         });
 
-        while (!isDone()) {
-            Thread.sleep(100);
-        }
-
         return !isFailed();
     }
 }
