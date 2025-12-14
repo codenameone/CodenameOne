@@ -14,6 +14,26 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class WebServiceProxyCallTest extends UITestBase {
 
+    @org.junit.jupiter.api.BeforeEach
+    public void resetNetworkManager() {
+        // Ensure NetworkManager is in a clean state
+        try {
+            java.lang.reflect.Field runningField = NetworkManager.class.getDeclaredField("running");
+            runningField.setAccessible(true);
+            runningField.setBoolean(NetworkManager.getInstance(), false);
+
+            java.lang.reflect.Field threadsField = NetworkManager.class.getDeclaredField("networkThreads");
+            threadsField.setAccessible(true);
+            threadsField.set(NetworkManager.getInstance(), null);
+
+            java.lang.reflect.Field pendingField = NetworkManager.class.getDeclaredField("pending");
+            pendingField.setAccessible(true);
+            ((java.util.Vector)pendingField.get(NetworkManager.getInstance())).clear();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     @AfterEach
     public void cleanup() {
         if (implementation != null) {

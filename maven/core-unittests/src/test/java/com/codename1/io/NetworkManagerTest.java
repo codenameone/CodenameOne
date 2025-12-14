@@ -36,6 +36,11 @@ class NetworkManagerTest {
         Util.setImplementation(implementation);
         // Ensure Display is initialized for addToQueueAndWait
         if (!Display.isInitialized()) {
+            com.codename1.impl.ImplementationFactory.setInstance(new com.codename1.impl.ImplementationFactory() {
+                public Object createImplementation() {
+                    return implementation;
+                }
+            });
             Display.init(null);
         }
         manager = NetworkManager.getInstance();

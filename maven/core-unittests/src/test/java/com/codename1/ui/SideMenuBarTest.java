@@ -130,6 +130,10 @@ class SideMenuBarTest extends UITestBase {
         Command wrapper = b.getCommand();
         assertTrue(wrapper.getClass().getName().contains("CommandWrapper"));
 
+        // Initialize internal state (rightPanel) by opening menu
+        smb.openMenu(null);
+        com.codename1.ui.DisplayTest.flushEdt();
+
         // Trigger action
         // This should start ShowWaiter
         wrapper.actionPerformed(new ActionEvent(wrapper, ActionEvent.Type.Command));
