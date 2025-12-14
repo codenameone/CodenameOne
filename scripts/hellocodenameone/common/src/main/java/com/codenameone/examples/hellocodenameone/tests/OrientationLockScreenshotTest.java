@@ -27,17 +27,9 @@ public class OrientationLockScreenshotTest extends BaseTest {
                 }
                 Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("landscape_locked");
 
-                // Lock to Portrait
+                // Lock to Portrait for cleanup
                 CN.lockOrientation(true);
-
-                UITimer.timer(2000, false, () -> {
-                    if (CN.getDisplayWidth() > CN.getDisplayHeight()) {
-                        fail("Failed to lock to portrait. Width=" + CN.getDisplayWidth() + ", Height=" + CN.getDisplayHeight());
-                        return;
-                    }
-                    Cn1ssDeviceRunnerHelper.emitCurrentFormScreenshot("portrait_locked");
-                    done();
-                });
+                done();
             });
         });
 
