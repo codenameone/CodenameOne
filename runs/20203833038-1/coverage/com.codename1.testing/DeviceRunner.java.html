@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DeviceRunner.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.testing</a> &gt; <span class="el_source">DeviceRunner.java</span></div><h1>DeviceRunner.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.testing;
+
+import com.codename1.io.Log;
+import com.codename1.ui.CN;
+import com.codename1.ui.Display;
+
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+
+/**
+ * Runs the test cases from the test build of the app, notice that this class
+ * is abstract since device/app specific code can exist in the implementation
+ *
+ * @author Shai Almog
+ */
+<span class="fc" id="L39">public abstract class DeviceRunner {</span>
+    private static final int VERSION = 1;
+    private int failedTests;
+    private int passedTests;
+
+    /**
+     * Run all the test cases
+     */
+    public void runTests() {
+<span class="fc" id="L48">        failedTests = 0;</span>
+<span class="fc" id="L49">        passedTests = 0;</span>
+<span class="fc" id="L50">        Log.p(&quot;-----STARTING TESTS-----&quot;);</span>
+        try {
+<span class="fc" id="L52">            InputStream is = getClass().getResourceAsStream(&quot;/tests.dat&quot;);</span>
+
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            if (is == null) {</span>
+<span class="fc" id="L55">                is = Display.getInstance().getResourceAsStream(null, &quot;/tests.dat&quot;);</span>
+            }
+
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">            if (is == null) {</span>
+<span class="nc" id="L59">                Log.p(&quot;Test data not found in the file, make sure the ant task was executed in full&quot;);</span>
+<span class="nc" id="L60">                System.exit(2);</span>
+<span class="nc" id="L61">                return;</span>
+            }
+<span class="fc" id="L63">            DataInputStream di = new DataInputStream(is);</span>
+<span class="fc" id="L64">            int version = di.readInt();</span>
+<span class="pc bpc" id="L65" title="1 of 2 branches missed.">            if (version &gt; VERSION) {</span>
+<span class="nc" id="L66">                Log.p(&quot;Tests were built with a new version of Codename One and can't be executed with this runner&quot;);</span>
+<span class="nc" id="L67">                System.exit(4);</span>
+<span class="nc" id="L68">                return;</span>
+            }
+
+<span class="fc" id="L71">            String[] tests = new String[di.readInt()];</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">            for (int iter = 0; iter &lt; tests.length; iter++) {</span>
+<span class="fc" id="L73">                tests[iter] = di.readUTF();</span>
+            }
+<span class="fc" id="L75">            di.close();</span>
+
+<span class="fc bfc" id="L77" title="All 2 branches covered.">            for (int iter = 0; iter &lt; tests.length; iter++) {</span>
+<span class="fc" id="L78">                runTest(tests[iter]);</span>
+            }
+<span class="nc" id="L80">        } catch (IOException err) {</span>
+<span class="nc" id="L81">            TestReporting.getInstance().logException(err);</span>
+<span class="fc" id="L82">        }</span>
+<span class="fc" id="L83">        TestReporting.getInstance().testExecutionFinished(getClass().getName());</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">        if (failedTests &gt; 0) {</span>
+<span class="fc" id="L85">            Log.p(&quot;Test execution finished, some failed tests occurred. Passed: &quot; + passedTests + &quot; tests. Failed: &quot; + failedTests + &quot; tests.&quot;);</span>
+        } else {
+<span class="nc" id="L87">            Log.p(&quot;All tests passed. Total &quot; + passedTests + &quot; tests passed&quot;);</span>
+        }
+<span class="fc" id="L89">        Log.p(&quot;-----FINISHED TESTS-----&quot;);</span>
+<span class="fc" id="L90">    }</span>
+
+    /**
+     * This method starts a new application instance
+     */
+    protected abstract void startApplicationInstance();
+
+    /**
+     * This method should cleanup the application so the next test case can run on a clean
+     * application instance
+     */
+    protected abstract void stopApplicationInstance();
+
+    /**
+     * Runs the given test case
+     *
+     * @param testClassName the class name of the test case
+     */
+    public void runTest(String testClassName) {
+        try {
+<span class="fc" id="L110">            final UnitTest t = (UnitTest) Class.forName(testClassName).newInstance();</span>
+            try {
+<span class="fc" id="L112">                TestReporting.getInstance().startingTestCase(t.getClass().getName());</span>
+<span class="fc" id="L113">                startApplicationInstance();</span>
+<span class="fc" id="L114">                class RunTestImpl implements Runnable {</span>
+                    boolean result;
+
+                    public void run() {
+                        try {
+<span class="fc" id="L119">                            t.prepare();</span>
+<span class="fc" id="L120">                            result = t.runTest();</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">                            if (result) {</span>
+<span class="fc" id="L122">                                passedTests++;</span>
+                            } else {
+<span class="fc" id="L124">                                failedTests++;</span>
+                            }
+<span class="fc" id="L126">                            t.cleanup();</span>
+<span class="fc" id="L127">                        } catch (Throwable err) {</span>
+<span class="fc" id="L128">                            failedTests++;</span>
+<span class="fc" id="L129">                            TestReporting.getInstance().logException(err);</span>
+<span class="fc" id="L130">                            TestReporting.getInstance().finishedTestCase(t.getClass().getName(), false);</span>
+<span class="fc" id="L131">                        }</span>
+<span class="fc" id="L132">                    }</span>
+                }
+<span class="fc" id="L134">                RunTestImpl runTest = new RunTestImpl();</span>
+<span class="pc bpc" id="L135" title="1 of 4 branches missed.">                if (t.shouldExecuteOnEDT() &amp;&amp; !CN.isEdt()) {</span>
+<span class="nc" id="L136">                    CN.callSeriallyAndWait(runTest);</span>
+<span class="pc bpc" id="L137" title="1 of 4 branches missed.">                } else if (!t.shouldExecuteOnEDT() &amp;&amp; CN.isEdt()) {</span>
+<span class="fc" id="L138">                    CN.invokeAndBlock(runTest);</span>
+                } else {
+<span class="fc" id="L140">                    runTest.run();</span>
+                }
+<span class="fc" id="L142">                stopApplicationInstance();</span>
+<span class="fc" id="L143">                TestReporting.getInstance().finishedTestCase(t.getClass().getName(), runTest.result);</span>
+<span class="nc" id="L144">            } catch (Throwable err) {</span>
+<span class="nc" id="L145">                failedTests++;</span>
+<span class="nc" id="L146">                TestReporting.getInstance().logException(err);</span>
+<span class="nc" id="L147">                TestReporting.getInstance().finishedTestCase(t.getClass().getName(), false);</span>
+<span class="fc" id="L148">            }</span>
+<span class="fc" id="L149">        } catch (Throwable t) {</span>
+<span class="fc" id="L150">            TestReporting.getInstance().logMessage(&quot;Failed to create instance of &quot; + testClassName);</span>
+<span class="fc" id="L151">            TestReporting.getInstance().logMessage(&quot;Verify the class is public and doesn't have a specialized constructor&quot;);</span>
+<span class="fc" id="L152">            TestReporting.getInstance().logException(t);</span>
+<span class="fc" id="L153">        }</span>
+<span class="fc" id="L154">    }</span>
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

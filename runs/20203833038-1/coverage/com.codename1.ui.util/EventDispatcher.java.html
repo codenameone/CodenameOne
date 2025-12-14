@@ -1,0 +1,561 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>EventDispatcher.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.util</a> &gt; <span class="el_source">EventDispatcher.java</span></div><h1>EventDispatcher.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.util;
+
+import com.codename1.cloud.BindTarget;
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.events.FocusListener;
+import com.codename1.ui.events.ScrollListener;
+import com.codename1.ui.events.SelectionListener;
+import com.codename1.ui.events.StyleListener;
+import com.codename1.ui.plaf.Style;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Vector;
+
+/**
+ * &lt;p&gt;Handles event dispatching while guaranteeing that all events would
+ * be fired properly on the EDT regardless of their source. This class handles listener
+ * registration/removal in a safe and uniform way. &lt;/p&gt;
+ * &lt;p&gt;
+ * To integrate this into your code you can use something like:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/8abb07271bae62d0f81a.js&quot;&gt;&lt;/script&gt;
+ *
+ * @author Shai Almog
+ */
+<span class="fc" id="L53">public class EventDispatcher {</span>
+
+<span class="fc" id="L55">    private static boolean fireStyleEventsOnNonEDT = false;</span>
+    boolean actionListenerArray;
+    boolean styleListenerArray;
+    boolean bindTargetArray;
+    boolean dataChangeListenerArray;
+    boolean focusListenerArray;
+    boolean selectionListenerArray;
+    boolean scrollListenerArray;
+<span class="fc" id="L63">    private boolean blocking = false;</span>
+    private ArrayList&lt;Object&gt; listeners;
+
+    /**
+     * When set to true, style events will be dispatched even from non-EDT threads.
+     * When set to false, when in non-EDT threads, style events will not be dispatched at all (And developer has to make sure changes will be reflected by calling revalidate after all the changes)
+     * &lt;p&gt;
+     * Default is false. Setting this to true results in a performance penalty, and it is better instead to simply aggregate events performed on non-EDT threads and when all are over - call revalidate on the relevant container.
+     *
+     * @param fire true to fire on non-EDT, false otherwise
+     */
+    public static void setFireStyleEventsOnNonEDT(boolean fire) {
+<span class="nc" id="L75">        fireStyleEventsOnNonEDT = fire;</span>
+<span class="nc" id="L76">    }</span>
+
+    /**
+     * Add a listener to the dispatcher that would receive the events when they occurs
+     *
+     * @param listener a dispatcher listener to add
+     */
+    public synchronized void addListener(Object listener) {
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if (listener != null) {</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">            if (listeners == null) {</span>
+<span class="fc" id="L86">                listeners = new ArrayList&lt;Object&gt;();</span>
+            }
+<span class="fc bfc" id="L88" title="All 2 branches covered.">            if (!listeners.contains(listener)) {</span>
+<span class="fc" id="L89">                listeners.add(listener);</span>
+            }
+        }
+<span class="fc" id="L92">    }</span>
+
+    /**
+     * Returns the vector of the listeners
+     *
+     * @return the vector of listeners attached to the event dispatcher
+     * @deprecated use getListenerCollection instead, this method will now be VERY SLOW
+     */
+    public Vector getListenerVector() {
+<span class="fc" id="L101">        return new Vector(listeners);</span>
+    }
+
+    /**
+     * Returns the collection of the listeners
+     *
+     * @return the collection of listeners attached to the event dispatcher
+     */
+    public Collection getListenerCollection() {
+<span class="fc" id="L110">        return listeners;</span>
+    }
+
+    /**
+     * Remove the listener from the dispatcher
+     *
+     * @param listener a dispatcher listener to remove
+     */
+    public synchronized void removeListener(Object listener) {
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (listeners != null) {</span>
+<span class="fc" id="L120">            listeners.remove(listener);</span>
+        }
+<span class="fc" id="L122">    }</span>
+
+    /**
+     * Fires the event safely on the EDT without risk of concurrency errors
+     *
+     * @param index the index of the event
+     * @param type  the type of the event
+     */
+    public void fireDataChangeEvent(int index, int type) {
+<span class="pc bpc" id="L131" title="1 of 4 branches missed.">        if (listeners == null || listeners.size() == 0) {</span>
+<span class="fc" id="L132">            return;</span>
+        }
+<span class="fc" id="L134">        boolean isEdt = Display.getInstance().isEdt();</span>
+        // minor optimization for a common use case to avoid allocation costs
+<span class="pc bpc" id="L136" title="2 of 4 branches missed.">        if (isEdt &amp;&amp; listeners.size() == 1) {</span>
+<span class="fc" id="L137">            DataChangedListener a = (DataChangedListener) listeners.get(0);</span>
+<span class="fc" id="L138">            a.dataChanged(type, index);</span>
+<span class="fc" id="L139">            return;</span>
+        }
+        DataChangedListener[] array;
+<span class="nc" id="L142">        synchronized (this) {</span>
+<span class="nc" id="L143">            array = new DataChangedListener[listeners.size()];</span>
+<span class="nc" id="L144">            int alen = array.length;</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">            for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="nc" id="L146">                array[iter] = (DataChangedListener) listeners.get(iter);</span>
+            }
+<span class="nc" id="L148">        }</span>
+        // if we already are on the EDT just fire the event
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        if (isEdt) {</span>
+<span class="nc" id="L151">            fireDataChangeSync(array, type, index);</span>
+        } else {
+<span class="nc" id="L153">            dataChangeListenerArray = true;</span>
+<span class="nc" id="L154">            Runnable cl = new CallbackClass(array, new int[]{type, index});</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">            if (blocking) {</span>
+<span class="nc" id="L156">                Display.getInstance().callSeriallyAndWait(cl);</span>
+            } else {
+<span class="nc" id="L158">                Display.getInstance().callSerially(cl);</span>
+            }
+        }
+<span class="nc" id="L161">    }</span>
+
+    /**
+     * Fired when a property of the component changes to a new value
+     *
+     * @param source       the source component
+     * @param propertyName the name of the property
+     * @param oldValue     the old value of the property
+     * @param newValue     the new value for the property
+     */
+    public void fireBindTargetChange(Component source, String propertyName, Object oldValue, Object newValue) {
+<span class="nc bnc" id="L172" title="All 4 branches missed.">        if (listeners == null || listeners.size() == 0) {</span>
+<span class="nc" id="L173">            return;</span>
+        }
+        BindTarget[] array;
+<span class="nc" id="L176">        synchronized (this) {</span>
+<span class="nc" id="L177">            array = new BindTarget[listeners.size()];</span>
+<span class="nc" id="L178">            int alen = array.length;</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">            for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="nc" id="L180">                array[iter] = (BindTarget) listeners.get(iter);</span>
+            }
+<span class="nc" id="L182">        }</span>
+        // if we already are on the EDT just fire the event
+<span class="nc bnc" id="L184" title="All 2 branches missed.">        if (Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L185">            fireBindTargetChangeSync(array, source, propertyName, oldValue, newValue);</span>
+        } else {
+<span class="nc" id="L187">            bindTargetArray = true;</span>
+<span class="nc" id="L188">            Runnable cl = new CallbackClass(array, new Object[]{source, propertyName, oldValue, newValue});</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            if (blocking) {</span>
+<span class="nc" id="L190">                Display.getInstance().callSeriallyAndWait(cl);</span>
+            } else {
+<span class="nc" id="L192">                Display.getInstance().callSerially(cl);</span>
+            }
+        }
+<span class="nc" id="L195">    }</span>
+
+    /**
+     * Fired when a property of the component changes to a new value
+     *
+     * @param source       the source component
+     * @param propertyName the name of the property
+     * @param oldValue     the old value of the property
+     * @param newValue     the new value for the property
+     */
+    private void fireBindTargetChangeSync(BindTarget[] arr, Component source, String propertyName, Object oldValue, Object newValue) {
+<span class="nc" id="L206">        int alen = arr.length;</span>
+<span class="nc bnc" id="L207" title="All 2 branches missed.">        for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="nc" id="L208">            arr[iter].propertyChanged(source, propertyName, oldValue, newValue);</span>
+        }
+<span class="nc" id="L210">    }</span>
+
+    /**
+     * Fires the style change even to the listeners
+     *
+     * @param property the property name for the event
+     * @param source   the style firing the event
+     */
+    public void fireStyleChangeEvent(String property, Style source) {
+<span class="pc bpc" id="L219" title="2 of 4 branches missed.">        if (listeners == null || listeners.size() == 0) {</span>
+<span class="nc" id="L220">            return;</span>
+        }
+        // minor optimization for a common use case to avoid allocation costs
+<span class="fc" id="L223">        boolean isEdt = Display.getInstance().isEdt();</span>
+<span class="pc bpc" id="L224" title="1 of 4 branches missed.">        if (isEdt &amp;&amp; listeners.size() == 1) {</span>
+<span class="fc" id="L225">            StyleListener a = (StyleListener) listeners.get(0);</span>
+<span class="fc" id="L226">            a.styleChanged(property, source);</span>
+<span class="fc" id="L227">            return;</span>
+        }
+        StyleListener[] array;
+<span class="fc" id="L230">        synchronized (this) {</span>
+<span class="fc" id="L231">            array = new StyleListener[listeners.size()];</span>
+<span class="fc bfc" id="L232" title="All 2 branches covered.">            for (int iter = 0; iter &lt; array.length; iter++) {</span>
+<span class="fc" id="L233">                array[iter] = (StyleListener) listeners.get(iter);</span>
+            }
+<span class="fc" id="L235">        }</span>
+        // if we already are on the EDT just fire the event
+<span class="pc bpc" id="L237" title="1 of 2 branches missed.">        if (isEdt) {</span>
+<span class="nc" id="L238">            fireStyleChangeSync(array, property, source);</span>
+<span class="pc bpc" id="L239" title="1 of 2 branches missed.">        } else if (fireStyleEventsOnNonEDT) {</span>
+<span class="nc" id="L240">            styleListenerArray = true;</span>
+<span class="nc" id="L241">            Runnable cl = new CallbackClass(array, new Object[]{property, source});</span>
+<span class="nc" id="L242">            Display.getInstance().callSerially(cl);</span>
+        }
+<span class="fc" id="L244">    }</span>
+
+    /**
+     * Synchronious internal call for common code
+     */
+    private void fireDataChangeSync(DataChangedListener[] array, int type, int index) {
+<span class="nc" id="L250">        int alen = array.length;</span>
+<span class="nc bnc" id="L251" title="All 2 branches missed.">        for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="nc" id="L252">            array[iter].dataChanged(type, index);</span>
+        }
+<span class="nc" id="L254">    }</span>
+
+    /**
+     * Synchronious internal call for common code
+     */
+    private void fireStyleChangeSync(StyleListener[] array, String property, Style source) {
+<span class="nc" id="L260">        int alen = array.length;</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">        for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="nc" id="L262">            array[iter].styleChanged(property, source);</span>
+        }
+<span class="nc" id="L264">    }</span>
+
+    /**
+     * Synchronious internal call for common code
+     */
+    private void fireSelectionSync(SelectionListener[] array, int oldSelection, int newSelection) {
+<span class="fc" id="L270">        int alen = array.length;</span>
+<span class="fc bfc" id="L271" title="All 2 branches covered.">        for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="fc" id="L272">            array[iter].selectionChanged(oldSelection, newSelection);</span>
+        }
+<span class="fc" id="L274">    }</span>
+
+    /**
+     * Synchronious internal call for common code
+     */
+    private void fireScrollSync(ScrollListener[] array, int l, int t, int oldl, int oldt) {
+<span class="nc" id="L280">        int alen = array.length;</span>
+<span class="nc bnc" id="L281" title="All 2 branches missed.">        for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="nc" id="L282">            array[iter].scrollChanged(l, t, oldl, oldt);</span>
+        }
+<span class="nc" id="L284">    }</span>
+
+    /**
+     * Fires the event safely on the EDT without risk of concurrency errors
+     *
+     * @param ev the ActionEvent to fire to the listeners
+     */
+    public void fireActionEvent(ActionEvent ev) {
+<span class="fc bfc" id="L292" title="All 4 branches covered.">        if (listeners == null || listeners.size() == 0) {</span>
+<span class="fc" id="L293">            return;</span>
+        }
+
+        // minor optimization for a common use case to avoid allocation costs
+<span class="fc" id="L297">        boolean isEdt = Display.getInstance().isEdt();</span>
+<span class="fc bfc" id="L298" title="All 4 branches covered.">        if (isEdt &amp;&amp; listeners.size() == 1) {</span>
+<span class="fc" id="L299">            ActionListener a = (ActionListener) listeners.get(0);</span>
+<span class="fc" id="L300">            a.actionPerformed(ev);</span>
+<span class="fc" id="L301">            return;</span>
+        }
+        ActionListener[] array;
+<span class="fc" id="L304">        synchronized (this) {</span>
+<span class="fc" id="L305">            array = new ActionListener[listeners.size()];</span>
+<span class="fc" id="L306">            int alen = array.length;</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">            for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="fc" id="L308">                array[iter] = (ActionListener) listeners.get(iter);</span>
+            }
+<span class="fc" id="L310">        }</span>
+        // if we already are on the EDT just fire the event
+<span class="fc bfc" id="L312" title="All 2 branches covered.">        if (isEdt) {</span>
+<span class="fc" id="L313">            fireActionSync(array, ev);</span>
+        } else {
+<span class="fc" id="L315">            actionListenerArray = true;</span>
+<span class="fc" id="L316">            Runnable cl = new CallbackClass(array, ev);</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">            if (blocking) {</span>
+<span class="fc" id="L318">                Display.getInstance().callSeriallyAndWait(cl);</span>
+            } else {
+<span class="fc" id="L320">                Display.getInstance().callSerially(cl);</span>
+            }
+        }
+<span class="fc" id="L323">    }</span>
+
+    /**
+     * Fires the event safely on the EDT without risk of concurrency errors
+     *
+     * @param oldSelection old selection
+     * @param newSelection new selection
+     */
+    public void fireSelectionEvent(int oldSelection, int newSelection) {
+<span class="pc bpc" id="L332" title="1 of 4 branches missed.">        if (listeners == null || listeners.size() == 0) {</span>
+<span class="fc" id="L333">            return;</span>
+        }
+        // minor optimization for a common use case to avoid allocation costs
+<span class="fc" id="L336">        boolean isEdt = Display.getInstance().isEdt();</span>
+<span class="pc bpc" id="L337" title="1 of 4 branches missed.">        if (isEdt &amp;&amp; listeners.size() == 1) {</span>
+<span class="fc" id="L338">            SelectionListener a = (SelectionListener) listeners.get(0);</span>
+<span class="fc" id="L339">            a.selectionChanged(oldSelection, newSelection);</span>
+<span class="fc" id="L340">            return;</span>
+        }
+        SelectionListener[] array;
+<span class="fc" id="L343">        synchronized (this) {</span>
+<span class="fc" id="L344">            array = new SelectionListener[listeners.size()];</span>
+<span class="fc" id="L345">            int alen = array.length;</span>
+<span class="fc bfc" id="L346" title="All 2 branches covered.">            for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="fc" id="L347">                array[iter] = (SelectionListener) listeners.get(iter);</span>
+            }
+<span class="fc" id="L349">        }</span>
+        // if we already are on the EDT just fire the event
+<span class="pc bpc" id="L351" title="1 of 2 branches missed.">        if (isEdt) {</span>
+<span class="fc" id="L352">            fireSelectionSync(array, oldSelection, newSelection);</span>
+        } else {
+<span class="nc" id="L354">            selectionListenerArray = true;</span>
+<span class="nc" id="L355">            Runnable cl = new CallbackClass(array, new int[]{oldSelection, newSelection});</span>
+<span class="nc bnc" id="L356" title="All 2 branches missed.">            if (blocking) {</span>
+<span class="nc" id="L357">                Display.getInstance().callSeriallyAndWait(cl);</span>
+            } else {
+<span class="nc" id="L359">                Display.getInstance().callSerially(cl);</span>
+            }
+        }
+<span class="fc" id="L362">    }</span>
+
+    /**
+     * Fires the event safely on the EDT without risk of concurrency errors
+     */
+    public void fireScrollEvent(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
+<span class="pc bpc" id="L368" title="2 of 4 branches missed.">        if (listeners == null || listeners.size() == 0) {</span>
+<span class="nc" id="L369">            return;</span>
+        }
+        // minor optimization for a common use case to avoid allocation costs
+<span class="fc" id="L372">        boolean isEdt = Display.getInstance().isEdt();</span>
+<span class="pc bpc" id="L373" title="2 of 4 branches missed.">        if (isEdt &amp;&amp; listeners.size() == 1) {</span>
+<span class="fc" id="L374">            ScrollListener a = (ScrollListener) listeners.get(0);</span>
+<span class="fc" id="L375">            a.scrollChanged(scrollX, scrollY, oldscrollX, oldscrollY);</span>
+<span class="fc" id="L376">            return;</span>
+        }
+        ScrollListener[] array;
+<span class="nc" id="L379">        synchronized (this) {</span>
+<span class="nc" id="L380">            array = new ScrollListener[listeners.size()];</span>
+<span class="nc" id="L381">            int alen = array.length;</span>
+<span class="nc bnc" id="L382" title="All 2 branches missed.">            for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="nc" id="L383">                array[iter] = (ScrollListener) listeners.get(iter);</span>
+            }
+<span class="nc" id="L385">        }</span>
+        // if we already are on the EDT just fire the event
+<span class="nc bnc" id="L387" title="All 2 branches missed.">        if (isEdt) {</span>
+<span class="nc" id="L388">            fireScrollSync(array, scrollX, scrollY, oldscrollX, oldscrollY);</span>
+        } else {
+<span class="nc" id="L390">            scrollListenerArray = true;</span>
+<span class="nc" id="L391">            Runnable cl = new CallbackClass(array, new int[]{scrollX, scrollY, oldscrollX, oldscrollY});</span>
+<span class="nc bnc" id="L392" title="All 2 branches missed.">            if (blocking) {</span>
+<span class="nc" id="L393">                Display.getInstance().callSeriallyAndWait(cl);</span>
+            } else {
+<span class="nc" id="L395">                Display.getInstance().callSerially(cl);</span>
+            }
+        }
+<span class="nc" id="L398">    }</span>
+
+    /**
+     * Synchronous internal call for common code
+     */
+    private void fireActionSync(ActionListener[] array, ActionEvent ev) {
+<span class="fc" id="L404">        int alen = array.length;</span>
+<span class="fc bfc" id="L405" title="All 2 branches covered.">        for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="pc bpc" id="L406" title="1 of 4 branches missed.">            if (ev == null || !ev.isConsumed()) {</span>
+<span class="fc" id="L407">                array[iter].actionPerformed(ev);</span>
+            }
+        }
+<span class="fc" id="L410">    }</span>
+
+    /**
+     * Fires the event safely on the EDT without risk of concurrency errors
+     *
+     * @param c the Component that gets the focus event
+     */
+    public void fireFocus(Component c) {
+<span class="pc bpc" id="L418" title="2 of 4 branches missed.">        if (listeners == null || listeners.size() == 0) {</span>
+<span class="nc" id="L419">            return;</span>
+        }
+        // minor optimization for a common use case to avoid allocation costs
+<span class="fc" id="L422">        boolean isEdt = Display.getInstance().isEdt();</span>
+<span class="pc bpc" id="L423" title="1 of 4 branches missed.">        if (isEdt &amp;&amp; listeners.size() == 1) {</span>
+<span class="fc" id="L424">            FocusListener a = (FocusListener) listeners.get(0);</span>
+<span class="fc bfc" id="L425" title="All 2 branches covered.">            if (c.hasFocus()) {</span>
+<span class="fc" id="L426">                a.focusGained(c);</span>
+            } else {
+<span class="fc" id="L428">                a.focusLost(c);</span>
+            }
+<span class="fc" id="L430">            return;</span>
+        }
+        FocusListener[] array;
+<span class="fc" id="L433">        synchronized (this) {</span>
+<span class="fc" id="L434">            array = new FocusListener[listeners.size()];</span>
+<span class="fc" id="L435">            int alen = array.length;</span>
+<span class="fc bfc" id="L436" title="All 2 branches covered.">            for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="fc" id="L437">                array[iter] = (FocusListener) listeners.get(iter);</span>
+            }
+<span class="fc" id="L439">        }</span>
+        // if we already are on the EDT just fire the event
+<span class="pc bpc" id="L441" title="1 of 2 branches missed.">        if (isEdt) {</span>
+<span class="fc" id="L442">            fireFocusSync(array, c);</span>
+        } else {
+<span class="nc" id="L444">            focusListenerArray = true;</span>
+<span class="nc" id="L445">            Runnable cl = new CallbackClass(array, c);</span>
+<span class="nc bnc" id="L446" title="All 2 branches missed.">            if (blocking) {</span>
+<span class="nc" id="L447">                Display.getInstance().callSeriallyAndWait(cl);</span>
+            } else {
+<span class="nc" id="L449">                Display.getInstance().callSerially(cl);</span>
+            }
+        }
+<span class="fc" id="L452">    }</span>
+
+    /**
+     * Synchronous internal call for common code
+     */
+    private void fireFocusSync(FocusListener[] array, Component c) {
+<span class="fc bfc" id="L458" title="All 2 branches covered.">        if (c.hasFocus()) {</span>
+<span class="fc" id="L459">            int alen = array.length;</span>
+<span class="fc bfc" id="L460" title="All 2 branches covered.">            for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="fc" id="L461">                array[iter].focusGained(c);</span>
+            }
+<span class="fc" id="L463">        } else {</span>
+<span class="fc" id="L464">            int alen = array.length;</span>
+<span class="fc bfc" id="L465" title="All 2 branches covered.">            for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="fc" id="L466">                array[iter].focusLost(c);</span>
+            }
+        }
+<span class="fc" id="L469">    }</span>
+
+    /**
+     * Returns true if the event dispatcher has registered listeners
+     *
+     * @return true if the event dispatcher has registered listeners
+     */
+    public boolean hasListeners() {
+<span class="pc bpc" id="L477" title="1 of 4 branches missed.">        return listeners != null &amp;&amp; listeners.size() &gt; 0;</span>
+    }
+
+    /**
+     * Indicates whether this dispatcher blocks when firing events or not, normally
+     * a dispatcher uses callSeriallyAndWait() to be 100% synchronous with event delivery
+     * however this method is very slow. By setting blocking to false the callSerially
+     * method is used which allows much faster execution for IO heavy operations.
+     *
+     * @return the blocking state
+     */
+    public boolean isBlocking() {
+<span class="nc" id="L489">        return blocking;</span>
+    }
+
+    /**
+     * Indicates whether this dispatcher blocks when firing events or not, normally
+     * a dispatcher uses callSeriallyAndWait() to be 100% synchronous with event delivery
+     * however this method is very slow. By setting blocking to false the callSerially
+     * method is used which allows much faster execution for IO heavy operations.
+     *
+     * @param blocking the blocking value
+     */
+    public void setBlocking(boolean blocking) {
+<span class="fc" id="L501">        this.blocking = blocking;</span>
+<span class="fc" id="L502">    }</span>
+
+    class CallbackClass implements Runnable {
+        private final Object[] iPending;
+        private final Object iPendingEvent;
+
+<span class="fc" id="L508">        public CallbackClass(Object[] iPending, Object iPendingEvent) {</span>
+<span class="fc" id="L509">            this.iPending = iPending;</span>
+<span class="fc" id="L510">            this.iPendingEvent = iPendingEvent;</span>
+<span class="fc" id="L511">        }</span>
+
+        /**
+         * Do not invoke this method it handles the dispatching internally and serves
+         * as an implementation detail
+         */
+        public final void run() {
+            // We might not be running during a suspend/resume cycle
+<span class="pc bpc" id="L519" title="1 of 4 branches missed.">            if (Display.isInitialized() &amp;&amp; !Display.getInstance().isEdt()) {</span>
+<span class="nc" id="L520">                throw new IllegalStateException(&quot;This method should not be invoked by external code!&quot;);</span>
+            }
+
+<span class="pc bpc" id="L523" title="1 of 2 branches missed.">            if (styleListenerArray) {</span>
+<span class="nc" id="L524">                Object[] p = (Object[]) iPendingEvent;</span>
+<span class="nc" id="L525">                fireStyleChangeSync((StyleListener[]) iPending, (String) p[0], (Style) p[1]);</span>
+<span class="nc" id="L526">                return;</span>
+            }
+
+<span class="pc bpc" id="L529" title="1 of 2 branches missed.">            if (actionListenerArray) {</span>
+<span class="fc" id="L530">                fireActionSync((ActionListener[]) iPending, (ActionEvent) iPendingEvent);</span>
+<span class="fc" id="L531">                return;</span>
+            }
+
+<span class="nc bnc" id="L534" title="All 2 branches missed.">            if (focusListenerArray) {</span>
+<span class="nc" id="L535">                fireFocusSync((FocusListener[]) iPending, (Component) iPendingEvent);</span>
+<span class="nc" id="L536">                return;</span>
+            }
+
+<span class="nc bnc" id="L539" title="All 2 branches missed.">            if (dataChangeListenerArray) {</span>
+<span class="nc" id="L540">                fireDataChangeSync((DataChangedListener[]) iPending, ((int[]) iPendingEvent)[0], ((int[]) iPendingEvent)[1]);</span>
+<span class="nc" id="L541">                return;</span>
+            }
+
+<span class="nc bnc" id="L544" title="All 2 branches missed.">            if (selectionListenerArray) {</span>
+<span class="nc" id="L545">                fireSelectionSync((SelectionListener[]) iPending, ((int[]) iPendingEvent)[0], ((int[]) iPendingEvent)[1]);</span>
+<span class="nc" id="L546">                return;</span>
+            }
+
+<span class="nc bnc" id="L549" title="All 2 branches missed.">            if (scrollListenerArray) {</span>
+<span class="nc" id="L550">                fireScrollSync((ScrollListener[]) iPending, ((int[]) iPendingEvent)[0], ((int[]) iPendingEvent)[1], ((int[]) iPendingEvent)[2], ((int[]) iPendingEvent)[3]);</span>
+<span class="nc" id="L551">                return;</span>
+            }
+
+<span class="nc bnc" id="L554" title="All 2 branches missed.">            if (bindTargetArray) {</span>
+<span class="nc" id="L555">                Object[] a = (Object[]) iPendingEvent;</span>
+<span class="nc" id="L556">                fireBindTargetChangeSync((BindTarget[]) iPending, (Component) a[0], (String) a[1], a[2], a[3]);</span>
+            }
+<span class="nc" id="L558">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

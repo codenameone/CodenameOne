@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InterFormContainer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">InterFormContainer.java</span></div><h1>InterFormContainer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.ui.ComponentSelector.Filter;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.layouts.BorderLayout;
+
+import java.util.HashMap;
+import java.util.Map;
+
+import static com.codename1.ui.ComponentSelector.$;
+
+/**
+ * A container that allows you to use the same component on multiple forms.  This is most
+ * useful for adding a global footer or sidebar that appears on multiple forms, or even the
+ * whole app.  For example, the Twitter app has tabs for &quot;Home&quot;, &quot;Search&quot;, &quot;Messages&quot;, etc.. that
+ * are always shown in the app, and are fixed in place, even between forms.  This container
+ * allows you to achieve a similar thing with Codename One apps.
+ *
+ * &lt;p&gt;Note that the InterFormContainer object itself cannot be added to multiple forms.   You
+ * need to create two InterFormContainer instances that share the same content.&lt;/p&gt;
+ *
+ * @author shannah
+ * @since 7.0
+ */
+public class InterFormContainer extends Container {
+    private final Component content;
+
+    /**
+     * Creates an interform container with the provided content.
+     *
+     * @param content The component that is to be shared across multiple forms.
+     */
+<span class="fc" id="L55">    public InterFormContainer(Component content) {</span>
+<span class="fc" id="L56">        this.content = content;</span>
+<span class="fc" id="L57">        setLayout(new BorderLayout());</span>
+<span class="fc" id="L58">        $(this).selectAllStyles().setPadding(0).setMargin(0);</span>
+
+<span class="fc" id="L60">    }</span>
+
+    /**
+     * Finds common InterFormContainers in two different component trees.
+     *
+     * @param root1 The root of the first component tree to search.
+     * @param root2 The root of the second component tree to search.
+     * @return A Map that maps an InterFormContainer from the first tree to its corresponding container from the second
+     * tree.
+     */
+    public static Map&lt;InterFormContainer, InterFormContainer&gt; findCommonContainers(Component root1, Component root2) {
+<span class="fc" id="L71">        final Map&lt;Component, InterFormContainer&gt; set1 = new HashMap&lt;Component, InterFormContainer&gt;();</span>
+<span class="fc" id="L72">        final Map&lt;Component, InterFormContainer&gt; set2 = new HashMap&lt;Component, InterFormContainer&gt;();</span>
+<span class="fc" id="L73">        final Map&lt;InterFormContainer, InterFormContainer&gt; out = new HashMap&lt;InterFormContainer, InterFormContainer&gt;();</span>
+<span class="fc" id="L74">        ComponentSelector.select(&quot;*&quot;, root1).filter(new Filter() {</span>
+            @Override
+            public boolean filter(Component c) {
+<span class="pc bpc" id="L77" title="1 of 2 branches missed.">                if (c.getClass() == InterFormContainer.class) {</span>
+<span class="nc" id="L78">                    set1.put(((InterFormContainer) c).content, (InterFormContainer) c);</span>
+<span class="nc" id="L79">                    return true;</span>
+                }
+<span class="fc" id="L81">                return false;</span>
+            }
+
+        });
+<span class="fc" id="L85">        ComponentSelector.select(&quot;*&quot;, root2).filter(new Filter() {</span>
+            @Override
+            public boolean filter(Component c) {
+<span class="pc bpc" id="L88" title="1 of 2 branches missed.">                if (c.getClass() == InterFormContainer.class) {</span>
+<span class="nc" id="L89">                    set2.put(((InterFormContainer) c).content, (InterFormContainer) c);</span>
+<span class="nc" id="L90">                    return true;</span>
+                }
+<span class="fc" id="L92">                return false;</span>
+            }
+
+        });
+
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        for (Map.Entry&lt;Component, InterFormContainer&gt; entry : set1.entrySet()) {</span>
+<span class="nc" id="L98">            Component c = entry.getKey();</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            if (set2.containsKey(c)) {</span>
+<span class="nc" id="L100">                out.put(entry.getValue(), set2.get(c));</span>
+            }
+<span class="nc" id="L102">        }</span>
+<span class="fc" id="L103">        return out;</span>
+
+    }
+
+    /**
+     * Injects the given &quot;content&quot; as an InterFormContainer inside the component hierarchy
+     * rooted at &quot;root&quot;
+     *
+     * @param selector A selector to identify the component to add the container to.  See {@link ComponentSelector}.
+     * @param root     The root container serving as a starting point for the selector search.
+     * @param content  The content to inject.
+     * @return The InterFormContainer that was injected, or null if the selector didn't match any containers.
+     */
+    public static InterFormContainer inject(String selector, Container root, Component content) {
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        for (Component c : $(selector, root)) {</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">            if (c instanceof Container) {</span>
+<span class="nc" id="L119">                Container slotCnt = (Container) c;</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">                if (!(slotCnt.getLayout() instanceof BorderLayout)) {</span>
+<span class="nc" id="L121">                    slotCnt.setLayout(new BorderLayout());</span>
+                }
+<span class="nc" id="L123">                slotCnt.getStyle().stripMarginAndPadding();</span>
+<span class="nc" id="L124">                slotCnt.removeAll();</span>
+
+<span class="nc" id="L126">                InterFormContainer ifc = new InterFormContainer(content);</span>
+<span class="nc" id="L127">                slotCnt.add(BorderLayout.CENTER, ifc);</span>
+<span class="nc" id="L128">                return ifc;</span>
+            }
+<span class="nc" id="L130">        }</span>
+<span class="nc" id="L131">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected void initComponent() {
+<span class="pc bpc" id="L139" title="1 of 2 branches missed.">        if (content.getParent() != this) {</span>
+<span class="fc" id="L140">            content.remove();</span>
+<span class="fc" id="L141">            add(CENTER, content);</span>
+        }
+
+<span class="fc" id="L144">        super.initComponent();</span>
+<span class="fc" id="L145">    }</span>
+
+    /**
+     * Finds any InterformContainer instances in the UI hierarchy rooted at {@literal root}
+     * that contains the same content as this container.
+     *
+     * @param root A component/container whose UI hierarchy is to be searched.
+     * @return An InterFormContainer with the same content as this container, or null if none is found.
+     */
+    public InterFormContainer findPeer(Component root) {
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        if (root.getClass() == InterFormContainer.class) {</span>
+<span class="nc" id="L156">            InterFormContainer cnt = (InterFormContainer) root;</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">            if (cnt.content == content) {</span>
+<span class="nc" id="L158">                return cnt;</span>
+            }
+        }
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        if (root instanceof Container) {</span>
+<span class="nc" id="L162">            Container cnt = (Container) root;</span>
+<span class="nc" id="L163">            int len = cnt.getComponentCount();</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L165">                InterFormContainer peer = findPeer(cnt.getComponentAt(i));</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">                if (peer != null) {</span>
+<span class="nc" id="L167">                    return peer;</span>
+                }
+            }
+        }
+<span class="nc" id="L171">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void paint(Graphics g) {
+<span class="pc bpc" id="L178" title="1 of 2 branches missed.">        if (!isVisible()) {</span>
+<span class="nc" id="L179">            return;</span>
+        }
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">        if (content.getParent() != this) {</span>
+<span class="nc bnc" id="L182" title="All 4 branches missed.">            if (isInitialized() &amp;&amp; !content.isInitialized()) {</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">                if (content.getParent() != null) {</span>
+<span class="nc" id="L184">                    content.remove();</span>
+                }
+<span class="nc" id="L186">                add(BorderLayout.CENTER, content);</span>
+            }
+        }
+
+<span class="fc" id="L190">        g.translate(getX() - content.getX(), getY() - content.getY());</span>
+<span class="fc" id="L191">        content.paintComponentBackground(g);</span>
+<span class="fc" id="L192">        content.paint(g);</span>
+<span class="fc" id="L193">        g.translate(content.getX() - getX(), content.getY() - getY());</span>
+<span class="fc" id="L194">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    protected Dimension calcPreferredSize() {
+<span class="fc" id="L201">        return new Dimension(content.getPreferredW() + content.getStyle().getHorizontalMargins(), content.getPreferredH() + content.getStyle().getVerticalMargins());</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

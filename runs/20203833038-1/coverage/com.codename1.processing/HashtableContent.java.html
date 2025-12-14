@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>HashtableContent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.processing</a> &gt; <span class="el_source">HashtableContent.java</span></div><h1>HashtableContent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Eric Coolman, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.processing;
+
+import com.codename1.io.JSONParser;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+
+import java.util.ArrayList;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Vector;
+
+/**
+ * Internal class, do not use.
+ * &lt;p&gt;
+ * A DOM accessor implementation for working with Map data.
+ *
+ * @author Eric Coolman
+ */
+class MapContent implements StructuredContent {
+
+    private final Object root;
+    private StructuredContent parent;
+
+    /**
+     * Construct from parsed Map content.
+     *
+     * @param content parsed Map content
+     */
+<span class="fc" id="L57">    public MapContent(Map content) {</span>
+<span class="fc" id="L58">        this.root = content;</span>
+<span class="fc" id="L59">    }</span>
+
+    /**
+     * Construct from a JSON string.
+     *
+     * @param content a JSON string.
+     * @throws IOException on error reading/parsing the string
+     */
+    public MapContent(String content) throws IOException {
+<span class="nc" id="L68">        this(new InputStreamReader(new ByteArrayInputStream(content.getBytes(&quot;UTF-8&quot;)), &quot;UTF-8&quot;));</span>
+<span class="nc" id="L69">    }</span>
+
+    /**
+     * Construct from a JSON input stream.
+     *
+     * @param content a JSON input stream.
+     * @throws IOException on error reading/parsing the stream
+     */
+    public MapContent(InputStream content) throws IOException {
+<span class="nc" id="L78">        this(new JSONParser().parse(new InputStreamReader(content)));</span>
+<span class="nc" id="L79">    }</span>
+
+    /**
+     * Construct from a JSON input stream.
+     *
+     * @param content a JSON reader.
+     * @throws IOException on error reading/parsing the stream
+     */
+    public MapContent(Reader content) throws IOException {
+<span class="nc" id="L88">        this(new JSONParser().parse(content));</span>
+<span class="nc" id="L89">    }</span>
+
+    /**
+     * INTERNAL - link a node to it's parent so we can traverse backwards when
+     * required.
+     *
+     * @param content a Map, List, or String node.
+     * @param parent  the parent element of content.
+     */
+<span class="fc" id="L98">    MapContent(Object content, StructuredContent parent) {</span>
+<span class="fc" id="L99">        this.root = content;</span>
+<span class="fc" id="L100">        this.parent = parent;</span>
+<span class="fc" id="L101">    }</span>
+
+    /**
+     * Convert the object back to a JSON string.
+     *
+     * @return the object as a string
+     */
+    public String toString() {
+<span class="pc bpc" id="L109" title="1 of 2 branches missed.">        if (root instanceof Map) {</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            if (((Map) root).containsKey(&quot;ROOT&quot;)) {</span>
+<span class="nc" id="L111">                return PrettyPrinter.print((Map) ((Map) root).get(&quot;ROOT&quot;));</span>
+            } else {
+<span class="fc" id="L113">                return PrettyPrinter.print((Map) root);</span>
+            }
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        } else if (root instanceof List) {</span>
+<span class="nc" id="L116">            return PrettyPrinter.print((List) root);</span>
+        } else {
+<span class="nc" id="L118">            return root.toString();</span>
+        }
+    }
+
+    /**
+     * @see java.lang.Object#hashCode()
+     */
+    public int hashCode() {
+<span class="nc" id="L126">        return root.hashCode();</span>
+    }
+
+    /**
+     * @see java.lang.Object#equals(Object)
+     */
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        return root.hashCode() == o.hashCode();</span>
+    }
+
+    /**
+     * Copy an array of Map elements to an array of StructuredContent nodes,
+     * also linking the parent.
+     *
+     * @param array
+     * @return
+     */
+    private List _asStructuredContentArray(List array) {
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (array == null) {</span>
+<span class="nc" id="L145">            return null;</span>
+        }
+        List children;
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">        if (array instanceof java.util.Vector) {</span>
+<span class="fc" id="L149">            children = new java.util.Vector();</span>
+        } else {
+<span class="nc" id="L151">            children = new ArrayList();</span>
+        }
+
+<span class="fc bfc" id="L154" title="All 2 branches covered.">        for (Iterator elements = array.iterator(); elements.hasNext(); ) {</span>
+<span class="fc" id="L155">            Object o = elements.next();</span>
+            // There is a bug that needs to be addressed, should always have
+            // Maps.
+            // for now prevent the critical cast exception.
+<span class="fc bfc" id="L159" title="All 2 branches covered.">            if (o instanceof Map) {</span>
+<span class="fc" id="L160">                children.add(new MapContent(o, this));</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">            } else if (o instanceof String) {</span>
+<span class="fc" id="L162">                children.add(new MapContent(o, this));</span>
+            }
+<span class="fc" id="L164">        }</span>
+<span class="fc" id="L165">        return children;</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see com.codename1.processing.StructuredContent#getChildren(java.lang.String)
+     */
+    public List getChildren(String name) {
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (root instanceof String) {</span>
+<span class="nc" id="L175">            return new Vector();</span>
+        }
+        // on arrays, auto select first element that contains 'name'.
+<span class="fc" id="L178">        Object node = root;</span>
+<span class="pc bpc" id="L179" title="2 of 4 branches missed.">        boolean oldList = node == null || (node instanceof Vector);</span>
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        if (node instanceof List) {</span>
+<span class="nc" id="L181">            Object tmp = null;</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">            for (Iterator e = ((List) node).iterator(); e.hasNext(); ) {</span>
+<span class="nc" id="L183">                tmp = e.next();</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">                if ((tmp instanceof Map)) {</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">                    if (((Map) tmp).containsKey(name)) {</span>
+<span class="nc" id="L186">                        break;</span>
+                    }
+                }
+<span class="nc" id="L189">                tmp = null;</span>
+            }
+<span class="nc bnc" id="L191" title="All 2 branches missed.">            if (tmp == null) {</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                if (oldList) {</span>
+<span class="nc" id="L193">                    return new java.util.Vector();</span>
+                } else {
+<span class="nc" id="L195">                    return new ArrayList();</span>
+                }
+            }
+<span class="nc" id="L198">            node = tmp;</span>
+        }
+<span class="fc" id="L200">        node = ((Map) node).get(name);</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        if (node == null) {</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">            if (oldList) {</span>
+<span class="nc" id="L203">                return new Vector();</span>
+            }
+<span class="fc" id="L205">            return new ArrayList();</span>
+<span class="fc bfc" id="L206" title="All 2 branches covered.">        } else if (node instanceof List) {</span>
+<span class="fc" id="L207">            return _asStructuredContentArray((List) node);</span>
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        } else if (node instanceof Map) {</span>
+            List array;
+<span class="pc bpc" id="L210" title="1 of 2 branches missed.">            if (node instanceof Hashtable) {</span>
+<span class="fc" id="L211">                array = new Vector();</span>
+            } else {
+<span class="nc" id="L213">                array = new ArrayList();</span>
+            }
+<span class="fc" id="L215">            array.add(new MapContent(node, this));</span>
+<span class="fc" id="L216">            return array;</span>
+        } else {
+            List array;
+<span class="pc bpc" id="L219" title="1 of 2 branches missed.">            if (oldList) {</span>
+<span class="nc" id="L220">                array = new Vector();</span>
+            } else {
+<span class="fc" id="L222">                array = new ArrayList();</span>
+            }
+<span class="fc" id="L224">            array.add(new MapContent(node.toString(), this));</span>
+<span class="fc" id="L225">            return array;</span>
+        }
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see com.codename1.processing.StructuredContent#getChild(int)
+     */
+    public StructuredContent getChild(int index) {
+<span class="pc bpc" id="L235" title="1 of 2 branches missed.">        if (root instanceof List) {</span>
+<span class="nc" id="L236">            return new MapContent(((List) root).get(index), this);</span>
+        }
+<span class="fc" id="L238">        Map h = (Map) root;</span>
+<span class="pc bpc" id="L239" title="2 of 4 branches missed.">        if (index &lt; 0 || index &gt;= h.size()) {</span>
+<span class="nc" id="L240">            return null;</span>
+        }
+<span class="fc" id="L242">        Iterator elements = h.keySet().iterator();</span>
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">        for (int i = 0; i &lt; index; i++) {</span>
+<span class="nc" id="L244">            elements.next();</span>
+        }
+<span class="fc" id="L246">        Object node = elements.next();</span>
+<span class="fc" id="L247">        return new MapContent(node, this);</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see com.codename1.processing.StructuredContent#getDescendants(java.lang.String )
+     */
+    public List getDescendants(String name) {
+        List decendants;
+<span class="pc bpc" id="L257" title="1 of 4 branches missed.">        if (root instanceof Vector || root instanceof Hashtable) {</span>
+<span class="fc" id="L258">            decendants = new Vector();</span>
+        } else {
+<span class="fc" id="L260">            decendants = new ArrayList();</span>
+        }
+<span class="pc bpc" id="L262" title="1 of 2 branches missed.">        if (root instanceof List) {</span>
+<span class="nc" id="L263">            _findByName(decendants, (List) root, name);</span>
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">        } else if (root instanceof Map) {</span>
+<span class="fc" id="L265">            _findByName(decendants, (Map) root, name);</span>
+        }
+<span class="fc" id="L267">        return decendants;</span>
+    }
+
+    /**
+     * Internal method for finding decendant nodes
+     *
+     * @param target List for collecting results
+     * @param source source array to search
+     * @param name   node name we are searching for
+     */
+    private void _findByName(List target, List source, String name) {
+<span class="fc bfc" id="L278" title="All 2 branches covered.">        for (int i = 0; i &lt; source.size(); i++) {</span>
+<span class="fc" id="L279">            Object o = source.get(i);</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">            if (o instanceof Map) {</span>
+<span class="fc" id="L281">                _findByName(target, (Map) o, name);</span>
+<span class="pc bpc" id="L282" title="1 of 2 branches missed.">            } else if (o instanceof List) {</span>
+<span class="nc" id="L283">                _findByName(target, (List) o, name);</span>
+            }
+        }
+<span class="fc" id="L286">    }</span>
+
+    /**
+     * Internal method for finding decendant nodes
+     *
+     * @param target List for collecting results
+     * @param source source element to search
+     * @param name   node name we are searching for
+     */
+    private void _findByName(List target, Map source, String name) {
+<span class="fc bfc" id="L296" title="All 2 branches covered.">        if (source.containsKey(name)) {</span>
+<span class="fc" id="L297">            Object o = source.get(name);</span>
+<span class="pc bpc" id="L298" title="1 of 2 branches missed.">            if (o instanceof StructuredContent) {</span>
+<span class="nc" id="L299">                target.add(o);</span>
+            } else {
+                // TODO: there will be a bug here with parent node, won't be able to walk up more than one node
+<span class="fc" id="L302">                target.add(new MapContent(o, new MapContent(source)));</span>
+            }
+        }
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        for (Iterator e = source.values().iterator(); e.hasNext(); ) {</span>
+<span class="fc" id="L306">            Object o = e.next();</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">            if (o instanceof List) {</span>
+<span class="fc" id="L308">                _findByName(target, (List) o, name);</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">            } else if (o instanceof Map) {</span>
+<span class="fc" id="L310">                _findByName(target, (Map) o, name);</span>
+            }
+<span class="fc" id="L312">        }</span>
+<span class="fc" id="L313">    }</span>
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see com.codename1.processing.StructuredContent#getAttribute(java.lang.String)
+     */
+    public String getAttribute(String name) {
+<span class="nc" id="L321">        return null;</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see com.codename1.processing.StructuredContent#getAttributes()
+     */
+    public Map getAttributes() {
+<span class="nc" id="L330">        return null;</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see com.codename1.processing.StructuredContent#getParent()
+     */
+    public StructuredContent getParent() {
+<span class="fc bfc" id="L339" title="All 2 branches covered.">        if (parent == null) {</span>
+<span class="fc" id="L340">            return null;</span>
+        }
+<span class="fc" id="L342">        return parent;</span>
+    }
+
+    /*
+     * (non-Javadoc)
+     *
+     * @see com.codename1.processing.StructuredContent#getText()
+     */
+    public String getText() {
+<span class="pc bpc" id="L351" title="1 of 2 branches missed.">        if (root instanceof String) {</span>
+<span class="fc" id="L352">            return (String) root;</span>
+        }
+<span class="nc" id="L354">        StructuredContent sc = getChild(0);</span>
+<span class="nc bnc" id="L355" title="All 2 branches missed.">        if (sc == null) {</span>
+<span class="nc" id="L356">            return null;</span>
+        }
+<span class="nc bnc" id="L358" title="All 2 branches missed.">        if (sc.getNativeRoot() instanceof String) {</span>
+<span class="nc" id="L359">            return (String) sc.getNativeRoot();</span>
+        }
+<span class="nc" id="L361">        return sc.toString();</span>
+    }
+
+    public Object getNativeRoot() {
+<span class="fc" id="L365">        return root;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

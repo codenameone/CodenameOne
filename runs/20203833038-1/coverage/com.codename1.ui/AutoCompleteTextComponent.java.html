@@ -1,0 +1,477 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AutoCompleteTextComponent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">AutoCompleteTextComponent.java</span></div><h1>AutoCompleteTextComponent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui;
+
+import com.codename1.ui.animations.ComponentAnimation;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.LayeredLayout;
+import com.codename1.ui.list.ListModel;
+
+/**
+ * A {@link TextComponent} version of {@link com.codename1.ui.AutoCompleteTextField}
+ * &lt;p&gt;
+ * This component was contributed here https://github.com/codenameone/CodenameOne/issues/2705
+ *
+ * @author Francesco Galgani
+ */
+public class AutoCompleteTextComponent extends TextComponent {
+    private static final int animationSpeed = 100;
+    private final AutoCompleteTextField field;
+    private Container animationLayer;
+    private Boolean focusAnimation;
+
+    /**
+     * This constructor allows us to create an AutoCompleteTextComponent with the
+     * given listModel and customFilter
+     *
+     * @param listModel
+     * @param customFilter
+     */
+<span class="fc" id="L51">    public AutoCompleteTextComponent(ListModel&lt;String&gt; listModel, final AutoCompleteFilter customFilter) {</span>
+<span class="fc" id="L52">        field = new AutoCompleteTextField(listModel) {</span>
+            @Override
+            void paintHint(Graphics g) {
+<span class="pc bpc" id="L55" title="1 of 2 branches missed.">                if (isFocusAnimation()) {</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">                    if (!hasFocus()) {</span>
+<span class="nc" id="L57">                        super.paintHint(g);</span>
+                    }
+                } else {
+<span class="fc" id="L60">                    super.paintHint(g);</span>
+                }
+<span class="fc" id="L62">            }</span>
+
+            @Override
+            void focusGainedInternal() {
+<span class="fc" id="L66">                super.focusGainedInternal();</span>
+<span class="pc bpc" id="L67" title="2 of 4 branches missed.">                if (isInitialized() &amp;&amp; isFocusAnimation()) {</span>
+<span class="nc" id="L68">                    getLabel().setFocus(true);</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">                    if (!getLabel().isVisible()) {</span>
+<span class="nc" id="L70">                        final Label text = new Label(getHint(), &quot;TextHint&quot;);</span>
+<span class="nc" id="L71">                        setHint(&quot;&quot;);</span>
+<span class="nc" id="L72">                        final Label placeholder = new Label();</span>
+<span class="nc" id="L73">                        Component.setSameSize(placeholder, field);</span>
+<span class="nc" id="L74">                        animationLayer.add(BorderLayout.NORTH, text);</span>
+<span class="nc" id="L75">                        animationLayer.add(BorderLayout.CENTER, placeholder);</span>
+<span class="nc" id="L76">                        text.setX(getX());</span>
+<span class="nc" id="L77">                        text.setY(getY());</span>
+<span class="nc" id="L78">                        text.setWidth(getWidth());</span>
+<span class="nc" id="L79">                        text.setHeight(getHeight());</span>
+<span class="nc" id="L80">                        ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation(&quot;FloatingHint&quot;, animationSpeed));</span>
+<span class="nc" id="L81">                        getAnimationManager().addAnimation(anim, new Runnable() {</span>
+                            public void run() {
+<span class="nc" id="L83">                                Component.setSameSize(field);</span>
+<span class="nc" id="L84">                                text.remove();</span>
+<span class="nc" id="L85">                                placeholder.remove();</span>
+<span class="nc" id="L86">                                getLabel().setVisible(true);</span>
+<span class="nc" id="L87">                            }</span>
+                        });
+                    }
+                }
+<span class="fc" id="L91">            }</span>
+
+            @Override
+            void focusLostInternal() {
+<span class="fc" id="L95">                super.focusLostInternal();</span>
+<span class="pc bpc" id="L96" title="2 of 4 branches missed.">                if (isInitialized() &amp;&amp; isFocusAnimation()) {</span>
+<span class="nc" id="L97">                    getLabel().setFocus(false);</span>
+<span class="nc bnc" id="L98" title="All 4 branches missed.">                    if (getText().length() == 0 &amp;&amp; getLabel().isVisible()) {</span>
+<span class="nc" id="L99">                        final Label text = new Label(getLabel().getText(), getLabel().getUIID());</span>
+<span class="nc" id="L100">                        final Label placeholder = new Label();</span>
+<span class="nc" id="L101">                        Component.setSameSize(placeholder, getLabel());</span>
+<span class="nc" id="L102">                        animationLayer.add(BorderLayout.NORTH, placeholder);</span>
+<span class="nc" id="L103">                        animationLayer.add(BorderLayout.CENTER, text);</span>
+<span class="nc" id="L104">                        text.setX(getLabel().getX());</span>
+<span class="nc" id="L105">                        text.setY(getLabel().getY());</span>
+<span class="nc" id="L106">                        text.setWidth(getLabel().getWidth());</span>
+<span class="nc" id="L107">                        text.setHeight(getLabel().getHeight());</span>
+<span class="nc" id="L108">                        String hintLabelUIID = &quot;TextHint&quot;;</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">                        if (getHintLabel() != null) {</span>
+<span class="nc" id="L110">                            hintLabelUIID = getHintLabel().getUIID();</span>
+                        }
+<span class="nc" id="L112">                        ComponentAnimation anim = ComponentAnimation.compoundAnimation(animationLayer.createAnimateLayout(animationSpeed), text.createStyleAnimation(hintLabelUIID, animationSpeed));</span>
+<span class="nc" id="L113">                        getAnimationManager().addAnimation(anim, new Runnable() {</span>
+                            public void run() {
+<span class="nc" id="L115">                                setHint(getLabel().getText());</span>
+<span class="nc" id="L116">                                getLabel().setVisible(false);</span>
+<span class="nc" id="L117">                                Component.setSameSize(getLabel());</span>
+<span class="nc" id="L118">                                text.remove();</span>
+<span class="nc" id="L119">                                placeholder.remove();</span>
+<span class="nc" id="L120">                            }</span>
+                        });
+                    }
+                }
+<span class="fc" id="L124">            }</span>
+
+            @Override
+            protected boolean filter(String text) {
+<span class="fc" id="L128">                return customFilter.filter(text);</span>
+            }
+        };
+<span class="fc" id="L131">        initInput();</span>
+<span class="fc" id="L132">    }</span>
+
+    /**
+     * Allows us to invoke setters/getters and bind listeners to the text field
+     *
+     * @return the text field instance
+     */
+    @Override
+    public TextField getField() {
+<span class="fc" id="L141">        return field;</span>
+    }
+
+    void constructUI() {
+<span class="fc bfc" id="L145" title="All 2 branches covered.">        if (getComponentCount() == 0) {</span>
+<span class="pc bpc" id="L146" title="3 of 4 branches missed.">            if (isOnTopMode() &amp;&amp; isFocusAnimation()) {</span>
+<span class="nc" id="L147">                getLabel().setUIID(&quot;FloatingHint&quot;);</span>
+<span class="nc" id="L148">                setLayout(new LayeredLayout());</span>
+<span class="nc" id="L149">                Container tfContainer = BorderLayout.center(field).</span>
+<span class="nc" id="L150">                        add(BorderLayout.NORTH, getLabel()).</span>
+<span class="nc" id="L151">                        add(BorderLayout.SOUTH,</span>
+<span class="nc" id="L152">                                LayeredLayout.encloseIn(</span>
+<span class="nc" id="L153">                                        getErrorMessage(),</span>
+<span class="nc" id="L154">                                        getDescriptionMessage()));</span>
+<span class="nc" id="L155">                add(tfContainer);</span>
+
+<span class="nc" id="L157">                Label errorMessageFiller = new Label();</span>
+<span class="nc" id="L158">                Component.setSameSize(errorMessageFiller, getErrorMessage());</span>
+<span class="nc" id="L159">                animationLayer = BorderLayout.south(errorMessageFiller);</span>
+<span class="nc" id="L160">                add(animationLayer);</span>
+<span class="nc bnc" id="L161" title="All 4 branches missed.">                if (field.getText() == null || field.getText().length() == 0) {</span>
+<span class="nc" id="L162">                    field.setHint(getLabel().getText());</span>
+<span class="nc" id="L163">                    getLabel().setVisible(false);</span>
+                }
+<span class="nc" id="L165">            } else {</span>
+<span class="fc" id="L166">                super.constructUI();</span>
+            }
+        }
+<span class="fc" id="L169">    }</span>
+
+    /**
+     * Returns the editor component e.g. text field picker etc.
+     *
+     * @return the editor component
+     */
+    @Override
+    public Component getEditor() {
+<span class="fc" id="L178">        return field;</span>
+    }
+
+    void refreshForGuiBuilder() {
+<span class="pc bpc" id="L182" title="1 of 2 branches missed.">        if (guiBuilderMode) {</span>
+<span class="nc bnc" id="L183" title="All 2 branches missed.">            if (animationLayer != null) {</span>
+<span class="nc" id="L184">                animationLayer.remove();</span>
+            }
+<span class="nc" id="L186">            super.refreshForGuiBuilder();</span>
+        }
+<span class="fc" id="L188">    }</span>
+
+    /**
+     * The focus animation mode forces the hint and text to be identical and
+     * animates the hint to the label when focus is in the text field as is
+     * common on Android. This can be customized using the theme constant
+     * {@code textComponentAnimBool} which is true by default on Android. Notice
+     * that this is designed for the {@code onTopMode} and might not work if
+     * that is set to false...
+     *
+     * @return true if the text should be on top
+     */
+    public boolean isFocusAnimation() {
+<span class="fc bfc" id="L201" title="All 2 branches covered.">        if (focusAnimation != null) {</span>
+<span class="fc" id="L202">            return focusAnimation.booleanValue();</span>
+        }
+<span class="fc" id="L204">        return getUIManager().isThemeConstant(&quot;textComponentAnimBool&quot;, false);</span>
+    }
+
+    /**
+     * The focus animation mode forces the hint and text to be identical and
+     * animates the hint to the label when focus is in the text field as is
+     * common on Android. This can be customized using the theme constant
+     * {@code textComponentAnimBool} which is true by default on Android. Notice
+     * that this is designed for the {@code onTopMode} and might not work if
+     * that is set to false...
+     *
+     * @param focusAnimation true for the label to animate into place on focus,
+     *                       false otherwise
+     * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;);
+     * }
+     */
+    public AutoCompleteTextComponent focusAnimation(boolean focusAnimation) {
+<span class="fc" id="L221">        this.focusAnimation = Boolean.valueOf(focusAnimation);</span>
+<span class="fc" id="L222">        refreshForGuiBuilder();</span>
+<span class="fc" id="L223">        return this;</span>
+    }
+
+    /**
+     * Sets the text of the field
+     *
+     * @param text the text
+     * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;);
+     * }
+     */
+    public AutoCompleteTextComponent text(String text) {
+<span class="fc" id="L234">        field.setText(text);</span>
+<span class="fc" id="L235">        refreshForGuiBuilder();</span>
+<span class="fc" id="L236">        return this;</span>
+    }
+
+    /**
+     * Overridden for covariant return type {@inheritDoc}
+     */
+    public AutoCompleteTextComponent onTopMode(boolean onTopMode) {
+<span class="nc" id="L243">        return (AutoCompleteTextComponent) super.onTopMode(onTopMode);</span>
+    }
+
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    public AutoCompleteTextComponent descriptionMessage(String descriptionMessage) {
+<span class="nc" id="L251">        super.descriptionMessage(descriptionMessage);</span>
+<span class="nc" id="L252">        return this;</span>
+    }
+
+    /**
+     * Overridden for covariant return type {@inheritDoc}
+     */
+    public AutoCompleteTextComponent errorMessage(String errorMessage) {
+<span class="nc" id="L259">        super.errorMessage(errorMessage);</span>
+<span class="nc" id="L260">        return this;</span>
+    }
+
+    /**
+     * Overridden for covariant return type      * {@inheritDoc}
+     * }
+     */
+    public AutoCompleteTextComponent label(String text) {
+<span class="fc" id="L268">        super.label(text);</span>
+<span class="fc" id="L269">        return this;</span>
+    }
+
+    /**
+     * Convenience method for setting the label and hint together
+     *
+     * @param text the text and hint
+     * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;);
+     * }
+     */
+    public AutoCompleteTextComponent labelAndHint(String text) {
+<span class="nc" id="L280">        super.label(text);</span>
+<span class="nc" id="L281">        hint(text);</span>
+<span class="nc" id="L282">        return this;</span>
+    }
+
+    /**
+     * Sets the hint of the field
+     *
+     * @param hint the text of the hint
+     * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;);
+     * }
+     */
+    public AutoCompleteTextComponent hint(String hint) {
+<span class="fc" id="L293">        field.setHint(hint);</span>
+<span class="fc" id="L294">        refreshForGuiBuilder();</span>
+<span class="fc" id="L295">        return this;</span>
+    }
+
+    /**
+     * Sets the hint of the field
+     *
+     * @param hint the icon for the hint
+     * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;);
+     * }
+     */
+    public AutoCompleteTextComponent hint(Image hint) {
+<span class="fc" id="L306">        field.setHintIcon(hint);</span>
+<span class="fc" id="L307">        refreshForGuiBuilder();</span>
+<span class="fc" id="L308">        return this;</span>
+    }
+
+    /**
+     * Sets the text field to multiline or single line
+     *
+     * @param multiline true for multiline, false otherwise
+     * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;);
+     * }
+     */
+    public AutoCompleteTextComponent multiline(boolean multiline) {
+<span class="pc bpc" id="L319" title="1 of 2 branches missed.">        field.setSingleLineTextArea(!multiline);</span>
+<span class="fc" id="L320">        refreshForGuiBuilder();</span>
+<span class="fc" id="L321">        return this;</span>
+    }
+
+    /**
+     * Sets the columns in the text field
+     *
+     * @param columns the number of columns which is used for preferred size
+     *                calculations
+     * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;);
+     * }
+     */
+    public AutoCompleteTextComponent columns(int columns) {
+<span class="fc" id="L333">        field.setColumns(columns);</span>
+<span class="fc" id="L334">        refreshForGuiBuilder();</span>
+<span class="fc" id="L335">        return this;</span>
+    }
+
+    /**
+     * Sets the rows in the text field
+     *
+     * @param rows the number of rows which is used for preferred size
+     *             calculations
+     * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;);
+     * }
+     */
+    public AutoCompleteTextComponent rows(int rows) {
+<span class="fc" id="L347">        field.setRows(rows);</span>
+<span class="fc" id="L348">        refreshForGuiBuilder();</span>
+<span class="fc" id="L349">        return this;</span>
+    }
+
+    /**
+     * Sets the constraint for text input matching the constraints from the text
+     * area class
+     *
+     * @param constraint one of the constants from the
+     *                   {@link com.codename1.ui.TextArea} class see
+     *                   {@link com.codename1.ui.TextArea#setConstraint(int)}
+     * @return this for chaining calls E.g. {@code AutoCompleteTextComponent tc = new AutoCompleteTextComponent().text(&quot;Text&quot;).label(&quot;Label&quot;);
+     * }
+     */
+    public AutoCompleteTextComponent constraint(int constraint) {
+<span class="fc" id="L363">        field.setConstraint(constraint);</span>
+<span class="fc" id="L364">        return this;</span>
+    }
+
+    /**
+     * Allows us to invoke setters/getters and bind listeners to the text field
+     *
+     * @return the text field instance
+     */
+    public AutoCompleteTextField getAutoCompleteField() {
+<span class="fc" id="L373">        return field;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+<span class="fc" id="L380">        return new String[]{&quot;text&quot;, &quot;label&quot;, &quot;hint&quot;, &quot;multiline&quot;, &quot;columns&quot;, &quot;rows&quot;, &quot;constraint&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+<span class="fc" id="L387">        return new Class[]{String.class, String.class, String.class, Boolean.class, Integer.class, Integer.class, Integer.class};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyTypeNames() {
+<span class="fc" id="L394">        return new String[]{&quot;String&quot;, &quot;String&quot;, &quot;String&quot;, &quot;Boolean&quot;, &quot;Integer&quot;, &quot;Integer&quot;, &quot;Integer&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+<span class="fc bfc" id="L401" title="All 2 branches covered.">        if (name.equals(&quot;text&quot;)) {</span>
+<span class="fc" id="L402">            return field.getText();</span>
+        }
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        if (name.equals(&quot;hint&quot;)) {</span>
+<span class="fc" id="L405">            return field.getHint();</span>
+        }
+<span class="fc bfc" id="L407" title="All 2 branches covered.">        if (name.equals(&quot;multiline&quot;)) {</span>
+<span class="pc bpc" id="L408" title="1 of 2 branches missed.">            return Boolean.valueOf(!field.isSingleLineTextArea());</span>
+        }
+<span class="fc bfc" id="L410" title="All 2 branches covered.">        if (name.equals(&quot;columns&quot;)) {</span>
+<span class="fc" id="L411">            return field.getColumns();</span>
+        }
+<span class="fc bfc" id="L413" title="All 2 branches covered.">        if (name.equals(&quot;rows&quot;)) {</span>
+<span class="fc" id="L414">            return field.getRows();</span>
+        }
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">        if (name.equals(&quot;constraint&quot;)) {</span>
+<span class="fc" id="L417">            return field.getConstraint();</span>
+        }
+
+<span class="nc" id="L420">        return super.getPropertyValue(name);</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+<span class="fc bfc" id="L427" title="All 2 branches covered.">        if (name.equals(&quot;text&quot;)) {</span>
+<span class="fc" id="L428">            text((String) value);</span>
+<span class="fc" id="L429">            return null;</span>
+        }
+<span class="fc bfc" id="L431" title="All 2 branches covered.">        if (name.equals(&quot;hint&quot;)) {</span>
+<span class="fc" id="L432">            hint((String) value);</span>
+<span class="fc" id="L433">            return null;</span>
+        }
+<span class="fc bfc" id="L435" title="All 2 branches covered.">        if (name.equals(&quot;multiline&quot;)) {</span>
+<span class="pc bpc" id="L436" title="1 of 2 branches missed.">            field.setSingleLineTextArea(!((Boolean) value).booleanValue());</span>
+<span class="fc" id="L437">            return null;</span>
+        }
+<span class="fc bfc" id="L439" title="All 2 branches covered.">        if (name.equals(&quot;columns&quot;)) {</span>
+<span class="fc" id="L440">            field.setColumns((Integer) value);</span>
+<span class="fc" id="L441">            return null;</span>
+        }
+<span class="fc bfc" id="L443" title="All 2 branches covered.">        if (name.equals(&quot;rows&quot;)) {</span>
+<span class="fc" id="L444">            field.setRows((Integer) value);</span>
+<span class="fc" id="L445">            return null;</span>
+        }
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">        if (name.equals(&quot;constraint&quot;)) {</span>
+<span class="fc" id="L448">            field.setConstraint((Integer) value);</span>
+<span class="fc" id="L449">            return null;</span>
+        }
+<span class="nc" id="L451">        return super.setPropertyValue(name, value);</span>
+    }
+
+    /**
+     * Returns the text in the field {@link com.codename1.ui.TextArea#getText()}
+     *
+     * @return the text
+     */
+    @Override
+    public String getText() {
+<span class="fc" id="L461">        return field.getText();</span>
+    }
+
+    /**
+     * Allows filtering the entries in the auto complete
+     */
+    public interface AutoCompleteFilter {
+        /**
+         * Callback to filter based on this given text
+         *
+         * @param text the text for filtering
+         * @return true if the entry should be filtered in
+         */
+        boolean filter(String text);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

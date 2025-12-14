@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StringReader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util.regex</a> &gt; <span class="el_source">StringReader.java</span></div><h1>StringReader.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package com.codename1.util.regex;
+
+import java.io.Reader;
+
+/**
+ * @author Nikolay Neizvesny
+ */
+public class StringReader extends Reader {
+
+    private static final char NEW_LINE = '\n';
+
+    private final String str;
+<span class="fc" id="L29">    private int pointer = 0;</span>
+
+<span class="fc" id="L31">    public StringReader(String str) {</span>
+<span class="fc" id="L32">        this.str = str;</span>
+<span class="fc" id="L33">    }</span>
+
+    public int read() {
+<span class="nc bnc" id="L36" title="All 2 branches missed.">        if (pointer &gt;= str.length()) {</span>
+<span class="nc" id="L37">            return -1;</span>
+        }
+<span class="nc" id="L39">        return str.charAt(pointer++);</span>
+    }
+
+    public int read(char[] cbuf, int off, int len) {
+<span class="fc bfc" id="L43" title="All 2 branches covered.">        if (pointer &gt;= str.length()) {</span>
+<span class="fc" id="L44">            return -1;</span>
+        }
+<span class="fc" id="L46">        int read = 0;</span>
+<span class="fc" id="L47">        int slen = str.length();</span>
+<span class="pc bpc" id="L48" title="1 of 4 branches missed.">        for (int i = 0; i &lt; len &amp;&amp; pointer &lt; slen; i++, read++) {</span>
+<span class="fc" id="L49">            cbuf[off + i] = str.charAt(pointer++);</span>
+        }
+<span class="fc" id="L51">        return read;</span>
+    }
+
+    public void close() {
+<span class="nc" id="L55">    }</span>
+
+    public String readLine() {
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        if (pointer &gt;= str.length()) {</span>
+<span class="nc" id="L59">            return null;</span>
+        }
+<span class="nc" id="L61">        int nextLine = str.indexOf(NEW_LINE, pointer);</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (nextLine == -1) {</span>
+<span class="nc" id="L63">            nextLine = str.length();</span>
+        }
+<span class="nc" id="L65">        String result = str.substring(pointer, nextLine);</span>
+<span class="nc" id="L66">        pointer = nextLine + 1;</span>
+<span class="nc" id="L67">        return result;</span>
+    }
+
+    public boolean ready() {
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        return pointer &lt; str.length();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

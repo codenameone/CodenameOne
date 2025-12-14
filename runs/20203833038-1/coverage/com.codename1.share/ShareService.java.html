@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ShareService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.share</a> &gt; <span class="el_source">ShareService.java</span></div><h1>ShareService.java</h1><pre class="source lang-java linenums">/*
+ * To change this template, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package com.codename1.share;
+
+import com.codename1.ui.Command;
+import com.codename1.ui.Form;
+import com.codename1.ui.Image;
+import com.codename1.ui.events.ActionEvent;
+
+/**
+ * This is an abstract sharing service.
+ *
+ * @author Chen
+ */
+public abstract class ShareService extends Command {
+
+    private String message;
+    private String image;
+    private String mimeType;
+    private Form original;
+
+    /**
+     * Constructor with the service name and icon
+     *
+     * @param name the service name
+     * @param icon the service icon
+     */
+    public ShareService(String name, Image icon) {
+<span class="fc" id="L31">        super(name, icon);</span>
+<span class="fc" id="L32">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void actionPerformed(ActionEvent evt) {
+<span class="fc bfc" id="L38" title="All 2 branches covered.">        if (image != null) {</span>
+<span class="fc" id="L39">            share(message, image, mimeType);</span>
+        } else {
+<span class="fc" id="L41">            share(message);</span>
+        }
+<span class="fc" id="L43">    }</span>
+
+    /**
+     * This is the sharing method which should be implemented by the service.
+     *
+     * @param text text to share
+     */
+    public abstract void share(String text);
+
+    /**
+     * This is the image sharing method which should be implemented by the
+     * service, if the service returned true on the canShareImage() method
+     * Notice not all services are able to share text and image together, in this
+     * case the image sharing will be preferred by these services
+     *
+     * @param text  text to share
+     * @param image image to share
+     */
+    public void share(String text, String image, String imageMimeType) {
+<span class="nc" id="L62">    }</span>
+
+    /**
+     * The implementing service needs to declare if it is capable to share an
+     * image
+     *
+     * @return true if the service can share images
+     */
+    public abstract boolean canShareImage();
+
+    /**
+     * Sets the message to share, this is done by the ShareButton and shouldn't
+     * be used by the developers
+     *
+     * @param message
+     */
+    public void setMessage(String message) {
+<span class="fc" id="L79">        this.message = message;</span>
+<span class="fc" id="L80">    }</span>
+
+    /**
+     * Sets the image to share, this is done by the ShareButton and shouldn't
+     * be used by the developers
+     *
+     * @param image the file path to the image
+     * @param mime  the image mime type e.g. image/png, image/jpeg
+     */
+    public void setImage(String image, String mime) {
+<span class="fc" id="L90">        this.image = image;</span>
+<span class="fc" id="L91">        this.mimeType = mime;</span>
+<span class="fc" id="L92">    }</span>
+
+    /**
+     * Sets the Original Form (this is the Form of the share button)
+     */
+    public void setOriginalForm(Form original) {
+<span class="fc" id="L98">        this.original = original;</span>
+<span class="fc" id="L99">    }</span>
+
+    /**
+     * Gets the original Form
+     */
+    public Form getOriginal() {
+<span class="nc" id="L105">        return original;</span>
+    }
+
+    /**
+     * Once the share service has finished sharing it should call the finish
+     * method
+     */
+    public void finish() {
+<span class="fc" id="L113">        original.showBack();</span>
+<span class="fc" id="L114">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

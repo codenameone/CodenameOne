@@ -1,0 +1,727 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AbstractStringBuilder.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">AbstractStringBuilder.java</span></div><h1>AbstractStringBuilder.java</h1><pre class="source lang-java linenums">/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the &quot;License&quot;); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package com.codename1.util;
+
+/**
+ * A modifiable {@link CharSequence sequence of characters} for use in creating
+ * and modifying Strings. This class is intended as a base class for
+ * {@link StringBuffer} and {@link StringBuilder}.
+ *
+ * @see StringBuffer
+ * @see StringBuilder
+ * @since 1.5
+ */
+abstract class AbstractStringBuilder {
+
+    static final int INITIAL_CAPACITY = 16;
+
+    private char[] value;
+
+    private int count;
+
+<span class="fc" id="L37">    AbstractStringBuilder() {</span>
+<span class="fc" id="L38">        value = new char[INITIAL_CAPACITY];</span>
+<span class="fc" id="L39">    }</span>
+
+<span class="nc" id="L41">    AbstractStringBuilder(int capacity) {</span>
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        if (capacity &lt; 0) {</span>
+<span class="nc" id="L43">            throw new NegativeArraySizeException();</span>
+        }
+<span class="nc" id="L45">        value = new char[capacity];</span>
+<span class="nc" id="L46">    }</span>
+
+<span class="nc" id="L48">    AbstractStringBuilder(String string) {</span>
+<span class="nc" id="L49">        count = string.length();</span>
+<span class="nc" id="L50">        value = new char[count + INITIAL_CAPACITY];</span>
+<span class="nc" id="L51">        string.getChars(0, count, value, 0);</span>
+<span class="nc" id="L52">    }</span>
+
+    /*
+     * Returns the character array.
+     */
+    final char[] getValue() {
+<span class="nc" id="L58">        return value;</span>
+    }
+
+    /*
+     * Restores internal state after deserialization.
+     */
+    final void set(char[] val, int len) {
+<span class="nc bnc" id="L65" title="All 2 branches missed.">        if (val == null) {</span>
+<span class="nc" id="L66">            val = new char[0];</span>
+        }
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        if (val.length &lt; len) {</span>
+<span class="nc" id="L69">            throw new RuntimeException();</span>
+        }
+
+<span class="nc" id="L72">        value = val;</span>
+<span class="nc" id="L73">        count = len;</span>
+<span class="nc" id="L74">    }</span>
+
+    private void enlargeBuffer(int min) {
+<span class="nc" id="L77">        int newSize = ((value.length &gt;&gt; 1) + value.length) + 2;</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        char[] newData = new char[min &gt; newSize ? min : newSize];</span>
+<span class="nc" id="L79">        System.arraycopy(value, 0, newData, 0, count);</span>
+<span class="nc" id="L80">        value = newData;</span>
+<span class="nc" id="L81">    }</span>
+
+    final void appendNull() {
+<span class="nc" id="L84">        int newSize = count + 4;</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (newSize &gt; value.length) {</span>
+<span class="nc" id="L86">            enlargeBuffer(newSize);</span>
+        }
+<span class="nc" id="L88">        value[count++] = 'n';</span>
+<span class="nc" id="L89">        value[count++] = 'u';</span>
+<span class="nc" id="L90">        value[count++] = 'l';</span>
+<span class="nc" id="L91">        value[count++] = 'l';</span>
+<span class="nc" id="L92">    }</span>
+
+    final void append0(char[] chars) {
+<span class="nc" id="L95">        int newSize = count + chars.length;</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (newSize &gt; value.length) {</span>
+<span class="nc" id="L97">            enlargeBuffer(newSize);</span>
+        }
+<span class="nc" id="L99">        System.arraycopy(chars, 0, value, count, chars.length);</span>
+<span class="nc" id="L100">        count = newSize;</span>
+<span class="nc" id="L101">    }</span>
+
+    final void append0(char[] chars, int offset, int length) {
+        // Force null check of chars first!
+<span class="nc bnc" id="L105" title="All 4 branches missed.">        if (offset &gt; chars.length || offset &lt; 0) {</span>
+            // luni.12=Offset out of bounds \: {0}
+<span class="nc" id="L107">            throw new ArrayIndexOutOfBoundsException();</span>
+        }
+<span class="nc bnc" id="L109" title="All 4 branches missed.">        if (length &lt; 0 || chars.length - offset &lt; length) {</span>
+            // luni.18=Length out of bounds \: {0}
+<span class="nc" id="L111">            throw new ArrayIndexOutOfBoundsException();</span>
+        }
+
+<span class="nc" id="L114">        int newSize = count + length;</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        if (newSize &gt; value.length) {</span>
+<span class="nc" id="L116">            enlargeBuffer(newSize);</span>
+        }
+<span class="nc" id="L118">        System.arraycopy(chars, offset, value, count, length);</span>
+<span class="nc" id="L119">        count = newSize;</span>
+<span class="nc" id="L120">    }</span>
+
+    final void append0(char ch) {
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">        if (count == value.length) {</span>
+<span class="nc" id="L124">            enlargeBuffer(count + 1);</span>
+        }
+<span class="fc" id="L126">        value[count++] = ch;</span>
+<span class="fc" id="L127">    }</span>
+
+    final void append0(String string) {
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        if (string == null) {</span>
+<span class="nc" id="L131">            appendNull();</span>
+<span class="nc" id="L132">            return;</span>
+        }
+<span class="fc" id="L134">        int adding = string.length();</span>
+<span class="fc" id="L135">        int newSize = count + adding;</span>
+<span class="pc bpc" id="L136" title="1 of 2 branches missed.">        if (newSize &gt; value.length) {</span>
+<span class="nc" id="L137">            enlargeBuffer(newSize);</span>
+        }
+<span class="fc" id="L139">        string.getChars(0, adding, value, count);</span>
+<span class="fc" id="L140">        count = newSize;</span>
+<span class="fc" id="L141">    }</span>
+
+    /**
+     * Returns the number of characters that can be held without growing.
+     *
+     * @return the capacity
+     * @see #ensureCapacity
+     * @see #length
+     */
+    public int capacity() {
+<span class="nc" id="L151">        return value.length;</span>
+    }
+
+    /**
+     * Retrieves the character at the {@code index}.
+     *
+     * @param index the index of the character to retrieve.
+     * @return the char value.
+     * @throws IndexOutOfBoundsException if {@code index} is negative or greater than or equal to the
+     *                                   current {@link #length()}.
+     */
+    public char charAt(int index) {
+<span class="pc bpc" id="L163" title="2 of 4 branches missed.">        if (index &lt; 0 || index &gt;= count) {</span>
+<span class="nc" id="L164">            throw new StringIndexOutOfBoundsException(index);</span>
+        }
+<span class="fc" id="L166">        return value[index];</span>
+    }
+
+    final void delete0(int start, int end) {
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        if (start &gt;= 0) {</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">            if (end &gt; count) {</span>
+<span class="nc" id="L172">                end = count;</span>
+            }
+<span class="nc bnc" id="L174" title="All 2 branches missed.">            if (end == start) {</span>
+<span class="nc" id="L175">                return;</span>
+            }
+<span class="nc bnc" id="L177" title="All 2 branches missed.">            if (end &gt; start) {</span>
+<span class="nc" id="L178">                int length = count - end;</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">                if (length &gt;= 0) {</span>
+<span class="nc" id="L180">                    System.arraycopy(value, end, value, start, length);</span>
+                }
+<span class="nc" id="L182">                count -= end - start;</span>
+<span class="nc" id="L183">                return;</span>
+            }
+        }
+<span class="nc" id="L186">        throw new StringIndexOutOfBoundsException();</span>
+    }
+
+    final void deleteCharAt0(int location) {
+<span class="nc bnc" id="L190" title="All 4 branches missed.">        if (0 &gt; location || location &gt;= count) {</span>
+<span class="nc" id="L191">            throw new StringIndexOutOfBoundsException(location);</span>
+        }
+<span class="nc" id="L193">        int length = count - location - 1;</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if (length &gt; 0) {</span>
+<span class="nc" id="L195">            System.arraycopy(value, location + 1, value, location, length);</span>
+        }
+<span class="nc" id="L197">        count--;</span>
+<span class="nc" id="L198">    }</span>
+
+    /**
+     * Ensures that this object has a minimum capacity available before
+     * requiring the internal buffer to be enlarged. The general policy of this
+     * method is that if the {@code minimumCapacity} is larger than the current
+     * {@link #capacity()}, then the capacity will be increased to the largest
+     * value of either the {@code minimumCapacity} or the current capacity
+     * multiplied by two plus two. Although this is the general policy, there is
+     * no guarantee that the capacity will change.
+     *
+     * @param min the new minimum capacity to set.
+     */
+    public void ensureCapacity(int min) {
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        if (min &gt; value.length) {</span>
+<span class="nc" id="L213">            int twice = (value.length &lt;&lt; 1) + 2;</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">            enlargeBuffer(twice &gt; min ? twice : min);</span>
+        }
+<span class="nc" id="L216">    }</span>
+
+    /**
+     * Copies the requested sequence of characters to the {@code char[]} passed
+     * starting at {@code destStart}.
+     *
+     * @param start     the inclusive start index of the characters to copy.
+     * @param end       the exclusive end index of the characters to copy.
+     * @param dest      the {@code char[]} to copy the characters to.
+     * @param destStart the inclusive start index of {@code dest} to begin copying to.
+     * @throws IndexOutOfBoundsException if the {@code start} is negative, the {@code destStart} is
+     *                                   negative, the {@code start} is greater than {@code end}, the
+     *                                   {@code end} is greater than the current {@link #length()} or
+     *                                   {@code destStart + end - begin} is greater than
+     *                                   {@code dest.length}.
+     */
+    public void getChars(int start, int end, char[] dest, int destStart) {
+<span class="nc bnc" id="L233" title="All 6 branches missed.">        if (start &gt; count || end &gt; count || start &gt; end) {</span>
+<span class="nc" id="L234">            throw new StringIndexOutOfBoundsException();</span>
+        }
+<span class="nc" id="L236">        System.arraycopy(value, start, dest, destStart, end - start);</span>
+<span class="nc" id="L237">    }</span>
+
+    final void insert0(int index, char[] chars) {
+<span class="nc bnc" id="L240" title="All 4 branches missed.">        if (0 &gt; index || index &gt; count) {</span>
+<span class="nc" id="L241">            throw new StringIndexOutOfBoundsException(index);</span>
+        }
+<span class="nc bnc" id="L243" title="All 2 branches missed.">        if (chars.length != 0) {</span>
+<span class="nc" id="L244">            move(chars.length, index);</span>
+<span class="nc" id="L245">            System.arraycopy(chars, 0, value, index, chars.length);</span>
+<span class="nc" id="L246">            count += chars.length;</span>
+        }
+<span class="nc" id="L248">    }</span>
+
+    final void insert0(int index, char[] chars, int start, int length) {
+<span class="nc bnc" id="L251" title="All 4 branches missed.">        if (0 &lt;= index &amp;&amp; index &lt;= count) {</span>
+            // start + length could overflow, start/length maybe MaxInt
+<span class="nc bnc" id="L253" title="All 6 branches missed.">            if (start &gt;= 0 &amp;&amp; 0 &lt;= length &amp;&amp; length &lt;= chars.length - start) {</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">                if (length != 0) {</span>
+<span class="nc" id="L255">                    move(length, index);</span>
+<span class="nc" id="L256">                    System.arraycopy(chars, start, value, index, length);</span>
+<span class="nc" id="L257">                    count += length;</span>
+                }
+<span class="nc" id="L259">                return;</span>
+            }
+<span class="nc" id="L261">            throw new StringIndexOutOfBoundsException(&quot;offset &quot; + start //$NON-NLS-1$</span>
+                    + &quot;, length &quot; + length //$NON-NLS-1$
+                    + &quot;, char[].length &quot; + chars.length); //$NON-NLS-1$
+        }
+<span class="nc" id="L265">        throw new StringIndexOutOfBoundsException(index);</span>
+    }
+
+    final void insert0(int index, char ch) {
+<span class="nc bnc" id="L269" title="All 4 branches missed.">        if (0 &gt; index || index &gt; count) {</span>
+            // RI compatible exception type
+<span class="nc" id="L271">            throw new ArrayIndexOutOfBoundsException(index);</span>
+        }
+<span class="nc" id="L273">        move(1, index);</span>
+<span class="nc" id="L274">        value[index] = ch;</span>
+<span class="nc" id="L275">        count++;</span>
+<span class="nc" id="L276">    }</span>
+
+    final void insert0(int index, String string) {
+<span class="pc bpc" id="L279" title="2 of 4 branches missed.">        if (0 &lt;= index &amp;&amp; index &lt;= count) {</span>
+<span class="pc bpc" id="L280" title="1 of 2 branches missed.">            if (string == null) {</span>
+<span class="nc" id="L281">                string = &quot;null&quot;; //$NON-NLS-1$</span>
+            }
+<span class="fc" id="L283">            int min = string.length();</span>
+<span class="pc bpc" id="L284" title="1 of 2 branches missed.">            if (min != 0) {</span>
+<span class="fc" id="L285">                move(min, index);</span>
+<span class="fc" id="L286">                string.getChars(0, min, value, index);</span>
+<span class="fc" id="L287">                count += min;</span>
+            }
+<span class="fc" id="L289">        } else {</span>
+<span class="nc" id="L290">            throw new StringIndexOutOfBoundsException(index);</span>
+        }
+<span class="fc" id="L292">    }</span>
+
+    /**
+     * The current length.
+     *
+     * @return the number of characters contained in this instance.
+     */
+    public int length() {
+<span class="nc" id="L300">        return count;</span>
+    }
+
+    private void move(int size, int index) {
+        int newSize;
+<span class="pc bpc" id="L305" title="1 of 2 branches missed.">        if (value.length - count &gt;= size) {</span>
+<span class="fc" id="L306">            System.arraycopy(value, index, value, index + size, count</span>
+                    - index); // index == count case is no-op
+<span class="fc" id="L308">            return;</span>
+        } else {
+<span class="nc" id="L310">            int a = count + size, b = (value.length &lt;&lt; 1) + 2;</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">            newSize = a &gt; b ? a : b;</span>
+        }
+
+<span class="nc" id="L314">        char[] newData = new char[newSize];</span>
+<span class="nc" id="L315">        System.arraycopy(value, 0, newData, 0, index);</span>
+        // index == count case is no-op
+<span class="nc" id="L317">        System.arraycopy(value, index, newData, index + size, count - index);</span>
+<span class="nc" id="L318">        value = newData;</span>
+<span class="nc" id="L319">    }</span>
+
+    final void replace0(int start, int end, String string) {
+<span class="nc bnc" id="L322" title="All 2 branches missed.">        if (start &gt;= 0) {</span>
+<span class="nc bnc" id="L323" title="All 2 branches missed.">            if (end &gt; count) {</span>
+<span class="nc" id="L324">                end = count;</span>
+            }
+<span class="nc bnc" id="L326" title="All 2 branches missed.">            if (end &gt; start) {</span>
+<span class="nc" id="L327">                int stringLength = string.length();</span>
+<span class="nc" id="L328">                int diff = end - start - stringLength;</span>
+<span class="nc bnc" id="L329" title="All 2 branches missed.">                if (diff &gt; 0) { // replacing with fewer characters</span>
+                    // index == count case is no-op
+<span class="nc" id="L331">                    System.arraycopy(value, end, value, start</span>
+                            + stringLength, count - end);
+<span class="nc bnc" id="L333" title="All 2 branches missed.">                } else if (diff &lt; 0) {</span>
+                    // replacing with more characters...need some room
+<span class="nc" id="L335">                    move(-diff, end);</span>
+                }
+<span class="nc" id="L337">                string.getChars(0, stringLength, value, start);</span>
+<span class="nc" id="L338">                count -= diff;</span>
+<span class="nc" id="L339">                return;</span>
+            }
+<span class="nc bnc" id="L341" title="All 2 branches missed.">            if (start == end) {</span>
+<span class="nc bnc" id="L342" title="All 2 branches missed.">                if (string == null) {</span>
+<span class="nc" id="L343">                    throw new NullPointerException();</span>
+                }
+<span class="nc" id="L345">                insert0(start, string);</span>
+<span class="nc" id="L346">                return;</span>
+            }
+        }
+<span class="nc" id="L349">        throw new StringIndexOutOfBoundsException();</span>
+    }
+
+    final void reverse0() {
+<span class="nc bnc" id="L353" title="All 2 branches missed.">        if (count &lt; 2) {</span>
+<span class="nc" id="L354">            return;</span>
+        }
+<span class="nc" id="L356">        int end = count - 1;</span>
+<span class="nc" id="L357">        char frontHigh = value[0];</span>
+<span class="nc" id="L358">        char endLow = value[end];</span>
+<span class="nc" id="L359">        boolean allowFrontSur = true, allowEndSur = true;</span>
+<span class="nc bnc" id="L360" title="All 2 branches missed.">        for (int i = 0, mid = count / 2; i &lt; mid; i++, --end) {</span>
+<span class="nc" id="L361">            char frontLow = value[i + 1];</span>
+<span class="nc" id="L362">            char endHigh = value[end - 1];</span>
+<span class="nc bnc" id="L363" title="All 10 branches missed.">            boolean surAtFront = allowFrontSur &amp;&amp; frontLow &gt;= 0xdc00</span>
+                    &amp;&amp; frontLow &lt;= 0xdfff &amp;&amp; frontHigh &gt;= 0xd800
+                    &amp;&amp; frontHigh &lt;= 0xdbff;
+<span class="nc bnc" id="L366" title="All 4 branches missed.">            if (surAtFront &amp;&amp; (count &lt; 3)) {</span>
+<span class="nc" id="L367">                return;</span>
+            }
+<span class="nc bnc" id="L369" title="All 10 branches missed.">            boolean surAtEnd = allowEndSur &amp;&amp; endHigh &gt;= 0xd800</span>
+                    &amp;&amp; endHigh &lt;= 0xdbff &amp;&amp; endLow &gt;= 0xdc00
+                    &amp;&amp; endLow &lt;= 0xdfff;
+<span class="nc" id="L372">            allowFrontSur = allowEndSur = true;</span>
+<span class="nc bnc" id="L373" title="All 2 branches missed.">            if (surAtFront == surAtEnd) {</span>
+<span class="nc bnc" id="L374" title="All 2 branches missed.">                if (surAtFront) {</span>
+                    // both surrogates
+<span class="nc" id="L376">                    value[end] = frontLow;</span>
+<span class="nc" id="L377">                    value[end - 1] = frontHigh;</span>
+<span class="nc" id="L378">                    value[i] = endHigh;</span>
+<span class="nc" id="L379">                    value[i + 1] = endLow;</span>
+<span class="nc" id="L380">                    frontHigh = value[i + 2];</span>
+<span class="nc" id="L381">                    endLow = value[end - 2];</span>
+<span class="nc" id="L382">                    i++;</span>
+<span class="nc" id="L383">                    end--;</span>
+                } else {
+                    // neither surrogates
+<span class="nc" id="L386">                    value[end] = frontHigh;</span>
+<span class="nc" id="L387">                    value[i] = endLow;</span>
+<span class="nc" id="L388">                    frontHigh = frontLow;</span>
+<span class="nc" id="L389">                    endLow = endHigh;</span>
+                }
+            } else {
+<span class="nc bnc" id="L392" title="All 2 branches missed.">                if (surAtFront) {</span>
+                    // surrogate only at the front
+<span class="nc" id="L394">                    value[end] = frontLow;</span>
+<span class="nc" id="L395">                    value[i] = endLow;</span>
+<span class="nc" id="L396">                    endLow = endHigh;</span>
+<span class="nc" id="L397">                    allowFrontSur = false;</span>
+                } else {
+                    // surrogate only at the end
+<span class="nc" id="L400">                    value[end] = frontHigh;</span>
+<span class="nc" id="L401">                    value[i] = endHigh;</span>
+<span class="nc" id="L402">                    frontHigh = frontLow;</span>
+<span class="nc" id="L403">                    allowEndSur = false;</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L407" title="All 6 branches missed.">        if ((count &amp; 1) == 1 &amp;&amp; (!allowFrontSur || !allowEndSur)) {</span>
+<span class="nc bnc" id="L408" title="All 2 branches missed.">            value[end] = allowFrontSur ? endLow : frontHigh;</span>
+        }
+<span class="nc" id="L410">    }</span>
+
+    /**
+     * Sets the character at the {@code index}.
+     *
+     * @param index the zero-based index of the character to replace.
+     * @param ch    the character to set.
+     * @throws IndexOutOfBoundsException if {@code index} is negative or greater than or equal to the
+     *                                   current {@link #length()}.
+     */
+    public void setCharAt(int index, char ch) {
+<span class="nc bnc" id="L421" title="All 4 branches missed.">        if (0 &gt; index || index &gt;= count) {</span>
+<span class="nc" id="L422">            throw new StringIndexOutOfBoundsException(index);</span>
+        }
+<span class="nc" id="L424">        value[index] = ch;</span>
+<span class="nc" id="L425">    }</span>
+
+    /**
+     * Sets the current length to a new value. If the new length is larger than
+     * the current length, then the new characters at the end of this object
+     * will contain the {@code char} value of {@code \u0000}.
+     *
+     * @param length the new length of this StringBuffer.
+     * @throws IndexOutOfBoundsException if {@code length &lt; 0}.
+     * @see #length
+     */
+    public void setLength(int length) {
+<span class="nc bnc" id="L437" title="All 2 branches missed.">        if (length &lt; 0) {</span>
+<span class="nc" id="L438">            throw new StringIndexOutOfBoundsException(length);</span>
+        }
+<span class="nc bnc" id="L440" title="All 2 branches missed.">        if (length &gt; value.length) {</span>
+<span class="nc" id="L441">            enlargeBuffer(length);</span>
+        } else {
+<span class="nc bnc" id="L443" title="All 2 branches missed.">            if (count &lt; length) {</span>
+<span class="nc bnc" id="L444" title="All 2 branches missed.">                for (int iter = count; iter &lt; count + length; iter++) {</span>
+<span class="nc" id="L445">                    value[iter] = (char) 0;</span>
+                }
+            }
+        }
+<span class="nc" id="L449">        count = length;</span>
+<span class="nc" id="L450">    }</span>
+
+    /**
+     * Returns the String value of the subsequence from the {@code start} index
+     * to the current end.
+     *
+     * @param start the inclusive start index to begin the subsequence.
+     * @return a String containing the subsequence.
+     * @throws StringIndexOutOfBoundsException if {@code start} is negative or greater than the current
+     *                                         {@link #length()}.
+     */
+    public String substring(int start) {
+<span class="nc bnc" id="L462" title="All 4 branches missed.">        if (0 &lt;= start &amp;&amp; start &lt;= count) {</span>
+<span class="nc bnc" id="L463" title="All 2 branches missed.">            if (start == count) {</span>
+<span class="nc" id="L464">                return &quot;&quot;; //$NON-NLS-1$</span>
+            }
+
+            // Remove String sharing for more performance
+<span class="nc" id="L468">            return new String(value, start, count - start);</span>
+        }
+<span class="nc" id="L470">        throw new StringIndexOutOfBoundsException(start);</span>
+    }
+
+    /**
+     * Returns the String value of the subsequence from the {@code start} index
+     * to the {@code end} index.
+     *
+     * @param start the inclusive start index to begin the subsequence.
+     * @param end   the exclusive end index to end the subsequence.
+     * @return a String containing the subsequence.
+     * @throws StringIndexOutOfBoundsException if {@code start} is negative, greater than {@code end} or if
+     *                                         {@code end} is greater than the current {@link #length()}.
+     */
+    public String substring(int start, int end) {
+<span class="nc bnc" id="L484" title="All 6 branches missed.">        if (0 &lt;= start &amp;&amp; start &lt;= end &amp;&amp; end &lt;= count) {</span>
+<span class="nc bnc" id="L485" title="All 2 branches missed.">            if (start == end) {</span>
+<span class="nc" id="L486">                return &quot;&quot;; //$NON-NLS-1$</span>
+            }
+
+            // Remove String sharing for more performance
+<span class="nc" id="L490">            return new String(value, start, end - start);</span>
+        }
+<span class="nc" id="L492">        throw new StringIndexOutOfBoundsException();</span>
+    }
+
+    /**
+     * Returns the current String representation.
+     *
+     * @return a String containing the characters in this instance.
+     */
+    @Override
+    public String toString() {
+<span class="pc bpc" id="L502" title="1 of 2 branches missed.">        if (count == 0) {</span>
+<span class="nc" id="L503">            return &quot;&quot;;</span>
+        }
+<span class="fc" id="L505">        return new String(value, 0, count);</span>
+    }
+
+    /**
+     * Searches for the first index of the specified character. The search for
+     * the character starts at the beginning and moves towards the end.
+     *
+     * @param string the string to find.
+     * @return the index of the specified character, -1 if the character isn't
+     * found.
+     * @see #lastIndexOf(String)
+     * @since 1.4
+     */
+    public int indexOf(String string) {
+<span class="nc" id="L519">        return indexOf(string, 0);</span>
+    }
+
+    /**
+     * Searches for the index of the specified character. The search for the
+     * character starts at the specified offset and moves towards the end.
+     *
+     * @param subString the string to find.
+     * @param start     the starting offset.
+     * @return the index of the specified character, -1 if the character isn't
+     * found
+     * @see #lastIndexOf(String, int)
+     * @since 1.4
+     */
+    public int indexOf(String subString, int start) {
+<span class="nc bnc" id="L534" title="All 2 branches missed.">        if (start &lt; 0) {</span>
+<span class="nc" id="L535">            start = 0;</span>
+        }
+<span class="nc" id="L537">        int subCount = subString.length();</span>
+<span class="nc bnc" id="L538" title="All 2 branches missed.">        if (subCount &gt; 0) {</span>
+<span class="nc bnc" id="L539" title="All 2 branches missed.">            if (subCount + start &gt; count) {</span>
+<span class="nc" id="L540">                return -1;</span>
+            }
+            // TODO optimize charAt to direct array access
+<span class="nc" id="L543">            char firstChar = subString.charAt(0);</span>
+            while (true) {
+<span class="nc" id="L545">                int i = start;</span>
+<span class="nc" id="L546">                boolean found = false;</span>
+<span class="nc bnc" id="L547" title="All 2 branches missed.">                for (; i &lt; count; i++) {</span>
+<span class="nc bnc" id="L548" title="All 2 branches missed.">                    if (value[i] == firstChar) {</span>
+<span class="nc" id="L549">                        found = true;</span>
+<span class="nc" id="L550">                        break;</span>
+                    }
+                }
+<span class="nc bnc" id="L553" title="All 4 branches missed.">                if (!found || subCount + i &gt; count) {</span>
+<span class="nc" id="L554">                    return -1; // handles subCount &gt; count || start &gt;= count</span>
+                }
+<span class="nc" id="L556">                int o1 = i, o2 = 0;</span>
+<span class="nc bnc" id="L557" title="All 4 branches missed.">                while (++o2 &lt; subCount &amp;&amp; value[++o1] == subString.charAt(o2)) {</span>
+                    // Intentionally empty
+                }
+<span class="nc bnc" id="L560" title="All 2 branches missed.">                if (o2 == subCount) {</span>
+<span class="nc" id="L561">                    return i;</span>
+                }
+<span class="nc" id="L563">                start = i + 1;</span>
+<span class="nc" id="L564">            }</span>
+        }
+<span class="nc bnc" id="L566" title="All 4 branches missed.">        return (start &lt; count || start == 0) ? start : count;</span>
+    }
+
+    /**
+     * Searches for the last index of the specified character. The search for
+     * the character starts at the end and moves towards the beginning.
+     *
+     * @param string the string to find.
+     * @return the index of the specified character, -1 if the character isn't
+     * found.
+     * @throws NullPointerException if {@code string} is {@code null}.
+     * @see String#lastIndexOf(java.lang.String)
+     * @since 1.4
+     */
+    public int lastIndexOf(String string) {
+<span class="nc" id="L581">        return lastIndexOf(string, count);</span>
+    }
+
+    /**
+     * Searches for the index of the specified character. The search for the
+     * character starts at the specified offset and moves towards the beginning.
+     *
+     * @param subString the string to find.
+     * @param start     the starting offset.
+     * @return the index of the specified character, -1 if the character isn't
+     * found.
+     * @throws NullPointerException if {@code subString} is {@code null}.
+     * @see String#lastIndexOf(String, int)
+     * @since 1.4
+     */
+    public int lastIndexOf(String subString, int start) {
+<span class="nc" id="L597">        int subCount = subString.length();</span>
+<span class="nc bnc" id="L598" title="All 4 branches missed.">        if (subCount &lt;= count &amp;&amp; start &gt;= 0) {</span>
+<span class="nc bnc" id="L599" title="All 2 branches missed.">            if (subCount &gt; 0) {</span>
+<span class="nc bnc" id="L600" title="All 2 branches missed.">                if (start &gt; count - subCount) {</span>
+<span class="nc" id="L601">                    start = count - subCount; // count and subCount are both</span>
+                }
+                // &gt;= 1
+                // TODO optimize charAt to direct array access
+<span class="nc" id="L605">                char firstChar = subString.charAt(0);</span>
+                while (true) {
+<span class="nc" id="L607">                    int i = start;</span>
+<span class="nc" id="L608">                    boolean found = false;</span>
+<span class="nc bnc" id="L609" title="All 2 branches missed.">                    for (; i &gt;= 0; --i) {</span>
+<span class="nc bnc" id="L610" title="All 2 branches missed.">                        if (value[i] == firstChar) {</span>
+<span class="nc" id="L611">                            found = true;</span>
+<span class="nc" id="L612">                            break;</span>
+                        }
+                    }
+<span class="nc bnc" id="L615" title="All 2 branches missed.">                    if (!found) {</span>
+<span class="nc" id="L616">                        return -1;</span>
+                    }
+<span class="nc" id="L618">                    int o1 = i, o2 = 0;</span>
+<span class="nc bnc" id="L619" title="All 2 branches missed.">                    while (++o2 &lt; subCount</span>
+<span class="nc bnc" id="L620" title="All 2 branches missed.">                            &amp;&amp; value[++o1] == subString.charAt(o2)) {</span>
+                        // Intentionally empty
+                    }
+<span class="nc bnc" id="L623" title="All 2 branches missed.">                    if (o2 == subCount) {</span>
+<span class="nc" id="L624">                        return i;</span>
+                    }
+<span class="nc" id="L626">                    start = i - 1;</span>
+<span class="nc" id="L627">                }</span>
+            }
+<span class="nc bnc" id="L629" title="All 2 branches missed.">            return start &lt; count ? start : count;</span>
+        }
+<span class="nc" id="L631">        return -1;</span>
+    }
+
+    /**
+     * Trims off any extra capacity beyond the current length. Note, this method
+     * is NOT guaranteed to change the capacity of this object.
+     *
+     * @since 1.5
+     */
+    public void trimToSize() {
+<span class="nc bnc" id="L641" title="All 2 branches missed.">        if (count &lt; value.length) {</span>
+<span class="nc" id="L642">            char[] newValue = new char[count];</span>
+<span class="nc" id="L643">            System.arraycopy(value, 0, newValue, 0, count);</span>
+<span class="nc" id="L644">            value = newValue;</span>
+        }
+<span class="nc" id="L646">    }</span>
+
+    /**
+     * Retrieves the Unicode code point value at the {@code index}.
+     *
+     * @param index the index to the {@code char} code unit.
+     * @return the Unicode code point value.
+     * @throws IndexOutOfBoundsException if {@code index} is negative or greater than or equal to
+     *                                   {@link #length()}.
+     * @see Character
+     * @see Character#codePointAt(char[], int, int)
+     * @since 1.5
+     */
+    public int codePointAt(int index) {
+<span class="nc bnc" id="L660" title="All 4 branches missed.">        if (index &lt; 0 || index &gt;= count) {</span>
+<span class="nc" id="L661">            throw new StringIndexOutOfBoundsException(index);</span>
+        }
+<span class="nc" id="L663">        return Character.codePointAt(value, index, count);</span>
+    }
+
+    /**
+     * Retrieves the Unicode code point value that precedes the {@code index}.
+     *
+     * @param index the index to the {@code char} code unit within this object.
+     * @return the Unicode code point value.
+     * @throws IndexOutOfBoundsException if {@code index} is less than 1 or greater than
+     *                                   {@link #length()}.
+     * @see Character
+     * @see Character#codePointBefore(char[], int, int)
+     * @since 1.5
+     */
+    public int codePointBefore(int index) {
+<span class="nc bnc" id="L678" title="All 4 branches missed.">        if (index &lt; 1 || index &gt; count) {</span>
+<span class="nc" id="L679">            throw new StringIndexOutOfBoundsException(index);</span>
+        }
+<span class="nc" id="L681">        return Character.codePointBefore(value, index);</span>
+    }
+
+    /**
+     * Calculates the number of Unicode code points between {@code beginIndex}
+     * and {@code endIndex}.
+     *
+     * @param beginIndex the inclusive beginning index of the subsequence.
+     * @param endIndex   the exclusive end index of the subsequence.
+     * @return the number of Unicode code points in the subsequence.
+     * @throws IndexOutOfBoundsException if {@code beginIndex} is negative or greater than
+     *                                   {@code endIndex} or {@code endIndex} is greater than
+     *                                   {@link #length()}.
+     * @see Character
+     * @see Character#codePointCount(char[], int, int)
+     * @since 1.5
+     */
+    public int codePointCount(int beginIndex, int endIndex) {
+<span class="nc bnc" id="L699" title="All 6 branches missed.">        if (beginIndex &lt; 0 || endIndex &gt; count || beginIndex &gt; endIndex) {</span>
+<span class="nc" id="L700">            throw new StringIndexOutOfBoundsException();</span>
+        }
+<span class="nc" id="L702">        return Character.codePointCount(value, beginIndex, endIndex</span>
+                - beginIndex);
+    }
+
+    /**
+     * Returns the index that is offset {@code codePointOffset} code points from
+     * {@code index}.
+     *
+     * @param index           the index to calculate the offset from.
+     * @param codePointOffset the number of code points to count.
+     * @return the index that is {@code codePointOffset} code points away from
+     * index.
+     * @throws IndexOutOfBoundsException if {@code index} is negative or greater than
+     *                                   {@link #length()} or if there aren't enough code points
+     *                                   before or after {@code index} to match
+     *                                   {@code codePointOffset}.
+     * @see Character
+     * @see Character#offsetByCodePoints(char[], int, int, int, int)
+     * @since 1.5
+     */
+    public int offsetByCodePoints(int index, int codePointOffset) {
+<span class="nc" id="L723">        return Character.offsetByCodePoints(value, 0, count, index,</span>
+                codePointOffset);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

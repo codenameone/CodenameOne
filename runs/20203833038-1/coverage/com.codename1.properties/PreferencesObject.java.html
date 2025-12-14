@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PreferencesObject.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.properties</a> &gt; <span class="el_source">PreferencesObject.java</span></div><h1>PreferencesObject.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.properties;
+
+import com.codename1.io.Preferences;
+
+/**
+ * Binds an object to the {@link com.codename1.io.Preferences} API for automatic persistent storage.
+ * You can use this API like the builder pattern by using the create method and chaining it with setters until
+ * bind is invoked.
+ *
+ * @author Shai Almog
+ */
+public class PreferencesObject {
+    private PropertyBusinessObject bo;
+    private String prefix;
+    private boolean bound;
+
+    private PreferencesObject() {
+    }
+
+    /**
+     * Creates a binding object, this method doesn't do anything until bind is invoked
+     *
+     * @param bo the business object this binding relates to
+     * @return the object controlling the binding
+     */
+    public static PreferencesObject create(PropertyBusinessObject bo) {
+<span class="fc" id="L50">        PreferencesObject po = new PreferencesObject();</span>
+<span class="fc" id="L51">        po.bo = bo;</span>
+<span class="fc" id="L52">        po.prefix = bo.getPropertyIndex().getName() + &quot;.&quot;;</span>
+<span class="fc" id="L53">        return po;</span>
+    }
+
+    /**
+     * Binds the object so it's seamlessly stored in preferences
+     *
+     * @return this to enable builder pattern binding
+     */
+    public PreferencesObject bind() {
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        for (PropertyBase pb : bo.getPropertyIndex()) {</span>
+<span class="fc" id="L63">            String name = (String) pb.getClientProperty(&quot;cn1-po-name&quot;);</span>
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            if (name == null) {</span>
+<span class="fc" id="L65">                name = pb.getName();</span>
+            }
+<span class="fc" id="L67">            Class type = pb.getGenericType();</span>
+<span class="fc" id="L68">            String n = prefix + name;</span>
+<span class="pc bpc" id="L69" title="1 of 4 branches missed.">            if (type == String.class || type == null) {</span>
+<span class="fc" id="L70">                ((Property) pb).set(Preferences.getAndSet(n, (String) pb.get()));</span>
+<span class="fc" id="L71">                bindChangeListener((Property) pb, n, type);</span>
+<span class="fc" id="L72">                continue;</span>
+            }
+<span class="fc" id="L74">            Object obj = pb.get();</span>
+<span class="fc bfc" id="L75" title="All 2 branches covered.">            if (type == Boolean.class) {</span>
+<span class="pc bpc" id="L76" title="2 of 4 branches missed.">                ((Property) pb).set(Preferences.getAndSet(n, obj != null &amp;&amp; (Boolean) obj));</span>
+<span class="fc" id="L77">                bindChangeListener((Property) pb, n, type);</span>
+<span class="fc" id="L78">                continue;</span>
+            }
+<span class="pc bpc" id="L80" title="1 of 2 branches missed.">            if (type == Double.class) {</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">                ((Property) pb).set(Preferences.getAndSet(n, obj == null ? 0.0 : (Double) obj));</span>
+<span class="nc" id="L82">                bindChangeListener((Property) pb, n, type);</span>
+<span class="nc" id="L83">                continue;</span>
+            }
+<span class="pc bpc" id="L85" title="1 of 2 branches missed.">            if (type == Float.class) {</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">                ((Property) pb).set(Preferences.getAndSet(n, obj == null ? 0.0f : (Float) obj));</span>
+<span class="nc" id="L87">                bindChangeListener((Property) pb, n, type);</span>
+<span class="nc" id="L88">                continue;</span>
+            }
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">            if (type == Integer.class) {</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">                ((Property) pb).set(Preferences.getAndSet(n, obj == null ? 0 : (Integer) obj));</span>
+<span class="fc" id="L92">                bindChangeListener((Property) pb, n, type);</span>
+<span class="fc" id="L93">                continue;</span>
+            }
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            if (type == Long.class) {</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">                ((Property) pb).set(Preferences.getAndSet(n, obj == null ? (long) 0 : (Long) obj));</span>
+<span class="nc" id="L97">                bindChangeListener((Property) pb, n, type);</span>
+<span class="nc" id="L98">                continue;</span>
+            }
+<span class="nc" id="L100">            throw new IllegalStateException(&quot;Unsupported property type in preferences: &quot; + type.getName());</span>
+        }
+<span class="fc" id="L102">        bound = true;</span>
+<span class="fc" id="L103">        return this;</span>
+    }
+
+    private void bindChangeListener(final Property pb, final String n, final Class type) {
+<span class="fc" id="L107">        pb.addChangeListener(new PropertyChangeListener() {</span>
+            public void propertyChanged(PropertyBase p) {
+<span class="pc bpc" id="L109" title="1 of 4 branches missed.">                if (type == String.class || type == null) {</span>
+<span class="fc" id="L110">                    Preferences.set(n, (String) pb.get());</span>
+<span class="fc" id="L111">                    return;</span>
+                }
+<span class="fc bfc" id="L113" title="All 2 branches covered.">                if (type == Boolean.class) {</span>
+<span class="fc" id="L114">                    Preferences.set(n, (Boolean) pb.get());</span>
+<span class="fc" id="L115">                    return;</span>
+                }
+<span class="pc bpc" id="L117" title="1 of 2 branches missed.">                if (type == Double.class) {</span>
+<span class="nc" id="L118">                    Preferences.set(n, (Double) pb.get());</span>
+<span class="nc" id="L119">                    return;</span>
+                }
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">                if (type == Float.class) {</span>
+<span class="nc" id="L122">                    Preferences.set(n, (Float) pb.get());</span>
+<span class="nc" id="L123">                    return;</span>
+                }
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">                if (type == Integer.class) {</span>
+<span class="fc" id="L126">                    Preferences.set(n, (Integer) pb.get());</span>
+<span class="fc" id="L127">                    return;</span>
+                }
+<span class="nc bnc" id="L129" title="All 2 branches missed.">                if (type == Long.class) {</span>
+<span class="nc" id="L130">                    Preferences.set(n, (Long) pb.get());</span>
+                }
+<span class="nc" id="L132">            }</span>
+        });
+<span class="fc" id="L134">    }</span>
+
+    private void checkBind() {
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (bound) {</span>
+<span class="nc" id="L138">            throw new IllegalStateException(&quot;Method can't be invoked after binding&quot;);</span>
+        }
+<span class="fc" id="L140">    }</span>
+
+    /**
+     * Sets the prefix for the binding, by default the object name with a &quot;.&quot; is the common prefix
+     *
+     * @param prefix a string that will prefix the name
+     * @return this to enable builder pattern binding
+     */
+    public PreferencesObject setPrefix(String prefix) {
+<span class="fc" id="L149">        checkBind();</span>
+
+        // intern is used to trigger a null pointer exception if null is used
+<span class="fc" id="L152">        this.prefix = prefix.intern();</span>
+<span class="fc" id="L153">        return this;</span>
+    }
+
+    /**
+     * Sets the name of the specific field not including the prefix, by default the property name is used
+     *
+     * @param pb   the property
+     * @param name the name for the property
+     * @return this to enable builder pattern binding
+     */
+    public PreferencesObject setName(PropertyBase pb, String name) {
+<span class="fc" id="L164">        checkBind();</span>
+
+        // intern is used to trigger a null pointer exception if null is used
+<span class="fc" id="L167">        pb.putClientProperty(&quot;cn1-po-name&quot;, name);</span>
+<span class="fc" id="L168">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

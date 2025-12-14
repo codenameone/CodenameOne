@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ImageFactory.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">ImageFactory.java</span></div><h1>ImageFactory.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+/**
+ * A factory class for creating mutable images.  This can be used to override how
+ * mutable images are generated.  You can use this to implement, for example, a LRU
+ * cache for images so that they can be reused to conserve memory.
+ *
+ * &lt;p&gt;There is a default static image factory that can be assigned by calling:&lt;/p&gt;
+ * &lt;pre&gt;{@code
+ * ImageFactory.setImageFactory(null, new ImageFactory() {
+ *      public Image createImage(int w, int h, int bgColor) {
+ *          // create an image
+ *          // The Default would be just to call
+ *          return Image.createImage(w, h, bgColor);
+ *      }
+ * });
+ * }&lt;/pre&gt;
+ *
+ * &lt;p&gt;You can also assign a factory whose scope is limited to a particular Form, Container,
+ * or Component, by setting the context argument in {@code setImageFactory()}.&lt;/p&gt;
+ *
+ * @author shannah
+ * @since 8.0
+ */
+<span class="fc" id="L47">public abstract class ImageFactory {</span>
+    private static final String KEY = &quot;$$IMAGE_FACTORY$$&quot;;
+
+    /**
+     * The default global image factory.
+     */
+<span class="fc" id="L53">    private static ImageFactory defaultFactory = new ImageFactory() {</span>
+        @Override
+        public Image createImage(int w, int h, int bgColor) {
+<span class="fc" id="L56">            return Image.createImage(w, h, bgColor);</span>
+        }
+
+    };
+
+    /**
+     * Gets the image factory for a given component.  If the component
+     * doesn't have an ImageFactory assigned, then it will check the parent
+     * container, and its descendants, until it finds a Component with an ImageFactory.
+     *
+     * &lt;p&gt;If none of the component's descendants have an ImageFactory, then it will
+     * use the default global ImageFactory.&lt;/p&gt;
+     *
+     * @param cmp The context from which to load the image factory.  Use {@literal null} to get the global
+     *            default factory.
+     * @return An image Factory
+     */
+    public static ImageFactory getImageFactory(Component cmp) {
+<span class="fc bfc" id="L74" title="All 2 branches covered.">        if (cmp == null) {</span>
+<span class="fc" id="L75">            return defaultFactory;</span>
+        }
+<span class="fc" id="L77">        ImageFactory f = (ImageFactory) cmp.getClientProperty(KEY);</span>
+<span class="pc bpc" id="L78" title="1 of 2 branches missed.">        if (f == null) {</span>
+<span class="fc" id="L79">            return getImageFactory(cmp.getParent());</span>
+
+        }
+<span class="nc" id="L82">        return f;</span>
+    }
+
+    /**
+     * Sets the ImageFactory for the given component.
+     *
+     * @param cmp The component to set the ImageFactory for.  If this parameter is {@literal null}, then
+     *            this method will set the default global ImageFactory
+     * @param f   The ImageFactory to assign to the component.
+     * @return The previous image factory that was assigned to the component, or null if none was previously assigned.
+     */
+    public static ImageFactory setImageFactory(Component cmp, ImageFactory f) {
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        if (cmp != null) {</span>
+<span class="nc" id="L95">            ImageFactory old = (ImageFactory) cmp.getClientProperty(KEY);</span>
+<span class="nc" id="L96">            cmp.putClientProperty(KEY, f);</span>
+<span class="nc" id="L97">            return old;</span>
+        } else {
+<span class="nc" id="L99">            ImageFactory old = defaultFactory;</span>
+<span class="nc" id="L100">            defaultFactory = f;</span>
+<span class="nc" id="L101">            return old;</span>
+        }
+    }
+
+    /**
+     * Creates an image using the factory at a given context.
+     *
+     * @param context The context where the ImageFactory should be loaded from.
+     * @param w       The width of the image to create.
+     * @param h       The height of the image to create.
+     * @param bgColor The background color of the image.
+     * @return A mutable Image.
+     */
+    public static Image createImage(Component context, int w, int h, int bgColor) {
+<span class="fc" id="L115">        return getImageFactory(context).createImage(w, h, bgColor);</span>
+    }
+
+    public abstract Image createImage(int w, int h, int bgColor);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

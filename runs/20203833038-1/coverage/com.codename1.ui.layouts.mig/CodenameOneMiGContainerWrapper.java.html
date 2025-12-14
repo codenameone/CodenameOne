@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CodenameOneMiGContainerWrapper.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts.mig</a> &gt; <span class="el_source">CodenameOneMiGContainerWrapper.java</span></div><h1>CodenameOneMiGContainerWrapper.java</h1><pre class="source lang-java linenums">package com.codename1.ui.layouts.mig;
+/*
+ * License (BSD):
+ * ==============
+ *
+ * Copyright (c) 2004, Mikael Grev, MiG InfoCom AB. (miglayout (at) miginfocom (dot) com)
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * Neither the name of the MiG InfoCom AB nor the names of its contributors may be
+ * used to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ *
+ * @version 1.0
+ * @author Mikael Grev, MiG InfoCom AB
+ *         Date: 2006-sep-08
+ */
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+
+/**
+ *
+ */
+final class CodenameOneMiGContainerWrapper extends CodenameOneMiGComponentWrapper implements ContainerWrapper {
+    /**
+     * Debug color for cell outline.
+     */
+    //private static final Color DB_CELL_OUTLINE = new Color(255, 0, 0);
+    public CodenameOneMiGContainerWrapper(Container c) {
+<span class="fc" id="L48">        super(c);</span>
+<span class="fc" id="L49">    }</span>
+
+    public ComponentWrapper[] getComponents() {
+<span class="fc" id="L52">        Container c = (Container) getComponent();</span>
+<span class="fc" id="L53">        ComponentWrapper[] cws = new ComponentWrapper[c.getComponentCount()];</span>
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        for (int i = 0; i &lt; cws.length; i++)</span>
+<span class="fc" id="L55">            cws[i] = new CodenameOneMiGComponentWrapper(c.getComponentAt(i));</span>
+<span class="fc" id="L56">        return cws;</span>
+    }
+
+    public int getComponentCount() {
+<span class="fc" id="L60">        return ((Container) getComponent()).getComponentCount();</span>
+    }
+
+    public Object getLayout() {
+<span class="fc" id="L64">        return ((Container) getComponent()).getLayout();</span>
+    }
+
+    public boolean isLeftToRight() {
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        return !((Container) getComponent()).isRTL();</span>
+    }
+
+    public void paintDebugCell(int x, int y, int width, int height) {
+<span class="nc" id="L72">        Component c = (Component) getComponent();</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (!c.isVisible()) {</span>
+        }
+
+        // TODO: this can probably be done using glasspane
+		/*Graphics2D g = (Graphics2D) c.getGraphics();
+		if (g == null)
+			return;
+
+		g.setStroke(new BasicStroke(1f, BasicStroke.CAP_SQUARE, BasicStroke.JOIN_MITER, 10f, new float[] {2f, 3f}, 0));
+		g.setPaint(DB_CELL_OUTLINE);
+		g.drawRect(x, y, width - 1, height - 1);*/
+<span class="nc" id="L84">    }</span>
+
+    public int getComponentType(boolean disregardScrollPane) {
+<span class="nc" id="L87">        return TYPE_CONTAINER;</span>
+    }
+
+    // Removed for 2.3 because the parent.isValid() in MigLayout will catch this instead.
+    public int getLayoutHashCode() {
+<span class="nc" id="L92">        return 0;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

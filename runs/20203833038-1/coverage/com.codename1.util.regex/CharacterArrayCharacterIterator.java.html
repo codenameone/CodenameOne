@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CharacterArrayCharacterIterator.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util.regex</a> &gt; <span class="el_source">CharacterArrayCharacterIterator.java</span></div><h1>CharacterArrayCharacterIterator.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the &quot;License&quot;); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.codename1.util.regex;
+
+/**
+ * Encapsulates char[] as CharacterIterator
+ *
+ * @author &lt;a href=&quot;mailto:ales.novak@netbeans.com&quot;&gt;Ales Novak&lt;/a&gt;
+ * @version CVS $Id: CharacterArrayCharacterIterator.java 518156 2007-03-14 14:31:26Z vgritsenko $
+ */
+public final class CharacterArrayCharacterIterator implements CharacterIterator {
+    /**
+     * encapsulated
+     */
+    private final char[] src;
+    /**
+     * offset in the char array
+     */
+    private final int off;
+    /**
+     * used portion of the array
+     */
+    private final int len;
+
+    /**
+     * @param src - encapsulated String
+     */
+<span class="nc" id="L43">    public CharacterArrayCharacterIterator(char[] src, int off, int len) {</span>
+<span class="nc" id="L44">        this.src = src;</span>
+<span class="nc" id="L45">        this.off = off;</span>
+<span class="nc" id="L46">        this.len = len;</span>
+<span class="nc" id="L47">    }</span>
+
+    /**
+     * @return a substring
+     */
+    public String substring(int beginIndex, int endIndex) {
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        if (endIndex &gt; len) {</span>
+<span class="nc" id="L54">            throw new IndexOutOfBoundsException(&quot;endIndex=&quot; + endIndex</span>
+                    + &quot;; sequence size=&quot; + len);
+        }
+<span class="nc bnc" id="L57" title="All 4 branches missed.">        if (beginIndex &lt; 0 || beginIndex &gt; endIndex) {</span>
+<span class="nc" id="L58">            throw new IndexOutOfBoundsException(&quot;beginIndex=&quot; + beginIndex</span>
+                    + &quot;; endIndex=&quot; + endIndex);
+        }
+<span class="nc" id="L61">        return new String(src, off + beginIndex, endIndex - beginIndex);</span>
+    }
+
+    /**
+     * @return a substring
+     */
+    public String substring(int beginIndex) {
+<span class="nc" id="L68">        return substring(beginIndex, len);</span>
+    }
+
+    /**
+     * @return a character at the specified position.
+     */
+    public char charAt(int pos) {
+<span class="nc" id="L75">        return src[off + pos];</span>
+    }
+
+    /**
+     * @return &lt;tt&gt;true&lt;/tt&gt; iff if the specified index is after the end of the character stream
+     */
+    public boolean isEnd(int pos) {
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        return (pos &gt;= len);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

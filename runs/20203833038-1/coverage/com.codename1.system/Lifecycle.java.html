@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Lifecycle.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.system</a> &gt; <span class="el_source">Lifecycle.java</span></div><h1>Lifecycle.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.system;
+
+import com.codename1.io.Log;
+import com.codename1.io.NetworkEvent;
+import com.codename1.ui.CN;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.Form;
+import com.codename1.ui.Label;
+import com.codename1.ui.Toolbar;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.Resources;
+
+import static com.codename1.ui.CN.addNetworkErrorListener;
+
+/**
+ * Optional helper class that implements the Codename One lifecycle methods with reasonable default
+ * implementations to help keep sample code smaller.
+ */
+<span class="fc" id="L43">public class Lifecycle {</span>
+    private Form current;
+    private Resources theme;
+
+    /**
+     * Invoked when the app is &quot;cold launched&quot;, this acts like a constructor
+     *
+     * @param context some OSs might pass a native object representing platform internal information
+     */
+    public void init(Object context) {
+        // use two network threads instead of one
+<span class="nc" id="L54">        CN.updateNetworkThreadCount(getNetworkThreadCount());</span>
+
+<span class="nc" id="L56">        theme = UIManager.initFirstTheme(getThemeName());</span>
+
+        // Enable Toolbar on all Forms by default
+<span class="nc" id="L59">        Toolbar.setGlobalToolbar(true);</span>
+
+<span class="nc" id="L61">        bindCrashProtection();</span>
+
+<span class="nc" id="L63">        addNetworkErrorListener(new ActionListener&lt;NetworkEvent&gt;() {</span>
+            @Override
+            public void actionPerformed(NetworkEvent err) {
+<span class="nc" id="L66">                handleNetworkError(err);</span>
+<span class="nc" id="L67">            }</span>
+        });
+<span class="nc" id="L69">    }</span>
+
+    /**
+     * Callback that can be overriden to disable or modify crash protection
+     */
+    protected void bindCrashProtection() {
+        // Pro only feature
+<span class="nc" id="L76">        Log.bindCrashProtection(true);</span>
+<span class="nc" id="L77">    }</span>
+
+    /**
+     * Returns the default number of network thread count
+     *
+     * @return currently two threads
+     */
+    protected int getNetworkThreadCount() {
+<span class="nc" id="L85">        return 2;</span>
+    }
+
+    /**
+     * Returns the name of the global theme file, by default it's &quot;/theme&quot;. Can be overriden by subclasses to
+     * load a different file name
+     *
+     * @return &quot;/theme&quot;
+     */
+    protected String getThemeName() {
+<span class="nc" id="L95">        return &quot;/theme&quot;;</span>
+    }
+
+    /**
+     * The theme instance
+     *
+     * @return the theme
+     */
+    public Resources getTheme() {
+<span class="nc" id="L104">        return theme;</span>
+    }
+
+    /**
+     * Invoked on a network error callback
+     *
+     * @param err the network error event
+     */
+    protected void handleNetworkError(NetworkEvent err) {
+        // prevent the event from propagating
+<span class="nc" id="L114">        err.consume();</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        if (err.getError() != null) {</span>
+<span class="nc" id="L116">            Log.e(err.getError());</span>
+        }
+<span class="nc" id="L118">        Log.sendLogAsync();</span>
+<span class="nc" id="L119">        Dialog.show(&quot;Connection Error&quot;, &quot;There was a networking error in the connection to &quot; + err.getConnectionRequest().getUrl(), &quot;OK&quot;, null);</span>
+<span class="nc" id="L120">    }</span>
+
+    /**
+     * Default start callback that's invoked on application resume
+     */
+    public void start() {
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (current != null) {</span>
+<span class="nc" id="L127">            current.show();</span>
+<span class="nc" id="L128">            return;</span>
+        }
+
+<span class="fc" id="L131">        runApp();</span>
+<span class="fc" id="L132">    }</span>
+
+
+    /**
+     * This method is invoked by start to show the first form of the application
+     */
+    public void runApp() {
+<span class="nc" id="L139">        Form hello = new Form(&quot;Hello&quot;, BoxLayout.y());</span>
+<span class="nc" id="L140">        hello.add(new Label(&quot;You should override runApp() with your code&quot;));</span>
+<span class="nc" id="L141">        hello.show();</span>
+<span class="nc" id="L142">    }</span>
+
+
+    /**
+     * Callback when the app is suspended
+     */
+    public void stop() {
+<span class="fc" id="L149">        current = CN.getCurrentForm();</span>
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (current instanceof Dialog) {</span>
+<span class="nc" id="L151">            ((Dialog) current).dispose();</span>
+<span class="nc" id="L152">            current = CN.getCurrentForm();</span>
+        }
+<span class="fc" id="L154">    }</span>
+
+    /**
+     * Callback when the app is destroyed
+     */
+    public void destroy() {
+<span class="fc" id="L160">    }</span>
+
+    /**
+     * The current form within the application lifecycle which possibly differs from the one in the implementation
+     */
+    protected Form getCurrentForm() {
+<span class="nc" id="L166">        return current;</span>
+    }
+
+    /**
+     * The current form within the application lifecycle which possibly differs from the one in the implementation
+     *
+     * @param current the new current Form
+     */
+    protected void setCurrentForm(Form current) {
+<span class="nc" id="L175">        this.current = current;</span>
+<span class="nc" id="L176">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

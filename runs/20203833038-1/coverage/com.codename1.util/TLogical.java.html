@@ -1,0 +1,848 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TLogical.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">TLogical.java</span></div><h1>TLogical.java</h1><pre class="source lang-java linenums">/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the &quot;License&quot;); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package com.codename1.util;
+
+/**
+ * The library implements some logical operations over {@code BigInteger}. The
+ * operations provided are listed below.
+ * &lt;ul type=&quot;circle&quot;&gt;
+ * &lt;li&gt;not&lt;/li&gt;
+ * &lt;li&gt;and&lt;/li&gt;
+ * &lt;li&gt;andNot&lt;/li&gt;
+ * &lt;li&gt;or&lt;/li&gt;
+ * &lt;li&gt;xor&lt;/li&gt;
+ * &lt;/ul&gt;
+ */
+class TLogical {
+
+    /**
+     * Just to denote that this class can't be instantiated.
+     */
+
+    private TLogical() {
+    }
+
+
+    /**
+     * @see TBigInteger#not()
+     */
+    static TBigInteger not(TBigInteger val) {
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (val.sign == 0) {</span>
+<span class="nc" id="L46">            return TBigInteger.MINUS_ONE;</span>
+        }
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        if (val.equals(TBigInteger.MINUS_ONE)) {</span>
+<span class="nc" id="L49">            return TBigInteger.ZERO;</span>
+        }
+<span class="nc" id="L51">        int[] resDigits = new int[val.numberLength + 1];</span>
+        int i;
+
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (val.sign &gt; 0) {</span>
+            // ~val = -val + 1
+<span class="nc bnc" id="L56" title="All 2 branches missed.">            if (val.digits[val.numberLength - 1] != -1) {</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">                for (i = 0; val.digits[i] == -1; i++) {</span>
+                    // do nothing
+                }
+            } else {
+<span class="nc bnc" id="L61" title="All 4 branches missed.">                for (i = 0; (i &lt; val.numberLength) &amp;&amp; (val.digits[i] == -1); i++) {</span>
+                    // do nothing
+                }
+<span class="nc bnc" id="L64" title="All 2 branches missed.">                if (i == val.numberLength) {</span>
+<span class="nc" id="L65">                    resDigits[i] = 1;</span>
+<span class="nc" id="L66">                    return new TBigInteger(-val.sign, i + 1, resDigits);</span>
+                }
+            }
+            // Here a carry 1 was generated
+        } else {// (val.sign &lt; 0)
+            // ~val = -val - 1
+<span class="nc bnc" id="L72" title="All 2 branches missed.">            for (i = 0; val.digits[i] == 0; i++) {</span>
+<span class="nc" id="L73">                resDigits[i] = -1;</span>
+            }
+            // Here a borrow -1 was generated
+        }
+        // Now, the carry/borrow can be absorbed
+<span class="nc" id="L78">        resDigits[i] = val.digits[i] + val.sign;</span>
+        // Copying the remaining unchanged digit
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        for (i++; i &lt; val.numberLength; i++) {</span>
+<span class="nc" id="L81">            resDigits[i] = val.digits[i];</span>
+        }
+<span class="nc" id="L83">        return new TBigInteger(-val.sign, i, resDigits);</span>
+    }
+
+    /**
+     * @see TBigInteger#and(TBigInteger)
+     */
+    static TBigInteger and(TBigInteger val, TBigInteger that) {
+<span class="pc bpc" id="L90" title="2 of 4 branches missed.">        if (that.sign == 0 || val.sign == 0) {</span>
+<span class="nc" id="L91">            return TBigInteger.ZERO;</span>
+        }
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">        if (that.equals(TBigInteger.MINUS_ONE)) {</span>
+<span class="nc" id="L94">            return val;</span>
+        }
+<span class="pc bpc" id="L96" title="1 of 2 branches missed.">        if (val.equals(TBigInteger.MINUS_ONE)) {</span>
+<span class="nc" id="L97">            return that;</span>
+        }
+
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (val.sign &gt; 0) {</span>
+<span class="pc bpc" id="L101" title="1 of 2 branches missed.">            if (that.sign &gt; 0) {</span>
+<span class="fc" id="L102">                return andPositive(val, that);</span>
+            } else {
+<span class="nc" id="L104">                return andDiffSigns(val, that);</span>
+            }
+        } else {
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            if (that.sign &gt; 0) {</span>
+<span class="nc" id="L108">                return andDiffSigns(that, val);</span>
+<span class="nc bnc" id="L109" title="All 2 branches missed.">            } else if (val.numberLength &gt; that.numberLength) {</span>
+<span class="nc" id="L110">                return andNegative(val, that);</span>
+            } else {
+<span class="nc" id="L112">                return andNegative(that, val);</span>
+            }
+        }
+    }
+
+    /**
+     * @return sign = 1, magnitude = val.magnitude &amp; that.magnitude
+     */
+    static TBigInteger andPositive(TBigInteger val, TBigInteger that) {
+        // PRE: both arguments are positive
+<span class="fc" id="L122">        int resLength = Math.min(val.numberLength, that.numberLength);</span>
+<span class="fc" id="L123">        int i = Math.max(val.getFirstNonzeroDigit(), that.getFirstNonzeroDigit());</span>
+
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (i &gt;= resLength) {</span>
+<span class="nc" id="L126">            return TBigInteger.ZERO;</span>
+        }
+
+<span class="fc" id="L129">        int[] resDigits = new int[resLength];</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        for (; i &lt; resLength; i++) {</span>
+<span class="fc" id="L131">            resDigits[i] = val.digits[i] &amp; that.digits[i];</span>
+        }
+
+<span class="fc" id="L134">        TBigInteger result = new TBigInteger(1, resLength, resDigits);</span>
+<span class="fc" id="L135">        result.cutOffLeadingZeroes();</span>
+<span class="fc" id="L136">        return result;</span>
+    }
+
+    /**
+     * @return sign = positive.magnitude &amp; magnitude = -negative.magnitude
+     */
+    static TBigInteger andDiffSigns(TBigInteger positive, TBigInteger negative) {
+        // PRE: positive is positive and negative is negative
+<span class="nc" id="L144">        int iPos = positive.getFirstNonzeroDigit();</span>
+<span class="nc" id="L145">        int iNeg = negative.getFirstNonzeroDigit();</span>
+
+        // Look if the trailing zeros of the negative will &quot;blank&quot; all
+        // the positive digits
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (iNeg &gt;= positive.numberLength) {</span>
+<span class="nc" id="L150">            return TBigInteger.ZERO;</span>
+        }
+<span class="nc" id="L152">        int resLength = positive.numberLength;</span>
+<span class="nc" id="L153">        int[] resDigits = new int[resLength];</span>
+
+        // Must start from max(iPos, iNeg)
+<span class="nc" id="L156">        int i = Math.max(iPos, iNeg);</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (i == iNeg) {</span>
+<span class="nc" id="L158">            resDigits[i] = -negative.digits[i] &amp; positive.digits[i];</span>
+<span class="nc" id="L159">            i++;</span>
+        }
+<span class="nc" id="L161">        int limit = Math.min(negative.numberLength, positive.numberLength);</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        for (; i &lt; limit; i++) {</span>
+<span class="nc" id="L163">            resDigits[i] = ~negative.digits[i] &amp; positive.digits[i];</span>
+        }
+        // if the negative was shorter must copy the remaining digits
+        // from positive
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        if (i &gt;= negative.numberLength) {</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">            for (; i &lt; positive.numberLength; i++) {</span>
+<span class="nc" id="L169">                resDigits[i] = positive.digits[i];</span>
+            }
+        } // else positive ended and must &quot;copy&quot; virtual 0's, do nothing then
+
+<span class="nc" id="L173">        TBigInteger result = new TBigInteger(1, resLength, resDigits);</span>
+<span class="nc" id="L174">        result.cutOffLeadingZeroes();</span>
+<span class="nc" id="L175">        return result;</span>
+    }
+
+    /**
+     * @return sign = -1, magnitude = -(-longer.magnitude &amp; -shorter.magnitude)
+     */
+    static TBigInteger andNegative(TBigInteger longer, TBigInteger shorter) {
+        // PRE: longer and shorter are negative
+        // PRE: longer has at least as many digits as shorter
+<span class="nc" id="L184">        int iLonger = longer.getFirstNonzeroDigit();</span>
+<span class="nc" id="L185">        int iShorter = shorter.getFirstNonzeroDigit();</span>
+
+        // Does shorter matter?
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        if (iLonger &gt;= shorter.numberLength) {</span>
+<span class="nc" id="L189">            return longer;</span>
+        }
+
+        int resLength;
+        int[] resDigits;
+<span class="nc" id="L194">        int i = Math.max(iShorter, iLonger);</span>
+        int digit;
+<span class="nc bnc" id="L196" title="All 2 branches missed.">        if (iShorter &gt; iLonger) {</span>
+<span class="nc" id="L197">            digit = -shorter.digits[i] &amp; ~longer.digits[i];</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        } else if (iShorter &lt; iLonger) {</span>
+<span class="nc" id="L199">            digit = ~shorter.digits[i] &amp; -longer.digits[i];</span>
+        } else {
+<span class="nc" id="L201">            digit = -shorter.digits[i] &amp; -longer.digits[i];</span>
+        }
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        if (digit == 0) {</span>
+<span class="nc bnc" id="L204" title="All 4 branches missed.">            for (i++; i &lt; shorter.numberLength &amp;&amp; (digit = ~(longer.digits[i] | shorter.digits[i])) == 0; i++) {</span>
+                // do nothing
+            }
+<span class="nc bnc" id="L207" title="All 2 branches missed.">            if (digit == 0) {</span>
+                // shorter has only the remaining virtual sign bits
+<span class="nc bnc" id="L209" title="All 4 branches missed.">                for (; i &lt; longer.numberLength &amp;&amp; (digit = ~longer.digits[i]) == 0; i++) {</span>
+                    // do nothing
+                }
+<span class="nc bnc" id="L212" title="All 2 branches missed.">                if (digit == 0) {</span>
+<span class="nc" id="L213">                    resLength = longer.numberLength + 1;</span>
+<span class="nc" id="L214">                    resDigits = new int[resLength];</span>
+<span class="nc" id="L215">                    resDigits[resLength - 1] = 1;</span>
+
+<span class="nc" id="L217">                    TBigInteger result = new TBigInteger(-1, resLength, resDigits);</span>
+<span class="nc" id="L218">                    return result;</span>
+                }
+            }
+        }
+<span class="nc" id="L222">        resLength = longer.numberLength;</span>
+<span class="nc" id="L223">        resDigits = new int[resLength];</span>
+<span class="nc" id="L224">        resDigits[i] = -digit;</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">        for (i++; i &lt; shorter.numberLength; i++) {</span>
+            // resDigits[i] = ~(~longer.digits[i] &amp; ~shorter.digits[i];)
+<span class="nc" id="L227">            resDigits[i] = longer.digits[i] | shorter.digits[i];</span>
+        }
+        // shorter has only the remaining virtual sign bits
+<span class="nc bnc" id="L230" title="All 2 branches missed.">        for (; i &lt; longer.numberLength; i++) {</span>
+<span class="nc" id="L231">            resDigits[i] = longer.digits[i];</span>
+        }
+
+<span class="nc" id="L234">        TBigInteger result = new TBigInteger(-1, resLength, resDigits);</span>
+<span class="nc" id="L235">        return result;</span>
+    }
+
+    /**
+     * @see TBigInteger#andNot(TBigInteger)
+     */
+    static TBigInteger andNot(TBigInteger val, TBigInteger that) {
+<span class="nc bnc" id="L242" title="All 2 branches missed.">        if (that.sign == 0) {</span>
+<span class="nc" id="L243">            return val;</span>
+        }
+<span class="nc bnc" id="L245" title="All 2 branches missed.">        if (val.sign == 0) {</span>
+<span class="nc" id="L246">            return TBigInteger.ZERO;</span>
+        }
+<span class="nc bnc" id="L248" title="All 2 branches missed.">        if (val.equals(TBigInteger.MINUS_ONE)) {</span>
+<span class="nc" id="L249">            return that.not();</span>
+        }
+<span class="nc bnc" id="L251" title="All 2 branches missed.">        if (that.equals(TBigInteger.MINUS_ONE)) {</span>
+<span class="nc" id="L252">            return TBigInteger.ZERO;</span>
+        }
+
+        //if val == that, return 0
+
+<span class="nc bnc" id="L257" title="All 2 branches missed.">        if (val.sign &gt; 0) {</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">            if (that.sign &gt; 0) {</span>
+<span class="nc" id="L259">                return andNotPositive(val, that);</span>
+            } else {
+<span class="nc" id="L261">                return andNotPositiveNegative(val, that);</span>
+            }
+        } else {
+<span class="nc bnc" id="L264" title="All 2 branches missed.">            if (that.sign &gt; 0) {</span>
+<span class="nc" id="L265">                return andNotNegativePositive(val, that);</span>
+            } else {
+<span class="nc" id="L267">                return andNotNegative(val, that);</span>
+            }
+        }
+    }
+
+    /**
+     * @return sign = 1, magnitude = val.magnitude &amp; ~that.magnitude
+     */
+    static TBigInteger andNotPositive(TBigInteger val, TBigInteger that) {
+        // PRE: both arguments are positive
+<span class="nc" id="L277">        int[] resDigits = new int[val.numberLength];</span>
+
+<span class="nc" id="L279">        int limit = Math.min(val.numberLength, that.numberLength);</span>
+        int i;
+<span class="nc bnc" id="L281" title="All 2 branches missed.">        for (i = val.getFirstNonzeroDigit(); i &lt; limit; i++) {</span>
+<span class="nc" id="L282">            resDigits[i] = val.digits[i] &amp; ~that.digits[i];</span>
+        }
+<span class="nc bnc" id="L284" title="All 2 branches missed.">        for (; i &lt; val.numberLength; i++) {</span>
+<span class="nc" id="L285">            resDigits[i] = val.digits[i];</span>
+        }
+
+<span class="nc" id="L288">        TBigInteger result = new TBigInteger(1, val.numberLength, resDigits);</span>
+<span class="nc" id="L289">        result.cutOffLeadingZeroes();</span>
+<span class="nc" id="L290">        return result;</span>
+    }
+
+    /**
+     * @return sign = 1, magnitude = positive.magnitude &amp; ~(-negative.magnitude)
+     */
+    static TBigInteger andNotPositiveNegative(TBigInteger positive, TBigInteger negative) {
+        // PRE: positive &gt; 0 &amp;&amp; negative &lt; 0
+<span class="nc" id="L298">        int iNeg = negative.getFirstNonzeroDigit();</span>
+<span class="nc" id="L299">        int iPos = positive.getFirstNonzeroDigit();</span>
+
+<span class="nc bnc" id="L301" title="All 2 branches missed.">        if (iNeg &gt;= positive.numberLength) {</span>
+<span class="nc" id="L302">            return positive;</span>
+        }
+
+<span class="nc" id="L305">        int resLength = Math.min(positive.numberLength, negative.numberLength);</span>
+<span class="nc" id="L306">        int[] resDigits = new int[resLength];</span>
+
+        // Always start from first non zero of positive
+<span class="nc" id="L309">        int i = iPos;</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">        for (; i &lt; iNeg; i++) {</span>
+            // resDigits[i] = positive.digits[i] &amp; -1 (~0)
+<span class="nc" id="L312">            resDigits[i] = positive.digits[i];</span>
+        }
+<span class="nc bnc" id="L314" title="All 2 branches missed.">        if (i == iNeg) {</span>
+<span class="nc" id="L315">            resDigits[i] = positive.digits[i] &amp; (negative.digits[i] - 1);</span>
+<span class="nc" id="L316">            i++;</span>
+        }
+<span class="nc bnc" id="L318" title="All 2 branches missed.">        for (; i &lt; resLength; i++) {</span>
+            // resDigits[i] = positive.digits[i] &amp; ~(~negative.digits[i]);
+<span class="nc" id="L320">            resDigits[i] = positive.digits[i] &amp; negative.digits[i];</span>
+        }
+
+<span class="nc" id="L323">        TBigInteger result = new TBigInteger(1, resLength, resDigits);</span>
+<span class="nc" id="L324">        result.cutOffLeadingZeroes();</span>
+<span class="nc" id="L325">        return result;</span>
+    }
+
+    /**
+     * @return sign = -1, magnitude = -(-negative.magnitude &amp; ~positive.magnitude)
+     */
+    static TBigInteger andNotNegativePositive(TBigInteger negative, TBigInteger positive) {
+        // PRE: negative &lt; 0 &amp;&amp; positive &gt; 0
+        int resLength;
+        int[] resDigits;
+        int limit;
+        int digit;
+
+<span class="nc" id="L338">        int iNeg = negative.getFirstNonzeroDigit();</span>
+<span class="nc" id="L339">        int iPos = positive.getFirstNonzeroDigit();</span>
+
+<span class="nc bnc" id="L341" title="All 2 branches missed.">        if (iNeg &gt;= positive.numberLength) {</span>
+<span class="nc" id="L342">            return negative;</span>
+        }
+
+<span class="nc" id="L345">        resLength = Math.max(negative.numberLength, positive.numberLength);</span>
+<span class="nc" id="L346">        int i = iNeg;</span>
+<span class="nc bnc" id="L347" title="All 2 branches missed.">        if (iPos &gt; iNeg) {</span>
+<span class="nc" id="L348">            resDigits = new int[resLength];</span>
+<span class="nc" id="L349">            limit = Math.min(negative.numberLength, iPos);</span>
+<span class="nc bnc" id="L350" title="All 2 branches missed.">            for (; i &lt; limit; i++) {</span>
+                // 1st case:  resDigits [i] = -(-negative.digits[i] &amp; (~0))
+                // otherwise: resDigits[i] = ~(~negative.digits[i] &amp; ~0)  ;
+<span class="nc" id="L353">                resDigits[i] = negative.digits[i];</span>
+            }
+<span class="nc bnc" id="L355" title="All 2 branches missed.">            if (i == negative.numberLength) {</span>
+<span class="nc bnc" id="L356" title="All 2 branches missed.">                for (i = iPos; i &lt; positive.numberLength; i++) {</span>
+                    // resDigits[i] = ~(~positive.digits[i] &amp; -1);
+<span class="nc" id="L358">                    resDigits[i] = positive.digits[i];</span>
+                }
+            }
+        } else {
+<span class="nc" id="L362">            digit = -negative.digits[i] &amp; ~positive.digits[i];</span>
+<span class="nc bnc" id="L363" title="All 2 branches missed.">            if (digit == 0) {</span>
+<span class="nc" id="L364">                limit = Math.min(positive.numberLength, negative.numberLength);</span>
+<span class="nc bnc" id="L365" title="All 4 branches missed.">                for (i++; i &lt; limit &amp;&amp; (digit = ~(negative.digits[i] | positive.digits[i])) == 0; i++) {</span>
+                    // do nothing
+                }
+<span class="nc bnc" id="L368" title="All 2 branches missed.">                if (digit == 0) {</span>
+                    // the shorter has only the remaining virtual sign bits
+<span class="nc bnc" id="L370" title="All 4 branches missed.">                    for (; i &lt; positive.numberLength &amp;&amp; (digit = ~positive.digits[i]) == 0; i++) {</span>
+                        // do nothing
+                    }
+<span class="nc bnc" id="L373" title="All 4 branches missed.">                    for (; i &lt; negative.numberLength &amp;&amp; (digit = ~negative.digits[i]) == 0; i++) {</span>
+                        // do nothing
+                    }
+<span class="nc bnc" id="L376" title="All 2 branches missed.">                    if (digit == 0) {</span>
+<span class="nc" id="L377">                        resLength++;</span>
+<span class="nc" id="L378">                        resDigits = new int[resLength];</span>
+<span class="nc" id="L379">                        resDigits[resLength - 1] = 1;</span>
+
+<span class="nc" id="L381">                        TBigInteger result = new TBigInteger(-1, resLength, resDigits);</span>
+<span class="nc" id="L382">                        return result;</span>
+                    }
+                }
+            }
+<span class="nc" id="L386">            resDigits = new int[resLength];</span>
+<span class="nc" id="L387">            resDigits[i] = -digit;</span>
+<span class="nc" id="L388">            i++;</span>
+        }
+
+<span class="nc" id="L391">        limit = Math.min(positive.numberLength, negative.numberLength);</span>
+<span class="nc bnc" id="L392" title="All 2 branches missed.">        for (; i &lt; limit; i++) {</span>
+            //resDigits[i] = ~(~negative.digits[i] &amp; ~positive.digits[i]);
+<span class="nc" id="L394">            resDigits[i] = negative.digits[i] | positive.digits[i];</span>
+        }
+        // Actually one of the next two cycles will be executed
+<span class="nc bnc" id="L397" title="All 2 branches missed.">        for (; i &lt; negative.numberLength; i++) {</span>
+<span class="nc" id="L398">            resDigits[i] = negative.digits[i];</span>
+        }
+<span class="nc bnc" id="L400" title="All 2 branches missed.">        for (; i &lt; positive.numberLength; i++) {</span>
+<span class="nc" id="L401">            resDigits[i] = positive.digits[i];</span>
+        }
+
+<span class="nc" id="L404">        TBigInteger result = new TBigInteger(-1, resLength, resDigits);</span>
+<span class="nc" id="L405">        return result;</span>
+    }
+
+    /**
+     * @return sign = 1, magnitude = -val.magnitude &amp; ~(-that.magnitude)
+     */
+    static TBigInteger andNotNegative(TBigInteger val, TBigInteger that) {
+        // PRE: val &lt; 0 &amp;&amp; that &lt; 0
+<span class="nc" id="L413">        int iVal = val.getFirstNonzeroDigit();</span>
+<span class="nc" id="L414">        int iThat = that.getFirstNonzeroDigit();</span>
+
+<span class="nc bnc" id="L416" title="All 2 branches missed.">        if (iVal &gt;= that.numberLength) {</span>
+<span class="nc" id="L417">            return TBigInteger.ZERO;</span>
+        }
+
+<span class="nc" id="L420">        int resLength = that.numberLength;</span>
+<span class="nc" id="L421">        int[] resDigits = new int[resLength];</span>
+        int limit;
+<span class="nc" id="L423">        int i = iVal;</span>
+<span class="nc bnc" id="L424" title="All 2 branches missed.">        if (iVal &lt; iThat) {</span>
+            // resDigits[i] = -val.digits[i] &amp; -1;
+<span class="nc" id="L426">            resDigits[i] = -val.digits[i];</span>
+<span class="nc" id="L427">            limit = Math.min(val.numberLength, iThat);</span>
+<span class="nc bnc" id="L428" title="All 2 branches missed.">            for (i++; i &lt; limit; i++) {</span>
+                // resDigits[i] = ~val.digits[i] &amp; -1;
+<span class="nc" id="L430">                resDigits[i] = ~val.digits[i];</span>
+            }
+<span class="nc bnc" id="L432" title="All 2 branches missed.">            if (i == val.numberLength) {</span>
+<span class="nc bnc" id="L433" title="All 2 branches missed.">                for (; i &lt; iThat; i++) {</span>
+                    // resDigits[i] = -1 &amp; -1;
+<span class="nc" id="L435">                    resDigits[i] = -1;</span>
+                }
+                // resDigits[i] = -1 &amp; ~-that.digits[i];
+<span class="nc" id="L438">                resDigits[i] = that.digits[i] - 1;</span>
+            } else {
+                // resDigits[i] = ~val.digits[i] &amp; ~-that.digits[i];
+<span class="nc" id="L441">                resDigits[i] = ~val.digits[i] &amp; (that.digits[i] - 1);</span>
+            }
+<span class="nc bnc" id="L443" title="All 2 branches missed.">        } else if (iThat &lt; iVal) {</span>
+            // resDigits[i] = -val.digits[i] &amp; ~~that.digits[i];
+<span class="nc" id="L445">            resDigits[i] = -val.digits[i] &amp; that.digits[i];</span>
+        } else {
+            // resDigits[i] = -val.digits[i] &amp; ~-that.digits[i];
+<span class="nc" id="L448">            resDigits[i] = -val.digits[i] &amp; (that.digits[i] - 1);</span>
+        }
+
+<span class="nc" id="L451">        limit = Math.min(val.numberLength, that.numberLength);</span>
+<span class="nc bnc" id="L452" title="All 2 branches missed.">        for (i++; i &lt; limit; i++) {</span>
+            // resDigits[i] = ~val.digits[i] &amp; ~~that.digits[i];
+<span class="nc" id="L454">            resDigits[i] = ~val.digits[i] &amp; that.digits[i];</span>
+        }
+<span class="nc bnc" id="L456" title="All 2 branches missed.">        for (; i &lt; that.numberLength; i++) {</span>
+            // resDigits[i] = -1 &amp; ~~that.digits[i];
+<span class="nc" id="L458">            resDigits[i] = that.digits[i];</span>
+        }
+
+<span class="nc" id="L461">        TBigInteger result = new TBigInteger(1, resLength, resDigits);</span>
+<span class="nc" id="L462">        result.cutOffLeadingZeroes();</span>
+<span class="nc" id="L463">        return result;</span>
+    }
+
+    /**
+     * @see TBigInteger#or(TBigInteger)
+     */
+    static TBigInteger or(TBigInteger val, TBigInteger that) {
+<span class="pc bpc" id="L470" title="2 of 4 branches missed.">        if (that.equals(TBigInteger.MINUS_ONE) || val.equals(TBigInteger.MINUS_ONE)) {</span>
+<span class="nc" id="L471">            return TBigInteger.MINUS_ONE;</span>
+        }
+<span class="pc bpc" id="L473" title="1 of 2 branches missed.">        if (that.sign == 0) {</span>
+<span class="nc" id="L474">            return val;</span>
+        }
+<span class="pc bpc" id="L476" title="1 of 2 branches missed.">        if (val.sign == 0) {</span>
+<span class="nc" id="L477">            return that;</span>
+        }
+
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">        if (val.sign &gt; 0) {</span>
+<span class="pc bpc" id="L481" title="1 of 2 branches missed.">            if (that.sign &gt; 0) {</span>
+<span class="pc bpc" id="L482" title="1 of 2 branches missed.">                if (val.numberLength &gt; that.numberLength) {</span>
+<span class="nc" id="L483">                    return orPositive(val, that);</span>
+                } else {
+<span class="fc" id="L485">                    return orPositive(that, val);</span>
+                }
+            } else {
+<span class="nc" id="L488">                return orDiffSigns(val, that);</span>
+            }
+        } else {
+<span class="nc bnc" id="L491" title="All 2 branches missed.">            if (that.sign &gt; 0) {</span>
+<span class="nc" id="L492">                return orDiffSigns(that, val);</span>
+<span class="nc bnc" id="L493" title="All 2 branches missed.">            } else if (that.getFirstNonzeroDigit() &gt; val.getFirstNonzeroDigit()) {</span>
+<span class="nc" id="L494">                return orNegative(that, val);</span>
+            } else {
+<span class="nc" id="L496">                return orNegative(val, that);</span>
+            }
+        }
+    }
+
+    /**
+     * @return sign = 1, magnitude = longer.magnitude | shorter.magnitude
+     */
+    static TBigInteger orPositive(TBigInteger longer, TBigInteger shorter) {
+        // PRE: longer and shorter are positive;
+        // PRE: longer has at least as many digits as shorter
+<span class="fc" id="L507">        int resLength = longer.numberLength;</span>
+<span class="fc" id="L508">        int[] resDigits = new int[resLength];</span>
+
+<span class="fc" id="L510">        int i = Math.min(longer.getFirstNonzeroDigit(), shorter.getFirstNonzeroDigit());</span>
+<span class="fc bfc" id="L511" title="All 2 branches covered.">        for (i = 0; i &lt; shorter.numberLength; i++) {</span>
+<span class="fc" id="L512">            resDigits[i] = longer.digits[i] | shorter.digits[i];</span>
+        }
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">        for (; i &lt; resLength; i++) {</span>
+<span class="nc" id="L515">            resDigits[i] = longer.digits[i];</span>
+        }
+
+<span class="fc" id="L518">        TBigInteger result = new TBigInteger(1, resLength, resDigits);</span>
+<span class="fc" id="L519">        return result;</span>
+    }
+
+    /**
+     * @return sign = -1, magnitude = -(-val.magnitude | -that.magnitude)
+     */
+    static TBigInteger orNegative(TBigInteger val, TBigInteger that) {
+        // PRE: val and that are negative;
+        // PRE: val has at least as many trailing zeros digits as that
+<span class="nc" id="L528">        int iThat = that.getFirstNonzeroDigit();</span>
+<span class="nc" id="L529">        int iVal = val.getFirstNonzeroDigit();</span>
+        int i;
+
+<span class="nc bnc" id="L532" title="All 2 branches missed.">        if (iVal &gt;= that.numberLength) {</span>
+<span class="nc" id="L533">            return that;</span>
+<span class="nc bnc" id="L534" title="All 2 branches missed.">        } else if (iThat &gt;= val.numberLength) {</span>
+<span class="nc" id="L535">            return val;</span>
+        }
+
+<span class="nc" id="L538">        int resLength = Math.min(val.numberLength, that.numberLength);</span>
+<span class="nc" id="L539">        int[] resDigits = new int[resLength];</span>
+
+        //Looking for the first non-zero digit of the result
+<span class="nc bnc" id="L542" title="All 2 branches missed.">        if (iThat == iVal) {</span>
+<span class="nc" id="L543">            resDigits[iVal] = -(-val.digits[iVal] | -that.digits[iVal]);</span>
+<span class="nc" id="L544">            i = iVal;</span>
+        } else {
+<span class="nc bnc" id="L546" title="All 2 branches missed.">            for (i = iThat; i &lt; iVal; i++) {</span>
+<span class="nc" id="L547">                resDigits[i] = that.digits[i];</span>
+            }
+<span class="nc" id="L549">            resDigits[i] = that.digits[i] &amp; (val.digits[i] - 1);</span>
+        }
+
+<span class="nc bnc" id="L552" title="All 2 branches missed.">        for (i++; i &lt; resLength; i++) {</span>
+<span class="nc" id="L553">            resDigits[i] = val.digits[i] &amp; that.digits[i];</span>
+        }
+
+<span class="nc" id="L556">        TBigInteger result = new TBigInteger(-1, resLength, resDigits);</span>
+<span class="nc" id="L557">        result.cutOffLeadingZeroes();</span>
+<span class="nc" id="L558">        return result;</span>
+    }
+
+    /**
+     * @return sign = -1, magnitude = -(positive.magnitude | -negative.magnitude)
+     */
+    static TBigInteger orDiffSigns(TBigInteger positive, TBigInteger negative) {
+        // Jumping over the least significant zero bits
+<span class="nc" id="L566">        int iNeg = negative.getFirstNonzeroDigit();</span>
+<span class="nc" id="L567">        int iPos = positive.getFirstNonzeroDigit();</span>
+        int i;
+        int limit;
+
+        // Look if the trailing zeros of the positive will &quot;copy&quot; all
+        // the negative digits
+<span class="nc bnc" id="L573" title="All 2 branches missed.">        if (iPos &gt;= negative.numberLength) {</span>
+<span class="nc" id="L574">            return negative;</span>
+        }
+<span class="nc" id="L576">        int resLength = negative.numberLength;</span>
+<span class="nc" id="L577">        int[] resDigits = new int[resLength];</span>
+
+<span class="nc bnc" id="L579" title="All 2 branches missed.">        if (iNeg &lt; iPos) {</span>
+            // We know for sure that this will
+            // be the first non zero digit in the result
+<span class="nc bnc" id="L582" title="All 2 branches missed.">            for (i = iNeg; i &lt; iPos; i++) {</span>
+<span class="nc" id="L583">                resDigits[i] = negative.digits[i];</span>
+            }
+<span class="nc bnc" id="L585" title="All 2 branches missed.">        } else if (iPos &lt; iNeg) {</span>
+<span class="nc" id="L586">            i = iPos;</span>
+<span class="nc" id="L587">            resDigits[i] = -positive.digits[i];</span>
+<span class="nc" id="L588">            limit = Math.min(positive.numberLength, iNeg);</span>
+<span class="nc bnc" id="L589" title="All 2 branches missed.">            for (i++; i &lt; limit; i++) {</span>
+<span class="nc" id="L590">                resDigits[i] = ~positive.digits[i];</span>
+            }
+<span class="nc bnc" id="L592" title="All 2 branches missed.">            if (i != positive.numberLength) {</span>
+<span class="nc" id="L593">                resDigits[i] = ~(-negative.digits[i] | positive.digits[i]);</span>
+            } else {
+<span class="nc bnc" id="L595" title="All 2 branches missed.">                for (; i &lt; iNeg; i++) {</span>
+<span class="nc" id="L596">                    resDigits[i] = -1;</span>
+                }
+                // resDigits[i] = ~(-negative.digits[i] | 0);
+<span class="nc" id="L599">                resDigits[i] = negative.digits[i] - 1;</span>
+            }
+<span class="nc" id="L601">            i++;</span>
+        } else {// iNeg == iPos
+            // Applying two complement to negative and to result
+<span class="nc" id="L604">            i = iPos;</span>
+<span class="nc" id="L605">            resDigits[i] = -(-negative.digits[i] | positive.digits[i]);</span>
+<span class="nc" id="L606">            i++;</span>
+        }
+<span class="nc" id="L608">        limit = Math.min(negative.numberLength, positive.numberLength);</span>
+<span class="nc bnc" id="L609" title="All 2 branches missed.">        for (; i &lt; limit; i++) {</span>
+            // Applying two complement to negative and to result
+            // resDigits[i] = ~(~negative.digits[i] | positive.digits[i] );
+<span class="nc" id="L612">            resDigits[i] = negative.digits[i] &amp; ~positive.digits[i];</span>
+        }
+<span class="nc bnc" id="L614" title="All 2 branches missed.">        for (; i &lt; negative.numberLength; i++) {</span>
+<span class="nc" id="L615">            resDigits[i] = negative.digits[i];</span>
+        }
+
+<span class="nc" id="L618">        TBigInteger result = new TBigInteger(-1, resLength, resDigits);</span>
+<span class="nc" id="L619">        result.cutOffLeadingZeroes();</span>
+<span class="nc" id="L620">        return result;</span>
+    }
+
+    /**
+     * @see TBigInteger#xor(TBigInteger)
+     */
+    static TBigInteger xor(TBigInteger val, TBigInteger that) {
+<span class="pc bpc" id="L627" title="1 of 2 branches missed.">        if (that.sign == 0) {</span>
+<span class="nc" id="L628">            return val;</span>
+        }
+<span class="pc bpc" id="L630" title="1 of 2 branches missed.">        if (val.sign == 0) {</span>
+<span class="nc" id="L631">            return that;</span>
+        }
+<span class="pc bpc" id="L633" title="1 of 2 branches missed.">        if (that.equals(TBigInteger.MINUS_ONE)) {</span>
+<span class="nc" id="L634">            return val.not();</span>
+        }
+<span class="pc bpc" id="L636" title="1 of 2 branches missed.">        if (val.equals(TBigInteger.MINUS_ONE)) {</span>
+<span class="nc" id="L637">            return that.not();</span>
+        }
+
+<span class="pc bpc" id="L640" title="1 of 2 branches missed.">        if (val.sign &gt; 0) {</span>
+<span class="pc bpc" id="L641" title="1 of 2 branches missed.">            if (that.sign &gt; 0) {</span>
+<span class="pc bpc" id="L642" title="1 of 2 branches missed.">                if (val.numberLength &gt; that.numberLength) {</span>
+<span class="nc" id="L643">                    return xorPositive(val, that);</span>
+                } else {
+<span class="fc" id="L645">                    return xorPositive(that, val);</span>
+                }
+            } else {
+<span class="nc" id="L648">                return xorDiffSigns(val, that);</span>
+            }
+        } else {
+<span class="nc bnc" id="L651" title="All 2 branches missed.">            if (that.sign &gt; 0) {</span>
+<span class="nc" id="L652">                return xorDiffSigns(that, val);</span>
+<span class="nc bnc" id="L653" title="All 2 branches missed.">            } else if (that.getFirstNonzeroDigit() &gt; val.getFirstNonzeroDigit()) {</span>
+<span class="nc" id="L654">                return xorNegative(that, val);</span>
+            } else {
+<span class="nc" id="L656">                return xorNegative(val, that);</span>
+            }
+        }
+    }
+
+    /**
+     * @return sign = 0, magnitude = longer.magnitude | shorter.magnitude
+     */
+    static TBigInteger xorPositive(TBigInteger longer, TBigInteger shorter) {
+        // PRE: longer and shorter are positive;
+        // PRE: longer has at least as many digits as shorter
+<span class="fc" id="L667">        int resLength = longer.numberLength;</span>
+<span class="fc" id="L668">        int[] resDigits = new int[resLength];</span>
+<span class="fc" id="L669">        int i = Math.min(longer.getFirstNonzeroDigit(), shorter.getFirstNonzeroDigit());</span>
+<span class="fc bfc" id="L670" title="All 2 branches covered.">        for (; i &lt; shorter.numberLength; i++) {</span>
+<span class="fc" id="L671">            resDigits[i] = longer.digits[i] ^ shorter.digits[i];</span>
+        }
+<span class="pc bpc" id="L673" title="1 of 2 branches missed.">        for (; i &lt; longer.numberLength; i++) {</span>
+<span class="nc" id="L674">            resDigits[i] = longer.digits[i];</span>
+        }
+
+<span class="fc" id="L677">        TBigInteger result = new TBigInteger(1, resLength, resDigits);</span>
+<span class="fc" id="L678">        result.cutOffLeadingZeroes();</span>
+<span class="fc" id="L679">        return result;</span>
+    }
+
+    /**
+     * @return sign = 0, magnitude = -val.magnitude ^ -that.magnitude
+     */
+    static TBigInteger xorNegative(TBigInteger val, TBigInteger that) {
+        // PRE: val and that are negative
+        // PRE: val has at least as many trailing zero digits as that
+<span class="nc" id="L688">        int resLength = Math.max(val.numberLength, that.numberLength);</span>
+<span class="nc" id="L689">        int[] resDigits = new int[resLength];</span>
+<span class="nc" id="L690">        int iVal = val.getFirstNonzeroDigit();</span>
+<span class="nc" id="L691">        int iThat = that.getFirstNonzeroDigit();</span>
+<span class="nc" id="L692">        int i = iThat;</span>
+        int limit;
+
+
+<span class="nc bnc" id="L696" title="All 2 branches missed.">        if (iVal == iThat) {</span>
+<span class="nc" id="L697">            resDigits[i] = -val.digits[i] ^ -that.digits[i];</span>
+        } else {
+<span class="nc" id="L699">            resDigits[i] = -that.digits[i];</span>
+<span class="nc" id="L700">            limit = Math.min(that.numberLength, iVal);</span>
+<span class="nc bnc" id="L701" title="All 2 branches missed.">            for (i++; i &lt; limit; i++) {</span>
+<span class="nc" id="L702">                resDigits[i] = ~that.digits[i];</span>
+            }
+            // Remains digits in that?
+<span class="nc bnc" id="L705" title="All 2 branches missed.">            if (i == that.numberLength) {</span>
+                //Jumping over the remaining zero to the first non one
+<span class="nc bnc" id="L707" title="All 2 branches missed.">                for (; i &lt; iVal; i++) {</span>
+                    //resDigits[i] = 0 ^ -1;
+<span class="nc" id="L709">                    resDigits[i] = -1;</span>
+                }
+                //resDigits[i] = -val.digits[i] ^ -1;
+<span class="nc" id="L712">                resDigits[i] = val.digits[i] - 1;</span>
+            } else {
+<span class="nc" id="L714">                resDigits[i] = -val.digits[i] ^ ~that.digits[i];</span>
+            }
+        }
+
+<span class="nc" id="L718">        limit = Math.min(val.numberLength, that.numberLength);</span>
+        //Perform ^ between that al val until that ends
+<span class="nc bnc" id="L720" title="All 2 branches missed.">        for (i++; i &lt; limit; i++) {</span>
+            //resDigits[i] = ~val.digits[i] ^ ~that.digits[i];
+<span class="nc" id="L722">            resDigits[i] = val.digits[i] ^ that.digits[i];</span>
+        }
+        //Perform ^ between val digits and -1 until val ends
+<span class="nc bnc" id="L725" title="All 2 branches missed.">        for (; i &lt; val.numberLength; i++) {</span>
+            //resDigits[i] = ~val.digits[i] ^ -1  ;
+<span class="nc" id="L727">            resDigits[i] = val.digits[i];</span>
+        }
+<span class="nc bnc" id="L729" title="All 2 branches missed.">        for (; i &lt; that.numberLength; i++) {</span>
+            //resDigits[i] = -1 ^ ~that.digits[i] ;
+<span class="nc" id="L731">            resDigits[i] = that.digits[i];</span>
+        }
+
+<span class="nc" id="L734">        TBigInteger result = new TBigInteger(1, resLength, resDigits);</span>
+<span class="nc" id="L735">        result.cutOffLeadingZeroes();</span>
+<span class="nc" id="L736">        return result;</span>
+    }
+
+    /**
+     * @return sign = 1, magnitude = -(positive.magnitude ^ -negative.magnitude)
+     */
+    static TBigInteger xorDiffSigns(TBigInteger positive, TBigInteger negative) {
+<span class="nc" id="L743">        int resLength = Math.max(negative.numberLength, positive.numberLength);</span>
+        int[] resDigits;
+<span class="nc" id="L745">        int iNeg = negative.getFirstNonzeroDigit();</span>
+<span class="nc" id="L746">        int iPos = positive.getFirstNonzeroDigit();</span>
+        int i;
+        int limit;
+
+        //The first
+<span class="nc bnc" id="L751" title="All 2 branches missed.">        if (iNeg &lt; iPos) {</span>
+<span class="nc" id="L752">            resDigits = new int[resLength];</span>
+<span class="nc" id="L753">            i = iNeg;</span>
+            //resDigits[i] = -(-negative.digits[i]);
+<span class="nc" id="L755">            resDigits[i] = negative.digits[i];</span>
+<span class="nc" id="L756">            limit = Math.min(negative.numberLength, iPos);</span>
+            //Skip the positive digits while they are zeros
+<span class="nc bnc" id="L758" title="All 2 branches missed.">            for (i++; i &lt; limit; i++) {</span>
+                //resDigits[i] = ~(~negative.digits[i]);
+<span class="nc" id="L760">                resDigits[i] = negative.digits[i];</span>
+            }
+            //if the negative has no more elements, must fill the
+            //result with the remaining digits of the positive
+<span class="nc bnc" id="L764" title="All 2 branches missed.">            if (i == negative.numberLength) {</span>
+<span class="nc bnc" id="L765" title="All 2 branches missed.">                for (; i &lt; positive.numberLength; i++) {</span>
+                    //resDigits[i] = ~(positive.digits[i] ^ -1) -&gt; ~(~positive.digits[i])
+<span class="nc" id="L767">                    resDigits[i] = positive.digits[i];</span>
+                }
+            }
+<span class="nc bnc" id="L770" title="All 2 branches missed.">        } else if (iPos &lt; iNeg) {</span>
+<span class="nc" id="L771">            resDigits = new int[resLength];</span>
+<span class="nc" id="L772">            i = iPos;</span>
+            //Applying two complement to the first non-zero digit of the result
+<span class="nc" id="L774">            resDigits[i] = -positive.digits[i];</span>
+<span class="nc" id="L775">            limit = Math.min(positive.numberLength, iNeg);</span>
+<span class="nc bnc" id="L776" title="All 2 branches missed.">            for (i++; i &lt; limit; i++) {</span>
+                //Continue applying two complement the result
+<span class="nc" id="L778">                resDigits[i] = ~positive.digits[i];</span>
+            }
+            //When the first non-zero digit of the negative is reached, must apply
+            //two complement (arithmetic negation) to it, and then operate
+<span class="nc bnc" id="L782" title="All 2 branches missed.">            if (i == iNeg) {</span>
+<span class="nc" id="L783">                resDigits[i] = ~(positive.digits[i] ^ -negative.digits[i]);</span>
+<span class="nc" id="L784">                i++;</span>
+            } else {
+                //if the positive has no more elements must fill the remaining digits with
+                //the negative ones
+<span class="nc bnc" id="L788" title="All 2 branches missed.">                for (; i &lt; iNeg; i++) {</span>
+                    // resDigits[i] = ~(0 ^ 0)
+<span class="nc" id="L790">                    resDigits[i] = -1;</span>
+                }
+<span class="nc bnc" id="L792" title="All 2 branches missed.">                for (; i &lt; negative.numberLength; i++) {</span>
+                    //resDigits[i] = ~(~negative.digits[i] ^ 0)
+<span class="nc" id="L794">                    resDigits[i] = negative.digits[i];</span>
+                }
+            }
+        } else {
+            int digit;
+            //The first non-zero digit of the positive and negative are the same
+<span class="nc" id="L800">            i = iNeg;</span>
+<span class="nc" id="L801">            digit = positive.digits[i] ^ -negative.digits[i];</span>
+<span class="nc bnc" id="L802" title="All 2 branches missed.">            if (digit == 0) {</span>
+<span class="nc" id="L803">                limit = Math.min(positive.numberLength, negative.numberLength);</span>
+<span class="nc bnc" id="L804" title="All 4 branches missed.">                for (i++; i &lt; limit &amp;&amp; (digit = positive.digits[i] ^ ~negative.digits[i]) == 0; i++) {</span>
+                    // do nothing
+                }
+<span class="nc bnc" id="L807" title="All 2 branches missed.">                if (digit == 0) {</span>
+                    // shorter has only the remaining virtual sign bits
+<span class="nc bnc" id="L809" title="All 4 branches missed.">                    for (; i &lt; positive.numberLength &amp;&amp; (digit = ~positive.digits[i]) == 0; i++) {</span>
+                        // do nothing
+                    }
+<span class="nc bnc" id="L812" title="All 4 branches missed.">                    for (; i &lt; negative.numberLength &amp;&amp; (digit = ~negative.digits[i]) == 0; i++) {</span>
+                        // do nothing
+                    }
+<span class="nc bnc" id="L815" title="All 2 branches missed.">                    if (digit == 0) {</span>
+<span class="nc" id="L816">                        resLength = resLength + 1;</span>
+<span class="nc" id="L817">                        resDigits = new int[resLength];</span>
+<span class="nc" id="L818">                        resDigits[resLength - 1] = 1;</span>
+
+<span class="nc" id="L820">                        TBigInteger result = new TBigInteger(-1, resLength, resDigits);</span>
+<span class="nc" id="L821">                        return result;</span>
+                    }
+                }
+            }
+<span class="nc" id="L825">            resDigits = new int[resLength];</span>
+<span class="nc" id="L826">            resDigits[i] = -digit;</span>
+<span class="nc" id="L827">            i++;</span>
+        }
+
+<span class="nc" id="L830">        limit = Math.min(negative.numberLength, positive.numberLength);</span>
+<span class="nc bnc" id="L831" title="All 2 branches missed.">        for (; i &lt; limit; i++) {</span>
+<span class="nc" id="L832">            resDigits[i] = ~(~negative.digits[i] ^ positive.digits[i]);</span>
+        }
+<span class="nc bnc" id="L834" title="All 2 branches missed.">        for (; i &lt; positive.numberLength; i++) {</span>
+            // resDigits[i] = ~(positive.digits[i] ^ -1)
+<span class="nc" id="L836">            resDigits[i] = positive.digits[i];</span>
+        }
+<span class="nc bnc" id="L838" title="All 2 branches missed.">        for (; i &lt; negative.numberLength; i++) {</span>
+            // resDigits[i] = ~(0 ^ ~negative.digits[i])
+<span class="nc" id="L840">            resDigits[i] = negative.digits[i];</span>
+        }
+
+<span class="nc" id="L843">        TBigInteger result = new TBigInteger(-1, resLength, resDigits);</span>
+<span class="nc" id="L844">        result.cutOffLeadingZeroes();</span>
+<span class="nc" id="L845">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

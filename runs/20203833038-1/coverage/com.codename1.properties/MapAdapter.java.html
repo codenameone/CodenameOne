@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MapAdapter.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.properties</a> &gt; <span class="el_source">MapAdapter.java</span></div><h1>MapAdapter.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.properties;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * &lt;p&gt;Instances of this class adapt an arbitrary object type so a property can
+ * appear differently when it's placed into a Map or initialized from a Map.
+ * This impacts JSON generation too as it relies heavily on the process of
+ * transforming elements to/from maps.&lt;/p&gt;
+ * &lt;p&gt;To use this class create a new subclass of it and override the appropriate
+ * methods.&lt;/p&gt;
+ *
+ * @author Shai Almog
+ */
+public abstract class MapAdapter {
+<span class="fc" id="L40">    private final static Map&lt;String, MapAdapter&gt; lookup = new HashMap&lt;String, MapAdapter&gt;();</span>
+    private final Class type;
+
+    /**
+     * By default subclasses should target a specific type but this can be
+     * further narrowed by overriding {@link #useAdapterFor(com.codename1.properties.PropertyBase)}.
+     *
+     * @param type the type to which the map adapter is bound
+     */
+<span class="nc" id="L49">    protected MapAdapter(Class type) {</span>
+<span class="nc" id="L50">        this.type = type;</span>
+<span class="nc" id="L51">        lookup.put(type.getName(), this);</span>
+<span class="nc" id="L52">    }</span>
+
+    static MapAdapter checkInstance(PropertyBase b) {
+<span class="fc bfc" id="L55" title="All 2 branches covered.">        if (b.getGenericType() != null) {</span>
+<span class="fc" id="L56">            MapAdapter a = lookup.get(b.getGenericType().getName());</span>
+<span class="pc bpc" id="L57" title="3 of 4 branches missed.">            if (a != null &amp;&amp; a.useAdapterFor(b)) {</span>
+<span class="nc" id="L58">                return a;</span>
+            }
+        }
+<span class="fc" id="L61">        return null;</span>
+    }
+
+    /**
+     * Returns true if the adapter should be used for this property
+     *
+     * @param b the property
+     * @return true if this adapter should be used for this property
+     */
+    public boolean useAdapterFor(PropertyBase b) {
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        return b.getGenericType() == type;</span>
+    }
+
+    /**
+     * Places the given property into the given map
+     *
+     * @param b the property object
+     * @param m the map instance
+     */
+    public void placeInMap(PropertyBase b, Map m) {
+<span class="nc" id="L81">        m.put(b.getName(), b.get());</span>
+<span class="nc" id="L82">    }</span>
+
+    /**
+     * Sets the value of the property from the map object
+     *
+     * @param b the property object
+     * @param m the map instance
+     */
+    public void setFromMap(PropertyBase b, Map m) {
+<span class="nc" id="L91">        b.setImpl(m.get(b.getName()));</span>
+<span class="nc" id="L92">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

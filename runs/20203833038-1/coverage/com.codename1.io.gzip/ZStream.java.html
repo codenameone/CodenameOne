@@ -1,0 +1,396 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ZStream.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.gzip</a> &gt; <span class="el_source">ZStream.java</span></div><h1>ZStream.java</h1><pre class="source lang-java linenums">
+/* -*-mode:java; c-basic-offset:2; indent-tabs-mode:nil -*- */
+/*
+Copyright (c) 2000-2011 ymnk, JCraft,Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+  1. Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright 
+     notice, this list of conditions and the following disclaimer in 
+     the documentation and/or other materials provided with the distribution.
+
+  3. The names of the authors may not be used to endorse or promote products
+     derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL JCRAFT,
+INC. OR ANY CONTRIBUTORS TO THIS SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
+ * This program is based on zlib-1.1.3, so all credit should go authors
+ * Jean-loup Gailly(jloup@gzip.org) and Mark Adler(madler@alumni.caltech.edu)
+ * and contributors of zlib.
+ */
+
+package com.codename1.io.gzip;
+
+/**
+ * ZStream
+ *
+ * @deprecated Not for public use in the future.
+ */
+@Deprecated
+public class ZStream {
+
+    static final private int MAX_WBITS = 15;        // 32K LZ77 window
+    static final private int DEF_WBITS = MAX_WBITS;
+
+    static final private int Z_NO_FLUSH = 0;
+    static final private int Z_PARTIAL_FLUSH = 1;
+    static final private int Z_SYNC_FLUSH = 2;
+    static final private int Z_FULL_FLUSH = 3;
+    static final private int Z_FINISH = 4;
+
+    static final private int MAX_MEM_LEVEL = 9;
+
+    static final private int Z_OK = 0;
+    static final private int Z_STREAM_END = 1;
+    static final private int Z_NEED_DICT = 2;
+    static final private int Z_ERRNO = -1;
+    static final private int Z_STREAM_ERROR = -2;
+    static final private int Z_DATA_ERROR = -3;
+    static final private int Z_MEM_ERROR = -4;
+    static final private int Z_BUF_ERROR = -5;
+    static final private int Z_VERSION_ERROR = -6;
+
+    public byte[] next_in;     // next input byte
+    public int next_in_index;
+    public int avail_in;       // number of bytes available at next_in
+    public long total_in;      // total nb of input bytes read so far
+
+    public byte[] next_out;    // next output byte should be put there
+    public int next_out_index;
+    public int avail_out;      // remaining free space at next_out
+    public long total_out;     // total nb of bytes output so far
+
+    public String msg;
+
+    Deflate dstate;
+    Inflate istate;
+
+    int data_type; // best guess about the data type: ascii or binary
+
+    Checksum adler;
+
+    public ZStream() {
+<span class="fc" id="L87">        this(new Adler32());</span>
+<span class="fc" id="L88">    }</span>
+
+<span class="fc" id="L90">    public ZStream(Checksum adler) {</span>
+<span class="fc" id="L91">        this.adler = adler;</span>
+<span class="fc" id="L92">    }</span>
+
+    public int inflateInit() {
+<span class="nc" id="L95">        return inflateInit(DEF_WBITS);</span>
+    }
+
+    public int inflateInit(boolean nowrap) {
+<span class="nc" id="L99">        return inflateInit(DEF_WBITS, nowrap);</span>
+    }
+
+    public int inflateInit(int w) {
+<span class="nc" id="L103">        return inflateInit(w, false);</span>
+    }
+
+    public int inflateInit(JZlib.WrapperType wrapperType) {
+<span class="nc" id="L107">        return inflateInit(DEF_WBITS, wrapperType);</span>
+    }
+
+    public int inflateInit(int w, JZlib.WrapperType wrapperType) {
+<span class="nc" id="L111">        boolean nowrap = false;</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (wrapperType == JZlib.W_NONE) {</span>
+<span class="nc" id="L113">            nowrap = true;</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        } else if (wrapperType == JZlib.W_GZIP) {</span>
+<span class="nc" id="L115">            w += 16;</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        } else if (wrapperType == JZlib.W_ANY) {</span>
+<span class="nc" id="L117">            w |= Inflate.INFLATE_ANY;</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        } else if (wrapperType == JZlib.W_ZLIB) {</span>
+        }
+<span class="nc" id="L120">        return inflateInit(w, nowrap);</span>
+    }
+
+    public int inflateInit(int w, boolean nowrap) {
+<span class="nc" id="L124">        istate = new Inflate(this);</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        return istate.inflateInit(nowrap ? -w : w);</span>
+    }
+
+    public int inflate(int f) {
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        if (istate == null) return Z_STREAM_ERROR;</span>
+<span class="nc" id="L130">        return istate.inflate(f);</span>
+    }
+
+    public int inflateEnd() {
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        if (istate == null) return Z_STREAM_ERROR;</span>
+<span class="nc" id="L135">        int ret = istate.inflateEnd();</span>
+//    istate = null;
+<span class="nc" id="L137">        return ret;</span>
+    }
+
+    public int inflateSync() {
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (istate == null)</span>
+<span class="nc" id="L142">            return Z_STREAM_ERROR;</span>
+<span class="nc" id="L143">        return istate.inflateSync();</span>
+    }
+
+    public int inflateSyncPoint() {
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        if (istate == null)</span>
+<span class="nc" id="L148">            return Z_STREAM_ERROR;</span>
+<span class="nc" id="L149">        return istate.inflateSyncPoint();</span>
+    }
+
+    public int inflateSetDictionary(byte[] dictionary, int dictLength) {
+<span class="nc bnc" id="L153" title="All 2 branches missed.">        if (istate == null)</span>
+<span class="nc" id="L154">            return Z_STREAM_ERROR;</span>
+<span class="nc" id="L155">        return istate.inflateSetDictionary(dictionary, dictLength);</span>
+    }
+
+    public boolean inflateFinished() {
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        return istate.mode == 12 /*DONE*/;</span>
+    }
+
+    public int deflateInit(int level) {
+<span class="nc" id="L163">        return deflateInit(level, MAX_WBITS);</span>
+    }
+
+    public int deflateInit(int level, boolean nowrap) {
+<span class="nc" id="L167">        return deflateInit(level, MAX_WBITS, nowrap);</span>
+    }
+
+    public int deflateInit(int level, int bits) {
+<span class="nc" id="L171">        return deflateInit(level, bits, false);</span>
+    }
+
+    public int deflateInit(int level, int bits, int memlevel, JZlib.WrapperType wrapperType) {
+<span class="nc bnc" id="L175" title="All 4 branches missed.">        if (bits &lt; 9 || bits &gt; 15) {</span>
+<span class="nc" id="L176">            return Z_STREAM_ERROR;</span>
+        }
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (wrapperType == JZlib.W_NONE) {</span>
+<span class="nc" id="L179">            bits *= -1;</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        } else if (wrapperType == JZlib.W_GZIP) {</span>
+<span class="nc" id="L181">            bits += 16;</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        } else if (wrapperType == JZlib.W_ANY) {</span>
+<span class="nc" id="L183">            return Z_STREAM_ERROR;</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">        } else if (wrapperType == JZlib.W_ZLIB) {</span>
+        }
+<span class="nc" id="L186">        return this.deflateInit(level, bits, memlevel);</span>
+    }
+
+    public int deflateInit(int level, int bits, int memlevel) {
+<span class="nc" id="L190">        dstate = new Deflate(this);</span>
+<span class="nc" id="L191">        return dstate.deflateInit(level, bits, memlevel);</span>
+    }
+
+    public int deflateInit(int level, int bits, boolean nowrap) {
+<span class="nc" id="L195">        dstate = new Deflate(this);</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">        return dstate.deflateInit(level, nowrap ? -bits : bits);</span>
+    }
+
+    public int deflate(int flush) {
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (dstate == null) {</span>
+<span class="nc" id="L201">            return Z_STREAM_ERROR;</span>
+        }
+<span class="nc" id="L203">        return dstate.deflate(flush);</span>
+    }
+
+    public int deflateEnd() {
+<span class="nc bnc" id="L207" title="All 2 branches missed.">        if (dstate == null) return Z_STREAM_ERROR;</span>
+<span class="nc" id="L208">        int ret = dstate.deflateEnd();</span>
+<span class="nc" id="L209">        dstate = null;</span>
+<span class="nc" id="L210">        return ret;</span>
+    }
+
+    public int deflateParams(int level, int strategy) {
+<span class="nc bnc" id="L214" title="All 2 branches missed.">        if (dstate == null) return Z_STREAM_ERROR;</span>
+<span class="nc" id="L215">        return dstate.deflateParams(level, strategy);</span>
+    }
+
+    public int deflateSetDictionary(byte[] dictionary, int dictLength) {
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        if (dstate == null)</span>
+<span class="nc" id="L220">            return Z_STREAM_ERROR;</span>
+<span class="nc" id="L221">        return dstate.deflateSetDictionary(dictionary, dictLength);</span>
+    }
+
+    // Flush as much pending output as possible. All deflate() output goes
+    // through this function so some applications may wish to modify it
+    // to avoid allocating a large strm-&gt;next_out buffer and copying into it.
+    // (See also read_buf()).
+    void flush_pending() {
+<span class="fc" id="L229">        int len = dstate.pending;</span>
+
+<span class="pc bpc" id="L231" title="1 of 2 branches missed.">        if (len &gt; avail_out) len = avail_out;</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        if (len == 0) return;</span>
+
+<span class="pc bpc" id="L234" title="4 of 8 branches missed.">        if (dstate.pending_buf.length &lt;= dstate.pending_out ||</span>
+                next_out.length &lt;= next_out_index ||
+                dstate.pending_buf.length &lt; (dstate.pending_out + len) ||
+                next_out.length &lt; (next_out_index + len)) {
+            //System.out.println(dstate.pending_buf.length+&quot;, &quot;+dstate.pending_out+
+            //		 &quot;, &quot;+next_out.length+&quot;, &quot;+next_out_index+&quot;, &quot;+len);
+            //System.out.println(&quot;avail_out=&quot;+avail_out);
+        }
+
+<span class="fc" id="L243">        System.arraycopy(dstate.pending_buf, dstate.pending_out,</span>
+                next_out, next_out_index, len);
+
+<span class="fc" id="L246">        next_out_index += len;</span>
+<span class="fc" id="L247">        dstate.pending_out += len;</span>
+<span class="fc" id="L248">        total_out += len;</span>
+<span class="fc" id="L249">        avail_out -= len;</span>
+<span class="fc" id="L250">        dstate.pending -= len;</span>
+<span class="pc bpc" id="L251" title="1 of 2 branches missed.">        if (dstate.pending == 0) {</span>
+<span class="fc" id="L252">            dstate.pending_out = 0;</span>
+        }
+<span class="fc" id="L254">    }</span>
+
+    // Read a new buffer from the current input stream, update the adler32
+    // and total number of bytes read.  All deflate() input goes through
+    // this function so some applications may wish to modify it to avoid
+    // allocating a large strm-&gt;next_in buffer and copying from it.
+    // (See also flush_pending()).
+    int read_buf(byte[] buf, int start, int size) {
+<span class="fc" id="L262">        int len = avail_in;</span>
+
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">        if (len &gt; size) len = size;</span>
+<span class="pc bpc" id="L265" title="1 of 2 branches missed.">        if (len == 0) return 0;</span>
+
+<span class="fc" id="L267">        avail_in -= len;</span>
+
+<span class="pc bpc" id="L269" title="1 of 2 branches missed.">        if (dstate.wrap != 0) {</span>
+<span class="fc" id="L270">            adler.update(next_in, next_in_index, len);</span>
+        }
+<span class="fc" id="L272">        System.arraycopy(next_in, next_in_index, buf, start, len);</span>
+<span class="fc" id="L273">        next_in_index += len;</span>
+<span class="fc" id="L274">        total_in += len;</span>
+<span class="fc" id="L275">        return len;</span>
+    }
+
+    public long getAdler() {
+<span class="nc" id="L279">        return adler.getValue();</span>
+    }
+
+    public void free() {
+<span class="fc" id="L283">        next_in = null;</span>
+<span class="fc" id="L284">        next_out = null;</span>
+<span class="fc" id="L285">        msg = null;</span>
+<span class="fc" id="L286">    }</span>
+
+    public void setOutput(byte[] buf) {
+<span class="nc" id="L289">        setOutput(buf, 0, buf.length);</span>
+<span class="nc" id="L290">    }</span>
+
+    public void setOutput(byte[] buf, int off, int len) {
+<span class="fc" id="L293">        next_out = buf;</span>
+<span class="fc" id="L294">        next_out_index = off;</span>
+<span class="fc" id="L295">        avail_out = len;</span>
+<span class="fc" id="L296">    }</span>
+
+    public void setInput(byte[] buf) {
+<span class="nc" id="L299">        setInput(buf, 0, buf.length, false);</span>
+<span class="nc" id="L300">    }</span>
+
+    public void setInput(byte[] buf, boolean append) {
+<span class="nc" id="L303">        setInput(buf, 0, buf.length, append);</span>
+<span class="nc" id="L304">    }</span>
+
+    public void setInput(byte[] buf, int off, int len, boolean append) {
+<span class="pc bpc" id="L307" title="3 of 6 branches missed.">        if (len &lt;= 0 &amp;&amp; append &amp;&amp; next_in != null) return;</span>
+
+<span class="pc bpc" id="L309" title="3 of 4 branches missed.">        if (avail_in &gt; 0 &amp;&amp; append) {</span>
+<span class="nc" id="L310">            byte[] tmp = new byte[avail_in + len];</span>
+<span class="nc" id="L311">            System.arraycopy(next_in, next_in_index, tmp, 0, avail_in);</span>
+<span class="nc" id="L312">            System.arraycopy(buf, off, tmp, avail_in, len);</span>
+<span class="nc" id="L313">            next_in = tmp;</span>
+<span class="nc" id="L314">            next_in_index = 0;</span>
+<span class="nc" id="L315">            avail_in += len;</span>
+<span class="nc" id="L316">        } else {</span>
+<span class="fc" id="L317">            next_in = buf;</span>
+<span class="fc" id="L318">            next_in_index = off;</span>
+<span class="fc" id="L319">            avail_in = len;</span>
+        }
+<span class="fc" id="L321">    }</span>
+
+    public byte[] getNextIn() {
+<span class="nc" id="L324">        return next_in;</span>
+    }
+
+    public void setNextIn(byte[] next_in) {
+<span class="nc" id="L328">        this.next_in = next_in;</span>
+<span class="nc" id="L329">    }</span>
+
+    public int getNextInIndex() {
+<span class="nc" id="L332">        return next_in_index;</span>
+    }
+
+    public void setNextInIndex(int next_in_index) {
+<span class="nc" id="L336">        this.next_in_index = next_in_index;</span>
+<span class="nc" id="L337">    }</span>
+
+    public int getAvailIn() {
+<span class="nc" id="L340">        return avail_in;</span>
+    }
+
+    public void setAvailIn(int avail_in) {
+<span class="nc" id="L344">        this.avail_in = avail_in;</span>
+<span class="nc" id="L345">    }</span>
+
+    public byte[] getNextOut() {
+<span class="nc" id="L348">        return next_out;</span>
+    }
+
+    public void setNextOut(byte[] next_out) {
+<span class="nc" id="L352">        this.next_out = next_out;</span>
+<span class="nc" id="L353">    }</span>
+
+    public int getNextOutIndex() {
+<span class="nc" id="L356">        return next_out_index;</span>
+    }
+
+    public void setNextOutIndex(int next_out_index) {
+<span class="nc" id="L360">        this.next_out_index = next_out_index;</span>
+<span class="nc" id="L361">    }</span>
+
+    public int getAvailOut() {
+<span class="nc" id="L364">        return avail_out;</span>
+
+    }
+
+    public void setAvailOut(int avail_out) {
+<span class="nc" id="L369">        this.avail_out = avail_out;</span>
+<span class="nc" id="L370">    }</span>
+
+    public long getTotalOut() {
+<span class="nc" id="L373">        return total_out;</span>
+    }
+
+    public long getTotalIn() {
+<span class="nc" id="L377">        return total_in;</span>
+    }
+
+    public String getMessage() {
+<span class="nc" id="L381">        return msg;</span>
+    }
+
+    /**
+     * Those methods are expected to be override by Inflater and Deflater.
+     * In the future, they will become abstract methods.
+     */
+    public int end() {
+<span class="nc" id="L389">        return Z_OK;</span>
+    }
+
+    public boolean finished() {
+<span class="nc" id="L393">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,288 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>MorphTransition.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.animations</a> &gt; <span class="el_source">MorphTransition.java</span></div><h1>MorphTransition.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui.animations;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Form;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Label;
+import com.codename1.ui.geom.Dimension;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * A transition inspired by the Android L release morph activity effect allowing
+ * a set of components in one form/container to morph into another in a different
+ * container/form.
+ *
+ * @author Shai Almog
+ */
+public class MorphTransition extends Transition {
+    private int duration;
+<span class="fc" id="L45">    private final HashMap&lt;String, String&gt; fromTo = new HashMap&lt;String, String&gt;();</span>
+    private CC[] fromToComponents;
+    private Motion animationMotion;
+    private boolean finished;
+
+<span class="fc" id="L50">    private MorphTransition() {</span>
+<span class="fc" id="L51">    }</span>
+
+    /**
+     * Creates a transition with the given duration, this transition should be modified with the
+     * builder methods such as morph
+     *
+     * @param duration the duration of the transition
+     * @return a new Morph transition instance
+     */
+    public static MorphTransition create(int duration) {
+<span class="fc" id="L61">        MorphTransition mt = new MorphTransition();</span>
+<span class="fc" id="L62">        mt.duration = duration;</span>
+<span class="fc" id="L63">        return mt;</span>
+    }
+
+    private static Component findByName(Container root, String componentName) {
+<span class="fc" id="L67">        int count = root.getComponentCount();</span>
+<span class="fc bfc" id="L68" title="All 2 branches covered.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="fc" id="L69">            Component c = root.getComponentAt(iter);</span>
+<span class="fc" id="L70">            String n = c.getName();</span>
+<span class="pc bpc" id="L71" title="1 of 4 branches missed.">            if (n != null &amp;&amp; n.equals(componentName)) {</span>
+<span class="fc" id="L72">                return c;</span>
+            }
+<span class="fc bfc" id="L74" title="All 2 branches covered.">            if (c instanceof Container) {</span>
+<span class="fc" id="L75">                c = findByName((Container) c, componentName);</span>
+<span class="fc bfc" id="L76" title="All 2 branches covered.">                if (c != null) {</span>
+<span class="fc" id="L77">                    return c;</span>
+                }
+            }
+        }
+<span class="fc" id="L81">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Transition copy(boolean reverse) {
+<span class="fc" id="L88">        MorphTransition m = create(duration);</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (reverse) {</span>
+<span class="fc bfc" id="L90" title="All 2 branches covered.">            for (Map.Entry&lt;String, String&gt; entry : fromTo.entrySet()) {</span>
+<span class="fc" id="L91">                m.fromTo.put(entry.getValue(), entry.getKey());</span>
+<span class="fc" id="L92">            }</span>
+        } else {
+<span class="nc" id="L94">            m.fromTo.putAll(fromTo);</span>
+        }
+<span class="fc" id="L96">        return m;</span>
+    }
+
+    /**
+     * Morphs the component with the given source name in the source container hierarchy
+     * to the component with the same name in the destination hierarchy
+     *
+     * @param cmp the compoennt name
+     * @return this so morph operations can be chained as MorphTransition t = MorphTransition.create(300).morph(&quot;a&quot;).(&quot;c&quot;);
+     */
+    public MorphTransition morph(String cmp) {
+<span class="fc" id="L107">        fromTo.put(cmp, cmp);</span>
+<span class="fc" id="L108">        return this;</span>
+    }
+
+    /**
+     * Morphs the component with the given source name in the source container hierarchy
+     * to the component with the given name in the destination hierarchy
+     *
+     * @param source
+     * @param to
+     * @return this so morph operations can be chained as MorphTransition t = MorphTransition.create(300).morph(&quot;a&quot;, &quot;b&quot;).(&quot;c&quot;, &quot;d&quot;);
+     */
+    public MorphTransition morph(String source, String to) {
+<span class="fc" id="L120">        fromTo.put(source, to);</span>
+<span class="fc" id="L121">        return this;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public final void initTransition() {
+<span class="fc" id="L128">        animationMotion = Motion.createEaseInOutMotion(0, 255, duration);</span>
+<span class="fc" id="L129">        animationMotion.start();</span>
+<span class="fc" id="L130">        Container s = (Container) getSource();</span>
+<span class="fc" id="L131">        Container d = (Container) getDestination();</span>
+
+<span class="fc" id="L133">        int size = fromTo.size();</span>
+<span class="fc" id="L134">        fromToComponents = new CC[size];</span>
+<span class="fc" id="L135">        Form destForm = d.getComponentForm();</span>
+<span class="fc" id="L136">        destForm.forceRevalidate();</span>
+<span class="fc" id="L137">        Form sourceForm = s.getComponentForm();</span>
+<span class="fc" id="L138">        int index = 0;</span>
+<span class="fc bfc" id="L139" title="All 2 branches covered.">        for (Map.Entry&lt;String, String&gt; entry : fromTo.entrySet()) {</span>
+<span class="fc" id="L140">            String k = entry.getKey();</span>
+<span class="fc" id="L141">            String v = entry.getValue();</span>
+<span class="fc" id="L142">            Component sourceCmp = findByName(s, k);</span>
+<span class="fc" id="L143">            Component destCmp = findByName(d, v);</span>
+<span class="pc bpc" id="L144" title="2 of 4 branches missed.">            if (sourceCmp == null || destCmp == null) {</span>
+<span class="nc" id="L145">                continue;</span>
+            }
+<span class="fc" id="L147">            CC cc = new CC(sourceCmp, destCmp, sourceForm, destForm);</span>
+<span class="fc" id="L148">            fromToComponents[index] = cc;</span>
+<span class="fc" id="L149">            index++;</span>
+<span class="fc" id="L150">            cc.placeholderDest = new Label();</span>
+<span class="fc" id="L151">            cc.placeholderDest.setVisible(false);</span>
+<span class="fc" id="L152">            Container destParent = cc.dest.getParent();</span>
+<span class="fc" id="L153">            cc.placeholderDest.setX(cc.dest.getX());</span>
+<span class="fc" id="L154">            cc.placeholderDest.setY(cc.dest.getY() - destForm.getContentPane().getY());</span>
+<span class="fc" id="L155">            cc.placeholderDest.setWidth(cc.dest.getWidth());</span>
+<span class="fc" id="L156">            cc.placeholderDest.setHeight(cc.dest.getHeight());</span>
+<span class="fc" id="L157">            cc.placeholderDest.setPreferredSize(new Dimension(cc.dest.getWidth(), cc.dest.getHeight()));</span>
+<span class="fc" id="L158">            destParent.replace(cc.dest, cc.placeholderDest, null);</span>
+<span class="fc" id="L159">            destForm.getLayeredPane().addComponent(cc.dest);</span>
+
+<span class="fc" id="L161">            cc.placeholderSrc = new Label();</span>
+<span class="fc" id="L162">            cc.placeholderSrc.setVisible(false);</span>
+<span class="fc" id="L163">            cc.placeholderSrc.setX(cc.source.getX());</span>
+<span class="fc" id="L164">            cc.placeholderSrc.setY(cc.source.getY() - sourceForm.getContentPane().getY());</span>
+<span class="fc" id="L165">            cc.placeholderSrc.setWidth(cc.source.getWidth());</span>
+<span class="fc" id="L166">            cc.placeholderSrc.setHeight(cc.source.getHeight());</span>
+<span class="fc" id="L167">            cc.placeholderSrc.setPreferredSize(new Dimension(cc.source.getWidth(), cc.source.getHeight()));</span>
+
+<span class="fc" id="L169">            cc.originalContainer = cc.source.getParent();</span>
+<span class="fc" id="L170">            cc.originalConstraint = cc.originalContainer.getLayout().getComponentConstraint(cc.source);</span>
+<span class="fc" id="L171">            cc.originalOffset = cc.originalContainer.getComponentIndex(cc.source);</span>
+<span class="fc" id="L172">            cc.originalContainer.replace(cc.source, cc.placeholderSrc, null);</span>
+<span class="fc" id="L173">            cc.originalContainer.getComponentForm().getLayeredPane().addComponent(cc.source);</span>
+<span class="fc" id="L174">        }</span>
+<span class="fc" id="L175">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean animate() {
+<span class="fc bfc" id="L181" title="All 2 branches covered.">        if (!finished) {</span>
+            // animate one last time
+<span class="fc bfc" id="L183" title="All 2 branches covered.">            if (animationMotion.isFinished()) {</span>
+<span class="fc" id="L184">                finished = true;</span>
+
+                // restore forms to orignial states
+<span class="fc bfc" id="L187" title="All 2 branches covered.">                for (CC c : fromToComponents) {</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">                    if (c == null) {</span>
+<span class="nc" id="L189">                        continue;</span>
+                    }
+<span class="fc" id="L191">                    Container p = c.placeholderDest.getParent();</span>
+<span class="fc" id="L192">                    c.dest.getParent().removeComponent(c.dest);</span>
+<span class="fc" id="L193">                    p.replace(c.placeholderDest, c.dest, null);</span>
+
+<span class="fc" id="L195">                    p = c.placeholderSrc.getParent();</span>
+<span class="fc" id="L196">                    c.source.getParent().removeComponent(c.source);</span>
+<span class="fc" id="L197">                    p.replace(c.placeholderSrc, c.source, null);</span>
+                }
+
+                // remove potential memory leak
+<span class="fc" id="L201">                fromToComponents = null;</span>
+
+<span class="fc" id="L203">                return true;</span>
+            }
+<span class="fc bfc" id="L205" title="All 2 branches covered.">            for (CC c : fromToComponents) {</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">                if (c == null) {</span>
+<span class="nc" id="L207">                    continue;</span>
+                }
+<span class="fc" id="L209">                int x = c.xMotion.getValue();</span>
+<span class="fc" id="L210">                int y = c.yMotion.getValue();</span>
+<span class="fc" id="L211">                int w = c.wMotion.getValue();</span>
+<span class="fc" id="L212">                int h = c.hMotion.getValue();</span>
+<span class="fc" id="L213">                c.source.setX(x);</span>
+<span class="fc" id="L214">                c.source.setY(y);</span>
+<span class="fc" id="L215">                c.source.setWidth(w);</span>
+<span class="fc" id="L216">                c.source.setHeight(h);</span>
+<span class="fc" id="L217">                c.dest.setX(x);</span>
+<span class="fc" id="L218">                c.dest.setY(y);</span>
+<span class="fc" id="L219">                c.dest.setWidth(w);</span>
+<span class="fc" id="L220">                c.dest.setHeight(h);</span>
+            }
+
+<span class="fc" id="L223">            return true;</span>
+        }
+
+<span class="fc" id="L226">        return false;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void paint(Graphics g) {
+<span class="nc" id="L233">        int oldAlpha = g.getAlpha();</span>
+<span class="nc" id="L234">        int alpha = animationMotion.getValue();</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        if (alpha &lt; 255) {</span>
+<span class="nc" id="L236">            g.setAlpha(255 - alpha);</span>
+<span class="nc" id="L237">            getSource().paintComponent(g);</span>
+
+<span class="nc" id="L239">            g.setAlpha(alpha);</span>
+<span class="nc" id="L240">            byte bgT = getDestination().getUnselectedStyle().getBgTransparency();</span>
+<span class="nc" id="L241">            getDestination().getUnselectedStyle().setBgTransparency(0);</span>
+<span class="nc" id="L242">            getDestination().paintComponent(g, false);</span>
+<span class="nc" id="L243">            getDestination().getUnselectedStyle().setBgTransparency(bgT);</span>
+<span class="nc" id="L244">            g.setAlpha(oldAlpha);</span>
+<span class="nc" id="L245">        } else {</span>
+<span class="nc" id="L246">            getDestination().paintComponent(g);</span>
+        }
+<span class="nc" id="L248">    }</span>
+
+    class CC {
+        Component source;
+        Component dest;
+        Label placeholderSrc;
+        Label placeholderDest;
+        Motion xMotion;
+        Motion yMotion;
+        Motion wMotion;
+        Motion hMotion;
+        Object originalConstraint;
+        Container originalContainer;
+        int originalOffset;
+<span class="fc" id="L262">        public CC(Component source, Component dest, Form sourceForm, Form destForm) {</span>
+<span class="fc" id="L263">            this.source = source;</span>
+<span class="fc" id="L264">            this.dest = dest;</span>
+<span class="fc" id="L265">            xMotion = Motion.createEaseInOutMotion(positionRelativeToScreen(source, false), positionRelativeToScreen(dest, false), duration);</span>
+<span class="fc" id="L266">            xMotion.start();</span>
+<span class="fc" id="L267">            yMotion = Motion.createEaseInOutMotion(positionRelativeToScreen(source, true), positionRelativeToScreen(dest, true), duration);</span>
+<span class="fc" id="L268">            yMotion.start();</span>
+<span class="fc" id="L269">            hMotion = Motion.createEaseInOutMotion(source.getHeight(), dest.getHeight(), duration);</span>
+<span class="fc" id="L270">            hMotion.start();</span>
+<span class="fc" id="L271">            wMotion = Motion.createEaseInOutMotion(source.getWidth(), dest.getWidth(), duration);</span>
+<span class="fc" id="L272">            wMotion.start();</span>
+<span class="fc" id="L273">        }</span>
+
+        private int positionRelativeToScreen(Component cmp, boolean yAxis) {
+<span class="fc" id="L276">            int retVal = 0;</span>
+<span class="fc bfc" id="L277" title="All 2 branches covered.">            if (yAxis) {</span>
+<span class="fc" id="L278">                int titleHeight = cmp.getComponentForm().getContentPane().getAbsoluteY();</span>
+<span class="fc" id="L279">                retVal = cmp.getAbsoluteY() - titleHeight;</span>
+<span class="fc" id="L280">            } else {</span>
+<span class="fc" id="L281">                retVal = cmp.getAbsoluteX();</span>
+            }
+
+<span class="fc" id="L284">            return retVal;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

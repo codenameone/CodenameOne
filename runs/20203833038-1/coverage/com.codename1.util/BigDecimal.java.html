@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BigDecimal.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">BigDecimal.java</span></div><h1>BigDecimal.java</h1><pre class="source lang-java linenums">/*
+ *  This code originates from the bouncy castle library and didn't have a copyright header
+ */
+
+package com.codename1.util;
+
+/**
+ * Class representing a simple version of a big decimal. A
+ * &lt;code&gt;BigDecimal&lt;/code&gt; is basically a
+ * {@link java.math.BigInteger BigInteger} with a few digits on the right of
+ * the decimal point. The number of (binary) digits on the right of the decimal
+ * point is called the &lt;code&gt;scale&lt;/code&gt; of the &lt;code&gt;BigDecimal&lt;/code&gt;.
+ * Unlike in {@link java.math.BigDecimal BigDecimal}, the scale is not adjusted
+ * automatically, but must be set manually. All &lt;code&gt;BigDecimal&lt;/code&gt;s
+ * taking part in the same arithmetic operation must have equal scale. The
+ * result of a multiplication of two &lt;code&gt;BigDecimal&lt;/code&gt;s returns a
+ * &lt;code&gt;BigDecimal&lt;/code&gt; with double scale.
+ */
+public class BigDecimal {
+<span class="fc" id="L20">    private static final BigInteger ZERO = BigInteger.valueOf(0);</span>
+<span class="fc" id="L21">    private static final BigInteger ONE = BigInteger.valueOf(1);</span>
+
+    //private final BigInteger bigInt;
+    //private final int scale;
+
+    TBigDecimal peer;
+
+    /**
+     * Constructor for &lt;code&gt;BigDecimal&lt;/code&gt;. The value of the
+     * constructed &lt;code&gt;BigDecimal&lt;/code&gt; equals &lt;code&gt;bigInt /
+     * 10&lt;sup&gt;scale&lt;/sup&gt;&lt;/code&gt;.
+     *
+     * @param bigInt The &lt;code&gt;bigInt&lt;/code&gt; value parameter.
+     * @param scale  The scale of the constructed &lt;code&gt;BigDecimal&lt;/code&gt;.
+     */
+<span class="fc" id="L36">    public BigDecimal(BigInteger bigInt, int scale) {</span>
+<span class="fc" id="L37">        peer = new TBigDecimal(bigInt.peer, scale);</span>
+<span class="fc" id="L38">    }</span>
+
+<span class="nc" id="L40">    private BigDecimal(BigDecimal limBigDec) {</span>
+<span class="nc" id="L41">        peer = new TBigDecimal(limBigDec.toString());</span>
+<span class="nc" id="L42">    }</span>
+
+<span class="fc" id="L44">    private BigDecimal(TBigDecimal peer) {</span>
+<span class="fc" id="L45">        this.peer = peer;</span>
+<span class="fc" id="L46">    }</span>
+
+    /**
+     * Returns a &lt;code&gt;BigDecimal&lt;/code&gt; with value &lt;code&gt;value / 2&lt;sup&gt;scale&lt;/sup&gt; / 10&lt;sup&gt;scale&lt;/sup&gt;&lt;/code&gt;
+     *
+     * @param value The value of the &lt;code&gt;BigDecimal&lt;/code&gt; to be
+     *              created.
+     * @param scale The scale of the &lt;code&gt;BigDecimal&lt;/code&gt; to be
+     *              created.
+     * @return The such created &lt;code&gt;BigDecimal&lt;/code&gt;.
+     * @deprecated This method is not part of the JDK's &lt;code&gt;BigDecimal&lt;/code&gt; class and its presence is historical,
+     * as the first implementation of Codename One's BigDecimal class was ported from BouncyCastle, which is different
+     * than the JDK's BigDecimal class in that is optimizes binary arithmetic. The implementation of this method
+     * is counter-intuitive since it performs a bitwise left shift on &lt;code&gt;value&lt;/code&gt; before scaling it.  Use {@link #BigDecimal(com.codename1.util.BigInteger, int) }
+     * instead if you just want to convert a &lt;code&gt;BigInteger&lt;/code&gt; into a &lt;code&gt;BigDecimal&lt;/code&gt;.  &lt;strong&gt;Do not rely on this method
+     * as it will be removed in a future version of Codename One.&lt;/strong&gt;.
+     */
+    public static BigDecimal getInstance(BigInteger value, int scale) {
+<span class="nc" id="L64">        return new BigDecimal(value.shiftLeft(scale), scale);</span>
+    }
+
+    public BigDecimal adjustScale(int newScale) {
+<span class="fc" id="L68">        return new BigDecimal(peer.setScale(newScale));</span>
+    }
+
+    public BigDecimal add(BigDecimal b) {
+<span class="fc" id="L72">        return new BigDecimal(peer.add(b.peer));</span>
+    }
+
+    public BigDecimal add(BigInteger b) {
+<span class="nc" id="L76">        return new BigDecimal(peer.add(new TBigDecimal(b.peer, 0)));</span>
+    }
+
+    public BigDecimal negate() {
+<span class="fc" id="L80">        return new BigDecimal(peer.negate());</span>
+    }
+
+    public BigDecimal subtract(BigDecimal b) {
+<span class="nc" id="L84">        return new BigDecimal(peer.subtract(b.peer));</span>
+    }
+
+    public BigDecimal subtract(BigInteger b) {
+<span class="fc" id="L88">        return new BigDecimal(peer.subtract(new TBigDecimal(b.peer, 0)));</span>
+    }
+
+    public BigDecimal multiply(BigDecimal b) {
+<span class="nc" id="L92">        return new BigDecimal(peer.multiply(b.peer));</span>
+    }
+
+    public BigDecimal multiply(BigInteger b) {
+<span class="fc" id="L96">        return new BigDecimal(peer.multiply(new TBigDecimal(b.peer, 0)));</span>
+    }
+
+    public BigDecimal divide(BigDecimal b) {
+<span class="nc" id="L100">        return new BigDecimal(peer.divide(b.peer));</span>
+    }
+
+    public BigDecimal divide(BigInteger b) {
+<span class="fc" id="L104">        return new BigDecimal(peer.divide(new TBigDecimal(b.peer, 0)));</span>
+    }
+
+    public BigDecimal shiftLeft(int n) {
+<span class="nc" id="L108">        throw new RuntimeException(&quot;Not implemented yet&quot;);</span>
+    }
+
+    public int compareTo(BigDecimal val) {
+<span class="fc" id="L112">        return peer.compareTo(val.peer);</span>
+    }
+
+    public int compareTo(BigInteger val) {
+<span class="nc" id="L116">        return peer.compareTo(new TBigDecimal(val.peer, 0));</span>
+    }
+
+    public BigInteger floor() {
+<span class="fc" id="L120">        BigInteger out = new BigInteger(peer.toBigInteger());</span>
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (peer.signum() &lt; 0) {</span>
+<span class="nc" id="L122">            return out.subtract(new BigInteger(&quot;1&quot;, 0));</span>
+        }
+<span class="fc" id="L124">        return out;</span>
+    }
+
+    public BigInteger round() {
+<span class="fc" id="L128">        BigInteger out = new BigInteger(peer.toBigInteger());</span>
+<span class="fc" id="L129">        BigDecimal outD = new BigDecimal(out, 0);</span>
+
+<span class="pc bpc" id="L131" title="1 of 2 branches missed.">        BigInteger next = peer.signum() &lt; 0 ? out.subtract(BigInteger.ONE) : out.add(BigInteger.ONE);</span>
+<span class="fc" id="L132">        BigDecimal nextD = new BigDecimal(next, 0);</span>
+
+<span class="fc" id="L134">        BigDecimal diffThis = new BigDecimal(outD.peer.abs().subtract(peer.abs()).abs());</span>
+<span class="fc" id="L135">        BigDecimal diffNext = new BigDecimal(outD.peer.abs().subtract(nextD.peer.abs()).abs());</span>
+
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        return diffThis.compareTo(diffNext) &gt; 0 ? out : next;</span>
+
+    }
+
+    public int intValue() {
+<span class="fc" id="L142">        return floor().intValue();</span>
+    }
+
+    public long longValue() {
+<span class="fc" id="L146">        return floor().longValue();</span>
+    }
+
+    /* NON-J2ME compliant.
+public double doubleValue()
+{
+  return Double.valueOf(toString()).doubleValue();
+}
+
+public float floatValue()
+{
+  return Float.valueOf(toString()).floatValue();
+}
+ */
+    public int getScale() {
+<span class="fc" id="L161">        return peer.scale();</span>
+    }
+
+    public String toString() {
+<span class="fc" id="L165">        return peer.toString();</span>
+    }
+
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        if (this == o) {</span>
+<span class="nc" id="L170">            return true;</span>
+        }
+
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        if (!(o instanceof BigDecimal)) {</span>
+<span class="nc" id="L174">            return false;</span>
+        }
+
+<span class="nc" id="L177">        BigDecimal other = (BigDecimal) o;</span>
+<span class="nc" id="L178">        return peer.equals(other.peer);</span>
+    }
+
+    public int hashCode() {
+<span class="nc" id="L182">        return peer.hashCode();</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

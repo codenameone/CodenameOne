@@ -1,0 +1,399 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FilterProxyListModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.list</a> &gt; <span class="el_source">FilterProxyListModel.java</span></div><h1>FilterProxyListModel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.list;
+
+import com.codename1.ui.List;
+import com.codename1.ui.TextField;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.events.SelectionListener;
+
+import java.util.ArrayList;
+import java.util.Map;
+
+/**
+ * This class allows filtering/sorting a list model dynamically using a text field
+ *
+ * @author Shai Almog
+ */
+public class FilterProxyListModel&lt;T&gt; implements ListModel&lt;T&gt;, DataChangedListener {
+    private final ListModel&lt;T&gt; underlying;
+    private ArrayList&lt;Integer&gt; filter;
+<span class="fc" id="L41">    private final ArrayList&lt;DataChangedListener&gt; listeners = new ArrayList&lt;DataChangedListener&gt;();</span>
+    private boolean startsWithMode;
+
+    /**
+     * The proxy is applied to the actual model and effectively hides it
+     *
+     * @param underlying the &quot;real&quot; model for the list
+     */
+<span class="fc" id="L49">    public FilterProxyListModel(ListModel&lt;T&gt; underlying) {</span>
+<span class="fc" id="L50">        this.underlying = underlying;</span>
+<span class="fc" id="L51">        underlying.addDataChangedListener(this);</span>
+<span class="fc" id="L52">    }</span>
+
+    /**
+     * Installs a search field on a list making sure the filter method is invoked properly
+     */
+    public static void install(final TextField search, final List l) {
+<span class="fc" id="L58">        search.addDataChangedListener(new DataChangedListener() {</span>
+            public void dataChanged(int type, int index) {
+                FilterProxyListModel f;
+<span class="nc bnc" id="L61" title="All 2 branches missed.">                if (l.getModel() instanceof FilterProxyListModel) {</span>
+<span class="nc" id="L62">                    f = (FilterProxyListModel) l.getModel();</span>
+                } else {
+<span class="nc bnc" id="L64" title="All 2 branches missed.">                    if (search.getText().length() == 0) {</span>
+<span class="nc" id="L65">                        return;</span>
+                    }
+<span class="nc" id="L67">                    f = new FilterProxyListModel(l.getModel());</span>
+<span class="nc" id="L68">                    l.setModel(f);</span>
+                }
+<span class="nc bnc" id="L70" title="All 2 branches missed.">                if (search.getText().length() == 0) {</span>
+<span class="nc" id="L71">                    l.setModel(f.getUnderlying());</span>
+                } else {
+<span class="nc" id="L73">                    f.filter(search.getText());</span>
+                }
+<span class="nc" id="L75">            }</span>
+        });
+<span class="fc" id="L77">    }</span>
+
+    /**
+     * Installs a search field on a list making sure the filter method is invoked properly
+     */
+    public static void install(final TextField search, final ContainerList l) {
+<span class="nc" id="L83">        search.addDataChangedListener(new DataChangedListener() {</span>
+            public void dataChanged(int type, int index) {
+                FilterProxyListModel f;
+<span class="nc bnc" id="L86" title="All 2 branches missed.">                if (l.getModel() instanceof FilterProxyListModel) {</span>
+<span class="nc" id="L87">                    f = (FilterProxyListModel) l.getModel();</span>
+                } else {
+<span class="nc bnc" id="L89" title="All 2 branches missed.">                    if (search.getText().length() == 0) {</span>
+<span class="nc" id="L90">                        return;</span>
+                    }
+<span class="nc" id="L92">                    f = new FilterProxyListModel(l.getModel());</span>
+<span class="nc" id="L93">                    l.setModel(f);</span>
+                }
+<span class="nc bnc" id="L95" title="All 2 branches missed.">                if (search.getText().length() == 0) {</span>
+<span class="nc" id="L96">                    l.setModel(f.getUnderlying());</span>
+                } else {
+<span class="nc" id="L98">                    f.filter(search.getText());</span>
+                }
+<span class="nc" id="L100">            }</span>
+        });
+<span class="nc" id="L102">    }</span>
+
+    private int getFilterOffset(int index) {
+<span class="fc bfc" id="L105" title="All 2 branches covered.">        if (filter == null) {</span>
+<span class="fc" id="L106">            return index;</span>
+        }
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (filter.size() &gt; index) {</span>
+<span class="fc" id="L109">            return filter.get(index).intValue();</span>
+        }
+<span class="fc" id="L111">        return -1;</span>
+    }
+
+    /**
+     * This method performs a sort of the list, to determine the sort order this class should be derived
+     * and the compare() method should be overriden
+     *
+     * @param ascending sort in ascending order
+     */
+    public void sort(boolean ascending) {
+<span class="pc bpc" id="L121" title="1 of 2 branches missed.">        if (filter == null) {</span>
+<span class="fc" id="L122">            filterImpl(&quot;&quot;);</span>
+        }
+<span class="fc" id="L124">        Integer[] filterArray = new Integer[filter.size()];</span>
+<span class="fc" id="L125">        Integer[] tempArray = new Integer[filter.size()];</span>
+<span class="fc bfc" id="L126" title="All 2 branches covered.">        for (int iter = 0; iter &lt; filter.size(); iter++) {</span>
+<span class="fc" id="L127">            filterArray[iter] = filter.get(iter);</span>
+        }
+<span class="fc" id="L129">        System.arraycopy(filterArray, 0, tempArray, 0, filterArray.length);</span>
+<span class="fc" id="L130">        mergeSort(filterArray, tempArray, 0, filterArray.length, 0, ascending);</span>
+
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        for (int iter = 0; iter &lt; filter.size(); iter++) {</span>
+<span class="fc" id="L133">            filter.set(iter, tempArray[iter]);</span>
+        }
+<span class="fc" id="L135">        dataChanged(DataChangedListener.CHANGED, -1);</span>
+<span class="fc" id="L136">    }</span>
+
+    private int compareObj(Object a, Object b, boolean ascending) {
+<span class="fc" id="L139">        return compare(underlying.getItemAt(((Integer) a).intValue()),</span>
+<span class="fc" id="L140">                underlying.getItemAt(((Integer) b).intValue()), ascending);</span>
+    }
+
+    /**
+     * This method can be overriden by subclasses to allow sorting arbitrary objects within
+     * the list, it follows the traditional contract of the compare method in Java
+     *
+     * @param a         first object
+     * @param b         second object
+     * @param ascending direction of sort
+     * @return 1, 0 or -1 to indicate the larger/smaller object
+     */
+    protected int compare(Object a, Object b, boolean ascending) {
+
+        String s1;
+        String s2;
+<span class="pc bpc" id="L156" title="1 of 2 branches missed.">        if (a instanceof String) {</span>
+<span class="fc" id="L157">            s1 = (String) a;</span>
+<span class="fc" id="L158">            s2 = (String) b;</span>
+        } else {
+<span class="nc" id="L160">            s1 = (String) ((Map) a).get(&quot;name&quot;);</span>
+<span class="nc" id="L161">            s2 = (String) ((Map) b).get(&quot;name&quot;);</span>
+        }
+<span class="fc" id="L163">        s1 = s1.toUpperCase();</span>
+<span class="fc" id="L164">        s2 = s2.toUpperCase();</span>
+
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        if (ascending) {</span>
+<span class="fc" id="L167">            return s1.compareTo(s2);</span>
+        } else {
+<span class="nc" id="L169">            return -s1.compareTo(s2);</span>
+        }
+    }
+
+    private void swap(Object[] dest, int offset1, int offset2) {
+<span class="fc" id="L174">        Object val1 = dest[offset1];</span>
+<span class="fc" id="L175">        Object val2 = dest[offset2];</span>
+<span class="fc" id="L176">        dest[offset2] = val1;</span>
+<span class="fc" id="L177">        dest[offset1] = val2;</span>
+<span class="fc" id="L178">    }</span>
+
+    private void mergeSort(Object[] src,
+                           Object[] dest,
+                           int low,
+                           int high,
+                           int off, boolean ascending) {
+<span class="fc" id="L185">        int length = high - low;</span>
+
+        // Insertion sort on smallest arrays
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">        if (length &lt; 7) {</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            for (int i = low; i &lt; high; i++)</span>
+<span class="fc bfc" id="L190" title="All 2 branches covered.">                for (int j = i; j &gt; low &amp;&amp;</span>
+<span class="fc bfc" id="L191" title="All 2 branches covered.">                        compareObj(dest[j - 1], dest[j], ascending) &gt; 0; j--)</span>
+<span class="fc" id="L192">                    swap(dest, j, j - 1);</span>
+<span class="fc" id="L193">            return;</span>
+        }
+
+        // Recursively sort halves of dest into src
+<span class="nc" id="L197">        int destLow = low;</span>
+<span class="nc" id="L198">        int destHigh = high;</span>
+<span class="nc" id="L199">        low += off;</span>
+<span class="nc" id="L200">        high += off;</span>
+<span class="nc" id="L201">        int mid = (low + high) / 2;</span>
+<span class="nc" id="L202">        mergeSort(dest, src, low, mid, -off, ascending);</span>
+<span class="nc" id="L203">        mergeSort(dest, src, mid, high, -off, ascending);</span>
+
+        // If list is already sorted, just copy from src to dest.  This is an
+        // optimization that results in faster sorts for nearly ordered lists.
+<span class="nc bnc" id="L207" title="All 2 branches missed.">        if (compareObj(src[mid - 1], src[mid], ascending) &lt;= 0) {</span>
+<span class="nc" id="L208">            System.arraycopy(src, low, dest, destLow, length);</span>
+<span class="nc" id="L209">            return;</span>
+        }
+
+        // Merge sorted halves (now in src) into dest
+<span class="nc bnc" id="L213" title="All 2 branches missed.">        for (int i = destLow, p = low, q = mid; i &lt; destHigh; i++) {</span>
+<span class="nc bnc" id="L214" title="All 6 branches missed.">            if (q &gt;= high || p &lt; mid &amp;&amp; compareObj(src[p], src[q], ascending) &lt;= 0)</span>
+<span class="nc" id="L215">                dest[i] = src[p++];</span>
+            else
+<span class="nc" id="L217">                dest[i] = src[q++];</span>
+        }
+<span class="nc" id="L219">    }</span>
+
+    private int getUnderlyingOffset(int index) {
+<span class="fc bfc" id="L222" title="All 2 branches covered.">        if (filter == null) {</span>
+<span class="fc" id="L223">            return index;</span>
+        }
+<span class="fc" id="L225">        return filter.indexOf(Integer.valueOf(index));</span>
+    }
+
+    /**
+     * Returns the underlying model which is needed to perform mutations on the list.
+     *
+     * @return the underlying model
+     */
+    public ListModel getUnderlying() {
+<span class="fc" id="L234">        return underlying;</span>
+    }
+
+    private void filterImpl(String str) {
+<span class="fc" id="L238">        filter = new ArrayList&lt;Integer&gt;();</span>
+<span class="fc" id="L239">        str = str.toUpperCase();</span>
+<span class="fc bfc" id="L240" title="All 2 branches covered.">        for (int iter = 0; iter &lt; underlying.getSize(); iter++) {</span>
+<span class="fc" id="L241">            Object o = underlying.getItemAt(iter);</span>
+<span class="pc bpc" id="L242" title="1 of 2 branches missed.">            if (o != null) {</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">                if (check(o, str)) {</span>
+<span class="fc" id="L244">                    filter.add(Integer.valueOf(iter));</span>
+                }
+            }
+        }
+<span class="fc" id="L248">    }</span>
+
+    /**
+     * Checks whether the filter condition is matched, receives an uppercase version of the
+     * filter string to match against
+     *
+     * @param o   the object being compared
+     * @param str the string
+     * @return true if match is checked
+     */
+    protected boolean check(Object o, String str) {
+<span class="pc bpc" id="L259" title="1 of 2 branches missed.">        if (o instanceof Map) {</span>
+<span class="nc" id="L260">            Map h = (Map) o;</span>
+<span class="nc" id="L261">            return comp(h.get(&quot;name&quot;), str);</span>
+        } else {
+<span class="fc" id="L263">            String element = o.toString();</span>
+<span class="fc bfc" id="L264" title="All 2 branches covered.">            if (startsWithMode) {</span>
+<span class="fc" id="L265">                return element.toUpperCase().startsWith(str);</span>
+            } else {
+<span class="fc bfc" id="L267" title="All 2 branches covered.">                return element.toUpperCase().indexOf(str) &gt; -1;</span>
+            }
+        }
+    }
+
+    private boolean comp(Object val, String str) {
+<span class="nc bnc" id="L273" title="All 2 branches missed.">        if (startsWithMode) {</span>
+<span class="nc bnc" id="L274" title="All 4 branches missed.">            return val != null &amp;&amp; ((String) val).toUpperCase().startsWith(str);</span>
+        }
+<span class="nc bnc" id="L276" title="All 4 branches missed.">        return val != null &amp;&amp; ((String) val).toUpperCase().indexOf(str) &gt; -1;</span>
+    }
+
+    /**
+     * Filters the list based on the given string
+     *
+     * @param str the string to filter the list by
+     */
+    public void filter(String str) {
+<span class="fc" id="L285">        filterImpl(str);</span>
+<span class="fc" id="L286">        dataChanged(DataChangedListener.CHANGED, -1);</span>
+<span class="fc" id="L287">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public T getItemAt(int index) {
+<span class="fc" id="L293">        return underlying.getItemAt(getFilterOffset(index));</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getSize() {
+<span class="fc bfc" id="L300" title="All 2 branches covered.">        if (filter == null) {</span>
+<span class="fc" id="L301">            return underlying.getSize();</span>
+        }
+<span class="fc" id="L303">        return filter.size();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getSelectedIndex() {
+<span class="fc" id="L310">        return Math.max(0, getUnderlyingOffset(underlying.getSelectedIndex()));</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setSelectedIndex(int index) {
+<span class="pc bpc" id="L317" title="1 of 2 branches missed.">        if (index &lt; 0) {</span>
+<span class="nc" id="L318">            underlying.setSelectedIndex(index);</span>
+        } else {
+<span class="fc" id="L320">            underlying.setSelectedIndex(getFilterOffset(index));</span>
+        }
+<span class="fc" id="L322">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addDataChangedListener(DataChangedListener l) {
+<span class="fc" id="L328">        listeners.add(l);</span>
+<span class="fc" id="L329">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void removeDataChangedListener(DataChangedListener l) {
+<span class="fc" id="L335">        listeners.remove(l);</span>
+<span class="fc" id="L336">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addSelectionListener(SelectionListener l) {
+<span class="fc" id="L342">        underlying.addSelectionListener(l);</span>
+<span class="fc" id="L343">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void removeSelectionListener(SelectionListener l) {
+<span class="fc" id="L349">        underlying.removeSelectionListener(l);</span>
+<span class="fc" id="L350">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addItem(T item) {
+<span class="nc" id="L356">        underlying.addItem(item);</span>
+<span class="nc" id="L357">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void removeItem(int index) {
+<span class="nc" id="L363">        underlying.removeItem(getFilterOffset(index));</span>
+<span class="nc" id="L364">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void dataChanged(int type, int index) {
+<span class="fc bfc" id="L370" title="All 2 branches covered.">        if (index &gt; -1) {</span>
+<span class="fc" id="L371">            index = getUnderlyingOffset(index);</span>
+<span class="fc bfc" id="L372" title="All 2 branches covered.">            if (index &lt; 0) {</span>
+<span class="fc" id="L373">                return;</span>
+            }
+        }
+<span class="fc bfc" id="L376" title="All 2 branches covered.">        for (int iter = 0; iter &lt; listeners.size(); iter++) {</span>
+<span class="fc" id="L377">            listeners.get(iter).dataChanged(type, index);</span>
+        }
+<span class="fc" id="L379">    }</span>
+
+    /**
+     * When enabled this makes the filter check that the string starts with rather than within the index
+     *
+     * @return the startsWithMode
+     */
+    public boolean isStartsWithMode() {
+<span class="nc" id="L387">        return startsWithMode;</span>
+    }
+
+    /**
+     * When enabled this makes the filter check that the string starts with rather than within the index
+     *
+     * @param startsWithMode the startsWithMode to set
+     */
+    public void setStartsWithMode(boolean startsWithMode) {
+<span class="fc" id="L396">        this.startsWithMode = startsWithMode;</span>
+<span class="fc" id="L397">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
