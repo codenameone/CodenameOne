@@ -36,24 +36,46 @@ final class Cn1ssDeviceRunnerHelper {
         if (current == null) {
             println("CN1SS:ERR:test=" + safeName + " message=Current form is null");
             println("CN1SS:END:" + safeName);
+            return;
         }
         int width = Math.max(1, current.getWidth());
         int height = Math.max(1, current.getHeight());
         Image[] img = new Image[1];
         Display.getInstance().screenshot(screen -> img[0] = screen);
+
+        // Wait for screenshot with timeout, but do NOT block EDT indefinitely if we are already on EDT
         long time = System.currentTimeMillis();
-        Display.getInstance().invokeAndBlock(() -> {
-            while(img[0] == null) {
-                Util.sleep(50);
-                // timeout
-                if (System.currentTimeMillis() - time > 2000) {
-                    return;
+        if (Display.getInstance().isEdt()) {
+            // We are on EDT, we cannot use invokeAndBlock to wait for something that might need EDT to process (screenshot callback)
+            // But Display.screenshot usually calls back on EDT.
+            // If we are on EDT, we can't wait for the callback here because the callback needs EDT to run.
+            // This helper method assumes it can block.
+            // If we are on EDT, we have to spin wait but that freezes UI.
+            // However, Display.invokeAndBlock pumps events.
+            Display.getInstance().invokeAndBlock(() -> {
+                while(img[0] == null) {
+                    Util.sleep(50);
+                    if (System.currentTimeMillis() - time > 5000) {
+                        break;
+                    }
+                }
+            });
+        } else {
+             // Not on EDT, just sleep wait
+             while(img[0] == null) {
+                try {
+                    Thread.sleep(50);
+                } catch (InterruptedException e) {}
+                if (System.currentTimeMillis() - time > 5000) {
+                    break;
                 }
             }
-        });
+        }
+
         if (img[0] == null) {
             println("CN1SS:ERR:test=" + safeName + " message=Screenshot process timed out");
             println("CN1SS:END:" + safeName);
+            return;
         }
         Image screenshot = img[0];
         try {
