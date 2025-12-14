@@ -3983,7 +3983,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         private int errorCode = -1;
         private String errorMessage;
 
-        TestSocket(String host, int port) {
+        public TestSocket(String host, int port) {
             this.host = host;
             this.port = port;
         }

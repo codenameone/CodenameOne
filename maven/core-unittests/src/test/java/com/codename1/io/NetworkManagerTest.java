@@ -195,11 +195,11 @@ class NetworkManagerTest {
         TestCodenameOneImplementation.getInstance().addNetworkMockResponse("http://example.com/async", 200, "OK", new byte[0]);
 
         AsyncResource<ConnectionRequest> res = manager.addToQueueAsync(req);
-        res.onComplete(r -> {
+        res.ready(r -> {
             result.set(r);
             latch.countDown();
         });
-        res.onError(e -> {
+        res.except(e -> {
             error.set(e);
             latch.countDown();
         });

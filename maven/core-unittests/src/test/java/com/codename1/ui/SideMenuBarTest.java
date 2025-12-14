@@ -115,7 +115,7 @@ class SideMenuBarTest extends UITestBase {
         smb.initMenuBar(f);
 
         f.putClientProperty("cn1$sideMenuParent", smb);
-        Display.getInstance().setCurrent(f);
+        Display.getInstance().setCurrent(f, false);
 
         AtomicBoolean executed = new AtomicBoolean(false);
         Command cmd = new Command("Test") {
