@@ -123,6 +123,9 @@ class SideMenuBarTest extends UITestBase {
         smb.initMenuBar(f);
         smb.installMenuBar();
 
+        // Ensure form has a toolbar to prevent NPE in SideMenuBar logic if it checks for one
+        f.setToolbar(new Toolbar());
+
         f.putClientProperty("cn1$sideMenuParent", smb);
         Display.getInstance().setCurrent(f, false);
 
@@ -143,18 +146,10 @@ class SideMenuBarTest extends UITestBase {
         smb.openMenu(null);
         com.codename1.ui.DisplayTest.flushEdt();
 
-        // Workaround for potential bug in SideMenuBar where pointerDragged might be null
-        try {
-            java.lang.reflect.Field pdField = SideMenuBar.class.getDeclaredField("pointerDragged");
-            pdField.setAccessible(true);
-            if (pdField.get(smb) == null) {
-                pdField.set(smb, new ActionListener() {
-                    public void actionPerformed(ActionEvent evt) {}
-                });
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        // The SideMenuBar opens a new Form ('menu'). We need to ensure it has a Toolbar
+        // because CommandWrapper checks Toolbar.isOnTopSideMenu() and accesses getCurrent().getToolbar()
+        // which would otherwise be null and cause NPE.
+        Display.getInstance().getCurrent().setToolbar(new Toolbar());
 
         // Trigger action
         // This should start ShowWaiter
