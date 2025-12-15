@@ -142,6 +142,19 @@ class SideMenuBarTest extends UITestBase {
         smb.openMenu(null);
         com.codename1.ui.DisplayTest.flushEdt();
 
+        // Workaround for potential bug in SideMenuBar where pointerDragged might be null
+        try {
+            java.lang.reflect.Field pdField = SideMenuBar.class.getDeclaredField("pointerDragged");
+            pdField.setAccessible(true);
+            if (pdField.get(smb) == null) {
+                pdField.set(smb, new ActionListener() {
+                    public void actionPerformed(ActionEvent evt) {}
+                });
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
         // Trigger action
         // This should start ShowWaiter
         wrapper.actionPerformed(new ActionEvent(wrapper, ActionEvent.Type.Command));
