@@ -2637,22 +2637,7 @@ BOOL prefersStatusBarHidden = NO;
         }
     }
     //return YES;
-    switch (orientationLock) {
-        case 0:
-            return YES;
-            
-        case 1:
-            if(interfaceOrientation == UIInterfaceOrientationPortrait || interfaceOrientation == UIInterfaceOrientationPortraitUpsideDown) {
-                return YES;
-            }
-            return NO;
-            
-        default:
-            if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationLandscapeRight) {
-                return YES;
-            }
-    }
-    return NO;
+    return YES;
 }
 
 
