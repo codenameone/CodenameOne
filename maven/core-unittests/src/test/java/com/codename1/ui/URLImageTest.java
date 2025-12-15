@@ -4,6 +4,7 @@ import com.codename1.io.NetworkManager;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation;
+import org.junit.jupiter.api.Assertions;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -74,5 +75,33 @@ class URLImageTest extends UITestBase {
             Thread.sleep(200);
         } catch (InterruptedException e) {}
         com.codename1.ui.DisplayTest.flushEdt();
+    }
+
+    @FormTest
+    public void testCachedImage() {
+        EncodedImage placeholder = createPlaceholder();
+        String url = "http://example.com/cached.png";
+
+        // Mock response
+        byte[] data = new byte[] {
+            (byte)0x47, (byte)0x49, (byte)0x46, (byte)0x38, (byte)0x39, (byte)0x61, (byte)0x01, (byte)0x00,
+            (byte)0x01, (byte)0x00, (byte)0x80, (byte)0x00, (byte)0x00, (byte)0xff, (byte)0xff, (byte)0xff,
+            (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x2c, (byte)0x00, (byte)0x00, (byte)0x00, (byte)0x00,
+            (byte)0x01, (byte)0x00, (byte)0x01, (byte)0x00, (byte)0x00, (byte)0x02, (byte)0x02, (byte)0x44,
+            (byte)0x01, (byte)0x00, (byte)0x3b
+        };
+        TestCodenameOneImplementation.getInstance().addNetworkMockResponse(url, 200, "OK", data);
+
+        try {
+            com.codename1.io.FileSystemStorage.getInstance().openOutputStream("cachedKey").write(data);
+            com.codename1.io.FileSystemStorage.getInstance().openOutputStream("cachedKey").close();
+        } catch(java.io.IOException err) {}
+
+        URLImage img = URLImage.createToStorage(placeholder, "cachedKey", url, URLImage.RESIZE_SCALE);
+
+        Assertions.assertNotNull(img.getImage());
+
+        Image buffer = Image.createImage(10, 10);
+        buffer.getGraphics().drawImage(img, 0, 0);
     }
 }

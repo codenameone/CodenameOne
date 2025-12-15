@@ -11,6 +11,34 @@ import org.junit.jupiter.api.Assertions;
 public class GroupLayoutTest extends UITestBase {
 
     @FormTest
+    public void testGapSpring() {
+        Container cnt = new Container();
+        GroupLayout layout = new GroupLayout(cnt);
+        cnt.setLayout(layout);
+
+        Label l1 = new Label("Label 1");
+        Label l2 = new Label("Label 2");
+
+        // Explicit gap
+        layout.setHorizontalGroup(
+            layout.createSequentialGroup()
+                .add(l1)
+                .add(20, 20, 20) // This creates GapSpring
+                .add(l2)
+        );
+
+        layout.setVerticalGroup(
+            layout.createSequentialGroup().add(l1).add(l2)
+        );
+
+        cnt.setWidth(500);
+        cnt.setHeight(100);
+        cnt.layoutContainer();
+
+        Assertions.assertTrue(l2.getX() >= l1.getX() + l1.getWidth() + 20, "Gap should be at least 20");
+    }
+
+    @FormTest
     public void testPaddingSpring() {
         Container cnt = new Container();
         GroupLayout layout = new GroupLayout(cnt);

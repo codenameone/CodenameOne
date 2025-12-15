@@ -69,6 +69,22 @@ public class CSSBorderTest extends UITestBase {
     }
 
     @FormTest
+    public void testLinearGradient() {
+        CSSBorder border = new CSSBorder();
+        border.backgroundImage("linear-gradient(90deg, #ff0000, #0000ff)");
+
+        Assertions.assertTrue(border.toCSSString().contains("linear-gradient"));
+
+        Form f = new Form();
+        Component c = new Component() {};
+        c.setSize(new com.codename1.ui.geom.Dimension(100, 100));
+        c.getStyle().setBorder(border);
+
+        Image buffer = Image.createImage(100, 100);
+        border.paintBorderBackground(buffer.getGraphics(), c);
+    }
+
+    @FormTest
     public void testBoxShadow() {
         CSSBorder border = new CSSBorder();
         border.boxShadow("5px 5px 5px 5px #000000"); // h v blur spread color
