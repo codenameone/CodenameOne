@@ -2686,6 +2686,17 @@ BOOL prefersStatusBarHidden = NO;
     return NO;
 }
 
+- (UIInterfaceOrientationMask)supportedInterfaceOrientations {
+    switch (orientationLock) {
+        case 1:
+            return UIInterfaceOrientationMaskPortrait | UIInterfaceOrientationMaskPortraitUpsideDown;
+        case 2:
+            return UIInterfaceOrientationMaskLandscape;
+        default:
+            return UIInterfaceOrientationMaskAll;
+    }
+}
+
 -(void) viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id)coordinator {
     
     if(editingComponent != nil) {
