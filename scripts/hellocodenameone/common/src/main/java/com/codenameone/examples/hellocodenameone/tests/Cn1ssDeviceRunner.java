@@ -34,8 +34,12 @@ import com.codenameone.examples.hellocodenameone.tests.graphics.TransformRotatio
 import com.codenameone.examples.hellocodenameone.tests.graphics.TransformTranslation;
 import com.codenameone.examples.hellocodenameone.tests.accessibility.AccessibilityTest;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 public final class Cn1ssDeviceRunner extends DeviceRunner {
-    private static final BaseTest[] TEST_CLASSES = new BaseTest[] {
+    private static final List<BaseTest> TEST_CLASSES = new ArrayList<>(Arrays.asList(
             new MainScreenScreenshotTest(),
             new DrawLine(),
             new FillRect(),
@@ -66,8 +70,11 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new MediaPlaybackScreenshotTest(),
             new OrientationLockScreenshotTest(),
             new InPlaceEditViewTest(),
-            new AccessibilityTest()
-    };
+            new AccessibilityTest()));
+
+    public static void addTest(BaseTest test) {
+        TEST_CLASSES.add(0, test);
+    }
 
     public void runSuite() {
         CN.callSerially(() -> {
