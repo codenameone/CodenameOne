@@ -198,7 +198,19 @@ class NetworkManagerTest extends com.codename1.junit.UITestBase {
             latch.countDown();
         });
 
-        waitFor(latch, 5000);
+        // waitFor(latch, 5000); // Uses Thread.sleep which blocks EDT
+        // Custom wait loop pumping EDT
+        long start = System.currentTimeMillis();
+        while (latch.getCount() > 0) {
+            if (System.currentTimeMillis() - start > 5000) {
+                fail("Timed out waiting for async request");
+            }
+            com.codename1.ui.DisplayTest.flushEdt();
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException e) {}
+        }
+
         assertNull(error.get());
         assertSame(req, result.get());
         assertTrue(req.complete);
