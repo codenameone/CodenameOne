@@ -111,6 +111,7 @@ class SideMenuBarTest extends UITestBase {
         // Disable shadow to prevent resource loading error and provide dummy image
         java.util.Hashtable theme = new java.util.Hashtable();
         theme.put("sideMenuShadowBool", Boolean.FALSE);
+        theme.put("@sideMenuShadowBool", "false");
         theme.put("sideMenuShadowImage", Image.createImage(1, 1, 0));
         UIManager.getInstance().addThemeProps(theme);
 
