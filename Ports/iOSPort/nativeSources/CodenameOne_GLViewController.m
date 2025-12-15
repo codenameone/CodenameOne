@@ -2636,7 +2636,10 @@ BOOL prefersStatusBarHidden = NO;
             upsideDownMultiplier = -1;
         }
     }
-    //return YES;
+    // We return YES here to allow the system to check supportedInterfaceOrientations.
+    // If we return NO, the system will not attempt to rotate, even if the current orientation
+    // is not supported by the mask (which effectively prevents programmatic rotation).
+    // The supportedInterfaceOrientations method will ensure the app stays locked if needed.
     return YES;
 }
 
