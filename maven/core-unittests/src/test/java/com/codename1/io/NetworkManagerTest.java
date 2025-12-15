@@ -277,4 +277,16 @@ class NetworkManagerTest extends com.codename1.junit.UITestBase {
 
     private static class MockConnectionRequest extends ConnectionRequest {
     }
+
+    @FormTest
+    public void testKillAndWait() {
+        manager.start();
+        ConnectionRequest req = new ConnectionRequest();
+        req.setUrl("http://example.com/kill");
+
+        // This will invoke KillWaitingClass logic
+        manager.killAndWait(req);
+
+        assertTrue(req.isKilled());
+    }
 }

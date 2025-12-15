@@ -69,6 +69,84 @@ public class CSSBorderTest extends UITestBase {
     }
 
     @FormTest
+    public void testLinearGradient() throws Exception {
+        // Use reflection to test LinearGradient since parsing logic seems unimplemented or internal
+        CSSBorder border = new CSSBorder((Resources)null);
+
+        // Reflection to create LinearGradient
+        Class<?> linearGradientClass = Class.forName("com.codename1.ui.plaf.CSSBorder$LinearGradient");
+        java.lang.reflect.Constructor<?> lgCtor = linearGradientClass.getDeclaredConstructor(CSSBorder.class);
+        lgCtor.setAccessible(true);
+        Object linearGradient = lgCtor.newInstance(border);
+
+        // Set angle
+        java.lang.reflect.Field angleField = linearGradientClass.getDeclaredField("angle");
+        angleField.setAccessible(true);
+        angleField.setFloat(linearGradient, 90f);
+
+        // Create ColorStops
+        Class<?> colorStopClass = Class.forName("com.codename1.ui.plaf.CSSBorder$ColorStop");
+        java.lang.reflect.Constructor<?> csCtor = colorStopClass.getDeclaredConstructor(CSSBorder.class);
+        csCtor.setAccessible(true);
+
+        Object stop1 = csCtor.newInstance(border);
+
+        // Create Colors
+        Class<?> colorClass = Class.forName("com.codename1.ui.plaf.CSSBorder$Color");
+        java.lang.reflect.Constructor<?> colorCtor = colorClass.getDeclaredConstructor(String.class);
+        colorCtor.setAccessible(true);
+        Object red = colorCtor.newInstance("#ff0000");
+        Object blue = colorCtor.newInstance("#0000ff");
+
+        java.lang.reflect.Field colorField = colorStopClass.getDeclaredField("color");
+        colorField.setAccessible(true);
+        colorField.set(stop1, red);
+
+        Object stop2 = csCtor.newInstance(border);
+        colorField.set(stop2, blue);
+        java.lang.reflect.Field positionField = colorStopClass.getDeclaredField("position");
+        positionField.setAccessible(true);
+        positionField.setInt(stop2, 100);
+
+        Object stops = java.lang.reflect.Array.newInstance(colorStopClass, 2);
+        java.lang.reflect.Array.set(stops, 0, stop1);
+        java.lang.reflect.Array.set(stops, 1, stop2);
+
+        java.lang.reflect.Field colorsField = linearGradientClass.getDeclaredField("colors");
+        colorsField.setAccessible(true);
+        colorsField.set(linearGradient, stops);
+
+        // Create BackgroundImage and attach LinearGradient
+        Class<?> bgImageClass = Class.forName("com.codename1.ui.plaf.CSSBorder$BackgroundImage");
+        java.lang.reflect.Constructor<?> bgCtor = bgImageClass.getDeclaredConstructor(CSSBorder.class);
+        bgCtor.setAccessible(true);
+        Object bgImage = bgCtor.newInstance(border);
+
+        java.lang.reflect.Field lgField = bgImageClass.getDeclaredField("linearGradient");
+        lgField.setAccessible(true);
+        lgField.set(bgImage, linearGradient);
+
+        // Attach BackgroundImage to CSSBorder
+        java.lang.reflect.Field bgImagesField = CSSBorder.class.getDeclaredField("backgroundImages");
+        bgImagesField.setAccessible(true);
+        Object bgImagesArray = java.lang.reflect.Array.newInstance(bgImageClass, 1);
+        java.lang.reflect.Array.set(bgImagesArray, 0, bgImage);
+        bgImagesField.set(border, bgImagesArray);
+
+        // Verify toCSSString
+        Assertions.assertTrue(border.toCSSString().contains("linear-gradient"));
+
+        // Verify painting
+        Form f = new Form();
+        Component c = new Component() {};
+        c.setSize(new com.codename1.ui.geom.Dimension(100, 100));
+        c.getStyle().setBorder(border);
+
+        Image buffer = Image.createImage(100, 100);
+        border.paintBorderBackground(buffer.getGraphics(), c);
+    }
+
+    @FormTest
     public void testBoxShadow() {
         CSSBorder border = new CSSBorder();
         border.boxShadow("5px 5px 5px 5px #000000"); // h v blur spread color
