@@ -2636,23 +2636,11 @@ BOOL prefersStatusBarHidden = NO;
             upsideDownMultiplier = -1;
         }
     }
-    //return YES;
-    switch (orientationLock) {
-        case 0:
-            return YES;
-            
-        case 1:
-            if(interfaceOrientation == UIInterfaceOrientationPortrait || interfaceOrientation == UIInterfaceOrientationPortraitUpsideDown) {
-                return YES;
-            }
-            return NO;
-            
-        default:
-            if(interfaceOrientation == UIInterfaceOrientationLandscapeLeft || interfaceOrientation == UIInterfaceOrientationLandscapeRight) {
-                return YES;
-            }
-    }
-    return NO;
+    // We return YES here to allow the system to check supportedInterfaceOrientations.
+    // If we return NO, the system will not attempt to rotate, even if the current orientation
+    // is not supported by the mask (which effectively prevents programmatic rotation).
+    // The supportedInterfaceOrientations method will ensure the app stays locked if needed.
+    return YES;
 }
 
 
@@ -2684,6 +2672,17 @@ BOOL prefersStatusBarHidden = NO;
             }
     }
     return NO;
+}
+
+- (UIInterfaceOrientationMask)supportedInterfaceOrientations {
+    switch (orientationLock) {
+        case 1:
+            return UIInterfaceOrientationMaskPortrait | UIInterfaceOrientationMaskPortraitUpsideDown;
+        case 2:
+            return UIInterfaceOrientationMaskLandscape;
+        default:
+            return UIInterfaceOrientationMaskAll;
+    }
 }
 
 -(void) viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id)coordinator {
