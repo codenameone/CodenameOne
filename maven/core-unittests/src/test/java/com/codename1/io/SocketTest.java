@@ -170,4 +170,39 @@ class SocketTest extends UITestBase {
         implementation.setHostOrIP("device.local");
         assertEquals("device.local", Socket.getHostOrIP());
     }
+
+    public static class MockSocketConnection extends SocketConnection {
+        public static CountDownLatch latch;
+        public static AtomicInteger successCount = new AtomicInteger();
+
+        public MockSocketConnection() {
+        }
+
+        @Override
+        public void connectionEstablished(InputStream is, OutputStream os) {
+            successCount.incrementAndGet();
+            if (latch != null) latch.countDown();
+        }
+
+        @Override
+        public void connectionError(int errorCode, String message) {
+        }
+    }
+
+    @EdtTest
+    void testListen() throws Exception {
+        int port = 9999;
+        MockSocketConnection.latch = new CountDownLatch(1);
+        MockSocketConnection.successCount.set(0);
+
+        Socket.StopListening listener = Socket.listen(port, MockSocketConnection.class);
+
+        TestSocket mockSocket = new TestSocket("localhost", port);
+        implementation.simulateIncomingConnection(port, mockSocket);
+
+        assertTrue(MockSocketConnection.latch.await(2, TimeUnit.SECONDS));
+        assertEquals(1, MockSocketConnection.successCount.get());
+
+        listener.stop();
+    }
 }

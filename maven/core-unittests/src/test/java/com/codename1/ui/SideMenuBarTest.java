@@ -4,11 +4,14 @@ import com.codename1.junit.FormTest;
 import com.codename1.junit.TestLogger;
 import com.codename1.junit.UITestBase;
 import com.codename1.ui.Command;
+import com.codename1.ui.Button;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.plaf.UIManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -102,5 +105,66 @@ class SideMenuBarTest extends UITestBase {
             }
         }
         return false;
+    }
+
+    @FormTest
+    public void testSideMenuBarCommandWrapperAndShowWaiter() throws Exception {
+        // Disable shadow to prevent resource loading error and provide dummy image
+        java.util.Hashtable theme = new java.util.Hashtable();
+        theme.put("sideMenuShadowBool", Boolean.FALSE);
+        theme.put("@sideMenuShadowBool", "false");
+        theme.put("sideMenuShadowImage", Image.createImage(1, 1, 0));
+        UIManager.getInstance().addThemeProps(theme);
+
+        Form f = new Form("Main", new BorderLayout());
+        SideMenuBar smb = new SideMenuBar();
+
+        // Setup parent form interaction
+        smb.initMenuBar(f);
+        smb.installMenuBar();
+
+        // Ensure form has a toolbar to prevent NPE in SideMenuBar logic if it checks for one
+        f.setToolbar(new Toolbar());
+
+        f.putClientProperty("cn1$sideMenuParent", smb);
+        Display.getInstance().setCurrent(f, false);
+
+        AtomicBoolean executed = new AtomicBoolean(false);
+        Command cmd = new Command("Test") {
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+                executed.set(true);
+            }
+        };
+
+        // Create wrapper
+        Button b = smb.createTouchCommandButton(cmd);
+        Command wrapper = b.getCommand();
+        assertTrue(wrapper.getClass().getName().contains("CommandWrapper"));
+
+        // Initialize internal state (rightPanel) by opening menu
+        smb.openMenu(null);
+        com.codename1.ui.DisplayTest.flushEdt();
+
+        // The SideMenuBar opens a new Form ('menu'). We need to ensure it has a Toolbar
+        // because CommandWrapper checks Toolbar.isOnTopSideMenu() and accesses getCurrent().getToolbar()
+        // which would otherwise be null and cause NPE.
+        Display.getInstance().getCurrent().setToolbar(new Toolbar());
+
+        // Trigger action
+        // This should start ShowWaiter
+        wrapper.actionPerformed(new ActionEvent(wrapper, ActionEvent.Type.Command));
+
+        // ShowWaiter runs in background then callSerially.
+        // Wait for it.
+        long start = System.currentTimeMillis();
+        while (!executed.get() && System.currentTimeMillis() - start < 2000) {
+            Thread.sleep(50);
+            com.codename1.ui.DisplayTest.flushEdt();
+        }
+
+        assertTrue(executed.get(), "Command should be executed by ShowWaiter");
+
+        smb.openMenu(null);
     }
 }

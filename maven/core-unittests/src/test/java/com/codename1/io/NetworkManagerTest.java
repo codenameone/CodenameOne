@@ -7,26 +7,31 @@ import com.codename1.ui.Display;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.io.Storage;
 import com.codename1.io.Util;
+import com.codename1.util.AsyncResource;
+import java.io.InputStream;
+import java.io.IOException;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Vector;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
-class NetworkManagerTest {
+
+class NetworkManagerTest extends com.codename1.junit.UITestBase {
     private NetworkManager manager;
-    private TestCodenameOneImplementation implementation;
 
     @BeforeEach
     void setUp() throws Exception {
+        super.setUpDisplay();
         Storage.setStorageInstance(null);
-        implementation = new TestCodenameOneImplementation(true);
-        Util.setImplementation(implementation);
         manager = NetworkManager.getInstance();
         resetManagerState();
     }
@@ -34,8 +39,9 @@ class NetworkManagerTest {
     @AfterEach
     void tearDown() throws Exception {
         resetManagerState();
-        Util.setImplementation(null);
         Storage.setStorageInstance(null);
+        implementation.clearNetworkMocks();
+        super.tearDownDisplay();
     }
 
     @Test
@@ -163,6 +169,72 @@ class NetworkManagerTest {
         assertArrayEquals(new String[]{"wifi"}, manager.getAPIds());
         assertEquals(NetworkManager.ACCESS_POINT_TYPE_WLAN, manager.getAPType("wifi"));
         assertEquals("WiFi", manager.getAPName("wifi"));
+    }
+
+    @FormTest
+    void testAddToQueueAsync() throws Exception {
+        final CountDownLatch latch = new CountDownLatch(1);
+        final AtomicReference<ConnectionRequest> result = new AtomicReference<>();
+        final AtomicReference<Throwable> error = new AtomicReference<>();
+
+        ConnectionRequest req = new ConnectionRequest() {
+            @Override
+            protected void readResponse(InputStream input) throws IOException {
+                // do nothing
+            }
+        };
+        req.setUrl("http://example.com/async");
+        req.setPost(false);
+
+        TestCodenameOneImplementation.getInstance().addNetworkMockResponse("http://example.com/async", 200, "OK", new byte[0]);
+
+        AsyncResource<ConnectionRequest> res = manager.addToQueueAsync(req);
+        res.ready(r -> {
+            result.set(r);
+            latch.countDown();
+        });
+        res.except(e -> {
+            error.set(e);
+            latch.countDown();
+        });
+
+        try {
+            waitFor(latch, 2000);
+        } catch (AssertionError e) {
+            // Retry with explicit loop just in case waitFor is not behaving as expected with threads
+            long start = System.currentTimeMillis();
+            while (latch.getCount() > 0) {
+                if (System.currentTimeMillis() - start > 2000) {
+                    throw new AssertionError("Timed out waiting for async request");
+                }
+                com.codename1.ui.DisplayTest.flushEdt();
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException ex) {}
+            }
+        }
+
+        assertNull(error.get());
+        assertSame(req, result.get());
+        assertTrue(req.complete);
+    }
+
+    @FormTest
+    void testAddToQueueAndWait() throws Exception {
+        final ConnectionRequest req = new ConnectionRequest() {
+            @Override
+            protected void readResponse(InputStream input) throws IOException {
+                // do nothing
+            }
+        };
+        req.setUrl("http://example.com/wait");
+        req.setPost(false);
+
+        TestCodenameOneImplementation.getInstance().addNetworkMockResponse("http://example.com/wait", 200, "OK", new byte[0]);
+
+        manager.addToQueueAndWait(req);
+
+        assertTrue(req.complete);
     }
 
     private Vector getPendingQueue() throws Exception {
