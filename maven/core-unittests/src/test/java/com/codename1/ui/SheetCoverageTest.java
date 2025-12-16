@@ -30,4 +30,11 @@ public class SheetCoverageTest extends UITestBase {
         // Test null cases
         Assertions.assertNull(Sheet.findContainingSheet(form));
     }
+
+    @FormTest
+    public void testSheetResult() throws Exception {
+        // Just invoking getCurrentSheet is enough to exercise the method body
+        // even if the inner class is dead code.
+        Sheet.getCurrentSheet();
+    }
 }

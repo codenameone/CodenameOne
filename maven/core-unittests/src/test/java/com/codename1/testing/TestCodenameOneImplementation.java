@@ -706,6 +706,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         this.browserScriptResponder = responder;
     }
 
+    public void setNativeBrowserTypeSupported(boolean supported) {
+        // Just a flag for testing support
+    }
+
     @Override
     public void setBrowserURL(PeerComponent internal, String url) {
         browserUrls.put(internal, url);
