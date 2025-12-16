@@ -1,5 +1,6 @@
 package com.codenameone.examples.hellocodenameone.tests;
 
+import com.codename1.contacts.Contact;
 import com.codename1.contacts.ContactsManager;
 import com.codename1.ui.Display;
 import com.codename1.ui.Form;
@@ -17,7 +18,7 @@ public class ContactsTest extends BaseTest {
         new Thread(() -> {
             try {
                 // Requesting only IDs to be minimal and reduce permission friction where possible
-                String[] contacts = ContactsManager.getContacts(false, false, false, false, false, false);
+                Contact[] contacts = ContactsManager.getContacts(false, false, false, false, false, false);
                 Display.getInstance().callSerially(() -> {
                     if (contacts == null) {
                         status.setText("Contacts access denied or returned null");

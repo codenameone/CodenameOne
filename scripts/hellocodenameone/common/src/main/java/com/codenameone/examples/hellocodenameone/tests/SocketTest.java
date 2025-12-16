@@ -41,8 +41,26 @@ public class SocketTest extends BaseTest {
                 try {
                     os.write("GET / HTTP/1.1\r\nHost: google.com\r\n\r\n".getBytes());
                     os.flush();
+
+                    // Simple read to verify basic connectivity
+                    byte[] buffer = new byte[128];
+                    int read = is.read(buffer);
+                    if (read > 0) {
+                         Display.getInstance().callSerially(() -> {
+                             status.setText("Data received: " + read + " bytes. Success.");
+                             form.revalidate();
+                             done();
+                        });
+                    } else {
+                        Display.getInstance().callSerially(() -> {
+                             fail("Read 0 or -1 bytes from socket.");
+                        });
+                    }
+
                 } catch (Exception e) {
-                    fail("Write failed: " + e.getMessage());
+                    Display.getInstance().callSerially(() -> {
+                        fail("Write/Read failed: " + e.getMessage());
+                    });
                 }
             }
 
@@ -51,18 +69,6 @@ public class SocketTest extends BaseTest {
                  Display.getInstance().callSerially(() -> {
                     fail("Connection error: " + message);
                 });
-            }
-
-            @Override
-            public void messageReceived(InputStream is, OutputStream os) {
-                // We received something, that's enough for coverage
-                Display.getInstance().callSerially(() -> {
-                     status.setText("Message received. Success.");
-                     form.revalidate();
-                     done();
-                });
-                // We do not assume we can close the socket gracefully here easily as SocketConnection
-                // is managed by the implementation.
             }
         });
 
