@@ -649,7 +649,7 @@ public class Parser extends ClassVisitor {
     }
     
     public Parser() {
-        super(Opcodes.ASM5);
+        super(Opcodes.ASM9);
     }
 
     @Override
@@ -738,7 +738,7 @@ public class Parser extends ClassVisitor {
     class MethodVisitorWrapper extends MethodVisitor {
         private BytecodeMethod mtd;
         public MethodVisitorWrapper(MethodVisitor mv, BytecodeMethod mtd) {
-            super(Opcodes.ASM5, mv);
+            super(Opcodes.ASM9, mv);
             this.mtd = mtd;
         }
 
@@ -930,7 +930,7 @@ public class Parser extends ClassVisitor {
     class FieldVisitorWrapper extends FieldVisitor {
 
         public FieldVisitorWrapper(FieldVisitor fv) {
-            super(Opcodes.ASM5, fv);
+            super(Opcodes.ASM9, fv);
         }
 
         @Override
@@ -958,7 +958,7 @@ public class Parser extends ClassVisitor {
     class AnnotationVisitorWrapper extends AnnotationVisitor {
 
         public AnnotationVisitorWrapper(AnnotationVisitor av) {
-            super(Opcodes.ASM5, av);
+            super(Opcodes.ASM9, av);
         }
 
         @Override
