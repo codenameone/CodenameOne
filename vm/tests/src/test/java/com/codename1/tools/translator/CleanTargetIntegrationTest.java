@@ -1,6 +1,8 @@
 package com.codename1.tools.translator;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
@@ -23,8 +25,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CleanTargetIntegrationTest {
 
-    @Test
-    void generatesRunnableHelloWorldUsingCleanTarget() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"1.5", "1.8"})
+    void generatesRunnableHelloWorldUsingCleanTarget(String targetVersion) throws Exception {
+        if ("1.5".equals(targetVersion) && !isSourceVersionSupported("1.5")) {
+             return; // Skip on newer JDKs that dropped 1.5 support
+        }
         Parser.cleanup();
 
         Path sourceDir = Files.createTempDirectory("clean-target-sources");
@@ -47,6 +53,8 @@ class CleanTargetIntegrationTest {
                 null,
                 null,
                 null,
+                "-source", targetVersion,
+                "-target", targetVersion,
                 "-d", classesDir.toString(),
                 javaFile.toString(),
                 sourceDir.resolve("java/lang/Object.java").toString(),
@@ -451,5 +459,21 @@ class CleanTargetIntegrationTest {
                 "void HelloWorld_nativeHello__(CODENAME_ONE_THREAD_STATE) {\n" +
                 "    printf(\"Hello, Clean Target!\\n\");\n" +
                 "}\n";
+    }
+
+    private boolean isSourceVersionSupported(String version) {
+        String javaVersion = System.getProperty("java.specification.version");
+        if (javaVersion.startsWith("1.")) {
+            return true;
+        }
+        try {
+            int major = Integer.parseInt(javaVersion);
+            if ("1.5".equals(version)) {
+                 if (major >= 9) return false;
+            }
+        } catch (NumberFormatException e) {
+            return true;
+        }
+        return true;
     }
 }
