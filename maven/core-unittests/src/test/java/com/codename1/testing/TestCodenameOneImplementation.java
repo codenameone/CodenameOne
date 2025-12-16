@@ -837,6 +837,86 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         fileSystem.clear();
     }
 
+    public void reset() {
+        clearFileSystem();
+        clearSockets();
+        clearConnections();
+        clearStorage();
+        clearQueuedRequests();
+        clearScheduledNotifications();
+        clearContacts();
+        clearMediaAsyncMappings();
+        clearSystemOutMessages();
+        clearNetworkMocks();
+        clearSslCertificates();
+        databases.clear();
+        browserExecuted.clear();
+        browserUrls.clear();
+        mediaAsync = null;
+        backgroundMediaAsync = null;
+        backgroundMedia = null;
+        media = null;
+        properties.clear();
+        cleanupCalls.clear();
+        heavyButtonPeers.clear();
+        nativeBrowserWindowOnLoadListener.clear();
+        nativeBrowserWindowCloseListener.clear();
+        nativeBrowserWindow = null;
+        browserScriptResponder = null;
+        connectionResponseProvider = null;
+        logListener = null;
+        timeoutInvoked = false;
+        translateInvoked = false;
+        drawShapeInvoked = false;
+        fillShapeInvoked = false;
+        lastDrawShape = null;
+        lastFillShape = null;
+        lastClipShape = null;
+        lastDrawStroke = null;
+        fillOperations.clear();
+        gradientOperations.clear();
+        activeTextEditor = null;
+        blockCopyAndPaste = false;
+        executeURL = null;
+        animation = false;
+        mediaRecorder = null;
+        mediaRecorderHandler = null;
+        mediaRecorderBuilderHandler = null;
+        locationManager = null;
+        localizationManager = null;
+        imageIO = null;
+        inAppPurchase = null;
+        contactIdCounter.set(1);
+        accessPointIds = new String[0];
+        accessPointTypes.clear();
+        accessPointNames.clear();
+        currentAccessPoint = null;
+        startRemoteControlInvocations = 0;
+        stopRemoteControlInvocations = 0;
+        nativeTitle = false;
+        softkeyCount = 2;
+        thirdSoftButton = false;
+        nativeFontSchemeSupported = true;
+        nativeImageCacheSupported = false;
+        resetTextSelectionTracking();
+        resetHeavyButtonTracking();
+        flushStorageCacheInvocations = 0;
+        nativePickerTypeSupported = null;
+        socketAvailable = true;
+        serverSocketAvailable = false;
+        appHomePath = "file://app/";
+        hostOrIp = null;
+        resetGalleryTracking();
+        nextCapturePhotoPath = "file://test-photo.jpg";
+        nextCaptureVideoPath = "file://test-video.mp4";
+        nextCaptureAudioPath = "file://test-audio.wav";
+        lastMediaRecorderBuilder = null;
+        lastVideoConstraints = null;
+        audioCaptureFrames.clear();
+        incomingConnections.clear();
+        resourceAsStreams.clear();
+    }
+
     public List<Object> getCleanupCalls() {
         return new ArrayList<Object>(cleanupCalls);
     }

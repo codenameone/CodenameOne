@@ -8,8 +8,11 @@ import com.codename1.testing.TestUtils;
 import com.codename1.ui.Display;
 import com.codename1.ui.DisplayTest;
 import com.codename1.ui.plaf.UIManager;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.TestInstance;
 
 import java.lang.reflect.Field;
 import java.util.ArrayDeque;
@@ -24,6 +27,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * Provides a minimal initialized {@link Display} environment for unit tests that instantiate UI components.
  */
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class UITestBase {
     protected Display display;
     protected TestCodenameOneImplementation implementation;
@@ -40,7 +44,7 @@ public abstract class UITestBase {
         }
     }
 
-    @BeforeEach
+    @BeforeAll
     protected void setUpDisplay() throws Exception {
         if (!Display.isInitialized()) {
             implementation = TestCodenameOneImplementation.getInstance();
@@ -66,10 +70,22 @@ public abstract class UITestBase {
         Util.setImplementation(implementation);
     }
 
+    @BeforeEach
+    protected void setUpImplementation() {
+        implementation = TestCodenameOneImplementation.getInstance();
+    }
+
     @AfterEach
     protected void tearDownDisplay() throws Exception {
         DisplayTest.flushEdt();
         resetUIManager();
+        if (implementation != null) {
+            implementation.reset();
+        }
+    }
+
+    @AfterAll
+    protected void tearDownClass() {
         Display.deinitialize();
     }
 

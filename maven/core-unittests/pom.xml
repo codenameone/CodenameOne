@@ -36,7 +36,7 @@
                 <configuration>
                     <!-- Run each test in its own forked JVM to ensure an isolated classloader. -->
                     <forkCount>1C</forkCount>
-                    <reuseForks>false</reuseForks>
+                    <reuseForks>true</reuseForks>
                 </configuration>
             </plugin>
             <plugin>
