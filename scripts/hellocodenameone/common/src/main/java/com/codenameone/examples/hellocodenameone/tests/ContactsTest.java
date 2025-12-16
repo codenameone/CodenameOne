@@ -9,8 +9,13 @@ import com.codename1.ui.layouts.BorderLayout;
 
 public class ContactsTest extends BaseTest {
     @Override
+    public boolean shouldTakeScreenshot() {
+        return false;
+    }
+
+    @Override
     public boolean runTest() throws Exception {
-        Form form = createForm("Contacts", new BorderLayout(), "Contacts");
+        Form form = new Form("Contacts", new BorderLayout());
         Label status = new Label("Reading contacts...");
         form.add(BorderLayout.CENTER, status);
         form.show();
@@ -26,11 +31,13 @@ public class ContactsTest extends BaseTest {
                         status.setText("Found " + contacts.length + " contact IDs");
                     }
                     form.revalidate();
+                    done();
                 });
             } catch (Exception e) {
                 Display.getInstance().callSerially(() -> {
                     status.setText("Exception: " + e.getMessage());
                     form.revalidate();
+                    done();
                 });
                 e.printStackTrace();
             }
