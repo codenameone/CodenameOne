@@ -726,7 +726,9 @@ public class SQLMap {
             this.prefix = prefix;
             this.suffix = suffix;
             this.parent = parent;
-            parent.child = this;
+            if (parent != null) {
+                parent.child = this;
+            }
         }
 
         /**
