@@ -7,23 +7,39 @@ import com.codename1.ui.util.UITimer;
 
 public class BrowserComponentScreenshotTest extends BaseTest {
     private BrowserComponent browser;
+    private boolean loaded;
+    private Runnable readyRunnable;
+    private Form form;
+
     @Override
     public boolean runTest() throws Exception {
         if (!BrowserComponent.isNativeBrowserSupported()) {
             done();
             return true;
         }
-        Form form = createForm("Browser Test", new BorderLayout(), "BrowserComponent");
+        form = createForm("Browser Test", new BorderLayout(), "BrowserComponent");
         browser = new BrowserComponent();
+        browser.addWebEventListener(BrowserComponent.onLoad, evt -> {
+            loaded = true;
+            checkReady();
+        });
         browser.setPage(buildHtml(), null);
         form.add(BorderLayout.CENTER, browser);
         form.show();
         return true;
     }
 
+    @Override
     protected void registerReadyCallback(Form parent, final Runnable run) {
-        browser.addWebEventListener(BrowserComponent.onLoad, evt ->
-                UITimer.timer(200, false, parent, run));
+        this.readyRunnable = run;
+        checkReady();
+    }
+
+    private void checkReady() {
+        if (loaded && readyRunnable != null) {
+            UITimer.timer(500, false, form, readyRunnable);
+            readyRunnable = null;
+        }
     }
 
     private static String buildHtml() {
