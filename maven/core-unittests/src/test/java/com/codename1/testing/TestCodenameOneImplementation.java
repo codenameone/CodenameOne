@@ -915,6 +915,16 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         audioCaptureFrames.clear();
         incomingConnections.clear();
         resourceAsStreams.clear();
+        deviceDensity = Display.DENSITY_MEDIUM;
+        displayWidth = 1080;
+        displayHeight = 1920;
+        desktopSize = new Dimension(displayWidth, displayHeight);
+        windowBounds = new Rectangle(0, 0, displayWidth, displayHeight);
+        lastWindowSize = null;
+        nativeTitle = false;
+        softkeyCount = 2;
+        thirdSoftButton = false;
+        mutableImagesFast = true;
     }
 
     public List<Object> getCleanupCalls() {

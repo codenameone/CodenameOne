@@ -118,13 +118,17 @@ class SeriesTransitionTest extends UITestBase {
 
         @Override
         public void registerAnimated(Animation cmp) {
-            registeredAnimations.add(cmp);
+            if (registeredAnimations != null) {
+                registeredAnimations.add(cmp);
+            }
             super.registerAnimated(cmp);
         }
 
         @Override
         public void deregisterAnimated(Animation cmp) {
-            deregisteredAnimations.add(cmp);
+            if (deregisteredAnimations != null) {
+                deregisteredAnimations.add(cmp);
+            }
             super.deregisterAnimated(cmp);
         }
     }

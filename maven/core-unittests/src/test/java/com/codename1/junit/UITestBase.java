@@ -79,8 +79,29 @@ public abstract class UITestBase {
     protected void tearDownDisplay() throws Exception {
         DisplayTest.flushEdt();
         resetUIManager();
+        com.codename1.ui.Toolbar.setGlobalToolbar(false);
         if (implementation != null) {
             implementation.reset();
+        }
+
+        // Clear pending serial calls on the Display to avoid pollution
+        try {
+            Field pendingField = Display.class.getDeclaredField("pendingSerialCalls");
+            pendingField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            List<Runnable> pending = (List<Runnable>) pendingField.get(display);
+            if (pending != null) {
+                pending.clear();
+            }
+
+            Field runningField = Display.class.getDeclaredField("runningSerialCallsQueue");
+            runningField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Deque<Runnable> running = (Deque<Runnable>) runningField.get(display);
+            if (running != null) {
+                running.clear();
+            }
+        } catch (Exception ignored) {
         }
     }
 
