@@ -30,6 +30,9 @@ public class CommonProgressAnimationsCoverageTest extends UITestBase {
 
         ProgressAnimation pa = CircleProgress.markComponentLoading(l);
         ProgressAnimation.markComponentReady(l);
+
+        // Coverage for outer class constructor
+        new CommonProgressAnimations();
     }
 
     @FormTest
