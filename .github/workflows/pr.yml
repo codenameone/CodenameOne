@@ -239,16 +239,16 @@ jobs:
       run: ant -noinput -buildfile Ports/iOSPort/build.xml jar
 
     - name: Build iOS VM API
-      run: ant -noinput -buildfile vm/JavaAPI/build.xml jar
+      run: mvn -f vm/JavaAPI/pom.xml package
 
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v4
       with:
         name: JavaAPI.jar
-        path: vm/JavaAPI/dist/JavaAPI.jar
+        path: vm/JavaAPI/target/JavaAPI-1.0-SNAPSHOT.jar
 
     - name: Build iOS VM
-      run: ant -noinput -buildfile vm/ByteCodeTranslator/build.xml jar
+      run: mvn -f vm/ByteCodeTranslator/pom.xml package
 
     - name: Build CLDC 11 VM
       run: ant -noinput -buildfile Ports/CLDC11/build.xml jar
@@ -257,7 +257,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: ByteCodeTranslator.jar
-        path: vm/ByteCodeTranslator/dist/ByteCodeTranslator.jar
+        path: vm/ByteCodeTranslator/target/ByteCodeTranslator-1.0-SNAPSHOT.jar
 
     - name: Upload a Build Artifact
       uses: actions/upload-artifact@v4
