@@ -245,9 +245,6 @@ public class Sheet extends Container {
         if (cnt == null) {
             return null;
         }
-        class Result {
-            Sheet found;
-        }
         for (Component cmp : $(".Sheet", cnt)) {
             if (cmp instanceof Sheet) {
                 return (Sheet) cmp;
