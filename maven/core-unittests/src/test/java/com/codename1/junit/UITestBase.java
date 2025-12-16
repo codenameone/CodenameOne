@@ -113,6 +113,7 @@ public abstract class UITestBase {
 
     private void resetUIManager() throws Exception {
         UIManager.getInstance().setThemeProps(new Hashtable());
+        UIManager.getInstance().getLookAndFeel().setRTL(false);
     }
 
 

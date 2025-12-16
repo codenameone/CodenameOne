@@ -52,7 +52,6 @@ public class SetPageURLHierarchyTestTest extends UITestBase {
         flushSerialCalls();
 
         String url = implementation.getBrowserURL(mockPeer);
-        System.out.println("Set URL Hierarchy Result: " + url);
 
         // We only check if no crash occurred and if URL ends with Page.html IF it was set.
         if (url != null) {

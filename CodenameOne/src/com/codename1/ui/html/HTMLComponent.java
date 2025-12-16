@@ -1709,6 +1709,9 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             }
         }*/
 
+        if(document == null) {
+            return;
+        }
         // Get the HTML root tag and extract the HEAD and BODY (Note that the document tag is ROOT which contains HTML and so on.
         //HTMLElement html=document.getChildById(HTMLElement.TAG_HTML);
         HTMLElement html = null;
@@ -2192,7 +2195,9 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         lbl.getSelectedStyle().setFgColor(color);
 
         //lbl.setVerticalAlignment(Component.BOTTOM); //TODO - This still doesn't align as label alignment in Codename One refers to the text alignment in relation to its icon (if exists)
-        lbl.getUnselectedStyle().setFont(font.getFont());
+        if(font != null) {
+            lbl.getUnselectedStyle().setFont(font.getFont());
+        }
         lbl.getUnselectedStyle().setBgTransparency(0);
         lbl.setGap(0);
         lbl.setTickerEnabled(false);

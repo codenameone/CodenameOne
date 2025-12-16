@@ -18,25 +18,32 @@ import com.codename1.ui.layouts.BorderLayout;
 
 public class FullScreenWithBrowserComponentSample {
 
-    private Form current;
-    private Resources theme;
+    private final BrowserComponent bc = new BrowserComponent();
 
     private BrowserForm browserForm;
+    private Button button;
+
+    public BrowserComponent getBrowserComponent() {
+        return bc;
+    }
+
+    public Button getButton() {
+        return button;
+    }
 
     class BrowserForm extends Form {
-        BrowserComponent bc = new BrowserComponent();
         BrowserForm() {
             super(new BorderLayout());
             add(BorderLayout.CENTER, bc);
-            Button b = new Button("Toggle Fullscreen");
-            b.addActionListener(e->{
+            button = new Button("Toggle Fullscreen");
+            button.addActionListener(e->{
                 if (Display.getInstance().isInFullScreenMode()) {
                     Display.getInstance().exitFullScreen();
                 } else {
                     Display.getInstance().requestFullScreen();
                 }
             });
-            add(BorderLayout.SOUTH, b);
+            add(BorderLayout.SOUTH, button);
         }
 
         void setPage(String content) {
@@ -44,41 +51,13 @@ public class FullScreenWithBrowserComponentSample {
         }
     }
 
-    public void init(Object context) {
-         // use two network threads instead of one
-        updateNetworkThreadCount(2);
-
-        // Enable Toolbar on all Forms by default
-        Toolbar.setGlobalToolbar(true);
-    }
-
     public void start() {
-         if (current != null)
-        {
-            current.show();
-        }
-        else
-        {
-            browserForm = new BrowserForm();
-
-            current = browserForm;
-            browserForm.show();
-
-            browserForm.setPage("<html><body>HELLO WORLD</body><html>");
-            test();
-        }
+        browserForm = new BrowserForm();
+        browserForm.show();
+        browserForm.setPage("<html><body>HELLO WORLD</body><html>");
+        test();
     }
 
-    public void stop() {
-        current = getCurrentForm();
-        if(current instanceof Dialog) {
-            ((Dialog)current).dispose();
-            current = getCurrentForm();
-        }
-    }
-
-    public void destroy() {
-    }
     public void test()
     {
         browserForm.setPage("<html><body>HELLO WORLD</body><html>");

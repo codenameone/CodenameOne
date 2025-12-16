@@ -268,6 +268,9 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public InputStream getResourceAsStream(Class cls, String resource) {
+        if(resource.equals("/CN1Resource.res")) {
+            return getClass().getResourceAsStream("/CN1Resource.res");
+        }
         return resourceAsStreams.get(resource);
     }
 
@@ -673,6 +676,10 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     @Override
     public PeerComponent createBrowserComponent(Object browserComponent) {
+        if(this.browserComponent == null) {
+            return new PeerComponent(new Object()) {
+            };
+        }
         return this.browserComponent;
     }
 
@@ -856,6 +863,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         backgroundMediaAsync = null;
         backgroundMedia = null;
         media = null;
+        browserComponent = null;
         properties.clear();
         cleanupCalls.clear();
         heavyButtonPeers.clear();
