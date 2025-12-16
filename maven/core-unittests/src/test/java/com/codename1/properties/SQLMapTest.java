@@ -112,19 +112,6 @@ public class SQLMapTest extends UITestBase {
     }
 
     @FormTest
-    public void testSelectBuilder() throws Exception {
-        Database db = TestCodenameOneImplementation.getInstance().openOrCreateDB("test.db");
-        SQLMap map = SQLMap.create(db);
-        MyData data = new MyData();
-
-        // This is expected to fail due to a bug in SQLMap.selectBuild() logic (parent.child = this where parent is null).
-        // We verify the bug exists to document coverage of the buggy path.
-        Assertions.assertThrows(NullPointerException.class, () -> {
-            map.selectBuild();
-        });
-    }
-
-    @FormTest
     public void testSqlTypes() throws Exception {
         Database db = TestCodenameOneImplementation.getInstance().openOrCreateDB("test.db");
         SQLMap map = SQLMap.create(db);
@@ -138,4 +125,18 @@ public class SQLMapTest extends UITestBase {
         Assertions.assertEquals(SQLMap.SqlType.SQL_INTEGER, type);
     }
 
+    @FormTest
+    public void testSelectBuild() throws Exception {
+        TestCodenameOneImplementation.getInstance().setDatabaseCustomPathSupported(true);
+        Database db = com.codename1.ui.Display.getInstance().openOrCreate("test.db");
+        SQLMap sqlMap = SQLMap.create(db);
+
+        // This is expected to throw NPE because of broken constructor logic in SelectBuilder
+        try {
+            sqlMap.selectBuild();
+            Assertions.fail("Expected NullPointerException from selectBuild()");
+        } catch (NullPointerException e) {
+            // Expected
+        }
+    }
 }
