@@ -22,6 +22,8 @@ on:
       - 'tests/**'
       - '!tests/**/*.md'
       - '!docs/**'
+      - 'maven/**'
+      - '!maven/core-unittests/**'
   push:
     branches: [ master ]
     paths:
@@ -44,6 +46,8 @@ on:
       - 'tests/**'
       - '!tests/**/*.md'
       - '!docs/**'
+      - 'maven/**'
+      - '!maven/core-unittests/**'
 
 jobs:
   build-ios:

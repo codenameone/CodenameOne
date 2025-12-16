@@ -581,16 +581,7 @@ public class IPhoneBuilder extends Executor {
             iosPods += (((iosPods.length() > 0) ? ",":"") + "GoogleSignIn ~>5.0.0");
             addMinDeploymentTarget("8.0");
         }
-
-        try {
-            if (!retrolambda(new File(System.getProperty("user.dir")), request, classesDir)) {
-                return false;
-            }
-        } catch (Exception ex) {
-            throw new BuildException("Error occurred while running retrolambda on project classes", ex);
-        }
-
-
+        
         try {
             scanClassesForPermissions(classesDir, new Executor.ClassScanner() {
                 @Override
