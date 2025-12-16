@@ -35,6 +35,7 @@ import org.objectweb.asm.Handle;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.Type;
 import org.objectweb.asm.TypePath;
 import org.objectweb.asm.commons.JSRInlinerAdapter;
 
@@ -49,6 +50,7 @@ public class Parser extends ClassVisitor {
     private String clsName;
     private static String[] nativeSources;
     private static List<ByteCodeClass> classes = new ArrayList<ByteCodeClass>();
+    private int lambdaCounter;
     public static void cleanup() {
     	nativeSources = null;
     	classes.clear();
@@ -836,6 +838,170 @@ public class Parser extends ClassVisitor {
 
         @Override
         public void visitInvokeDynamicInsn(String name, String desc, Handle bsm, Object... bsmArgs) {
+            if ("java/lang/invoke/LambdaMetafactory".equals(bsm.getOwner()) &&
+                ("metafactory".equals(bsm.getName()) || "altMetafactory".equals(bsm.getName()))) {
+
+                // 1. Generate a unique class name for the lambda
+                String lambdaClassName = clsName + "_lambda_" + (lambdaCounter++);
+
+                // 2. Create the ByteCodeClass for the lambda
+                ByteCodeClass lambdaClass = new ByteCodeClass(lambdaClassName, lambdaClassName.replace('_', '/'));
+                lambdaClass.setBaseClass("java/lang/Object");
+
+                // The interface implemented is the return type of the invokedynamic descriptor
+                Type invokedType = Type.getMethodType(desc);
+                Type interfaceType = invokedType.getReturnType();
+                lambdaClass.setBaseInterfaces(new String[]{interfaceType.getInternalName()});
+
+                // 3. Add fields for captured arguments
+                Type[] capturedArgs = invokedType.getArgumentTypes();
+                for (int i = 0; i < capturedArgs.length; i++) {
+                    String fieldName = "arg$" + (i + 1);
+                    String fieldDesc = capturedArgs[i].getDescriptor();
+                    ByteCodeField field = new ByteCodeField(lambdaClassName, Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL, fieldName, fieldDesc, null, null);
+                    lambdaClass.addField(field);
+                }
+
+                // 4. Add Constructor
+                StringBuilder ctorDesc = new StringBuilder("(");
+                for (Type t : capturedArgs) {
+                    ctorDesc.append(t.getDescriptor());
+                }
+                ctorDesc.append(")V");
+
+                BytecodeMethod ctor = new BytecodeMethod(lambdaClassName, Opcodes.ACC_PUBLIC, "<init>", ctorDesc.toString(), null, null);
+                lambdaClass.addMethod(ctor);
+
+                // Constructor body (we need to generate instructions manually)
+                // ALOAD 0
+                // INVOKESPECIAL java/lang/Object.<init>
+                // ... assign fields ...
+                // RETURN
+
+                ctor.addInstruction(Opcodes.ALOAD); // 25
+                ctor.addVariableOperation(Opcodes.ALOAD, 0);
+                ctor.addInvoke(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+
+                int varIndex = 1;
+                for (int i = 0; i < capturedArgs.length; i++) {
+                    ctor.addInstruction(Opcodes.ALOAD);
+                    ctor.addVariableOperation(Opcodes.ALOAD, 0); // this
+
+                    Type t = capturedArgs[i];
+                    int opcode = t.getOpcode(Opcodes.ILOAD); // correct load opcode for type
+                    ctor.addVariableOperation(opcode, varIndex);
+                    varIndex += t.getSize();
+
+                    String fieldName = "arg$" + (i + 1);
+                    ctor.addField(lambdaClass, Opcodes.PUTFIELD, lambdaClassName, fieldName, t.getDescriptor());
+                }
+                ctor.addInstruction(Opcodes.RETURN);
+                ctor.setMaxes(varIndex + 1, varIndex); // Approximate maxes
+
+
+                // 5. Implement the interface method
+                Type samMethodType = (Type) bsmArgs[0];
+                Handle implMethod = (Handle) bsmArgs[1];
+                Type instantiatedMethodType = (Type) bsmArgs[2];
+
+                String samMethodName = name; // Name from invokedynamic
+                String samMethodDesc = samMethodType.getDescriptor(); // Signature from BSM arg 0
+
+                BytecodeMethod interfaceMethod = new BytecodeMethod(lambdaClassName, Opcodes.ACC_PUBLIC, samMethodName, samMethodDesc, null, null);
+                lambdaClass.addMethod(interfaceMethod);
+
+                // Method Body:
+                // Load captured arguments from fields
+                // Load method arguments
+                // Invoke implMethod
+                // Return result
+
+                // Handle Constructor Reference (special case)
+                boolean isCtorRef = (implMethod.getTag() == Opcodes.H_NEWINVOKESPECIAL);
+                if (isCtorRef) {
+                    interfaceMethod.addTypeInstruction(Opcodes.NEW, implMethod.getOwner());
+                    interfaceMethod.addInstruction(Opcodes.DUP);
+                }
+
+                // Load captured args
+                for (int i = 0; i < capturedArgs.length; i++) {
+                    interfaceMethod.addInstruction(Opcodes.ALOAD);
+                    interfaceMethod.addVariableOperation(Opcodes.ALOAD, 0);
+                    String fieldName = "arg$" + (i + 1);
+                    interfaceMethod.addField(lambdaClass, Opcodes.GETFIELD, lambdaClassName, fieldName, capturedArgs[i].getDescriptor());
+                }
+
+                // Load method args
+                Type[] samArgs = samMethodType.getArgumentTypes();
+                int localIndex = 1;
+                for (Type t : samArgs) {
+                    interfaceMethod.addVariableOperation(t.getOpcode(Opcodes.ILOAD), localIndex);
+                    localIndex += t.getSize();
+                }
+
+                // Invoke implMethod
+                int invokeOpcode;
+                switch (implMethod.getTag()) {
+                    case Opcodes.H_INVOKESTATIC: invokeOpcode = Opcodes.INVOKESTATIC; break;
+                    case Opcodes.H_INVOKEVIRTUAL: invokeOpcode = Opcodes.INVOKEVIRTUAL; break;
+                    case Opcodes.H_INVOKEINTERFACE: invokeOpcode = Opcodes.INVOKEINTERFACE; break;
+                    case Opcodes.H_INVOKESPECIAL: invokeOpcode = Opcodes.INVOKESPECIAL; break;
+                    case Opcodes.H_NEWINVOKESPECIAL: invokeOpcode = Opcodes.INVOKESPECIAL; break;
+                    default: invokeOpcode = Opcodes.INVOKESTATIC; // Fallback
+                }
+
+                if (isCtorRef) {
+                    interfaceMethod.addInvoke(Opcodes.INVOKESPECIAL, implMethod.getOwner(), implMethod.getName(), implMethod.getDesc(), false);
+                } else {
+                    interfaceMethod.addInvoke(invokeOpcode, implMethod.getOwner(), implMethod.getName(), implMethod.getDesc(), implMethod.isInterface());
+                }
+
+                // Return
+                Type returnType = samMethodType.getReturnType();
+                interfaceMethod.addInstruction(returnType.getOpcode(Opcodes.IRETURN));
+                interfaceMethod.setMaxes(20, 20); // Approximation
+
+
+                // 6. Add static factory method
+                String factoryMethodName = "lambda$factory";
+                String factoryDesc = desc; // The desc of invokedynamic is (CapturedArgs)Interface.
+
+                // We want factory to be (CapturedArgs)LambdaClass (to match NEW output but wrapped)
+                // Actually, replacing invokedynamic with INVOKESTATIC means the return type on stack should match
+                // what invokedynamic promised, which is the Interface.
+                // Our factory returns LambdaClass, which implements Interface. So it's assignment compatible.
+                // However, the method signature in C needs to return an object pointer anyway.
+
+                // Let's make the factory return the class type explicitly in signature
+                String factoryRetType = "L" + lambdaClassName + ";";
+                String actualFactoryDesc = desc.substring(0, desc.lastIndexOf(')') + 1) + factoryRetType;
+
+                BytecodeMethod factory = new BytecodeMethod(lambdaClassName, Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC, factoryMethodName, actualFactoryDesc, null, null);
+                lambdaClass.addMethod(factory);
+
+                factory.addTypeInstruction(Opcodes.NEW, lambdaClassName);
+                factory.addInstruction(Opcodes.DUP);
+
+                // Load factory arguments (captured args)
+                localIndex = 0; // Static method
+                for (Type t : capturedArgs) {
+                    factory.addVariableOperation(t.getOpcode(Opcodes.ILOAD), localIndex);
+                    localIndex += t.getSize();
+                }
+
+                factory.addInvoke(Opcodes.INVOKESPECIAL, lambdaClassName, "<init>", ctorDesc.toString(), false);
+                factory.addInstruction(Opcodes.ARETURN);
+                factory.setMaxes(localIndex + 2, localIndex);
+
+                // 7. Register the new class
+                classes.add(lambdaClass);
+
+                // 8. Replace invokedynamic with INVOKESTATIC to factory
+                mtd.addInvoke(Opcodes.INVOKESTATIC, lambdaClassName, factoryMethodName, actualFactoryDesc, false);
+
+                return;
+            }
+
             super.visitInvokeDynamicInsn(name, desc, bsm, bsmArgs); 
         }
 
