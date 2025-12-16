@@ -18,9 +18,7 @@ public class PieChartTest extends UITestBase {
 
         PieChart chart = new PieChart(dataset, renderer);
 
-        // PieChart does not implement getChartType() (inherits from RoundChart which doesn't enforce it)
         Assertions.assertNotNull(chart);
-        // mDataset is protected in RoundChart, but no public getter. We can only verify constructor behavior indirectly or via renderer.
         Assertions.assertEquals(renderer, chart.getRenderer());
         Assertions.assertEquals(Integer.MAX_VALUE, chart.getCenterX());
         Assertions.assertEquals(Integer.MAX_VALUE, chart.getCenterY());
@@ -30,9 +28,8 @@ public class PieChartTest extends UITestBase {
         Assertions.assertEquals(100, chart.getCenterX());
         Assertions.assertEquals(100, chart.getCenterY());
 
-        // Verify segment shape (basic check)
-        // getSegmentShape relies on internal mapper which might need drawing first or setup
-        // But we can check it doesn't crash on invalid index or something if we didn't draw yet.
-        // Actually PieMapper is initialized in constructor.
+        // Removed call to getChartType() as PieChart (and RoundChart) does not implement it.
+        // It is defined in XYChart, but PieChart extends RoundChart.
+        // RoundChart does not seem to have this abstract method.
     }
 }
