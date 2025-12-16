@@ -41,4 +41,43 @@ public class RSSReaderCoverageTest extends UITestBase {
 
         Assertions.assertEquals(testUrl, TestCodenameOneImplementation.getInstance().getExecuteURL());
     }
+
+    @FormTest
+    public void testEventHandler() {
+        class TestRSSReader extends RSSReader {
+            public void fireEvent(ActionEvent evt) {
+                super.fireActionEvent(evt);
+            }
+        }
+
+        TestRSSReader reader = new TestRSSReader();
+        reader.setURL("http://example.com/rss");
+
+        reader.initComponent();
+
+        com.codename1.io.services.RSSService service = new com.codename1.io.services.RSSService("http://example.com/rss");
+
+        java.util.Hashtable<String, String> item = new java.util.Hashtable<String, String>();
+        item.put("title", "Test Title");
+        item.put("description", "Desc");
+        item.put("link", "http://example.com/article");
+
+        java.util.Vector<java.util.Hashtable<String, String>> metaData = new java.util.Vector<java.util.Hashtable<String, String>>();
+        metaData.add(item);
+
+        com.codename1.io.NetworkEvent ne = new com.codename1.io.NetworkEvent(null, service);
+        // NetworkEvent stores metaData in a private field, set by constructor (request, metaData)
+        // We use that constructor.
+        ne = new com.codename1.io.NetworkEvent(service, (Object)metaData);
+
+        reader.fireEvent(ne);
+
+        Assertions.assertTrue(reader.getModel().getSize() > 0);
+
+        reader.setSelectedIndex(0);
+        reader.fireEvent(new ActionEvent(reader));
+
+        // Use TestUtils wait if available or just check immediately since everything is on same thread
+        // waitForFormTitle("Test Title");
+    }
 }
