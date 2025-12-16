@@ -2348,8 +2348,8 @@ void com_codename1_impl_ios_IOSNative_fillRectRadialGradientMutable___int_int_in
     CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
     CGGradientRef myGradient = CGGradientCreateWithColorComponents (colorSpace, components, locations, num_locations);
     [UIColorFromRGB(n2, 255) set];
-    CGContextFillRect(UIGraphicsGetCurrentContext(), CGRectMake(0, 0, width, height));
-    CGPoint myCentrePoint = CGPointMake(relativeX * width, relativeY * height);
+    CGContextFillRect(UIGraphicsGetCurrentContext(), CGRectMake(n3, n4, width, height));
+    CGPoint myCentrePoint = CGPointMake(n3 + relativeX * width, n4 + relativeY * height);
     float myRadius = MIN(width, height) * relativeSize;
     CGContextDrawRadialGradient (UIGraphicsGetCurrentContext(), myGradient, myCentrePoint,
                                  0, myCentrePoint, myRadius,
