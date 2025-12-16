@@ -1,0 +1,53 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.codename1.parparvm</groupId>
+        <artifactId>parparvm-parent</artifactId>
+        <version>1.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>JavaAPI</artifactId>
+    <packaging>jar</packaging>
+    <name>JavaAPI</name>
+
+    <build>
+        <sourceDirectory>src</sourceDirectory>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <source>1.5</source>
+                    <target>1.5</target>
+                    <!-- Allow compiling java.* packages -->
+                    <compilerArgs>
+                        <arg>-Xlint:-options</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+            <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <configuration>
+                            <target>
+                                <mkdir dir="${project.basedir}/dist"/>
+                                <copy file="${project.build.directory}/${project.build.finalName}.jar"
+                                      tofile="${project.basedir}/dist/${project.artifactId}.jar"/>
+                            </target>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>
