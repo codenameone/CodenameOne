@@ -131,12 +131,9 @@ public class SQLMapTest extends UITestBase {
         Database db = com.codename1.ui.Display.getInstance().openOrCreate("test.db");
         SQLMap sqlMap = SQLMap.create(db);
 
-        // This is expected to throw NPE because of broken constructor logic in SelectBuilder
-        try {
-            sqlMap.selectBuild();
-            Assertions.fail("Expected NullPointerException from selectBuild()");
-        } catch (NullPointerException e) {
-            // Expected
-        }
+        // This was expected to throw NPE because of broken constructor logic in SelectBuilder
+        // But we fixed it, so now it should work.
+        SQLMap.SelectBuilder builder = sqlMap.selectBuild();
+        Assertions.assertNotNull(builder);
     }
 }

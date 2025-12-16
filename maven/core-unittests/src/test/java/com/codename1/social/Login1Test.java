@@ -46,6 +46,11 @@ public class Login1Test extends UITestBase {
         login.setOauth2URL("url");
         login.setRedirectURI("uri");
 
-        login.doLogin();
+        com.codename1.junit.TestLogger.install();
+        try {
+            login.doLogin();
+        } finally {
+            com.codename1.junit.TestLogger.remove();
+        }
     }
 }

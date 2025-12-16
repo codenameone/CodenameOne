@@ -243,6 +243,9 @@ public class SideMenuBar extends MenuBar {
      * {@inheritDoc}
      */
     protected void installMenuBar() {
+        if (parent == null) {
+            return;
+        }
         if (parent.getClientProperty("Menu") != null) {
             return;
         }
