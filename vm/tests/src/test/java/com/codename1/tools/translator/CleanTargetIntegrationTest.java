@@ -26,11 +26,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class CleanTargetIntegrationTest {
 
     @ParameterizedTest
-    @ValueSource(strings = {"1.5", "1.8"})
-    void generatesRunnableHelloWorldUsingCleanTarget(String targetVersion) throws Exception {
-        if ("1.5".equals(targetVersion) && !isSourceVersionSupported("1.5")) {
-             return; // Skip on newer JDKs that dropped 1.5 support
-        }
+    @org.junit.jupiter.params.provider.MethodSource("com.codename1.tools.translator.BytecodeInstructionIntegrationTest#provideCompilerConfigs")
+    void generatesRunnableHelloWorldUsingCleanTarget(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 
         Path sourceDir = Files.createTempDirectory("clean-target-sources");
@@ -47,25 +44,47 @@ class CleanTargetIntegrationTest {
         Files.write(sourceDir.resolve("java/lang/NullPointerException.java"), javaLangNullPointerExceptionSource().getBytes(StandardCharsets.UTF_8));
         Files.write(sourceDir.resolve("native_hello.c"), nativeHelloSource().getBytes(StandardCharsets.UTF_8));
 
-        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-        assertNotNull(compiler, "A JDK is required to compile test sources");
-        int compileResult = compiler.run(
-                null,
-                null,
-                null,
-                "-source", targetVersion,
-                "-target", targetVersion,
-                "-d", classesDir.toString(),
-                javaFile.toString(),
-                sourceDir.resolve("java/lang/Object.java").toString(),
-                sourceDir.resolve("java/lang/String.java").toString(),
-                sourceDir.resolve("java/lang/Class.java").toString(),
-                sourceDir.resolve("java/lang/Throwable.java").toString(),
-                sourceDir.resolve("java/lang/Exception.java").toString(),
-                sourceDir.resolve("java/lang/RuntimeException.java").toString(),
-                sourceDir.resolve("java/lang/NullPointerException.java").toString()
-        );
-        assertEquals(0, compileResult, "HelloWorld.java should compile");
+        List<String> compileArgs = new java.util.ArrayList<>();
+
+        double jdkVer = 1.8;
+        try { jdkVer = Double.parseDouble(config.jdkVersion); } catch (NumberFormatException ignored) {}
+
+        if (jdkVer >= 9) {
+             // For CleanTarget, we are compiling java.lang classes.
+             // On JDK 9+, this requires patching java.base.
+             // However, --patch-module is incompatible with -target 8.
+             // If we can't use --patch-module with -target 8, we skip this permutation.
+             if (Double.parseDouble(config.targetVersion) < 9) {
+                 return; // Skip JDK 9+ compiling for Target < 9 for this specific test
+             }
+             compileArgs.add("-source");
+             compileArgs.add(config.targetVersion);
+             compileArgs.add("-target");
+             compileArgs.add(config.targetVersion);
+             compileArgs.add("--patch-module");
+             compileArgs.add("java.base=" + sourceDir.toString());
+             compileArgs.add("-Xlint:-module");
+        } else {
+             compileArgs.add("-source");
+             compileArgs.add(config.targetVersion);
+             compileArgs.add("-target");
+             compileArgs.add(config.targetVersion);
+             compileArgs.add("-Xlint:-options");
+        }
+
+        compileArgs.add("-d");
+        compileArgs.add(classesDir.toString());
+        compileArgs.add(javaFile.toString());
+        compileArgs.add(sourceDir.resolve("java/lang/Object.java").toString());
+        compileArgs.add(sourceDir.resolve("java/lang/String.java").toString());
+        compileArgs.add(sourceDir.resolve("java/lang/Class.java").toString());
+        compileArgs.add(sourceDir.resolve("java/lang/Throwable.java").toString());
+        compileArgs.add(sourceDir.resolve("java/lang/Exception.java").toString());
+        compileArgs.add(sourceDir.resolve("java/lang/RuntimeException.java").toString());
+        compileArgs.add(sourceDir.resolve("java/lang/NullPointerException.java").toString());
+
+        int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
+        assertEquals(0, compileResult, "HelloWorld.java should compile with " + config);
 
         Files.copy(sourceDir.resolve("native_hello.c"), classesDir.resolve("native_hello.c"));
 
@@ -461,19 +480,4 @@ class CleanTargetIntegrationTest {
                 "}\n";
     }
 
-    private boolean isSourceVersionSupported(String version) {
-        String javaVersion = System.getProperty("java.specification.version");
-        if (javaVersion.startsWith("1.")) {
-            return true;
-        }
-        try {
-            int major = Integer.parseInt(javaVersion);
-            if ("1.5".equals(version)) {
-                 if (major >= 9) return false;
-            }
-        } catch (NumberFormatException e) {
-            return true;
-        }
-        return true;
-    }
 }
