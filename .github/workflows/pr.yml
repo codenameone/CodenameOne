@@ -12,6 +12,7 @@ on:
       - '**/*.md'
       - '.github/workflows/developer-guide-docs.yml'
       - 'CodenameOneDesigner/**'
+      - 'Ports/IOSPort/**'
   push:
     branches:
       - master
@@ -23,6 +24,7 @@ on:
       - '**/*.md'
       - '.github/workflows/developer-guide-docs.yml'
       - 'CodenameOneDesigner/**'
+      - 'Ports/IOSPort/**'
 
 permissions:
   contents: write
