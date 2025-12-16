@@ -187,12 +187,12 @@ static GLuint getOGLProgram(){
                 
             case GRADIENT_TYPE_HORIZONTAL:
                 CGContextDrawLinearGradient(context, myGradient,
-                                            CGPointMake(0, 0), CGPointMake(0, width), kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
+                                            CGPointMake(0, 0), CGPointMake(width, 0), kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
                 break;
                 
             case GRADIENT_TYPE_VERTICAL:
                 CGContextDrawLinearGradient(context, myGradient,
-                                            CGPointMake(0, 0), CGPointMake(height, 0), kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
+                                            CGPointMake(0, 0), CGPointMake(0, height), kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
                 break;
         }
         UIGraphicsPopContext();
@@ -215,21 +215,24 @@ static GLuint getOGLProgram(){
     
     GLfloat vertexes[] = {
         x, y,
-        x + p2w, y,
-        x, y + p2h,
-        x + p2w, y + p2h
+        x + width, y,
+        x, y + height,
+        x + width, y + height
     };
     
-    //static const GLshort textureCoordinates[] = {
-    //    0, 1,
-    //    1, 1,
-    //    0, 0,
-    //    1, 0,
-    //};
+    float maxS = (float)width / p2w;
+    float maxT = (float)height / p2h;
+
+    GLfloat textureCoordinates[] = {
+        0, maxT,
+        maxS, maxT,
+        0, 0,
+        maxS, 0,
+    };
     
     //_glTexCoordPointer(2, GL_SHORT, 0, textureCoordinates);
     //GLErrorLog;
-    glVertexAttribPointer(textureCoordAtt, 2, GL_SHORT, 0, 0, textureCoordinates);
+    glVertexAttribPointer(textureCoordAtt, 2, GL_FLOAT, 0, 0, textureCoordinates);
     GLErrorLog;
     //_glVertexPointer(2, GL_FLOAT, 0, vertexes);
     //GLErrorLog;
@@ -324,12 +327,12 @@ static GLuint getOGLProgram(){
 
             case GRADIENT_TYPE_HORIZONTAL:
                 CGContextDrawLinearGradient(context, myGradient, 
-                                            CGPointMake(0, 0), CGPointMake(0, width), kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
+                                            CGPointMake(0, 0), CGPointMake(width, 0), kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
                 break;
 
             case GRADIENT_TYPE_VERTICAL:
                 CGContextDrawLinearGradient(context, myGradient, 
-                                            CGPointMake(0, 0), CGPointMake(height, 0), kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);                
+                                            CGPointMake(0, 0), CGPointMake(0, height), kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
                 break;
         }
         UIGraphicsPopContext();
@@ -351,19 +354,22 @@ static GLuint getOGLProgram(){
     
     GLfloat vertexes[] = {
         x, y,
-        x + p2w, y,
-        x, y + p2h,
-        x + p2w, y + p2h
+        x + width, y,
+        x, y + height,
+        x + width, y + height
     };
     
-    static const GLshort textureCoordinates[] = {
-        0, 1,
-        1, 1,
+    float maxS = (float)width / p2w;
+    float maxT = (float)height / p2h;
+
+    GLfloat textureCoordinates[] = {
+        0, maxT,
+        maxS, maxT,
         0, 0,
-        1, 0,
+        maxS, 0,
     };
     
-    _glTexCoordPointer(2, GL_SHORT, 0, textureCoordinates);
+    _glTexCoordPointer(2, GL_FLOAT, 0, textureCoordinates);
     GLErrorLog;
     _glVertexPointer(2, GL_FLOAT, 0, vertexes);
     GLErrorLog;
