@@ -322,8 +322,10 @@ class LambdaIntegrationTest {
                 "void java_lang_Object___INIT____(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);\n" +
                 "JAVA_OBJECT __NEW_java_lang_Object(CODENAME_ONE_THREAD_STATE);\n" +
                 "void __INIT_VTABLE_java_lang_Object(CODENAME_ONE_THREAD_STATE, void** vtable);\n" +
+                "JAVA_OBJECT java_lang_Object_getClass___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);\n" +
+                "JAVA_OBJECT virtual_java_lang_Object_getClass___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj);\n" +
                 "#endif\n";
-            Files.write(objectHeader, objectContent.getBytes(StandardCharsets.UTF_8));
+        Files.write(objectHeader, objectContent.getBytes(StandardCharsets.UTF_8));
 
 
         // Append implementations to runtime_stubs.c or create extra_stubs.c
@@ -376,6 +378,12 @@ class LambdaIntegrationTest {
                      "}\n" +
                      "void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {\n" +
                      "    // Dummy implementation\n" +
+                     "}\n" +
+                     "JAVA_OBJECT java_lang_Object_getClass___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {\n" +
+                     "    return JAVA_NULL; // Stub\n" +
+                     "}\n" +
+                     "JAVA_OBJECT virtual_java_lang_Object_getClass___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {\n" +
+                     "    return java_lang_Object_getClass___R_java_lang_Class(threadStateData, obj);\n" +
                      "}\n";
              Files.write(extraStubs, stubs.getBytes(StandardCharsets.UTF_8));
         }
