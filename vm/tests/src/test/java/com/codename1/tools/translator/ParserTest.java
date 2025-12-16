@@ -3,6 +3,8 @@ package com.codename1.tools.translator;
 import com.codename1.tools.translator.bytecodes.Instruction;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -24,9 +26,10 @@ class ParserTest {
         Parser.cleanup();
     }
 
-    @Test
-    void parsesBasicClassWithFieldsAndMethodBodies() throws Exception {
-        Path classFile = createSampleClass();
+    @ParameterizedTest
+    @ValueSource(ints = {Opcodes.V1_5, Opcodes.V1_8})
+    void parsesBasicClassWithFieldsAndMethodBodies(int opcodeVersion) throws Exception {
+        Path classFile = createSampleClass(opcodeVersion);
 
         Parser.parse(classFile.toFile());
 
@@ -54,9 +57,10 @@ class ParserTest {
         assertEquals(Opcodes.IRETURN, opcodes.get(opcodes.size() - 1));
     }
 
-    @Test
-    void parsesInterfacesAsAbstractContracts() throws Exception {
-        Path classFile = createTaskInterface();
+    @ParameterizedTest
+    @ValueSource(ints = {Opcodes.V1_5, Opcodes.V1_8})
+    void parsesInterfacesAsAbstractContracts(int opcodeVersion) throws Exception {
+        Path classFile = createTaskInterface(opcodeVersion);
 
         Parser.parse(classFile.toFile());
 
@@ -69,9 +73,10 @@ class ParserTest {
         assertTrue(method.canBeVirtual());
     }
 
-    @Test
-    void parsesEnumMetadataAndBaseType() throws Exception {
-        Path classFile = createPriorityEnum();
+    @ParameterizedTest
+    @ValueSource(ints = {Opcodes.V1_5, Opcodes.V1_8})
+    void parsesEnumMetadataAndBaseType(int opcodeVersion) throws Exception {
+        Path classFile = createPriorityEnum(opcodeVersion);
 
         Parser.parse(classFile.toFile());
 
@@ -81,9 +86,10 @@ class ParserTest {
         assertTrue(readPrivateBoolean(cls, "isEnum"));
     }
 
-    @Test
-    void parsesAnnotationsWithCorrectFlags() throws Exception {
-        Path classFile = createAnnotation();
+    @ParameterizedTest
+    @ValueSource(ints = {Opcodes.V1_5, Opcodes.V1_8})
+    void parsesAnnotationsWithCorrectFlags(int opcodeVersion) throws Exception {
+        Path classFile = createAnnotation(opcodeVersion);
 
         Parser.parse(classFile.toFile());
 
@@ -123,9 +129,9 @@ class ParserTest {
         return field.getBoolean(target);
     }
 
-    private Path createSampleClass() throws Exception {
+    private Path createSampleClass(int opcodeVersion) throws Exception {
         return writeClass("com/example/Sample", cw -> {
-            cw.visit(Opcodes.V1_5, Opcodes.ACC_PUBLIC | Opcodes.ACC_SUPER, "com/example/Sample", null, "java/lang/Object", null);
+            cw.visit(opcodeVersion, Opcodes.ACC_PUBLIC | Opcodes.ACC_SUPER, "com/example/Sample", null, "java/lang/Object", null);
             cw.visitField(Opcodes.ACC_PRIVATE, "counter", "I", null, null).visitEnd();
             cw.visitField(Opcodes.ACC_PUBLIC | Opcodes.ACC_STATIC | Opcodes.ACC_FINAL, "GREETING", "Ljava/lang/String;", null, "hi").visitEnd();
             cw.visitField(Opcodes.ACC_PUBLIC, "names", "Ljava/util/List;", "Ljava/util/List<Ljava/lang/String;>;", null).visitEnd();
@@ -151,10 +157,10 @@ class ParserTest {
         });
     }
 
-    private Path createTaskInterface() throws Exception {
+    private Path createTaskInterface(int opcodeVersion) throws Exception {
         return writeClass("com/example/Task", cw -> {
             cw.visit(
-                    Opcodes.V1_5,
+                    opcodeVersion,
                     Opcodes.ACC_PUBLIC | Opcodes.ACC_ABSTRACT | Opcodes.ACC_INTERFACE,
                     "com/example/Task",
                     null,
@@ -166,10 +172,10 @@ class ParserTest {
         });
     }
 
-    private Path createPriorityEnum() throws Exception {
+    private Path createPriorityEnum(int opcodeVersion) throws Exception {
         return writeClass("com/example/Priority", cw -> {
             cw.visit(
-                    Opcodes.V1_5,
+                    opcodeVersion,
                     Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_SUPER | Opcodes.ACC_ENUM,
                     "com/example/Priority",
                     null,
@@ -252,10 +258,10 @@ class ParserTest {
         });
     }
 
-    private Path createAnnotation() throws Exception {
+    private Path createAnnotation(int opcodeVersion) throws Exception {
         return writeClass("com/example/TestAnnotation", cw -> {
             cw.visit(
-                    Opcodes.V1_5,
+                    opcodeVersion,
                     Opcodes.ACC_PUBLIC | Opcodes.ACC_ABSTRACT | Opcodes.ACC_INTERFACE | Opcodes.ACC_ANNOTATION,
                     "com/example/TestAnnotation",
                     null,

@@ -10,6 +10,8 @@ import com.codename1.tools.translator.bytecodes.LocalVariable;
 import com.codename1.tools.translator.bytecodes.MultiArray;
 import com.codename1.tools.translator.bytecodes.VarOp;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
@@ -39,8 +41,12 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class BytecodeInstructionIntegrationTest {
 
-    @Test
-    void translatesOptimizedBytecodeToLLVMExecutable() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"1.5", "1.8"})
+    void translatesOptimizedBytecodeToLLVMExecutable(String targetVersion) throws Exception {
+        if ("1.5".equals(targetVersion) && !isSourceVersionSupported("1.5")) {
+             return; // Skip on newer JDKs that dropped 1.5 support
+        }
         Parser.cleanup();
 
         Path sourceDir = Files.createTempDirectory("bytecode-integration-sources");
@@ -61,9 +67,9 @@ class BytecodeInstructionIntegrationTest {
         // Compile App using JavaAPI as bootclasspath
         List<String> compileArgs = new ArrayList<>();
         compileArgs.add("-source");
-        compileArgs.add("1.5");
+        compileArgs.add(targetVersion);
         compileArgs.add("-target");
-        compileArgs.add("1.5");
+        compileArgs.add(targetVersion);
         compileArgs.add("-bootclasspath");
         compileArgs.add(javaApiDir.toString());
         compileArgs.add("-d");
@@ -183,8 +189,12 @@ class BytecodeInstructionIntegrationTest {
                 "}\n";
     }
 
-    @Test
-    void translatesInvokeAndLdcBytecodeToLLVMExecutable() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"1.5", "1.8"})
+    void translatesInvokeAndLdcBytecodeToLLVMExecutable(String targetVersion) throws Exception {
+        if ("1.5".equals(targetVersion) && !isSourceVersionSupported("1.5")) {
+             return; // Skip on newer JDKs that dropped 1.5 support
+        }
         Parser.cleanup();
 
         Path sourceDir = Files.createTempDirectory("invoke-ldc-sources");
@@ -204,9 +214,9 @@ class BytecodeInstructionIntegrationTest {
 
         List<String> compileArgs = new ArrayList<>();
         compileArgs.add("-source");
-        compileArgs.add("1.5");
+        compileArgs.add(targetVersion);
         compileArgs.add("-target");
-        compileArgs.add("1.5");
+        compileArgs.add(targetVersion);
         compileArgs.add("-bootclasspath");
         compileArgs.add(javaApiDir.toString());
         compileArgs.add("-d");
@@ -974,15 +984,19 @@ class BytecodeInstructionIntegrationTest {
                 "}\n";
     }
 
-    @Test
-    void handleDefaultOutputWritesOutput() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"1.5", "1.8"})
+    void handleDefaultOutputWritesOutput(String targetVersion) throws Exception {
+        if ("1.5".equals(targetVersion) && !isSourceVersionSupported("1.5")) {
+             return; // Skip on newer JDKs that dropped 1.5 support
+        }
         Parser.cleanup();
         resetByteCodeClass();
         Path sourceDir = Files.createTempDirectory("default-output-source");
         Path outputDir = Files.createTempDirectory("default-output-dest");
 
         Files.write(sourceDir.resolve("resource.txt"), "data".getBytes(StandardCharsets.UTF_8));
-        compileDummyMainClass(sourceDir, "com.example", "MyAppDefault");
+        compileDummyMainClass(sourceDir, "com.example", "MyAppDefault", targetVersion);
 
         String[] args = new String[] {
                 "csharp",
@@ -1061,15 +1075,19 @@ class BytecodeInstructionIntegrationTest {
         assertTrue(Files.exists(copiedRoot.resolve("subdir/file2.txt")));
     }
 
-    @Test
-    void handleIosOutputGeneratesProjectStructure() throws Exception {
+    @ParameterizedTest
+    @ValueSource(strings = {"1.5", "1.8"})
+    void handleIosOutputGeneratesProjectStructure(String targetVersion) throws Exception {
+        if ("1.5".equals(targetVersion) && !isSourceVersionSupported("1.5")) {
+             return; // Skip on newer JDKs that dropped 1.5 support
+        }
         Parser.cleanup();
         resetByteCodeClass();
         Path sourceDir = Files.createTempDirectory("ios-output-source");
         Path outputDir = Files.createTempDirectory("ios-output-dest");
 
         Files.write(sourceDir.resolve("resource.txt"), "data".getBytes(StandardCharsets.UTF_8));
-        compileDummyMainClass(sourceDir, "com.example", "MyAppIOS");
+        compileDummyMainClass(sourceDir, "com.example", "MyAppIOS", targetVersion);
 
         // Add a bundle to test copyDir invocation in execute loop
         Path bundleDir = sourceDir.resolve("test.bundle");
@@ -1121,7 +1139,7 @@ class BytecodeInstructionIntegrationTest {
         ((Set<?>) writableFieldsField.get(null)).clear();
     }
 
-    private void compileDummyMainClass(Path sourceDir, String packageName, String className) throws Exception {
+    private void compileDummyMainClass(Path sourceDir, String packageName, String className, String targetVersion) throws Exception {
         Path packageDir = sourceDir;
         for (String part : packageName.split("\\.")) {
             packageDir = packageDir.resolve(part);
@@ -1136,8 +1154,8 @@ class BytecodeInstructionIntegrationTest {
 
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         int result = compiler.run(null, null, null,
-                "-source", "1.5",
-                "-target", "1.5",
+                "-source", targetVersion,
+                "-target", targetVersion,
                 "-d", sourceDir.toString(),
                 javaFile.toString());
         assertEquals(0, result, "Compilation failed");
@@ -1242,5 +1260,21 @@ class BytecodeInstructionIntegrationTest {
 
         // Let's rely on integration tests for complex dependency checks in ArithmeticExpression,
         // or mock if possible. But here we can check basic behavior.
+    }
+
+    private boolean isSourceVersionSupported(String version) {
+        String javaVersion = System.getProperty("java.specification.version");
+        if (javaVersion.startsWith("1.")) {
+            return true;
+        }
+        try {
+            int major = Integer.parseInt(javaVersion);
+            if ("1.5".equals(version)) {
+                 if (major >= 9) return false;
+            }
+        } catch (NumberFormatException e) {
+            return true;
+        }
+        return true;
     }
 }
