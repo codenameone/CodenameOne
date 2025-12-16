@@ -24,26 +24,33 @@ public class VideoPlaybackTest extends BaseTest {
         form.add(BorderLayout.NORTH, status);
         form.show();
 
+        // Use createMediaAsync to avoid blocking the EDT (which causes timeouts)
         try {
-            Media video = MediaManager.createMedia(VIDEO_URL, true, null);
-            if (video != null) {
-                video.setNativePlayerMode(false); // Try to embed if possible
-                form.add(BorderLayout.CENTER, video.getVideoComponent());
-                status.setText("Playing video...");
-                form.revalidate();
-                video.play();
-            } else {
-                status.setText("Failed to create media (null).");
-                form.revalidate();
-            }
+            MediaManager.createMediaAsync(VIDEO_URL, true, () -> {
+                // On completion of playback (optional, we just want to start it)
+            }).ready(media -> {
+                if (media != null) {
+                    media.setNativePlayerMode(false); // Try to embed if possible
+                    form.add(BorderLayout.CENTER, media.getVideoComponent());
+                    status.setText("Playing video...");
+                    form.revalidate();
+                    media.play();
+                } else {
+                    status.setText("Failed to create media (null).");
+                    form.revalidate();
+                }
+                // Wait a bit for playback to start, then finish.
+                UITimer.timer(2000, false, form, () -> done());
+            }).except(err -> {
+                 status.setText("Error creating media: " + err.getMessage());
+                 form.revalidate();
+                 done();
+            });
         } catch (Exception e) {
             status.setText("Error: " + e.getMessage());
             e.printStackTrace();
+            done();
         }
-
-        // Wait a bit for playback to start/fail, then finish.
-        // We do not wait for the video to finish as it is a playback test, not a completion test.
-        UITimer.timer(2000, false, form, () -> done());
 
         return true;
     }
