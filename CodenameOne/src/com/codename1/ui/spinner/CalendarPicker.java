@@ -26,6 +26,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.layouts.BorderLayout;
 
 import java.util.Date;
+import java.util.TimeZone;
 
 /**
  * A Calendar Picker widget.  Used by the picker.
@@ -56,6 +57,14 @@ class CalendarPicker extends Container implements InternalPickerWidget {
         Date dt = (Date) value;
         calendar.setDate(dt);
 
+    }
+
+    public void setTimeZone(TimeZone tmz) {
+        calendar.setTimeZone(tmz);
+    }
+
+    public TimeZone getTimeZone() {
+        return calendar.getTimeZone();
     }
 
 }
