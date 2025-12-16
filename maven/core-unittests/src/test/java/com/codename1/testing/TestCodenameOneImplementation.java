@@ -125,6 +125,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private Media mediaRecorder;
     private boolean trueTypeSupported = true;
     private static TestCodenameOneImplementation instance;
+    private String executeURL;
 
     private boolean autoProcessConnections = true;
     private Map<String, String> properties = new HashMap<>();
@@ -735,6 +736,15 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public static TestCodenameOneImplementation getInstance() {
         return instance;
+    }
+
+    @Override
+    public void execute(String url) {
+        this.executeURL = url;
+    }
+
+    public String getExecuteURL() {
+        return executeURL;
     }
 
     @Override
