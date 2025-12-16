@@ -9,8 +9,8 @@ import com.codename1.ui.util.UITimer;
 import com.codename1.ui.layouts.BorderLayout;
 
 public class VideoPlaybackTest extends BaseTest {
-    // A small, public domain video sample
-    private static final String VIDEO_URL = "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Small.mp4";
+    // A small, public domain video sample (HTTPS to avoid cleartext issues)
+    private static final String VIDEO_URL = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Small.mp4";
 
     @Override
     public boolean shouldTakeScreenshot() {
@@ -24,10 +24,10 @@ public class VideoPlaybackTest extends BaseTest {
         form.add(BorderLayout.NORTH, status);
         form.show();
 
-        // Use createMediaAsync to avoid blocking the EDT (which causes timeouts)
+        // Use createMediaAsync to avoid blocking the EDT on network access.
         try {
             MediaManager.createMediaAsync(VIDEO_URL, true, () -> {
-                // On completion of playback (optional, we just want to start it)
+                // On completion of playback
             }).ready(media -> {
                 if (media != null) {
                     media.setNativePlayerMode(false); // Try to embed if possible
@@ -39,18 +39,26 @@ public class VideoPlaybackTest extends BaseTest {
                     status.setText("Failed to create media (null).");
                     form.revalidate();
                 }
-                // Wait a bit for playback to start, then finish.
-                UITimer.timer(2000, false, form, () -> done());
             }).except(err -> {
                  status.setText("Error creating media: " + err.getMessage());
                  form.revalidate();
-                 done();
             });
         } catch (Exception e) {
-            status.setText("Error: " + e.getMessage());
+            status.setText("Error starting media creation: " + e.getMessage());
             e.printStackTrace();
-            done();
         }
+
+        // Safety timeout: Ensure the test finishes even if callbacks are never invoked (e.g. network hang)
+        // We allow plenty of time (10s) for buffering, but ensure we eventually call done().
+        UITimer.timer(10000, false, form, () -> {
+            if (!isDone()) {
+                if (status.getText().equals("Initializing video...")) {
+                     status.setText("Video initialization timed out.");
+                     form.revalidate();
+                }
+                done();
+            }
+        });
 
         return true;
     }
