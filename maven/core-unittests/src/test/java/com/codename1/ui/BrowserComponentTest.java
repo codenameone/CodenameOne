@@ -190,4 +190,10 @@ public class BrowserComponentTest extends UITestBase {
             s.setMargin(0, 0, 0, 0);
         }
     }
+
+    @FormTest
+    public void testJSExpression() {
+        BrowserComponent.JSExpression expression = new BrowserComponent.JSExpression("window.innerWidth");
+        assertEquals("window.innerWidth", expression.toString());
+    }
 }

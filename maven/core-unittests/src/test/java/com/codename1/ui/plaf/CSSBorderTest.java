@@ -175,4 +175,42 @@ public class CSSBorderTest extends UITestBase {
             border.toCSSString(); // BoxShadow toCSSString throws RuntimeException as per source
         });
     }
+
+    @FormTest
+    public void testRadialGradient() throws Exception {
+        // Use reflection to test RadialGradient
+        CSSBorder border = new CSSBorder((Resources)null);
+
+        // Reflection to create RadialGradient
+        Class<?> radialGradientClass = Class.forName("com.codename1.ui.plaf.CSSBorder$RadialGradient");
+        java.lang.reflect.Constructor<?> rgCtor = radialGradientClass.getDeclaredConstructor(CSSBorder.class);
+        rgCtor.setAccessible(true);
+        Object radialGradient = rgCtor.newInstance(border);
+
+        // Create BackgroundImage and attach RadialGradient
+        Class<?> bgImageClass = Class.forName("com.codename1.ui.plaf.CSSBorder$BackgroundImage");
+        java.lang.reflect.Constructor<?> bgCtor = bgImageClass.getDeclaredConstructor(CSSBorder.class);
+        bgCtor.setAccessible(true);
+        Object bgImage = bgCtor.newInstance(border);
+
+        java.lang.reflect.Field rgField = bgImageClass.getDeclaredField("radialGradient");
+        rgField.setAccessible(true);
+        rgField.set(bgImage, radialGradient);
+
+        // Attach BackgroundImage to CSSBorder
+        java.lang.reflect.Field bgImagesField = CSSBorder.class.getDeclaredField("backgroundImages");
+        bgImagesField.setAccessible(true);
+        Object bgImagesArray = java.lang.reflect.Array.newInstance(bgImageClass, 1);
+        java.lang.reflect.Array.set(bgImagesArray, 0, bgImage);
+        bgImagesField.set(border, bgImagesArray);
+
+        // Verify toCSSString
+        try {
+            border.toCSSString();
+            Assertions.fail("RadialGradient toCSSString should throw RuntimeException");
+        } catch(RuntimeException ex) {
+            // Expected
+            Assertions.assertEquals("RadialGradlient toCSSString() not implemented yet", ex.getMessage());
+        }
+    }
 }

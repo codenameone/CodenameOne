@@ -59,4 +59,11 @@ public class BrowserWindowTest extends UITestBase {
         window.removeCloseListener(closeListener);
         assertFalse(implementation.getNativeBrowserWindowCloseListener().contains(closeListener));
     }
+
+    @FormTest
+    public void testEvalRequest() {
+        BrowserWindow.EvalRequest request = new BrowserWindow.EvalRequest();
+        request.setJS("alert('Hello');");
+        assertEquals("alert('Hello');", request.getJS());
+    }
 }
