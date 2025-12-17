@@ -15,6 +15,13 @@ TMPDIR="${TMPDIR%/}"
 DOWNLOAD_DIR="${TMPDIR%/}/codenameone-tools"
 log "The DOWNLOAD_DIR is ${DOWNLOAD_DIR}"
 
+CN1_BINARIES_PARENT="$(cd .. && pwd -P)"
+CN1_BINARIES="${CN1_BINARIES_PARENT%/}/cn1-binaries"
+if [ ! -d "$CN1_BINARIES" ]; then
+    # Fallback to the maven build dir if the external one doesn't exist
+    CN1_BINARIES="$(pwd)/maven/target/cn1-binaries"
+fi
+
 ENV_DIR="$DOWNLOAD_DIR/tools"
 ENV_FILE="$ENV_DIR/env.sh"
 
