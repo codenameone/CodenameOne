@@ -2068,5 +2068,29 @@ public class BytecodeMethod implements SignatureSet {
         return null;
     }
 
+    public void populateMethodUsageIndex(Map<String, List<BytecodeMethod>> index) {
+        if(isEliminated()) return;
+
+        Set<String> uniqueCalls = new HashSet<String>();
+
+        for(Instruction ins : instructions) {
+            String sname = ins.getMethodName();
+            if(sname != null) {
+                String sig = ins.getSignature();
+                if (sig != null) {
+                   String key = sname + sig;
+                   if (!uniqueCalls.contains(key)) {
+                       uniqueCalls.add(key);
+                       List<BytecodeMethod> callers = index.get(key);
+                       if (callers == null) {
+                           callers = new ArrayList<BytecodeMethod>();
+                           index.put(key, callers);
+                       }
+                       callers.add(this);
+                   }
+                }
+            }
+        }
+    }
 
 }

@@ -50,11 +50,13 @@ public class Parser extends ClassVisitor {
     private String clsName;
     private static String[] nativeSources;
     private static List<ByteCodeClass> classes = new ArrayList<ByteCodeClass>();
+    private static Map<String, List<BytecodeMethod>> usageIndex;
     private int lambdaCounter;
     public static void cleanup() {
     	nativeSources = null;
     	classes.clear();
     	LabelInstruction.cleanup();
+        usageIndex = null;
     }
     public static void parse(File sourceFile) throws Exception {
         if(ByteCodeTranslator.verbose) {
@@ -434,7 +436,9 @@ public class Parser extends ClassVisitor {
             if (BytecodeMethod.optimizerOn) {
                 System.out.println("Optimizer On: Removing unused methods and classes...");
                 Date now = new Date();
+                buildMethodUsageIndex();
                 neliminated += eliminateUnusedMethods();
+                usageIndex = null;
                 Date later = new Date();
                 long dif = later.getTime()-now.getTime();
                 System.out.println("unusued Method cull removed "+neliminated+" methods in "+(dif/1000)+" seconds");
@@ -488,6 +492,15 @@ public class Parser extends ClassVisitor {
         
     }
     
+    private static void buildMethodUsageIndex() {
+        usageIndex = new HashMap<String, List<BytecodeMethod>>();
+        for(ByteCodeClass bc : classes) {
+            for(BytecodeMethod m : bc.getMethods()) {
+                m.populateMethodUsageIndex(usageIndex);
+            }
+        }
+    }
+
     private static int eliminateUnusedMethods() {
         return(eliminateUnusedMethods(false, 0));
     }
@@ -613,6 +626,24 @@ public class Parser extends ClassVisitor {
         if (!m.isEliminated() && m.isMethodUsedByNative(nativeSources, cls)) {
             return true;
         }
+
+        if (usageIndex != null) {
+            String name = m.getMethodName();
+            if ("__INIT__".equals(name)) {
+                name = "<init>";
+            }
+            String key = name + m.getSignature();
+            List<BytecodeMethod> callers = usageIndex.get(key);
+            if (callers != null) {
+                for (BytecodeMethod caller : callers) {
+                    if (!caller.isEliminated() && caller != m) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         for(ByteCodeClass bc : classes) {
             for(BytecodeMethod mtd : bc.getMethods()) {
                 if(mtd.isEliminated() || mtd == m) {
