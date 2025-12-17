@@ -346,6 +346,7 @@ rm -rf "$DERIVED_DATA_DIR"
 BUILD_LOG="$ARTIFACTS_DIR/xcodebuild-build.log"
 
 ri_log "Building simulator app with xcodebuild"
+COMPILE_START=$(date +%s)
 if ! xcodebuild \
   -workspace "$WORKSPACE_PATH" \
   -scheme "$SCHEME" \
@@ -358,6 +359,9 @@ if ! xcodebuild \
   ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
   exit 10
 fi
+COMPILE_END=$(date +%s)
+COMPILATION_TIME=$((COMPILE_END - COMPILE_START))
+ri_log "Compilation time: ${COMPILATION_TIME}s"
 
 BUILD_SETTINGS="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -configuration Debug -showBuildSettings 2>/dev/null || true)"
 TARGET_BUILD_DIR="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ TARGET_BUILD_DIR /{print $2; exit}')"
@@ -611,6 +615,15 @@ export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 export CN1SS_COMMENT_MARKER="<!-- CN1SS_IOS_COMMENT -->"
 export CN1SS_COMMENT_LOG_PREFIX="[run-ios-device-tests]"
 export CN1SS_PREVIEW_SUBDIR="ios"
+
+# Load VM translation time if available
+CN1SS_VM_TIME=0
+if [ -f "$ARTIFACTS_DIR/vm_time.txt" ]; then
+  CN1SS_VM_TIME=$(cat "$ARTIFACTS_DIR/vm_time.txt")
+  ri_log "Loaded VM translation time: ${CN1SS_VM_TIME}s"
+fi
+export CN1SS_VM_TIME
+export CN1SS_COMPILATION_TIME="$COMPILATION_TIME"
 
 cn1ss_process_and_report \
   "iOS screenshot updates" \

@@ -62,13 +62,21 @@ xcodebuild -version
 
 bia_log "Building iOS Xcode project using Codename One port"
 cd $APP_DIR
+VM_START=$(date +%s)
 ./mvnw package \
   -DskipTests \
   -Dcodename1.platform=ios \
   -Dcodename1.buildTarget=ios-source \
   -Dopen=false \
   -U -e
+VM_END=$(date +%s)
+VM_TIME=$((VM_END - VM_START))
 cd ../..
+
+ARTIFACTS_DIR="${ARTIFACTS_DIR:-$REPO_ROOT/artifacts}"
+mkdir -p "$ARTIFACTS_DIR"
+echo "$VM_TIME" > "$ARTIFACTS_DIR/vm_time.txt"
+bia_log "VM translation time: ${VM_TIME}s (saved to $ARTIFACTS_DIR/vm_time.txt)"
 
 IOS_TARGET_DIR="$APP_DIR/ios/target"
 if [ ! -d "$IOS_TARGET_DIR" ]; then
