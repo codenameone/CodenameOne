@@ -27,7 +27,7 @@ class KotlinUiTest : BaseTest() {
         )
 
         val accordion = Accordion()
-        accordion.add("Details", BoxLayout.encloseY(
+        accordion.addContent("Details", BoxLayout.encloseY(
                 MultiButton("MultiButton Line 1").apply {
                     setTextLine2("Additional detail line")
                 },
@@ -42,9 +42,9 @@ class KotlinUiTest : BaseTest() {
                 Switch().apply { setOn() },
                 TextArea(3, 20).apply { hint = "Add a short note" }
         )
-        accordion.add("Preferences", preferences)
+        accordion.addContent("Preferences", preferences)
 
-        accordion.add("Summary", BoxLayout.encloseY(
+        accordion.addContent("Summary", BoxLayout.encloseY(
                 Label("Accordion showcases grouped UI"),
                 Button("Confirm Settings")
         ))
