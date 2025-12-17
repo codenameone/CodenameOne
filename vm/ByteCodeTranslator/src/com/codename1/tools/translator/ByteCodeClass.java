@@ -25,6 +25,7 @@ package com.codename1.tools.translator;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -78,7 +79,7 @@ public class ByteCodeClass {
     private boolean isUnitTest;
 
 
-    private static Set<String> arrayTypes = new TreeSet<String>();
+    private static Set<String> arrayTypes = Collections.synchronizedSet(new TreeSet<String>());
     
     private ByteCodeClass baseClassObject;
     private List<ByteCodeClass> baseInterfacesObject;
@@ -89,10 +90,10 @@ public class ByteCodeClass {
     private int classOffset;
     
     private boolean marked;
-    private static ByteCodeClass mainClass;
+    private static volatile ByteCodeClass mainClass;
     private boolean finalClass;
     private boolean isEnum;
-    private static Set<String> writableFields = new HashSet<String>();
+    private static Set<String> writableFields = Collections.synchronizedSet(new HashSet<String>());
     
     /**
      * 
@@ -151,10 +152,12 @@ public class ByteCodeClass {
     
     public void addMethod(BytecodeMethod m) {
         if(m.isMain()) {
-            if (mainClass == null) {
-                mainClass = this;
-            } else {
-                throw new RuntimeException("Multiple main classes: "+mainClass.clsName+" and "+this.clsName);
+            synchronized(ByteCodeClass.class) {
+                if (mainClass == null) {
+                    mainClass = this;
+                } else {
+                    throw new RuntimeException("Multiple main classes: "+mainClass.clsName+" and "+this.clsName);
+                }
             }
         }
         m.setSourceFile(sourceFile);

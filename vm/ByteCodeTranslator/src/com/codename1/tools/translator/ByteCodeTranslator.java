@@ -38,6 +38,10 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  *
@@ -79,12 +83,26 @@ public class ByteCodeTranslator {
      * Recursively parses the files in the hierarchy to the output directory
      */
     void execute(File[] sourceDirs, File outputDir) throws Exception {
-        for(File f : sourceDirs) {
-            execute(f, outputDir);
+        ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        List<Future<?>> futures = new ArrayList<Future<?>>();
+        try {
+            for(File f : sourceDirs) {
+                execute(f, outputDir, executor, futures);
+            }
+            for(Future<?> future : futures) {
+                try {
+                    future.get();
+                } catch (ExecutionException e) {
+                    if (e.getCause() instanceof Exception) throw (Exception)e.getCause();
+                    throw e;
+                }
+            }
+        } finally {
+            executor.shutdown();
         }
     }
     
-    void execute(File sourceDir, File outputDir) throws Exception {
+    void execute(File sourceDir, final File outputDir, ExecutorService executor, List<Future<?>> futures) throws Exception {
         File[] directoryList = sourceDir.listFiles(new FileFilter() {
             @Override
             public boolean accept(File pathname) {
@@ -98,7 +116,7 @@ public class ByteCodeTranslator {
             }
         });
         if(fileList != null) {
-            for(File f : fileList) {
+            for(final File f : fileList) {
                 if (f.getName().equals("module-info.class")) {
                     // Remove module-info.class that might have been added by jdk9 compile
                     System.out.println("WARNING: Found module-info.class file at "+f+".  One or more of your jars must have been built for JDK9 or higher.  -target 8 or lower is required.");
@@ -106,11 +124,27 @@ public class ByteCodeTranslator {
                     continue;
                 }
                 if(f.getName().endsWith(".class")) {
-                    Parser.parse(f);
+                    futures.add(executor.submit(new Runnable() {
+                        public void run() {
+                            try {
+                                Parser.parse(f);
+                            } catch(Exception e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+                    }));
                 } else {
                     if(!f.isDirectory()) {
                         // copy the file to the dest dir
-                        copy(new FileInputStream(f), new FileOutputStream(new File(outputDir, f.getName())));
+                        futures.add(executor.submit(new Runnable() {
+                            public void run() {
+                                try {
+                                    copy(new FileInputStream(f), new FileOutputStream(new File(outputDir, f.getName())));
+                                } catch(Exception e) {
+                                    throw new RuntimeException(e);
+                                }
+                            }
+                        }));
                     }
                 }
             }
@@ -121,7 +155,7 @@ public class ByteCodeTranslator {
                     copyDir(f, outputDir);
                     continue;
                 }
-                execute(f, outputDir);
+                execute(f, outputDir, executor, futures);
             }
         }
     }

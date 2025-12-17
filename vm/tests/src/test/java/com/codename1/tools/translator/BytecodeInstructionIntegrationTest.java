@@ -378,12 +378,39 @@ class BytecodeInstructionIntegrationTest {
 
     @Test
     void byteCodeTranslatorFilenameFilterMatchesExpectedFiles() throws Exception {
-        Class<?> filterClass = Class.forName("com.codename1.tools.translator.ByteCodeTranslator$3");
+        Class<?> filterClass = null;
+        File directory = Files.createTempDirectory("bytecode-filter").toFile();
+        // Search for the anonymous FilenameFilter class
+        for (int i = 1; i < 50; i++) {
+            try {
+                Class<?> c = Class.forName("com.codename1.tools.translator.ByteCodeTranslator$" + i);
+                if (FilenameFilter.class.isAssignableFrom(c)) {
+                    // Check if it has a no-arg constructor (static context)
+                    try {
+                        Constructor<?> ctor = c.getDeclaredConstructor();
+                        ctor.setAccessible(true);
+                        FilenameFilter filter = (FilenameFilter) ctor.newInstance();
+                        // Verify it's the correct filter by testing behavior
+                        if (filter.accept(directory, "assets.bundle") && !filter.accept(directory, "Images.xcassets")) {
+                            filterClass = c;
+                            break;
+                        }
+                    } catch (Exception e) {
+                        // It might be an instance inner class or different constructor
+                    }
+                }
+            } catch (ClassNotFoundException e) {
+                // End of inner classes
+                break;
+            }
+        }
+
+        assertNotNull(filterClass, "Could not find the expected FilenameFilter inner class in ByteCodeTranslator");
+
         Constructor<?> ctor = filterClass.getDeclaredConstructor();
         ctor.setAccessible(true);
 
         FilenameFilter filter = (FilenameFilter) ctor.newInstance();
-        File directory = Files.createTempDirectory("bytecode-filter").toFile();
 
         assertTrue(filter.accept(directory, "assets.bundle"));
         assertTrue(filter.accept(directory, "model.xcdatamodeld"));

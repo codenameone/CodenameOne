@@ -25,6 +25,10 @@ package com.codename1.tools.translator;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.Attribute;
@@ -49,7 +53,7 @@ public class Parser extends ClassVisitor {
     private ByteCodeClass cls;
     private String clsName;
     private static String[] nativeSources;
-    private static List<ByteCodeClass> classes = new ArrayList<ByteCodeClass>();
+    private static List<ByteCodeClass> classes = Collections.synchronizedList(new ArrayList<ByteCodeClass>());
     private int lambdaCounter;
     public static void cleanup() {
     	nativeSources = null;
@@ -102,12 +106,14 @@ public class Parser extends ClassVisitor {
         }
     }
 
-    private static ArrayList<String> constantPool = new ArrayList<String>();
+    private static List<String> constantPool = Collections.synchronizedList(new ArrayList<String>());
     
     public static ByteCodeClass getClassObject(String name) {
-        for(ByteCodeClass cls : classes) {
-            if(cls.getClsName().equals(name)) {
-                return cls;
+        synchronized(classes) {
+            for(ByteCodeClass cls : classes) {
+                if(cls.getClsName().equals(name)) {
+                    return cls;
+                }
             }
         }
         return null;
@@ -116,7 +122,7 @@ public class Parser extends ClassVisitor {
     /**
      * Adds the given string to the hardcoded constant pool strings returns the offset in the pool
      */
-    public static int addToConstantPool(String s) {
+    public static synchronized int addToConstantPool(String s) {
         int i = constantPool.indexOf(s);
         if(i < 0) {
             constantPool.add(s);
@@ -416,10 +422,25 @@ public class Parser extends ClassVisitor {
             // and the class may be purged before it even has a shot.
             readNativeFiles(outputDirectory);
 
-            for(ByteCodeClass bc : classes) {
+            ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+            List<Future<?>> futures = new ArrayList<Future<?>>();
+            for(final ByteCodeClass bc : classes) {
                 file = bc.getClsName();
-                bc.updateAllDependencies();
+                futures.add(executor.submit(new Runnable() {
+                    public void run() {
+                        bc.updateAllDependencies();
+                    }
+                }));
             }
+            for (Future<?> f : futures) {
+                try {
+                    f.get();
+                } catch (ExecutionException e) {
+                    if (e.getCause() instanceof Exception) throw (Exception)e.getCause();
+                    throw new RuntimeException(e);
+                }
+            }
+            futures.clear();
             ByteCodeClass.markDependencies(classes, nativeSources);
             Set<ByteCodeClass> unmarked = new HashSet<ByteCodeClass>(classes);
             classes = ByteCodeClass.clearUnmarked(classes);
@@ -445,11 +466,35 @@ public class Parser extends ClassVisitor {
             boolean concatenate = "true".equals(System.getProperty("concatenateFiles", "false"));
             ConcatenatingFileOutputStream cos = concatenate ? new ConcatenatingFileOutputStream(outputDirectory) : null;
 
-            for(ByteCodeClass bc : classes) {
-                file = bc.getClsName();
-                writeFile(bc, outputDirectory, cos);
+            if (cos != null) {
+                for(ByteCodeClass bc : classes) {
+                    file = bc.getClsName();
+                    writeFile(bc, outputDirectory, cos);
+                }
+                cos.realClose();
+            } else {
+                for(final ByteCodeClass bc : classes) {
+                    file = bc.getClsName();
+                    futures.add(executor.submit(new Runnable() {
+                        public void run() {
+                            try {
+                                writeFile(bc, outputDirectory, null);
+                            } catch (Exception e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+                    }));
+                }
+                for (Future<?> f : futures) {
+                    try {
+                        f.get();
+                    } catch (ExecutionException e) {
+                        if (e.getCause() instanceof Exception) throw (Exception)e.getCause();
+                        throw new RuntimeException(e);
+                    }
+                }
+                executor.shutdown();
             }
-            if (cos != null) cos.realClose();
 
         } catch(Throwable t) {
             System.out.println("Error while working with the class: " + file);

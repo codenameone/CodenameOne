@@ -47,6 +47,7 @@ import com.codename1.tools.translator.bytecodes.TryCatch;
 import com.codename1.tools.translator.bytecodes.TypeInstruction;
 import com.codename1.tools.translator.bytecodes.VarOp;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
@@ -98,7 +99,7 @@ public class BytecodeMethod implements SignatureSet {
     private boolean virtualOverriden;
     private boolean finalMethod;
     private boolean synchronizedMethod;
-    private final static Set<String> virtualMethodsInvoked = new TreeSet<String>();    
+    private final static Set<String> virtualMethodsInvoked = Collections.synchronizedSet(new TreeSet<String>());
     private String desc;
     private boolean eliminated;
 
