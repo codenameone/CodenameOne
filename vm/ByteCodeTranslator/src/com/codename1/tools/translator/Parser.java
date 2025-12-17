@@ -29,6 +29,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.Attribute;
@@ -53,11 +55,17 @@ public class Parser extends ClassVisitor {
     private ByteCodeClass cls;
     private String clsName;
     private static String[] nativeSources;
-    private static List<ByteCodeClass> classes = Collections.synchronizedList(new ArrayList<ByteCodeClass>());
+    private static List<ByteCodeClass> classes = new ArrayList<ByteCodeClass>();
+    private static ReadWriteLock classesLock = new ReentrantReadWriteLock();
     private int lambdaCounter;
     public static void cleanup() {
     	nativeSources = null;
-    	classes.clear();
+        classesLock.writeLock().lock();
+        try {
+	    classes.clear();
+        } finally {
+            classesLock.writeLock().unlock();
+        }
     	LabelInstruction.cleanup();
     }
     public static void parse(File sourceFile) throws Exception {
@@ -74,16 +82,26 @@ public class Parser extends ClassVisitor {
         p.cls = new ByteCodeClass(p.clsName, r.getClassName());
         r.accept(p, ClassReader.EXPAND_FRAMES);
         
-        classes.add(p.cls);
+        classesLock.writeLock().lock();
+        try {
+            classes.add(p.cls);
+        } finally {
+            classesLock.writeLock().unlock();
+        }
     }
     
     private static ByteCodeClass getClassByName(String name) {
         name = name.replace('/', '_').replace('$', '_');
-        for(ByteCodeClass bc : classes) {
-            if(bc.getClsName().equals(name)) {
-                return bc;
+        classesLock.readLock().lock();
+        try {
+            for(ByteCodeClass bc : classes) {
+                if(bc.getClsName().equals(name)) {
+                    return bc;
+                }
             }
-        }        
+        } finally {
+            classesLock.readLock().unlock();
+        }
         return null;
     }
     
@@ -106,15 +124,19 @@ public class Parser extends ClassVisitor {
         }
     }
 
-    private static List<String> constantPool = Collections.synchronizedList(new ArrayList<String>());
+    private static List<String> constantPool = new ArrayList<String>();
+    private static ReadWriteLock constantPoolLock = new ReentrantReadWriteLock();
     
     public static ByteCodeClass getClassObject(String name) {
-        synchronized(classes) {
+        classesLock.readLock().lock();
+        try {
             for(ByteCodeClass cls : classes) {
                 if(cls.getClsName().equals(name)) {
                     return cls;
                 }
             }
+        } finally {
+            classesLock.readLock().unlock();
         }
         return null;
     }
@@ -122,13 +144,27 @@ public class Parser extends ClassVisitor {
     /**
      * Adds the given string to the hardcoded constant pool strings returns the offset in the pool
      */
-    public static synchronized int addToConstantPool(String s) {
-        int i = constantPool.indexOf(s);
-        if(i < 0) {
-            constantPool.add(s);
-            return constantPool.size() - 1;
+    public static int addToConstantPool(String s) {
+        constantPoolLock.readLock().lock();
+        try {
+            int i = constantPool.indexOf(s);
+            if(i > -1) {
+                return i;
+            }
+        } finally {
+            constantPoolLock.readLock().unlock();
         }
-        return i;
+        constantPoolLock.writeLock().lock();
+        try {
+            int i = constantPool.indexOf(s);
+            if(i < 0) {
+                constantPool.add(s);
+                return constantPool.size() - 1;
+            }
+            return i;
+        } finally {
+            constantPoolLock.writeLock().unlock();
+        }
     }
     
     
@@ -270,30 +306,35 @@ public class Parser extends ClassVisitor {
         bldM.append("};\n\n");
         
         bld.append("#define CN1_CONSTANT_POOL_SIZE ");
-        bld.append(constantPool.size());
-        bld.append("\n\nextern const char * const constantPool[];\n");
+        constantPoolLock.readLock().lock();
+        try {
+            bld.append(constantPool.size());
+            bld.append("\n\nextern const char * const constantPool[];\n");
 
-        bldM.append("\n\nconst char * const constantPool[] = {\n");
-        first = true;
-        int offset = 0;
-        for(String con : constantPool) {
-            if(first) {
-                bldM.append("\n    \"");
-            } else {
-                bldM.append(",\n    \"");
+            bldM.append("\n\nconst char * const constantPool[] = {\n");
+            first = true;
+            int offset = 0;
+            for(String con : constantPool) {
+                if(first) {
+                    bldM.append("\n    \"");
+                } else {
+                    bldM.append(",\n    \"");
+                }
+                first = false;
+                try {
+                    bldM.append(encodeString(con));
+                } catch(Throwable t) {
+                    t.printStackTrace();
+                    System.out.println("Error writing the constant pool string: '" + con + "'");
+                    System.exit(1);
+                }
+                bldM.append("\" /* ");
+                bldM.append(offset);
+                offset++;
+                bldM.append(" */");
             }
-            first = false;            
-            try {
-                bldM.append(encodeString(con));
-            } catch(Throwable t) {
-                t.printStackTrace();
-                System.out.println("Error writing the constant pool string: '" + con + "'");
-                System.exit(1);
-            }
-            bldM.append("\" /* ");
-            bldM.append(offset);
-            offset++;
-            bldM.append(" */");
+        } finally {
+            constantPoolLock.readLock().unlock();
         }
         bldM.append("};\n\nint classListSize = ");
         bldM.append(classes.size());
@@ -387,7 +428,14 @@ public class Parser extends ClassVisitor {
 		}
         String file = "Unknown File";
         try {
-            for(ByteCodeClass bc : classes) {
+            List<ByteCodeClass> classesCopy;
+            classesLock.readLock().lock();
+            try {
+                classesCopy = new ArrayList<ByteCodeClass>(classes);
+            } finally {
+                classesLock.readLock().unlock();
+            }
+            for(ByteCodeClass bc : classesCopy) {
                 // special case for object
                 if(bc.getClsName().equals("java_lang_Object")) {
                     continue;
@@ -408,7 +456,7 @@ public class Parser extends ClassVisitor {
             boolean foundNewUnitTests = true;
             while (foundNewUnitTests) {
                 foundNewUnitTests = false;
-                for (ByteCodeClass bc : classes) {
+                for (ByteCodeClass bc : classesCopy) {
                     if (!bc.isUnitTest() && bc.getBaseClassObject() != null && bc.getBaseClassObject().isUnitTest()) {
                         bc.setIsUnitTest(true);
                         foundNewUnitTests = true;
@@ -424,7 +472,7 @@ public class Parser extends ClassVisitor {
 
             ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
             List<Future<?>> futures = new ArrayList<Future<?>>();
-            for(final ByteCodeClass bc : classes) {
+            for(final ByteCodeClass bc : classesCopy) {
                 file = bc.getClsName();
                 futures.add(executor.submit(new Runnable() {
                     public void run() {
@@ -441,10 +489,16 @@ public class Parser extends ClassVisitor {
                 }
             }
             futures.clear();
-            ByteCodeClass.markDependencies(classes, nativeSources);
-            Set<ByteCodeClass> unmarked = new HashSet<ByteCodeClass>(classes);
-            classes = ByteCodeClass.clearUnmarked(classes);
-            unmarked.removeAll(classes);
+            ByteCodeClass.markDependencies(classesCopy, nativeSources);
+            Set<ByteCodeClass> unmarked = new HashSet<ByteCodeClass>(classesCopy);
+            List<ByteCodeClass> markedClasses = ByteCodeClass.clearUnmarked(classesCopy);
+            classesLock.writeLock().lock();
+            try {
+                classes = markedClasses;
+            } finally {
+                classesLock.writeLock().unlock();
+            }
+            unmarked.removeAll(markedClasses);
             int neliminated = 0;
             for (ByteCodeClass removedClass : unmarked) {
                 removedClass.setEliminated(true);
@@ -467,13 +521,26 @@ public class Parser extends ClassVisitor {
             ConcatenatingFileOutputStream cos = concatenate ? new ConcatenatingFileOutputStream(outputDirectory) : null;
 
             if (cos != null) {
-                for(ByteCodeClass bc : classes) {
+                classesLock.readLock().lock();
+                try {
+                    classesCopy = new ArrayList<ByteCodeClass>(classes);
+                } finally {
+                    classesLock.readLock().unlock();
+                }
+                for(ByteCodeClass bc : classesCopy) {
                     file = bc.getClsName();
                     writeFile(bc, outputDirectory, cos);
                 }
                 cos.realClose();
+                executor.shutdown();
             } else {
-                for(final ByteCodeClass bc : classes) {
+                classesLock.readLock().lock();
+                try {
+                    classesCopy = new ArrayList<ByteCodeClass>(classes);
+                } finally {
+                    classesLock.readLock().unlock();
+                }
+                for(final ByteCodeClass bc : classesCopy) {
                     file = bc.getClsName();
                     futures.add(executor.submit(new Runnable() {
                         public void run() {
@@ -545,7 +612,14 @@ public class Parser extends ClassVisitor {
 
     private static int cullMethods() {
     	int nfound = 0;
-    	for(ByteCodeClass bc : classes) {
+        List<ByteCodeClass> classesCopy;
+        classesLock.readLock().lock();
+        try {
+            classesCopy = new ArrayList<ByteCodeClass>(classes);
+        } finally {
+            classesLock.readLock().unlock();
+        }
+	for(ByteCodeClass bc : classesCopy) {
             bc.unmark();
             if(bc.isIsInterface() || bc.getBaseClass() == null) {
                 continue;
@@ -618,12 +692,19 @@ public class Parser extends ClassVisitor {
     private static int cullClasses(boolean found, int depth) {
         System.out.println("cullClasses()");
         if(found && depth < 4) {
-            for(ByteCodeClass bc : classes) {
+            List<ByteCodeClass> classesCopy;
+            classesLock.readLock().lock();
+            try {
+                classesCopy = new ArrayList<ByteCodeClass>(classes);
+            } finally {
+                classesLock.readLock().unlock();
+            }
+            for(ByteCodeClass bc : classesCopy) {
                 bc.updateAllDependencies();
             }   
 
-            ByteCodeClass.markDependencies(classes, nativeSources);
-            List<ByteCodeClass> tmp = ByteCodeClass.clearUnmarked(classes);
+            ByteCodeClass.markDependencies(classesCopy, nativeSources);
+            List<ByteCodeClass> tmp = ByteCodeClass.clearUnmarked(classesCopy);
             /*if(ByteCodeTranslator.verbose) {
             System.out.println("Classes removed from: " + classCount + " to " + classes.size());
             for(ByteCodeClass bc : classes) {
@@ -636,13 +717,18 @@ public class Parser extends ClassVisitor {
             // 2nd pass to mark classes as eliminated so that we can propagate down to each
             // method of the class to mark it eliminated so that virtual methods
             // aren't included later on when writing virtual methods
-            Set<ByteCodeClass> removedClasses = new HashSet<ByteCodeClass>(classes);
+            Set<ByteCodeClass> removedClasses = new HashSet<ByteCodeClass>(classesCopy);
             removedClasses.removeAll(tmp);
             int nfound = 0;
             for (ByteCodeClass cls : removedClasses) {
                 nfound += cls.setEliminated(true);
             }
-            classes = tmp;
+            classesLock.writeLock().lock();
+            try {
+                classes = tmp;
+            } finally {
+                classesLock.writeLock().unlock();
+            }
             return nfound + eliminateUnusedMethods(nfound > 0, depth + 1);
         }
 
@@ -658,7 +744,14 @@ public class Parser extends ClassVisitor {
         if (!m.isEliminated() && m.isMethodUsedByNative(nativeSources, cls)) {
             return true;
         }
-        for(ByteCodeClass bc : classes) {
+        List<ByteCodeClass> classesCopy;
+        classesLock.readLock().lock();
+        try {
+            classesCopy = new ArrayList<ByteCodeClass>(classes);
+        } finally {
+            classesLock.readLock().unlock();
+        }
+        for(ByteCodeClass bc : classesCopy) {
             for(BytecodeMethod mtd : bc.getMethods()) {
                 if(mtd.isEliminated() || mtd == m) {
                     continue;

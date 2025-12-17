@@ -82,7 +82,8 @@ public class ByteCodeClass {
     private boolean isUnitTest;
 
 
-    private static Set<String> arrayTypes = Collections.synchronizedSet(new TreeSet<String>());
+    private static Set<String> arrayTypes = new TreeSet<String>();
+    private static ReadWriteLock arrayTypesLock = new ReentrantReadWriteLock();
     
     private ByteCodeClass baseClassObject;
     private List<ByteCodeClass> baseInterfacesObject;
@@ -94,9 +95,11 @@ public class ByteCodeClass {
     
     private boolean marked;
     private static volatile ByteCodeClass mainClass;
+    private static ReentrantLock mainClassLock = new ReentrantLock();
     private boolean finalClass;
     private boolean isEnum;
-    private static Set<String> writableFields = Collections.synchronizedSet(new HashSet<String>());
+    private static Set<String> writableFields = new HashSet<String>();
+    private static ReadWriteLock writableFieldsLock = new ReentrantReadWriteLock();
     
     /**
      * 
@@ -155,12 +158,15 @@ public class ByteCodeClass {
     
     public void addMethod(BytecodeMethod m) {
         if(m.isMain()) {
-            synchronized(ByteCodeClass.class) {
+            mainClassLock.lock();
+            try {
                 if (mainClass == null) {
                     mainClass = this;
                 } else {
                     throw new RuntimeException("Multiple main classes: "+mainClass.clsName+" and "+this.clsName);
                 }
+            } finally {
+                mainClassLock.unlock();
             }
         }
         m.setSourceFile(sourceFile);
@@ -1058,29 +1064,29 @@ public class ByteCodeClass {
         b.append(clsName);
         b.append(");\n        return;\n    }\n\n");
         
-        boolean c1 = false;
-        boolean c2 = false;
-        boolean c3 = false;
+        boolean arrayTypeC1 = false;
+        boolean arrayTypeC2 = false;
+        boolean arrayTypeC3 = false;
         arrayTypesLock.readLock().lock();
         try {
-            c1 = arrayTypes.contains("1_" + clsName) || arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName);
-            c2 = arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName);
-            c3 = arrayTypes.contains("3_" + clsName);
+            arrayTypeC1 = arrayTypes.contains("1_" + clsName) || arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName);
+            arrayTypeC2 = arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName);
+            arrayTypeC3 = arrayTypes.contains("3_" + clsName);
         } finally {
             arrayTypesLock.readLock().unlock();
         }
-        if(c1) {
+        if(arrayTypeC1) {
             b.append("class_array1__");
             b.append(clsName);
             b.append(".vtable = initVtableForInterface();\n    ");
         }
 
-        if(c2) {
+        if(arrayTypeC2) {
             b.append("class_array2__");
             b.append(clsName);
             b.append(".vtable = initVtableForInterface();\n    ");
         }
-        if(c3) {
+        if(arrayTypeC3) {
             b.append("class_array3__");
             b.append(clsName);
             b.append(".vtable = initVtableForInterface();\n    ");
@@ -1294,30 +1300,30 @@ public class ByteCodeClass {
         b.append(clsName);
         b.append(";\n");
 
-        boolean _c1 = false;
-        boolean _c2 = false;
-        boolean _c3 = false;
+        boolean arrayTypeC1 = false;
+        boolean arrayTypeC2 = false;
+        boolean arrayTypeC3 = false;
         arrayTypesLock.readLock().lock();
         try {
-            _c1 = arrayTypes.contains("1_" + clsName) || arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName);
-            _c2 = arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName);
-            _c3 = arrayTypes.contains("3_" + clsName);
+            arrayTypeC1 = arrayTypes.contains("1_" + clsName) || arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName);
+            arrayTypeC2 = arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName);
+            arrayTypeC3 = arrayTypes.contains("3_" + clsName);
         } finally {
             arrayTypesLock.readLock().unlock();
         }
-        if(_c1) {
+        if(arrayTypeC1) {
             b.append("extern struct clazz class_array1__");
             b.append(clsName);
             b.append(";\n");
         }
 
-        if(_c2) {
+        if(arrayTypeC2) {
             b.append("extern struct clazz class_array2__");
             b.append(clsName);
             b.append(";\n");
         }
 
-        if(_c3) {
+        if(arrayTypeC3) {
             b.append("extern struct clazz class_array3__");
             b.append(clsName);
             b.append(";\n");
@@ -1357,14 +1363,14 @@ public class ByteCodeClass {
             b.append("extern JAVA_OBJECT __VALUE_OF_").append(clsName).append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT value);\n");
         }
                 
-        boolean _c1_arr = false;
+        boolean arrayTypeC1_arr = false;
         arrayTypesLock.readLock().lock();
         try {
-            _c1_arr = arrayTypes.contains("1_" + clsName);
+            arrayTypeC1_arr = arrayTypes.contains("1_" + clsName);
         } finally {
             arrayTypesLock.readLock().unlock();
         }
-        if(_c1_arr) {
+        if(arrayTypeC1_arr) {
             b.append("extern JAVA_OBJECT __NEW_ARRAY_");
             b.append(clsName);
             b.append("(CODENAME_ONE_THREAD_STATE, JAVA_INT size);\n");
