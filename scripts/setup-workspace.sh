@@ -233,13 +233,14 @@ log "Building Codename One Maven plugin"
   -pl codenameone-maven-plugin -am \
   -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
   -DskipTests -Djava.awt.headless=true \
+  -Dcn1.binaries="$CN1_BINARIES" \
   -P !download-cn1-binaries \
   install "$@"
 
 BUILD_CLIENT="$HOME/.codenameone/CodeNameOneBuildClient.jar"
 log "Ensuring CodeNameOneBuildClient.jar is installed"
 if [ ! -f "$BUILD_CLIENT" ]; then
-  if ! "$MAVEN_HOME/bin/mvn" -f maven/pom.xml -P !download-cn1-binaries cn1:install-codenameone "$@"; then
+  if ! "$MAVEN_HOME/bin/mvn" -f maven/pom.xml -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries cn1:install-codenameone "$@"; then
     log "Falling back to copying CodeNameOneBuildClient.jar"
     mkdir -p "$(dirname "$BUILD_CLIENT")"
     cp maven/CodeNameOneBuildClient.jar "$BUILD_CLIENT" || true
