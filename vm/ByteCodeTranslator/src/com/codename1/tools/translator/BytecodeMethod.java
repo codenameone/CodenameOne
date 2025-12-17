@@ -99,7 +99,8 @@ public class BytecodeMethod implements SignatureSet {
     private boolean virtualOverriden;
     private boolean finalMethod;
     private boolean synchronizedMethod;
-    private final static Set<String> virtualMethodsInvoked = Collections.synchronizedSet(new TreeSet<String>());
+    private final static Set<String> virtualMethodsInvoked = new TreeSet<String>();
+    private final static ReadWriteLock virtualMethodsInvokedLock = new ReentrantReadWriteLock();
     private String desc;
     private boolean eliminated;
 
@@ -827,8 +828,21 @@ public class BytecodeMethod implements SignatureSet {
     }
     
     public static void addVirtualMethodsInvoked(String m) {
-        if(!virtualMethodsInvoked.contains(m)) {
-            virtualMethodsInvoked.add(m);
+        virtualMethodsInvokedLock.readLock().lock();
+        try {
+            if(virtualMethodsInvoked.contains(m)) {
+                return;
+            }
+        } finally {
+            virtualMethodsInvokedLock.readLock().unlock();
+        }
+        virtualMethodsInvokedLock.writeLock().lock();
+        try {
+            if(!virtualMethodsInvoked.contains(m)) {
+                virtualMethodsInvoked.add(m);
+            }
+        } finally {
+            virtualMethodsInvokedLock.writeLock().unlock();
         }
     }
     
@@ -861,7 +875,14 @@ public class BytecodeMethod implements SignatureSet {
             returnType.appendCMethodExt(bld);
         }
         
-        if(!forceVirtual && !virtualMethodsInvoked.contains(bld.toString())) {
+        boolean invoked = false;
+        virtualMethodsInvokedLock.readLock().lock();
+        try {
+            invoked = virtualMethodsInvoked.contains(bld.toString());
+        } finally {
+            virtualMethodsInvokedLock.readLock().unlock();
+        }
+        if(!forceVirtual && !invoked) {
             return;
         }
                 
@@ -914,7 +935,14 @@ public class BytecodeMethod implements SignatureSet {
             bld.append("_R");
             returnType.appendCMethodExt(bld);
         }
-        if(!forceVirtual && !virtualMethodsInvoked.contains(bld.toString())) {
+        boolean invoked = false;
+        virtualMethodsInvokedLock.readLock().lock();
+        try {
+            invoked = virtualMethodsInvoked.contains(bld.toString());
+        } finally {
+            virtualMethodsInvokedLock.readLock().unlock();
+        }
+        if(!forceVirtual && !invoked) {
             return;
         }
         appendCMethodPrefix(b, "virtual_", cls);

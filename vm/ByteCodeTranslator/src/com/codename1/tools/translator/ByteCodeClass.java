@@ -175,7 +175,12 @@ public class ByteCodeClass {
     }
     
     public void addWritableField(String field) {
-        writableFields.add(field);
+        writableFieldsLock.writeLock().lock();
+        try {
+            writableFields.add(field);
+        } finally {
+            writableFieldsLock.writeLock().unlock();
+        }
     }
 
     /**
@@ -432,8 +437,21 @@ public class ByteCodeClass {
     
     public static void addArrayType(String type, int dimenstions) {
         String arr = dimenstions + "_" + type;
-        if(!arrayTypes.contains(arr)) {
-            arrayTypes.add(arr);
+        arrayTypesLock.readLock().lock();
+        try {
+            if(arrayTypes.contains(arr)) {
+                return;
+            }
+        } finally {
+            arrayTypesLock.readLock().unlock();
+        }
+        arrayTypesLock.writeLock().lock();
+        try {
+            if(!arrayTypes.contains(arr)) {
+                arrayTypes.add(arr);
+            }
+        } finally {
+            arrayTypesLock.writeLock().unlock();
         }
     }
 
@@ -569,8 +587,17 @@ public class ByteCodeClass {
 
         // create class objects for 1 - 3 dimension arrays
         for(int iter = 1 ; iter < 4 ; iter++) {
-            if(!(arrayTypes.contains(iter + "_" + clsName) || arrayTypes.contains((iter + 1) + "_" + clsName) || 
-                    arrayTypes.contains((iter + 2) + "_" + clsName))) {
+            boolean shouldContinue = false;
+            arrayTypesLock.readLock().lock();
+            try {
+                if(!(arrayTypes.contains(iter + "_" + clsName) || arrayTypes.contains((iter + 1) + "_" + clsName) ||
+                        arrayTypes.contains((iter + 2) + "_" + clsName))) {
+                    shouldContinue = true;
+                }
+            } finally {
+                arrayTypesLock.readLock().unlock();
+            }
+            if(shouldContinue) {
                 continue;
             }
             b.append("struct clazz class_array");
@@ -632,7 +659,14 @@ public class ByteCodeClass {
                 if (isEnum && ("_VALUES".equals(bf.getFieldName().replace('$','_')) || "ENUM_VALUES".equals(bf.getFieldName().replace('$','_')))) {
                     enumValuesField = bf.getFieldName();
                 }
-                if(bf.isFinal() && bf.getValue() != null && !writableFields.contains(bf.getFieldName())) {
+                boolean isWritable = false;
+                writableFieldsLock.readLock().lock();
+                try {
+                    isWritable = writableFields.contains(bf.getFieldName());
+                } finally {
+                    writableFieldsLock.readLock().unlock();
+                }
+                if(bf.isFinal() && bf.getValue() != null && !isWritable) {
                     // static getter 
                     b.append(bf.getCDefinition());
                     b.append(" get_static_");
@@ -873,7 +907,14 @@ public class ByteCodeClass {
             }
         }
                 
-        if(arrayTypes.contains("1_" + clsName) || arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName)) {
+        boolean containsArrayTypes = false;
+        arrayTypesLock.readLock().lock();
+        try {
+            containsArrayTypes = arrayTypes.contains("1_" + clsName) || arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName);
+        } finally {
+            arrayTypesLock.readLock().unlock();
+        }
+        if(containsArrayTypes) {
             b.append("JAVA_OBJECT __NEW_ARRAY_");
             b.append(clsName);
             b.append("(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {\n");
@@ -1014,18 +1055,29 @@ public class ByteCodeClass {
         b.append(clsName);
         b.append(");\n        return;\n    }\n\n");
         
-        if(arrayTypes.contains("1_" + clsName) || arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName)) {
+        boolean c1 = false;
+        boolean c2 = false;
+        boolean c3 = false;
+        arrayTypesLock.readLock().lock();
+        try {
+            c1 = arrayTypes.contains("1_" + clsName) || arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName);
+            c2 = arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName);
+            c3 = arrayTypes.contains("3_" + clsName);
+        } finally {
+            arrayTypesLock.readLock().unlock();
+        }
+        if(c1) {
             b.append("class_array1__");
             b.append(clsName);
             b.append(".vtable = initVtableForInterface();\n    ");
         }
 
-        if( arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName)) {
+        if(c2) {
             b.append("class_array2__");
             b.append(clsName);
             b.append(".vtable = initVtableForInterface();\n    ");
         }
-        if(arrayTypes.contains("3_" + clsName)) {
+        if(c3) {
             b.append("class_array3__");
             b.append(clsName);
             b.append(".vtable = initVtableForInterface();\n    ");
@@ -1239,19 +1291,30 @@ public class ByteCodeClass {
         b.append(clsName);
         b.append(";\n");
 
-        if(arrayTypes.contains("1_" + clsName) || arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName)) {
+        boolean c1 = false;
+        boolean c2 = false;
+        boolean c3 = false;
+        arrayTypesLock.readLock().lock();
+        try {
+            c1 = arrayTypes.contains("1_" + clsName) || arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName);
+            c2 = arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName);
+            c3 = arrayTypes.contains("3_" + clsName);
+        } finally {
+            arrayTypesLock.readLock().unlock();
+        }
+        if(c1) {
             b.append("extern struct clazz class_array1__");
             b.append(clsName);
             b.append(";\n");
         }
 
-        if(arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName)) {
+        if(c2) {
             b.append("extern struct clazz class_array2__");
             b.append(clsName);
             b.append(";\n");
         }
 
-        if(arrayTypes.contains("3_" + clsName)) {
+        if(c3) {
             b.append("extern struct clazz class_array3__");
             b.append(clsName);
             b.append(";\n");
@@ -1291,7 +1354,14 @@ public class ByteCodeClass {
             b.append("extern JAVA_OBJECT __VALUE_OF_").append(clsName).append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT value);\n");
         }
                 
-        if(arrayTypes.contains("1_" + clsName)) {
+        boolean c1 = false;
+        arrayTypesLock.readLock().lock();
+        try {
+            c1 = arrayTypes.contains("1_" + clsName);
+        } finally {
+            arrayTypesLock.readLock().unlock();
+        }
+        if(c1) {
             b.append("extern JAVA_OBJECT __NEW_ARRAY_");
             b.append(clsName);
             b.append("(CODENAME_ONE_THREAD_STATE, JAVA_INT size);\n");
@@ -1336,7 +1406,14 @@ public class ByteCodeClass {
                     b.append("_");
                     b.append(bf.getFieldName());
                     b.append("();\n");
-                    if(!(bf.isFinal() && bf.getValue() != null && !writableFields.contains(bf.getFieldName()))) {
+                    boolean isWritable = false;
+                    writableFieldsLock.readLock().lock();
+                    try {
+                        isWritable = writableFields.contains(bf.getFieldName());
+                    } finally {
+                        writableFieldsLock.readLock().unlock();
+                    }
+                    if(!(bf.isFinal() && bf.getValue() != null && !isWritable)) {
                         b.append("extern ");
                         b.append(bf.getCDefinition());
                         b.append(" STATIC_FIELD_");
@@ -1845,10 +1922,15 @@ public class ByteCodeClass {
     }
 
     private String getArrayClazz(int dim) {
-        if((arrayTypes.contains(dim + "_" + clsName) )) {
-            return "&class_array"+dim+"__"+clsName;
-        } else {
-            return "0";
+        arrayTypesLock.readLock().lock();
+        try {
+            if((arrayTypes.contains(dim + "_" + clsName) )) {
+                return "&class_array"+dim+"__"+clsName;
+            } else {
+                return "0";
+            }
+        } finally {
+            arrayTypesLock.readLock().unlock();
         }
     }
 

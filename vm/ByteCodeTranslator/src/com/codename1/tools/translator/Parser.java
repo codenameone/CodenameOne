@@ -1039,7 +1039,12 @@ public class Parser extends ClassVisitor {
                 factory.setMaxes(localIndex + 2, localIndex);
 
                 // 7. Register the new class
-                classes.add(lambdaClass);
+                classesLock.writeLock().lock();
+                try {
+                    classes.add(lambdaClass);
+                } finally {
+                    classesLock.writeLock().unlock();
+                }
 
                 // 8. Replace invokedynamic with INVOKESTATIC to factory
                 mtd.addInvoke(Opcodes.INVOKESTATIC, lambdaClassName, factoryMethodName, actualFactoryDesc, false);
