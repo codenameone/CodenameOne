@@ -24,6 +24,8 @@
 package com.codename1.tools.translator;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 
 import org.objectweb.asm.AnnotationVisitor;
@@ -127,7 +129,7 @@ public class Parser extends ClassVisitor {
     
     
     
-    private static void generateClassAndMethodIndexHeader(File outputDirectory) throws Exception {
+    private static void generateClassAndMethodIndexHeader(File outputDirectory, Cache cache) throws Exception {
         int classOffset = 0;
         int methodOffset = 0;
         ArrayList<BytecodeMethod> methods = new ArrayList<BytecodeMethod>();
@@ -325,8 +327,8 @@ public class Parser extends ClassVisitor {
         
         bld.append("\n\n#endif // __CN1_CLASS_METHOD_INDEX_H__\n");        
         
-        writeIfChanged(new File(outputDirectory, "cn1_class_method_index.h"), bld.toString());
-        writeIfChanged(new File(outputDirectory, "cn1_class_method_index.m"), bldM.toString());
+        writeIfChanged(new File(outputDirectory, "cn1_class_method_index.h"), bld.toString(), cache);
+        writeIfChanged(new File(outputDirectory, "cn1_class_method_index.m"), bldM.toString(), cache);
     }
     
     private static String encodeString(String con) {
@@ -436,16 +438,18 @@ public class Parser extends ClassVisitor {
                 System.out.println("unusued Method cull removed "+neliminated+" methods in "+(dif/1000)+" seconds");
             }
 
-            generateClassAndMethodIndexHeader(outputDirectory);
+            Cache cache = new Cache(outputDirectory);
+            generateClassAndMethodIndexHeader(outputDirectory, cache);
 
             boolean concatenate = "true".equals(System.getProperty("concatenateFiles", "false"));
             ConcatenatingFileOutputStream cos = concatenate ? new ConcatenatingFileOutputStream(outputDirectory) : null;
 
             for(ByteCodeClass bc : classes) {
                 file = bc.getClsName();
-                writeFile(bc, outputDirectory, cos);
+                writeFile(bc, outputDirectory, cos, cache);
             }
             if (cos != null) cos.realClose();
+            cache.save();
 
         } catch(Throwable t) {
             System.out.println("Error while working with the class: " + file);
@@ -622,7 +626,7 @@ public class Parser extends ClassVisitor {
         return false;
     }
 
-    private static void writeFile(ByteCodeClass cls, File outputDir, ConcatenatingFileOutputStream writeBufferInstead) throws Exception {
+    private static void writeFile(ByteCodeClass cls, File outputDir, ConcatenatingFileOutputStream writeBufferInstead, Cache cache) throws Exception {
         if (writeBufferInstead != null && ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_IOS) {
             writeBufferInstead.beginNextFile(cls.getClsName());
             writeBufferInstead.write(cls.generateCCode(classes).getBytes("UTF-8"));
@@ -630,38 +634,26 @@ public class Parser extends ClassVisitor {
 
             // we also need to write the header file for C outputs
             String headerName = cls.getClsName() + ".h";
-            writeIfChanged(new File(outputDir, headerName), cls.generateCHeader());
+            writeIfChanged(new File(outputDir, headerName), cls.generateCHeader(), cache);
             return;
         }
 
         if(ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_CSHARP) {
-            writeIfChanged(new File(outputDir, cls.getClsName() + "." + ByteCodeTranslator.output.extension()), cls.generateCSharpCode());
+            writeIfChanged(new File(outputDir, cls.getClsName() + "." + ByteCodeTranslator.output.extension()), cls.generateCSharpCode(), cache);
         } else {
-            writeIfChanged(new File(outputDir, cls.getClsName() + "." + ByteCodeTranslator.output.extension()), cls.generateCCode(classes));
+            writeIfChanged(new File(outputDir, cls.getClsName() + "." + ByteCodeTranslator.output.extension()), cls.generateCCode(classes), cache);
 
             // we also need to write the header file for C outputs
             String headerName = cls.getClsName() + ".h";
-            writeIfChanged(new File(outputDir, headerName), cls.generateCHeader());
+            writeIfChanged(new File(outputDir, headerName), cls.generateCHeader(), cache);
         }
     }
 
-    private static void writeIfChanged(File dest, String content) throws IOException {
+    private static void writeIfChanged(File dest, String content, Cache cache) throws IOException {
         byte[] data = content.getBytes("UTF-8");
-        if(dest.exists() && dest.length() == data.length) {
-            // let's check if the content is the same
-            byte[] existing = new byte[(int)dest.length()];
-            DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(dest)));
-            dis.readFully(existing);
-            dis.close();
-
-            if(Arrays.equals(data, existing)) {
-                return;
-            }
+        if(cache.shouldWrite(dest, data)) {
+            Files.write(dest.toPath(), data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
         }
-        FileOutputStream fos = new FileOutputStream(dest);
-        BufferedOutputStream bos = new BufferedOutputStream(fos);
-        bos.write(data);
-        bos.close();
     }
     
     public Parser() {
