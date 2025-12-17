@@ -32,7 +32,7 @@ public class RenderScreenshotReport {
 
         CoverageSummary coverage = loadCoverage(arguments.coverageSummary, arguments.coverageHtmlUrl);
 
-        SummaryAndComment output = buildSummaryAndComment(data, title, marker, successMessage, coverage);
+        SummaryAndComment output = buildSummaryAndComment(data, title, marker, successMessage, coverage, arguments.vmTime, arguments.compilationTime);
         writeLines(arguments.summaryOut, output.summaryLines);
         writeLines(arguments.commentOut, output.commentLines);
     }
@@ -51,7 +51,7 @@ public class RenderScreenshotReport {
         Files.writeString(path, sb.toString(), StandardCharsets.UTF_8);
     }
 
-    private static SummaryAndComment buildSummaryAndComment(Map<String, Object> data, String title, String marker, String successMessage, CoverageSummary coverage) {
+    private static SummaryAndComment buildSummaryAndComment(Map<String, Object> data, String title, String marker, String successMessage, CoverageSummary coverage, Long vmTime, Long compilationTime) {
         List<String> summaryLines = new ArrayList<>();
         List<String> commentLines = new ArrayList<>();
         Object resultsObj = data.get("results");
@@ -148,22 +148,34 @@ public class RenderScreenshotReport {
 
         appendCoverageComment(commentLines, coverage);
 
-        if (commentLines.isEmpty()) {
+        // If no visual regressions or errors were found (commentEntries is empty),
+        // we should display the success message.
+        // However, we also need to include benchmark results.
+        if (commentEntries.isEmpty()) {
             commentLines.add(successMessage != null ? successMessage : DEFAULT_SUCCESS_MESSAGE);
             commentLines.add("");
-            comparisonOverviewAdded = appendComparisonOverview(commentLines, comparisonSummary);
-            appendCoverageComment(commentLines, coverage);
-        } else if (commentLines.size() == 1 && commentLines.get(0).isEmpty()) {
-            commentLines.add(successMessage != null ? successMessage : DEFAULT_SUCCESS_MESSAGE);
-            commentLines.add("");
-            comparisonOverviewAdded = appendComparisonOverview(commentLines, comparisonSummary);
+            if (!comparisonOverviewAdded) {
+                comparisonOverviewAdded = appendComparisonOverview(commentLines, comparisonSummary);
+            }
             appendCoverageComment(commentLines, coverage);
         }
 
-        if (commentLines.isEmpty()) {
-            commentLines.add(successMessage != null ? successMessage : DEFAULT_SUCCESS_MESSAGE);
-            commentLines.add("");
-            appendComparisonOverview(commentLines, comparisonSummary);
+        // Add benchmark results at the end
+        appendBenchmarkResults(commentLines, vmTime, compilationTime);
+
+        if (commentLines.isEmpty() || (commentLines.size() == 1 && commentLines.get(0).isEmpty())) {
+            // This fallback block might be redundant now, but kept for safety.
+            // If for some reason we still have empty lines (e.g. no benchmarks and no visual changes and logic skipped above),
+            // ensure we output something.
+            if (commentEntries.isEmpty()) {
+                 if (commentLines.isEmpty() || !commentLines.contains(successMessage != null ? successMessage : DEFAULT_SUCCESS_MESSAGE)) {
+                     commentLines.add(0, successMessage != null ? successMessage : DEFAULT_SUCCESS_MESSAGE);
+                     commentLines.add(1, "");
+                 }
+            }
+            if (!comparisonOverviewAdded) {
+                comparisonOverviewAdded = appendComparisonOverview(commentLines, comparisonSummary);
+            }
         }
 
         if (marker != null && !marker.isEmpty()) {
@@ -217,6 +229,24 @@ public class RenderScreenshotReport {
                     coverage.artifact() != null ? coverage.artifact() : ""
             )));
         }
+    }
+
+    private static void appendBenchmarkResults(List<String> commentLines, Long vmTime, Long compilationTime) {
+        if (vmTime == null && compilationTime == null) {
+            return;
+        }
+        if (!commentLines.isEmpty() && !commentLines.get(commentLines.size() - 1).isEmpty()) {
+            commentLines.add("");
+        }
+        commentLines.add("### Benchmark Results");
+        commentLines.add("");
+        if (vmTime != null) {
+            commentLines.add(String.format("- **VM Translation Time:** %d seconds", vmTime));
+        }
+        if (compilationTime != null) {
+            commentLines.add(String.format("- **Compilation Time:** %d seconds", compilationTime));
+        }
+        commentLines.add("");
     }
 
     private static void appendCoverageComment(List<String> commentLines, CoverageSummary coverage) {
@@ -418,8 +448,10 @@ public class RenderScreenshotReport {
         final String successMessage;
         final Path coverageSummary;
         final String coverageHtmlUrl;
+        final Long vmTime;
+        final Long compilationTime;
 
-        private Arguments(Path compareJson, Path commentOut, Path summaryOut, String marker, String title, String successMessage, Path coverageSummary, String coverageHtmlUrl) {
+        private Arguments(Path compareJson, Path commentOut, Path summaryOut, String marker, String title, String successMessage, Path coverageSummary, String coverageHtmlUrl, Long vmTime, Long compilationTime) {
             this.compareJson = compareJson;
             this.commentOut = commentOut;
             this.summaryOut = summaryOut;
@@ -428,6 +460,8 @@ public class RenderScreenshotReport {
             this.successMessage = successMessage;
             this.coverageSummary = coverageSummary;
             this.coverageHtmlUrl = coverageHtmlUrl;
+            this.vmTime = vmTime;
+            this.compilationTime = compilationTime;
         }
 
         static Arguments parse(String[] args) {
@@ -439,6 +473,8 @@ public class RenderScreenshotReport {
             String successMessage = null;
             Path coverageSummary = null;
             String coverageHtmlUrl = null;
+            Long vmTime = null;
+            Long compilationTime = null;
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
                 switch (arg) {
@@ -498,6 +534,30 @@ public class RenderScreenshotReport {
                         }
                         coverageHtmlUrl = args[i];
                     }
+                    case "--vm-time" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --vm-time");
+                            return null;
+                        }
+                        try {
+                            vmTime = Long.parseLong(args[i]);
+                        } catch (NumberFormatException e) {
+                            System.err.println("Invalid value for --vm-time: " + args[i]);
+                            return null;
+                        }
+                    }
+                    case "--compilation-time" -> {
+                        if (++i >= args.length) {
+                            System.err.println("Missing value for --compilation-time");
+                            return null;
+                        }
+                        try {
+                            compilationTime = Long.parseLong(args[i]);
+                        } catch (NumberFormatException e) {
+                            System.err.println("Invalid value for --compilation-time: " + args[i]);
+                            return null;
+                        }
+                    }
                     default -> {
                         System.err.println("Unknown argument: " + arg);
                         return null;
@@ -508,7 +568,7 @@ public class RenderScreenshotReport {
                 System.err.println("--compare-json, --comment-out, and --summary-out are required");
                 return null;
             }
-            return new Arguments(compare, comment, summary, marker, title, successMessage, coverageSummary, coverageHtmlUrl);
+            return new Arguments(compare, comment, summary, marker, title, successMessage, coverageSummary, coverageHtmlUrl, vmTime, compilationTime);
         }
     }
 

@@ -354,6 +354,12 @@ cn1ss_process_and_report() {
   if [ -n "${CN1SS_COVERAGE_HTML_URL:-}" ]; then
     render_args+=(--coverage-html-url "$CN1SS_COVERAGE_HTML_URL")
   fi
+  if [ -n "${CN1SS_VM_TIME:-}" ]; then
+    render_args+=(--vm-time "$CN1SS_VM_TIME")
+  fi
+  if [ -n "${CN1SS_COMPILATION_TIME:-}" ]; then
+    render_args+=(--compilation-time "$CN1SS_COMPILATION_TIME")
+  fi
 
   if ! cn1ss_java_run "$CN1SS_RENDER_CLASS" "${render_args[@]}"; then
     cn1ss_log "FATAL: Failed to render screenshot summary/comment"
