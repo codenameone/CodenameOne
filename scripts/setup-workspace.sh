@@ -226,11 +226,12 @@ if [ ! -d "$CN1_BINARIES/.git" ]; then
 fi
 
 log "Building Codename One core modules"
-"$MAVEN_HOME/bin/mvn" -f maven/pom.xml -DskipTests -Djava.awt.headless=true -Dcn1.binaries="$CN1_BINARIES" -Dcodename1.platform=javase -P local-dev-javase,compile-android,!download-cn1-binaries install "$@"
+"$MAVEN_HOME/bin/mvn" -f maven/pom.xml -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -DskipTests -Djava.awt.headless=true -Dcn1.binaries="$CN1_BINARIES" -Dcodename1.platform=javase -P local-dev-javase,compile-android,!download-cn1-binaries install "$@"
 
 log "Building Codename One Maven plugin"
 "$MAVEN_HOME/bin/mvn" -f maven/pom.xml \
   -pl codenameone-maven-plugin -am \
+  -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true \
   -DskipTests -Djava.awt.headless=true \
   -P !download-cn1-binaries \
   install "$@"
@@ -273,6 +274,6 @@ if [ "${skip_archetypes:-0}" -eq 0 ]; then
       log "Updating cn1-maven-archetypes version from $current_version to $CN1_VERSION to match local snapshot"
       "$MAVEN_HOME/bin/mvn" -q -B versions:set -DnewVersion="$CN1_VERSION" -DgenerateBackupPoms=false
     fi
-    "$MAVEN_HOME/bin/mvn" -DskipTests -DskipITs=true -Dinvoker.skip=true install
+    "$MAVEN_HOME/bin/mvn" -T 1C -DskipTests -DskipITs=true -Dinvoker.skip=true install
   ) || log "Archetype mvn install failed; continuing."
 fi
