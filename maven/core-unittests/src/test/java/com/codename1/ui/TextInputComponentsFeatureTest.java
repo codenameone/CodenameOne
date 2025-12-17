@@ -184,7 +184,7 @@ class TextInputComponentsFeatureTest extends UITestBase {
             flushSerialCalls();
         }
 
-        //assertEquals("alpha", field.getText());
+        assertEquals("alpha", field.getText());
         assertEquals("alpha", selected.get());
     }
 
@@ -239,7 +239,7 @@ class TextInputComponentsFeatureTest extends UITestBase {
             flushSerialCalls();
         }
 
-        //assertEquals("green", field.getText(), "Selecting from popup should update the field text");
+        assertEquals("green", field.getText(), "Selecting from popup should update the field text");
         assertEquals("green", component.getText(), "Component text should mirror field value");
     }
 }

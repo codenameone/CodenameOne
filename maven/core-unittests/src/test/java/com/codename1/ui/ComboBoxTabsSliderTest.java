@@ -63,6 +63,7 @@ class ComboBoxTabsSliderTest extends UITestBase {
 
         combo.setSelectedIndex(2);
         combo.triggerActionEvent();
+        DisplayTest.flushEdt();
 
         assertEquals("Three", combo.getSelectedItem());
         assertEquals(2, selectionEvent[0], "Selection listener should capture updated index");
