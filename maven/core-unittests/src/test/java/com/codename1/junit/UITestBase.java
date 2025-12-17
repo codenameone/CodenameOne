@@ -63,6 +63,7 @@ public abstract class UITestBase {
             implementation = TestCodenameOneImplementation.getInstance();
             implementation.setLocalizationManager(new SafeL10NManager("en", "US"));
         }
+        display = Display.getInstance();
         Util.setImplementation(implementation);
     }
 
