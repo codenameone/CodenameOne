@@ -23,8 +23,6 @@
 
 package com.codename1.tools.translator;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileFilter;
@@ -35,9 +33,6 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -241,14 +236,14 @@ public class ByteCodeTranslator {
         b.execute(sources, srcRoot);
 
         File cn1Globals = new File(srcRoot, "cn1_globals.h");
-        Files.copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), cn1Globals.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), new FileOutputStream(cn1Globals));
         if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
         File xmlvm = new File(srcRoot, "xmlvm.h");
-        Files.copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), xmlvm.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), new FileOutputStream(xmlvm));
         File nativeMethods = new File(srcRoot, "nativeMethods.m");
-        Files.copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), nativeMethods.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethods));
 
         Parser.writeOutput(srcRoot);
 
@@ -273,13 +268,13 @@ public class ByteCodeTranslator {
         launchImageLaunchimage.mkdirs();
         //cleanDir(launchImageLaunchimage);
 
-        Files.copy(ByteCodeTranslator.class.getResourceAsStream("/LaunchImages.json"), new File(launchImageLaunchimage, "Contents.json").toPath(), StandardCopyOption.REPLACE_EXISTING);
+        copy(ByteCodeTranslator.class.getResourceAsStream("/LaunchImages.json"), new FileOutputStream(new File(launchImageLaunchimage, "Contents.json")));
 
         File appIconAppiconset = new File(imagesXcassets, "AppIcon.appiconset");
         appIconAppiconset.mkdirs();
         //cleanDir(appIconAppiconset);
 
-        Files.copy(ByteCodeTranslator.class.getResourceAsStream("/Icons.json"), new File(appIconAppiconset, "Contents.json").toPath(), StandardCopyOption.REPLACE_EXISTING);
+        copy(ByteCodeTranslator.class.getResourceAsStream("/Icons.json"), new FileOutputStream(new File(appIconAppiconset, "Contents.json")));
 
 
         File xcproj = new File(root, appName + ".xcodeproj");
@@ -296,37 +291,37 @@ public class ByteCodeTranslator {
         b.execute(sources, srcRoot);
 
         File cn1Globals = new File(srcRoot, "cn1_globals.h");
-        Files.copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), cn1Globals.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.h"), new FileOutputStream(cn1Globals));
         if (System.getProperty("INCLUDE_NPE_CHECKS", "false").equals("true")) {
             replaceInFile(cn1Globals, "//#define CN1_INCLUDE_NPE_CHECKS",  "#define CN1_INCLUDE_NPE_CHECKS");
         }
         File cn1GlobalsM = new File(srcRoot, "cn1_globals.m");
-        Files.copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), cn1GlobalsM.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        copy(ByteCodeTranslator.class.getResourceAsStream("/cn1_globals.m"), new FileOutputStream(cn1GlobalsM));
         File nativeMethods = new File(srcRoot, "nativeMethods.m");
-        Files.copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), nativeMethods.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        copy(ByteCodeTranslator.class.getResourceAsStream("/nativeMethods.m"), new FileOutputStream(nativeMethods));
 
         if (System.getProperty("USE_RPMALLOC", "false").equals("true")) {
             File malloc = new File(srcRoot, "malloc.c");
-            Files.copy(ByteCodeTranslator.class.getResourceAsStream("/malloc.c"), malloc.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            copy(ByteCodeTranslator.class.getResourceAsStream("/malloc.c"), new FileOutputStream(malloc));
             File rpmalloc = new File(srcRoot, "rpmalloc.c");
-            Files.copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.c"), rpmalloc.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.c"), new FileOutputStream(rpmalloc));
             File rpmalloch = new File(srcRoot, "rpmalloc.h");
-            Files.copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.h"), rpmalloch.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            copy(ByteCodeTranslator.class.getResourceAsStream("/rpmalloc.h"), new FileOutputStream(rpmalloch));
         }
 
         Parser.writeOutput(srcRoot);
 
         File templateInfoPlist = new File(srcRoot, appName + "-Info.plist");
-        Files.copy(ByteCodeTranslator.class.getResourceAsStream("/template/template/template-Info.plist"), templateInfoPlist.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        copy(ByteCodeTranslator.class.getResourceAsStream("/template/template/template-Info.plist"), new FileOutputStream(templateInfoPlist));
 
         File templatePch = new File(srcRoot, appName + "-Prefix.pch");
-        Files.copy(ByteCodeTranslator.class.getResourceAsStream("/template/template/template-Prefix.pch"), templatePch.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        copy(ByteCodeTranslator.class.getResourceAsStream("/template/template/template-Prefix.pch"), new FileOutputStream(templatePch));
 
         File xmlvm = new File(srcRoot, "xmlvm.h");
-        Files.copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), xmlvm.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        copy(ByteCodeTranslator.class.getResourceAsStream("/xmlvm.h"), new FileOutputStream(xmlvm));
 
         File projectWorkspaceData = new File(projectXCworkspace, "contents.xcworkspacedata");
-        Files.copy(ByteCodeTranslator.class.getResourceAsStream("/template/template.xcodeproj/project.xcworkspace/contents.xcworkspacedata"), projectWorkspaceData.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        copy(ByteCodeTranslator.class.getResourceAsStream("/template/template.xcodeproj/project.xcworkspace/contents.xcworkspacedata"), new FileOutputStream(projectWorkspaceData));
         replaceInFile(projectWorkspaceData, "KitchenSink", appName);
 
 
@@ -625,8 +620,11 @@ public class ByteCodeTranslator {
     //
     private static StringBuilder readFileAsStringBuilder(File sourceFile) throws IOException
     {
-        byte[] data = Files.readAllBytes(sourceFile.toPath());
-        StringBuilder b = new StringBuilder(new String(data, "UTF-8"));
+        DataInputStream dis = new DataInputStream(new FileInputStream(sourceFile));
+        byte[] data = new byte[(int)sourceFile.length()];
+        dis.readFully(data);
+        dis.close();
+        StringBuilder b = new StringBuilder(new String(data));
         return b;
     }
     //
@@ -656,7 +654,9 @@ public class ByteCodeTranslator {
         // don't start the output file until all the processing is done
         //
         System.out.println("Rewrite " + sourceFile + " with " + totchanges + " changes");
-        Files.write(sourceFile.toPath(), str.toString().getBytes("UTF-8"), StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+        FileWriter fios = new FileWriter(sourceFile);
+        fios.write(str.toString());
+        fios.close();
     }
     
 
@@ -683,25 +683,12 @@ public class ByteCodeTranslator {
      */
     public static void copy(InputStream i, OutputStream o, int bufferSize) throws IOException {
         try {
-            if (i instanceof FileInputStream && o instanceof FileOutputStream) {
-               // This case should be handled by caller using Files.copy usually, but if streams are passed we can't cast to Path
-               // We can't use Files.copy with streams easily without copying to temp.
-               // So we stick to stream copy but ensure buffering.
-            }
-
-            if(!(i instanceof BufferedInputStream)) {
-                i = new BufferedInputStream(i);
-            }
-            if(!(o instanceof BufferedOutputStream)) {
-                o = new BufferedOutputStream(o);
-            }
             byte[] buffer = new byte[bufferSize];
             int size = i.read(buffer);
             while(size > -1) {
                 o.write(buffer, 0, size);
                 size = i.read(buffer);
             }
-            o.flush();
         } finally {
             cleanup(o);
             cleanup(i);
