@@ -159,6 +159,7 @@ public class CustomInvoke extends Instruction {
         }
         
         StringBuilder bld = new StringBuilder();
+        boolean isVirtualCall = false;
         if(origOpcode == Opcodes.INVOKEINTERFACE || origOpcode == Opcodes.INVOKEVIRTUAL) {
             b.append("    ");
             
@@ -179,6 +180,7 @@ public class CustomInvoke extends Instruction {
             }
             if (isVirtual) {
                 bld.append("virtual_");
+                isVirtualCall = true;
             }
         } else {
             b.append("    ");
@@ -207,6 +209,9 @@ public class CustomInvoke extends Instruction {
         bld.append("__");
         ArrayList<String> args = new ArrayList<String>();
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
+        if (isVirtualCall) {
+            BytecodeMethod.addVirtualMethodsInvoked(bld.substring("virtual_".length()));
+        }
         int numLiteralArgs = this.getNumLiteralArgs();
         if (numLiteralArgs > 0) {
             b.append("/* CustomInvoke */");
