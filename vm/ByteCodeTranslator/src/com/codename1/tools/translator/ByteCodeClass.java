@@ -30,6 +30,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Parsed class file
@@ -1291,30 +1294,30 @@ public class ByteCodeClass {
         b.append(clsName);
         b.append(";\n");
 
-        boolean c1 = false;
-        boolean c2 = false;
-        boolean c3 = false;
+        boolean _c1 = false;
+        boolean _c2 = false;
+        boolean _c3 = false;
         arrayTypesLock.readLock().lock();
         try {
-            c1 = arrayTypes.contains("1_" + clsName) || arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName);
-            c2 = arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName);
-            c3 = arrayTypes.contains("3_" + clsName);
+            _c1 = arrayTypes.contains("1_" + clsName) || arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName);
+            _c2 = arrayTypes.contains("2_" + clsName) || arrayTypes.contains("3_" + clsName);
+            _c3 = arrayTypes.contains("3_" + clsName);
         } finally {
             arrayTypesLock.readLock().unlock();
         }
-        if(c1) {
+        if(_c1) {
             b.append("extern struct clazz class_array1__");
             b.append(clsName);
             b.append(";\n");
         }
 
-        if(c2) {
+        if(_c2) {
             b.append("extern struct clazz class_array2__");
             b.append(clsName);
             b.append(";\n");
         }
 
-        if(c3) {
+        if(_c3) {
             b.append("extern struct clazz class_array3__");
             b.append(clsName);
             b.append(";\n");
@@ -1354,14 +1357,14 @@ public class ByteCodeClass {
             b.append("extern JAVA_OBJECT __VALUE_OF_").append(clsName).append("(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT value);\n");
         }
                 
-        boolean c1 = false;
+        boolean _c1_arr = false;
         arrayTypesLock.readLock().lock();
         try {
-            c1 = arrayTypes.contains("1_" + clsName);
+            _c1_arr = arrayTypes.contains("1_" + clsName);
         } finally {
             arrayTypesLock.readLock().unlock();
         }
-        if(c1) {
+        if(_c1_arr) {
             b.append("extern JAVA_OBJECT __NEW_ARRAY_");
             b.append(clsName);
             b.append("(CODENAME_ONE_THREAD_STATE, JAVA_INT size);\n");
