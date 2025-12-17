@@ -430,31 +430,38 @@ public class NetworkManager {
     public void addToQueueAndWait(final ConnectionRequest request) {
         class WaitingClass implements Runnable, ActionListener<NetworkEvent> {
             private final boolean edt = CN.isEdt();
-            private boolean finishedWaiting;
+
+            private boolean isInQueueOrProcessing() {
+                synchronized (LOCK) {
+                    if(pending == null || networkThreads == null) {
+                        return false;
+                    }
+                    if(pending.contains(request)) {
+                        return true;
+                    }
+                    for(NetworkThread t : networkThreads) {
+                        if(t.currentRequest == request) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
 
             public void run() {
                 if (edt) {
-                    while (!finishedWaiting) {
-                        try {
-                            Thread.sleep(30);
-                        } catch (InterruptedException ex) {
-                            ex.printStackTrace();
-                        }
+                    while (isInQueueOrProcessing()) {
+                        Util.sleep(30);
                     }
                 } else {
-                    while (!request.complete) {
-                        try {
-                            Thread.sleep(30);
-                        } catch (InterruptedException ex) {
-                            ex.printStackTrace();
-                        }
+                    while (isInQueueOrProcessing()) {
+                        Util.sleep(30);
                     }
                 }
             }
 
             public void actionPerformed(NetworkEvent e) {
                 if (e.getError() != null) {
-                    finishedWaiting = true;
                     removeProgressListener(this);
                     removeErrorListener(this);
                     return;
@@ -465,7 +472,6 @@ public class NetworkManager {
                             request.retrying = false;
                             return;
                         }
-                        finishedWaiting = true;
                         removeProgressListener(this);
                         removeErrorListener(this);
                     }
