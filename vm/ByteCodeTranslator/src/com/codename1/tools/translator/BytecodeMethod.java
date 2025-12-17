@@ -98,9 +98,10 @@ public class BytecodeMethod implements SignatureSet {
     private boolean virtualOverriden;
     private boolean finalMethod;
     private boolean synchronizedMethod;
-    private final static Set<String> virtualMethodsInvoked = new TreeSet<String>();    
+    private final static Set<String> virtualMethodsInvoked = new TreeSet<String>();
     private String desc;
     private boolean eliminated;
+    private Set<String> calledMethodSignatureKeys;
 
     
     static boolean optimizerOn;
@@ -347,7 +348,39 @@ public class BytecodeMethod implements SignatureSet {
         usedByNative = false;
         return false;
     }
-    
+
+    private static String toMethodKey(String signature, String name) {
+        if (signature == null || name == null) {
+            return null;
+        }
+        if ("__INIT__".equals(name)) {
+            return signature + ".<init>";
+        }
+        if ("__CLINIT__".equals(name)) {
+            return signature + ".<clinit>";
+        }
+        return signature + "." + name;
+    }
+
+    public String getMethodUsageKey() {
+        return toMethodKey(desc, methodName);
+    }
+
+    public Set<String> getCalledMethodSignatureKeys() {
+        if (calledMethodSignatureKeys == null) {
+            calledMethodSignatureKeys = new HashSet<String>();
+            for (Instruction ins : instructions) {
+                String name = ins.getMethodName();
+                String signature = ins.getSignature();
+                String key = toMethodKey(signature, name);
+                if (key != null) {
+                    calledMethodSignatureKeys.add(key);
+                }
+            }
+        }
+        return calledMethodSignatureKeys;
+    }
+
     private Set<String> usedMethods;
     public boolean isMethodUsedOldWay(BytecodeMethod bm) {
         if(usedMethods == null) {

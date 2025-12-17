@@ -50,11 +50,17 @@ public class Parser extends ClassVisitor {
     private String clsName;
     private static String[] nativeSources;
     private static List<ByteCodeClass> classes = new ArrayList<ByteCodeClass>();
+    private static Map<String, Integer> methodUsageCounts;
+    private static Map<BytecodeMethod, Set<String>> methodCallMap;
+    private static Set<BytecodeMethod> removedFromUsageIndex;
     private int lambdaCounter;
     public static void cleanup() {
-    	nativeSources = null;
-    	classes.clear();
-    	LabelInstruction.cleanup();
+        nativeSources = null;
+        classes.clear();
+        methodUsageCounts = null;
+        methodCallMap = null;
+        removedFromUsageIndex = null;
+        LabelInstruction.cleanup();
     }
     public static void parse(File sourceFile) throws Exception {
         if(ByteCodeTranslator.verbose) {
@@ -485,14 +491,83 @@ public class Parser extends ClassVisitor {
             nativeSources[iter] = new String(dat, "UTF-8");
         }
         System.out.println("Native files total "+(size/1024)+"K");
-        
+
     }
-    
+
+    private static String buildMethodUsageKey(BytecodeMethod method) {
+        return method.getMethodUsageKey();
+    }
+
+    private static void ensureMethodUsageIndex() {
+        if (methodUsageCounts != null) {
+            return;
+        }
+        buildMethodUsageIndex();
+    }
+
+    private static Set<String> collectCalledMethods(BytecodeMethod caller) {
+        Set<String> calls = new HashSet<String>();
+        String callerKey = buildMethodUsageKey(caller);
+        for (String key : caller.getCalledMethodSignatureKeys()) {
+            if (!key.equals(callerKey)) {
+                calls.add(key);
+            }
+        }
+        return calls;
+    }
+
+    private static void buildMethodUsageIndex() {
+        methodUsageCounts = new HashMap<String, Integer>();
+        methodCallMap = new HashMap<BytecodeMethod, Set<String>>();
+        removedFromUsageIndex = new HashSet<BytecodeMethod>();
+
+        for (ByteCodeClass bc : classes) {
+            for (BytecodeMethod method : bc.getMethods()) {
+                if (method.isEliminated()) {
+                    continue;
+                }
+                Set<String> calls = collectCalledMethods(method);
+                methodCallMap.put(method, calls);
+                for (String key : calls) {
+                    Integer count = methodUsageCounts.get(key);
+                    methodUsageCounts.put(key, count == null ? 1 : count + 1);
+                }
+            }
+        }
+    }
+
+    private static void removeFromMethodUsageIndex(BytecodeMethod method) {
+        if (removedFromUsageIndex == null) {
+            removedFromUsageIndex = new HashSet<BytecodeMethod>();
+        }
+        if (removedFromUsageIndex.contains(method)) {
+            return;
+        }
+        ensureMethodUsageIndex();
+        Set<String> calls = methodCallMap.remove(method);
+        if (calls == null) {
+            calls = collectCalledMethods(method);
+        }
+        for (String key : calls) {
+            Integer count = methodUsageCounts.get(key);
+            if (count == null) {
+                continue;
+            }
+            if (count <= 1) {
+                methodUsageCounts.remove(key);
+            } else {
+                methodUsageCounts.put(key, count - 1);
+            }
+        }
+        removedFromUsageIndex.add(method);
+    }
+
     private static int eliminateUnusedMethods() {
         return(eliminateUnusedMethods(false, 0));
     }
 
     private static int eliminateUnusedMethods(boolean forceFound, int depth) {
+        ensureMethodUsageIndex();
         int nfound = cullMethods();
         nfound += cullClasses(nfound>0 || forceFound, depth);
         return(nfound);
@@ -519,6 +594,7 @@ public class Parser extends ClassVisitor {
                         continue;
                     }
                     mtd.setEliminated(true);
+                    removeFromMethodUsageIndex(mtd);
                     nfound++;
                 }
             }
@@ -596,6 +672,9 @@ public class Parser extends ClassVisitor {
             int nfound = 0;
             for (ByteCodeClass cls : removedClasses) {
                 nfound += cls.setEliminated(true);
+                for (BytecodeMethod method : cls.getMethods()) {
+                    removeFromMethodUsageIndex(method);
+                }
             }
             classes = tmp;
             return nfound + eliminateUnusedMethods(nfound > 0, depth + 1);
@@ -613,17 +692,9 @@ public class Parser extends ClassVisitor {
         if (!m.isEliminated() && m.isMethodUsedByNative(nativeSources, cls)) {
             return true;
         }
-        for(ByteCodeClass bc : classes) {
-            for(BytecodeMethod mtd : bc.getMethods()) {
-                if(mtd.isEliminated() || mtd == m) {
-                    continue;
-                }
-                if(mtd.isMethodUsed(m)) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        ensureMethodUsageIndex();
+        Integer count = methodUsageCounts.get(buildMethodUsageKey(m));
+        return count != null && count > 0;
     }
 
     private static void writeFile(ByteCodeClass cls, File outputDir, ConcatenatingFileOutputStream writeBufferInstead) throws Exception {
