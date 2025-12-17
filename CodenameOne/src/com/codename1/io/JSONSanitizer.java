@@ -324,8 +324,10 @@ final class JSONSanitizer {
                         --nZeroesPending;
                     }
 
-                    // TODO: limit s to 21 digits?
-                    sanitizedJson.setCharAt(digitOutPos++, vdigit);
+                    // Limit s to 21 digits
+                    if (digitOutPos - intStart < 21) {
+                        sanitizedJson.setCharAt(digitOutPos++, vdigit);
+                    }
                 }
             }
         }
