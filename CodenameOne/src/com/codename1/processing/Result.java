@@ -1,12 +1,12 @@
 /*
  Copyright (c) 2007, Sun Microsystems, Inc.
- 
+
  All rights reserved.
- 
+
  Redistribution and use in source and binary forms, with or without
  modification, are permitted provided that the following conditions
  are met:
- 
+
  * Redistributions of source code must retain the above copyright
  notice, this list of conditions and the following disclaimer.
  * Redistributions in binary form must reproduce the above copyright
@@ -16,7 +16,7 @@
  * Neither the name of Sun Microsystems, Inc. nor the names of its
  contributors may be used to endorse or promote products derived
  from this software without specific prior written permission.
- 
+
  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
@@ -30,10 +30,10 @@
  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
  Derivative Revision History:
- 
+
  2012-03 - derivative work from original Sun source, removed references
  to Sun's JSON parser, support for any structured document that implements
- a StructuredSource interface.  Added globbing and backtracking support 
+ a StructuredSource interface.  Added globbing and backtracking support
  (backed by structured document impl), support for predicate expressions,
  nested expressions, and various XPath style features.
 
@@ -620,7 +620,6 @@ public class Result {
         return array == null ? 0 : array.size();
     }
 
-    // TODO: add array accessors for other types, or parameterize by type
 
     /**
      * Get an array of string values from the requested path.
@@ -670,10 +669,16 @@ public class Result {
         final String[] arr = new String[jarr == null ? 0 : jarr.size()];
         int alen = arr.length;
         for (int i = 0; i < alen; i++) {
-            StructuredContent element = (StructuredContent) jarr.get(i);
-            arr[i] = element.getText();
+            arr[i] = _getText(jarr.get(i));
         }
         return arr;
+    }
+
+    private String _getText(Object o) {
+        if (o instanceof StructuredContent) {
+            return ((StructuredContent) o).getText();
+        }
+        return o.toString();
     }
 
     /**
@@ -726,9 +731,12 @@ public class Result {
         final int[] arr = new int[jarr == null ? 0 : jarr.size()];
         int alen = arr.length;
         for (int i = 0; i < alen; i++) {
-            StructuredContent element = (StructuredContent) jarr.get(i);
-            String s = element.getText();
-            arr[i] = Integer.parseInt(s);
+            String s = _getText(jarr.get(i));
+            if (s.indexOf('.') > -1) {
+                arr[i] = (int) Double.parseDouble(s);
+            } else {
+                arr[i] = Integer.parseInt(s);
+            }
         }
         return arr;
     }
@@ -753,9 +761,12 @@ public class Result {
         final long[] arr = new long[jarr == null ? 0 : jarr.size()];
         int alen = arr.length;
         for (int i = 0; i < alen; i++) {
-            StructuredContent element = (StructuredContent) jarr.get(i);
-            String s = element.getText();
-            arr[i] = Long.parseLong(s);
+            String s = _getText(jarr.get(i));
+            if (s.indexOf('.') > -1) {
+                arr[i] = (long) Double.parseDouble(s);
+            } else {
+                arr[i] = Long.parseLong(s);
+            }
         }
         return arr;
     }
@@ -780,8 +791,7 @@ public class Result {
         final double[] arr = new double[jarr == null ? 0 : jarr.size()];
         int alen = arr.length;
         for (int i = 0; i < alen; i++) {
-            StructuredContent element = (StructuredContent) jarr.get(i);
-            String s = element.getText();
+            String s = _getText(jarr.get(i));
             arr[i] = Double.parseDouble(s);
         }
         return arr;
@@ -805,8 +815,7 @@ public class Result {
         final boolean[] arr = new boolean[jarr == null ? 0 : jarr.size()];
         int alen = arr.length;
         for (int i = 0; i < alen; i++) {
-            StructuredContent element = (StructuredContent) jarr.get(i);
-            String s = element.getText();
+            String s = _getText(jarr.get(i));
             boolean b = false;
             if ("true".equals(s)) {
                 b = true;
@@ -814,6 +823,89 @@ public class Result {
                 b = true;
             }
             arr[i] = b;
+        }
+        return arr;
+    }
+
+    /**
+     * Get an array of short values from the requested path.
+     * <pre>
+     * short values[] = result.getAsShortArray(&quot;//values&quot;);
+     * </pre>
+     *
+     * @param path Path expression to evaluate
+     * @return the value at the requested path
+     * @throws IllegalArgumentException on error traversing the document, ie.
+     *                                  traversing into an array without using subscripts.
+     * @throws NumberFormatException    if the value at path can not be converted
+     *                                  to a short.
+     */
+    public short[] getAsShortArray(final String path)
+            throws IllegalArgumentException {
+        final List jarr = _internalGetAsArray(path);
+        final short[] arr = new short[jarr == null ? 0 : jarr.size()];
+        int alen = arr.length;
+        for (int i = 0; i < alen; i++) {
+            String s = _getText(jarr.get(i));
+            if (s.indexOf('.') > -1) {
+                arr[i] = (short) Double.parseDouble(s);
+            } else {
+                arr[i] = Short.parseShort(s);
+            }
+        }
+        return arr;
+    }
+
+    /**
+     * Get an array of float values from the requested path.
+     * <pre>
+     * float values[] = result.getAsFloatArray(&quot;//values&quot;);
+     * </pre>
+     *
+     * @param path Path expression to evaluate
+     * @return the value at the requested path
+     * @throws IllegalArgumentException on error traversing the document, ie.
+     *                                  traversing into an array without using subscripts.
+     * @throws NumberFormatException    if the value at path can not be converted
+     *                                  to a float.
+     */
+    public float[] getAsFloatArray(final String path)
+            throws IllegalArgumentException {
+        final List jarr = _internalGetAsArray(path);
+        final float[] arr = new float[jarr == null ? 0 : jarr.size()];
+        int alen = arr.length;
+        for (int i = 0; i < alen; i++) {
+            String s = _getText(jarr.get(i));
+            arr[i] = Float.parseFloat(s);
+        }
+        return arr;
+    }
+
+    /**
+     * Get an array of byte values from the requested path.
+     * <pre>
+     * byte values[] = result.getAsByteArray(&quot;//values&quot;);
+     * </pre>
+     *
+     * @param path Path expression to evaluate
+     * @return the value at the requested path
+     * @throws IllegalArgumentException on error traversing the document, ie.
+     *                                  traversing into an array without using subscripts.
+     * @throws NumberFormatException    if the value at path can not be converted
+     *                                  to a byte.
+     */
+    public byte[] getAsByteArray(final String path)
+            throws IllegalArgumentException {
+        final List jarr = _internalGetAsArray(path);
+        final byte[] arr = new byte[jarr == null ? 0 : jarr.size()];
+        int alen = arr.length;
+        for (int i = 0; i < alen; i++) {
+            String s = _getText(jarr.get(i));
+            if (s.indexOf('.') > -1) {
+                arr[i] = (byte) Double.parseDouble(s);
+            } else {
+                arr[i] = Byte.parseByte(s);
+            }
         }
         return arr;
     }
