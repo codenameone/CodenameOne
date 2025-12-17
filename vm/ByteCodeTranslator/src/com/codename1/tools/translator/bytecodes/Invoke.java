@@ -142,9 +142,10 @@ public class Invoke extends Instruction {
         }
         
         StringBuilder bld = new StringBuilder();
+        boolean isVirtualCall = false;
         if(opcode == Opcodes.INVOKEINTERFACE || opcode == Opcodes.INVOKEVIRTUAL) {
             b.append("    ");
-            
+
             // Well, it is actually legal to call private methods with invoke virtual, and kotlin
             // generates such calls.  But ParparVM strips out these virtual method definitions
             // so we need to check if the method is private, and remove the virtual invocation 
@@ -162,6 +163,7 @@ public class Invoke extends Instruction {
             }
             if (isVirtual) {
                 bld.append("virtual_");
+                isVirtualCall = true;
             }
         } else {
             b.append("    ");
@@ -195,6 +197,9 @@ public class Invoke extends Instruction {
         bld.append("__");
         ArrayList<String> args = new ArrayList<String>();
         String returnVal = BytecodeMethod.appendMethodSignatureSuffixFromDesc(desc, bld, args);
+        if (isVirtualCall) {
+            BytecodeMethod.addVirtualMethodsInvoked(bld.substring("virtual_".length()));
+        }
         boolean noPop = false;
         if(returnVal == null) {
             b.append(bld);
