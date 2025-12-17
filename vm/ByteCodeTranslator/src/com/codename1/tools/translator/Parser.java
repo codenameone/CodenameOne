@@ -325,12 +325,8 @@ public class Parser extends ClassVisitor {
         
         bld.append("\n\n#endif // __CN1_CLASS_METHOD_INDEX_H__\n");        
         
-        FileOutputStream fos = new FileOutputStream(new File(outputDirectory, "cn1_class_method_index.h"));
-        fos.write(bld.toString().getBytes("UTF-8"));
-        fos.close();
-        fos = new FileOutputStream(new File(outputDirectory, "cn1_class_method_index.m"));
-        fos.write(bldM.toString().getBytes("UTF-8"));
-        fos.close();
+        writeIfChanged(new File(outputDirectory, "cn1_class_method_index.h"), bld.toString());
+        writeIfChanged(new File(outputDirectory, "cn1_class_method_index.m"), bldM.toString());
     }
     
     private static String encodeString(String con) {
@@ -627,27 +623,45 @@ public class Parser extends ClassVisitor {
     }
 
     private static void writeFile(ByteCodeClass cls, File outputDir, ConcatenatingFileOutputStream writeBufferInstead) throws Exception {
-        OutputStream outMain =
-                writeBufferInstead != null && ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_IOS ?
-                        writeBufferInstead :
-                        new FileOutputStream(new File(outputDir, cls.getClsName() + "." + ByteCodeTranslator.output.extension()));
-
-        if (outMain instanceof ConcatenatingFileOutputStream) {
-            ((ConcatenatingFileOutputStream)outMain).beginNextFile(cls.getClsName());
-        }
-        if(ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_CSHARP) {
-            outMain.write(cls.generateCSharpCode().getBytes());
-            outMain.close();
-        } else {
-            outMain.write(cls.generateCCode(classes).getBytes());
-            outMain.close();
+        if (writeBufferInstead != null && ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_IOS) {
+            writeBufferInstead.beginNextFile(cls.getClsName());
+            writeBufferInstead.write(cls.generateCCode(classes).getBytes("UTF-8"));
+            writeBufferInstead.close();
 
             // we also need to write the header file for C outputs
             String headerName = cls.getClsName() + ".h";
-            FileOutputStream outHeader = new FileOutputStream(new File(outputDir, headerName));
-            outHeader.write(cls.generateCHeader().getBytes());
-            outHeader.close();
+            writeIfChanged(new File(outputDir, headerName), cls.generateCHeader());
+            return;
         }
+
+        if(ByteCodeTranslator.output == ByteCodeTranslator.OutputType.OUTPUT_TYPE_CSHARP) {
+            writeIfChanged(new File(outputDir, cls.getClsName() + "." + ByteCodeTranslator.output.extension()), cls.generateCSharpCode());
+        } else {
+            writeIfChanged(new File(outputDir, cls.getClsName() + "." + ByteCodeTranslator.output.extension()), cls.generateCCode(classes));
+
+            // we also need to write the header file for C outputs
+            String headerName = cls.getClsName() + ".h";
+            writeIfChanged(new File(outputDir, headerName), cls.generateCHeader());
+        }
+    }
+
+    private static void writeIfChanged(File dest, String content) throws IOException {
+        byte[] data = content.getBytes("UTF-8");
+        if(dest.exists() && dest.length() == data.length) {
+            // let's check if the content is the same
+            byte[] existing = new byte[(int)dest.length()];
+            DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(dest)));
+            dis.readFully(existing);
+            dis.close();
+
+            if(Arrays.equals(data, existing)) {
+                return;
+            }
+        }
+        FileOutputStream fos = new FileOutputStream(dest);
+        BufferedOutputStream bos = new BufferedOutputStream(fos);
+        bos.write(data);
+        bos.close();
     }
     
     public Parser() {

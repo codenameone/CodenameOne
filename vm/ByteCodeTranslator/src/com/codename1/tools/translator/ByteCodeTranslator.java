@@ -23,6 +23,8 @@
 
 package com.codename1.tools.translator;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileFilter;
@@ -620,7 +622,7 @@ public class ByteCodeTranslator {
     //
     private static StringBuilder readFileAsStringBuilder(File sourceFile) throws IOException
     {
-        DataInputStream dis = new DataInputStream(new FileInputStream(sourceFile));
+        DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(sourceFile)));
         byte[] data = new byte[(int)sourceFile.length()];
         dis.readFully(data);
         dis.close();
@@ -683,12 +685,19 @@ public class ByteCodeTranslator {
      */
     public static void copy(InputStream i, OutputStream o, int bufferSize) throws IOException {
         try {
+            if(!(i instanceof BufferedInputStream)) {
+                i = new BufferedInputStream(i);
+            }
+            if(!(o instanceof BufferedOutputStream)) {
+                o = new BufferedOutputStream(o);
+            }
             byte[] buffer = new byte[bufferSize];
             int size = i.read(buffer);
             while(size > -1) {
                 o.write(buffer, 0, size);
                 size = i.read(buffer);
             }
+            o.flush();
         } finally {
             cleanup(o);
             cleanup(i);
