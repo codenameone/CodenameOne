@@ -2,7 +2,6 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
-import com.codename1.ui.ComponentSelector;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListCellRenderer;
@@ -240,8 +239,8 @@ public class AutoCompleteTextComponentTest extends UITestBase {
             flushSerialCalls();
         }
 
-        assertEquals("Red", field.getText());
-        assertEquals("Red", component.getText());
+        assertEquals("Red", field.getText(), "Field isn't red. Implementation details: " + implementation);
+        assertEquals("Red", component.getText(), "Component isn't red. Implementation details: " + implementation);
         assertTrue(filteredInputs.contains("re"));
     }
 

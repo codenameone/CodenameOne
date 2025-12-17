@@ -197,6 +197,137 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private boolean sslCertificatesSupported;
     private final Map<String, MockResponse> mockResponses = new ConcurrentHashMap<String, MockResponse>();
 
+    @Override
+    public String toString() {
+        return "TestCodenameOneImplementation{" +
+                "storageEntries=" + storageEntries +
+                ", fileSystem=" + fileSystem +
+                ", connections=" + connections +
+                ", sockets=" + sockets +
+                ", queuedRequests=" + queuedRequests +
+                ", databases=" + databases +
+                ", contacts=" + contacts +
+                ", scheduledNotifications=" + scheduledNotifications +
+                ", contactIdCounter=" + contactIdCounter +
+                ", getAllContactsFast=" + getAllContactsFast +
+                ", databaseCustomPathSupported=" + databaseCustomPathSupported +
+                ", lastSentMessageRecipients=" + Arrays.toString(lastSentMessageRecipients) +
+                ", lastSentMessageSubject='" + lastSentMessageSubject + '\'' +
+                ", lastSentMessage=" + lastSentMessage +
+                ", refreshContactsCount=" + refreshContactsCount +
+                ", defaultFont=" + defaultFont +
+                ", displayWidth=" + displayWidth +
+                ", displayHeight=" + displayHeight +
+                ", desktopSize=" + desktopSize +
+                ", lastWindowSize=" + lastWindowSize +
+                ", windowBounds=" + windowBounds +
+                ", deviceDensity=" + deviceDensity +
+                ", portrait=" + portrait +
+                ", tablet=" + tablet +
+                ", touchDevice=" + touchDevice +
+                ", timeoutSupported=" + timeoutSupported +
+                ", timeoutInvoked=" + timeoutInvoked +
+                ", timeoutValue=" + timeoutValue +
+                ", translationSupported=" + translationSupported +
+                ", translateInvoked=" + translateInvoked +
+                ", shapeSupported=" + shapeSupported +
+                ", drawShapeInvoked=" + drawShapeInvoked +
+                ", fillShapeInvoked=" + fillShapeInvoked +
+                ", lastClipShape=" + lastClipShape +
+                ", lastDrawShape=" + lastDrawShape +
+                ", lastFillShape=" + lastFillShape +
+                ", lastDrawStroke=" + lastDrawStroke +
+                ", fillOperations=" + fillOperations +
+                ", gradientOperations=" + gradientOperations +
+                ", accessPointIds=" + Arrays.toString(accessPointIds) +
+                ", accessPointTypes=" + accessPointTypes +
+                ", accessPointNames=" + accessPointNames +
+                ", currentAccessPoint='" + currentAccessPoint + '\'' +
+                ", locationManager=" + locationManager +
+                ", localizationManager=" + localizationManager +
+                ", imageIO=" + imageIO +
+                ", gaussianBlurSupported=" + gaussianBlurSupported +
+                ", gaussianBlurInvocations=" + gaussianBlurInvocations +
+                ", mediaRecorderBuilderHandler=" + mediaRecorderBuilderHandler +
+                ", mediaRecorderHandler=" + mediaRecorderHandler +
+                ", animation=" + animation +
+                ", availableRecordingMimeTypes=" + Arrays.toString(availableRecordingMimeTypes) +
+                ", mediaRecorder=" + mediaRecorder +
+                ", trueTypeSupported=" + trueTypeSupported +
+                ", executeURL='" + executeURL + '\'' +
+                ", autoProcessConnections=" + autoProcessConnections +
+                ", properties=" + properties +
+                ", blockCopyAndPaste=" + blockCopyAndPaste +
+                ", browserComponent=" + browserComponent +
+                ", browserExecuted=" + browserExecuted +
+                ", browserUrls=" + browserUrls +
+                ", backgroundMediaAsync=" + backgroundMediaAsync +
+                ", backgroundMedia=" + backgroundMedia +
+                ", media=" + media +
+                ", mediaAsync=" + mediaAsync +
+                ", mediaAsyncByUri=" + mediaAsyncByUri +
+                ", inAppPurchase=" + inAppPurchase +
+                ", startRemoteControlInvocations=" + startRemoteControlInvocations +
+                ", stopRemoteControlInvocations=" + stopRemoteControlInvocations +
+                ", mutableImagesFast=" + mutableImagesFast +
+                ", nativeTitle=" + nativeTitle +
+                ", softkeyCount=" + softkeyCount +
+                ", thirdSoftButton=" + thirdSoftButton +
+                ", nativeFontSchemeSupported=" + nativeFontSchemeSupported +
+                ", resourceAsStreams=" + resourceAsStreams +
+                ", nativeBrowserWindow=" + nativeBrowserWindow +
+                ", nativeBrowserWindowOnLoadListener=" + nativeBrowserWindowOnLoadListener +
+                ", nativeBrowserWindowTitle='" + nativeBrowserWindowTitle + '\'' +
+                ", nativeBrowserWindowSize=" + nativeBrowserWindowSize +
+                ", nativeBrowserWindowCloseListener=" + nativeBrowserWindowCloseListener +
+                ", nativeBrowserWindowShowInvoked=" + nativeBrowserWindowShowInvoked +
+                ", nativeBrowserWindowCleanupInvoked=" + nativeBrowserWindowCleanupInvoked +
+                ", nativeBrowserWindowHideInvoked=" + nativeBrowserWindowHideInvoked +
+                ", nativeImageCacheSupported=" + nativeImageCacheSupported +
+                ", initializeTextSelectionCount=" + initializeTextSelectionCount +
+                ", deinitializeTextSelectionCount=" + deinitializeTextSelectionCount +
+                ", lastInitializedTextSelection=" + lastInitializedTextSelection +
+                ", lastDeinitializedTextSelection=" + lastDeinitializedTextSelection +
+                ", copySelectionInvocations=" + copySelectionInvocations +
+                ", lastCopiedTextSelection=" + lastCopiedTextSelection +
+                ", lastCopiedText='" + lastCopiedText + '\'' +
+                ", heavyButtonPeers=" + heavyButtonPeers +
+                ", requiresHeavyButton=" + requiresHeavyButton +
+                ", allowKeyEventReentry=" + allowKeyEventReentry +
+                ", systemOutMessages=" + systemOutMessages +
+                ", logListener=" + logListener +
+                ", cleanupCalls=" + cleanupCalls +
+                ", flushStorageCacheInvocations=" + flushStorageCacheInvocations +
+                ", nativePickerTypeSupported=" + Arrays.toString(nativePickerTypeSupported) +
+                ", nativePickerTypeSupportedIndex=" + nativePickerTypeSupportedIndex +
+                ", socketAvailable=" + socketAvailable +
+                ", serverSocketAvailable=" + serverSocketAvailable +
+                ", appHomePath='" + appHomePath + '\'' +
+                ", hostOrIp='" + hostOrIp + '\'' +
+                ", openGalleryCallCount=" + openGalleryCallCount +
+                ", lastOpenGalleryResponse=" + lastOpenGalleryResponse +
+                ", lastOpenGalleryType=" + lastOpenGalleryType +
+                ", openImageGalleryCallCount=" + openImageGalleryCallCount +
+                ", lastOpenImageGalleryResponse=" + lastOpenImageGalleryResponse +
+                ", galleryTypeSupportedCallCount=" + galleryTypeSupportedCallCount +
+                ", lastGalleryTypeQuery=" + lastGalleryTypeQuery +
+                ", galleryTypeSupport=" + galleryTypeSupport +
+                ", nextCapturePhotoPath='" + nextCapturePhotoPath + '\'' +
+                ", nextCaptureVideoPath='" + nextCaptureVideoPath + '\'' +
+                ", nextCaptureAudioPath='" + nextCaptureAudioPath + '\'' +
+                ", lastMediaRecorderBuilder=" + lastMediaRecorderBuilder +
+                ", lastVideoConstraints=" + lastVideoConstraints +
+                ", audioCaptureFrames=" + audioCaptureFrames +
+                ", activeTextEditor=" + activeTextEditor +
+                ", connectionResponseProvider=" + connectionResponseProvider +
+                ", browserScriptResponder=" + browserScriptResponder +
+                ", sslCertificatesByUrl=" + sslCertificatesByUrl +
+                ", sslCertificatesSupported=" + sslCertificatesSupported +
+                ", mockResponses=" + mockResponses +
+                ", incomingConnections=" + incomingConnections +
+                '}';
+    }
+
     public static class MockResponse {
         int code;
         String message;
@@ -206,6 +337,15 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             this.code = code;
             this.message = message;
             this.body = body;
+        }
+
+        @Override
+        public String toString() {
+            return "MockResponse{" +
+                    "code=" + code +
+                    ", message='" + message + '\'' +
+                    ", body=" + Arrays.toString(body) +
+                    '}';
         }
     }
 
@@ -263,6 +403,20 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
         public int getUpdateCount() {
             return updateCount;
+        }
+
+        @Override
+        public String toString() {
+            return "HeavyButtonPeerState{" +
+                    "listeners=" + listeners +
+                    ", x=" + x +
+                    ", y=" + y +
+                    ", width=" + width +
+                    ", height=" + height +
+                    ", initCalled=" + initCalled +
+                    ", deinitCalled=" + deinitCalled +
+                    ", updateCount=" + updateCount +
+                    '}';
         }
     }
 
@@ -3026,6 +3180,15 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         public int getRepeat() {
             return repeat;
         }
+
+        @Override
+        public String toString() {
+            return "ScheduledNotification{" +
+                    "notification=" + notification +
+                    ", firstTime=" + firstTime +
+                    ", repeat=" + repeat +
+                    '}';
+        }
     }
 
     public static final class TestDatabase extends Database {
@@ -3158,6 +3321,22 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             executedQueries.add(sql);
             executedQueryParameters.add(null);
             return new TestCursor(columns, rows, rowExtSupported);
+        }
+
+        @Override
+        public String toString() {
+            return "TestDatabase{" +
+                    "name='" + name + '\'' +
+                    ", inTransaction=" + inTransaction +
+                    ", closed=" + closed +
+                    ", columns=" + Arrays.toString(columns) +
+                    ", rows=" + Arrays.toString(rows) +
+                    ", executedStatements=" + executedStatements +
+                    ", executedParameters=" + executedParameters +
+                    ", executedQueries=" + executedQueries +
+                    ", executedQueryParameters=" + executedQueryParameters +
+                    ", rowExtSupported=" + rowExtSupported +
+                    '}';
         }
     }
 
@@ -3375,6 +3554,13 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             }
             return values[index];
         }
+
+        @Override
+        public String toString() {
+            return "TestRow{" +
+                    "values=" + Arrays.toString(values) +
+                    '}';
+        }
     }
 
     private static final class WasNullRow extends TestRow implements RowExt {
@@ -3393,6 +3579,13 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
         public boolean wasNull() throws IOException {
             return lastWasNull;
+        }
+
+        @Override
+        public String toString() {
+            return "WasNullRow{" +
+                    "lastWasNull=" + lastWasNull +
+                    '}';
         }
     }
 
@@ -3444,6 +3637,17 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         public int getColor() {
             return color;
         }
+
+        @Override
+        public String toString() {
+            return "FillOperation{" +
+                    "x=" + x +
+                    ", y=" + y +
+                    ", width=" + width +
+                    ", height=" + height +
+                    ", color=" + color +
+                    '}';
+        }
     }
 
     public static final class GradientOperation {
@@ -3492,6 +3696,19 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         public boolean isHorizontal() {
             return horizontal;
         }
+
+        @Override
+        public String toString() {
+            return "GradientOperation{" +
+                    "x=" + x +
+                    ", y=" + y +
+                    ", width=" + width +
+                    ", height=" + height +
+                    ", startColor=" + startColor +
+                    ", endColor=" + endColor +
+                    ", horizontal=" + horizontal +
+                    '}';
+        }
     }
 
     public static final class TestGraphics {
@@ -3509,6 +3726,22 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         TestGraphics(int width, int height) {
             this.clipWidth = width;
             this.clipHeight = height;
+        }
+
+        @Override
+        public String toString() {
+            return "TestGraphics{" +
+                    "color=" + color +
+                    ", alpha=" + alpha +
+                    ", clipX=" + clipX +
+                    ", clipY=" + clipY +
+                    ", clipWidth=" + clipWidth +
+                    ", clipHeight=" + clipHeight +
+                    ", translateX=" + translateX +
+                    ", translateY=" + translateY +
+                    ", font=" + font +
+                    ", image=" + image +
+                    '}';
         }
     }
 
@@ -3690,6 +3923,22 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             result = 31 * result + Float.floatToIntBits(translateZ);
             return result;
         }
+
+        @Override
+        public String toString() {
+            return "TestTransform{" +
+                    "m00=" + m00 +
+                    ", m01=" + m01 +
+                    ", m02=" + m02 +
+                    ", m10=" + m10 +
+                    ", m11=" + m11 +
+                    ", m12=" + m12 +
+                    ", m20=" + m20 +
+                    ", m21=" + m21 +
+                    ", m22=" + m22 +
+                    ", translateZ=" + translateZ +
+                    '}';
+        }
     }
 
     public static final class TestFont {
@@ -3717,6 +3966,14 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
         int charWidth(char c) {
             return charWidth;
+        }
+
+        @Override
+        public String toString() {
+            return "TestFont{" +
+                    "charWidth=" + charWidth +
+                    ", height=" + height +
+                    '}';
         }
     }
 
@@ -3767,6 +4024,16 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
             int[] data = new int[Math.max(1, width * height)];
             Arrays.fill(data, 0xff000000);
             return new TestImage(width, height, data);
+        }
+
+        @Override
+        public String toString() {
+            return "TestImage{" +
+                    "width=" + width +
+                    ", height=" + height +
+                    ", argb=" + Arrays.toString(argb) +
+                    ", graphics=" + graphics +
+                    '}';
         }
     }
 
@@ -3888,6 +4155,27 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
         public void setContentLength(int contentLength) {
             this.contentLength = contentLength;
+        }
+
+        @Override
+        public String toString() {
+            return "TestConnection{" +
+                    "url='" + url + '\'' +
+                    ", headers=" + headers +
+                    ", multiHeaders=" + multiHeaders +
+                    ", inputData=" + Arrays.toString(inputData) +
+                    ", output=" + output +
+                    ", bufferedOutput=" + bufferedOutput +
+                    ", readRequested=" + readRequested +
+                    ", writeRequested=" + writeRequested +
+                    ", postRequest=" + postRequest +
+                    ", responseCode=" + responseCode +
+                    ", responseMessage='" + responseMessage + '\'' +
+                    ", contentLength=" + contentLength +
+                    ", outputOffset=" + outputOffset +
+                    ", httpMethod='" + httpMethod + '\'' +
+                    ", httpMethodException=" + httpMethodException +
+                    '}';
         }
     }
 
@@ -4066,6 +4354,15 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         private float[] getSamples() {
             return Arrays.copyOf(samples, samples.length);
         }
+
+        @Override
+        public String toString() {
+            return "AudioCaptureFrame{" +
+                    "sampleRate=" + sampleRate +
+                    ", numChannels=" + numChannels +
+                    ", samples=" + Arrays.toString(samples) +
+                    '}';
+        }
     }
 
     public static final class TestFile {
@@ -4083,6 +4380,14 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
         static TestFile directory() {
             return new TestFile(true, new byte[0]);
+        }
+
+        @Override
+        public String toString() {
+            return "TestFile{" +
+                    "directory=" + directory +
+                    ", content=" + Arrays.toString(content) +
+                    '}';
         }
     }
 
@@ -4169,6 +4474,19 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
         public String getErrorMessage() {
             return errorMessage;
+        }
+
+        @Override
+        public String toString() {
+            return "TestSocket{" +
+                    "host='" + host + '\'' +
+                    ", port=" + port +
+                    ", inbound=" + inbound +
+                    ", outbound=" + outbound +
+                    ", connected=" + connected +
+                    ", errorCode=" + errorCode +
+                    ", errorMessage='" + errorMessage + '\'' +
+                    '}';
         }
     }
 }
