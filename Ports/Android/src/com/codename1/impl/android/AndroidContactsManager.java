@@ -100,19 +100,21 @@ public class AndroidContactsManager {
 
         Uri photoUri = ContentUris.withAppendedId(ContactsContract.Data.CONTENT_URI, photo_id);
 
-        Cursor c = cr.query(photoUri, new String[]{ContactsContract.CommonDataKinds.Photo.PHOTO}, null, null, null);
+        Cursor c = null;
 
         try {
-            if (c.moveToFirst()) {
+            c = cr.query(photoUri, new String[]{ContactsContract.CommonDataKinds.Photo.PHOTO}, null, null, null);
+            if (c != null && c.moveToFirst()) {
                 photoBytes = c.getBlob(0);
             }
 
         } catch (Exception e) {
-            // TODO: handle exception
-            e.printStackTrace();
+            Logger.getLogger(AndroidContactsManager.class.getName()).log(Level.SEVERE, null, e);
 
         } finally {
-            c.close();
+            if (c != null) {
+                c.close();
+            }
         }
 
         if (photoBytes != null) {
