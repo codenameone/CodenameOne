@@ -9,6 +9,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class DisplayTest extends UITestBase {
 
+    public static void initInvokeAndBlockThreads() {
+        RunnableWrapper.setMaxThreadCount(100);
+    }
+
     public static void flushEdt() {
         final Display display = Display.getInstance();
         if (display.isEdt()) {

@@ -46,6 +46,7 @@ public abstract class UITestBase {
 
     @BeforeAll
     protected void setUpDisplay() throws Exception {
+        DisplayTest.initInvokeAndBlockThreads();
         if (!Display.isInitialized()) {
             implementation = TestCodenameOneImplementation.getInstance();
             if (implementation == null) {
