@@ -41,12 +41,20 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class BytecodeInstructionIntegrationTest {
 
+    static Stream<CompilerHelper.CompilerConfig> provideCompilerConfigs() {
+        List<CompilerHelper.CompilerConfig> configs = new ArrayList<>();
+        configs.addAll(CompilerHelper.getAvailableCompilers("1.5"));
+        configs.addAll(CompilerHelper.getAvailableCompilers("1.8"));
+        configs.addAll(CompilerHelper.getAvailableCompilers("11"));
+        configs.addAll(CompilerHelper.getAvailableCompilers("17"));
+        configs.addAll(CompilerHelper.getAvailableCompilers("21"));
+        configs.addAll(CompilerHelper.getAvailableCompilers("25"));
+        return configs.stream();
+    }
+
     @ParameterizedTest
-    @ValueSource(strings = {"1.5", "1.8"})
-    void translatesOptimizedBytecodeToLLVMExecutable(String targetVersion) throws Exception {
-        if ("1.5".equals(targetVersion) && !isSourceVersionSupported("1.5")) {
-             return; // Skip on newer JDKs that dropped 1.5 support
-        }
+    @org.junit.jupiter.params.provider.MethodSource("provideCompilerConfigs")
+    void translatesOptimizedBytecodeToLLVMExecutable(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 
         Path sourceDir = Files.createTempDirectory("bytecode-integration-sources");
@@ -61,28 +69,43 @@ class BytecodeInstructionIntegrationTest {
         Path nativeReport = sourceDir.resolve("native_report.c");
         Files.write(nativeReport, nativeReportSource().getBytes(StandardCharsets.UTF_8));
 
-        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-        assertNotNull(compiler, "A JDK is required to compile test sources");
-
-        // Compile App using JavaAPI as bootclasspath
+        // Compile App using the specific JDK
         List<String> compileArgs = new ArrayList<>();
-        compileArgs.add("-source");
-        compileArgs.add(targetVersion);
-        compileArgs.add("-target");
-        compileArgs.add(targetVersion);
-        compileArgs.add("-bootclasspath");
-        compileArgs.add(javaApiDir.toString());
+
+        double targetVer = 1.8;
+        try { targetVer = Double.parseDouble(config.targetVersion); } catch (NumberFormatException ignored) {}
+
+        double jdkVer = 1.8;
+        try { jdkVer = Double.parseDouble(config.jdkVersion); } catch (NumberFormatException ignored) {}
+
+        if (jdkVer >= 9) {
+             compileArgs.add("-source");
+             compileArgs.add(config.targetVersion);
+             compileArgs.add("-target");
+             compileArgs.add(config.targetVersion);
+             // On JDK 9+, -bootclasspath is removed.
+             // --patch-module is not allowed with -target 8.
+             // We rely on the JDK's own bootstrap classes but include our JavaAPI in classpath
+             // so that any non-replaced classes are found.
+             // This means we compile against JDK 9+ API but emit older bytecode.
+             compileArgs.add("-classpath");
+             compileArgs.add(javaApiDir.toString());
+        } else {
+             compileArgs.add("-source");
+             compileArgs.add(config.targetVersion);
+             compileArgs.add("-target");
+             compileArgs.add(config.targetVersion);
+             compileArgs.add("-bootclasspath");
+             compileArgs.add(javaApiDir.toString());
+             compileArgs.add("-Xlint:-options");
+        }
+
         compileArgs.add("-d");
         compileArgs.add(classesDir.toString());
         compileArgs.add(sourceDir.resolve("BytecodeInstructionApp.java").toString());
 
-        int compileResult = compiler.run(
-                null,
-                null,
-                null,
-                compileArgs.toArray(new String[0])
-        );
-        assertEquals(0, compileResult, "BytecodeInstructionApp should compile");
+        int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
+        assertEquals(0, compileResult, "BytecodeInstructionApp should compile with " + config);
 
         Files.copy(nativeReport, classesDir.resolve("native_report.c"));
 
@@ -190,11 +213,8 @@ class BytecodeInstructionIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"1.5", "1.8"})
-    void translatesInvokeAndLdcBytecodeToLLVMExecutable(String targetVersion) throws Exception {
-        if ("1.5".equals(targetVersion) && !isSourceVersionSupported("1.5")) {
-             return; // Skip on newer JDKs that dropped 1.5 support
-        }
+    @org.junit.jupiter.params.provider.MethodSource("provideCompilerConfigs")
+    void translatesInvokeAndLdcBytecodeToLLVMExecutable(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
 
         Path sourceDir = Files.createTempDirectory("invoke-ldc-sources");
@@ -209,27 +229,37 @@ class BytecodeInstructionIntegrationTest {
         Path nativeReport = sourceDir.resolve("native_report.c");
         Files.write(nativeReport, nativeReportSource().getBytes(StandardCharsets.UTF_8));
 
-        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-        assertNotNull(compiler, "A JDK is required to compile test sources");
-
         List<String> compileArgs = new ArrayList<>();
-        compileArgs.add("-source");
-        compileArgs.add(targetVersion);
-        compileArgs.add("-target");
-        compileArgs.add(targetVersion);
-        compileArgs.add("-bootclasspath");
-        compileArgs.add(javaApiDir.toString());
+
+        double targetVer = 1.8;
+        try { targetVer = Double.parseDouble(config.targetVersion); } catch (NumberFormatException ignored) {}
+
+        double jdkVer = 1.8;
+        try { jdkVer = Double.parseDouble(config.jdkVersion); } catch (NumberFormatException ignored) {}
+
+        if (jdkVer >= 9) {
+             compileArgs.add("-source");
+             compileArgs.add(config.targetVersion);
+             compileArgs.add("-target");
+             compileArgs.add(config.targetVersion);
+             compileArgs.add("-classpath");
+             compileArgs.add(javaApiDir.toString());
+        } else {
+             compileArgs.add("-source");
+             compileArgs.add(config.targetVersion);
+             compileArgs.add("-target");
+             compileArgs.add(config.targetVersion);
+             compileArgs.add("-bootclasspath");
+             compileArgs.add(javaApiDir.toString());
+             compileArgs.add("-Xlint:-options");
+        }
+
         compileArgs.add("-d");
         compileArgs.add(classesDir.toString());
         compileArgs.add(sourceDir.resolve("InvokeLdcLocalVarsApp.java").toString());
 
-        int compileResult = compiler.run(
-                null,
-                null,
-                null,
-                compileArgs.toArray(new String[0])
-        );
-        assertEquals(0, compileResult, "InvokeLdcLocalVarsApp should compile");
+        int compileResult = CompilerHelper.compile(config.jdkHome, compileArgs);
+        assertEquals(0, compileResult, "InvokeLdcLocalVarsApp should compile with " + config);
 
         Files.copy(nativeReport, classesDir.resolve("native_report.c"));
 
@@ -985,18 +1015,15 @@ class BytecodeInstructionIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"1.5", "1.8"})
-    void handleDefaultOutputWritesOutput(String targetVersion) throws Exception {
-        if ("1.5".equals(targetVersion) && !isSourceVersionSupported("1.5")) {
-             return; // Skip on newer JDKs that dropped 1.5 support
-        }
+    @org.junit.jupiter.params.provider.MethodSource("provideCompilerConfigs")
+    void handleDefaultOutputWritesOutput(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
         resetByteCodeClass();
         Path sourceDir = Files.createTempDirectory("default-output-source");
         Path outputDir = Files.createTempDirectory("default-output-dest");
 
         Files.write(sourceDir.resolve("resource.txt"), "data".getBytes(StandardCharsets.UTF_8));
-        compileDummyMainClass(sourceDir, "com.example", "MyAppDefault", targetVersion);
+        compileDummyMainClass(sourceDir, "com.example", "MyAppDefault", config);
 
         String[] args = new String[] {
                 "csharp",
@@ -1076,18 +1103,15 @@ class BytecodeInstructionIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"1.5", "1.8"})
-    void handleIosOutputGeneratesProjectStructure(String targetVersion) throws Exception {
-        if ("1.5".equals(targetVersion) && !isSourceVersionSupported("1.5")) {
-             return; // Skip on newer JDKs that dropped 1.5 support
-        }
+    @org.junit.jupiter.params.provider.MethodSource("provideCompilerConfigs")
+    void handleIosOutputGeneratesProjectStructure(CompilerHelper.CompilerConfig config) throws Exception {
         Parser.cleanup();
         resetByteCodeClass();
         Path sourceDir = Files.createTempDirectory("ios-output-source");
         Path outputDir = Files.createTempDirectory("ios-output-dest");
 
         Files.write(sourceDir.resolve("resource.txt"), "data".getBytes(StandardCharsets.UTF_8));
-        compileDummyMainClass(sourceDir, "com.example", "MyAppIOS", targetVersion);
+        compileDummyMainClass(sourceDir, "com.example", "MyAppIOS", config);
 
         // Add a bundle to test copyDir invocation in execute loop
         Path bundleDir = sourceDir.resolve("test.bundle");
@@ -1139,7 +1163,7 @@ class BytecodeInstructionIntegrationTest {
         ((Set<?>) writableFieldsField.get(null)).clear();
     }
 
-    private void compileDummyMainClass(Path sourceDir, String packageName, String className, String targetVersion) throws Exception {
+    private void compileDummyMainClass(Path sourceDir, String packageName, String className, CompilerHelper.CompilerConfig config) throws Exception {
         Path packageDir = sourceDir;
         for (String part : packageName.split("\\.")) {
             packageDir = packageDir.resolve(part);
@@ -1152,13 +1176,17 @@ class BytecodeInstructionIntegrationTest {
                 "}\n";
         Files.write(javaFile, content.getBytes(StandardCharsets.UTF_8));
 
-        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-        int result = compiler.run(null, null, null,
-                "-source", targetVersion,
-                "-target", targetVersion,
-                "-d", sourceDir.toString(),
-                javaFile.toString());
-        assertEquals(0, result, "Compilation failed");
+        List<String> args = new ArrayList<>();
+        args.add("-source");
+        args.add(config.targetVersion);
+        args.add("-target");
+        args.add(config.targetVersion);
+        args.add("-d");
+        args.add(sourceDir.toString());
+        args.add(javaFile.toString());
+
+        int result = CompilerHelper.compile(config.jdkHome, args);
+        assertEquals(0, result, "Compilation failed with " + config);
     }
 
     @Test
@@ -1262,19 +1290,4 @@ class BytecodeInstructionIntegrationTest {
         // or mock if possible. But here we can check basic behavior.
     }
 
-    private boolean isSourceVersionSupported(String version) {
-        String javaVersion = System.getProperty("java.specification.version");
-        if (javaVersion.startsWith("1.")) {
-            return true;
-        }
-        try {
-            int major = Integer.parseInt(javaVersion);
-            if ("1.5".equals(version)) {
-                 if (major >= 9) return false;
-            }
-        } catch (NumberFormatException e) {
-            return true;
-        }
-        return true;
-    }
 }

@@ -19,7 +19,7 @@
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <asm.version>9.2</asm.version>
+        <asm.version>9.8</asm.version>
         <junit.jupiter.version>5.10.2</junit.jupiter.version>
     </properties>
 
