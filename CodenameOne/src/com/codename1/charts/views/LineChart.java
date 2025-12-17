@@ -23,6 +23,7 @@ import com.codename1.charts.renderers.SimpleSeriesRenderer;
 import com.codename1.charts.renderers.XYMultipleSeriesRenderer;
 import com.codename1.charts.renderers.XYSeriesRenderer;
 import com.codename1.charts.renderers.XYSeriesRenderer.FillOutsideLine;
+import com.codename1.ui.geom.GeneralPath;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -91,16 +92,6 @@ public class LineChart extends XYChart {
         for (FillOutsideLine fill : fillOutsideLine) {
             if (fill.getType() != FillOutsideLine.Type.NONE) {
                 paint.setColor(fill.getColor());
-                // TODO: find a way to do area charts without duplicating data
-                List<Float> fillPoints = new ArrayList<Float>();
-                int[] range = fill.getFillRange();
-                if (range == null) {
-                    fillPoints.addAll(points);
-                } else {
-                    if (points.size() > range[0] * 2 && points.size() > range[1] * 2) {
-                        fillPoints.addAll(points.subList(range[0] * 2, range[1] * 2));
-                    }
-                }
 
                 final float referencePoint;
 
@@ -120,28 +111,20 @@ public class LineChart extends XYChart {
                         }
                     }
                 }
-        /*switch (fill.getType()) {
-        case BOUNDS_ALL:
-          referencePoint = yAxisValue;
-          break;
-        case BOUNDS_BELOW:
-          referencePoint = yAxisValue;
-          break;
-        case BOUNDS_ABOVE:
-          referencePoint = yAxisValue;
-          break;
-        case BELOW:
-          referencePoint = canvas.getHeight();
-          break;
-        case ABOVE:
-          referencePoint = 0;
-          break;
-        default:
-          throw new RuntimeException(
-              "You have added a new type of filling but have not implemented.");
-        }*/
+
+                int[] range = fill.getFillRange();
+
                 if (fill.getType() == FillOutsideLine.Type.BOUNDS_ABOVE
                         || fill.getType() == FillOutsideLine.Type.BOUNDS_BELOW) {
+                    List<Float> fillPoints = new ArrayList<Float>();
+                    if (range == null) {
+                        fillPoints.addAll(points);
+                    } else {
+                        if (points.size() > range[0] * 2 && points.size() > range[1] * 2) {
+                            fillPoints.addAll(points.subList(range[0] * 2, range[1] * 2));
+                        }
+                    }
+
                     List<Float> boundsPoints = new ArrayList<Float>();
                     boolean add = false;
                     int length = fillPoints.size();
@@ -186,22 +169,25 @@ public class LineChart extends XYChart {
 
                     fillPoints.clear();
                     fillPoints.addAll(boundsPoints);
-                }
-                int length = fillPoints.size();
-                if (length > 0) {
-                    fillPoints.set(0, fillPoints.get(0) + 1);
-                    fillPoints.add(fillPoints.get(length - 2));
-                    fillPoints.add(referencePoint);
-                    fillPoints.add(fillPoints.get(0));
-                    fillPoints.add(fillPoints.get(length + 1));
-                    for (int i = 0; i < length + 4; i += 2) {
-                        if (fillPoints.get(i + 1) < 0) {
-                            fillPoints.set(i + 1, 0f);
+                    length = fillPoints.size();
+                    if (length > 0) {
+                        fillPoints.set(0, fillPoints.get(0) + 1);
+                        fillPoints.add(fillPoints.get(length - 2));
+                        fillPoints.add(referencePoint);
+                        fillPoints.add(fillPoints.get(0));
+                        fillPoints.add(fillPoints.get(length + 1));
+                        for (int i = 0; i < length + 4; i += 2) {
+                            if (fillPoints.get(i + 1) < 0) {
+                                fillPoints.set(i + 1, 0f);
+                            }
                         }
-                    }
 
+                        paint.setStyle(Style.FILL);
+                        drawPath(canvas, fillPoints, paint, true);
+                    }
+                } else {
                     paint.setStyle(Style.FILL);
-                    drawPath(canvas, fillPoints, paint, true);
+                    drawFillPath(canvas, points, paint, referencePoint, range);
                 }
             }
         }
@@ -209,6 +195,110 @@ public class LineChart extends XYChart {
         paint.setStyle(Style.STROKE);
         drawPath(canvas, points, paint, false);
         paint.setStrokeWidth(lineWidth);
+    }
+
+    private void drawFillPath(Canvas canvas, List<Float> points, Paint paint, float referencePoint, int[] range) {
+        GeneralPath path = new GeneralPath();
+        int height = canvas.getHeight();
+        int width = canvas.getWidth();
+
+        int startIndex = 0;
+        int endIndex = points.size();
+        if (range != null) {
+            if (points.size() > range[0] * 2 && points.size() > range[1] * 2) {
+                startIndex = range[0] * 2;
+                endIndex = range[1] * 2;
+            }
+        }
+
+        int length = endIndex - startIndex;
+        if (length < 2) return;
+
+        // Logic from original:
+        // 1. fillPoints.set(0, fillPoints.get(0) + 1);
+        // 2. Add extra closing points
+        // 3. Clamp Y < 0 to 0
+
+        // We construct the path iteratively, mimicking drawPath logic but using our special iterator/values
+
+        float startX = points.get(startIndex) + 1;
+        float startY = points.get(startIndex + 1);
+        if (startY < 0) startY = 0;
+
+        // Since we need to form segments (p1, p2) for calculateDrawPoints
+
+        float p1x, p1y, p2x, p2y;
+        float[] tempDrawPoints;
+
+        if (length >= 4) {
+            p1x = startX;
+            p1y = startY;
+            p2x = points.get(startIndex + 2);
+            p2y = points.get(startIndex + 3);
+            if (p2y < 0) p2y = 0;
+
+            tempDrawPoints = calculateDrawPoints(p1x, p1y, p2x, p2y, height, width);
+            path.moveTo(tempDrawPoints[0], tempDrawPoints[1]);
+            path.lineTo(tempDrawPoints[2], tempDrawPoints[3]);
+
+            for (int i = 4; i < length; i += 2) {
+                p1x = points.get(startIndex + i - 2);
+                p1y = points.get(startIndex + i - 1);
+                if (p1y < 0) p1y = 0;
+
+                p2x = points.get(startIndex + i);
+                p2y = points.get(startIndex + i + 1);
+                if (p2y < 0) p2y = 0;
+
+                tempDrawPoints = calculateDrawPoints(p1x, p1y, p2x, p2y, height, width);
+                path.lineTo(tempDrawPoints[2], tempDrawPoints[3]);
+            }
+        } else {
+            // only 1 point?
+            path.moveTo(startX, startY);
+        }
+
+        // Now add closing points.
+        // Last point was (points.get(endIndex-2), points.get(endIndex-1)) (clamped)
+
+        // 1. To (LastX, RefY)
+        float lastX = points.get(endIndex - 2);
+        float nextX = lastX;
+        float nextY = referencePoint;
+        if (nextY < 0) nextY = 0;
+
+        // We need previous point (p1) to calculate draw points segment.
+        p1x = points.get(endIndex - 2); // original X
+        p1y = points.get(endIndex - 1); // original Y
+        if (p1y < 0) p1y = 0;
+
+        tempDrawPoints = calculateDrawPoints(p1x, p1y, nextX, nextY, height, width);
+        path.lineTo(tempDrawPoints[2], tempDrawPoints[3]);
+
+        // 2. To (StartX, RefY)
+        // p1 is (LastX, RefY)
+        p1x = nextX;
+        p1y = nextY;
+
+        nextX = startX; // This is StartX (modified +1)
+        nextY = referencePoint;
+        if (nextY < 0) nextY = 0;
+
+        tempDrawPoints = calculateDrawPoints(p1x, p1y, nextX, nextY, height, width);
+        path.lineTo(tempDrawPoints[2], tempDrawPoints[3]);
+
+        // 3. To (StartX, StartY) - Closing the loop
+        p1x = nextX;
+        p1y = nextY;
+
+        nextX = startX;
+        nextY = startY;
+
+        tempDrawPoints = calculateDrawPoints(p1x, p1y, nextX, nextY, height, width);
+        path.lineTo(tempDrawPoints[2], tempDrawPoints[3]);
+
+        // Done
+        canvas.drawPath(path, paint);
     }
 
     @Override

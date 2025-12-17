@@ -41,7 +41,7 @@ import java.util.List;
 public abstract class AbstractChart {
     private static final char[] stopCharCandidates = "!@#$%^&*()?><,./+-qwertyuiop[zxcvbnm,./\\|}{".toCharArray();
 
-    private static float[] calculateDrawPoints(float p1x, float p1y, float p2x, float p2y,
+    protected static float[] calculateDrawPoints(float p1x, float p1y, float p2x, float p2y,
                                                int screenHeight, int screenWidth) {
         float drawP1x;
         float drawP1y;
