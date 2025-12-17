@@ -15,6 +15,13 @@ TMPDIR="${TMPDIR%/}"
 DOWNLOAD_DIR="${TMPDIR%/}/codenameone-tools"
 log "The DOWNLOAD_DIR is ${DOWNLOAD_DIR}"
 
+CN1_BINARIES_PARENT="$(cd .. && pwd -P)"
+CN1_BINARIES="${CN1_BINARIES_PARENT%/}/cn1-binaries"
+if [ ! -d "$CN1_BINARIES" ]; then
+    # Fallback to the maven build dir if the external one doesn't exist
+    CN1_BINARIES="$(pwd)/maven/target/cn1-binaries"
+fi
+
 ENV_DIR="$DOWNLOAD_DIR/tools"
 ENV_FILE="$ENV_DIR/env.sh"
 
@@ -119,9 +126,9 @@ run_maven() {
 
 BUILD_CLIENT="$HOME/.codenameone/CodeNameOneBuildClient.jar"
 if [ ! -f "$BUILD_CLIENT" ]; then
-  if ! run_maven -q -f maven/pom.xml cn1:install-codenameone "$@"; then
+  if ! run_maven -q -f maven/pom.xml -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries cn1:install-codenameone "$@"; then
     [ -f maven/CodeNameOneBuildClient.jar ] && cp maven/CodeNameOneBuildClient.jar "$BUILD_CLIENT" || true
   fi
 fi
 
-run_maven -q -f maven/pom.xml -pl android -am -Dmaven.javadoc.skip=true -Djava.awt.headless=true clean install "$@"
+run_maven -q -f maven/pom.xml -pl android -am -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -Djava.awt.headless=true clean install "$@"
