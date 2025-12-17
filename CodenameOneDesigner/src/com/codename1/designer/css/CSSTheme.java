@@ -1667,9 +1667,42 @@ public class CSSTheme {
         
     }
     
+    private boolean isOwnedBy(String key, String id) {
+        if (key.length() <= id.length() + 1) {
+            return false;
+        }
+        if (!key.startsWith(id)) {
+            return false;
+        }
+        char sep = key.charAt(id.length());
+        if (sep != '.' && sep != '#') {
+            return false;
+        }
+        // Check for dots in the suffix
+        return key.indexOf('.', id.length() + 1) == -1;
+    }
+
     public void updateResources() {
-        // TODO:  We need to remove stale theme entries
-        // https://github.com/codenameone/CodenameOne/issues/2698
+        if (res != null) {
+            Map<String, Object> themeData = res.getTheme(themeName);
+            if (themeData != null) {
+                Set<String> keys = new HashSet<String>(themeData.keySet());
+                Set<String> modifiedIds = new HashSet<String>();
+                for (String id : elements.keySet()) {
+                    if (isModified(id)) {
+                        modifiedIds.add(id);
+                    }
+                }
+
+                for (String id : modifiedIds) {
+                    for (String key : keys) {
+                        if (isOwnedBy(key, id)) {
+                             res.setThemeProperty(themeName, key, null);
+                        }
+                    }
+                }
+            }
+        }
         
         for (String id : elements.keySet()) {
             if (!isModified(id)) {
