@@ -441,6 +441,14 @@ def parse_checkstyle() -> Optional[AnalysisReport]:
     return AnalysisReport(totals=severities, findings=findings)
 
 
+def parse_benchmark() -> Optional[str]:
+    for target_dir in TARGET_DIRS:
+        candidate = target_dir / "benchmark-results.md"
+        if candidate.exists():
+            return candidate.read_text(encoding="utf-8")
+    return None
+
+
 def format_tests(totals: Optional[Dict[str, int]]) -> str:
     if not totals:
         return "- ⚠️ No test results were found."
@@ -650,6 +658,7 @@ def build_report(
     spotbugs, spotbugs_generated, spotbugs_error = parse_spotbugs()
     pmd = parse_pmd()
     checkstyle = parse_checkstyle()
+    benchmark_report = parse_benchmark()
 
     write_analysis_html("spotbugs", "SpotBugs Findings", spotbugs)
     write_analysis_html("pmd", "PMD Findings", pmd)
@@ -672,6 +681,9 @@ def build_report(
         "### Test & Coverage",
         format_tests(tests),
     ]
+    if benchmark_report:
+        lines.append("")
+        lines.append(benchmark_report)
     lines.extend(
         format_coverage(
             coverage,

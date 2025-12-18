@@ -78,7 +78,17 @@ jobs:
 
       - name: Run ParparVM JVM tests
         working-directory: vm
-        run: mvn -B clean test -pl tests -am
+        run: mvn -B clean package -pl JavaAPI -am -DskipTests && mvn -B test -pl tests -am -DexcludedGroups=benchmark
+        env:
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+          JDK_11_HOME: ${{ env.JDK_11_HOME }}
+          JDK_17_HOME: ${{ env.JDK_17_HOME }}
+          JDK_21_HOME: ${{ env.JDK_21_HOME }}
+          JDK_25_HOME: ${{ env.JDK_25_HOME }}
+
+      - name: Run ParparVM Benchmark
+        working-directory: vm
+        run: mvn -B test -pl tests -am -Dgroups=benchmark -Djacoco.skip=true
         env:
           JDK_8_HOME: ${{ env.JDK_8_HOME }}
           JDK_11_HOME: ${{ env.JDK_11_HOME }}
