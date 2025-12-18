@@ -228,13 +228,6 @@ jobs:
         wget https://github.com/codenameone/cn1-binaries/archive/refs/heads/master.zip
         unzip master.zip -d ..
         mv ../cn1-binaries-master ../cn1-binaries
-    - name: Build with Ant
-      run: |
-        ANT_OPTS_ARGS=""
-        if [ "${{ matrix.java-version }}" != "8" ]; then
-          ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
-        fi
-        xvfb-run ant $ANT_OPTS_ARGS test-javase
     - name: Build CLDC11 JAR
       run: |
         ANT_OPTS_ARGS=""
@@ -242,6 +235,13 @@ jobs:
           ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
         fi
         ant $ANT_OPTS_ARGS -noinput -buildfile Ports/CLDC11/build.xml jar
+    - name: Build with Ant
+      run: |
+        ANT_OPTS_ARGS=""
+        if [ "${{ matrix.java-version }}" != "8" ]; then
+          ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
+        fi
+        xvfb-run ant $ANT_OPTS_ARGS test-javase
       
     - name: Build Release
       if: matrix.java-version == 8
