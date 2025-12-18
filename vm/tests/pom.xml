@@ -34,19 +34,19 @@
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-core</artifactId>
-            <version>7.0.150</version>
+            <version>7.0.214</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-ios</artifactId>
-            <version>7.0.150</version>
+            <version>7.0.214</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.codenameone</groupId>
             <artifactId>codenameone-ios</artifactId>
-            <version>7.0.150</version>
+            <version>7.0.214</version>
             <classifier>bundle</classifier>
             <scope>test</scope>
         </dependency>

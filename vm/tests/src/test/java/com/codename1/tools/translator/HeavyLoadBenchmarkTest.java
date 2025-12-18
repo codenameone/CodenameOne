@@ -41,11 +41,11 @@ public class HeavyLoadBenchmarkTest {
         Path coreJar = findDependencyJar("codenameone-core");
 
         // Locate IOSPort jar
-        Path iosPortJar = findDependencyJar("codenameone-ios-7.0.150.jar"); // Look for specific jar first
+        Path iosPortJar = findDependencyJar("codenameone-ios-7.0.214.jar"); // Look for specific jar first
         if (iosPortJar == null) iosPortJar = findDependencyJar("codenameone-ios"); // Fallback
 
         // Locate IOS Bundle (for nativeios.jar)
-        Path iosBundleJar = findDependencyJar("codenameone-ios-7.0.150-bundle.jar");
+        Path iosBundleJar = findDependencyJar("codenameone-ios-7.0.214-bundle.jar");
         if (iosBundleJar == null) iosBundleJar = findDependencyJar("bundle");
 
         // Locate HelloCodenameOne sources
