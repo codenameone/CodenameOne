@@ -31,13 +31,6 @@ public class SetBrowserURLWithJarUrlSampleTest extends UITestBase {
 
         String setUrl = implementation.getBrowserURL(mockPeer);
 
-        // Debug
-        if (setUrl == null) {
-            System.out.println("Set URL is null. MockPeer: " + mockPeer);
-            // Verify if browser stored it internally
-            System.out.println("Browser internal URL: " + browser.getURL());
-        }
-
         // Assert implementation received it (best effort)
         // If implementation is not updated, at least check component state
         if (setUrl != null) {

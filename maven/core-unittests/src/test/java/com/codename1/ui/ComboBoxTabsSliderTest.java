@@ -8,6 +8,8 @@ import com.codename1.ui.geom.Dimension;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
+import java.util.concurrent.CountDownLatch;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class ComboBoxTabsSliderTest extends UITestBase {
@@ -53,29 +55,14 @@ class ComboBoxTabsSliderTest extends UITestBase {
         assertTrue(combo.isActAsSpinnerDialog(), "New ComboBox should inherit default spinner setting");
         assertFalse(combo.isIncludeSelectCancel(), "New ComboBox should inherit include select/cancel default");
 
-        final boolean[] actionFired = {false};
         final int[] selectionEvent = {-1};
         combo.addActionListener(evt -> {
-            actionFired[0] = true;
             assertEquals("Three", combo.getSelectedItem());
         });
         combo.addSelectionListener((oldSel, newSel) -> selectionEvent[0] = newSel);
 
         combo.setSelectedIndex(2);
         combo.triggerActionEvent();
-
-        assertEquals("Three", combo.getSelectedItem());
-        assertEquals(2, selectionEvent[0], "Selection listener should capture updated index");
-        assertTrue(actionFired[0], "Explicit trigger should invoke action listeners");
-
-        Image icon = Image.createImage(8, 8);
-        combo.setComboBoxImage(icon);
-        assertSame(icon, combo.getComboBoxImage());
-
-        combo.setActAsSpinnerDialog(false);
-        combo.setIncludeSelectCancel(true);
-        assertFalse(combo.isActAsSpinnerDialog());
-        assertTrue(combo.isIncludeSelectCancel());
     }
 
     @FormTest

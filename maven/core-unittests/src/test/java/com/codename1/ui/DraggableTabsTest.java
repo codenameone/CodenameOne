@@ -3,6 +3,7 @@ package com.codename1.ui;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation;
+import com.codename1.testing.TestUtils;
 import com.codename1.ui.layouts.BorderLayout;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -43,11 +44,15 @@ class DraggableTabsTest extends UITestBase {
         int targetX = thirdHeader.getAbsoluteX() + thirdHeader.getWidth() / 2;
         int targetY = thirdHeader.getAbsoluteY() + thirdHeader.getHeight() / 2;
 
-        TestCodenameOneImplementation impl = implementation;
-        impl.dispatchPointerPress(startX, startY);
-        impl.dispatchPointerDrag(dragX, dragY);
-        impl.dispatchPointerDrag(targetX, targetY);
-        impl.dispatchPointerRelease(targetX, targetY);
+        implementation.dispatchPointerPress(startX, startY);
+        implementation.setHasDragStarted(true);
+        flushSerialCalls();
+        for(int iter = startX ; iter <= targetX ; iter++) {
+            implementation.dispatchPointerDrag(iter, startY);
+        }
+        implementation.dispatchPointerDrag(targetX, targetY);
+        implementation.dispatchPointerRelease(targetX, targetY);
+        flushSerialCalls();
 
         assertEquals(4, tabs.getTabCount());
         assertEquals("T2", tabs.getTabTitle(0));
@@ -89,7 +94,7 @@ class DraggableTabsTest extends UITestBase {
                 } else {
                     tabs.insertTab(title, null, content, destIndex);
                 }
-                tabsContainer.animateLayout(0);
+                tabsContainer.revalidate();
             });
         }
     }

@@ -44,14 +44,14 @@ class SwitchSamplesTest extends UITestBase {
 
         CountDownLatch count = new CountDownLatch(2);
         sw.addActionListener(e -> count.countDown());
-        implementation.tapComponent(sw);
+        tapComponent(sw);
         waitFor(count, 1, 2000);
         ensureLaidOut(form);
 
         assertTrue(sw.isOn(), "Switch should toggle on after tap");
         assertEquals(1, actionCount[0], "Tapping switch should fire action listener");
 
-        implementation.tapComponent(sw);
+        tapComponent(sw);
         waitFor(count, 2000);
         ensureLaidOut(form);
 
@@ -81,7 +81,7 @@ class SwitchSamplesTest extends UITestBase {
 
         CountDownLatch latch = new CountDownLatch(2);
         firstSwitch.addActionListener(e -> latch.countDown());
-        implementation.tapComponent(firstSwitch);
+        tapComponent(firstSwitch);
         waitFor(latch, 1, 2000);
         ensureLaidOut(form);
 
@@ -92,7 +92,7 @@ class SwitchSamplesTest extends UITestBase {
         Switch thirdSwitch = findSwitch(thirdCell);
         assertNotNull(thirdSwitch);
         thirdSwitch.addActionListener(e -> latch.countDown());
-        implementation.tapComponent(thirdSwitch);
+        tapComponent(thirdSwitch);
         waitFor(latch, 2000);
         ensureLaidOut(form);
 
@@ -127,7 +127,7 @@ class SwitchSamplesTest extends UITestBase {
         ensureLaidOut(form);
         final CountDownLatch latch = new CountDownLatch(1);
         target.addActionListener(ev -> latch.countDown());
-        implementation.tapComponent(target);
+        tapComponent(target);
         waitFor(latch, 2000);
         assertNotEquals(initialState, target.isOn(), "Switch should toggle even after scrolling");
         assertFalse(switches.get(2).isOn(), "Unrelated switches should not toggle during scrolling");

@@ -42,7 +42,7 @@ class BlockLeadIssue3246Test extends UITestBase {
         flushSerialCalls();
         ensureSized(blocked, form);
 
-        implementation.tapComponent(blocked);
+        tapComponent(blocked);
         flushSerialCalls();
         DisplayTest.flushEdt();
         flushSerialCalls();
@@ -60,8 +60,7 @@ class BlockLeadIssue3246Test extends UITestBase {
         flushSerialCalls();
         DisplayTest.flushEdt();
 
-        implementation.tapComponent(blocked);
-        flushSerialCalls();
+        tapComponent(blocked);
         DisplayTest.flushEdt();
         flushSerialCalls();
 

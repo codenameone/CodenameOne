@@ -2,7 +2,7 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
-import com.codename1.ui.ComponentSelector;
+import com.codename1.testing.TestUtils;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListCellRenderer;
@@ -14,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -60,7 +61,7 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         field.setMinimumLength(0);
         form.show();
         flushSerialCalls();
-        implementation.tapComponent(field);
+        tapComponent(field);
         flushSerialCalls();
 
         implementation.dispatchKeyPress('a');
@@ -199,7 +200,7 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         field.setMinimumLength(2);
         form.revalidate();
         flushSerialCalls();
-        implementation.tapComponent(field);
+        tapComponent(field);
         flushSerialCalls();
 
         implementation.dispatchKeyPress('r');
@@ -228,16 +229,24 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         Object firstValue = popupList.getModel().getItemAt(0);
         @SuppressWarnings({"rawtypes", "unchecked"})
         ListCellRenderer renderer = (ListCellRenderer) popupList.getRenderer();
+        CountDownLatch latch = new CountDownLatch(1);
+        popupList.addActionListener(e -> latch.countDown());
         Dimension cellSize = renderer.getListCellRendererComponent(popupList, firstValue, 0, true).getPreferredSize();
         int selectX = popupList.getAbsoluteX() + Math.max(1, Math.min(cellSize.getWidth(), popupList.getWidth()) / 2);
         int selectY = popupList.getAbsoluteY() + Math.max(1, Math.min(cellSize.getHeight(), popupList.getHeight()) / 2);
         implementation.dispatchPointerPressAndRelease(selectX, selectY);
-        flushSerialCalls();
 
-        if (!"Red".equals(field.getText())) {
-            popupList.setSelectedIndex(0);
-            popupList.fireActionEvent();
-            flushSerialCalls();
+        assertTrue(form == CN.getCurrentForm());
+        //waitFor(latch, 400);
+        int timeout = 400;
+        while(latch.getCount() > 0) {
+            assertTrue(timeout > 0, "Failed when cellSize: " + cellSize +
+                    " selectX: " + selectX + " selectY: " + selectY +
+                    " popupList.getWidth(): " + popupList.getWidth() +
+                    " popupList.getHeight(): " + popupList.getHeight() +
+                    " componentAt: " + form.getComponentAt(selectX, selectY));
+            TestUtils.waitFor(5);
+            timeout -= 5;
         }
 
         assertEquals("Red", field.getText());

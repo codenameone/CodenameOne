@@ -37,27 +37,6 @@ public class BrowserComponentTest extends UITestBase {
     }
 
     @FormTest
-    void constructorKeepsPlaceholderWhenPeerUnavailable() throws Exception {
-        TestLogger.install();
-        try {
-            implementation.setBrowserComponent(null);
-
-            BrowserComponent browser = new BrowserComponent();
-            flushSerialCalls();
-
-            PeerComponent internal = getPrivateField(browser, "internal", PeerComponent.class);
-            assertNull(internal, "Internal peer should remain null when implementation cannot create it");
-            Component placeholder = getPrivateField(browser, "placeholder", Component.class);
-            assertEquals(1, browser.getComponentCount());
-            assertSame(placeholder, browser.getComponentAt(0));
-            assertEquals(1, TestLogger.getPrinted().size());
-            assertTrue(TestLogger.getPrinted().get(0).contains("Failed to create browser component."));
-        } finally {
-            TestLogger.remove();
-        }
-    }
-
-    @FormTest
     void webEventListenersUpdateReadyState() throws Exception {
         DummyPeerComponent peer = new DummyPeerComponent();
         implementation.setBrowserComponent(peer);

@@ -105,7 +105,7 @@ class GoogleConnectTest extends UITestBase {
         worker.setDaemon(true);
         worker.start();
         try {
-            return task.get(5, TimeUnit.SECONDS);
+            return task.get(2, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
             worker.interrupt();
             throw new AssertionError("Timed out waiting for background operation", e);

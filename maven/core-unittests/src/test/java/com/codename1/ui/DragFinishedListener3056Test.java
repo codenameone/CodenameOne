@@ -57,7 +57,6 @@ class DragFinishedListener3056Test extends UITestBase {
         form.add(container);
         form.revalidate();
 
-        TestCodenameOneImplementation impl = implementation;
         int startX = draggableIcon.getAbsoluteX() + draggableIcon.getWidth() / 2;
         int startY = draggableIcon.getAbsoluteY() + draggableIcon.getHeight() / 2;
         int dragX = startX + 15;
@@ -65,10 +64,13 @@ class DragFinishedListener3056Test extends UITestBase {
         int releaseX = startX + 25;
         int releaseY = startY + 20;
 
-        impl.dispatchPointerPress(startX, startY);
-        impl.dispatchPointerDrag(dragX, dragY);
-        impl.dispatchPointerDrag(releaseX, releaseY);
-        impl.dispatchPointerRelease(releaseX, releaseY);
+        implementation.dispatchPointerPress(startX, startY);
+        implementation.setHasDragStarted(true);
+        flushSerialCalls();
+        implementation.dispatchPointerDrag(dragX, dragY);
+        implementation.dispatchPointerDrag(releaseX, releaseY);
+        implementation.dispatchPointerRelease(releaseX, releaseY);
+        flushSerialCalls();
 
         assertEquals(Boolean.TRUE, container.getClientProperty("isTest"),
                 "Container should preserve client property used by the sample");

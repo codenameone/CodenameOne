@@ -28,9 +28,9 @@ class SpinnerComponentCoverageTest extends UITestBase {
 
     @FormTest
     void calendarPickerTracksDateChanges() {
+        TimeZone.setDefault(TimeZone.getTimeZone("UTC"));
         CalendarPicker picker = new CalendarPicker();
         Calendar calendar = Calendar.getInstance();
-        calendar.setTimeZone(TimeZone.getTimeZone("UTC"));
         calendar.set(2023, Calendar.FEBRUARY, 10, 0, 0, 0);
         Date target = calendar.getTime();
 

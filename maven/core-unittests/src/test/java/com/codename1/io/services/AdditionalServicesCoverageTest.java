@@ -1,32 +1,22 @@
 package com.codename1.io.services;
 
-import com.codename1.io.FileSystemStorage;
-import com.codename1.io.NetworkEvent;
-import com.codename1.io.NetworkManager;
 import com.codename1.io.Storage;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
 import com.codename1.testing.TestCodenameOneImplementation;
-import com.codename1.ui.Component;
-import com.codename1.ui.Display;
 import com.codename1.ui.DisplayTest;
-import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Form;
 import com.codename1.ui.Image;
 import com.codename1.ui.Label;
-import com.codename1.ui.geom.Dimension;
-import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.util.ImageIO;
 
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.HashMap;
-import java.util.Hashtable;
 import java.util.Vector;
 import java.util.Map;
 import com.codename1.ui.List;

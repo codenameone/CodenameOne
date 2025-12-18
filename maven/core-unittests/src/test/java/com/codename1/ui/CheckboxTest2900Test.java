@@ -46,24 +46,15 @@ public class CheckboxTest2900Test extends UITestBase {
         assertTrue(oppositeSide.isSelected(), "Opposite side checkbox starts selected");
         assertTrue(regularSide.isSelected(), "Regular checkbox starts selected");
 
-        implementation.tapComponent(oppositeSide);
-        DisplayTest.flushEdt();
-        flushSerialCalls();
-        DisplayTest.flushEdt();
+        tapComponent(oppositeSide);
 
-        implementation.tapComponent(regularSide);
-        DisplayTest.flushEdt();
-        flushSerialCalls();
-        DisplayTest.flushEdt();
+        tapComponent(regularSide);
 
         assertFalse(oppositeSide.isSelected(), "Pointer events should toggle the opposite side checkbox");
         assertFalse(regularSide.isSelected(), "Pointer events should toggle the regular checkbox");
 
-        implementation.tapComponent(oppositeSide);
-        implementation.tapComponent(regularSide);
-        DisplayTest.flushEdt();
-        flushSerialCalls();
-        DisplayTest.flushEdt();
+        tapComponent(oppositeSide);
+        tapComponent(regularSide);
 
         assertTrue(oppositeSide.isSelected(), "Second tap should re-select the opposite side checkbox");
         assertTrue(regularSide.isSelected(), "Second tap should re-select the regular checkbox");

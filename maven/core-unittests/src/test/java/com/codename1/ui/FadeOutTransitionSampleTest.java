@@ -50,26 +50,22 @@ public class FadeOutTransitionSampleTest extends UITestBase {
         assertFalse(contentPane.contains(button2), "Button 2 should not be present initially");
 
         // 1. Click Toggle -> Button 1 added
-        implementation.tapComponent(doFade);
-        DisplayTest.flushEdt();
+        tapComponent(doFade);
         assertTrue(contentPane.contains(button1), "Button 1 should be present after 1st click");
         assertFalse(contentPane.contains(button2), "Button 2 should not be present after 1st click");
 
         // 2. Click Toggle -> Button 2 replaces Button 1
-        implementation.tapComponent(doFade);
-        DisplayTest.flushEdt();
+        tapComponent(doFade);
         assertFalse(contentPane.contains(button1), "Button 1 should not be present after 2nd click");
         assertTrue(contentPane.contains(button2), "Button 2 should be present after 2nd click");
 
         // 3. Click Toggle -> Empty replaces Button 2
-        implementation.tapComponent(doFade);
-        DisplayTest.flushEdt();
+        tapComponent(doFade);
         assertFalse(contentPane.contains(button1), "Button 1 should not be present after 3rd click");
         assertFalse(contentPane.contains(button2), "Button 2 should not be present after 3rd click");
 
         // 4. Click Toggle -> Button 1 added again
-        implementation.tapComponent(doFade);
-        DisplayTest.flushEdt();
+        tapComponent(doFade);
         assertTrue(contentPane.contains(button1), "Button 1 should be present after 4th click");
     }
 }

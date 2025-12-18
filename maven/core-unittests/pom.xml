@@ -33,11 +33,6 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.1</version>
-                <configuration>
-                    <!-- Run each test in its own forked JVM to ensure an isolated classloader. -->
-                    <forkCount>1</forkCount>
-                    <reuseForks>false</reuseForks>
-                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.jacoco</groupId>

@@ -57,10 +57,10 @@ public abstract class Transition implements Animation {
     public final void init(Component source, Component destination) {
         this.source = source;
         this.destination = destination;
-        if (source != null && source instanceof Container) {
+        if (source instanceof Container) {
             ((Container) source).layoutContainer();
         }
-        if (destination != null && destination instanceof Container) {
+        if (destination instanceof Container) {
             ((Container) destination).layoutContainer();
         }
         interFormContainers = InterFormContainer.findCommonContainers(getSource(), getDestination());

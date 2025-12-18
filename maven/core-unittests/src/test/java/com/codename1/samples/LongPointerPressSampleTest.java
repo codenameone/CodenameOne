@@ -40,9 +40,11 @@ public class LongPointerPressSampleTest extends UITestBase {
         int y = centerCnt.getAbsoluteY() + 10;
 
         impl.dispatchPointerPress(x, y);
+        flushSerialCalls();
         assertTrue(pointerPressedTriggered, "pointerPressed should be triggered");
 
         centerCnt.longPointerPress(x, y);
+        flushSerialCalls();
         assertTrue(longPressTriggered, "longPointerPress should be triggered");
 
         impl.dispatchPointerRelease(x, y);

@@ -905,6 +905,9 @@ public final class CommonTransitions extends Transition {
 
     private void paintAlpha(Graphics graphics) {
         Component src = getSource();
+        if(src == null) {
+            return;
+        }
         int w = src.getWidth();
         int h = src.getHeight();
         int position = this.position;

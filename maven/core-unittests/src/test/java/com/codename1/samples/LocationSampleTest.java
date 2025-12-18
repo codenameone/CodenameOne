@@ -13,9 +13,8 @@ public class LocationSampleTest extends UITestBase {
 
     @FormTest
     public void testLocationSample() {
-        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
         MockLocationManager mockLoc = new MockLocationManager();
-        impl.setLocationManager(mockLoc);
+        implementation.setLocationManager(mockLoc);
 
         Form hi = new Form("Hi World", BoxLayout.y());
         Button checkIfDetectionAvailable = new Button("Check if GPS Detection Available");
@@ -40,13 +39,13 @@ public class LocationSampleTest extends UITestBase {
         hi.show();
         waitForFormTitle("Hi World");
 
-        impl.tapComponent(checkIfDetectionAvailable);
+        tapComponent(checkIfDetectionAvailable);
         assertEquals("GPS Detection IS supported", checkIfDetectionAvailable.getClientProperty("lastMessage"));
 
-        impl.tapComponent(isGPSEnabled);
+        tapComponent(isGPSEnabled);
         assertEquals("GPS IS enabled", isGPSEnabled.getClientProperty("lastMessage"));
 
-        impl.tapComponent(getLocation);
+        tapComponent(getLocation);
         String locMsg = (String) getLocation.getClientProperty("lastMessage");
         assertTrue(locMsg != null && locMsg.contains("Location is"), "Should find location");
     }

@@ -39,7 +39,7 @@ class AddComponentToRightBarSampleTest extends UITestBase {
             assertNotNull(commandComponent);
             ensureSized(commandComponent, form);
 
-            implementation.tapComponent(commandComponent);
+            tapComponent(commandComponent);
             flushSerialCalls();
             DisplayTest.flushEdt();
             flushSerialCalls();
@@ -86,7 +86,7 @@ class AddComponentToRightBarSampleTest extends UITestBase {
             assertFalse(rightBarContainer.contains(commandComponent));
 
             ensureSized(replacement, form);
-            implementation.tapComponent(replacement);
+            tapComponent(replacement);
             flushSerialCalls();
             DisplayTest.flushEdt();
             flushSerialCalls();
