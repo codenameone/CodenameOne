@@ -56,13 +56,15 @@ if [ -z "${JAVA17_HOME:-}" ]; then
   exit 3
 fi
 
-JAVA17_BIN="$JAVA17_HOME/bin/java"
-if [ ! -x "$JAVA17_BIN" ]; then
-  ra_log "JDK 17 java binary missing at $JAVA17_BIN" >&2
+TARGET_JAVA_HOME="${JDK_HOME:-$JAVA17_HOME}"
+TARGET_JAVA_BIN="$TARGET_JAVA_HOME/bin/java"
+
+if [ ! -x "$TARGET_JAVA_BIN" ]; then
+  ra_log "Target java binary missing at $TARGET_JAVA_BIN" >&2
   exit 3
 fi
 
-cn1ss_setup "$JAVA17_BIN" "$CN1SS_HELPER_SOURCE_DIR"
+cn1ss_setup "$TARGET_JAVA_BIN" "$CN1SS_HELPER_SOURCE_DIR"
 
 [ -d "$GRADLE_PROJECT_DIR" ] || { ra_log "Gradle project directory not found: $GRADLE_PROJECT_DIR"; exit 4; }
 [ -x "$GRADLE_PROJECT_DIR/gradlew" ] || chmod +x "$GRADLE_PROJECT_DIR/gradlew"
@@ -115,7 +117,7 @@ GRADLE_CMD=("$GRADLEW" --stacktrace --info --no-daemon connectedDebugAndroidTest
 ra_log "Executing connectedDebugAndroidTest via Gradle"
 if ! (
   cd "scripts/hellocodenameone/android/target/hellocodenameone-android-1.0-SNAPSHOT-android-source"
-  JAVA_HOME="$JAVA17_HOME" "${GRADLE_CMD[@]}"
+  JAVA_HOME="${JDK_HOME:-$JAVA17_HOME}" "${GRADLE_CMD[@]}"
 ); then
   ra_log "FATAL: connectedDebugAndroidTest failed"
   exit 10
@@ -140,15 +142,19 @@ done
 
 sleep 3
 
-ra_log "STAGE:COVERAGE -> Collecting Jacoco coverage report"
-if ARTIFACTS_DIR="$ARTIFACTS_DIR" "$SCRIPT_DIR/generate-android-coverage-report.sh" "$GRADLE_PROJECT_DIR"; then
-  if [ -f "$COVERAGE_SUMMARY" ]; then
-    ra_log "  -> Coverage summary detected at $COVERAGE_SUMMARY"
-  else
-    ra_log "  -> Coverage summary not found after report generation"
-  fi
+if [ "${CN1SS_SKIP_COVERAGE:-0}" = "1" ]; then
+  ra_log "Skipping coverage report generation (CN1SS_SKIP_COVERAGE=1)"
 else
-  ra_log "WARNING: Coverage report generation failed; continuing without coverage details"
+  ra_log "STAGE:COVERAGE -> Collecting Jacoco coverage report"
+  if ARTIFACTS_DIR="$ARTIFACTS_DIR" "$SCRIPT_DIR/generate-android-coverage-report.sh" "$GRADLE_PROJECT_DIR"; then
+    if [ -f "$COVERAGE_SUMMARY" ]; then
+      ra_log "  -> Coverage summary detected at $COVERAGE_SUMMARY"
+    else
+      ra_log "  -> Coverage summary not found after report generation"
+    fi
+  else
+    ra_log "WARNING: Coverage report generation failed; continuing without coverage details"
+  fi
 fi
 
 declare -a CN1SS_SOURCES=("LOGCAT:$TEST_LOG")

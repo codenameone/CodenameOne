@@ -131,9 +131,9 @@ if [ ! -f "$PATCH_GRADLE_SOURCE_PATH/$PATCH_GRADLE_MAIN_CLASS.java" ]; then
   exit 1
 fi
 
-PATCH_GRADLE_JAVA="${JAVA17_HOME}/bin/java"
+PATCH_GRADLE_JAVA="${JDK_HOME:-$JAVA17_HOME}/bin/java"
 if [ ! -x "$PATCH_GRADLE_JAVA" ]; then
-  ba_log "JDK 17 java binary missing at $PATCH_GRADLE_JAVA" >&2
+  ba_log "JDK java binary missing at $PATCH_GRADLE_JAVA" >&2
   exit 1
 fi
 
@@ -151,7 +151,7 @@ echo "---------------------------------"
 ba_log "Invoking Gradle build in $GRADLE_PROJECT_DIR"
 chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 ORIGINAL_JAVA_HOME="$JAVA_HOME"
-export JAVA_HOME="$JAVA17_HOME"
+export JAVA_HOME="${JDK_HOME:-$JAVA17_HOME}"
 (
   cd "$GRADLE_PROJECT_DIR"
   if command -v sdkmanager >/dev/null 2>&1; then

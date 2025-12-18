@@ -403,8 +403,17 @@ cn1ss_process_and_report() {
 
   cn1ss_log "STAGE:COMMENT_POST -> Submitting PR feedback"
   local comment_rc=0
-  if ! cn1ss_post_pr_comment "$comment_out" "$preview_dir"; then
+  if [ "${CN1SS_SKIP_COMMENT:-0}" = "1" ]; then
+    cn1ss_log "Skipping PR comment as requested (CN1SS_SKIP_COMMENT=1)"
+  elif ! cn1ss_post_pr_comment "$comment_out" "$preview_dir"; then
     comment_rc=$?
+  fi
+
+  if [ "${CN1SS_FAIL_ON_MISMATCH:-0}" = "1" ]; then
+    if [ -f "$summary_out" ] && (grep -q "^different|" "$summary_out" || grep -q "^error|" "$summary_out"); then
+      cn1ss_log "FATAL: Screenshot mismatches or errors detected (CN1SS_FAIL_ON_MISMATCH=1)"
+      return 15
+    fi
   fi
 
   return $comment_rc
