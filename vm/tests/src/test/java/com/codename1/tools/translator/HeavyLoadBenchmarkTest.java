@@ -46,17 +46,18 @@ public class HeavyLoadBenchmarkTest {
         // Locate IOS Bundle (for nativeios.jar)
         Path iosBundleJar = findJar("maven", "ios", "target", "codenameone-ios-8.0-SNAPSHOT-bundle.jar");
 
-        // Locate HelloCodenameOne jar
-        Path helloJar = findJar("scripts", "hellocodenameone", "common", "target", "hellocodenameone-common-1.0-SNAPSHOT.jar");
+        // Locate HelloCodenameOne sources
+        Path helloSrc = findPath("scripts", "hellocodenameone", "common", "src", "main", "java");
 
         // Ensure jars exist
         Assertions.assertTrue(Files.exists(javaApiJar), "JavaAPI.jar not found at " + javaApiJar);
+
+        boolean hasCore = coreJar != null;
 
         List<Path> jarsToScan = new ArrayList<>();
         jarsToScan.add(javaApiJar);
         if (coreJar != null) jarsToScan.add(coreJar);
         if (iosPortJar != null) jarsToScan.add(iosPortJar);
-        if (helloJar != null) jarsToScan.add(helloJar);
 
         System.out.println("Scanning " + jarsToScan.size() + " jars...");
 
@@ -68,11 +69,47 @@ public class HeavyLoadBenchmarkTest {
         Files.createDirectories(srcDir);
         Files.createDirectories(classesDir);
 
+        // Compile the benchmark main - Setup Compiler
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        String cp = javaApiJar.toString();
+        if (hasCore) {
+            cp += File.pathSeparator + coreJar.toString();
+        }
+        if (iosPortJar != null) {
+            cp += File.pathSeparator + iosPortJar.toString();
+        }
+
+        // Compile HelloCodenameOne first if available
+        if (helloSrc != null && hasCore) {
+            System.out.println("Compiling HelloCodenameOne from " + helloSrc);
+            List<String> helloSources = Files.walk(helloSrc)
+                    .filter(p -> p.toString().endsWith(".java"))
+                    .map(Path::toString)
+                    .collect(Collectors.toList());
+            if (!helloSources.isEmpty()) {
+                List<String> compileArgs = new ArrayList<>();
+                compileArgs.add("-cp");
+                compileArgs.add(cp);
+                compileArgs.add("-d");
+                compileArgs.add(classesDir.toString());
+                compileArgs.addAll(helloSources);
+                int helloResult = compiler.run(null, null, null, compileArgs.toArray(new String[0]));
+                if (helloResult == 0) {
+                    System.out.println("Compiled HelloCodenameOne successfully.");
+                } else {
+                    System.out.println("WARNING: Failed to compile HelloCodenameOne.");
+                }
+            }
+        }
+
         // Scan jars for public classes
         List<String> publicClasses = new ArrayList<>();
         for (Path jar : jarsToScan) {
             publicClasses.addAll(scanPublicClasses(jar));
         }
+        // Scan compiled app classes
+        publicClasses.addAll(scanDirectory(classesDir));
+
         System.out.println("Found " + publicClasses.size() + " public classes total.");
 
         // Create a heavy main class that references these classes
@@ -113,13 +150,9 @@ public class HeavyLoadBenchmarkTest {
 
         Files.write(javaFile, source.toString().getBytes());
 
-        // Compile the benchmark main
-        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-        String cp = javaApiJar.toString();
-        if (hasCore) {
-            cp += File.pathSeparator + coreJar.toString();
-        }
-        int result = compiler.run(null, null, null, "-cp", cp, "-d", classesDir.toString(), javaFile.toString());
+        // Compile BenchmarkMain (referencing jars + classesDir)
+        String cpWithClasses = cp + File.pathSeparator + classesDir.toString();
+        int result = compiler.run(null, null, null, "-cp", cpWithClasses, "-d", classesDir.toString(), javaFile.toString());
         Assertions.assertEquals(0, result, "Compilation of BenchmarkMain failed");
 
         // Unzip jars into classesDir to avoid Jar scanning issues and ensure heavy load
@@ -241,6 +274,10 @@ public class HeavyLoadBenchmarkTest {
     }
 
     private Path findJar(String... parts) {
+        return findPath(parts);
+    }
+
+    private Path findPath(String... parts) {
         // Try paths relative to vm/tests, vm, and root
         Path p = Paths.get("..", "..");
         for (String part : parts) p = p.resolve(part);
@@ -255,6 +292,24 @@ public class HeavyLoadBenchmarkTest {
         if (Files.exists(p)) return p.normalize().toAbsolutePath();
 
         return null;
+    }
+
+    private List<String> scanDirectory(Path dir) throws IOException {
+        List<String> classes = new ArrayList<>();
+        Files.walk(dir).forEach(p -> {
+            if (Files.isRegularFile(p) && p.toString().endsWith(".class")) {
+                try (java.io.InputStream is = Files.newInputStream(p)) {
+                    ClassReader cr = new ClassReader(is);
+                    if ((cr.getAccess() & Opcodes.ACC_PUBLIC) != 0) {
+                        String name = cr.getClassName().replace('/', '.');
+                        if (!name.contains("-") && !name.equals("module-info")) {
+                            classes.add(name);
+                        }
+                    }
+                } catch (Exception e) {}
+            }
+        });
+        return classes;
     }
 
     private void unzip(Path zipFile, Path outputDir) throws IOException {
