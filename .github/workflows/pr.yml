@@ -229,9 +229,19 @@ jobs:
         unzip master.zip -d ..
         mv ../cn1-binaries-master ../cn1-binaries
     - name: Build with Ant
-      run: xvfb-run ant test-javase
+      run: |
+        ANT_OPTS_ARGS=""
+        if [ "${{ matrix.java-version }}" != "8" ]; then
+          ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
+        fi
+        xvfb-run ant $ANT_OPTS_ARGS test-javase
     - name: Build CLDC11 JAR
-      run: ant -noinput -buildfile Ports/CLDC11/build.xml jar
+      run: |
+        ANT_OPTS_ARGS=""
+        if [ "${{ matrix.java-version }}" != "8" ]; then
+          ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
+        fi
+        ant $ANT_OPTS_ARGS -noinput -buildfile Ports/CLDC11/build.xml jar
       
     - name: Build Release
       if: matrix.java-version == 8
@@ -253,7 +263,12 @@ jobs:
         cd ..
 
     - name: Build iOS Port
-      run: ant -noinput -buildfile Ports/iOSPort/build.xml jar
+      run: |
+        ANT_OPTS_ARGS=""
+        if [ "${{ matrix.java-version }}" != "8" ]; then
+          ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
+        fi
+        ant $ANT_OPTS_ARGS -noinput -buildfile Ports/iOSPort/build.xml jar
 
     - name: Build iOS VM API
       run: mvn -f vm/JavaAPI/pom.xml package
@@ -269,7 +284,12 @@ jobs:
       run: mvn -f vm/ByteCodeTranslator/pom.xml package
 
     - name: Build CLDC 11 VM
-      run: ant -noinput -buildfile Ports/CLDC11/build.xml jar
+      run: |
+        ANT_OPTS_ARGS=""
+        if [ "${{ matrix.java-version }}" != "8" ]; then
+          ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
+        fi
+        ant $ANT_OPTS_ARGS -noinput -buildfile Ports/CLDC11/build.xml jar
 
     - name: Upload a Build Artifact
       if: matrix.java-version == 8
@@ -286,7 +306,12 @@ jobs:
         path: Ports/CLDC11/dist/CLDC11.jar
 
     - name: Build Android Port
-      run: ant -noinput -buildfile Ports/Android/build.xml jar
+      run: |
+        ANT_OPTS_ARGS=""
+        if [ "${{ matrix.java-version }}" != "8" ]; then
+          ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
+        fi
+        ant $ANT_OPTS_ARGS -noinput -buildfile Ports/Android/build.xml jar
 
     - name: Packaging Everything
       if: matrix.java-version == 8
