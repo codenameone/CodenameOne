@@ -262,6 +262,29 @@ public class BytecodeMethod implements SignatureSet {
     
     
     private Hashtable<String,SignatureSet> usedSigs;
+
+    private static String[] nativeSourcesCache;
+    private static Map<String, Boolean> nativeClassUsageCache = new HashMap<String, Boolean>();
+    private static Map<String, Boolean> nativeMethodUsageCache = new HashMap<String, Boolean>();
+
+    private static void resetNativeUsageCaches(String[] nativeSources) {
+        if (nativeSourcesCache != nativeSources) {
+            nativeSourcesCache = nativeSources;
+            nativeClassUsageCache = new HashMap<String, Boolean>();
+            nativeMethodUsageCache = new HashMap<String, Boolean>();
+        }
+    }
+
+    private String functionPointer;
+
+    private String getFunctionPointer() {
+        if (functionPointer == null) {
+            StringBuilder b = new StringBuilder();
+            this.appendFunctionPointer(b);
+            functionPointer = b.toString();
+        }
+        return functionPointer;
+    }
     
     // [ddyer 4/2017] avoid creating a lot of temporary objects. 
     // more than 3x faster than the old way.
@@ -307,6 +330,7 @@ public class BytecodeMethod implements SignatureSet {
      */
     public boolean isMethodUsedByNative(String[] nativeSources, ByteCodeClass cls) {
         if (nativeSources == null) return false;
+        resetNativeUsageCaches(nativeSources);
         if (nativeSources == usedByNativeSources) {
             return usedByNative;
         }
@@ -318,12 +342,32 @@ public class BytecodeMethod implements SignatureSet {
             return false;
         }
 
+        String str = getFunctionPointer();
+        Boolean cachedMethodUsage = nativeMethodUsageCache.get(str);
+        if (cachedMethodUsage != null) {
+            usedByNative = cachedMethodUsage.booleanValue();
+            if (cls != null) {
+                if (cachedMethodUsage.booleanValue()) {
+                    cls.setUsedByNative(true);
+                } else {
+                    Boolean cachedClassUsage = nativeClassUsageCache.get(clsName);
+                    if (cachedClassUsage != null && !cachedClassUsage.booleanValue()) {
+                        cls.setUsedByNative(false);
+                    }
+                }
+            }
+            return cachedMethodUsage.booleanValue();
+        }
 
+        Boolean cachedClassUsage = nativeClassUsageCache.get(clsName);
+        if (cls != null && cachedClassUsage != null && !cachedClassUsage.booleanValue()) {
+            usedByNative = false;
+            cls.setUsedByNative(false);
+            nativeMethodUsageCache.put(str, Boolean.FALSE);
+            return false;
+        }
 
         // check native code
-        StringBuilder b = new StringBuilder();
-        this.appendFunctionPointer(b);
-        String str = b.toString();
         boolean foundClassName = false;
         for(String s : nativeSources) {
             if (cls != null && !foundClassName && s.contains(clsName)) {
@@ -334,9 +378,14 @@ public class BytecodeMethod implements SignatureSet {
                 usedByNative = true;
                 if (cls != null) {
                     cls.setUsedByNative(true);
+                    nativeClassUsageCache.put(clsName, Boolean.TRUE);
                 }
+                nativeMethodUsageCache.put(str, Boolean.TRUE);
                 return true;
             }
+        }
+        if (cls != null && cachedClassUsage == null) {
+            nativeClassUsageCache.put(clsName, Boolean.valueOf(foundClassName));
         }
         if (!foundClassName && cls != null) {
             // We didn't find the class at all.
@@ -345,6 +394,7 @@ public class BytecodeMethod implements SignatureSet {
             cls.setUsedByNative(false);
         }
         usedByNative = false;
+        nativeMethodUsageCache.put(str, Boolean.FALSE);
         return false;
     }
     
