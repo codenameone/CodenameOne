@@ -24,8 +24,10 @@
 package com.codename1.tools.translator;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -37,8 +39,12 @@ import java.util.Set;
  */
 public class MethodDependencyGraph {
     private final Map<String, Set<BytecodeMethod>> callersByLookupSignature = new HashMap<String, Set<BytecodeMethod>>();
-    private final Map<BytecodeMethod, Set<String>> methodToCalls = new HashMap<BytecodeMethod, Set<String>>();
+    private final Map<BytecodeMethod, Set<String>> methodToCalls = new IdentityHashMap<BytecodeMethod, Set<String>>();
     private final Map<String, Set<BytecodeMethod>> methodsByClass = new HashMap<String, Set<BytecodeMethod>>();
+
+    private static Set<BytecodeMethod> newIdentitySet() {
+        return Collections.newSetFromMap(new IdentityHashMap<BytecodeMethod, Boolean>());
+    }
 
     public void clear() {
         callersByLookupSignature.clear();
@@ -49,7 +55,7 @@ public class MethodDependencyGraph {
     public void registerMethod(BytecodeMethod method) {
         Set<BytecodeMethod> byClass = methodsByClass.get(method.getClsName());
         if (byClass == null) {
-            byClass = new HashSet<BytecodeMethod>();
+            byClass = newIdentitySet();
             methodsByClass.put(method.getClsName(), byClass);
         }
         byClass.add(method);
@@ -58,7 +64,7 @@ public class MethodDependencyGraph {
     public void recordMethodCall(BytecodeMethod caller, String calleeSignature) {
         Set<BytecodeMethod> callers = callersByLookupSignature.get(calleeSignature);
         if (callers == null) {
-            callers = new HashSet<BytecodeMethod>();
+            callers = newIdentitySet();
             callersByLookupSignature.put(calleeSignature, callers);
         }
         callers.add(caller);
