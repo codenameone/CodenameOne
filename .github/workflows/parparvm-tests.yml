@@ -76,8 +76,10 @@ jobs:
           java-version: '8'
           cache: 'maven'
 
-      - name: Build CodenameOne Core
-        run: mvn -B -f maven/pom.xml install -pl core -am -DskipTests -P !download-cn1-binaries,!install-cn1 -Dcn1.binaries=/tmp/dummy
+      - name: Build CodenameOne and HelloCodenameOne
+        run: |
+          mvn -B -f maven/pom.xml install -DskipTests -P !download-cn1-binaries,!install-cn1 -Dcn1.binaries=/tmp/dummy
+          mvn -B -f scripts/hellocodenameone/pom.xml package -DskipTests
         env:
           JDK_8_HOME: ${{ env.JDK_8_HOME }}
 

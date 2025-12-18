@@ -38,25 +38,27 @@ public class HeavyLoadBenchmarkTest {
             javaApiJar = Paths.get("vm", "JavaAPI", "dist", "JavaAPI.jar").normalize().toAbsolutePath();
         }
         // Locate CodenameOne Core jar
-        Path coreJar = Paths.get("..", "..", "maven", "core", "target", "codenameone-core-8.0-SNAPSHOT.jar").normalize().toAbsolutePath();
-        if (!Files.exists(coreJar)) {
-             coreJar = Paths.get("..", "maven", "core", "target", "codenameone-core-8.0-SNAPSHOT.jar").normalize().toAbsolutePath();
-        }
-        if (!Files.exists(coreJar)) {
-             // Try assuming we are in root
-             coreJar = Paths.get("maven", "core", "target", "codenameone-core-8.0-SNAPSHOT.jar").normalize().toAbsolutePath();
-        }
+        Path coreJar = findJar("maven", "core", "target", "codenameone-core-8.0-SNAPSHOT.jar");
+
+        // Locate IOSPort jar
+        Path iosPortJar = findJar("maven", "ios", "target", "codenameone-ios-8.0-SNAPSHOT-jar-with-dependencies.jar");
+
+        // Locate IOS Bundle (for nativeios.jar)
+        Path iosBundleJar = findJar("maven", "ios", "target", "codenameone-ios-8.0-SNAPSHOT-bundle.jar");
+
+        // Locate HelloCodenameOne jar
+        Path helloJar = findJar("scripts", "hellocodenameone", "common", "target", "hellocodenameone-common-1.0-SNAPSHOT.jar");
 
         // Ensure jars exist
         Assertions.assertTrue(Files.exists(javaApiJar), "JavaAPI.jar not found at " + javaApiJar);
-        // Note: Core jar is optional if not built, but for heavy load we prefer it.
-        // If missing, we proceed with just JavaAPI but warn.
-        boolean hasCore = Files.exists(coreJar);
-        if (!hasCore) {
-            System.out.println("WARNING: CodenameOne Core jar not found. Benchmark will be lighter.");
-        } else {
-            System.out.println("Found CodenameOne Core jar: " + coreJar);
-        }
+
+        List<Path> jarsToScan = new ArrayList<>();
+        jarsToScan.add(javaApiJar);
+        if (coreJar != null) jarsToScan.add(coreJar);
+        if (iosPortJar != null) jarsToScan.add(iosPortJar);
+        if (helloJar != null) jarsToScan.add(helloJar);
+
+        System.out.println("Scanning " + jarsToScan.size() + " jars...");
 
         Path outputDir = tempDir.resolve("benchmark-output");
         Path srcDir = tempDir.resolve("benchmark-src");
@@ -67,9 +69,9 @@ public class HeavyLoadBenchmarkTest {
         Files.createDirectories(classesDir);
 
         // Scan jars for public classes
-        List<String> publicClasses = scanPublicClasses(javaApiJar);
-        if (hasCore) {
-            publicClasses.addAll(scanPublicClasses(coreJar));
+        List<String> publicClasses = new ArrayList<>();
+        for (Path jar : jarsToScan) {
+            publicClasses.addAll(scanPublicClasses(jar));
         }
         System.out.println("Found " + publicClasses.size() + " public classes total.");
 
@@ -121,9 +123,26 @@ public class HeavyLoadBenchmarkTest {
         Assertions.assertEquals(0, result, "Compilation of BenchmarkMain failed");
 
         // Unzip jars into classesDir to avoid Jar scanning issues and ensure heavy load
-        unzip(javaApiJar, classesDir);
-        if (hasCore) {
-            unzip(coreJar, classesDir);
+        for (Path jar : jarsToScan) {
+            unzip(jar, classesDir);
+        }
+
+        // Handle nativeios.jar from bundle if present
+        if (iosBundleJar != null) {
+            try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(iosBundleJar))) {
+                ZipEntry ze;
+                while ((ze = zis.getNextEntry()) != null) {
+                    if (ze.getName().endsWith("nativeios.jar")) {
+                        Path nativeJar = tempDir.resolve("nativeios.jar");
+                        Files.copy(zis, nativeJar);
+                        unzip(nativeJar, classesDir);
+                        System.out.println("Extracted and unzipped nativeios.jar");
+                        break;
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("WARNING: Failed to extract nativeios.jar from bundle: " + e.getMessage());
+            }
         }
 
         SimpleProfiler profiler = new SimpleProfiler(Thread.currentThread());
@@ -219,6 +238,23 @@ public class HeavyLoadBenchmarkTest {
             }
         }
         return classes;
+    }
+
+    private Path findJar(String... parts) {
+        // Try paths relative to vm/tests, vm, and root
+        Path p = Paths.get("..", "..");
+        for (String part : parts) p = p.resolve(part);
+        if (Files.exists(p)) return p.normalize().toAbsolutePath();
+
+        p = Paths.get("..");
+        for (String part : parts) p = p.resolve(part);
+        if (Files.exists(p)) return p.normalize().toAbsolutePath();
+
+        p = Paths.get(".");
+        for (String part : parts) p = p.resolve(part);
+        if (Files.exists(p)) return p.normalize().toAbsolutePath();
+
+        return null;
     }
 
     private void unzip(Path zipFile, Path outputDir) throws IOException {
