@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.io.TempDir;
+import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.Opcodes;
 
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
@@ -19,6 +21,8 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 @Tag("benchmark")
 public class HeavyLoadBenchmarkTest {
@@ -45,26 +49,47 @@ public class HeavyLoadBenchmarkTest {
         Files.createDirectories(srcDir);
         Files.createDirectories(classesDir);
 
-        // Create a heavy main class that references various parts of the API to force traversal
+        // Scan JavaAPI for public classes to generate a heavy load
+        List<String> publicClasses = scanPublicClasses(javaApiJar);
+        System.out.println("Found " + publicClasses.size() + " public classes in JavaAPI.");
+
+        // Create a heavy main class that references these classes
         Path pkgDir = srcDir.resolve("com").resolve("benchmark");
         Files.createDirectories(pkgDir);
         Path javaFile = pkgDir.resolve("BenchmarkMain.java");
-        String source = "package com.benchmark;\n" +
-                "public class BenchmarkMain {\n" +
-                "    public static void main(String[] args) {\n" +
-                "        java.util.ArrayList l = new java.util.ArrayList();\n" +
-                "        l.add(\"Hello\");\n" +
-                "        java.util.HashMap m = new java.util.HashMap();\n" +
-                "        m.put(\"Key\", l);\n" +
-                "        System.out.println(m);\n" +
-                "        java.util.Vector v = new java.util.Vector();\n" +
-                "        v.addElement(new java.util.Date());\n" +
-                "        try {\n" +
-                "            Class.forName(\"java.util.TimeZone\");\n" +
-                "        } catch (Exception e) {}\n" +
-                "    }\n" +
-                "}";
-        Files.write(javaFile, source.getBytes());
+
+        StringBuilder source = new StringBuilder();
+        source.append("package com.benchmark;\n");
+        source.append("public class BenchmarkMain {\n");
+        source.append("    public static void main(String[] args) {\n");
+        source.append("        System.out.println(\"Starting benchmark...\");\n");
+
+        // Split into chunks to avoid method size limits
+        int methodCount = 0;
+        int chunkSize = 500;
+        for (int i = 0; i < publicClasses.size(); i += chunkSize) {
+            source.append("        loadChunk").append(methodCount++).append("();\n");
+        }
+        source.append("    }\n");
+
+        methodCount = 0;
+        for (int i = 0; i < publicClasses.size(); i += chunkSize) {
+            source.append("    private static void loadChunk").append(methodCount++).append("() {\n");
+            source.append("        try {\n");
+            source.append("            Class[] classes = new Class[] {\n");
+            int end = Math.min(i + chunkSize, publicClasses.size());
+            for (int j = i; j < end; j++) {
+                String clsName = publicClasses.get(j);
+                // Use Class.forName to avoid compilation issues with package-private classes/inner classes
+                source.append("                Class.forName(\"").append(clsName).append("\"),\n");
+            }
+            source.append("            };\n");
+            source.append("        } catch (Throwable t) {}\n");
+            source.append("    }\n");
+        }
+        source.append("}\n");
+
+        Files.write(javaFile, source.toString().getBytes());
 
         // Compile the benchmark main
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
@@ -146,9 +171,32 @@ public class HeavyLoadBenchmarkTest {
         }
     }
 
+    private List<String> scanPublicClasses(Path jarFile) throws IOException {
+        List<String> classes = new ArrayList<>();
+        try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(jarFile))) {
+            ZipEntry ze;
+            while ((ze = zis.getNextEntry()) != null) {
+                if (ze.getName().endsWith(".class") && !ze.getName().startsWith("META-INF")) {
+                    try {
+                        ClassReader cr = new ClassReader(zis);
+                        if ((cr.getAccess() & Opcodes.ACC_PUBLIC) != 0) {
+                            String name = cr.getClassName().replace('/', '.');
+                            if (!name.contains("-") && !name.equals("module-info")) {
+                                classes.add(name);
+                            }
+                        }
+                    } catch (Exception e) {
+                        // ignore bad classes
+                    }
+                }
+            }
+        }
+        return classes;
+    }
+
     private void unzip(Path zipFile, Path outputDir) throws IOException {
-        try (java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(Files.newInputStream(zipFile))) {
-            java.util.zip.ZipEntry ze = zis.getNextEntry();
+        try (ZipInputStream zis = new ZipInputStream(Files.newInputStream(zipFile))) {
+            ZipEntry ze = zis.getNextEntry();
             while (ze != null) {
                 Path newFile = outputDir.resolve(ze.getName());
                 if (ze.isDirectory()) {
