@@ -50,16 +50,20 @@ public class Parser extends ClassVisitor {
     private String clsName;
     private static String[] nativeSources;
     private static List<ByteCodeClass> classes = new ArrayList<ByteCodeClass>();
+    private static MethodDependencyGraph dependencyGraph = new MethodDependencyGraph();
     private int lambdaCounter;
     public static void cleanup() {
-    	nativeSources = null;
-    	classes.clear();
-    	LabelInstruction.cleanup();
+        nativeSources = null;
+        classes.clear();
+        dependencyGraph.clear();
+        BytecodeMethod.setDependencyGraph(null);
+        LabelInstruction.cleanup();
     }
     public static void parse(File sourceFile) throws Exception {
         if(ByteCodeTranslator.verbose) {
             System.out.println("Parsing: " + sourceFile.getAbsolutePath());
         }
+        BytecodeMethod.setDependencyGraph(dependencyGraph);
         ClassReader r = new ClassReader(new FileInputStream(sourceFile));
         /*if(ByteCodeTranslator.verbose) {
             System.out.println("Class: " + r.getClassName() + " derives from: " + r.getSuperName() + " interfaces: " + Arrays.asList(r.getInterfaces()));
@@ -409,8 +413,8 @@ public class Parser extends ClassVisitor {
                     }
                 }
             }
-            
-            // load the native sources (including user native code) 
+
+            // load the native sources (including user native code)
             // We need to load native sources before we clear any unmarked classes
             // because native source may be the only thing referencing a class,
             // and the class may be purged before it even has a shot.
@@ -499,8 +503,8 @@ public class Parser extends ClassVisitor {
     }
 
     private static int cullMethods() {
-    	int nfound = 0;
-    	for(ByteCodeClass bc : classes) {
+        int nfound = 0;
+        for(ByteCodeClass bc : classes) {
             bc.unmark();
             if(bc.isIsInterface() || bc.getBaseClass() == null) {
                 continue;
@@ -519,6 +523,7 @@ public class Parser extends ClassVisitor {
                         continue;
                     }
                     mtd.setEliminated(true);
+                    dependencyGraph.removeMethod(mtd);
                     nfound++;
                 }
             }
@@ -526,7 +531,7 @@ public class Parser extends ClassVisitor {
         }
         return nfound;
     }
-    
+
     private static boolean isMethodUsedByBaseClassOrInterface(BytecodeMethod mtd, ByteCodeClass cls) {
         boolean b = checkMethodUsedByBaseClassOrInterface(mtd, cls.getBaseClassObject());
         if(b) {
@@ -596,6 +601,7 @@ public class Parser extends ClassVisitor {
             int nfound = 0;
             for (ByteCodeClass cls : removedClasses) {
                 nfound += cls.setEliminated(true);
+                dependencyGraph.removeClass(cls.getClsName());
             }
             classes = tmp;
             return nfound + eliminateUnusedMethods(nfound > 0, depth + 1);
@@ -613,14 +619,13 @@ public class Parser extends ClassVisitor {
         if (!m.isEliminated() && m.isMethodUsedByNative(nativeSources, cls)) {
             return true;
         }
-        for(ByteCodeClass bc : classes) {
-            for(BytecodeMethod mtd : bc.getMethods()) {
-                if(mtd.isEliminated() || mtd == m) {
-                    continue;
-                }
-                if(mtd.isMethodUsed(m)) {
-                    return true;
-                }
+        List<BytecodeMethod> callers = dependencyGraph.getCallers(m.getLookupSignature());
+        for (BytecodeMethod caller : callers) {
+            if(caller.isEliminated() || caller == m) {
+                continue;
+            }
+            if(caller.isMethodUsed(m)) {
+                return true;
             }
         }
         return false;

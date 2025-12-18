@@ -61,7 +61,8 @@ import org.objectweb.asm.Opcodes;
  *
  * @author Shai Almog
  */
-public class BytecodeMethod implements SignatureSet {    
+public class BytecodeMethod implements SignatureSet {
+    private static MethodDependencyGraph dependencyGraph;
 
     /**
      * @return the acceptStaticOnEquals
@@ -75,6 +76,10 @@ public class BytecodeMethod implements SignatureSet {
      */
     public static void setAcceptStaticOnEquals(boolean aAcceptStaticOnEquals) {
         acceptStaticOnEquals = aAcceptStaticOnEquals;
+    }
+
+    public static void setDependencyGraph(MethodDependencyGraph dependencyGraph) {
+        BytecodeMethod.dependencyGraph = dependencyGraph;
     }
     private List<ByteCodeMethodArg> arguments = new ArrayList<ByteCodeMethodArg>();
     private Set<LocalVariable> localVariables = new HashSet<LocalVariable>();
@@ -120,6 +125,9 @@ public class BytecodeMethod implements SignatureSet {
         staticMethod = (access & Opcodes.ACC_STATIC) == Opcodes.ACC_STATIC;
         finalMethod = (access & Opcodes.ACC_FINAL) == Opcodes.ACC_FINAL;
         synchronizedMethod = (access & Opcodes.ACC_SYNCHRONIZED) == Opcodes.ACC_SYNCHRONIZED;
+        if (dependencyGraph != null) {
+            dependencyGraph.registerMethod(this);
+        }
         int pos = desc.lastIndexOf(')');
         if (!staticMethod) {
             if (!dependentClasses.contains("java_lang_NullPointerException")) {
@@ -350,19 +358,39 @@ public class BytecodeMethod implements SignatureSet {
     
     private Set<String> usedMethods;
     public boolean isMethodUsedOldWay(BytecodeMethod bm) {
-        if(usedMethods == null) {
-            usedMethods = new TreeSet<String>();
-            for(Instruction ins : instructions) {
-                String s = ins.getMethodUsed();
-                if(s != null && !usedMethods.contains(s)) {
-                    usedMethods.add(s);
-                }
-            }
-        }
+        ensureUsedMethodsInitialized();
         if(bm.methodName.equals("__INIT__")) {
             return usedMethods.contains(bm.desc + ".<init>");
         }
         return usedMethods.contains(bm.desc + "." + bm.methodName);
+    }
+
+    public Set<String> getCalledMethodSignatures() {
+        ensureUsedMethodsInitialized();
+        return usedMethods;
+    }
+
+    public String getLookupSignature() {
+        if(methodName.equals("__INIT__")) {
+            return desc + ".<init>";
+        }
+        if(methodName.equals("__CLINIT__")) {
+            return desc + ".<clinit>";
+        }
+        return desc + "." + methodName;
+    }
+
+    private void ensureUsedMethodsInitialized() {
+        if(usedMethods != null) {
+            return;
+        }
+        usedMethods = new TreeSet<String>();
+        for(Instruction ins : instructions) {
+            String s = ins.getMethodUsed();
+            if(s != null && !usedMethods.contains(s)) {
+                usedMethods.add(s);
+            }
+        }
     }
     
     public void findWritableFields(Set<String> outSet) {
@@ -1049,6 +1077,12 @@ public class BytecodeMethod implements SignatureSet {
     private void addInstruction(Instruction i) {
         instructions.add(i);
         i.addDependencies(dependentClasses);
+        if (dependencyGraph != null) {
+            String methodUsed = i.getMethodUsed();
+            if (methodUsed != null) {
+                dependencyGraph.recordMethodCall(this, methodUsed);
+            }
+        }
     }
     
     public void addVariableOperation(int opcode, int var) {
