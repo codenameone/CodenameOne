@@ -63,6 +63,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 /**
  * Lightweight {@link CodenameOneImplementation} used by unit tests.  It provides deterministic,
  * in-memory implementations for the storage, file system, and networking APIs that are required by
@@ -1697,22 +1699,16 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     private void sendPointerEventToCurrentForm(final boolean pressed, final int x, final int y) {
         final Display display = Display.getInstance();
-        if (display == null) {
-            return;
-        }
+        assertNotNull(display);
 
-        Runnable r = new Runnable() {
-            public void run() {
-                Form current = display.getCurrent();
-                if (current == null) {
-                    return;
-                }
+        Runnable r = () -> {
+            Form current = display.getCurrent();
+            assertNotNull(current);
 
-                if (pressed) {
-                    current.pointerPressed(x, y);
-                } else {
-                    current.pointerReleased(x, y);
-                }
+            if (pressed) {
+                super.pointerPressed(x, y);
+            } else {
+                super.pointerReleased(x, y);
             }
         };
 
