@@ -34,17 +34,28 @@ permissions:
   issues: write
 
 jobs:
-  build-linux-jdk8-fx:
+  build-test:
 
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        java-version: [8, 17, 21, 25]
 
     steps:
     - uses: actions/checkout@v1
     - name: Set up JDK 8
+      if: matrix.java-version == 8
       uses: actions/setup-java@v1
       with:
         java-version: 1.8
         java-package: jdk+fx
+    - name: Set up JDK
+      if: matrix.java-version != 8
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: ${{ matrix.java-version }}
     - name: Cache Maven dependencies
       uses: actions/cache@v4
       with:
@@ -73,7 +84,7 @@ jobs:
           -Dcn1.binaries="${CN1_BINARIES}" \
           -pl codenameone-maven-plugin -am -Plocal-dev-javase test
     - name: Generate static analysis HTML summaries
-      if: ${{ always() }}
+      if: ${{ always() && matrix.java-version == 8 }}
       env:
         QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target
         QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
@@ -82,7 +93,7 @@ jobs:
         QUALITY_REPORT_GENERATE_HTML_ONLY: "1"
       run: python3 .github/scripts/generate-quality-report.py
     - name: Collect quality artifacts
-      if: ${{ always() }}
+      if: ${{ always() && matrix.java-version == 8 }}
       run: |
         set -euo pipefail
         mkdir -p quality-artifacts/static-analysis
@@ -110,14 +121,14 @@ jobs:
           echo "No quality artifacts were generated." > quality-artifacts/README.txt
         fi
     - name: Upload quality artifacts
-      if: ${{ always() }}
+      if: ${{ always() && matrix.java-version == 8 }}
       id: upload-quality-artifacts
       uses: actions/upload-artifact@v4
       with:
         name: quality-artifacts
         path: quality-artifacts
     - name: Publish quality report previews
-      if: ${{ always() && github.server_url == 'https://github.com' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+      if: ${{ always() && matrix.java-version == 8 && github.server_url == 'https://github.com' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
       id: publish-quality-previews
       env:
         GITHUB_TOKEN: ${{ github.token }}
@@ -183,7 +194,7 @@ jobs:
           echo "jacoco_url=${preview_base}/coverage/index.html" >> "$GITHUB_OUTPUT"
         fi
     - name: Generate quality report summary
-      if: ${{ always() }}
+      if: ${{ always() && matrix.java-version == 8 }}
       env:
         QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target
         QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
@@ -199,13 +210,13 @@ jobs:
         JACOCO_HTML_URL: ${{ steps.publish-quality-previews.outputs.jacoco_url }}
       run: python3 .github/scripts/generate-quality-report.py
     - name: Upload quality report summary
-      if: ${{ always() }}
+      if: ${{ always() && matrix.java-version == 8 }}
       uses: actions/upload-artifact@v4
       with:
         name: quality-report
         path: quality-report.md
     - name: Publish quality report comment
-      if: ${{ github.event_name == 'pull_request' }}
+      if: ${{ github.event_name == 'pull_request' && matrix.java-version == 8 }}
       uses: actions/github-script@v7
       with:
         script: |
@@ -223,9 +234,11 @@ jobs:
       run: ant -noinput -buildfile Ports/CLDC11/build.xml jar
       
     - name: Build Release
+      if: matrix.java-version == 8
       run: ant -noinput -buildfile CodenameOne/build.xml weeklyLibUpdate
 
     - name: Build JavaDocs
+      if: matrix.java-version == 8
       run: |
         cd CodenameOne
         mkdir -p build
@@ -246,6 +259,7 @@ jobs:
       run: mvn -f vm/JavaAPI/pom.xml package
 
     - name: Upload a Build Artifact
+      if: matrix.java-version == 8
       uses: actions/upload-artifact@v4
       with:
         name: JavaAPI.jar
@@ -258,12 +272,14 @@ jobs:
       run: ant -noinput -buildfile Ports/CLDC11/build.xml jar
 
     - name: Upload a Build Artifact
+      if: matrix.java-version == 8
       uses: actions/upload-artifact@v4
       with:
         name: ByteCodeTranslator.jar
         path: vm/ByteCodeTranslator/target/ByteCodeTranslator-1.0-SNAPSHOT.jar
 
     - name: Upload a Build Artifact
+      if: matrix.java-version == 8
       uses: actions/upload-artifact@v4
       with:
         name: CLDC11.jar
@@ -273,9 +289,11 @@ jobs:
       run: ant -noinput -buildfile Ports/Android/build.xml jar
 
     - name: Packaging Everything
+      if: matrix.java-version == 8
       run: zip -j result.zip CodenameOne/javadocs.zip CodenameOne/dist/CodenameOne.jar CodenameOne/updatedLibs.zip Ports/JavaSE/dist/JavaSE.jar build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip
 
     - name: Copying Files to Server
+      if: matrix.java-version == 8
       uses: marcodallasanta/ssh-scp-deploy@v1.0.5
       with:
         host: ${{ secrets.WP_HOST }}
@@ -284,6 +302,7 @@ jobs:
         local: result.zip
         
     - name: Upload a Build Artifact
+      if: matrix.java-version == 8
       uses: actions/upload-artifact@v4
       with:
         name: JavaSE.jar
