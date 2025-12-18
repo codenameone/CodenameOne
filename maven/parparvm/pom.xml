@@ -43,6 +43,8 @@
         <src.dir>../../vm/ByteCodeTranslator/src</src.dir>
 
         <codename1.javaapi.src.dir>../../vm/JavaAPI/src</codename1.javaapi.src.dir>
+        <javaapi.compiler.source>1.5</javaapi.compiler.source>
+        <javaapi.compiler.target>1.5</javaapi.compiler.target>
 
     </properties>
 
@@ -96,8 +98,8 @@
                             <target>
                                 <mkdir dir="${project.build.directory}/api-classes"/>
                                 <javac srcdir="${codename1.javaapi.src.dir}"
-                                       source="1.5"
-                                       target="1.5"
+                                       source="${javaapi.compiler.source}"
+                                       target="${javaapi.compiler.target}"
                                        destdir="${project.build.directory}/api-classes"
                                        failonerror="true"
                                 />
@@ -174,6 +176,16 @@
                     </plugin>
                 </plugins>
             </build>
+        </profile>
+        <profile>
+            <id>modern-jdk</id>
+            <activation>
+                <jdk>[9,)</jdk>
+            </activation>
+            <properties>
+                <javaapi.compiler.source>1.8</javaapi.compiler.source>
+                <javaapi.compiler.target>1.8</javaapi.compiler.target>
+            </properties>
         </profile>
     </profiles>
 
