@@ -38,13 +38,15 @@ public class HeavyLoadBenchmarkTest {
             javaApiJar = Paths.get("vm", "JavaAPI", "dist", "JavaAPI.jar").normalize().toAbsolutePath();
         }
         // Locate CodenameOne Core jar
-        Path coreJar = findJar("maven", "core", "target", "codenameone-core-8.0-SNAPSHOT.jar");
+        Path coreJar = findDependencyJar("codenameone-core");
 
         // Locate IOSPort jar
-        Path iosPortJar = findJar("maven", "ios", "target", "codenameone-ios-8.0-SNAPSHOT-jar-with-dependencies.jar");
+        Path iosPortJar = findDependencyJar("codenameone-ios-7.0.150.jar"); // Look for specific jar first
+        if (iosPortJar == null) iosPortJar = findDependencyJar("codenameone-ios"); // Fallback
 
         // Locate IOS Bundle (for nativeios.jar)
-        Path iosBundleJar = findJar("maven", "ios", "target", "codenameone-ios-8.0-SNAPSHOT-bundle.jar");
+        Path iosBundleJar = findDependencyJar("codenameone-ios-7.0.150-bundle.jar");
+        if (iosBundleJar == null) iosBundleJar = findDependencyJar("bundle");
 
         // Locate HelloCodenameOne sources
         Path helloSrc = findPath("scripts", "hellocodenameone", "common", "src", "main", "java");
@@ -53,6 +55,9 @@ public class HeavyLoadBenchmarkTest {
         Assertions.assertTrue(Files.exists(javaApiJar), "JavaAPI.jar not found at " + javaApiJar);
 
         boolean hasCore = coreJar != null;
+        if (!hasCore) {
+            System.out.println("WARNING: CodenameOne Core jar not found in dependencies.");
+        }
 
         List<Path> jarsToScan = new ArrayList<>();
         jarsToScan.add(javaApiJar);
@@ -292,6 +297,21 @@ public class HeavyLoadBenchmarkTest {
         if (Files.exists(p)) return p.normalize().toAbsolutePath();
 
         return null;
+    }
+
+    private Path findDependencyJar(String namePart) {
+        Path depsDir = Paths.get("target", "benchmark-dependencies");
+        if (!Files.exists(depsDir)) return null;
+        try {
+            return Files.list(depsDir)
+                    .filter(p -> p.getFileName().toString().contains(namePart))
+                    .findFirst()
+                    .map(Path::normalize)
+                    .map(Path::toAbsolutePath)
+                    .orElse(null);
+        } catch (IOException e) {
+            return null;
+        }
     }
 
     private List<String> scanDirectory(Path dir) throws IOException {
