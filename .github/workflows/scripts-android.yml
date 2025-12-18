@@ -95,6 +95,13 @@ jobs:
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+      - name: Free Disk Space
+        if: matrix.id != 'default'
+        run: |
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android/sdk/ndk
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/share/swift
       - name: Setup JDK
         if: matrix.id != 'default'
         uses: actions/setup-java@v4
