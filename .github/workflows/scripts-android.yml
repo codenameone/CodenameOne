@@ -72,10 +72,19 @@ name: Test Android build scripts
 
 jobs:
   build-android:
+    name: Build Android ${{ matrix.name }}
     strategy:
       fail-fast: false
       matrix:
-        jdk: ['Default: 8', '17', '21']
+        include:
+          - name: "Default: 8"
+            id: default
+          - name: "JDK 17"
+            id: jdk17
+            java_version: '17'
+          - name: "JDK 21"
+            id: jdk21
+            java_version: '21'
     permissions:
       contents: read
       pull-requests: write
@@ -87,16 +96,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Setup JDK
-        if: matrix.jdk != 'Default: 8'
+        if: matrix.id != 'default'
         uses: actions/setup-java@v4
         with:
-          java-version: ${{ matrix.jdk }}
+          java-version: ${{ matrix.java_version }}
           distribution: 'zulu'
       - name: Set JDK_HOME
-        if: matrix.jdk != 'Default: 8'
+        if: matrix.id != 'default'
         run: echo "JDK_HOME=${JAVA_HOME}" >> $GITHUB_ENV
       - name: Configure CN1SS options
-        if: matrix.jdk != 'Default: 8'
+        if: matrix.id != 'default'
         run: |
           echo "CN1SS_SKIP_COMMENT=1" >> $GITHUB_ENV
           echo "CN1SS_FAIL_ON_MISMATCH=1" >> $GITHUB_ENV
@@ -120,11 +129,11 @@ jobs:
           target: google_apis
           script: |
             ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
-            if [ "${{ matrix.jdk }}" == "Default: 8" ]; then
+            if [ "${{ matrix.id }}" == "default" ]; then
               ./scripts/generate-android-coverage-report.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
             fi
       - name: Upload emulator screenshot
-        if: always() && matrix.jdk == 'Default: 8'
+        if: always() && matrix.id == 'default'
         uses: actions/upload-artifact@v4
         with:
           name: emulator-screenshot
@@ -133,7 +142,7 @@ jobs:
           retention-days: 14
           compression-level: 6
       - name: Upload Android Jacoco coverage report
-        if: always() && matrix.jdk == 'Default: 8'
+        if: always() && matrix.id == 'default'
         uses: actions/upload-artifact@v4
         with:
           name: android-jacoco-coverage
