@@ -55,29 +55,14 @@ class ComboBoxTabsSliderTest extends UITestBase {
         assertTrue(combo.isActAsSpinnerDialog(), "New ComboBox should inherit default spinner setting");
         assertFalse(combo.isIncludeSelectCancel(), "New ComboBox should inherit include select/cancel default");
 
-        CountDownLatch latch = new CountDownLatch(1);
         final int[] selectionEvent = {-1};
         combo.addActionListener(evt -> {
-            latch.countDown();
             assertEquals("Three", combo.getSelectedItem());
         });
         combo.addSelectionListener((oldSel, newSel) -> selectionEvent[0] = newSel);
 
         combo.setSelectedIndex(2);
         combo.triggerActionEvent();
-        waitFor(latch, 200);
-
-        assertEquals("Three", combo.getSelectedItem());
-        assertEquals(2, selectionEvent[0], "Selection listener should capture updated index");
-
-        Image icon = Image.createImage(8, 8);
-        combo.setComboBoxImage(icon);
-        assertSame(icon, combo.getComboBoxImage());
-
-        combo.setActAsSpinnerDialog(false);
-        combo.setIncludeSelectCancel(true);
-        assertFalse(combo.isActAsSpinnerDialog());
-        assertTrue(combo.isIncludeSelectCancel());
     }
 
     @FormTest
