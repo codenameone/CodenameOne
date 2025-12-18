@@ -78,7 +78,7 @@ jobs:
 
       - name: Run ParparVM JVM tests
         working-directory: vm
-        run: mvn -B clean test -pl tests -am
+        run: mvn -B clean package -pl JavaAPI -am -DskipTests && mvn -B test -pl tests -am
         env:
           JDK_8_HOME: ${{ env.JDK_8_HOME }}
           JDK_11_HOME: ${{ env.JDK_11_HOME }}
