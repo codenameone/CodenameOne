@@ -178,10 +178,10 @@ public class ByteCodeClass {
     /**
      * Marks dependencies in this class based on the provided classes in this round of optimization.
      * @param lst The list of classes that are available in this optimization step.
-     * @param nativeSources Array of native sources in this round. Used to check if native files reference
+     * @param nativeTokens Set of native tokens in this round. Used to check if native files reference
      *                      this class or methods.
      */
-    public static void markDependencies(List<ByteCodeClass> lst, String[] nativeSources) {
+    public static void markDependencies(List<ByteCodeClass> lst, Set<String> nativeTokens) {
         mainClass.markDependent(lst);
         for(ByteCodeClass bc : lst) {
             if (bc.marked) {
@@ -237,7 +237,7 @@ public class ByteCodeClass {
             if (bc.getUsedByNative() == UsedByNativeResult.Unknown) {
                 // We don't yet know if this class is used by native
                 // calculate it now.
-                bc.calcUsedByNative(nativeSources);
+                bc.calcUsedByNative(nativeTokens);
             }
             if(bc.getUsedByNative() == UsedByNativeResult.Used){
                 bc.markDependent(lst);
@@ -1818,18 +1818,30 @@ public class ByteCodeClass {
        return usedByNative;
     }
 
+    public void resolveNativeUsage(Set<String> nativeTokens) {
+        if (usedByNative != UsedByNativeResult.Unknown) return;
+        for(String token : nativeTokens) {
+            if(token.contains(clsName)) {
+                setUsedByNative(true);
+                return;
+            }
+        }
+        setUsedByNative(false);
+    }
+
     /**
      * Calculates whether this class is used in any of the native sources.
-     * @param nativeSources The native sources to check.
+     * @param nativeTokens The native sources to check.
      * @see #getUsedByNative() 
      * @see #setUsedByNative(boolean)
      */
-    public void calcUsedByNative(String[] nativeSources) {
+    public void calcUsedByNative(Set<String> nativeTokens) {
+        resolveNativeUsage(nativeTokens);
+        if (usedByNative == UsedByNativeResult.Unused) {
+            return;
+        }
         for (BytecodeMethod m : methods) {
-            if (usedByNative != UsedByNativeResult.Unknown) {
-                return;
-            }
-            m.isMethodUsedByNative(nativeSources, this);
+            m.isMethodUsedByNative(nativeTokens, this);
         }
     }
 

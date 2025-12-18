@@ -48,11 +48,11 @@ import com.codename1.tools.translator.bytecodes.LabelInstruction;
 public class Parser extends ClassVisitor {
     private ByteCodeClass cls;
     private String clsName;
-    private static String[] nativeSources;
+    private static Set<String> nativeTokens;
     private static List<ByteCodeClass> classes = new ArrayList<ByteCodeClass>();
     private int lambdaCounter;
     public static void cleanup() {
-    	nativeSources = null;
+	nativeTokens = null;
     	classes.clear();
     	LabelInstruction.cleanup();
     }
@@ -420,7 +420,7 @@ public class Parser extends ClassVisitor {
                 file = bc.getClsName();
                 bc.updateAllDependencies();
             }
-            ByteCodeClass.markDependencies(classes, nativeSources);
+            ByteCodeClass.markDependencies(classes, nativeTokens);
             Set<ByteCodeClass> unmarked = new HashSet<ByteCodeClass>(classes);
             classes = ByteCodeClass.clearUnmarked(classes);
             unmarked.removeAll(classes);
@@ -471,7 +471,7 @@ public class Parser extends ClassVisitor {
                 return file.getName().endsWith(".m") || file.getName().endsWith("." + ByteCodeTranslator.output.extension());
             }
         });
-        nativeSources = new String[mFiles.length];
+        nativeTokens = new HashSet<String>();
         int size = 0;
         System.out.println(""+mFiles.length +" native files");
         for(int iter = 0 ; iter < mFiles.length ; iter++) { 
@@ -482,7 +482,15 @@ public class Parser extends ClassVisitor {
             byte[] dat = new byte[len];
             di.readFully(dat);
             fi.close();
-            nativeSources[iter] = new String(dat, "UTF-8");
+            String s = new String(dat, "UTF-8");
+
+            // tokenize the file content
+            String[] tokens = s.split("[^a-zA-Z0-9_$]+");
+            for(String t : tokens) {
+                if(t.length() > 1) {
+                    nativeTokens.add(t);
+                }
+            }
         }
         System.out.println("Native files total "+(size/1024)+"K");
         
@@ -577,7 +585,7 @@ public class Parser extends ClassVisitor {
                 bc.updateAllDependencies();
             }   
 
-            ByteCodeClass.markDependencies(classes, nativeSources);
+            ByteCodeClass.markDependencies(classes, nativeTokens);
             List<ByteCodeClass> tmp = ByteCodeClass.clearUnmarked(classes);
             /*if(ByteCodeTranslator.verbose) {
             System.out.println("Classes removed from: " + classCount + " to " + classes.size());
@@ -610,7 +618,7 @@ public class Parser extends ClassVisitor {
 
     
     private static boolean isMethodUsed(BytecodeMethod m, ByteCodeClass cls) {
-        if (!m.isEliminated() && m.isMethodUsedByNative(nativeSources, cls)) {
+        if (!m.isEliminated() && m.isMethodUsedByNative(nativeTokens, cls)) {
             return true;
         }
         for(ByteCodeClass bc : classes) {

@@ -294,28 +294,33 @@ public class BytecodeMethod implements SignatureSet {
      * Internal use: to track the list of native sources that were used to calculate the
      * usedByNative flag.
      */
-    private String[] usedByNativeSources;
+    private Set<String> usedByNativeSources;
 
     /**
      * Checks to see if this method is used by any of the provided native sources.
-     * @param nativeSources The native sources to check.
+     * @param nativeTokens The native sources to check.
      * @param cls The class that the method belongs to.  This is used to improve performance by first checking to
      *            see if the class is Not referenced in native sources.  If the class is not referenced, then we know that
      *            neither is the method.  This method will also set the {@link ByteCodeClass#setUsedByNative(boolean)} flag
      *            to improve the performance for the next method that is checked in the same class.
      * @return True if the method is used by native.
      */
-    public boolean isMethodUsedByNative(String[] nativeSources, ByteCodeClass cls) {
-        if (nativeSources == null) return false;
-        if (nativeSources == usedByNativeSources) {
+    public boolean isMethodUsedByNative(Set<String> nativeTokens, ByteCodeClass cls) {
+        if (nativeTokens == null) return false;
+        if (nativeTokens == usedByNativeSources) {
             return usedByNative;
         }
-        usedByNativeSources = nativeSources;
+        usedByNativeSources = nativeTokens;
 
-        if (cls != null && cls.getUsedByNative() == ByteCodeClass.UsedByNativeResult.Unused) {
-            // If the class isn't used, then neither is the method.
-            usedByNative = false;
-            return false;
+        if (cls != null) {
+            if (cls.getUsedByNative() == ByteCodeClass.UsedByNativeResult.Unknown) {
+                cls.resolveNativeUsage(nativeTokens);
+            }
+            if (cls.getUsedByNative() == ByteCodeClass.UsedByNativeResult.Unused) {
+                // If the class isn't used, then neither is the method.
+                usedByNative = false;
+                return false;
+            }
         }
 
 
@@ -324,26 +329,15 @@ public class BytecodeMethod implements SignatureSet {
         StringBuilder b = new StringBuilder();
         this.appendFunctionPointer(b);
         String str = b.toString();
-        boolean foundClassName = false;
-        for(String s : nativeSources) {
-            if (cls != null && !foundClassName && s.contains(clsName)) {
-                // For later we record whether the class is used.
-                foundClassName = true;
-            }
-            if(s.contains(str)) {
-                usedByNative = true;
-                if (cls != null) {
-                    cls.setUsedByNative(true);
-                }
-                return true;
-            }
+
+        if (nativeTokens.contains(str)) {
+             usedByNative = true;
+             if (cls != null) {
+                 cls.setUsedByNative(true);
+             }
+             return true;
         }
-        if (!foundClassName && cls != null) {
-            // We didn't find the class at all.
-            // Let's record that as it will save us time
-            // when looking up other methods in this class.
-            cls.setUsedByNative(false);
-        }
+
         usedByNative = false;
         return false;
     }
