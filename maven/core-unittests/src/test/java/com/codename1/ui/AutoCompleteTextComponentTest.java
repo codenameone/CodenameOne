@@ -2,6 +2,7 @@ package com.codename1.ui;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.testing.TestUtils;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.list.DefaultListModel;
 import com.codename1.ui.list.ListCellRenderer;
@@ -235,7 +236,18 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         int selectY = popupList.getAbsoluteY() + Math.max(1, Math.min(cellSize.getHeight(), popupList.getHeight()) / 2);
         implementation.dispatchPointerPressAndRelease(selectX, selectY);
 
-        waitFor(latch, 400);
+        assertTrue(form == CN.getCurrentForm());
+        //waitFor(latch, 400);
+        int timeout = 400;
+        while(latch.getCount() > 0) {
+            assertTrue(timeout > 0, "Failed when cellSize: " + cellSize +
+                    " selectX: " + selectX + " selectY: " + selectY +
+                    " popupList.getWidth(): " + popupList.getWidth() +
+                    " popupList.getHeight(): " + popupList.getHeight() +
+                    " componentAt: " + form.getComponentAt(selectX, selectY));
+            TestUtils.waitFor(5);
+            timeout -= 5;
+        }
 
         assertEquals("Red", field.getText());
         assertEquals("Red", component.getText());
