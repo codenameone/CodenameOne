@@ -86,6 +86,16 @@ jobs:
           JDK_21_HOME: ${{ env.JDK_21_HOME }}
           JDK_25_HOME: ${{ env.JDK_25_HOME }}
 
+      - name: Run ParparVM Benchmark
+        working-directory: vm
+        run: mvn -B test -pl tests -Dgroups=benchmark -P !skip-benchmark -Djacoco.skip=true
+        env:
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+          JDK_11_HOME: ${{ env.JDK_11_HOME }}
+          JDK_17_HOME: ${{ env.JDK_17_HOME }}
+          JDK_21_HOME: ${{ env.JDK_21_HOME }}
+          JDK_25_HOME: ${{ env.JDK_25_HOME }}
+
       - name: Publish ByteCodeTranslator quality previews
         if: ${{ always() && github.server_url == 'https://github.com' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         id: publish-bytecode-quality-previews
