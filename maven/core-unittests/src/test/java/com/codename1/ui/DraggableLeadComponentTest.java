@@ -29,6 +29,7 @@ class DraggableLeadComponentTest extends UITestBase {
         form.revalidate();
 
         Component draggedComponent = performPressDragAndReadDragged(form, button);
+        flushSerialCalls();
         assertEquals(draggableContainer, draggedComponent, "Draggable containers should start dragging even without a lead component");
     }
 
@@ -80,10 +81,19 @@ class DraggableLeadComponentTest extends UITestBase {
         int startY = interactionComponent.getAbsoluteY() + Math.max(1, interactionComponent.getHeight() / 2);
 
         implementation.dispatchPointerPress(startX, startY);
-        implementation.dispatchPointerDrag(startX + DRAG_DELTA, startY + DRAG_DELTA);
-        implementation.dispatchPointerDrag(startX + (DRAG_DELTA * 2), startY + (DRAG_DELTA * 2));
+        implementation.setHasDragStarted(true);
+        flushSerialCalls();
+        int destX = startX + (DRAG_DELTA * 2);
+        for(int iter = startX ; iter <= destX ; iter++) {
+            implementation.dispatchPointerDrag(iter, startY);
+        }
+        int destY = startY + (DRAG_DELTA * 2);
+        for(int iter = startY ; iter < destY ; iter++) {
+            implementation.dispatchPointerDrag(destX, iter);
+        }
         Component draggedComponent = form.getDraggedComponent();
-        implementation.dispatchPointerRelease(startX + (DRAG_DELTA * 2), startY + (DRAG_DELTA * 2));
+        implementation.dispatchPointerRelease(destX, destY);
+        flushSerialCalls();
         return draggedComponent;
     }
 }

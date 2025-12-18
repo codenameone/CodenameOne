@@ -74,15 +74,9 @@ public class BasicBrowserComponentSampleTest extends UITestBase {
         flushSerialCalls();
         DisplayTest.flushEdt();
 
-        implementation.tapComponent(hello);
-        DisplayTest.flushEdt();
-        flushSerialCalls();
-        DisplayTest.flushEdt();
+        tapComponent(hello);
 
-        implementation.tapComponent(prompt);
-        DisplayTest.flushEdt();
-        flushSerialCalls();
-        DisplayTest.flushEdt();
+        tapComponent(prompt);
 
         assertEquals(2, implementation.getBrowserExecuted().size());
         assertTrue(implementation.getBrowserExecuted().get(0).contains("confirm('continue?')"));
@@ -91,10 +85,7 @@ public class BasicBrowserComponentSampleTest extends UITestBase {
         Button popupButton = toolbar.findCommandComponent(popupCommand);
         assertNotNull(popupButton, "Popup command should create a button in the right bar");
 
-        implementation.tapComponent(popupButton);
-        DisplayTest.flushEdt();
-        flushSerialCalls();
-        DisplayTest.flushEdt();
+        tapComponent(popupButton);
 
         Sheet currentSheet = Sheet.getCurrentSheet();
         assertNotNull(currentSheet, "Sheet should be displayed after tapping popup command");

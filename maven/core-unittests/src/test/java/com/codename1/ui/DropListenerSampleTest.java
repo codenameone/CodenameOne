@@ -52,12 +52,15 @@ class DropListenerSampleTest extends UITestBase {
         int targetY = dropTarget.getAbsoluteY() + dropTarget.getHeight() / 2;
 
         implementation.dispatchPointerPress(startX, startY);
+        implementation.setHasDragStarted(true);
+        flushSerialCalls();
         implementation.dispatchPointerDrag(startX + draggable.getWidth() / 4, startY);
         implementation.dispatchPointerDrag(startX + draggable.getWidth() / 3, startY + draggable.getHeight() / 6);
         implementation.dispatchPointerDrag((startX + targetX) / 2, (startY + targetY) / 2);
         implementation.dispatchPointerDrag(targetX, targetY);
         implementation.dispatchPointerDrag(targetX, targetY + dropTarget.getHeight() / 4);
         implementation.dispatchPointerRelease(targetX, targetY);
+        flushSerialCalls();
 
         assertTrue(dropListenerCount[0] > 0, "Drop listener should be invoked when dropping on a target");
         assertNotNull(lastEvent[0], "Drop event should be captured");

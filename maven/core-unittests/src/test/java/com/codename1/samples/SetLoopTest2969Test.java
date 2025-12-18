@@ -8,15 +8,10 @@ import com.codename1.media.MediaManager;
 import com.codename1.ui.Button;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
-import com.codename1.ui.Display;
 import com.codename1.ui.Form;
-import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.layouts.BorderLayout;
-import com.codename1.ui.util.EventDispatcher;
 import org.junit.jupiter.api.Assertions;
-
-import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class SetLoopTest2969Test extends UITestBase {
 
@@ -75,7 +70,7 @@ public class SetLoopTest2969Test extends UITestBase {
                 f.revalidate();
 
             } catch (Exception ex) {
-                ex.printStackTrace();
+                fail(ex);
             }
         });
         f.add(BorderLayout.NORTH, playButton);
@@ -83,9 +78,7 @@ public class SetLoopTest2969Test extends UITestBase {
         f.show();
 
         // Simulate click
-        implementation.pressComponent(playButton);
-        implementation.releaseComponent(playButton);
-
+        tapComponent(playButton);
         // Check if our mock media was used
         Assertions.assertNotNull(media, "Media should have been created");
     }

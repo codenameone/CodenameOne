@@ -50,7 +50,7 @@ class DialogPositioningSampleTest extends UITestBase {
             flushSerialCalls();
 
             ensureSized(trigger, form);
-            implementation.tapComponent(trigger);
+            tapComponent(trigger);
             flushSerialCalls();
             DisplayTest.flushEdt();
             flushSerialCalls();

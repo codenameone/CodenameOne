@@ -24,18 +24,17 @@ public class MediaRecorderSampleTest extends UITestBase {
 
     @FormTest
     public void testMediaRecorderSample() {
-        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
-        impl.clearFileSystem();
-        String appHome = impl.getAppHomePath();
-        impl.mkdir(appHome);
+        implementation.clearFileSystem();
+        String appHome = implementation.getAppHomePath();
+        implementation.mkdir(appHome);
         String recordingsDir = appHome + "recordings/";
 
         String mockAudioFile = appHome + "tempAudio.wav";
-        impl.putFile(mockAudioFile, new byte[]{1, 2, 3});
-        impl.setNextCaptureAudioPath(mockAudioFile);
+        implementation.putFile(mockAudioFile, new byte[]{1, 2, 3});
+        implementation.setNextCaptureAudioPath(mockAudioFile);
 
         MockMedia mockMedia = new MockMedia();
-        impl.setMedia(mockMedia);
+        implementation.setMedia(mockMedia);
 
         Form hi = new Form("Capture", BoxLayout.y());
         hi.setToolbar(new Toolbar());
@@ -85,31 +84,31 @@ public class MediaRecorderSampleTest extends UITestBase {
 
         // Wait for show
         flushSerialCalls();
-        try { Thread.sleep(100); } catch(Exception e){}
-        flushSerialCalls();
 
         Component cmdButton = findComponentWithIcon(hi, icon);
         if (cmdButton != null) {
-            impl.tapComponent(cmdButton);
+            tapComponent(cmdButton);
         } else {
              Toolbar tb = hi.getToolbar();
              if (tb != null) {
                  Component titleArea = tb.getComponentAt(0);
                  if (titleArea instanceof Container) {
                       Component c = findComponentWithIcon((Container)titleArea, icon);
-                      if (c != null) impl.tapComponent(c);
+                      if (c != null) {
+                          tapComponent(c);
+                      }
                  }
              }
         }
 
         // No loop, check immediately
-        String[] files = impl.listFiles(recordingsDir);
+        String[] files = implementation.listFiles(recordingsDir);
         assertTrue(files.length > 0, "Recording should be saved immediately in sync test env");
 
         if (hi.getContentPane().getComponentCount() > 0) {
             Component c = hi.getContentPane().getComponentAt(hi.getContentPane().getComponentCount()-1);
             if (c instanceof MultiButton) {
-                impl.tapComponent(c);
+                tapComponent(c);
                 assertTrue(mockMedia.played, "Media should be played");
             }
         }

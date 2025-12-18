@@ -14,10 +14,9 @@ public class ListFilesSampleTest extends UITestBase {
 
     @FormTest
     public void testListFilesSample() {
-        TestCodenameOneImplementation impl = TestCodenameOneImplementation.getInstance();
-        impl.clearFileSystem();
-        String appHome = impl.getAppHomePath();
-        impl.mkdir(appHome);
+        implementation.clearFileSystem();
+        String appHome = implementation.getAppHomePath();
+        implementation.mkdir(appHome);
 
         Form hi = new Form("Hi World", new BorderLayout());
 
@@ -51,18 +50,18 @@ public class ListFilesSampleTest extends UITestBase {
         hi.show();
         waitForFormTitle("Hi World");
 
-        impl.tapComponent(add);
-        assertTrue(impl.exists(appHome + "NewDir"), "Directory NewDir should exist");
-        assertTrue(impl.isDirectory(appHome + "NewDir"), "NewDir should be a directory");
+        tapComponent(add);
+        assertTrue(implementation.exists(appHome + "NewDir"), "Directory NewDir should exist");
+        assertTrue(implementation.isDirectory(appHome + "NewDir"), "NewDir should be a directory");
 
-        impl.tapComponent(refresh);
+        tapComponent(refresh);
         assertTrue(listing.getText().contains("NewDir"), "Listing should contain NewDir");
 
-        impl.tapComponent(rename);
-        assertFalse(impl.exists(appHome + "NewDir"), "Old directory should not exist");
-        assertTrue(impl.exists(appHome + "RenamedDir"), "Renamed directory should exist");
+        tapComponent(rename);
+        assertFalse(implementation.exists(appHome + "NewDir"), "Old directory should not exist");
+        assertTrue(implementation.exists(appHome + "RenamedDir"), "Renamed directory should exist");
 
-        impl.tapComponent(refresh);
+        tapComponent(refresh);
         assertTrue(listing.getText().contains("RenamedDir"), "Listing should contain RenamedDir");
         assertFalse(listing.getText().contains("NewDir"), "Listing should not contain NewDir");
     }

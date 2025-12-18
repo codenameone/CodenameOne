@@ -5,6 +5,7 @@ import com.codename1.io.Util;
 import com.codename1.testing.SafeL10NManager;
 import com.codename1.testing.TestCodenameOneImplementation;
 import com.codename1.testing.TestUtils;
+import com.codename1.ui.Component;
 import com.codename1.ui.Display;
 import com.codename1.ui.DisplayTest;
 import com.codename1.ui.plaf.UIManager;
@@ -125,5 +126,10 @@ public abstract class UITestBase {
      */
     protected void flushSerialCalls() {
         DisplayTest.flushEdt();
+    }
+
+    protected void tapComponent(Component c) {
+        implementation.tapComponent(c);
+        flushSerialCalls();
     }
 }

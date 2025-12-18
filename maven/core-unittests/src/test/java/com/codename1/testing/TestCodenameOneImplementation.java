@@ -198,6 +198,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private final Map<String, String[]> sslCertificatesByUrl = new ConcurrentHashMap<String, String[]>();
     private boolean sslCertificatesSupported;
     private final Map<String, MockResponse> mockResponses = new ConcurrentHashMap<String, MockResponse>();
+    private Boolean hasDragStarted;
 
     @Override
     public String toString() {
@@ -1016,6 +1017,7 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         browserExecuted.clear();
         browserUrls.clear();
         mediaAsync = null;
+        hasDragStarted = null;
         backgroundMediaAsync = null;
         backgroundMedia = null;
         media = null;
@@ -1618,27 +1620,32 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         sendPointerEventToCurrentForm(false, x, y);
     }
 
+    @Override
+    protected boolean hasDragStarted(int x, int y) {
+        if(hasDragStarted != null) {
+            return hasDragStarted;
+        }
+        return super.hasDragStarted(x, y);
+    }
+
+    public void setHasDragStarted(boolean b) {
+        hasDragStarted = b;
+    }
+
     public void dispatchPointerDrag(final int x, final int y) {
         final Display display = Display.getInstance();
-        if (display == null) {
-            return;
-        }
+        assertNotNull(display);
 
-        Runnable r = new Runnable() {
-            public void run() {
-                Form current = display.getCurrent();
-                if (current == null) {
-                    return;
-                }
-
-                current.pointerDragged(x, y);
-            }
+        Runnable r = () -> {
+            Form current = display.getCurrent();
+            assertNotNull(current);
+            current.pointerDragged(x, y);
         };
 
         if (display.isEdt()) {
             r.run();
         } else {
-            display.callSeriallyAndWait(r);
+            display.callSerially(r);
         }
     }
 
@@ -1671,58 +1678,36 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     }
 
     public void pressComponent(Component component) {
-        if (component == null) {
-            return;
-        }
+        assertNotNull(component);
         int x = component.getAbsoluteX() + component.getWidth() / 2;
         int y = component.getAbsoluteY() + component.getHeight() / 2;
         dispatchPointerPress(x, y);
     }
 
     public void releaseComponent(Component component) {
-        if (component == null) {
-            return;
-        }
+        assertNotNull(component);
         int x = component.getAbsoluteX() + component.getWidth() / 2;
         int y = component.getAbsoluteY() + component.getHeight() / 2;
         dispatchPointerRelease(x, y);
     }
 
     public void tapComponent(Component component) {
-        if (component == null) {
-            return;
-        }
+        assertNotNull(component);
         int x = component.getAbsoluteX() + component.getWidth() / 2;
         int y = component.getAbsoluteY() + component.getHeight() / 2;
         dispatchPointerPressAndRelease(x, y);
     }
 
     private void sendPointerEventToCurrentForm(final boolean pressed, final int x, final int y) {
-        final Display display = Display.getInstance();
-        assertNotNull(display);
-
-        Runnable r = () -> {
-            Form current = display.getCurrent();
-            assertNotNull(current);
-
-            if (pressed) {
-                super.pointerPressed(x, y);
-            } else {
-                super.pointerReleased(x, y);
-            }
-        };
-
-        if (display.isEdt()) {
-            r.run();
+        if (pressed) {
+            super.pointerPressed(x, y);
         } else {
-            display.callSeriallyAndWait(r);
+            super.pointerReleased(x, y);
         }
     }
 
     public void tapListRow(com.codename1.ui.List list, int rowIndex) {
-        if (list == null) {
-            return;
-        }
+        assertNotNull(list);
         int visibleRows = Math.min(Math.max(1, list.getMinElementHeight()), list.getModel().getSize());
         int rowHeight = list.getHeight() / visibleRows;
         int x = list.getAbsoluteX() + list.getWidth() / 2;

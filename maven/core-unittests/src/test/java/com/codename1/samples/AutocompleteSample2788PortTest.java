@@ -66,23 +66,4 @@ class AutocompleteSample2788PortTest extends UITestBase {
         }
         return null;
     }
-
-    private void tapComponent(Component component) {
-        ensureSized(component);
-        int x = component.getAbsoluteX() + component.getWidth() / 2;
-        int y = component.getAbsoluteY() + component.getHeight() / 2;
-        implementation.dispatchPointerPressAndRelease(x, y);
-        flushSerialCalls();
-    }
-
-    private void ensureSized(Component component) {
-        Form parentForm = component.getComponentForm();
-        for (int i = 0; i < 5 && (component.getWidth() <= 0 || component.getHeight() <= 0); i++) {
-            if (parentForm != null) {
-                parentForm.revalidate();
-            }
-            DisplayTest.flushEdt();
-            flushSerialCalls();
-        }
-    }
 }

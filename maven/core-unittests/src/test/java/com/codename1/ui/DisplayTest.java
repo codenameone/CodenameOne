@@ -13,6 +13,10 @@ public class DisplayTest extends UITestBase {
         RunnableWrapper.setMaxThreadCount(100);
     }
 
+    public static void flushAnimations() {
+        CN.getCurrentForm().getAnimationManager().flush();
+    }
+
     public static void flushEdt() {
         final Display display = Display.getInstance();
         if (display.isEdt()) {

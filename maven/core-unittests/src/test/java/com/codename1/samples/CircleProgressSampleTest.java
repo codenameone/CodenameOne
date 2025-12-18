@@ -40,10 +40,9 @@ class CircleProgressSampleTest extends UITestBase {
         flushSerialCalls();
 
         ensureSized(showDetails, launcher);
-        implementation.tapComponent(showDetails);
+        tapComponent(showDetails);
         flushSerialCalls();
         DisplayTest.flushEdt();
-        flushSerialCalls();
 
         assertNotNull(detailsHolder[0]);
         assertSame(detailsHolder[0], Display.getInstance().getCurrent());

@@ -61,7 +61,7 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         field.setMinimumLength(0);
         form.show();
         flushSerialCalls();
-        implementation.tapComponent(field);
+        tapComponent(field);
         flushSerialCalls();
 
         implementation.dispatchKeyPress('a');
@@ -200,7 +200,7 @@ public class AutoCompleteTextComponentTest extends UITestBase {
         field.setMinimumLength(2);
         form.revalidate();
         flushSerialCalls();
-        implementation.tapComponent(field);
+        tapComponent(field);
         flushSerialCalls();
 
         implementation.dispatchKeyPress('r');

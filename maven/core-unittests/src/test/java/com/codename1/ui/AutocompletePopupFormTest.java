@@ -37,10 +37,7 @@ class AutocompletePopupFormTest extends UITestBase {
         Container popup = (Container) popupWrapper.getComponentAt(0);
         assertFalse(popup.isVisible(), "Popup should be hidden initially");
 
-        implementation.tapComponent(open);
-        DisplayTest.flushEdt();
-        flushSerialCalls();
-        DisplayTest.flushEdt();
+        tapComponent(open);
 
         assertTrue(popup.isVisible(), "Popup should become visible after triggering showPopup");
         com.codename1.ui.List suggestionList = (com.codename1.ui.List) popup.getComponentAt(0);

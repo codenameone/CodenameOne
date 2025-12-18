@@ -25,8 +25,7 @@ public class SendMessageSample2756Test extends UITestBase {
         hi.show();
 
         // Simulate button click
-        implementation.pressComponent(b);
-        implementation.releaseComponent(b);
+        tapComponent(b);
 
         String[] recipients = implementation.getLastSentMessageRecipients();
         Assertions.assertNotNull(recipients, "Recipients should not be null");

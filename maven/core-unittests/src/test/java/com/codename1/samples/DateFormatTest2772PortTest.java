@@ -32,7 +32,7 @@ class DateFormatTest2772PortTest extends UITestBase {
         form.show();
         ensureSized(showDate, form);
 
-        implementation.tapComponent(showDate);
+        tapComponent(showDate);
         flushSerialCalls();
         DisplayTest.flushEdt();
         flushSerialCalls();
