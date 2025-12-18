@@ -75,7 +75,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        jdk: ['current', '11', '17', '21', '25']
+        jdk: ['Default: 8', '17', '21']
     permissions:
       contents: read
       pull-requests: write
@@ -87,16 +87,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Setup JDK
-        if: matrix.jdk != 'current'
+        if: matrix.jdk != 'Default: 8'
         uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.jdk }}
           distribution: 'zulu'
       - name: Set JDK_HOME
-        if: matrix.jdk != 'current'
+        if: matrix.jdk != 'Default: 8'
         run: echo "JDK_HOME=${JAVA_HOME}" >> $GITHUB_ENV
       - name: Configure CN1SS options
-        if: matrix.jdk != 'current'
+        if: matrix.jdk != 'Default: 8'
         run: |
           echo "CN1SS_SKIP_COMMENT=1" >> $GITHUB_ENV
           echo "CN1SS_FAIL_ON_MISMATCH=1" >> $GITHUB_ENV
@@ -120,9 +120,11 @@ jobs:
           target: google_apis
           script: |
             ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
-            ./scripts/generate-android-coverage-report.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
+            if [ "${{ matrix.jdk }}" == "Default: 8" ]; then
+              ./scripts/generate-android-coverage-report.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
+            fi
       - name: Upload emulator screenshot
-        if: always()   # still collect it if tests fail
+        if: always() && matrix.jdk == 'Default: 8'
         uses: actions/upload-artifact@v4
         with:
           name: emulator-screenshot
@@ -131,7 +133,7 @@ jobs:
           retention-days: 14
           compression-level: 6
       - name: Upload Android Jacoco coverage report
-        if: always()
+        if: always() && matrix.jdk == 'Default: 8'
         uses: actions/upload-artifact@v4
         with:
           name: android-jacoco-coverage
