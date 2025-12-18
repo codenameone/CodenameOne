@@ -76,6 +76,11 @@ jobs:
           java-version: '8'
           cache: 'maven'
 
+      - name: Build CodenameOne Core
+        run: mvn -B -f maven/pom.xml install -pl core -am -DskipTests -P !download-cn1-binaries,!install-cn1 -Dcn1.binaries=/tmp/dummy
+        env:
+          JDK_8_HOME: ${{ env.JDK_8_HOME }}
+
       - name: Run ParparVM JVM tests
         working-directory: vm
         run: mvn -B clean package -pl JavaAPI -am -DskipTests && mvn -B test -pl tests -am -DexcludedGroups=benchmark

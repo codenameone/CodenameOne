@@ -37,9 +37,26 @@ public class HeavyLoadBenchmarkTest {
         if (!Files.exists(javaApiJar)) {
             javaApiJar = Paths.get("vm", "JavaAPI", "dist", "JavaAPI.jar").normalize().toAbsolutePath();
         }
+        // Locate CodenameOne Core jar
+        Path coreJar = Paths.get("..", "..", "maven", "core", "target", "codenameone-core-8.0-SNAPSHOT.jar").normalize().toAbsolutePath();
+        if (!Files.exists(coreJar)) {
+             coreJar = Paths.get("..", "maven", "core", "target", "codenameone-core-8.0-SNAPSHOT.jar").normalize().toAbsolutePath();
+        }
+        if (!Files.exists(coreJar)) {
+             // Try assuming we are in root
+             coreJar = Paths.get("maven", "core", "target", "codenameone-core-8.0-SNAPSHOT.jar").normalize().toAbsolutePath();
+        }
 
-        // Ensure JavaAPI jar exists
-        Assertions.assertTrue(Files.exists(javaApiJar), "JavaAPI.jar not found at " + javaApiJar + ". Make sure to build JavaAPI first.");
+        // Ensure jars exist
+        Assertions.assertTrue(Files.exists(javaApiJar), "JavaAPI.jar not found at " + javaApiJar);
+        // Note: Core jar is optional if not built, but for heavy load we prefer it.
+        // If missing, we proceed with just JavaAPI but warn.
+        boolean hasCore = Files.exists(coreJar);
+        if (!hasCore) {
+            System.out.println("WARNING: CodenameOne Core jar not found. Benchmark will be lighter.");
+        } else {
+            System.out.println("Found CodenameOne Core jar: " + coreJar);
+        }
 
         Path outputDir = tempDir.resolve("benchmark-output");
         Path srcDir = tempDir.resolve("benchmark-src");
@@ -49,9 +66,12 @@ public class HeavyLoadBenchmarkTest {
         Files.createDirectories(srcDir);
         Files.createDirectories(classesDir);
 
-        // Scan JavaAPI for public classes to generate a heavy load
+        // Scan jars for public classes
         List<String> publicClasses = scanPublicClasses(javaApiJar);
-        System.out.println("Found " + publicClasses.size() + " public classes in JavaAPI.");
+        if (hasCore) {
+            publicClasses.addAll(scanPublicClasses(coreJar));
+        }
+        System.out.println("Found " + publicClasses.size() + " public classes total.");
 
         // Create a heavy main class that references these classes
         Path pkgDir = srcDir.resolve("com").resolve("benchmark");
@@ -93,11 +113,18 @@ public class HeavyLoadBenchmarkTest {
 
         // Compile the benchmark main
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-        int result = compiler.run(null, null, null, "-cp", javaApiJar.toString(), "-d", classesDir.toString(), javaFile.toString());
+        String cp = javaApiJar.toString();
+        if (hasCore) {
+            cp += File.pathSeparator + coreJar.toString();
+        }
+        int result = compiler.run(null, null, null, "-cp", cp, "-d", classesDir.toString(), javaFile.toString());
         Assertions.assertEquals(0, result, "Compilation of BenchmarkMain failed");
 
-        // Unzip JavaAPI into classesDir to avoid Jar scanning issues and ensure heavy load
+        // Unzip jars into classesDir to avoid Jar scanning issues and ensure heavy load
         unzip(javaApiJar, classesDir);
+        if (hasCore) {
+            unzip(coreJar, classesDir);
+        }
 
         SimpleProfiler profiler = new SimpleProfiler(Thread.currentThread());
         profiler.start();
