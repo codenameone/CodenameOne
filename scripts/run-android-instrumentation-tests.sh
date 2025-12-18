@@ -142,15 +142,19 @@ done
 
 sleep 3
 
-ra_log "STAGE:COVERAGE -> Collecting Jacoco coverage report"
-if ARTIFACTS_DIR="$ARTIFACTS_DIR" "$SCRIPT_DIR/generate-android-coverage-report.sh" "$GRADLE_PROJECT_DIR"; then
-  if [ -f "$COVERAGE_SUMMARY" ]; then
-    ra_log "  -> Coverage summary detected at $COVERAGE_SUMMARY"
-  else
-    ra_log "  -> Coverage summary not found after report generation"
-  fi
+if [ "${CN1SS_SKIP_COVERAGE:-0}" = "1" ]; then
+  ra_log "Skipping coverage report generation (CN1SS_SKIP_COVERAGE=1)"
 else
-  ra_log "WARNING: Coverage report generation failed; continuing without coverage details"
+  ra_log "STAGE:COVERAGE -> Collecting Jacoco coverage report"
+  if ARTIFACTS_DIR="$ARTIFACTS_DIR" "$SCRIPT_DIR/generate-android-coverage-report.sh" "$GRADLE_PROJECT_DIR"; then
+    if [ -f "$COVERAGE_SUMMARY" ]; then
+      ra_log "  -> Coverage summary detected at $COVERAGE_SUMMARY"
+    else
+      ra_log "  -> Coverage summary not found after report generation"
+    fi
+  else
+    ra_log "WARNING: Coverage report generation failed; continuing without coverage details"
+  fi
 fi
 
 declare -a CN1SS_SOURCES=("LOGCAT:$TEST_LOG")
