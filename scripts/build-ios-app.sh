@@ -120,27 +120,44 @@ for candidate in "$PROJECT_DIR"/*.xcworkspace; do
     break
   fi
 done
-if [ -z "$WORKSPACE" ]; then
-  bia_log "Failed to locate xcworkspace in $PROJECT_DIR" >&2
-  ls "$PROJECT_DIR" >&2 || true
-  exit 1
+
+if [ -n "$WORKSPACE" ]; then
+  bia_log "Found xcworkspace: $WORKSPACE"
+  PROJECT_ARG="-workspace \"$WORKSPACE\""
+  OUTPUT_PATH="$WORKSPACE"
+else
+  bia_log "No xcworkspace found; looking for xcodeproj"
+  PROJECT=""
+  for candidate in "$PROJECT_DIR"/*.xcodeproj; do
+    if [ -d "$candidate" ]; then
+      PROJECT="$candidate"
+      break
+    fi
+  done
+  if [ -z "$PROJECT" ]; then
+    bia_log "Failed to locate xcworkspace or xcodeproj in $PROJECT_DIR" >&2
+    ls "$PROJECT_DIR" >&2 || true
+    exit 1
+  fi
+  bia_log "Found xcodeproj: $PROJECT"
+  PROJECT_ARG="-project \"$PROJECT\""
+  OUTPUT_PATH="$PROJECT"
 fi
-bia_log "Found xcworkspace: $WORKSPACE"
 
 
 # Make these visible to the next GH Actions step
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
   {
-    echo "workspace=$WORKSPACE"
+    echo "workspace=$OUTPUT_PATH"
     echo "scheme=HelloCodenameOne"
   } >> "$GITHUB_OUTPUT"
 fi
 
-bia_log "Emitted outputs -> workspace=$WORKSPACE, scheme=HelloCodenameOne"
+bia_log "Emitted outputs -> workspace=$OUTPUT_PATH, scheme=HelloCodenameOne"
 
 # (Optional) dump xcodebuild -list for debugging
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-$REPO_ROOT/artifacts}"
 mkdir -p "$ARTIFACTS_DIR"
-xcodebuild -workspace "$WORKSPACE" -list > "$ARTIFACTS_DIR/xcodebuild-list.txt" 2>&1 || true
+eval xcodebuild $PROJECT_ARG -list > "$ARTIFACTS_DIR/xcodebuild-list.txt" 2>&1 || true
 
 exit 0

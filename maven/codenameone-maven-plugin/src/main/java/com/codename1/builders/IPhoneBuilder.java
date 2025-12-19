@@ -305,10 +305,12 @@ public class IPhoneBuilder extends Executor {
             iosPods += (((iosPods.length() > 0) ? ",":"") + "FBSDKCoreKit "+fbPodsVersion+",FBSDKLoginKit "+fbPodsVersion+",FBSDKShareKit "+fbPodsVersion);
         }
         
-        runPods = true;
-        
-        
         String googleAdUnitId = request.getArg("ios.googleAdUnitId", request.getArg("google.adUnitId", null));
+        runPods = (iosPods.length() > 0) ||
+                  (googleAdUnitId != null && googleAdUnitId.length() > 0) ||
+                  "true".equals(request.getArg("ios.useCocoapods", "false")) ||
+                  "true".equals(request.getArg("ios.pods.alwaysRun", "false"));
+
         boolean usePodsForGoogleAds = runPods && googleAdUnitId != null && googleAdUnitId.length() > 0;
         if (usePodsForGoogleAds) {
             iosPods += (((iosPods.length() > 0) ? ",":"") + "Firebase/Core,Firebase/AdMob");
@@ -1527,7 +1529,7 @@ public class IPhoneBuilder extends Executor {
 
             debug("Building using addLibs="+addLibs);
             try {
-                if (!exec(userDir, env, 420000, "java", "-DsaveUnitTests=" + isUnitTestMode(), "-DfieldNullChecks=" + fieldNullChecks, "-DINCLUDE_NPE_CHECKS=" + includeNullChecks, "-DbundleVersionNumber=" + bundleVersionNumber, "-Xmx384m",
+            if (!exec(userDir, env, 420000, "java", "-DsaveUnitTests=" + isUnitTestMode(), "-DfieldNullChecks=" + fieldNullChecks, "-DINCLUDE_NPE_CHECKS=" + includeNullChecks, "-DbundleVersionNumber=" + bundleVersionNumber, "-Xmx2048m",
                         "-jar", parparVMCompilerJar, "ios",
                         classesDir.getAbsolutePath() + ";" + resDir.getAbsolutePath() + ";" +
                                 buildinRes.getAbsolutePath(),
@@ -1810,9 +1812,12 @@ public class IPhoneBuilder extends Executor {
                         return false;
                     }
 
-                    if (!exec(new File(tmpFile, "dist"), podTimeout, pod, "init")) {
-                        log("Failed to run "+pod+" init.  Make sure you have Cocoapods installed.");
-                        return false;
+                    boolean skipPodInstall = "true".equals(request.getArg("ios.pods.skipInstall", "false"));
+                    if (!skipPodInstall) {
+                        if (!exec(new File(tmpFile, "dist"), podTimeout, pod, "init")) {
+                            log("Failed to run "+pod+" init.  Make sure you have Cocoapods installed.");
+                            return false;
+                        }
                     }
                     File podFile = new File(new File(tmpFile, "dist"), "Podfile");
                     if (!podFile.exists()) {
@@ -1909,23 +1914,25 @@ public class IPhoneBuilder extends Executor {
                     Map<String,String> podEnv = new HashMap<String,String>();
                     podEnv.put("LANG", "en_US.UTF-8");
 
-                    if (!exec(new File(tmpFile, "dist"), (File)null, podTimeout, podEnv, pod, "install")) {
-                        // Perhaps we need to update the master repo
-                        log("Failed to exec cocoapods.  Trying to update master repo...");
-                        if (!exec(new File(tmpFile, "dist"), podTimeout * 3, pod, "repo", "update")) {
-                            log("Failed to update cocoapods master repo.  Trying to clean up spec repos");
-                            if (!exec(new File(tmpFile, "dist"), podTimeout * 3, pod, "repo", "update")) {
-                                log("Failed to update cocoapods master repo event after cleaning spec repos.");
-                                return false;
-                            }
-                        }
-
+                    if (!skipPodInstall) {
                         if (!exec(new File(tmpFile, "dist"), (File)null, podTimeout, podEnv,pod, "install")) {
-                            log("Cocoapods failed even after updating master repo");
-                            log("Trying to cleanup spec repos");
+                            // Perhaps we need to update the master repo
+                            log("Failed to exec cocoapods.  Trying to update master repo...");
+                            if (!exec(new File(tmpFile, "dist"), podTimeout * 3, pod, "repo", "update")) {
+                                log("Failed to update cocoapods master repo.  Trying to clean up spec repos");
+                                if (!exec(new File(tmpFile, "dist"), podTimeout * 3, pod, "repo", "update")) {
+                                    log("Failed to update cocoapods master repo event after cleaning spec repos.");
+                                    return false;
+                                }
+                            }
+
                             if (!exec(new File(tmpFile, "dist"), (File)null, podTimeout, podEnv,pod, "install")) {
-                                log("Cocoapods failed even after cleaning up spec repos.");
-                                return false;
+                                log("Cocoapods failed even after updating master repo");
+                                log("Trying to cleanup spec repos");
+                                if (!exec(new File(tmpFile, "dist"), (File)null, podTimeout, podEnv,pod, "install")) {
+                                    log("Cocoapods failed even after cleaning up spec repos.");
+                                    return false;
+                                }
                             }
                         }
                     }

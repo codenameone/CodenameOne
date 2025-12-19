@@ -82,7 +82,7 @@ if [ -z "$REQUESTED_SCHEME" ]; then
   if [[ "$WORKSPACE_PATH" == *.xcworkspace ]]; then
     REQUESTED_SCHEME="$(basename "$WORKSPACE_PATH" .xcworkspace)"
   else
-    REQUESTED_SCHEME="$(basename "$WORKSPACE_PATH")"
+    REQUESTED_SCHEME="$(basename "$WORKSPACE_PATH" .xcodeproj)"
   fi
 fi
 SCHEME="$REQUESTED_SCHEME"
@@ -97,8 +97,17 @@ mkdir -p "$SCREENSHOT_RAW_DIR" "$SCREENSHOT_PREVIEW_DIR"
 export CN1SS_OUTPUT_DIR="$SCREENSHOT_RAW_DIR"
 export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 
+# Determine build argument (workspace vs project)
+if [[ "$WORKSPACE_PATH" == *.xcodeproj ]]; then
+  BUILD_ARG="-project \"$WORKSPACE_PATH\""
+  # For project files, shared schemes are inside the .xcodeproj directory
+  SCHEME_FILE="$WORKSPACE_PATH/xcshareddata/xcschemes/$SCHEME.xcscheme"
+else
+  BUILD_ARG="-workspace \"$WORKSPACE_PATH\""
+  SCHEME_FILE="$WORKSPACE_PATH/xcshareddata/xcschemes/$SCHEME.xcscheme"
+fi
+
 # Patch scheme env vars to point to our runtime dirs
-SCHEME_FILE="$WORKSPACE_PATH/xcshareddata/xcschemes/$SCHEME.xcscheme"
 if [ -f "$SCHEME_FILE" ]; then
   if sed --version >/dev/null 2>&1; then
     # GNU sed
@@ -163,7 +172,7 @@ normalize_destination() {
 auto_select_destination() {
   local show_dest rc=0 best_line="" best_key="" line payload platform id name os priority key part value
   set +e
-  show_dest="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations 2>/dev/null)"
+  show_dest="$(eval xcodebuild $BUILD_ARG -scheme "$SCHEME" -sdk iphonesimulator -showdestinations 2>/dev/null)"
   rc=$?
   set -e
 
@@ -347,8 +356,8 @@ BUILD_LOG="$ARTIFACTS_DIR/xcodebuild-build.log"
 
 ri_log "Building simulator app with xcodebuild"
 COMPILE_START=$(date +%s)
-if ! xcodebuild \
-  -workspace "$WORKSPACE_PATH" \
+if ! eval xcodebuild \
+  $BUILD_ARG \
   -scheme "$SCHEME" \
   -sdk iphonesimulator \
   -configuration Debug \
@@ -363,7 +372,7 @@ COMPILE_END=$(date +%s)
 COMPILATION_TIME=$((COMPILE_END - COMPILE_START))
 ri_log "Compilation time: ${COMPILATION_TIME}s"
 
-BUILD_SETTINGS="$(xcodebuild -workspace "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -configuration Debug -showBuildSettings 2>/dev/null || true)"
+BUILD_SETTINGS="$(eval xcodebuild $BUILD_ARG -scheme "$SCHEME" -sdk iphonesimulator -configuration Debug -showBuildSettings 2>/dev/null || true)"
 TARGET_BUILD_DIR="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ TARGET_BUILD_DIR /{print $2; exit}')"
 WRAPPER_NAME="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ WRAPPER_NAME /{print $2; exit}')"
 if [ -z "$WRAPPER_NAME" ]; then
