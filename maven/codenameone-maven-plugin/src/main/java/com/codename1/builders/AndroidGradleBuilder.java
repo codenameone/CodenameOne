@@ -577,7 +577,13 @@ public class AndroidGradleBuilder extends Executor {
         if (!androidSDKDir.exists()) {
             throw new BuildException("Cannot find Android SDK at "+androidHome+".  Please install Android studio, or set the ANDROID_HOME environment variable to point to your android sdk directory.");
         }
-        if (!androidSDKDir.getName().equalsIgnoreCase("sdk")) {
+
+        boolean looksLikeSdk = new File(androidSDKDir, "platform-tools").exists() ||
+                               new File(androidSDKDir, "build-tools").exists() ||
+                               new File(androidSDKDir, "cmdline-tools").exists() ||
+                               new File(androidSDKDir, "platforms").exists();
+
+        if (!looksLikeSdk && !androidSDKDir.getName().equalsIgnoreCase("sdk")) {
             androidSDKDir = new File(androidSDKDir, "Sdk");
             if (!androidSDKDir.isDirectory()) {
                 androidSDKDir = new File(androidSDKDir.getParentFile(), "sdk");
