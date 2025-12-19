@@ -1527,7 +1527,7 @@ public class IPhoneBuilder extends Executor {
 
             debug("Building using addLibs="+addLibs);
             try {
-                if (!exec(userDir, env, 420000, "java", "-DsaveUnitTests=" + isUnitTestMode(), "-DfieldNullChecks=" + fieldNullChecks, "-DINCLUDE_NPE_CHECKS=" + includeNullChecks, "-DbundleVersionNumber=" + bundleVersionNumber, "-Xmx384m",
+                if (!exec(userDir, env, 420000, "java", "-DsaveUnitTests=" + isUnitTestMode(), "-DfieldNullChecks=" + fieldNullChecks, "-DINCLUDE_NPE_CHECKS=" + includeNullChecks, "-DbundleVersionNumber=" + bundleVersionNumber, "-Xmx2048m",
                         "-jar", parparVMCompilerJar, "ios",
                         classesDir.getAbsolutePath() + ";" + resDir.getAbsolutePath() + ";" +
                                 buildinRes.getAbsolutePath(),
