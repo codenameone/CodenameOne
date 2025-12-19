@@ -40,6 +40,9 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/codenameone/codenameone/ci-container:latest
+    defaults:
+      run:
+        shell: bash
 
     steps:
     - uses: actions/checkout@v1
