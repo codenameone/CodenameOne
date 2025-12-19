@@ -99,11 +99,11 @@ export CN1SS_PREVIEW_DIR="$SCREENSHOT_PREVIEW_DIR"
 
 # Determine build argument (workspace vs project)
 if [[ "$WORKSPACE_PATH" == *.xcodeproj ]]; then
-  BUILD_ARG="-project \"$WORKSPACE_PATH\""
+  BUILD_TYPE_FLAG="-project"
   # For project files, shared schemes are inside the .xcodeproj directory
   SCHEME_FILE="$WORKSPACE_PATH/xcshareddata/xcschemes/$SCHEME.xcscheme"
 else
-  BUILD_ARG="-workspace \"$WORKSPACE_PATH\""
+  BUILD_TYPE_FLAG="-workspace"
   SCHEME_FILE="$WORKSPACE_PATH/xcshareddata/xcschemes/$SCHEME.xcscheme"
 fi
 
@@ -172,7 +172,7 @@ normalize_destination() {
 auto_select_destination() {
   local show_dest rc=0 best_line="" best_key="" line payload platform id name os priority key part value
   set +e
-  show_dest="$(eval xcodebuild $BUILD_ARG -scheme "$SCHEME" -sdk iphonesimulator -showdestinations 2>/dev/null)"
+  show_dest="$(xcodebuild "$BUILD_TYPE_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -showdestinations 2>/dev/null)"
   rc=$?
   set -e
 
@@ -356,8 +356,8 @@ BUILD_LOG="$ARTIFACTS_DIR/xcodebuild-build.log"
 
 ri_log "Building simulator app with xcodebuild"
 COMPILE_START=$(date +%s)
-if ! eval xcodebuild \
-  $BUILD_ARG \
+if ! xcodebuild \
+  "$BUILD_TYPE_FLAG" "$WORKSPACE_PATH" \
   -scheme "$SCHEME" \
   -sdk iphonesimulator \
   -configuration Debug \
@@ -372,7 +372,7 @@ COMPILE_END=$(date +%s)
 COMPILATION_TIME=$((COMPILE_END - COMPILE_START))
 ri_log "Compilation time: ${COMPILATION_TIME}s"
 
-BUILD_SETTINGS="$(eval xcodebuild $BUILD_ARG -scheme "$SCHEME" -sdk iphonesimulator -configuration Debug -showBuildSettings 2>/dev/null || true)"
+BUILD_SETTINGS="$(xcodebuild "$BUILD_TYPE_FLAG" "$WORKSPACE_PATH" -scheme "$SCHEME" -sdk iphonesimulator -configuration Debug -showBuildSettings 2>/dev/null || true)"
 TARGET_BUILD_DIR="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ TARGET_BUILD_DIR /{print $2; exit}')"
 WRAPPER_NAME="$(printf '%s\n' "$BUILD_SETTINGS" | awk -F' = ' '/ WRAPPER_NAME /{print $2; exit}')"
 if [ -z "$WRAPPER_NAME" ]; then

@@ -123,7 +123,7 @@ done
 
 if [ -n "$WORKSPACE" ]; then
   bia_log "Found xcworkspace: $WORKSPACE"
-  PROJECT_ARG="-workspace \"$WORKSPACE\""
+  BUILD_TYPE_FLAG="-workspace"
   OUTPUT_PATH="$WORKSPACE"
 else
   bia_log "No xcworkspace found; looking for xcodeproj"
@@ -140,7 +140,7 @@ else
     exit 1
   fi
   bia_log "Found xcodeproj: $PROJECT"
-  PROJECT_ARG="-project \"$PROJECT\""
+  BUILD_TYPE_FLAG="-project"
   OUTPUT_PATH="$PROJECT"
 fi
 
@@ -158,6 +158,6 @@ bia_log "Emitted outputs -> workspace=$OUTPUT_PATH, scheme=HelloCodenameOne"
 # (Optional) dump xcodebuild -list for debugging
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-$REPO_ROOT/artifacts}"
 mkdir -p "$ARTIFACTS_DIR"
-eval xcodebuild $PROJECT_ARG -list > "$ARTIFACTS_DIR/xcodebuild-list.txt" 2>&1 || true
+xcodebuild "$BUILD_TYPE_FLAG" "$OUTPUT_PATH" -list > "$ARTIFACTS_DIR/xcodebuild-list.txt" 2>&1 || true
 
 exit 0
