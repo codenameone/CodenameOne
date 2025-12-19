@@ -65,8 +65,12 @@ jobs:
           ${{ runner.os }}-m2
     - name: Run Unit Tests
       run: |
+        MVN_ARGS=""
+        if [ "${{ matrix.java-version }}" != "8" ]; then
+          MVN_ARGS="-Dspotbugs.skip=true"
+        fi
         cd maven
-        mvn clean verify -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true -Plocal-dev-javase
+        mvn clean verify -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true -Plocal-dev-javase $MVN_ARGS
         cd ..
     - name: Prepare Codename One binaries for Maven plugin tests
       run: |
