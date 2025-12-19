@@ -859,7 +859,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                 Object v = properties[iter].get();
                 if (v != null) {
                     int b = v.hashCode();
-                    value = 31 * value + (b ^ (b >>> 32));
+                    value = 31 * value + b;
                 }
             }
         }
