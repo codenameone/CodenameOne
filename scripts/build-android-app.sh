@@ -131,7 +131,7 @@ if [ ! -f "$PATCH_GRADLE_SOURCE_PATH/$PATCH_GRADLE_MAIN_CLASS.java" ]; then
   exit 1
 fi
 
-PATCH_GRADLE_JAVA="${JDK_HOME:-$JAVA17_HOME}/bin/java"
+PATCH_GRADLE_JAVA="${JAVA17_HOME:-${JDK_HOME:-$JAVA_HOME}}/bin/java"
 if [ ! -x "$PATCH_GRADLE_JAVA" ]; then
   ba_log "JDK java binary missing at $PATCH_GRADLE_JAVA" >&2
   exit 1
