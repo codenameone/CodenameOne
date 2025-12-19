@@ -19,6 +19,8 @@ RUN apt-get update && apt-get install -y \
     libxxf86vm1 \
     ant \
     maven \
+    libncurses5 \
+    libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 
 # Setup Azul Repo
@@ -44,14 +46,9 @@ RUN mkdir -p /usr/lib/jvm/zulu8-fx && \
 # Clone cn1-binaries
 RUN git clone --depth=1 https://github.com/codenameone/cn1-binaries /opt/cn1-binaries
 
-# Set Environment Variables
-ENV JAVA_HOME=/usr/lib/jvm/zulu8-fx
-ENV PATH=$JAVA_HOME/bin:$PATH
-
+# Set Environment Variables for JDKs (Paths for apt installed JDKs usually symlinked to /usr/lib/jvm/zulu-XX-amd64)
 ENV JAVA8_HOME=/usr/lib/jvm/zulu8-fx
 ENV JDK8_HOME=/usr/lib/jvm/zulu8-fx
-
-# Paths for apt installed JDKs (usually symlinked to /usr/lib/jvm/zulu-XX-amd64)
 ENV JAVA11_HOME=/usr/lib/jvm/zulu-11-amd64
 ENV JDK11_HOME=/usr/lib/jvm/zulu-11-amd64
 ENV JAVA17_HOME=/usr/lib/jvm/zulu-17-amd64
@@ -60,6 +57,28 @@ ENV JAVA21_HOME=/usr/lib/jvm/zulu-21-amd64
 ENV JDK21_HOME=/usr/lib/jvm/zulu-21-amd64
 ENV JAVA25_HOME=/usr/lib/jvm/zulu-25-amd64
 ENV JDK25_HOME=/usr/lib/jvm/zulu-25-amd64
+
+# Install Android SDK
+ENV ANDROID_HOME=/opt/android-sdk
+ENV ANDROID_SDK_ROOT=/opt/android-sdk
+ENV CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+
+RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
+    wget -q ${CMDLINE_TOOLS_URL} -O /tmp/cmdline-tools.zip && \
+    unzip -q /tmp/cmdline-tools.zip -d ${ANDROID_HOME}/cmdline-tools && \
+    mv ${ANDROID_HOME}/cmdline-tools/cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest && \
+    rm /tmp/cmdline-tools.zip
+
+ENV PATH=${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/emulator:${PATH}
+
+# Accept licenses and install packages
+# Note: sdkmanager requires Java 11+ to run. We use JAVA17_HOME for this step.
+RUN yes | JAVA_HOME=${JAVA17_HOME} sdkmanager --licenses && \
+    JAVA_HOME=${JAVA17_HOME} sdkmanager "platform-tools" "platforms;android-31" "build-tools;31.0.0"
+
+# Set Default JAVA_HOME to Java 8 (as per user requirement for builds)
+ENV JAVA_HOME=/usr/lib/jvm/zulu8-fx
+ENV PATH=$JAVA_HOME/bin:$PATH
 
 ENV CN1_BINARIES=/opt/cn1-binaries
 
@@ -71,4 +90,5 @@ RUN java -version && \
     $JAVA25_HOME/bin/java -version && \
     ant -version && \
     mvn -version && \
-    python3 --version
+    python3 --version && \
+    JAVA_HOME=${JAVA17_HOME} sdkmanager --version
