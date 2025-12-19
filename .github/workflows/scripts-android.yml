@@ -90,27 +90,31 @@ jobs:
       pull-requests: write
       issues: write
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/codenameone/codenameone/ci-container:latest
+      # We need privileged for KVM access for emulator
+      options: --privileged --user root
+    defaults:
+      run:
+        shell: bash
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
-      - name: Free Disk Space
+
+      - name: Configure Java Selection
         if: matrix.id != 'default'
         run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android/sdk/ndk
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /usr/share/swift
-      - name: Setup JDK
-        if: matrix.id != 'default'
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ matrix.java_version }}
-          distribution: 'zulu'
-      - name: Set JDK_HOME
-        if: matrix.id != 'default'
-        run: echo "JDK_HOME=${JAVA_HOME}" >> $GITHUB_ENV
+          # Map matrix.java_version to container env vars
+          if [ "${{ matrix.java_version }}" == "17" ]; then
+            echo "JDK_HOME=$JAVA17_HOME" >> $GITHUB_ENV
+            echo "JAVA_HOME=$JAVA17_HOME" >> $GITHUB_ENV
+          elif [ "${{ matrix.java_version }}" == "21" ]; then
+            echo "JDK_HOME=$JAVA21_HOME" >> $GITHUB_ENV
+            echo "JAVA_HOME=$JAVA21_HOME" >> $GITHUB_ENV
+          fi
+
       - name: Configure CN1SS options
         if: matrix.id != 'default'
         run: |
@@ -118,17 +122,17 @@ jobs:
           echo "CN1SS_FAIL_ON_MISMATCH=1" >> $GITHUB_ENV
           echo "CN1SS_SKIP_COVERAGE=1" >> $GITHUB_ENV
       - name: Setup workspace
+        env:
+          CN1_SKIP_BINARIES_UPDATE: "1"
         run: ./scripts/setup-workspace.sh -q -DskipTests
       - name: Build Android port
         run: ./scripts/build-android-port.sh -q -DskipTests
       - name: Build Hello Codename One Android app
         id: build-android-app
         run: ./scripts/build-android-app.sh -q -DskipTests
-      - name: Enable KVM for Android emulator
+      - name: Check KVM
         run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm || true
       - name: Run Android instrumentation tests
         uses: reactivecircus/android-emulator-runner@v2
         with:

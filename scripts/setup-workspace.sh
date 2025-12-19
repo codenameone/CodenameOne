@@ -21,9 +21,12 @@ DOWNLOAD_DIR="${TMPDIR%/}/codenameone-tools"
 ENV_DIR="$DOWNLOAD_DIR/tools"
 mkdir -p "$DOWNLOAD_DIR"
 mkdir -p "$ENV_DIR"
+
 CN1_BINARIES_PARENT="$(cd .. && pwd -P)"
-CN1_BINARIES="${CN1_BINARIES_PARENT%/}/cn1-binaries"
-mkdir -p "$CN1_BINARIES_PARENT"
+if [ -z "${CN1_BINARIES:-}" ]; then
+  CN1_BINARIES="${CN1_BINARIES_PARENT%/}/cn1-binaries"
+fi
+mkdir -p "$(dirname "$CN1_BINARIES")"
 
 ENV_FILE="$ENV_DIR/env.sh"
 
@@ -185,7 +188,7 @@ PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 log "Preparing cn1-binaries checkout"
 if [ -d "$CN1_BINARIES/.git" ]; then
   log "Found existing cn1-binaries repository at $CN1_BINARIES"
-  if git -C "$CN1_BINARIES" remote get-url origin >/dev/null 2>&1; then
+  if [ "${CN1_SKIP_BINARIES_UPDATE:-0}" != "1" ] && git -C "$CN1_BINARIES" remote get-url origin >/dev/null 2>&1; then
     if git -C "$CN1_BINARIES" fetch --depth=1 origin; then
       remote_head=$(git -C "$CN1_BINARIES" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
       if [ -z "$remote_head" ]; then
