@@ -520,6 +520,7 @@ public class AndroidGradleBuilder extends Executor {
                 log("NOTICE: Enabling Java 8 source level for Gradle 8 build because RetroLambda is not supported on Java 17, which is required for gradle 8.");
                 useJava8SourceLevel = true;
             }
+            defaultEnvironment.put("JAVA_HOME", getGradleJavaHome());
         }
         if (newFirebaseMessaging && !useGradle8) {
             throw new BuildException("android.newFirebaseMessaging requires gradle version 8.1 or higher.  Please remove the android.gradleVersion build hint");
@@ -577,10 +578,21 @@ public class AndroidGradleBuilder extends Executor {
         if (!androidSDKDir.exists()) {
             throw new BuildException("Cannot find Android SDK at "+androidHome+".  Please install Android studio, or set the ANDROID_HOME environment variable to point to your android sdk directory.");
         }
-        if (!androidSDKDir.getName().equalsIgnoreCase("sdk")) {
-            androidSDKDir = new File(androidSDKDir, "Sdk");
-            if (!androidSDKDir.isDirectory()) {
-                androidSDKDir = new File(androidSDKDir.getParentFile(), "sdk");
+        // Check if this looks like an SDK directory
+        if (!new File(androidSDKDir, "cmdline-tools").exists() &&
+                !new File(androidSDKDir, "platform-tools").exists() &&
+                !new File(androidSDKDir, "build-tools").exists() &&
+                !new File(androidSDKDir, "tools").exists()) {
+            if (!androidSDKDir.getName().equalsIgnoreCase("sdk")) {
+                File childSdk = new File(androidSDKDir, "Sdk");
+                if (childSdk.isDirectory()) {
+                    androidSDKDir = childSdk;
+                } else {
+                    File siblingSdk = new File(androidSDKDir.getParentFile(), "sdk");
+                    if (siblingSdk.isDirectory()) {
+                        androidSDKDir = siblingSdk;
+                    }
+                }
             }
         }
 
