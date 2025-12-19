@@ -213,6 +213,7 @@ public class IPhoneBuilder extends Executor {
 
     @Override
     public boolean build(File sourceZip, BuildRequest request) throws BuildException {
+        Stopwatch stopwatch = new Stopwatch();
         addMinDeploymentTarget(DEFAULT_MIN_DEPLOYMENT_VERSION);
         detectJailbreak = request.getArg("ios.detectJailbreak", "false").equals("true");
         defaultEnvironment.put("LANG", "en_US.UTF-8");
@@ -346,7 +347,7 @@ public class IPhoneBuilder extends Executor {
         } catch (IOException ex) {
             throw new BuildException("Failed to unzip source Zip file.", ex);
         }
-        
+        stopwatch.split("Setup & Unzip");
         
         
         // We allow devs to add local podspecs inside a folder called "podspecs".  This will
@@ -479,6 +480,7 @@ public class IPhoneBuilder extends Executor {
                 
             }
         }
+        stopwatch.split("Extract Extensions");
         
         File podSpecs = new File(tmpFile, "podspecs");
         podSpecs.mkdirs();
@@ -563,6 +565,7 @@ public class IPhoneBuilder extends Executor {
             
             
         }
+        stopwatch.split("Google Services Setup");
         
         if (googleClientId == null && useGoogleSignIn) {
             log("GoogleService-Info.plist file specifies that GoogleSignIn should be used but it doesn't provide a client ID.  Likely the GoogleService-Info.plist file is not valid.  See "+GOOGLE_SIGNIN_TUTORIAL_URL+" for instructions on setting up GoogleSignIn");
@@ -603,7 +606,7 @@ public class IPhoneBuilder extends Executor {
         } catch (Exception ex) {
             throw new BuildException("Failed to scan project classes for permissions.", ex);
         }
-        
+        stopwatch.split("Scan Classes");
 
         debug("Local Notifications "+(usesLocalNotifications?"enabled":"disabled"));
         try {
@@ -646,6 +649,7 @@ public class IPhoneBuilder extends Executor {
         } catch (IOException ex) {
             throw new BuildException("Failed to extract nativeios.jar",ex);
         }
+        stopwatch.split("Extract Libs");
 
         if(request.getArg("noExtraResources", "false").equals("true")) {
             new File(buildinRes, "CN1Resource.res").delete();
@@ -910,6 +914,7 @@ public class IPhoneBuilder extends Executor {
                 adPadding = "        Display.getInstance().setProperty(\"adPaddingBottom\", \"" + adPadding + "\");\n"; 
             }
         }
+        stopwatch.split("Inject Build Hints");
         
         File stubSource = new File(tmpFile, "stub");
         stubSource.mkdirs();
@@ -918,6 +923,7 @@ public class IPhoneBuilder extends Executor {
         } catch (Exception ex) {
             throw new BuildException("Failed to generate Unit Test Files", ex);
         }
+        stopwatch.split("Generate Unit Tests");
 
         String newStorage = "";
         if(request.getArg("ios.newStorageLocation", "true").equals("true")) {
@@ -1005,6 +1011,7 @@ public class IPhoneBuilder extends Executor {
         } catch (IOException ex) {
             throw new BuildException("Failed to write stub source", ex);
         }
+        stopwatch.split("Generate Stubs");
         
         Class[] nativeInterfaces = getNativeInterfaces();
         if(nativeInterfaces != null && nativeInterfaces.length > 0) {
@@ -1173,6 +1180,7 @@ public class IPhoneBuilder extends Executor {
         } catch (Exception ex) {
             throw new BuildException("Failure occurred while compiling native interface stubs", ex);
         }
+        stopwatch.split("Compile Stubs");
 
         
         try {
@@ -1190,6 +1198,7 @@ public class IPhoneBuilder extends Executor {
         } catch (Exception ex) {
             throw new BuildException("Failed to generate launch screen");
         }
+        stopwatch.split("Generate Icons");
 
         resultDir = new File(tmpFile, "result");
         resultDir.mkdirs();
@@ -1526,6 +1535,7 @@ public class IPhoneBuilder extends Executor {
             debug("iosDeploymentTargetMajorVersionInt="+getDeploymentTargetInt(request));
 
             debug("Building using addLibs="+addLibs);
+            stopwatch.split("Prepare ParparVM");
             try {
                 if (!exec(userDir, env, 420000, "java", "-DsaveUnitTests=" + isUnitTestMode(), "-DfieldNullChecks=" + fieldNullChecks, "-DINCLUDE_NPE_CHECKS=" + includeNullChecks, "-DbundleVersionNumber=" + bundleVersionNumber, "-Xmx384m",
                         "-jar", parparVMCompilerJar, "ios",
@@ -1543,6 +1553,7 @@ public class IPhoneBuilder extends Executor {
             } catch (Exception ex) {
                 throw new BuildException("Failure while trying to run ByteCodeTranslator of ParparVM", ex);
             }
+            stopwatch.split("ParparVM Execution");
             try {
                 String orientations = request.getArg("ios.interface_orientation", null);
                 if (orientations != null && orientations.split(":").length < 4) {
@@ -1617,6 +1628,7 @@ public class IPhoneBuilder extends Executor {
             } catch (Exception ex) {
                 throw new BuildException("Failed to update infoplist file", ex);
             }
+            stopwatch.split("Post-VM Setup");
             if (runPods) {
                 try {
                     List<File> podSpecFileList = new ArrayList<File>();
@@ -1932,6 +1944,7 @@ public class IPhoneBuilder extends Executor {
                 } catch (Exception ex) {
                     throw new BuildException("Failed to generate PodFile", ex);
                 }
+                stopwatch.split("CocoaPods");
             }
 
             try {
@@ -1978,6 +1991,9 @@ public class IPhoneBuilder extends Executor {
 
             
         }
+
+        stopwatch.split("Finalize");
+        stopwatch.stop();
 
         if ("xcode".equals(getBuildTarget()) || getBuildTarget() == null) {
             xcodeProjectDir = new File(tmpFile, "dist");
@@ -2149,6 +2165,36 @@ public class IPhoneBuilder extends Executor {
         String clientId;
         boolean useSignIn;
         
+    }
+
+    private class Stopwatch {
+        private long startTime;
+        private long lastSplitTime;
+        private final StringBuilder summary = new StringBuilder();
+
+        public Stopwatch() {
+            startTime = System.currentTimeMillis();
+            lastSplitTime = startTime;
+            summary.append("Build Time Statistics:\n");
+            summary.append("----------------------\n");
+        }
+
+        public void split(String stepName) {
+            long now = System.currentTimeMillis();
+            long duration = now - lastSplitTime;
+            String message = String.format("%-40s : %d ms", stepName, duration);
+            log(message);
+            summary.append(message).append("\n");
+            lastSplitTime = now;
+        }
+
+        public void stop() {
+            long now = System.currentTimeMillis();
+            long totalDuration = now - startTime;
+            summary.append("----------------------\n");
+            summary.append(String.format("%-40s : %d ms", "Total Time", totalDuration));
+            log(summary.toString());
+        }
     }
 
     private File[] extractAppExtensions(File sourceDirectory, File targetDirectory) throws IOException {
