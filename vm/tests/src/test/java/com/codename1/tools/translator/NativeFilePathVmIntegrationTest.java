@@ -59,8 +59,7 @@ class NativeFilePathVmIntegrationTest {
                 "cmake",
                 "-S", distDir.toString(),
                 "-B", buildDir.toString(),
-                "-DCMAKE_C_COMPILER=gcc",
-                "-DCMAKE_OBJC_COMPILER=gcc"
+                "-DCMAKE_C_COMPILER=gcc"
         ), distDir);
 
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);

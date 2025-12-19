@@ -191,6 +191,10 @@ class CleanTargetIntegrationTest {
     static void stripObjectiveC(Path cmakeLists) throws IOException {
         String content = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
         content = content.replace(" OBJC", "");
+        content = content.replace("OBJC)", ")");
+        content = content.replace("OBJC)", ")");
+        content = content.replace("C OBJC", "C");
+        content = content.replace("enable_language(OBJC)", "");
         Files.write(cmakeLists, content.getBytes(StandardCharsets.UTF_8));
     }
 

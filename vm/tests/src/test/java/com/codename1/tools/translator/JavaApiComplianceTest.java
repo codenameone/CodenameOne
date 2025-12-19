@@ -68,6 +68,11 @@ class JavaApiComplianceTest {
         if (!System.getProperty("java.version").startsWith("1.")) {
             args.add("--patch-module");
             args.add("java.base=" + javaApiRoot.toString());
+            args.add("-source");
+            args.add("1.8");
+            args.add("-target");
+            args.add("1.8");
+            args.add("-Xlint:-options");
         } else {
             args.add("-source");
             args.add("1.5");
