@@ -49,14 +49,14 @@ RUN git clone --depth=1 https://github.com/codenameone/cn1-binaries /opt/cn1-bin
 # Set Environment Variables for JDKs (Paths for apt installed JDKs usually symlinked to /usr/lib/jvm/zulu-XX-amd64)
 ENV JAVA8_HOME=/usr/lib/jvm/zulu8-fx
 ENV JDK8_HOME=/usr/lib/jvm/zulu8-fx
-ENV JAVA11_HOME=/usr/lib/jvm/zulu-11-amd64
-ENV JDK11_HOME=/usr/lib/jvm/zulu-11-amd64
-ENV JAVA17_HOME=/usr/lib/jvm/zulu-17-amd64
-ENV JDK17_HOME=/usr/lib/jvm/zulu-17-amd64
-ENV JAVA21_HOME=/usr/lib/jvm/zulu-21-amd64
-ENV JDK21_HOME=/usr/lib/jvm/zulu-21-amd64
-ENV JAVA25_HOME=/usr/lib/jvm/zulu-25-amd64
-ENV JDK25_HOME=/usr/lib/jvm/zulu-25-amd64
+ENV JAVA11_HOME=/usr/lib/jvm/zulu11-ca-amd64
+ENV JDK11_HOME=/usr/lib/jvm/zulu11-ca-amd64
+ENV JAVA17_HOME=/usr/lib/jvm/zulu17-ca-amd64
+ENV JDK17_HOME=/usr/lib/jvm/zulu17-ca-amd64
+ENV JAVA21_HOME=/usr/lib/jvm/zulu21-ca-amd64
+ENV JDK21_HOME=/usr/lib/jvm/zulu21-ca-amd64
+ENV JAVA25_HOME=/usr/lib/jvm/zulu25-ca-amd64
+ENV JDK25_HOME=/usr/lib/jvm/zulu25-ca-amd64
 
 # Install Android SDK
 ENV ANDROID_HOME=/opt/android-sdk
