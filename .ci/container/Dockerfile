@@ -88,10 +88,15 @@ ENV JDK8_HOME=/usr/lib/jvm/zulu8-fx
 # If these paths are wrong, the build might fail later when finding java.
 # We will verify them in a RUN step or create symlinks.
 
-RUN ln -s /usr/lib/jvm/zulu*11* /usr/lib/jvm/java-11-zulu && \
-    ln -s /usr/lib/jvm/zulu*17* /usr/lib/jvm/java-17-zulu && \
-    ln -s /usr/lib/jvm/zulu*21* /usr/lib/jvm/java-21-zulu && \
-    ln -s /usr/lib/jvm/zulu*25* /usr/lib/jvm/java-25-zulu
+RUN for v in 11 17 21 25; do \
+        dir=$(ls -d /usr/lib/jvm/zulu*${v}* 2>/dev/null | head -n 1); \
+        if [ -n "$dir" ]; then \
+            echo "Linking $dir to /usr/lib/jvm/java-${v}-zulu"; \
+            ln -s "$dir" "/usr/lib/jvm/java-${v}-zulu"; \
+        else \
+            echo "Java ${v} not found"; \
+        fi \
+    done
 
 ENV JAVA11_HOME=/usr/lib/jvm/java-11-zulu
 ENV JDK11_HOME=/usr/lib/jvm/java-11-zulu
