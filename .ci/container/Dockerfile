@@ -73,8 +73,11 @@ ENV PATH=${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools
 
 # Accept licenses and install packages
 # Note: sdkmanager requires Java 11+ to run. We use JAVA17_HOME for this step.
-RUN yes | JAVA_HOME=${JAVA17_HOME} sdkmanager --licenses && \
-    JAVA_HOME=${JAVA17_HOME} sdkmanager "platform-tools" "platforms;android-31" "build-tools;31.0.0"
+# We dynamically locate Zulu 17 to ensure the correct path is used.
+RUN export JAVA17_REAL=$(find /usr/lib/jvm -maxdepth 1 -name "zulu*17*" -type d | head -n 1) && \
+    echo "Using JDK 17 at: $JAVA17_REAL" && \
+    yes | JAVA_HOME=$JAVA17_REAL sdkmanager --licenses && \
+    JAVA_HOME=$JAVA17_REAL sdkmanager "platform-tools" "platforms;android-31" "build-tools;31.0.0"
 
 # Set Default JAVA_HOME to Java 8 (as per user requirement for builds)
 ENV JAVA_HOME=/usr/lib/jvm/zulu8-fx
