@@ -70,6 +70,17 @@ cn1ss_setup "$TARGET_JAVA_BIN" "$CN1SS_HELPER_SOURCE_DIR"
 [ -x "$GRADLE_PROJECT_DIR/gradlew" ] || chmod +x "$GRADLE_PROJECT_DIR/gradlew"
 
 # ---- Prepare app + emulator state -----------------------------------------
+# Check for JAVA17_HOME or JDK17_HOME to run sdkmanager with a compatible JDK
+SDKMANAGER_JAVA_HOME=$JAVA_HOME
+if [ -n "${JAVA17_HOME:-}" ]; then
+    SDKMANAGER_JAVA_HOME=$JAVA17_HOME
+elif [ -n "${JDK17_HOME:-}" ]; then
+    SDKMANAGER_JAVA_HOME=$JDK17_HOME
+fi
+
+# Ensure licenses are accepted
+yes | JAVA_HOME="$SDKMANAGER_JAVA_HOME" sdkmanager --licenses > /dev/null
+
 MANIFEST="$GRADLE_PROJECT_DIR/app/src/main/AndroidManifest.xml"
 if [ ! -f "$MANIFEST" ]; then
   ra_log "FATAL: AndroidManifest.xml not found at $MANIFEST" >&2

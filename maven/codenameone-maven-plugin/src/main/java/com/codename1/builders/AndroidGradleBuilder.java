@@ -499,6 +499,23 @@ public class AndroidGradleBuilder extends Executor {
 
     @Override
     public boolean build(File sourceZip, final BuildRequest request) throws BuildException {
+        // Ensure that we use a java version that is compatible with the android sdk tools
+        // We prefer Java 17, but will fall back to others if not found.
+        String javaHome = System.getenv("JAVA17_HOME");
+        if (javaHome == null) {
+            javaHome = System.getenv("JDK17_HOME");
+        }
+        if (javaHome == null) {
+            javaHome = System.getenv("JAVA11_HOME");
+        }
+        if (javaHome == null) {
+            javaHome = System.getenv("JDK11_HOME");
+        }
+
+        if (javaHome != null) {
+            defaultEnvironment.put("JAVA_HOME", javaHome);
+        }
+
         boolean facebookSupported = request.getArg("facebook.appId", null) != null;
         newFirebaseMessaging = request.getArg("android.newFirebaseMessaging", "true").equals("true");
         useGradle8 = request.getArg("android.useGradle8", ""+(useGradle8 || newFirebaseMessaging || facebookSupported)).equals("true");
