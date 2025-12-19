@@ -73,7 +73,7 @@ class AndroidScreenshotTask implements Runnable {
                     new Handler(Looper.getMainLooper())
             );
         } catch (Throwable t) {
-            // Any unexpected issue → fallback
+            // Any unexpected issue -> fallback
             Log.e(t);
             tryFallbackDraw(w, h);
         }

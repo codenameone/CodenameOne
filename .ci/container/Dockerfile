@@ -112,4 +112,13 @@ ENV JDK25_HOME=/usr/lib/jvm/java-25-zulu
 RUN update-alternatives --install /usr/bin/java java /usr/lib/jvm/zulu8-fx/bin/java 100 && \
     update-alternatives --install /usr/bin/javac javac /usr/lib/jvm/zulu8-fx/bin/javac 100
 
+# Set locale to UTF-8
+RUN apt-get update && apt-get install -y locales && \
+    locale-gen en_US.UTF-8 && \
+    update-locale LANG=en_US.UTF-8
+
+ENV LANG=en_US.UTF-8 \
+    LANGUAGE=en_US:en \
+    LC_ALL=en_US.UTF-8
+
 CMD ["/bin/bash"]
