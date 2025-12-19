@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y \
     libxxf86vm1 \
     ant \
     maven \
-    libncurses5 \
+    libncurses6 \
     libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 

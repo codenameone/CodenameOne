@@ -98,13 +98,6 @@ jobs:
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
-      - name: Free Disk Space
-        if: matrix.id != 'default'
-        run: |
-          rm -rf /usr/share/dotnet
-          rm -rf /usr/local/lib/android/sdk/ndk
-          rm -rf /opt/ghc
-          rm -rf /usr/share/swift
       - name: Set JDK_HOME
         if: matrix.id != 'default'
         run: echo "JDK_HOME=/usr/lib/jvm/zulu-${{ matrix.java_version }}-amd64" >> $GITHUB_ENV

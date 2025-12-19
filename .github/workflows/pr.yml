@@ -203,6 +203,9 @@ jobs:
         script: |
           const { publishQualityComment } = require('./.github/scripts/publish-quality-comment.js');
           await publishQualityComment({ github, context, core });
+    - name: Link cn1-binaries
+      run: |
+        ln -sf $CN1_BINARIES ../cn1-binaries
     - name: Build with Ant
       run: xvfb-run ant test-javase
     - name: Build CLDC11 JAR
