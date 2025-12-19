@@ -89,6 +89,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
+      packages: read
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/codenameone/codenameone/ci-container:latest
@@ -100,7 +101,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Set JDK_HOME
         if: matrix.id != 'default'
-        run: echo "JDK_HOME=/usr/lib/jvm/zulu-${{ matrix.java_version }}-amd64" >> $GITHUB_ENV
+        run: echo "JDK_HOME=/usr/lib/jvm/zulu${{ matrix.java_version }}-ca-amd64" >> $GITHUB_ENV
       - name: Set JDK_HOME (Default)
         if: matrix.id == 'default'
         run: echo "JDK_HOME=${JDK8_HOME}" >> $GITHUB_ENV

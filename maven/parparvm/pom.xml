@@ -43,8 +43,6 @@
         <src.dir>../../vm/ByteCodeTranslator/src</src.dir>
 
         <codename1.javaapi.src.dir>../../vm/JavaAPI/src</codename1.javaapi.src.dir>
-        <javaapi.compiler.source>1.5</javaapi.compiler.source>
-        <javaapi.compiler.target>1.5</javaapi.compiler.target>
 
     </properties>
 
@@ -87,6 +85,15 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-antrun-plugin</artifactId>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.sun</groupId>
+                        <artifactId>tools</artifactId>
+                        <version>1.5.0</version>
+                        <scope>system</scope>
+                        <systemPath>${java.home}/../lib/tools.jar</systemPath>
+                    </dependency>
+                </dependencies>
                 <executions>
                     <execution>
                         <id>compile-java-api</id>
@@ -98,8 +105,8 @@
                             <target>
                                 <mkdir dir="${project.build.directory}/api-classes"/>
                                 <javac srcdir="${codename1.javaapi.src.dir}"
-                                       source="${javaapi.compiler.source}"
-                                       target="${javaapi.compiler.target}"
+                                       source="1.5"
+                                       target="1.5"
                                        destdir="${project.build.directory}/api-classes"
                                        failonerror="true"
                                 />
@@ -153,40 +160,5 @@
         </plugins>
     </build>
 
-    <profiles>
-        <profile>
-            <id>legacy-jdk-tools</id>
-            <activation>
-                <jdk>(,9)</jdk>
-            </activation>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-antrun-plugin</artifactId>
-                        <dependencies>
-                            <dependency>
-                                <groupId>com.sun</groupId>
-                                <artifactId>tools</artifactId>
-                                <version>1.5.0</version>
-                                <scope>system</scope>
-                                <systemPath>${java.home}/../lib/tools.jar</systemPath>
-                            </dependency>
-                        </dependencies>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-        <profile>
-            <id>modern-jdk</id>
-            <activation>
-                <jdk>[9,)</jdk>
-            </activation>
-            <properties>
-                <javaapi.compiler.source>1.8</javaapi.compiler.source>
-                <javaapi.compiler.target>1.8</javaapi.compiler.target>
-            </properties>
-        </profile>
-    </profiles>
 
 </project>
