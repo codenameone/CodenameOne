@@ -189,13 +189,25 @@ class CleanTargetIntegrationTest {
     }
 
     static void stripObjectiveC(Path cmakeLists) throws IOException {
-        String content = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
-        content = content.replace(" OBJC", "");
-        content = content.replace("OBJC)", ")");
-        content = content.replace("OBJC)", ")");
-        content = content.replace("C OBJC", "C");
-        content = content.replace("enable_language(OBJC)", "");
-        Files.write(cmakeLists, content.getBytes(StandardCharsets.UTF_8));
+        List<String> lines = Files.readAllLines(cmakeLists, StandardCharsets.UTF_8);
+        List<String> cleaned = new java.util.ArrayList<String>();
+        for (String line : lines) {
+            String upper = line.toUpperCase();
+            if (upper.contains("ENABLE_LANGUAGE(") && upper.contains("OBJC")) {
+                continue;
+            }
+            if (upper.contains("OBJC")) {
+                line = line.replace(" OBJC", "")
+                           .replace("OBJC)", ")")
+                           .replace("C;OBJC", "C")
+                           .replace("C OBJC", "C");
+                if (line.trim().isEmpty()) {
+                    continue;
+                }
+            }
+            cleaned.add(line);
+        }
+        Files.write(cmakeLists, cleaned, StandardCharsets.UTF_8);
     }
 
     static String runCommand(List<String> command, Path workingDir) throws Exception {
