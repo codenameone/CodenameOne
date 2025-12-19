@@ -32,9 +32,38 @@ public class RenderScreenshotReport {
 
         CoverageSummary coverage = loadCoverage(arguments.coverageSummary, arguments.coverageHtmlUrl);
 
-        SummaryAndComment output = buildSummaryAndComment(data, title, marker, successMessage, coverage, arguments.vmTime, arguments.compilationTime);
+        Map<String, String> extraStats = new LinkedHashMap<>();
+        if (arguments.extraStats != null) {
+            for (Path p : arguments.extraStats) {
+                if (Files.isRegularFile(p)) {
+                    parseStatsFile(p, extraStats);
+                }
+            }
+        }
+
+        SummaryAndComment output = buildSummaryAndComment(data, title, marker, successMessage, coverage, arguments.vmTime, arguments.compilationTime, extraStats);
         writeLines(arguments.summaryOut, output.summaryLines);
         writeLines(arguments.commentOut, output.commentLines);
+    }
+
+    private static void parseStatsFile(Path p, Map<String, String> extraStats) {
+        try {
+            List<String> lines = Files.readAllLines(p, StandardCharsets.UTF_8);
+            for (String line : lines) {
+                line = line.trim();
+                if (line.isEmpty() || line.startsWith("-")) {
+                    continue;
+                }
+                int colon = line.indexOf(':');
+                if (colon > 0) {
+                    String key = line.substring(0, colon).trim();
+                    String val = line.substring(colon + 1).trim();
+                    extraStats.put(key, val);
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Failed to read stats file " + p + ": " + e.getMessage());
+        }
     }
 
     private static void writeLines(Path path, List<String> lines) throws IOException {
@@ -51,7 +80,7 @@ public class RenderScreenshotReport {
         Files.writeString(path, sb.toString(), StandardCharsets.UTF_8);
     }
 
-    private static SummaryAndComment buildSummaryAndComment(Map<String, Object> data, String title, String marker, String successMessage, CoverageSummary coverage, Long vmTime, Long compilationTime) {
+    private static SummaryAndComment buildSummaryAndComment(Map<String, Object> data, String title, String marker, String successMessage, CoverageSummary coverage, Long vmTime, Long compilationTime, Map<String, String> extraStats) {
         List<String> summaryLines = new ArrayList<>();
         List<String> commentLines = new ArrayList<>();
         Object resultsObj = data.get("results");
@@ -161,7 +190,7 @@ public class RenderScreenshotReport {
         }
 
         // Add benchmark results at the end
-        appendBenchmarkResults(commentLines, vmTime, compilationTime);
+        appendBenchmarkResults(commentLines, vmTime, compilationTime, extraStats);
 
         if (commentLines.isEmpty() || (commentLines.size() == 1 && commentLines.get(0).isEmpty())) {
             // This fallback block might be redundant now, but kept for safety.
@@ -231,8 +260,8 @@ public class RenderScreenshotReport {
         }
     }
 
-    private static void appendBenchmarkResults(List<String> commentLines, Long vmTime, Long compilationTime) {
-        if (vmTime == null && compilationTime == null) {
+    private static void appendBenchmarkResults(List<String> commentLines, Long vmTime, Long compilationTime, Map<String, String> extraStats) {
+        if (vmTime == null && compilationTime == null && (extraStats == null || extraStats.isEmpty())) {
             return;
         }
         if (!commentLines.isEmpty() && !commentLines.get(commentLines.size() - 1).isEmpty()) {
@@ -245,6 +274,15 @@ public class RenderScreenshotReport {
         }
         if (compilationTime != null) {
             commentLines.add(String.format("- **Compilation Time:** %d seconds", compilationTime));
+        }
+        if (extraStats != null && !extraStats.isEmpty()) {
+            commentLines.add("");
+            commentLines.add("#### Detailed Performance Metrics");
+            commentLines.add("| Metric | Duration |");
+            commentLines.add("| --- | --- |");
+            for (Map.Entry<String, String> entry : extraStats.entrySet()) {
+                commentLines.add(String.format("| %s | %s |", entry.getKey(), entry.getValue()));
+            }
         }
         commentLines.add("");
     }
@@ -450,8 +488,9 @@ public class RenderScreenshotReport {
         final String coverageHtmlUrl;
         final Long vmTime;
         final Long compilationTime;
+        final List<Path> extraStats;
 
-        private Arguments(Path compareJson, Path commentOut, Path summaryOut, String marker, String title, String successMessage, Path coverageSummary, String coverageHtmlUrl, Long vmTime, Long compilationTime) {
+        private Arguments(Path compareJson, Path commentOut, Path summaryOut, String marker, String title, String successMessage, Path coverageSummary, String coverageHtmlUrl, Long vmTime, Long compilationTime, List<Path> extraStats) {
             this.compareJson = compareJson;
             this.commentOut = commentOut;
             this.summaryOut = summaryOut;
@@ -462,6 +501,7 @@ public class RenderScreenshotReport {
             this.coverageHtmlUrl = coverageHtmlUrl;
             this.vmTime = vmTime;
             this.compilationTime = compilationTime;
+            this.extraStats = extraStats;
         }
 
         static Arguments parse(String[] args) {
@@ -475,6 +515,7 @@ public class RenderScreenshotReport {
             String coverageHtmlUrl = null;
             Long vmTime = null;
             Long compilationTime = null;
+            List<Path> extraStats = new ArrayList<>();
             for (int i = 0; i < args.length; i++) {
                 String arg = args[i];
                 switch (arg) {
@@ -558,6 +599,13 @@ public class RenderScreenshotReport {
                             return null;
                         }
                     }
+                    case "--extra-stats" -> {
+                         if (++i >= args.length) {
+                            System.err.println("Missing value for --extra-stats");
+                            return null;
+                        }
+                        extraStats.add(Path.of(args[i]));
+                    }
                     default -> {
                         System.err.println("Unknown argument: " + arg);
                         return null;
@@ -568,7 +616,7 @@ public class RenderScreenshotReport {
                 System.err.println("--compare-json, --comment-out, and --summary-out are required");
                 return null;
             }
-            return new Arguments(compare, comment, summary, marker, title, successMessage, coverageSummary, coverageHtmlUrl, vmTime, compilationTime);
+            return new Arguments(compare, comment, summary, marker, title, successMessage, coverageSummary, coverageHtmlUrl, vmTime, compilationTime, extraStats);
         }
     }
 

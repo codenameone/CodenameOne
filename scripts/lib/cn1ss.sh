@@ -361,6 +361,15 @@ cn1ss_process_and_report() {
     render_args+=(--compilation-time "$CN1SS_COMPILATION_TIME")
   fi
 
+  # Pass any stats files found in artifacts
+  if [ -n "$artifacts_dir" ] && [ -d "$artifacts_dir" ]; then
+    for stats_file in "$artifacts_dir"/iphone-builder-stats.txt "$artifacts_dir"/ios-test-stats.txt; do
+      if [ -f "$stats_file" ]; then
+        render_args+=(--extra-stats "$stats_file")
+      fi
+    done
+  fi
+
   if ! cn1ss_java_run "$CN1SS_RENDER_CLASS" "${render_args[@]}"; then
     cn1ss_log "FATAL: Failed to render screenshot summary/comment"
     return 14

@@ -335,8 +335,11 @@ SIM_DESTINATION="$(normalize_destination "$SIM_DESTINATION")"
 SIM_UDID="$(printf '%s\n' "$SIM_DESTINATION" | sed -n 's/.*id=\([^,]*\).*/\1/p' | tr -d '\r[:space:]')"
 if [ -n "$SIM_UDID" ]; then
   ri_log "Booting simulator $SIM_UDID"
+  BOOT_START=$(date +%s)
   xcrun simctl boot "$SIM_UDID" >/dev/null 2>&1 || true
   xcrun simctl bootstatus "$SIM_UDID" -b
+  BOOT_END=$(date +%s)
+  echo "Simulator Boot : $(( (BOOT_END - BOOT_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
   SIM_DESTINATION="id=$SIM_UDID"
 fi
 ri_log "Running DeviceRunner on destination '$SIM_DESTINATION'"
@@ -435,8 +438,11 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
 
   if [ -n "$SIM_DEVICE_ID" ]; then
     ri_log "Booting simulator $SIM_DEVICE_ID"
+    BOOT_START=$(date +%s)
     xcrun simctl boot "$SIM_DEVICE_ID" >/dev/null 2>&1 || true
     xcrun simctl bootstatus "$SIM_DEVICE_ID" -b
+    BOOT_END=$(date +%s)
+    echo "Simulator Boot (Run) : $(( (BOOT_END - BOOT_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
   else
     ri_log "Warning: simulator UDID not resolved; relying on default booted device"
     xcrun simctl bootstatus booted -b || true
@@ -470,25 +476,36 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
   sleep 2
 
   ri_log "Installing simulator app bundle"
+  INSTALL_START=$(date +%s)
   if [ -n "$SIM_DEVICE_ID" ]; then
     if ! xcrun simctl install "$SIM_DEVICE_ID" "$APP_BUNDLE_PATH"; then
       ri_log "FATAL: simctl install failed"
       exit 11
     fi
+    INSTALL_END=$(date +%s)
+
+    LAUNCH_START=$(date +%s)
     if ! xcrun simctl launch "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1; then
       ri_log "FATAL: simctl launch failed"
       exit 11
     fi
+    LAUNCH_END=$(date +%s)
   else
     if ! xcrun simctl install booted "$APP_BUNDLE_PATH"; then
       ri_log "FATAL: simctl install failed"
       exit 11
     fi
+    INSTALL_END=$(date +%s)
+
+    LAUNCH_START=$(date +%s)
     if ! xcrun simctl launch booted "$BUNDLE_IDENTIFIER" >/dev/null 2>&1; then
       ri_log "FATAL: simctl launch failed"
       exit 11
     fi
+    LAUNCH_END=$(date +%s)
   fi
+  echo "App Install : $(( (INSTALL_END - INSTALL_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
+  echo "App Launch : $(( (LAUNCH_END - LAUNCH_START) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
 
 END_MARKER="CN1SS:SUITE:FINISHED"
 TIMEOUT_SECONDS=300
@@ -506,6 +523,8 @@ while true; do
   fi
   sleep 5
 done
+END_TIME=$(date +%s)
+echo "Test Execution : $(( (END_TIME - START_TIME) * 1000 )) ms" >> "$ARTIFACTS_DIR/ios-test-stats.txt"
 
 sleep 3
 
