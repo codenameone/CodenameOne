@@ -56,7 +56,7 @@ RUN apt-get install -y \
 RUN apt-get install -y zulu25-jdk || echo "zulu25-jdk install failed, proceeding without it"
 
 # Android SDK
-ENV ANDROID_HOME=/usr/lib/android-sdk
+ENV ANDROID_HOME=/opt/android/sdk
 RUN mkdir -p ${ANDROID_HOME}/cmdline-tools && \
     wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O /tmp/cmdline-tools.zip && \
     unzip /tmp/cmdline-tools.zip -d ${ANDROID_HOME}/cmdline-tools && \
