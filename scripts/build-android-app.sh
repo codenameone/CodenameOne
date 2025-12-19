@@ -64,7 +64,8 @@ export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
 if [ -z "$ANDROID_SDK_ROOT" ]; then
   if [ -d "/usr/local/lib/android/sdk" ]; then ANDROID_SDK_ROOT="/usr/local/lib/android/sdk"
-  elif [ -d "$HOME/Android/Sdk" ]; then ANDROID_SDK_ROOT="$HOME/Android/Sdk"; fi
+  elif [ -d "$HOME/Android/Sdk" ]; then ANDROID_SDK_ROOT="$HOME/Android/Sdk"
+  elif [ -d "/opt/android/sdk" ]; then ANDROID_SDK_ROOT="/opt/android/sdk"; fi
 fi
 if [ -z "$ANDROID_SDK_ROOT" ] || [ ! -d "$ANDROID_SDK_ROOT" ]; then
   ba_log "Android SDK not found. Set ANDROID_SDK_ROOT or ANDROID_HOME to a valid installation." >&2
