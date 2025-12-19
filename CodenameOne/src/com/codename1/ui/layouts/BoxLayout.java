@@ -520,11 +520,11 @@ public class BoxLayout extends Layout {
      * {@inheritDoc}
      */
     public boolean equals(Object o) {
-        return super.equals(o) && axis == ((BoxLayout) o).axis && align == ((BoxLayout) o).align;
+        return super.equals(o) && axis == ((BoxLayout) o).axis;
     }
 
     @Override
     public int hashCode() {
-        return super.hashCode() ^ axis ^ align;
+        return super.hashCode() ^ axis;
     }
 }

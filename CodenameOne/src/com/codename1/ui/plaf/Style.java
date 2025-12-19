@@ -3158,29 +3158,7 @@ public class Style {
 
     @Override
     public int hashCode() {
-        int hash = 7;
-        hash = 89 * hash + this.fgColor;
-        hash = 89 * hash + this.fgAlpha;
-        hash = 89 * hash + this.bgColor;
-        hash = 89 * hash + com.codename1.compat.java.util.Objects.hashCode(this.font);
-        hash = 89 * hash + com.codename1.compat.java.util.Objects.hashCode(this.bgImage);
-        hash = 89 * hash + this.transparency;
-        hash = 89 * hash + this.opacity;
-        hash = 89 * hash + this.backgroundType;
-        hash = 89 * hash + this.backgroundAlignment;
-        if (this.padding != null) {
-            for (float p : this.padding) {
-                hash = 89 * hash + Float.floatToIntBits(p);
-            }
-        }
-        if (this.margin != null) {
-            for (float m : this.margin) {
-                hash = 89 * hash + Float.floatToIntBits(m);
-            }
-        }
-        hash = 89 * hash + com.codename1.compat.java.util.Objects.hashCode(this.border);
-        hash = 89 * hash + this.align;
-        return hash;
+        return System.identityHashCode(this);
     }
 
 }
