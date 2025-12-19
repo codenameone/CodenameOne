@@ -965,6 +965,11 @@ public class TableLayout extends Layout {
         return super.equals(o) && ((TableLayout) o).getRows() == getRows() && ((TableLayout) o).getColumns() == getColumns();
     }
 
+    @Override
+    public int hashCode() {
+        return super.hashCode() ^ getRows() ^ getColumns();
+    }
+
     /**
      * {@inheritDoc}
      */

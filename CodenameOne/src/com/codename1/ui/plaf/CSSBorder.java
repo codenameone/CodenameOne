@@ -369,6 +369,11 @@ public class CSSBorder extends Border {
         return obj == this;
     }
 
+    @Override
+    public int hashCode() {
+        return System.identityHashCode(this);
+    }
+
     /**
      * Converts this border to a CSS string.
      *
@@ -1343,6 +1348,12 @@ public class CSSBorder extends Border {
             return false;
         }
 
+        @Override
+        public int hashCode() {
+            if (value == 0) return 0;
+            return Float.floatToIntBits(value) ^ type;
+        }
+
         boolean isZero() {
             return value == 0;
         }
@@ -1526,6 +1537,11 @@ public class CSSBorder extends Border {
             return false;
         }
 
+        @Override
+        public int hashCode() {
+            return color ^ alpha;
+        }
+
         boolean isTransparent() {
             return alpha == 0;
         }
@@ -1655,6 +1671,11 @@ public class CSSBorder extends Border {
                 return s.type == type && s.thickness.equals(thickness) && s.color.equals(color);
             }
             return false;
+        }
+
+        @Override
+        public int hashCode() {
+            return type ^ thickness.hashCode() ^ color.hashCode();
         }
 
         boolean isVisible() {

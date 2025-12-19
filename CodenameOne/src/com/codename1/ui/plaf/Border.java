@@ -1127,6 +1127,24 @@ public class Border {
     }
 
     /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+        int hash = 7;
+        hash = 31 * hash + type;
+        hash = 31 * hash + (themeColors ? 1 : 0);
+        hash = 31 * hash + colorA;
+        hash = 31 * hash + colorB;
+        hash = 31 * hash + colorC;
+        hash = 31 * hash + colorD;
+        hash = 31 * hash + Float.floatToIntBits(thickness);
+        hash = 31 * hash + arcWidth;
+        hash = 31 * hash + arcHeight;
+        hash = 31 * hash + (outline ? 1 : 0);
+        return hash;
+    }
+
+    /**
      * Returns true if installing this border will override the painting of the component background
      *
      * @return true if this border replaces the painter

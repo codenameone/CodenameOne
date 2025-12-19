@@ -378,4 +378,16 @@ class CustomFont extends Font {
         }
         return false;
     }
+
+    @Override
+    public int hashCode() {
+        int hash = 7;
+        hash = 97 * hash + (this.charsets != null ? this.charsets.hashCode() : 0);
+        if (cutOffsets != null) {
+            for (int i : cutOffsets) {
+                hash = 97 * hash + i;
+            }
+        }
+        return hash;
+    }
 }

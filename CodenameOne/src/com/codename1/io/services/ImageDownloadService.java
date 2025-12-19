@@ -935,6 +935,13 @@ public class ImageDownloadService extends ConnectionRequest {
     }
 
     /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+        return cacheId != null ? cacheId.hashCode() : 0;
+    }
+
+    /**
      * @return the maintainAspectRatio
      */
     public boolean isMaintainAspectRatio() {

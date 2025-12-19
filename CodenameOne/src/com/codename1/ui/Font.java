@@ -618,6 +618,16 @@ public class Font extends CN {
     }
 
     /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+        if (ttf && font != null) {
+            return font.hashCode();
+        }
+        return getFace() ^ getSize() ^ getStyle();
+    }
+
+    /**
      * The ascent is the amount by which the character ascends above the baseline.
      *
      * @return the ascent in pixels

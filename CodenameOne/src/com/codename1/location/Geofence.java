@@ -194,4 +194,19 @@ public class Geofence {
             return true; // both null
         }
     }
+
+    @Override
+    public int hashCode() {
+        int hash = 7;
+        hash = 53 * hash + (this.id != null ? this.id.hashCode() : 0);
+        if (this.loc != null) {
+            long temp = Double.doubleToLongBits(this.loc.getLatitude());
+            hash = 53 * hash + (int) (temp ^ (temp >>> 32));
+            temp = Double.doubleToLongBits(this.loc.getLongitude());
+            hash = 53 * hash + (int) (temp ^ (temp >>> 32));
+        }
+        hash = 53 * hash + this.radius;
+        hash = 53 * hash + (int) (this.expiration ^ (this.expiration >>> 32));
+        return hash;
+    }
 }

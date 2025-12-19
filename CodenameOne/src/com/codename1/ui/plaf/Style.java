@@ -3156,4 +3156,19 @@ public class Style {
         return this.surface == other.surface;
     }
 
+    @Override
+    public int hashCode() {
+        int hash = 7;
+        hash = 89 * hash + this.fgColor;
+        hash = 89 * hash + this.fgAlpha;
+        hash = 89 * hash + this.bgColor;
+        hash = 89 * hash + com.codename1.compat.java.util.Objects.hashCode(this.font);
+        hash = 89 * hash + com.codename1.compat.java.util.Objects.hashCode(this.bgImage);
+        hash = 89 * hash + this.transparency;
+        hash = 89 * hash + this.opacity;
+        hash = 89 * hash + this.backgroundType;
+        hash = 89 * hash + this.backgroundAlignment;
+        return hash;
+    }
+
 }

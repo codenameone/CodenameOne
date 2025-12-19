@@ -634,4 +634,9 @@ public class FlowLayout extends Layout {
                 ((FlowLayout) o).valign == valign &&
                 ((FlowLayout) o).fillRows == fillRows;
     }
+
+    @Override
+    public int hashCode() {
+        return super.hashCode() ^ orientation ^ valign ^ (fillRows ? 1231 : 1237);
+    }
 }

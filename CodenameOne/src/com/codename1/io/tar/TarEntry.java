@@ -52,6 +52,19 @@ public class TarEntry {
         return this.header.name.toString().equals( it.header.name.toString() );
     }
 
+    @Override
+    public boolean equals(Object obj) {
+        if (obj instanceof TarEntry) {
+            return equals((TarEntry) obj);
+        }
+        return false;
+    }
+
+    @Override
+    public int hashCode() {
+        return this.header.name.toString().hashCode();
+    }
+
     public boolean isDescendent(TarEntry desc) {
         return desc.header.name.toString().startsWith(this.header.name.toString());
     }
