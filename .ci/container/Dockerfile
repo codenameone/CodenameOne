@@ -1,0 +1,74 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install basics and tools
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    gnupg \
+    ca-certificates \
+    git \
+    unzip \
+    zip \
+    python3 \
+    python3-pip \
+    xvfb \
+    libgl1-mesa-dri \
+    libxtst6 \
+    libxxf86vm1 \
+    ant \
+    maven \
+    && rm -rf /var/lib/apt/lists/*
+
+# Setup Azul Repo
+RUN curl -s https://repos.azul.com/azul-repo.key | gpg --dearmor -o /usr/share/keyrings/azul.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/azul.gpg] https://repos.azul.com/zulu/deb stable main" | tee /etc/apt/sources.list.d/zulu.list
+
+# Install JDKs 11, 17, 21, 25
+RUN apt-get update && apt-get install -y \
+    zulu11-jdk \
+    zulu17-jdk \
+    zulu21-jdk \
+    zulu25-jdk \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install ZuluFX 8 (Tarball)
+# URL for Zulu 8 + FX (x64 Linux)
+# Using a fixed version to ensure reproducibility.
+RUN mkdir -p /usr/lib/jvm/zulu8-fx && \
+    curl -L "https://cdn.azul.com/zulu/bin/zulu8.82.0.21-ca-fx-jdk8.0.432-linux_x64.tar.gz" -o /tmp/zulu8.tar.gz && \
+    tar -xzf /tmp/zulu8.tar.gz -C /usr/lib/jvm/zulu8-fx --strip-components=1 && \
+    rm /tmp/zulu8.tar.gz
+
+# Clone cn1-binaries
+RUN git clone --depth=1 https://github.com/codenameone/cn1-binaries /opt/cn1-binaries
+
+# Set Environment Variables
+ENV JAVA_HOME=/usr/lib/jvm/zulu8-fx
+ENV PATH=$JAVA_HOME/bin:$PATH
+
+ENV JAVA8_HOME=/usr/lib/jvm/zulu8-fx
+ENV JDK8_HOME=/usr/lib/jvm/zulu8-fx
+
+# Paths for apt installed JDKs (usually symlinked to /usr/lib/jvm/zulu-XX-amd64)
+ENV JAVA11_HOME=/usr/lib/jvm/zulu-11-amd64
+ENV JDK11_HOME=/usr/lib/jvm/zulu-11-amd64
+ENV JAVA17_HOME=/usr/lib/jvm/zulu-17-amd64
+ENV JDK17_HOME=/usr/lib/jvm/zulu-17-amd64
+ENV JAVA21_HOME=/usr/lib/jvm/zulu-21-amd64
+ENV JDK21_HOME=/usr/lib/jvm/zulu-21-amd64
+ENV JAVA25_HOME=/usr/lib/jvm/zulu-25-amd64
+ENV JDK25_HOME=/usr/lib/jvm/zulu-25-amd64
+
+ENV CN1_BINARIES=/opt/cn1-binaries
+
+# Verify installations
+RUN java -version && \
+    $JAVA11_HOME/bin/java -version && \
+    $JAVA17_HOME/bin/java -version && \
+    $JAVA21_HOME/bin/java -version && \
+    $JAVA25_HOME/bin/java -version && \
+    ant -version && \
+    mvn -version && \
+    python3 --version

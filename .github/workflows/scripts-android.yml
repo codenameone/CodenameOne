@@ -90,6 +90,9 @@ jobs:
       pull-requests: write
       issues: write
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository }}/ci-container:latest
+      options: --privileged -v /dev/kvm:/dev/kvm
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
@@ -98,19 +101,13 @@ jobs:
       - name: Free Disk Space
         if: matrix.id != 'default'
         run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android/sdk/ndk
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /usr/share/swift
-      - name: Setup JDK
-        if: matrix.id != 'default'
-        uses: actions/setup-java@v4
-        with:
-          java-version: ${{ matrix.java_version }}
-          distribution: 'zulu'
+          rm -rf /usr/share/dotnet
+          rm -rf /usr/local/lib/android/sdk/ndk
+          rm -rf /opt/ghc
+          rm -rf /usr/share/swift
       - name: Set JDK_HOME
         if: matrix.id != 'default'
-        run: echo "JDK_HOME=${JAVA_HOME}" >> $GITHUB_ENV
+        run: echo "JDK_HOME=/usr/lib/jvm/zulu-${{ matrix.java_version }}-amd64" >> $GITHUB_ENV
       - name: Configure CN1SS options
         if: matrix.id != 'default'
         run: |
