@@ -32,6 +32,7 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
+  packages: read
 
 jobs:
   build-test:
@@ -58,6 +59,8 @@ jobs:
       run: |
         if [ "${{ matrix.java-version }}" == "8" ]; then
           echo "JAVA_HOME=$JAVA8_HOME" >> $GITHUB_ENV
+        elif [ "${{ matrix.java-version }}" == "11" ]; then
+          echo "JAVA_HOME=$JAVA11_HOME" >> $GITHUB_ENV
         elif [ "${{ matrix.java-version }}" == "17" ]; then
           echo "JAVA_HOME=$JAVA17_HOME" >> $GITHUB_ENV
         elif [ "${{ matrix.java-version }}" == "21" ]; then

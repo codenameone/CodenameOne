@@ -7,6 +7,10 @@ on:
     paths-ignore:
       - 'CodenameOneDesigner/**'
 
+permissions:
+  contents: read
+  packages: read
+
 jobs:
   build-linux-jdk8:
 

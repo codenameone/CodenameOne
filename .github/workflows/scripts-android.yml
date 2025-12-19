@@ -89,6 +89,7 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
+      packages: read
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/codenameone/codenameone/ci-container:latest
@@ -107,7 +108,10 @@ jobs:
         if: matrix.id != 'default'
         run: |
           # Map matrix.java_version to container env vars
-          if [ "${{ matrix.java_version }}" == "17" ]; then
+          if [ "${{ matrix.java_version }}" == "11" ]; then
+            echo "JDK_HOME=$JAVA11_HOME" >> $GITHUB_ENV
+            echo "JAVA_HOME=$JAVA11_HOME" >> $GITHUB_ENV
+          elif [ "${{ matrix.java_version }}" == "17" ]; then
             echo "JDK_HOME=$JAVA17_HOME" >> $GITHUB_ENV
             echo "JAVA_HOME=$JAVA17_HOME" >> $GITHUB_ENV
           elif [ "${{ matrix.java_version }}" == "21" ]; then

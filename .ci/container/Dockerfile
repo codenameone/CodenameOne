@@ -46,13 +46,14 @@ RUN mkdir -p /usr/lib/jvm && \
     rm /tmp/zulu8.tar.gz
 
 # Install other JDKs via apt
-# Note: zulu25-jdk might be available. If not, this step might fail.
-# If it fails, we will have to adjust. But the user implies availability.
 RUN apt-get install -y \
     zulu11-jdk \
     zulu17-jdk \
-    zulu21-jdk \
-    zulu25-jdk || echo "zulu25-jdk install failed, proceeding without it"
+    zulu21-jdk
+
+# Note: zulu25-jdk might be available. If not, this step might fail.
+# If it fails, we will have to adjust. But the user implies availability.
+RUN apt-get install -y zulu25-jdk || echo "zulu25-jdk install failed, proceeding without it"
 
 # Android SDK
 ENV ANDROID_HOME=/usr/lib/android-sdk
