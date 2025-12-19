@@ -50,6 +50,7 @@ class NativeFilePathVmIntegrationTest {
         CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
         CleanTargetIntegrationTest.writeRuntimeStubs(srcRoot);
         CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
+        CleanTargetIntegrationTest.stripObjectiveC(cmakeLists);
 
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);

@@ -219,11 +219,11 @@ public final class Paths {
             return new java.io.File(rawPath);
         }
 
-        public Path register(WatchService watcher, WatchEvent.Kind<?>[] events, WatchEvent.Modifier... modifiers) throws java.io.IOException {
+        public WatchKey register(WatchService watcher, WatchEvent.Kind<?>[] events, WatchEvent.Modifier... modifiers) throws java.io.IOException {
             throw new java.io.IOException("WatchService not supported in JavaAPI");
         }
 
-        public Path register(WatchService watcher, WatchEvent.Kind<?>... events) throws java.io.IOException {
+        public WatchKey register(WatchService watcher, WatchEvent.Kind<?>... events) throws java.io.IOException {
             throw new java.io.IOException("WatchService not supported in JavaAPI");
         }
 

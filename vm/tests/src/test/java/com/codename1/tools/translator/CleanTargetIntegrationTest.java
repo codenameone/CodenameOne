@@ -188,6 +188,12 @@ class CleanTargetIntegrationTest {
         Files.write(cmakeLists, replacement.getBytes(StandardCharsets.UTF_8));
     }
 
+    static void stripObjectiveC(Path cmakeLists) throws IOException {
+        String content = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
+        content = content.replace(" OBJC", "");
+        Files.write(cmakeLists, content.getBytes(StandardCharsets.UTF_8));
+    }
+
     static String runCommand(List<String> command, Path workingDir) throws Exception {
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(workingDir.toFile());

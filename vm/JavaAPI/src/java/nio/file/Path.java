@@ -7,7 +7,7 @@ import java.io.File;
 import java.net.URI;
 import java.util.Iterator;
 
-public interface Path extends Comparable<Path>, Iterable<Path> {
+public interface Path extends Comparable<Path>, Iterable<Path>, Watchable {
 
     FileSystem getFileSystem();
 
@@ -53,9 +53,9 @@ public interface Path extends Comparable<Path>, Iterable<Path> {
 
     File toFile();
 
-    Path register(WatchService watcher, WatchEvent.Kind<?>[] events, WatchEvent.Modifier... modifiers) throws java.io.IOException;
+    WatchKey register(WatchService watcher, WatchEvent.Kind<?>[] events, WatchEvent.Modifier... modifiers) throws java.io.IOException;
 
-    Path register(WatchService watcher, WatchEvent.Kind<?>... events) throws java.io.IOException;
+    WatchKey register(WatchService watcher, WatchEvent.Kind<?>... events) throws java.io.IOException;
 
     Iterator<Path> iterator();
 
