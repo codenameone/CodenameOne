@@ -10,7 +10,7 @@ public class DrawArc extends AbstractGraphicsScreenshotTest {
         g.setColor(0xffffff);
         for (int iter = 0 ; iter < bounds.getWidth() / 2 ; iter++) {
             nextColor(g);
-            g.drawArc(bounds.getX() + iter, bounds.getY() + iter, bounds.getX() + bounds.getWidth() - iter, bounds.getY() + bounds.getHeight() + iter, iter, 180);
+            g.drawArc(bounds.getX() + iter, bounds.getY() + iter, bounds.getWidth() - iter * 2, bounds.getHeight() - iter * 2, iter, 180);
         }
     }
 
