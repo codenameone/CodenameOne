@@ -230,7 +230,7 @@ public class UIBuilder { //implements Externalizable {
         blockAnalytics = aBlockAnalytics;
     }
 
-    static Hashtable getComponentRegistry() {
+    static synchronized Hashtable getComponentRegistry() {
         if (componentRegistry == null) {
             componentRegistry = new Hashtable();
             componentRegistry.put("Button", Button.class);

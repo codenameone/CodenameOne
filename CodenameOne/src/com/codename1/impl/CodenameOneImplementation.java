@@ -2680,7 +2680,7 @@ public abstract class CodenameOneImplementation {
                 break;
             case Component.DRAG_REGION_POSSIBLE_DRAG_X:
                 startY = Math.max(5, startY);
-                startX = Math.min(startY, 2f);
+                startX = Math.min(startX, 2f);
                 break;
             case Component.DRAG_REGION_POSSIBLE_DRAG_Y:
                 startX = Math.max(5, startX);
