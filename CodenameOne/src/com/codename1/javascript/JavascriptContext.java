@@ -104,7 +104,7 @@ public class JavascriptContext {
      * The name of the Javascript lookup table that is used to store and
      * look up Javascript objects that have a JSObject proxy.
      */
-    String jsLookupTable;
+    final String jsLookupTable;
 
     /**
      * A running counter for the next object ID that is to be assigned to

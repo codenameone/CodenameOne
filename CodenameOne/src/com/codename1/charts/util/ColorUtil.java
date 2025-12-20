@@ -27,15 +27,15 @@ package com.codename1.charts.util;
  * @author shannah
  */
 public class ColorUtil {
-    public static int LTGRAY = IColor.LightGray.argb;
-    public static int BLUE = IColor.Blue.argb;
-    public static int BLACK = IColor.Black.argb;
-    public static int WHITE = IColor.White.argb;
-    public static int CYAN = IColor.Cyan.argb;
-    public static int GREEN = IColor.Green.argb;
-    public static int YELLOW = IColor.Yellow.argb;
-    public static int MAGENTA = IColor.Magenta.argb;
-    public static int GRAY = IColor.Gray.argb;
+    public static final int LTGRAY = IColor.LightGray.argb;
+    public static final int BLUE = IColor.Blue.argb;
+    public static final int BLACK = IColor.Black.argb;
+    public static final int WHITE = IColor.White.argb;
+    public static final int CYAN = IColor.Cyan.argb;
+    public static final int GREEN = IColor.Green.argb;
+    public static final int YELLOW = IColor.Yellow.argb;
+    public static final int MAGENTA = IColor.Magenta.argb;
+    public static final int GRAY = IColor.Gray.argb;
 
 
     public static int argb(int a, int r, int g, int b) {

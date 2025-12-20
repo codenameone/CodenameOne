@@ -118,7 +118,7 @@ public final class PlatformDefaults {
      * to specify the visual padding.
      * <p>
      */
-    public static String VISUAL_PADDING_PROPERTY = "visualPadding";
+    public static final String VISUAL_PADDING_PROPERTY = "visualPadding";
     static BoundSize RELATED_X = null, RELATED_Y = null, UNRELATED_X = null, UNRELATED_Y = null;
     private static int DEF_H_UNIT = UnitValue.LPX;
     private static int DEF_V_UNIT = UnitValue.LPY;

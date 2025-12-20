@@ -45,17 +45,17 @@ public class DocumentInfo {
     /**
      * Indicates that the request is for a page
      */
-    public static int TYPE_HTML = 0;
+    public static final int TYPE_HTML = 0;
 
     /**
      * Indicates that the request is for an image
      */
-    public static int TYPE_IMAGE = 1;
+    public static final int TYPE_IMAGE = 1;
 
     /**
      * Indicates that the request is for a CSS file
      */
-    public static int TYPE_CSS = 2;
+    public static final int TYPE_CSS = 2;
 
     private static String DEFAULT_ENCODING = ENCODING_ISO;
 
