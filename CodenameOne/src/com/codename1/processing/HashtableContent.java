@@ -197,6 +197,13 @@ class MapContent implements StructuredContent {
             }
             node = tmp;
         }
+        if (node == null) {
+            if (oldList) {
+                return new java.util.Vector();
+            } else {
+                return new ArrayList();
+            }
+        }
         node = ((Map) node).get(name);
         if (node == null) {
             if (oldList) {

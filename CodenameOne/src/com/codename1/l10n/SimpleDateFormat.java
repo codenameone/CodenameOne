@@ -964,7 +964,7 @@ public class SimpleDateFormat extends DateFormat {
      */
     int parseMonth(String month, int offset) throws ParseException {
         if (month == null) {
-            throwInvalid("month", offset);
+            return throwInvalid("month", offset);
         }
         if (month.length() < 3) {
             return (parseNumber(month, offset, "month", 1, 12) - 1) + Calendar.JANUARY;
@@ -1066,7 +1066,7 @@ public class SimpleDateFormat extends DateFormat {
      */
     int parseTimeZone(String source, int ofs, TimeZoneResult res) throws ParseException {
         if (source == null) {
-            throwInvalid("timezone", ofs);
+            return throwInvalid("timezone", ofs);
         }
         char tzSign = source.charAt(0);
         if (tzSign == 'z' || tzSign == 'Z') {
@@ -1076,7 +1076,7 @@ public class SimpleDateFormat extends DateFormat {
         if (tzSign == SIGN_NEGATIVE || tzSign == SIGN_POSITIVE) {
             source = readSubstring(source, 1);
             if (source == null) {
-                throwInvalid("timezone", ofs);
+                return throwInvalid("timezone", ofs);
             }
             // set the index to point to divider between hours
             // and minutes. Hour can be one or two digits, minutes

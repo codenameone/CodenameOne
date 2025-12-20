@@ -1304,6 +1304,9 @@ public final class CommonTransitions extends Transition {
             case TYPE_PULSATE_DIALOG:
                 retVal = createDialogPulsate();
                 break;
+            default:
+                retVal = CommonTransitions.createEmpty();
+                break;
         }
         retVal.linearMotion = linearMotion;
         return retVal;

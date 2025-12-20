@@ -630,7 +630,10 @@ public class InteractionDialog extends Container {
      *             This is ignored if there isn't enough space
      */
     public void showPopupDialog(Component c, boolean bias) {
-        Form f = c == null ? null : c.getComponentForm(); // PMD Fix: BrokenNullCheck
+        if (c == null) {
+            throw new IllegalArgumentException("Component cannot be null");
+        }
+        Form f = c.getComponentForm(); // PMD Fix: BrokenNullCheck
         if (f != null && !formMode && !f.getContentPane().contains(c)) {
             setFormMode(true);
         }
@@ -664,6 +667,9 @@ public class InteractionDialog extends Container {
      *             This is ignored if there isn't enough space
      */
     public void showPopupDialog(Rectangle rect, boolean bias) {
+        if (rect == null) {
+            throw new IllegalArgumentException("rect cannot be null");
+        }
         Form f = Display.getInstance().getCurrent();
         Rectangle origRect = rect;
         rect = new Rectangle(rect);
