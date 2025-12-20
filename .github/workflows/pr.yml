@@ -32,11 +32,16 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
+  packages: read
 
 jobs:
   build-test:
 
     runs-on: ubuntu-latest
+    container: ghcr.io/codenameone/codenameone/pr-ci-container:latest
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
@@ -44,18 +49,21 @@ jobs:
 
     steps:
       - uses: actions/checkout@v1
-      - name: Set up JDK 8
-        if: matrix.java-version == 8
-        uses: actions/setup-java@v1
-        with:
-          java-version: 1.8
-          java-package: jdk+fx
-      - name: Set up JDK
-        if: matrix.java-version != 8
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: ${{ matrix.java-version }}
+      - name: Set up Java
+        run: |
+          if [ "${{ matrix.java-version }}" = "8" ]; then
+             echo "JAVA_HOME=${JAVA8_HOME}" >> $GITHUB_ENV
+             echo "${JAVA8_HOME}/bin" >> $GITHUB_PATH
+          elif [ "${{ matrix.java-version }}" = "17" ]; then
+             echo "JAVA_HOME=${JAVA17_HOME}" >> $GITHUB_ENV
+             echo "${JAVA17_HOME}/bin" >> $GITHUB_PATH
+          elif [ "${{ matrix.java-version }}" = "21" ]; then
+             echo "JAVA_HOME=${JAVA21_HOME}" >> $GITHUB_ENV
+             echo "${JAVA21_HOME}/bin" >> $GITHUB_PATH
+          elif [ "${{ matrix.java-version }}" = "25" ]; then
+             echo "JAVA_HOME=${JAVA25_HOME}" >> $GITHUB_ENV
+             echo "${JAVA25_HOME}/bin" >> $GITHUB_PATH
+          fi
       - name: Cache Maven dependencies
         uses: actions/cache@v4
         with:
@@ -76,7 +84,8 @@ jobs:
         run: |
           set -euo pipefail
           rm -rf maven/target/cn1-binaries
-          git clone --depth=1 --filter=blob:none https://github.com/codenameone/cn1-binaries maven/target/cn1-binaries
+          mkdir -p maven/target
+          cp -r /opt/cn1-binaries maven/target/cn1-binaries
       - name: Run Maven plugin tests
         working-directory: maven
         env:
@@ -226,12 +235,8 @@ jobs:
           script: |
             const { publishQualityComment } = require('./.github/scripts/publish-quality-comment.js');
             await publishQualityComment({ github, context, core });
-      - name: Install dependencies
-        run: |
-          sudo apt-get update && sudo apt-get install xvfb
-          wget https://github.com/codenameone/cn1-binaries/archive/refs/heads/master.zip
-          unzip master.zip -d ..
-          mv ../cn1-binaries-master ../cn1-binaries
+      - name: Link cn1-binaries
+        run: ln -s /opt/cn1-binaries ../cn1-binaries
       - name: Build CLDC11 JAR
         run: |
           ANT_OPTS_ARGS=""
