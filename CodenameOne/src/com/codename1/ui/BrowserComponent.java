@@ -1439,7 +1439,7 @@ public class BrowserComponent extends Container {
      * @param callback Callback to call when complete.
      */
     public void execute(int timeout, String js, Object[] params, SuccessCallback<JSRef> callback) {
-        execute(0, js, params, callback);
+        execute(timeout, injectParameters(js, params), callback);
     }
 
     /**

@@ -562,7 +562,7 @@ public class TextSelection {
      * @return
      */
     public Char newChar(int pos, Rectangle bounds) {
-        return newChar(pos, bounds);
+        return newChar(pos, bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
     }
 
     /**
