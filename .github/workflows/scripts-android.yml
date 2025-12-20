@@ -139,6 +139,8 @@ jobs:
           ls -l /dev/kvm || true
       - name: Run Android instrumentation tests
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          JAVA_HOME: /usr/lib/jvm/zulu17-ca-amd64
         with:
           api-level: 31
           arch: x86_64
