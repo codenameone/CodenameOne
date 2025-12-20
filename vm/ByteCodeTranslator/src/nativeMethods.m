@@ -1697,3 +1697,281 @@ JAVA_OBJECT java_lang_String_format___java_lang_String_java_lang_Object_1ARRAY_R
     return out;
     
 }
+
+// java.io.File implementation
+
+JAVA_BOOLEAN java_io_File_existsImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+    if(path == JAVA_NULL) return JAVA_FALSE;
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    BOOL res = [[NSFileManager defaultManager] fileExistsAtPath:p];
+    [pool release];
+    return res;
+}
+
+JAVA_BOOLEAN java_io_File_isDirectoryImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+    if(path == JAVA_NULL) return JAVA_FALSE;
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    BOOL isDir = NO;
+    BOOL exists = [[NSFileManager defaultManager] fileExistsAtPath:p isDirectory:&isDir];
+    [pool release];
+    return exists && isDir;
+}
+
+JAVA_BOOLEAN java_io_File_isFileImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+    if(path == JAVA_NULL) return JAVA_FALSE;
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    BOOL isDir = NO;
+    BOOL exists = [[NSFileManager defaultManager] fileExistsAtPath:p isDirectory:&isDir];
+    [pool release];
+    return exists && !isDir;
+}
+
+JAVA_BOOLEAN java_io_File_isHiddenImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+    if(path == JAVA_NULL) return JAVA_FALSE;
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    BOOL hidden = [[p lastPathComponent] hasPrefix:@"."];
+    [pool release];
+    return hidden;
+}
+
+JAVA_LONG java_io_File_lastModifiedImpl___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+    if(path == JAVA_NULL) return 0;
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    NSDictionary *attrs = [[NSFileManager defaultManager] attributesOfItemAtPath:p error:NULL];
+    JAVA_LONG time = 0;
+    if (attrs) {
+        NSDate *date = [attrs fileModificationDate];
+        time = (JAVA_LONG)([date timeIntervalSince1970] * 1000);
+    }
+    [pool release];
+    return time;
+}
+
+JAVA_LONG java_io_File_lengthImpl___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+    if(path == JAVA_NULL) return 0;
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    NSDictionary *attrs = [[NSFileManager defaultManager] attributesOfItemAtPath:p error:NULL];
+    JAVA_LONG len = 0;
+    if (attrs) {
+        len = [attrs fileSize];
+    }
+    [pool release];
+    return len;
+}
+
+JAVA_BOOLEAN java_io_File_createNewFileImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+    if(path == JAVA_NULL) return JAVA_FALSE;
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    BOOL res = [[NSFileManager defaultManager] createFileAtPath:p contents:nil attributes:nil];
+    [pool release];
+    return res;
+}
+
+JAVA_BOOLEAN java_io_File_deleteImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+    if(path == JAVA_NULL) return JAVA_FALSE;
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    BOOL res = [[NSFileManager defaultManager] removeItemAtPath:p error:NULL];
+    [pool release];
+    return res;
+}
+
+JAVA_OBJECT java_io_File_listImpl___java_lang_String_R_java_lang_String_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+    if(path == JAVA_NULL) return JAVA_NULL;
+    enteringNativeAllocations();
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    NSArray* files = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:p error:NULL];
+    if (files == nil) {
+        [pool release];
+        finishedNativeAllocations();
+        return JAVA_NULL;
+    }
+
+    JAVA_OBJECT arr = allocArray(threadStateData, [files count], &class__java_lang_String, sizeof(JAVA_OBJECT), 1);
+
+    for (int i=0; i<[files count]; i++) {
+        NSString* f = [files objectAtIndex:i];
+        JAVA_OBJECT s = fromNSString(CN1_THREAD_STATE_PASS_ARG f);
+        CN1_SET_ARRAY_ELEMENT_OBJECT(arr, i, s);
+    }
+
+    [pool release];
+    finishedNativeAllocations();
+    return arr;
+}
+
+JAVA_BOOLEAN java_io_File_mkdirImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+    if(path == JAVA_NULL) return JAVA_FALSE;
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    BOOL res = [[NSFileManager defaultManager] createDirectoryAtPath:p withIntermediateDirectories:NO attributes:nil error:NULL];
+    [pool release];
+    return res;
+}
+
+JAVA_BOOLEAN java_io_File_renameToImpl___java_lang_String_java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path, JAVA_OBJECT dest) {
+    if(path == JAVA_NULL || dest == JAVA_NULL) return JAVA_FALSE;
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    NSString* d = toNSString(CN1_THREAD_STATE_PASS_ARG dest);
+    BOOL res = [[NSFileManager defaultManager] moveItemAtPath:p toPath:d error:NULL];
+    [pool release];
+    return res;
+}
+
+JAVA_BOOLEAN java_io_File_setReadOnlyImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+    if(path == JAVA_NULL) return JAVA_FALSE;
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    NSDictionary* attrs = [NSDictionary dictionaryWithObject:[NSNumber numberWithBool:YES] forKey:NSFileImmutable];
+    BOOL res = [[NSFileManager defaultManager] setAttributes:attrs ofItemAtPath:p error:NULL];
+    [pool release];
+    return res;
+}
+
+JAVA_BOOLEAN java_io_File_setWritableImpl___java_lang_String_boolean_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path, JAVA_BOOLEAN writable) {
+    if(path == JAVA_NULL) return JAVA_FALSE;
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    // Setting writable usually means checking Immutable flag or Posix permissions
+    // Simplistic implementation for Immutable flag:
+    NSDictionary* attrs = [NSDictionary dictionaryWithObject:[NSNumber numberWithBool:(!writable)] forKey:NSFileImmutable];
+    BOOL res = [[NSFileManager defaultManager] setAttributes:attrs ofItemAtPath:p error:NULL];
+    [pool release];
+    return res;
+}
+
+JAVA_BOOLEAN java_io_File_setReadableImpl___java_lang_String_boolean_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path, JAVA_BOOLEAN readable) {
+    // Implementing setReadable on iOS sandbox is tricky via NSFileManager without POSIX.
+    // We'll treat it as success if file exists.
+    return java_io_File_existsImpl___java_lang_String_R_boolean(threadStateData, __cn1ThisObject, path);
+}
+
+JAVA_BOOLEAN java_io_File_setExecutableImpl___java_lang_String_boolean_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path, JAVA_BOOLEAN executable) {
+    // Executable permission is not typically managed this way on iOS documents
+    return java_io_File_existsImpl___java_lang_String_R_boolean(threadStateData, __cn1ThisObject, path);
+}
+
+JAVA_BOOLEAN java_io_File_canReadImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+    if(path == JAVA_NULL) return JAVA_FALSE;
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    BOOL res = [[NSFileManager defaultManager] isReadableFileAtPath:p];
+    [pool release];
+    return res;
+}
+
+JAVA_BOOLEAN java_io_File_canWriteImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+    if(path == JAVA_NULL) return JAVA_FALSE;
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    BOOL res = [[NSFileManager defaultManager] isWritableFileAtPath:p];
+    [pool release];
+    return res;
+}
+
+JAVA_BOOLEAN java_io_File_canExecuteImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+    if(path == JAVA_NULL) return JAVA_FALSE;
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    BOOL res = [[NSFileManager defaultManager] isExecutableFileAtPath:p];
+    [pool release];
+    return res;
+}
+
+JAVA_LONG java_io_File_getTotalSpaceImpl___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+#ifdef CN1_IOS
+    return 0;
+#else
+    if(path == JAVA_NULL) return 0;
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    NSDictionary *attrs = [[NSFileManager defaultManager] attributesOfFileSystemForPath:p error:NULL];
+    JAVA_LONG size = 0;
+    if(attrs) {
+        size = [[attrs objectForKey:NSFileSystemSize] longLongValue];
+    }
+    [pool release];
+    return size;
+#endif
+}
+
+JAVA_LONG java_io_File_getFreeSpaceImpl___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+#ifdef CN1_IOS
+    return 0;
+#else
+    if(path == JAVA_NULL) return 0;
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    NSDictionary *attrs = [[NSFileManager defaultManager] attributesOfFileSystemForPath:p error:NULL];
+    JAVA_LONG size = 0;
+    if(attrs) {
+        size = [[attrs objectForKey:NSFileSystemFreeSize] longLongValue];
+    }
+    [pool release];
+    return size;
+#endif
+}
+
+JAVA_LONG java_io_File_getUsableSpaceImpl___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+#ifdef CN1_IOS
+    return 0;
+#else
+    if(path == JAVA_NULL) return 0;
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    NSDictionary *attrs = [[NSFileManager defaultManager] attributesOfFileSystemForPath:p error:NULL];
+    JAVA_LONG size = 0;
+    if(attrs) {
+        size = [[attrs objectForKey:NSFileSystemFreeSize] longLongValue]; // Usable ~= Free usually
+    }
+    [pool release];
+    return size;
+#endif
+}
+
+JAVA_OBJECT java_io_File_getAbsolutePathImpl___java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+    if(path == JAVA_NULL) return JAVA_NULL;
+    enteringNativeAllocations();
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+
+    NSString* absPath;
+    if ([p isAbsolutePath]) {
+        absPath = p;
+    } else {
+        NSString* cwd = [[NSFileManager defaultManager] currentDirectoryPath];
+        absPath = [cwd stringByAppendingPathComponent:p];
+    }
+    JAVA_OBJECT res = fromNSString(CN1_THREAD_STATE_PASS_ARG absPath);
+    [pool release];
+    finishedNativeAllocations();
+    return res;
+}
+
+JAVA_OBJECT java_io_File_getCanonicalPathImpl___java_lang_String_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+    if(path == JAVA_NULL) return JAVA_NULL;
+    enteringNativeAllocations();
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
+    NSString* absPath;
+     if ([p isAbsolutePath]) {
+        absPath = p;
+    } else {
+        NSString* cwd = [[NSFileManager defaultManager] currentDirectoryPath];
+        absPath = [cwd stringByAppendingPathComponent:p];
+    }
+    NSString* canon = [absPath stringByStandardizingPath];
+    JAVA_OBJECT res = fromNSString(CN1_THREAD_STATE_PASS_ARG canon);
+    [pool release];
+    finishedNativeAllocations();
+    return res;
+}
