@@ -33,17 +33,17 @@ public class LocationRequest {
     /**
      * When you need gps location updates
      */
-    public static int PRIORITY_HIGH_ACCUARCY = 0;
+    public static final int PRIORITY_HIGH_ACCUARCY = 0;
 
     /**
      * When accuracy is not highly important and you want to save battery
      */
-    public static int PRIORITY_MEDIUM_ACCUARCY = 1;
+    public static final int PRIORITY_MEDIUM_ACCUARCY = 1;
 
     /**
      * When accuracy is not important and you want to save battery
      */
-    public static int PRIORITY_LOW_ACCUARCY = 2;
+    public static final int PRIORITY_LOW_ACCUARCY = 2;
 
     private int priority = PRIORITY_MEDIUM_ACCUARCY;
 

@@ -76,15 +76,15 @@ public class Log {
     /**
      * Indicates that log reporting to the cloud should be disabled
      */
-    public static int REPORTING_NONE = 0;
+    public static final int REPORTING_NONE = 0;
     /**
      * Indicates that log reporting to the cloud should occur regardless of whether an error occurred
      */
-    public static int REPORTING_DEBUG = 1;
+    public static final int REPORTING_DEBUG = 1;
     /**
      * Indicates that log reporting to the cloud should occur only if an error occurred
      */
-    public static int REPORTING_PRODUCTION = 3;
+    public static final int REPORTING_PRODUCTION = 3;
     private static boolean crashBound;
     private static Log instance = new Log();
     private static boolean initialized;

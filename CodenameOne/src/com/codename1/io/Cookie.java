@@ -34,7 +34,7 @@ import java.io.IOException;
  * @author Shai Almog
  */
 public class Cookie implements Externalizable {
-    public static String STORAGE_NAME = "Cookies";
+    public static final String STORAGE_NAME = "Cookies";
     private static boolean autoStored = true;
 
     static {
