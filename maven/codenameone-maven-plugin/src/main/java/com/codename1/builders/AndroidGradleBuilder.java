@@ -499,23 +499,6 @@ public class AndroidGradleBuilder extends Executor {
 
     @Override
     public boolean build(File sourceZip, final BuildRequest request) throws BuildException {
-        // Ensure that we use a java version that is compatible with the android sdk tools
-        // We prefer Java 17, but will fall back to others if not found.
-        String javaHome = System.getenv("JAVA17_HOME");
-        if (javaHome == null) {
-            javaHome = System.getenv("JDK17_HOME");
-        }
-        if (javaHome == null) {
-            javaHome = System.getenv("JAVA11_HOME");
-        }
-        if (javaHome == null) {
-            javaHome = System.getenv("JDK11_HOME");
-        }
-
-        if (javaHome != null) {
-            defaultEnvironment.put("JAVA_HOME", javaHome);
-        }
-
         boolean facebookSupported = request.getArg("facebook.appId", null) != null;
         newFirebaseMessaging = request.getArg("android.newFirebaseMessaging", "true").equals("true");
         useGradle8 = request.getArg("android.useGradle8", ""+(useGradle8 || newFirebaseMessaging || facebookSupported)).equals("true");
@@ -594,13 +577,7 @@ public class AndroidGradleBuilder extends Executor {
         if (!androidSDKDir.exists()) {
             throw new BuildException("Cannot find Android SDK at "+androidHome+".  Please install Android studio, or set the ANDROID_HOME environment variable to point to your android sdk directory.");
         }
-
-        boolean looksLikeSdk = new File(androidSDKDir, "platform-tools").exists() ||
-                               new File(androidSDKDir, "build-tools").exists() ||
-                               new File(androidSDKDir, "cmdline-tools").exists() ||
-                               new File(androidSDKDir, "platforms").exists();
-
-        if (!looksLikeSdk && !androidSDKDir.getName().equalsIgnoreCase("sdk")) {
+        if (!androidSDKDir.getName().equalsIgnoreCase("sdk")) {
             androidSDKDir = new File(androidSDKDir, "Sdk");
             if (!androidSDKDir.isDirectory()) {
                 androidSDKDir = new File(androidSDKDir.getParentFile(), "sdk");
