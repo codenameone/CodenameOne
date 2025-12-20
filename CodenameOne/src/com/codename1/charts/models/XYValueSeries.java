@@ -48,7 +48,7 @@ public class XYValueSeries extends XYSeries {
      * @param y the value for the Y axis
      * @param value the value
      */
-    public synchronized void add(double x, double y, double value) {
+    public void add(double x, double y, double value) {
         super.add(x, y);
         mValue.add(value);
         updateRange(value);
@@ -82,7 +82,7 @@ public class XYValueSeries extends XYSeries {
      * @param x the value for the X axis
      * @param y the value for the Y axis
      */
-    public synchronized void add(double x, double y) {
+    public void add(double x, double y) {
         add(x, y, 0d);
     }
 
@@ -91,7 +91,7 @@ public class XYValueSeries extends XYSeries {
      *
      * @param index the index in the series of the value to remove
      */
-    public synchronized void remove(int index) {
+    public void remove(int index) {
         super.remove(index);
         double removedValue = mValue.remove(index);
         if (removedValue == mMinValue || removedValue == mMaxValue) {
@@ -102,7 +102,7 @@ public class XYValueSeries extends XYSeries {
     /**
      * Removes all the values from the series.
      */
-    public synchronized void clear() {
+    public  void clear() {
         super.clear();
         mValue.clear();
         initRange();
@@ -114,7 +114,7 @@ public class XYValueSeries extends XYSeries {
      * @param index the index
      * @return the value
      */
-    public synchronized double getValue(int index) {
+    public double getValue(int index) {
         return mValue.get(index);
     }
 

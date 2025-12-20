@@ -2919,7 +2919,7 @@ public final class Display extends CN1Constants {
      * @see #removeVirtualKeyboardListener(com.codename1.ui.events.ActionListener)
      * @since 6.0
      */
-    public synchronized void addVirtualKeyboardListener(ActionListener l) {
+    public void addVirtualKeyboardListener(ActionListener l) {
         if (virtualKeyboardListeners == null) {
             virtualKeyboardListeners = new EventDispatcher();
         }
@@ -2937,7 +2937,7 @@ public final class Display extends CN1Constants {
      * @see #addVirtualKeyboardListener(com.codename1.ui.events.ActionListener)
      * @since 6.0
      */
-    public synchronized void removeVirtualKeyboardListener(ActionListener l) {
+    public void removeVirtualKeyboardListener(ActionListener l) {
         if (virtualKeyboardListeners != null) {
             virtualKeyboardListeners.removeListener(l);
         }
@@ -3422,7 +3422,7 @@ public final class Display extends CN1Constants {
      *
      * @param l the listener to add
      */
-    public synchronized void addWindowListener(ActionListener<WindowEvent> l) {
+    public void addWindowListener(ActionListener<WindowEvent> l) {
         if (windowListeners == null) {
             windowListeners = new EventDispatcher();
         }
@@ -3434,7 +3434,7 @@ public final class Display extends CN1Constants {
      *
      * @param l the listener to remove
      */
-    public synchronized void removeWindowListener(ActionListener<WindowEvent> l) {
+    public void removeWindowListener(ActionListener<WindowEvent> l) {
         if (windowListeners != null) {
             windowListeners.removeListener(l);
         }
@@ -5222,7 +5222,7 @@ public final class Display extends CN1Constants {
         private Throwable cause;
         private EdtException parent;
 
-        public synchronized Throwable getCause() {
+        public Throwable getCause() {
             return cause;
         }
 

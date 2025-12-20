@@ -90,12 +90,14 @@ public class DateFormatSymbols implements Cloneable {
         ampms = newAmpms;
     }
 
-    public Hashtable<String, String> getResourceBundle() {
+    public synchronized Hashtable<String, String> getResourceBundle() {
         return resourceBundle;
     }
 
     public void setResourceBundle(Hashtable<String, String> newResourceBundle) {
-        this.resourceBundle = newResourceBundle;
+        synchronized (this) {
+            this.resourceBundle = newResourceBundle;
+        }
         // force rebuild
         ampms = null;
         months = null;

@@ -34,7 +34,7 @@ import java.io.InputStream;
  */
 public class BufferedInputStream extends InputStream {
     private static int streamCount = 0;
-    private static int defaultBufferSize = 8192;
+    private static volatile int defaultBufferSize = 8192;
     private int actualAvailable = defaultBufferSize;
     private Object connection;
     private InputStream in;
@@ -212,10 +212,10 @@ public class BufferedInputStream extends InputStream {
     }
 
     /**
-     * Check to make sure that underlying input stream has not been
+     * Check to make sure that the underlying input stream has not been
      * nulled out due to close; if not return it;
      */
-    private InputStream getInIfOpen() throws IOException {
+    private synchronized InputStream getInIfOpen() throws IOException {
         InputStream input = in;
         if (input == null) {
             throw new IOException("Stream closed");
@@ -227,7 +227,7 @@ public class BufferedInputStream extends InputStream {
      * Check to make sure that buffer has not been nulled out due to
      * close; if not return it;
      */
-    private byte[] getBufIfOpen() throws IOException {
+    private synchronized byte[] getBufIfOpen() throws IOException {
         byte[] buffer = buf;
         if (buffer == null) {
             throw new IOException("Stream closed");
@@ -377,7 +377,7 @@ public class BufferedInputStream extends InputStream {
         return cnt;
     }
 
-    private void yieldTime() {
+    private synchronized void yieldTime() {
         long time = System.currentTimeMillis();
         if (time - elapsedSinceLastYield > 300) {
             try {
@@ -656,16 +656,16 @@ public class BufferedInputStream extends InputStream {
      *
      * @return time of the last activity on this stream
      */
-    public long getLastActivityTime() {
+    public synchronized long getLastActivityTime() {
         return lastActivityTime;
     }
 
     /**
-     * Returns the total amount of bytes read from this stream so far
+     * Returns the total number of bytes read from this stream so far
      *
-     * @return the total amount of bytes read from this stream so far
+     * @return the total number of bytes read from this stream so far
      */
-    public int getTotalBytesRead() {
+    public synchronized int getTotalBytesRead() {
         return totalBytesRead;
     }
 
@@ -706,14 +706,14 @@ public class BufferedInputStream extends InputStream {
     /**
      * @return the disableBuffering
      */
-    public boolean isDisableBuffering() {
+    public synchronized boolean isDisableBuffering() {
         return disableBuffering;
     }
 
     /**
      * @param disableBuffering the disableBuffering to set
      */
-    public void setDisableBuffering(boolean disableBuffering) {
+    public synchronized void setDisableBuffering(boolean disableBuffering) {
         this.disableBuffering = disableBuffering;
     }
 
@@ -723,7 +723,7 @@ public class BufferedInputStream extends InputStream {
      *
      * @return the printInput
      */
-    public boolean isPrintInput() {
+    public synchronized boolean isPrintInput() {
         return printInput;
     }
 
@@ -733,7 +733,7 @@ public class BufferedInputStream extends InputStream {
      *
      * @param printInput the printInput to set
      */
-    public void setPrintInput(boolean printInput) {
+    public synchronized void setPrintInput(boolean printInput) {
         this.printInput = printInput;
     }
 
@@ -743,7 +743,7 @@ public class BufferedInputStream extends InputStream {
      *
      * @return the yield
      */
-    public int getYield() {
+    public synchronized int getYield() {
         return yield;
     }
 
@@ -753,7 +753,7 @@ public class BufferedInputStream extends InputStream {
      *
      * @param yield the yield to set
      */
-    public void setYield(int yield) {
+    public synchronized void setYield(int yield) {
         this.yield = yield;
     }
 
@@ -761,7 +761,7 @@ public class BufferedInputStream extends InputStream {
      * Stop reading from the stream, invoking this will cause the read() to
      * return -1
      */
-    public void stop() {
+    public synchronized void stop() {
         stopped = true;
     }
 

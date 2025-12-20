@@ -137,7 +137,7 @@ public class BufferedOutputStream extends OutputStream {
     /**
      * Flush the internal buffer
      */
-    public void flushBuffer() throws IOException {
+    public synchronized void flushBuffer() throws IOException {
         if (closed) {
             return;
         }
@@ -218,7 +218,7 @@ public class BufferedOutputStream extends OutputStream {
      *
      * @return time of the last activity on this stream
      */
-    public long getLastActivityTime() {
+    public synchronized long getLastActivityTime() {
         return lastActivityTime;
     }
 
@@ -227,7 +227,7 @@ public class BufferedOutputStream extends OutputStream {
      *
      * @return the total amount of bytes written to this stream so far
      */
-    public int getTotalBytesWritten() {
+    public synchronized int getTotalBytesWritten() {
         return totalBytesWritten;
     }
 
