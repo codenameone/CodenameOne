@@ -549,7 +549,7 @@ public class BufferedInputStream extends InputStream {
      */
     public synchronized int available() throws IOException {
         if (disableBuffering) {
-            return available();
+            return in.available();
         }
         return superAvailable() + (count - pos);
     }
