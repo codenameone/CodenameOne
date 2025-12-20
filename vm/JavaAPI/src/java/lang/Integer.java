@@ -128,7 +128,7 @@ public final class Integer extends Number implements Comparable<Integer> {
      */
     public static int parseInt(String string, int radix) throws NumberFormatException {
         if (radix < Character.MIN_RADIX || radix > Character.MAX_RADIX) {
-            throw new NumberFormatException("Invalid radix: " + radix);
+            throw new NumberFormatException("Invalid radix");
         }
         if (string == null) {
             throw invalidInt(string);
@@ -176,7 +176,7 @@ public final class Integer extends Number implements Comparable<Integer> {
     }
 
     private static NumberFormatException invalidInt(String s) {
-        throw new NumberFormatException("Invalid int: \"" + s + "\"");
+        throw new NumberFormatException("Invalid int");
     }
 
 
