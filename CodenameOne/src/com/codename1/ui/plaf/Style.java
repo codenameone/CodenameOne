@@ -3156,4 +3156,9 @@ public class Style {
         return this.surface == other.surface;
     }
 
+    @Override
+    public int hashCode() {
+        return System.identityHashCode(this);
+    }
+
 }

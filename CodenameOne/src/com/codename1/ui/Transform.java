@@ -895,6 +895,31 @@ public class Transform {
         return out;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (o instanceof Transform) {
+            return equals((Transform) o);
+        }
+        return false;
+    }
+
+    @Override
+    public int hashCode() {
+        if (type == TYPE_IDENTITY) {
+            return 0;
+        }
+        int hash = 7;
+        hash = 29 * hash + this.type;
+        hash = 29 * hash + (this.nativeTransform != null ? this.nativeTransform.hashCode() : 0);
+        hash = 29 * hash + Float.floatToIntBits(this.translateX);
+        hash = 29 * hash + Float.floatToIntBits(this.translateY);
+        hash = 29 * hash + Float.floatToIntBits(this.translateZ);
+        hash = 29 * hash + Float.floatToIntBits(this.scaleX);
+        hash = 29 * hash + Float.floatToIntBits(this.scaleY);
+        hash = 29 * hash + Float.floatToIntBits(this.scaleZ);
+        return hash;
+    }
+
     public static class NotInvertibleException extends Exception {
 
     }

@@ -209,6 +209,11 @@ public class PropertyBase<T, K> {
         return false;
     }
 
+    @Override
+    public int hashCode() {
+        return name.hashCode();
+    }
+
     T get() {
         return null;
     }

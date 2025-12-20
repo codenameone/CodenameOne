@@ -522,4 +522,9 @@ public class BoxLayout extends Layout {
     public boolean equals(Object o) {
         return super.equals(o) && axis == ((BoxLayout) o).axis;
     }
+
+    @Override
+    public int hashCode() {
+        return super.hashCode() ^ axis;
+    }
 }

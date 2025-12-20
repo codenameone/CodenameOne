@@ -717,6 +717,11 @@ public class RoundBorder extends Border {
         return obj == this;
     }
 
+    @Override
+    public int hashCode() {
+        return System.identityHashCode(this);
+    }
+
     static class CacheValue {
         Image img;
         long modificationTime;

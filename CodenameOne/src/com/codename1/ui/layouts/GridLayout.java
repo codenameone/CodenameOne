@@ -356,6 +356,11 @@ public class GridLayout extends Layout {
                 ((GridLayout) o).getColumns() == getColumns() && ((GridLayout) o).autoFit == autoFit;
     }
 
+    @Override
+    public int hashCode() {
+        return super.hashCode() ^ getRows() ^ getColumns() ^ (autoFit ? 1231 : 1237);
+    }
+
     /**
      * When set to true makes the grid layout fill the last row of the layout
      * entirely if the number of elements in that row is bigger.

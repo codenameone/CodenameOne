@@ -845,6 +845,11 @@ public class BorderLayout extends Layout {
         return false;
     }
 
+    @Override
+    public int hashCode() {
+        return centerBehavior + (landscapeSwap == null ? 0 : landscapeSwap.hashCode());
+    }
+
     /**
      * Indicates that the center shouldn't grow and should be placed exactly in the center of the layout
      *

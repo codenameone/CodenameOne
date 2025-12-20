@@ -1142,6 +1142,11 @@ public class RoundRectBorder extends Border {
         return obj == this;
     }
 
+    @Override
+    public int hashCode() {
+        return System.identityHashCode(this);
+    }
+
 
     /**
      * Returns true if this border corner is round and false if it's square
