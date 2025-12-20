@@ -186,7 +186,7 @@ class ResourceThreadQueue {
      *
      * @return the queue size
      */
-    int getQueueSize() {
+    synchronized int getQueueSize() {
         return (images.size() + queue.size()); // CSS files are added directly to queue while images to the images vector
         //return queue.size();
     }

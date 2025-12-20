@@ -1576,7 +1576,7 @@ public class Image implements ActionSource {
     }
 
     @Override
-    public synchronized void addActionListener(ActionListener l) {
+    public void addActionListener(ActionListener l) {
         if (listeners == null) {
             listeners = new EventDispatcher();
         }
@@ -1584,7 +1584,7 @@ public class Image implements ActionSource {
     }
 
     @Override
-    public synchronized void removeActionListener(ActionListener l) {
+    public void removeActionListener(ActionListener l) {
         if (listeners != null) {
             listeners.removeListener(l);
         }

@@ -148,7 +148,7 @@ public class XYSeries {
      * @param x the value for the X axis
      * @param y the value for the Y axis
      */
-    public synchronized void add(double x, double y) {
+    public void add(double x, double y) {
         while (mXY.get(x) != null) {
             // add a very small value to x such as data points sharing the same x will
             // still be added
@@ -165,7 +165,7 @@ public class XYSeries {
      * @param x the value for the X axis
      * @param y the value for the Y axis
      */
-    public synchronized void add(int index, double x, double y) {
+    public void add(int index, double x, double y) {
         while (mXY.get(x) != null) {
             // add a very small value to x such as data points sharing the same x will
             // still be added
@@ -184,7 +184,7 @@ public class XYSeries {
      *
      * @param index the index in the series of the value to remove
      */
-    public synchronized void remove(int index) {
+    public void remove(int index) {
         XYEntry<Double, Double> removedEntry = mXY.removeByIndex(index);
         double removedX = removedEntry.getKey();
         double removedY = removedEntry.getValue();
@@ -196,7 +196,7 @@ public class XYSeries {
     /**
      * Removes all the existing values and annotations from the series.
      */
-    public synchronized void clear() {
+    public void clear() {
         clearAnnotations();
         clearSeriesValues();
     }
@@ -204,7 +204,7 @@ public class XYSeries {
     /**
      * Removes all the existing values from the series but annotations.
      */
-    public synchronized void clearSeriesValues() {
+    public void clearSeriesValues() {
         mXY.clear();
         initRange();
     }
@@ -212,7 +212,7 @@ public class XYSeries {
     /**
      * Removes all the existing annotations from the series.
      */
-    public synchronized void clearAnnotations() {
+    public void clearAnnotations() {
         mStringXY.clear();
         mAnnotations.clear();
     }
@@ -222,7 +222,7 @@ public class XYSeries {
      *
      * @return the XY map
      */
-    public synchronized IndexXYMap<Double, Double> getXYMap() {
+    public IndexXYMap<Double, Double> getXYMap() {
         return mXY;
     }
 
@@ -232,7 +232,7 @@ public class XYSeries {
      * @param index the index
      * @return the X value
      */
-    public synchronized double getX(int index) {
+    public double getX(int index) {
         return mXY.getXByIndex(index);
     }
 
@@ -242,7 +242,7 @@ public class XYSeries {
      * @param index the index
      * @return the Y value
      */
-    public synchronized double getY(int index) {
+    public double getY(int index) {
         return mXY.getYByIndex(index);
     }
 
@@ -335,7 +335,7 @@ public class XYSeries {
      *          visible ones must be displayed
      * @return a submap of x and y values
      */
-    public synchronized SortedMap<Double, Double> getRange(double start, double stop,
+    public SortedMap<Double, Double> getRange(double start, double stop,
                                                            boolean beforeAfterPoints) {
         if (beforeAfterPoints) {
             // we need to add one point before the start and one point after the end
@@ -379,7 +379,7 @@ public class XYSeries {
      *
      * @return the series item count
      */
-    public synchronized int getItemCount() {
+    public int getItemCount() {
         return mXY.size();
     }
 
