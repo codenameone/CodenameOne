@@ -2194,6 +2194,20 @@ public class IPhoneBuilder extends Executor {
             summary.append("----------------------\n");
             summary.append(String.format("%-40s : %d ms", "Total Time", totalDuration));
             log(summary.toString());
+            String statsFile = System.getenv("CN1_BUILD_STATS_FILE");
+            if (statsFile != null && statsFile.length() > 0) {
+                try {
+                    File f = new File(statsFile);
+                    if (f.getParentFile() != null) {
+                        f.getParentFile().mkdirs();
+                    }
+                    try (FileOutputStream fos = new FileOutputStream(f)) {
+                        fos.write(summary.toString().getBytes("UTF-8"));
+                    }
+                } catch (Exception ex) {
+                    log("Failed to write build stats to file " + statsFile + ": " + ex.getMessage());
+                }
+            }
         }
     }
 

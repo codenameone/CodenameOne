@@ -63,6 +63,12 @@ xcodebuild -version
 bia_log "Building iOS Xcode project using Codename One port"
 cd $APP_DIR
 VM_START=$(date +%s)
+
+ARTIFACTS_DIR="${ARTIFACTS_DIR:-$REPO_ROOT/artifacts}"
+mkdir -p "$ARTIFACTS_DIR"
+
+export CN1_BUILD_STATS_FILE="$ARTIFACTS_DIR/iphone-builder-stats.txt"
+
 ./mvnw package \
   -DskipTests \
   -Dcodename1.platform=ios \
@@ -73,10 +79,18 @@ VM_END=$(date +%s)
 VM_TIME=$((VM_END - VM_START))
 cd ../..
 
-ARTIFACTS_DIR="${ARTIFACTS_DIR:-$REPO_ROOT/artifacts}"
-mkdir -p "$ARTIFACTS_DIR"
 echo "$VM_TIME" > "$ARTIFACTS_DIR/vm_time.txt"
 bia_log "VM translation time: ${VM_TIME}s (saved to $ARTIFACTS_DIR/vm_time.txt)"
+
+# Calculate Maven overhead if stats file exists
+if [ -f "$ARTIFACTS_DIR/iphone-builder-stats.txt" ]; then
+    TOTAL_BUILDER_TIME_MS=$(grep "Total Time" "$ARTIFACTS_DIR/iphone-builder-stats.txt" | awk -F ':' '{print $2}' | tr -d ' ms')
+    if [ -n "$TOTAL_BUILDER_TIME_MS" ]; then
+        TOTAL_BUILDER_TIME_SEC=$((TOTAL_BUILDER_TIME_MS / 1000))
+        MAVEN_OVERHEAD=$((VM_TIME - TOTAL_BUILDER_TIME_SEC))
+        echo "Maven Overhead : ${MAVEN_OVERHEAD}000 ms" >> "$ARTIFACTS_DIR/iphone-builder-stats.txt"
+    fi
+fi
 
 IOS_TARGET_DIR="$APP_DIR/ios/target"
 if [ ! -d "$IOS_TARGET_DIR" ]; then
@@ -101,6 +115,7 @@ bia_log "Found generated iOS project at $PROJECT_DIR"
 # CocoaPods (project contains a Podfile but usually empty — fine)
 if [ -f "$PROJECT_DIR/Podfile" ]; then
   bia_log "Installing CocoaPods dependencies"
+  POD_START=$(date +%s)
   (
     cd "$PROJECT_DIR"
     if ! pod install --repo-update; then
@@ -108,6 +123,9 @@ if [ -f "$PROJECT_DIR/Podfile" ]; then
       pod install
     fi
   )
+  POD_END=$(date +%s)
+  POD_TIME=$((POD_END - POD_START))
+  echo "CocoaPods Install (Script) : ${POD_TIME}000 ms" >> "$ARTIFACTS_DIR/iphone-builder-stats.txt"
 else
   bia_log "Podfile not found in generated project; skipping pod install"
 fi
