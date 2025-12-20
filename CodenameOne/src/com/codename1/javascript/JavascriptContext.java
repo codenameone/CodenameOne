@@ -86,7 +86,7 @@ public class JavascriptContext {
     /**
      * Flag to enable/disable logging to a debug log.
      */
-    public static boolean DEBUG = false;
+    public static final boolean DEBUG = false;
     /**
      * Running counter to mark the context ID.  Each javascript context has its
      * own lookup table, and this running counter allows us to generate a unique
@@ -104,7 +104,7 @@ public class JavascriptContext {
      * The name of the Javascript lookup table that is used to store and
      * look up Javascript objects that have a JSObject proxy.
      */
-    final String jsLookupTable;
+    String jsLookupTable;
 
     /**
      * A running counter for the next object ID that is to be assigned to
