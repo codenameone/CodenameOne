@@ -32,329 +32,309 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
-  packages: read
 
 jobs:
   build-test:
 
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/codenameone/codenameone/pr-ci-container:latest
-      options: --privileged
     strategy:
       fail-fast: false
       matrix:
         java-version: [8, 17, 21, 25]
 
     steps:
-    - uses: actions/checkout@v1
-    - name: Configure Java
-      run: |
-        if [ "${{ matrix.java-version }}" == "8" ]; then
-          echo "JAVA_HOME=$JAVA_HOME_8" >> $GITHUB_ENV
-          echo "$JAVA_HOME_8/bin" >> $GITHUB_PATH
-        elif [ "${{ matrix.java-version }}" == "17" ]; then
-          echo "JAVA_HOME=$JAVA_HOME_17" >> $GITHUB_ENV
-          echo "$JAVA_HOME_17/bin" >> $GITHUB_PATH
-        elif [ "${{ matrix.java-version }}" == "21" ]; then
-          echo "JAVA_HOME=$JAVA_HOME_21" >> $GITHUB_ENV
-          echo "$JAVA_HOME_21/bin" >> $GITHUB_PATH
-        fi
-    - name: Set up JDK (Fallback/Java 25)
-      if: matrix.java-version == 25
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'zulu'
-        java-version: ${{ matrix.java-version }}
-    - name: Cache Maven dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.m2
-        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-        restore-keys: |
-          ${{ runner.os }}-m2
-    - name: Run Unit Tests
-      run: |
-        MVN_ARGS=""
-        if [ "${{ matrix.java-version }}" != "8" ]; then
-          MVN_ARGS="-Dspotbugs.skip=true"
-        fi
-        cd maven
-        mvn clean verify -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true -Plocal-dev-javase $MVN_ARGS
-        cd ..
-    - name: Prepare Codename One binaries for Maven plugin tests
-      run: |
-        set -euo pipefail
-        rm -rf maven/target/cn1-binaries
-        mkdir -p maven/target
-        if [ -d "$CN1_BINARIES" ]; then
-           ln -s "$CN1_BINARIES" maven/target/cn1-binaries
-        else
-           git clone --depth=1 --filter=blob:none https://github.com/codenameone/cn1-binaries maven/target/cn1-binaries
-        fi
-    - name: Run Maven plugin tests
-      working-directory: maven
-      env:
-        CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
-      run: |
-        mvn -B -Dmaven.javadoc.skip=true \
-          -DunitTests=true \
-          -Dcodename1.platform=javase \
-          -Dcn1.binaries="${CN1_BINARIES}" \
-          -pl codenameone-maven-plugin -am -Plocal-dev-javase test
-    - name: Generate static analysis HTML summaries
-      if: ${{ always() && matrix.java-version == 8 }}
-      env:
-        QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target
-        QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
-        QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
-        QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
-        QUALITY_REPORT_GENERATE_HTML_ONLY: "1"
-      run: python3 .github/scripts/generate-quality-report.py
-    - name: Collect quality artifacts
-      if: ${{ always() && matrix.java-version == 8 }}
-      run: |
-        set -euo pipefail
-        mkdir -p quality-artifacts/static-analysis
-        mkdir -p quality-artifacts/coverage
-        shopt -s nullglob
-        for path in maven/core-unittests/target/spotbugsXml.xml maven/core-unittests/target/spotbugs.xml; do
-          if [ -f "$path" ]; then
-            cp "$path" quality-artifacts/static-analysis/
+      - uses: actions/checkout@v1
+      - name: Set up JDK 8
+        if: matrix.java-version == 8
+        uses: actions/setup-java@v1
+        with:
+          java-version: 1.8
+          java-package: jdk+fx
+      - name: Set up JDK
+        if: matrix.java-version != 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: ${{ matrix.java-version }}
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2
+      - name: Run Unit Tests
+        run: |
+          MVN_ARGS=""
+          if [ "${{ matrix.java-version }}" != "8" ]; then
+            MVN_ARGS="-Dspotbugs.skip=true"
           fi
-        done
-        if [ -f maven/core-unittests/target/pmd.xml ]; then
-          cp maven/core-unittests/target/pmd.xml quality-artifacts/static-analysis/
-        fi
-        if [ -f maven/core-unittests/target/checkstyle-result.xml ]; then
-          cp maven/core-unittests/target/checkstyle-result.xml quality-artifacts/static-analysis/
-        fi
-        if [ -d target/quality-report ]; then
-          mkdir -p quality-artifacts/static-analysis/html
-          cp -R target/quality-report/. quality-artifacts/static-analysis/html/
-        fi
-        if [ -d maven/core-unittests/target/site/jacoco ]; then
-          cp -R maven/core-unittests/target/site/jacoco quality-artifacts/coverage/
-        fi
-        if [ "$(find quality-artifacts -type f | wc -l)" -eq 0 ]; then
-          echo "No quality artifacts were generated." > quality-artifacts/README.txt
-        fi
-    - name: Upload quality artifacts
-      if: ${{ always() && matrix.java-version == 8 }}
-      id: upload-quality-artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: quality-artifacts
-        path: quality-artifacts
-    - name: Publish quality report previews
-      if: ${{ always() && matrix.java-version == 8 && github.server_url == 'https://github.com' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-      id: publish-quality-previews
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-        SERVER_URL: ${{ github.server_url }}
-        REPOSITORY: ${{ github.repository }}
-        RUN_ID: ${{ github.run_id }}
-        RUN_ATTEMPT: ${{ github.run_attempt }}
-      run: |
-        set -euo pipefail
-        if [ "${SERVER_URL}" != "https://github.com" ]; then
-          echo "HTML previews are only published for github.com instances."
-          exit 0
-        fi
-        run_dir="runs/${RUN_ID}-${RUN_ATTEMPT}"
-        tmp_dir=$(mktemp -d)
-        dest_dir="${tmp_dir}/${run_dir}"
-        mkdir -p "${dest_dir}"
-        has_content=0
-        if compgen -G "target/quality-report/*.html" > /dev/null; then
-          mkdir -p "${dest_dir}/static-analysis"
-          cp target/quality-report/*.html "${dest_dir}/static-analysis/"
-          has_content=1
-        fi
-        if [ -d maven/core-unittests/target/site/jacoco ] && [ -f maven/core-unittests/target/site/jacoco/index.html ]; then
-          mkdir -p "${dest_dir}/coverage"
-          cp -R maven/core-unittests/target/site/jacoco/. "${dest_dir}/coverage/"
-          has_content=1
-        fi
-        if [ "${has_content}" -eq 0 ]; then
-          echo "No HTML outputs detected; skipping preview publishing."
-          exit 0
-        fi
-        printf '%s\n%s\n%s\n' \
-          '# Quality report previews' \
-          '' \
-          'This branch is automatically managed by the PR CI workflow and may be force-pushed.' \
-          > "${tmp_dir}/README.md"
-        git -C "${tmp_dir}" init -b previews >/dev/null
-        git -C "${tmp_dir}" config user.name "github-actions[bot]"
-        git -C "${tmp_dir}" config user.email "github-actions[bot]@users.noreply.github.com"
-        git -C "${tmp_dir}" add .
-        git -C "${tmp_dir}" commit -m "Publish quality report previews for run ${RUN_ID} (attempt ${RUN_ATTEMPT})" >/dev/null
-        remote_url="${SERVER_URL}/${REPOSITORY}.git"
-        token_remote_url="${remote_url/https:\/\//https://x-access-token:${GITHUB_TOKEN}@}"
-        git -C "${tmp_dir}" push --force "${token_remote_url}" previews:quality-report-previews >/dev/null
-        commit_sha=$(git -C "${tmp_dir}" rev-parse HEAD)
-        raw_base="https://raw.githubusercontent.com/${REPOSITORY}/${commit_sha}/${run_dir}"
-        preview_base="https://htmlpreview.github.io/?${raw_base}"
-        {
-          echo "commit=${commit_sha}"
-          echo "run_path=${run_dir}"
-        } >> "$GITHUB_OUTPUT"
-        if [ -f "${dest_dir}/static-analysis/spotbugs.html" ]; then
-          echo "spotbugs_url=${preview_base}/static-analysis/spotbugs.html" >> "$GITHUB_OUTPUT"
-        fi
-        if [ -f "${dest_dir}/static-analysis/pmd.html" ]; then
-          echo "pmd_url=${preview_base}/static-analysis/pmd.html" >> "$GITHUB_OUTPUT"
-        fi
-        if [ -f "${dest_dir}/static-analysis/checkstyle.html" ]; then
-          echo "checkstyle_url=${preview_base}/static-analysis/checkstyle.html" >> "$GITHUB_OUTPUT"
-        fi
-        if [ -f "${dest_dir}/coverage/index.html" ]; then
-          echo "jacoco_url=${preview_base}/coverage/index.html" >> "$GITHUB_OUTPUT"
-        fi
-    - name: Generate quality report summary
-      if: ${{ always() && matrix.java-version == 8 }}
-      env:
-        QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target
-        QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
-        QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
-        QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
-        SPOTBUGS_REPORT_URL: ${{ steps.upload-quality-artifacts.outputs.artifact-url }}
-        PMD_REPORT_URL: ${{ steps.upload-quality-artifacts.outputs.artifact-url }}
-        CHECKSTYLE_REPORT_URL: ${{ steps.upload-quality-artifacts.outputs.artifact-url }}
-        JACOCO_REPORT_URL: ${{ steps.upload-quality-artifacts.outputs.artifact-url }}
-        SPOTBUGS_HTML_URL: ${{ steps.publish-quality-previews.outputs.spotbugs_url }}
-        PMD_HTML_URL: ${{ steps.publish-quality-previews.outputs.pmd_url }}
-        CHECKSTYLE_HTML_URL: ${{ steps.publish-quality-previews.outputs.checkstyle_url }}
-        JACOCO_HTML_URL: ${{ steps.publish-quality-previews.outputs.jacoco_url }}
-      run: python3 .github/scripts/generate-quality-report.py
-    - name: Upload quality report summary
-      if: ${{ always() && matrix.java-version == 8 }}
-      uses: actions/upload-artifact@v4
-      with:
-        name: quality-report
-        path: quality-report.md
-    - name: Publish quality report comment
-      if: ${{ github.event_name == 'pull_request' && matrix.java-version == 8 }}
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const { publishQualityComment } = require('./.github/scripts/publish-quality-comment.js');
-          await publishQualityComment({ github, context, core });
-    - name: Install dependencies
-      run: |
-        if [ -d "$CN1_BINARIES" ]; then
-          echo "Using pre-installed cn1-binaries"
-          ln -s "$CN1_BINARIES" ../cn1-binaries
-        else
+          cd maven
+          mvn clean verify -DunitTests=true -pl core-unittests -am -Dmaven.javadoc.skip=true -Plocal-dev-javase $MVN_ARGS
+          cd ..
+      - name: Prepare Codename One binaries for Maven plugin tests
+        run: |
+          set -euo pipefail
+          rm -rf maven/target/cn1-binaries
+          git clone --depth=1 --filter=blob:none https://github.com/codenameone/cn1-binaries maven/target/cn1-binaries
+      - name: Run Maven plugin tests
+        working-directory: maven
+        env:
+          CN1_BINARIES: ${{ github.workspace }}/maven/target/cn1-binaries
+        run: |
+          mvn -B -Dmaven.javadoc.skip=true \
+            -DunitTests=true \
+            -Dcodename1.platform=javase \
+            -Dcn1.binaries="${CN1_BINARIES}" \
+            -pl codenameone-maven-plugin -am -Plocal-dev-javase test
+      - name: Generate static analysis HTML summaries
+        if: ${{ always() && matrix.java-version == 8 }}
+        env:
+          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target
+          QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
+          QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
+          QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+          QUALITY_REPORT_GENERATE_HTML_ONLY: "1"
+        run: python3 .github/scripts/generate-quality-report.py
+      - name: Collect quality artifacts
+        if: ${{ always() && matrix.java-version == 8 }}
+        run: |
+          set -euo pipefail
+          mkdir -p quality-artifacts/static-analysis
+          mkdir -p quality-artifacts/coverage
+          shopt -s nullglob
+          for path in maven/core-unittests/target/spotbugsXml.xml maven/core-unittests/target/spotbugs.xml; do
+            if [ -f "$path" ]; then
+              cp "$path" quality-artifacts/static-analysis/
+            fi
+          done
+          if [ -f maven/core-unittests/target/pmd.xml ]; then
+            cp maven/core-unittests/target/pmd.xml quality-artifacts/static-analysis/
+          fi
+          if [ -f maven/core-unittests/target/checkstyle-result.xml ]; then
+            cp maven/core-unittests/target/checkstyle-result.xml quality-artifacts/static-analysis/
+          fi
+          if [ -d target/quality-report ]; then
+            mkdir -p quality-artifacts/static-analysis/html
+            cp -R target/quality-report/. quality-artifacts/static-analysis/html/
+          fi
+          if [ -d maven/core-unittests/target/site/jacoco ]; then
+            cp -R maven/core-unittests/target/site/jacoco quality-artifacts/coverage/
+          fi
+          if [ "$(find quality-artifacts -type f | wc -l)" -eq 0 ]; then
+            echo "No quality artifacts were generated." > quality-artifacts/README.txt
+          fi
+      - name: Upload quality artifacts
+        if: ${{ always() && matrix.java-version == 8 }}
+        id: upload-quality-artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-artifacts
+          path: quality-artifacts
+      - name: Publish quality report previews
+        if: ${{ always() && matrix.java-version == 8 && github.server_url == 'https://github.com' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        id: publish-quality-previews
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SERVER_URL: ${{ github.server_url }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          if [ "${SERVER_URL}" != "https://github.com" ]; then
+            echo "HTML previews are only published for github.com instances."
+            exit 0
+          fi
+          run_dir="runs/${RUN_ID}-${RUN_ATTEMPT}"
+          tmp_dir=$(mktemp -d)
+          dest_dir="${tmp_dir}/${run_dir}"
+          mkdir -p "${dest_dir}"
+          has_content=0
+          if compgen -G "target/quality-report/*.html" > /dev/null; then
+            mkdir -p "${dest_dir}/static-analysis"
+            cp target/quality-report/*.html "${dest_dir}/static-analysis/"
+            has_content=1
+          fi
+          if [ -d maven/core-unittests/target/site/jacoco ] && [ -f maven/core-unittests/target/site/jacoco/index.html ]; then
+            mkdir -p "${dest_dir}/coverage"
+            cp -R maven/core-unittests/target/site/jacoco/. "${dest_dir}/coverage/"
+            has_content=1
+          fi
+          if [ "${has_content}" -eq 0 ]; then
+            echo "No HTML outputs detected; skipping preview publishing."
+            exit 0
+          fi
+          printf '%s\n%s\n%s\n' \
+            '# Quality report previews' \
+            '' \
+            'This branch is automatically managed by the PR CI workflow and may be force-pushed.' \
+            > "${tmp_dir}/README.md"
+          git -C "${tmp_dir}" init -b previews >/dev/null
+          git -C "${tmp_dir}" config user.name "github-actions[bot]"
+          git -C "${tmp_dir}" config user.email "github-actions[bot]@users.noreply.github.com"
+          git -C "${tmp_dir}" add .
+          git -C "${tmp_dir}" commit -m "Publish quality report previews for run ${RUN_ID} (attempt ${RUN_ATTEMPT})" >/dev/null
+          remote_url="${SERVER_URL}/${REPOSITORY}.git"
+          token_remote_url="${remote_url/https:\/\//https://x-access-token:${GITHUB_TOKEN}@}"
+          git -C "${tmp_dir}" push --force "${token_remote_url}" previews:quality-report-previews >/dev/null
+          commit_sha=$(git -C "${tmp_dir}" rev-parse HEAD)
+          raw_base="https://raw.githubusercontent.com/${REPOSITORY}/${commit_sha}/${run_dir}"
+          preview_base="https://htmlpreview.github.io/?${raw_base}"
+          {
+            echo "commit=${commit_sha}"
+            echo "run_path=${run_dir}"
+          } >> "$GITHUB_OUTPUT"
+          if [ -f "${dest_dir}/static-analysis/spotbugs.html" ]; then
+            echo "spotbugs_url=${preview_base}/static-analysis/spotbugs.html" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -f "${dest_dir}/static-analysis/pmd.html" ]; then
+            echo "pmd_url=${preview_base}/static-analysis/pmd.html" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -f "${dest_dir}/static-analysis/checkstyle.html" ]; then
+            echo "checkstyle_url=${preview_base}/static-analysis/checkstyle.html" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -f "${dest_dir}/coverage/index.html" ]; then
+            echo "jacoco_url=${preview_base}/coverage/index.html" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Generate quality report summary
+        if: ${{ always() && matrix.java-version == 8 }}
+        env:
+          QUALITY_REPORT_TARGET_DIRS: maven/core-unittests/target
+          QUALITY_REPORT_SERVER_URL: ${{ github.server_url }}
+          QUALITY_REPORT_REPOSITORY: ${{ github.repository }}
+          QUALITY_REPORT_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+          SPOTBUGS_REPORT_URL: ${{ steps.upload-quality-artifacts.outputs.artifact-url }}
+          PMD_REPORT_URL: ${{ steps.upload-quality-artifacts.outputs.artifact-url }}
+          CHECKSTYLE_REPORT_URL: ${{ steps.upload-quality-artifacts.outputs.artifact-url }}
+          JACOCO_REPORT_URL: ${{ steps.upload-quality-artifacts.outputs.artifact-url }}
+          SPOTBUGS_HTML_URL: ${{ steps.publish-quality-previews.outputs.spotbugs_url }}
+          PMD_HTML_URL: ${{ steps.publish-quality-previews.outputs.pmd_url }}
+          CHECKSTYLE_HTML_URL: ${{ steps.publish-quality-previews.outputs.checkstyle_url }}
+          JACOCO_HTML_URL: ${{ steps.publish-quality-previews.outputs.jacoco_url }}
+        run: python3 .github/scripts/generate-quality-report.py
+      - name: Upload quality report summary
+        if: ${{ always() && matrix.java-version == 8 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-report
+          path: quality-report.md
+      - name: Publish quality report comment
+        if: ${{ github.event_name == 'pull_request' && matrix.java-version == 8 }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { publishQualityComment } = require('./.github/scripts/publish-quality-comment.js');
+            await publishQualityComment({ github, context, core });
+      - name: Install dependencies
+        run: |
           sudo apt-get update && sudo apt-get install xvfb
           wget https://github.com/codenameone/cn1-binaries/archive/refs/heads/master.zip
           unzip master.zip -d ..
           mv ../cn1-binaries-master ../cn1-binaries
-        fi
-    - name: Build CLDC11 JAR
-      run: |
-        ANT_OPTS_ARGS=""
-        if [ "${{ matrix.java-version }}" != "8" ]; then
-          ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
-        fi
-        ant $ANT_OPTS_ARGS -noinput -buildfile Ports/CLDC11/build.xml jar
-    - name: Build with Ant
-      run: |
-        ANT_OPTS_ARGS=""
-        if [ "${{ matrix.java-version }}" != "8" ]; then
-          ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
-        fi
-        xvfb-run ant $ANT_OPTS_ARGS test-javase
-      
-    - name: Build Release
-      if: matrix.java-version == 8
-      run: ant -noinput -buildfile CodenameOne/build.xml weeklyLibUpdate
+      - name: Build CLDC11 JAR
+        run: |
+          ANT_OPTS_ARGS=""
+          if [ "${{ matrix.java-version }}" != "8" ]; then
+            ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
+          fi
+          ant $ANT_OPTS_ARGS -noinput -buildfile Ports/CLDC11/build.xml jar
+      - name: Build with Ant
+        run: |
+          ANT_OPTS_ARGS=""
+          if [ "${{ matrix.java-version }}" != "8" ]; then
+            ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
+          fi
+          xvfb-run ant $ANT_OPTS_ARGS test-javase
 
-    - name: Build JavaDocs
-      if: matrix.java-version == 8
-      run: |
-        cd CodenameOne
-        mkdir -p build
-        mkdir -p build/tempJavaSources
-        mkdir -p dist
-        mkdir -p dist/javadoc
-        # Skip JavaDocSourceEmbed due to gist access issues in CI
-        cp -r src/* build/tempJavaSources/
-        find build/tempJavaSources ../Ports/CLDC11/src -name "*.java" | /usr/bin/grep -v /impl/ | /usr/bin/xargs javadoc --allow-script-in-comments -protected -d dist/javadoc -windowtitle "Codename One API" || true
-        cd dist/javadoc
-        zip -r ../../javadocs.zip *
-        cd ..
+      - name: Build Release
+        if: matrix.java-version == 8
+        run: ant -noinput -buildfile CodenameOne/build.xml weeklyLibUpdate
 
-    - name: Build iOS Port
-      run: |
-        ANT_OPTS_ARGS=""
-        if [ "${{ matrix.java-version }}" != "8" ]; then
-          ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
-        fi
-        ant $ANT_OPTS_ARGS -noinput -buildfile Ports/iOSPort/build.xml jar
+      - name: Build JavaDocs
+        if: matrix.java-version == 8
+        run: |
+          cd CodenameOne
+          mkdir -p build
+          mkdir -p build/tempJavaSources
+          mkdir -p dist
+          mkdir -p dist/javadoc
+          # Skip JavaDocSourceEmbed due to gist access issues in CI
+          cp -r src/* build/tempJavaSources/
+          find build/tempJavaSources ../Ports/CLDC11/src -name "*.java" | /usr/bin/grep -v /impl/ | /usr/bin/xargs javadoc --allow-script-in-comments -protected -d dist/javadoc -windowtitle "Codename One API" || true
+          cd dist/javadoc
+          zip -r ../../javadocs.zip *
+          cd ..
 
-    - name: Build iOS VM API
-      run: mvn -f vm/JavaAPI/pom.xml package
+      - name: Build iOS Port
+        run: |
+          ANT_OPTS_ARGS=""
+          if [ "${{ matrix.java-version }}" != "8" ]; then
+            ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
+          fi
+          ant $ANT_OPTS_ARGS -noinput -buildfile Ports/iOSPort/build.xml jar
 
-    - name: Upload a Build Artifact
-      if: matrix.java-version == 8
-      uses: actions/upload-artifact@v4
-      with:
-        name: JavaAPI.jar
-        path: vm/JavaAPI/target/JavaAPI-1.0-SNAPSHOT.jar
+      - name: Build iOS VM API
+        run: mvn -f vm/JavaAPI/pom.xml package
 
-    - name: Build iOS VM
-      run: mvn -f vm/ByteCodeTranslator/pom.xml package
+      - name: Upload a Build Artifact
+        if: matrix.java-version == 8
+        uses: actions/upload-artifact@v4
+        with:
+          name: JavaAPI.jar
+          path: vm/JavaAPI/target/JavaAPI-1.0-SNAPSHOT.jar
 
-    - name: Build CLDC 11 VM
-      run: |
-        ANT_OPTS_ARGS=""
-        if [ "${{ matrix.java-version }}" != "8" ]; then
-          ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
-        fi
-        ant $ANT_OPTS_ARGS -noinput -buildfile Ports/CLDC11/build.xml jar
+      - name: Build iOS VM
+        run: mvn -f vm/ByteCodeTranslator/pom.xml package
 
-    - name: Upload a Build Artifact
-      if: matrix.java-version == 8
-      uses: actions/upload-artifact@v4
-      with:
-        name: ByteCodeTranslator.jar
-        path: vm/ByteCodeTranslator/target/ByteCodeTranslator-1.0-SNAPSHOT.jar
+      - name: Build CLDC 11 VM
+        run: |
+          ANT_OPTS_ARGS=""
+          if [ "${{ matrix.java-version }}" != "8" ]; then
+            ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
+          fi
+          ant $ANT_OPTS_ARGS -noinput -buildfile Ports/CLDC11/build.xml jar
 
-    - name: Upload a Build Artifact
-      if: matrix.java-version == 8
-      uses: actions/upload-artifact@v4
-      with:
-        name: CLDC11.jar
-        path: Ports/CLDC11/dist/CLDC11.jar
+      - name: Upload a Build Artifact
+        if: matrix.java-version == 8
+        uses: actions/upload-artifact@v4
+        with:
+          name: ByteCodeTranslator.jar
+          path: vm/ByteCodeTranslator/target/ByteCodeTranslator-1.0-SNAPSHOT.jar
 
-    - name: Build Android Port
-      run: |
-        ANT_OPTS_ARGS=""
-        if [ "${{ matrix.java-version }}" != "8" ]; then
-          ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
-        fi
-        ant $ANT_OPTS_ARGS -noinput -buildfile Ports/Android/build.xml jar
+      - name: Upload a Build Artifact
+        if: matrix.java-version == 8
+        uses: actions/upload-artifact@v4
+        with:
+          name: CLDC11.jar
+          path: Ports/CLDC11/dist/CLDC11.jar
 
-    - name: Packaging Everything
-      if: matrix.java-version == 8
-      run: zip -j result.zip CodenameOne/javadocs.zip CodenameOne/dist/CodenameOne.jar CodenameOne/updatedLibs.zip Ports/JavaSE/dist/JavaSE.jar build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip
+      - name: Build Android Port
+        run: |
+          ANT_OPTS_ARGS=""
+          if [ "${{ matrix.java-version }}" != "8" ]; then
+            ANT_OPTS_ARGS="-Djavac.source=1.8 -Djavac.target=1.8"
+          fi
+          ant $ANT_OPTS_ARGS -noinput -buildfile Ports/Android/build.xml jar
 
-    - name: Copying Files to Server
-      if: matrix.java-version == 8
-      uses: marcodallasanta/ssh-scp-deploy@v1.0.5
-      with:
-        host: ${{ secrets.WP_HOST }}
-        user: ${{ secrets.WP_USER }}
-        password: ${{ secrets.WP_PASSWORD }}
-        local: result.zip
-        
-    - name: Upload a Build Artifact
-      if: matrix.java-version == 8
-      uses: actions/upload-artifact@v4
-      with:
-        name: JavaSE.jar
-        path: Ports/JavaSE/dist/JavaSE.jar
+      - name: Packaging Everything
+        if: matrix.java-version == 8
+        run: zip -j result.zip CodenameOne/javadocs.zip CodenameOne/dist/CodenameOne.jar CodenameOne/updatedLibs.zip Ports/JavaSE/dist/JavaSE.jar build/CodenameOneDist/CodenameOne/demos/CodenameOne_SRC.zip
+
+      - name: Copying Files to Server
+        if: matrix.java-version == 8
+        uses: marcodallasanta/ssh-scp-deploy@v1.0.5
+        with:
+          host: ${{ secrets.WP_HOST }}
+          user: ${{ secrets.WP_USER }}
+          password: ${{ secrets.WP_PASSWORD }}
+          local: result.zip
+
+      - name: Upload a Build Artifact
+        if: matrix.java-version == 8
+        uses: actions/upload-artifact@v4
+        with:
+          name: JavaSE.jar
+          path: Ports/JavaSE/dist/JavaSE.jar
   
 
