@@ -101,6 +101,8 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      CN1_BINARIES: /opt/cn1-binaries
+      MAVEN_HOME: /usr/share/maven
     steps:
       - uses: actions/checkout@v4
 
@@ -145,6 +147,7 @@ jobs:
           api-level: 31
           arch: x86_64
           target: google_apis
+          disk-size: 4096M
           script: ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
       - name: Upload emulator screenshot
         if: always() && matrix.id == 'default'

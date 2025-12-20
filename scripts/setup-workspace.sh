@@ -188,38 +188,42 @@ PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 log "Preparing cn1-binaries checkout"
 if [ -d "$CN1_BINARIES/.git" ]; then
   log "Found existing cn1-binaries repository at $CN1_BINARIES"
-  if [ "${CN1_SKIP_BINARIES_UPDATE:-0}" != "1" ] && git -C "$CN1_BINARIES" remote get-url origin >/dev/null 2>&1; then
-    if git -C "$CN1_BINARIES" fetch --depth=1 origin; then
-      remote_head=$(git -C "$CN1_BINARIES" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
-      if [ -z "$remote_head" ]; then
-        current_branch=$(git -C "$CN1_BINARIES" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
-        if [ -n "$current_branch" ] && [ "$current_branch" != "HEAD" ]; then
-          remote_head="origin/$current_branch"
-        else
-          remote_head="origin/master"
+  if [ "${CN1_SKIP_BINARIES_UPDATE:-0}" != "1" ]; then
+    if git -C "$CN1_BINARIES" remote get-url origin >/dev/null 2>&1; then
+      if git -C "$CN1_BINARIES" fetch --depth=1 origin; then
+        remote_head=$(git -C "$CN1_BINARIES" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
+        if [ -z "$remote_head" ]; then
+          current_branch=$(git -C "$CN1_BINARIES" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+          if [ -n "$current_branch" ] && [ "$current_branch" != "HEAD" ]; then
+            remote_head="origin/$current_branch"
+          else
+            remote_head="origin/master"
+          fi
         fi
-      fi
-      if ! git -C "$CN1_BINARIES" rev-parse --verify "$remote_head" >/dev/null 2>&1; then
-        if git -C "$CN1_BINARIES" rev-parse --verify origin/main >/dev/null 2>&1; then
-          remote_head="origin/main"
-        elif git -C "$CN1_BINARIES" rev-parse --verify origin/master >/dev/null 2>&1; then
-          remote_head="origin/master"
-        else
-          log "Unable to determine remote head for cached cn1-binaries; removing checkout"
-          rm -rf "$CN1_BINARIES"
+        if ! git -C "$CN1_BINARIES" rev-parse --verify "$remote_head" >/dev/null 2>&1; then
+          if git -C "$CN1_BINARIES" rev-parse --verify origin/main >/dev/null 2>&1; then
+            remote_head="origin/main"
+          elif git -C "$CN1_BINARIES" rev-parse --verify origin/master >/dev/null 2>&1; then
+            remote_head="origin/master"
+          else
+            log "Unable to determine remote head for cached cn1-binaries; removing checkout"
+            rm -rf "$CN1_BINARIES"
+          fi
         fi
-      fi
-      if [ -d "$CN1_BINARIES/.git" ]; then
-        log "Updating cn1-binaries to $remote_head"
-        git -C "$CN1_BINARIES" reset --hard "$remote_head"
+        if [ -d "$CN1_BINARIES/.git" ]; then
+          log "Updating cn1-binaries to $remote_head"
+          git -C "$CN1_BINARIES" reset --hard "$remote_head"
+        fi
+      else
+        log "Failed to fetch updates for cached cn1-binaries; removing checkout"
+        rm -rf "$CN1_BINARIES"
       fi
     else
-      log "Failed to fetch updates for cached cn1-binaries; removing checkout"
+      log "Cached cn1-binaries checkout missing origin remote; removing"
       rm -rf "$CN1_BINARIES"
     fi
   else
-    log "Cached cn1-binaries checkout missing origin remote; removing"
-    rm -rf "$CN1_BINARIES"
+    log "Skipping cn1-binaries update (CN1_SKIP_BINARIES_UPDATE=1)"
   fi
 fi
 
