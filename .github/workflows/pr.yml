@@ -39,7 +39,7 @@ jobs:
 
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/${{ github.repository }}/pr-ci-container:latest
+      image: ghcr.io/codenameone/codenameone/pr-ci-container:latest
       options: --privileged
     strategy:
       fail-fast: false
