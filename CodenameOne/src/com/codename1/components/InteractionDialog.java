@@ -664,6 +664,9 @@ public class InteractionDialog extends Container {
      *             This is ignored if there isn't enough space
      */
     public void showPopupDialog(Rectangle rect, boolean bias) {
+        if (rect == null) {
+            throw new IllegalArgumentException("rect cannot be null");
+        }
         Form f = Display.getInstance().getCurrent();
         Rectangle origRect = rect;
         rect = new Rectangle(rect);

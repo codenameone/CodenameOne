@@ -5812,7 +5812,7 @@ public abstract class CodenameOneImplementation {
         if (!builder.isRedirectToAudioBuffer() && builder.getMimeType() == null) {
             builder.mimeType("audio/wav");
         }
-        System.out.println("in captureAudio " + recordingOptions.isRedirectToAudioBuffer());
+        System.out.println("in captureAudio " + builder.isRedirectToAudioBuffer());
         final AudioRecorderComponent cmp = new AudioRecorderComponent(builder);
         final Sheet sheet = new Sheet(null, "Record Audio");
         sheet.getContentPane().setLayout(new com.codename1.ui.layouts.BorderLayout());
@@ -5997,8 +5997,10 @@ public abstract class CodenameOneImplementation {
                                     Log.e(ex);
                                 }
                             }
-                            Image im = Image.createImage(data, 0, data.length);
-                            b.setIcon(im);
+                            if (data != null) {
+                                Image im = Image.createImage(data, 0, data.length);
+                                b.setIcon(im);
+                            }
                         }
                     });
 

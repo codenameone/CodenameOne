@@ -1612,17 +1612,25 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             g.fillShape(path);
             if (bgColor != strokeColor) {
                 g.setColor(strokeColor);
-                int alpha2 = g.concatenateAlpha(badgeStyle.getFgAlpha());
-                g.drawShape(path, new Stroke(1, Stroke.CAP_SQUARE, Stroke.JOIN_MITER, 1f));
-                g.setAlpha(alpha2);
+                if (badgeStyle != null) {
+                    int alpha2 = g.concatenateAlpha(badgeStyle.getFgAlpha());
+                    g.drawShape(path, new Stroke(1, Stroke.CAP_SQUARE, Stroke.JOIN_MITER, 1f));
+                    g.setAlpha(alpha2);
+                } else {
+                    g.drawShape(path, new Stroke(1, Stroke.CAP_SQUARE, Stroke.JOIN_MITER, 1f));
+                }
             }
 
 
             g.setColor(fgColor);
             g.setFont(badgeFont);
-            int alpha2 = g.concatenateAlpha(badgeStyle.getFgAlpha());
-            g.drawString(badgeText, rect.getX() + rect.getWidth() / 2 - badgeTextWidth / 2, rect.getY() + badgePaddingTop);
-            g.setAlpha(alpha2);
+            if (badgeStyle != null) {
+                int alpha2 = g.concatenateAlpha(badgeStyle.getFgAlpha());
+                g.drawString(badgeText, rect.getX() + rect.getWidth() / 2 - badgeTextWidth / 2, rect.getY() + badgePaddingTop);
+                g.setAlpha(alpha2);
+            } else {
+                g.drawString(badgeText, rect.getX() + rect.getWidth() / 2 - badgeTextWidth / 2, rect.getY() + badgePaddingTop);
+            }
 
 
             g.setColor(col);

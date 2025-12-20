@@ -239,9 +239,9 @@ class SpinnerNode extends Node {
     public void removeSelectionListener(SelectionListener l) {
         if (selectionListeners != null) {
             selectionListeners.remove(l);
-        }
-        if (selectionListeners.isEmpty()) {
-            selectionListeners = null;
+            if (selectionListeners.isEmpty()) {
+                selectionListeners = null;
+            }
         }
     }
 
