@@ -404,9 +404,7 @@ public class GroupLayout extends Layout {
             ComponentSpring cSpring = (ComponentSpring) spring;
             origin = cSpring.getOrigin() + " ";
             String name = cSpring.getComponent().toString();
-            if (name != null) {
-                origin = "name=" + name + ", ";
-            }
+            origin = "name=" + name + ", ";
         }
         if (spring instanceof AutopaddingSpring) {
             AutopaddingSpring paddingSpring = (AutopaddingSpring) spring;

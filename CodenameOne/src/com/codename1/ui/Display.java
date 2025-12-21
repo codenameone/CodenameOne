@@ -1647,9 +1647,7 @@ public final class Display extends CN1Constants {
             if (source != null) {
                 source.setLightweightMode(true);
             }
-            if (dest != null) {
-                dest.setLightweightMode(true);
-            }
+            dest.setLightweightMode(true);
 
             // if a native transition implementation exists then substitute it into place
             transition = impl.getNativeTransition(transition);

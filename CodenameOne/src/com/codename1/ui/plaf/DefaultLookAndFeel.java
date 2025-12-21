@@ -558,11 +558,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             textSpaceW = textSpaceW - icon.getWidth();
         }
 
-        if (stateIcon != null) {
-            textSpaceW = textSpaceW - stateIconSize;
-        } else {
-            textSpaceW = textSpaceW - preserveSpaceForState;
-        }
+        textSpaceW = textSpaceW - preserveSpaceForState;
 
         if (icon == null) { // no icon only string
             return calculateSpanForLabelString(sel, l, text, x, y, textSpaceW);

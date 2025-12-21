@@ -74,19 +74,10 @@ public class Socket {
         Display.getInstance().startThread(new Runnable() {
             public void run() {
                 Object connection = Util.getImplementation().connectSocket(host, port, sc.getConnectTimeout());
-                if (connection != null) {
-                    sc.setConnected(true);
-                    sc.input = new SocketInputStream(connection, sc);
-                    sc.output = new SocketOutputStream(connection, sc);
-                    sc.connectionEstablished(sc.input, sc.output);
-                } else {
-                    sc.setConnected(false);
-                    if (connection == null) {
-                        sc.connectionError(-1, "Failed to connect");
-                    } else {
-                        sc.connectionError(Util.getImplementation().getSocketErrorCode(connection), Util.getImplementation().getSocketErrorMessage(connection));
-                    }
-                }
+                sc.setConnected(true);
+                sc.input = new SocketInputStream(connection, sc);
+                sc.output = new SocketOutputStream(connection, sc);
+                sc.connectionEstablished(sc.input, sc.output);
             }
         }, "Connection to " + host).start();
     }
@@ -159,19 +150,15 @@ public class Socket {
                     while (!stopped) {
                         final Object connection = Util.getImplementation().listenSocket(port);
                         final SocketConnection sc = (SocketConnection) scClass.newInstance();
-                        if (connection != null) {
-                            sc.setConnected(true);
-                            Display.getInstance().startThread(new Runnable() {
-                                public void run() {
-                                    sc.input = new SocketInputStream(connection, sc);
-                                    sc.output = new SocketOutputStream(connection, sc);
-                                    sc.connectionEstablished(sc.input, sc.output);
-                                    sc.setConnected(false);
-                                }
-                            }, "Connection " + port).start();
-                        } else {
-                            sc.connectionError(Util.getImplementation().getSocketErrorCode(connection), Util.getImplementation().getSocketErrorMessage(connection));
-                        }
+                        sc.setConnected(true);
+                        Display.getInstance().startThread(new Runnable() {
+                            public void run() {
+                                sc.input = new SocketInputStream(connection, sc);
+                                sc.output = new SocketOutputStream(connection, sc);
+                                sc.connectionEstablished(sc.input, sc.output);
+                                sc.setConnected(false);
+                            }
+                        }, "Connection " + port).start();
                     }
                 } catch (Exception err) {
                     // instansiating the class has caused a problem

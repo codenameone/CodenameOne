@@ -372,9 +372,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                     if (val instanceof List) {
                         if (p instanceof CollectionProperty) {
                             if (recursiveType != null) {
-                                if (p != null) {
-                                    ((CollectionProperty) p).clear();
-                                }
+                                ((CollectionProperty) p).clear();
                                 for (Object e : (Collection) val) {
                                     if (e instanceof Map) {
                                         Class eType = p.getGenericType();

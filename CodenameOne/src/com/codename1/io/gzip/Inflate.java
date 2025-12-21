@@ -151,12 +151,6 @@ final class Inflate {
             inflateEnd();
             return Z_STREAM_ERROR;
         }
-        if (wbits != w) {
-            if (blocks != null) {
-                blocks.free();
-                blocks = null;
-            }
-        }
 
         // set window size
         wbits = w;

@@ -1015,12 +1015,9 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
 
 
             }
-            if (mgr != null) {
-                mgr.addAnimationAndBlock(
-                        ComponentAnimation.compoundAnimation(animations2.toArray(new ComponentAnimation[animations2.size()]))
-                );
-
-            }
+            mgr.addAnimationAndBlock(
+                    ComponentAnimation.compoundAnimation(animations2.toArray(new ComponentAnimation[animations2.size()]))
+            );
         }
 
         return this;

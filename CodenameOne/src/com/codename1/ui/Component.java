@@ -2028,7 +2028,7 @@ public class Component implements Animation, StyleListener, Editable {
         Form f = getComponentForm();
         if (f != null) {
             Component cmp = f.getComponentAt(x, y);
-            if (cmp != null && cmp.isOwnedBy(this)) {
+            if (cmp.isOwnedBy(this)) {
                 return true;
             }
         }

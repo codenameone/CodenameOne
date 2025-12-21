@@ -1409,9 +1409,6 @@ public class Resources {
                 }
 
                 if (mediaMatch) {
-                    if (mediaRules == null) {
-                        mediaRules = new HashMap<String, MediaRule>();
-                    }
                     MediaRule rule = mediaRules.get(subkey);
                     boolean replace = rule == null;
                     if (!replace && rule.matchCount <= matchCount) {
@@ -1670,10 +1667,8 @@ public class Resources {
             throw new IOException("Error while trying to read theme property: " + key);
         }
         if (enableMediaQueries) {
-            if (mediaRules != null) {
-                for (MediaRule rule : mediaRules.values()) {
-                    theme.put(rule.translatedKey, theme.get(rule.rawKey));
-                }
+            for (MediaRule rule : mediaRules.values()) {
+                theme.put(rule.translatedKey, theme.get(rule.rawKey));
             }
 
             if (fontScaleRules != null && !fontKeys.isEmpty()) {
