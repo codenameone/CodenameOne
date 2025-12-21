@@ -30,11 +30,6 @@
 
 #if defined(__APPLE__) && defined(__OBJC__)
 #import <Foundation/Foundation.h>
-#else
-#define NSLog(...) printf(__VA_ARGS__); printf("\n")
-typedef int BOOL;
-#define YES 1
-#define NO 0
 #endif
 
 #include <pthread.h>
@@ -385,13 +380,47 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
     finishedNativeAllocations();
     return destArr;
 #else
-    // Fallback stub for Linux/Test
-    // Just assumes ASCII/UTF8 simple copy for now
-    JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, len);
-    JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
-    for(int iter = 0 ; iter < len ; iter++) {
-        dest[iter] = (JAVA_CHAR)sourceData[iter];
+    // DFA Decoder for POSIX/Test
+    // TODO: Handle proper encoding check if not UTF-8/ASCII
+    size_t count;
+    uint32_t codepoint;
+    uint32_t state = 0;
+    JAVA_ARRAY_BYTE* s = sourceData;
+    JAVA_ARRAY_BYTE* end = s + len;
+    for (count=0; s < end; s = s + 1)
+        if (!decode(&state, &codepoint, (uint8_t)*s)) {
+            if (codepoint > 65535) {
+                count +=2;
+            } else {
+                count+=1;
+            }
+        }
+
+    if (state != UTF8_ACCEPT) {
+        JAVA_OBJECT ex = __NEW_java_lang_RuntimeException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+        java_lang_RuntimeException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, newStringFromCString(CN1_THREAD_STATE_PASS_ARG "Decoding Error"));
+        finishedNativeAllocations();
+        throwException(threadStateData, ex);
+        return NULL;
     }
+    JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, count);
+    JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
+    state = UTF8_ACCEPT;
+    codepoint = 0;
+    s = sourceData;
+    for (; s < end; s = s+1)
+        if (!decode(&state, &codepoint, (uint8_t)*s)) {
+            if (codepoint > 65535) {
+                *dest = 55296 + (((codepoint - 0x10000) >> 10) & 1023);
+                dest = dest + 1;
+                *dest = 56320 + ((codepoint - 0x10000) & 1023);
+                dest = dest+1;
+            } else {
+                *dest = (JAVA_CHAR)codepoint;
+                dest= dest + 1;
+            }
+        }
+
     finishedNativeAllocations();
     return destArr;
 #endif
@@ -461,6 +490,7 @@ JAVA_OBJECT java_lang_String_charsToBytes___char_1ARRAY_char_1ARRAY_R_byte_1ARRA
     return destArr;
 #else
     // Stub: Assume ASCII/UTF8 simple copy for Linux testing
+    // TODO: Implement proper encoding logic
     JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_BYTE(threadStateData, sourceArr->length);
     JAVA_ARRAY_CHAR* src = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)sourceArr)->data;
     JAVA_ARRAY_BYTE* dest = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)destArr)->data;
@@ -1508,6 +1538,7 @@ JAVA_LONG java_lang_Runtime_totalMemoryImpl___R_long(CODENAME_ONE_THREAD_STATE) 
 #if defined(__APPLE__) && defined(__OBJC__)
     return [NSProcessInfo processInfo].physicalMemory;
 #else
+    // TODO: implement for other platforms
     return 1024*1024*1024;
 #endif
 }
@@ -1522,6 +1553,7 @@ JAVA_LONG java_lang_Runtime_freeMemoryImpl___R_long(CODENAME_ONE_THREAD_STATE) {
                                    &size);
     return [NSProcessInfo processInfo].physicalMemory - info.resident_size;
 #else
+    // TODO: implement for other platforms
     return 1024*1024*1024;
 #endif
 }
@@ -1626,6 +1658,7 @@ JAVA_OBJECT java_text_DateFormat_format___java_util_Date_java_lang_StringBuffer_
 
     return str;
 #else
+    // TODO: Implement stub
     return JAVA_NULL; // Stub
 #endif
 }
@@ -1741,6 +1774,7 @@ JAVA_OBJECT java_lang_String_toUpperCase___R_java_lang_String(CODENAME_ONE_THREA
     finishedNativeAllocations();
     return jString;
 #else
+    // TODO: Implement stub
     return __cn1ThisObject; // Stub
 #endif
 }
@@ -1755,6 +1789,7 @@ JAVA_OBJECT java_lang_String_toLowerCase___R_java_lang_String(CODENAME_ONE_THREA
     finishedNativeAllocations();
     return jString;
 #else
+    // TODO: Implement stub
     return __cn1ThisObject; // Stub
 #endif
 }
@@ -1777,13 +1812,27 @@ JAVA_OBJECT java_lang_String_format___java_lang_String_java_lang_Object_1ARRAY_R
     finishedNativeAllocations();
     return out;
 #else
+    // TODO: Implement stub
     return format; // Stub
 #endif
 }
 
-#if !defined(__APPLE__) || !defined(__OBJC__)
+#ifndef __APPLE__
 
-// STUBS for Linux/Test environment
+// Additional Stubs for Linking
+
+struct clazz class_array1__JAVA_BOOLEAN = {0};
+struct clazz class_array1__JAVA_CHAR = {0};
+struct clazz class_array1__JAVA_BYTE = {0};
+struct clazz class_array1__JAVA_SHORT = {0};
+struct clazz class_array1__JAVA_INT = {0};
+struct clazz class_array1__JAVA_LONG = {0};
+struct clazz class_array1__JAVA_FLOAT = {0};
+struct clazz class_array1__JAVA_DOUBLE = {0};
+
+void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {} // TODO
+void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {} // TODO
+void arrayFinalizerFunction(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array) {} // TODO
 
 void** initVtableForInterface() { return 0; }
 JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
@@ -1862,11 +1911,11 @@ JAVA_OBJECT* constantPoolObjects = 0;
 
 int instanceofFunction(int sourceClass, int destId) { return 1; }
 
-void flushReleaseQueue() {}
-void codenameOneGCMark() {}
-void codenameOneGCSweep() {}
+void flushReleaseQueue() {} // TODO
+void codenameOneGCMark() {} // TODO
+void codenameOneGCSweep() {} // TODO
 JAVA_BOOLEAN lowMemoryMode = JAVA_FALSE;
-void collectThreadResources(struct ThreadLocalData *current) {}
+void collectThreadResources(struct ThreadLocalData *current) {} // TODO
 
 struct elementStruct* pop(struct elementStruct**sp) {
     (*sp)--;
@@ -1913,24 +1962,5 @@ void initConstantPool() {
 }
 pthread_key_t recursionKey;
 int currentGcMarkValue = 0;
-
-#endif
-
-#if !defined(__APPLE__) || !defined(__OBJC__)
-
-// Additional Stubs for Linking
-
-struct clazz class_array1__JAVA_BOOLEAN = {0};
-struct clazz class_array1__JAVA_CHAR = {0};
-struct clazz class_array1__JAVA_BYTE = {0};
-struct clazz class_array1__JAVA_SHORT = {0};
-struct clazz class_array1__JAVA_INT = {0};
-struct clazz class_array1__JAVA_LONG = {0};
-struct clazz class_array1__JAVA_FLOAT = {0};
-struct clazz class_array1__JAVA_DOUBLE = {0};
-
-void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {}
-void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {}
-void arrayFinalizerFunction(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array) {}
 
 #endif

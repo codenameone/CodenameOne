@@ -5,16 +5,6 @@
 #if defined(__APPLE__) && defined(__OBJC__)
 #import <Foundation/Foundation.h>
 
-// Helper to convert Java String to NSString (assuming toNSString is available or declared)
-// In nativeMethods.m, toNSString is defined. Here we might need to declare it extern if we link against it,
-// or implement a local version if we are standalone.
-// Since this file is part of the VM build, we assume toNSString is available via cn1_globals.h or similar.
-// But cn1_globals.h doesn't declare it. nativeMethods.m implements it.
-// We should declare it.
-@class NSString;
-extern NSString* toNSString(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o);
-extern JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str);
-
 JAVA_BOOLEAN java_io_File_existsImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
     if(path == JAVA_NULL) return JAVA_FALSE;
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
@@ -191,14 +181,19 @@ JAVA_BOOLEAN java_io_File_canWriteImpl___java_lang_String_R_boolean(CODENAME_ONE
 
 JAVA_BOOLEAN java_io_File_canExecuteImpl___java_lang_String_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
     if(path == JAVA_NULL) return JAVA_FALSE;
+#ifdef CN1_ENABLE_FILE_SYSTEM_STATS
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
     NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
     BOOL res = [[NSFileManager defaultManager] isExecutableFileAtPath:p];
     [pool release];
     return res;
+#else
+    return java_io_File_existsImpl___java_lang_String_R_boolean(threadStateData, __cn1ThisObject, path);
+#endif
 }
 
 JAVA_LONG java_io_File_getTotalSpaceImpl___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+#ifdef CN1_ENABLE_FILE_SYSTEM_STATS
     if(path == JAVA_NULL) return 0;
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
     NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
@@ -209,9 +204,13 @@ JAVA_LONG java_io_File_getTotalSpaceImpl___java_lang_String_R_long(CODENAME_ONE_
     }
     [pool release];
     return size;
+#else
+    return 0;
+#endif
 }
 
 JAVA_LONG java_io_File_getFreeSpaceImpl___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
+#ifdef CN1_ENABLE_FILE_SYSTEM_STATS
     if(path == JAVA_NULL) return 0;
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
     NSString* p = toNSString(CN1_THREAD_STATE_PASS_ARG path);
@@ -222,6 +221,9 @@ JAVA_LONG java_io_File_getFreeSpaceImpl___java_lang_String_R_long(CODENAME_ONE_T
     }
     [pool release];
     return size;
+#else
+    return 0;
+#endif
 }
 
 JAVA_LONG java_io_File_getUsableSpaceImpl___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT path) {
