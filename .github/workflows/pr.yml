@@ -45,24 +45,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java-version: [8, 17, 21, 25]
+        java-version: [8, 17, 21]
 
     steps:
       - uses: actions/checkout@v1
       - name: Set up Java
         run: |
           if [ "${{ matrix.java-version }}" = "8" ]; then
-             echo "JAVA_HOME=${JAVA8_HOME}" >> $GITHUB_ENV
-             echo "${JAVA8_HOME}/bin" >> $GITHUB_PATH
+             echo "JAVA_HOME=${JAVA_HOME_8}" >> $GITHUB_ENV
+             echo "${JAVA_HOME_8}/bin" >> $GITHUB_PATH
           elif [ "${{ matrix.java-version }}" = "17" ]; then
-             echo "JAVA_HOME=${JAVA17_HOME}" >> $GITHUB_ENV
-             echo "${JAVA17_HOME}/bin" >> $GITHUB_PATH
+             echo "JAVA_HOME=${JAVA_HOME_17}" >> $GITHUB_ENV
+             echo "${JAVA_HOME_17}/bin" >> $GITHUB_PATH
           elif [ "${{ matrix.java-version }}" = "21" ]; then
-             echo "JAVA_HOME=${JAVA21_HOME}" >> $GITHUB_ENV
-             echo "${JAVA21_HOME}/bin" >> $GITHUB_PATH
-          elif [ "${{ matrix.java-version }}" = "25" ]; then
-             echo "JAVA_HOME=${JAVA25_HOME}" >> $GITHUB_ENV
-             echo "${JAVA25_HOME}/bin" >> $GITHUB_PATH
+             echo "JAVA_HOME=${JAVA_HOME_21}" >> $GITHUB_ENV
+             echo "${JAVA_HOME_21}/bin" >> $GITHUB_PATH
           fi
       - name: Cache Maven dependencies
         uses: actions/cache@v4
