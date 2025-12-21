@@ -154,7 +154,6 @@ class LambdaIntegrationTest {
         // Add stubs for java.lang.invoke
         Path stubsDir = Files.createTempDirectory("java-lang-invoke-stubs");
         sources.addAll(generateJavaLangInvokeStubs(stubsDir));
-        sources.addAll(generateJavaUtilStubs(stubsDir));
 
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
         List<String> args = new ArrayList<>();
@@ -175,22 +174,6 @@ class LambdaIntegrationTest {
 
         int result = compiler.run(null, null, null, args.toArray(new String[0]));
         assertEquals(0, result, "JavaAPI should compile");
-    }
-
-    private List<String> generateJavaUtilStubs(Path stubsDir) throws IOException {
-        List<String> stubFiles = new ArrayList<>();
-        Path utilPkg = stubsDir.resolve("java/util");
-        Files.createDirectories(utilPkg);
-
-        // Objects
-        Path objs = utilPkg.resolve("Objects.java");
-        Files.write(objs, ("package java.util;\n" +
-                "public class Objects {\n" +
-                "    public static <T> T requireNonNull(T obj) { if (obj == null) throw new NullPointerException(); return obj; }\n" +
-                "}").getBytes(StandardCharsets.UTF_8));
-        stubFiles.add(objs.toString());
-
-        return stubFiles;
     }
 
     private List<String> generateJavaLangInvokeStubs(Path stubsDir) throws IOException {
