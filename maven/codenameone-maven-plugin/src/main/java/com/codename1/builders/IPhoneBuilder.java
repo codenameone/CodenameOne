@@ -293,9 +293,12 @@ public class IPhoneBuilder extends Executor {
         if(!new File(pod).exists()) {
             pod = "/usr/bin/pod";
             if(!new File(pod).exists()) {
-                log("You need to install cocoapods to proceed, to install cocoapods on your mac issue this command in the terminal: sudo gem install cocoapods --pre\n"
-                        + "followed by: sudo gem install xcodeproj");
-                return false;
+                pod = "/opt/homebrew/bin/pod";
+                if(!new File(pod).exists()) {
+                    log("You need to install cocoapods to proceed, to install cocoapods on your mac issue this command in the terminal: sudo gem install cocoapods --pre\n"
+                            + "followed by: sudo gem install xcodeproj");
+                    return false;
+                }
             }
         }
         
