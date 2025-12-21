@@ -39,7 +39,7 @@ public class StringIndexOutOfBoundsException extends java.lang.IndexOutOfBoundsE
      * index - the illegal index.
      */
     public StringIndexOutOfBoundsException(int index){
-        super("" + index);
+        super(String.valueOf(index));
     }
 
     /**

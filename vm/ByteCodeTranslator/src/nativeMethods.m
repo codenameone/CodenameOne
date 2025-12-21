@@ -1,4 +1,12 @@
 #include "cn1_globals.h"
+#include <stdint.h>
+#include <ctype.h>
+#include <assert.h>
+#include <errno.h>
+
+#ifndef MAX
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
+#endif
 
 #include "java_lang_Object.h"
 #include "java_lang_Boolean.h"
@@ -17,15 +25,26 @@
 #include "java_util_HashMap.h"
 #include "java_util_HashMap_Entry.h"
 #include "java_lang_NullPointerException.h"
+#include "java_lang_Class.h"
+#include "java_lang_System.h"
+
+#if defined(__APPLE__) && defined(__OBJC__)
 #import <Foundation/Foundation.h>
+#endif
+
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/time.h>
 #include "java_util_Date.h"
 #include "java_text_DateFormat.h"
+#if defined(__APPLE__) && defined(__OBJC__)
 #include "CodenameOne_GLViewController.h"
+#endif
 #include "java_lang_StringToReal.h"
+
+#if defined(__APPLE__) && defined(__OBJC__)
 #import <mach/mach.h>
+#endif
 
 extern JAVA_BOOLEAN lowMemoryMode;
 
@@ -87,6 +106,7 @@ JAVA_BOOLEAN compareStringToCharArray(const char* str, JAVA_ARRAY_CHAR* chrs, in
 }
 
 JAVA_VOID java_lang_String_releaseNSString___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG ns) {
+#if defined(__APPLE__) && defined(__OBJC__)
     if(ns != 0) {
         // this prevents a race condition where the string might get GC'd and the NSString is still pending
         // on a call in the native thread
@@ -95,6 +115,7 @@ JAVA_VOID java_lang_String_releaseNSString___long(CODENAME_ONE_THREAD_STATE, JAV
             [n release];
         });
     }
+#endif
 }
 
 JAVA_BOOLEAN java_lang_String_equals___java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT __cn1Arg1) {
@@ -217,6 +238,7 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
     enteringNativeAllocations();
     JAVA_ARRAY_BYTE* sourceData = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)b)->data;
     sourceData += off;
+#if defined(__APPLE__) && defined(__OBJC__)
     NSStringEncoding enc;
     struct obj__java_lang_String* encString = (struct obj__java_lang_String*)encoding;
     JAVA_ARRAY_CHAR* encArr = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)encString->java_lang_String_value)->data;
@@ -357,6 +379,51 @@ JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String
     [pool release];
     finishedNativeAllocations();
     return destArr;
+#else
+    // DFA Decoder for POSIX/Test
+    // TODO: Handle proper encoding check if not UTF-8/ASCII
+    size_t count;
+    uint32_t codepoint;
+    uint32_t state = 0;
+    JAVA_ARRAY_BYTE* s = sourceData;
+    JAVA_ARRAY_BYTE* end = s + len;
+    for (count=0; s < end; s = s + 1)
+        if (!decode(&state, &codepoint, (uint8_t)*s)) {
+            if (codepoint > 65535) {
+                count +=2;
+            } else {
+                count+=1;
+            }
+        }
+
+    if (state != UTF8_ACCEPT) {
+        JAVA_OBJECT ex = __NEW_java_lang_RuntimeException(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+        java_lang_RuntimeException___INIT_____java_lang_String(CN1_THREAD_STATE_PASS_ARG ex, newStringFromCString(CN1_THREAD_STATE_PASS_ARG "Decoding Error"));
+        finishedNativeAllocations();
+        throwException(threadStateData, ex);
+        return NULL;
+    }
+    JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, count);
+    JAVA_ARRAY_CHAR* dest = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)destArr)->data;
+    state = UTF8_ACCEPT;
+    codepoint = 0;
+    s = sourceData;
+    for (; s < end; s = s+1)
+        if (!decode(&state, &codepoint, (uint8_t)*s)) {
+            if (codepoint > 65535) {
+                *dest = 55296 + (((codepoint - 0x10000) >> 10) & 1023);
+                dest = dest + 1;
+                *dest = 56320 + ((codepoint - 0x10000) & 1023);
+                dest = dest+1;
+            } else {
+                *dest = (JAVA_CHAR)codepoint;
+                dest= dest + 1;
+            }
+        }
+
+    finishedNativeAllocations();
+    return destArr;
+#endif
 }
 
 JAVA_OBJECT java_io_InputStreamReader_bytesToChars___byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT b, JAVA_INT off, JAVA_INT len, JAVA_OBJECT encoding) {
@@ -375,6 +442,7 @@ JAVA_BOOLEAN isAsciiArray(JAVA_ARRAY sourceArr) {
 
 JAVA_OBJECT java_lang_String_charsToBytes___char_1ARRAY_char_1ARRAY_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT arr, JAVA_OBJECT encoding) {
     JAVA_ARRAY sourceArr = (JAVA_ARRAY)arr;
+#if defined(__APPLE__) && defined(__OBJC__)
     if(isAsciiArray(sourceArr)) {
         JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_BYTE(threadStateData, sourceArr->length);
         JAVA_ARRAY_CHAR* arr = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)sourceArr)->data;
@@ -420,6 +488,17 @@ JAVA_OBJECT java_lang_String_charsToBytes___char_1ARRAY_char_1ARRAY_R_byte_1ARRA
     [nsStr release];
     [pool release];
     return destArr;
+#else
+    // Stub: Assume ASCII/UTF8 simple copy for Linux testing
+    // TODO: Implement proper encoding logic
+    JAVA_OBJECT destArr = __NEW_ARRAY_JAVA_BYTE(threadStateData, sourceArr->length);
+    JAVA_ARRAY_CHAR* src = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)sourceArr)->data;
+    JAVA_ARRAY_BYTE* dest = (JAVA_ARRAY_BYTE*)((JAVA_ARRAY)destArr)->data;
+    for(int iter = 0 ; iter < sourceArr->length ; iter++) {
+        dest[iter] = (JAVA_ARRAY_BYTE)src[iter];
+    }
+    return destArr;
+#endif
 }
 
 JAVA_VOID java_lang_Throwable_fillInStack__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject) {
@@ -485,6 +564,7 @@ JAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREA
 }
 
 JAVA_VOID java_io_NSLogOutputStream_write___byte_1ARRAY_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_OBJECT b, JAVA_INT off, JAVA_INT len) {
+#if defined(__APPLE__) && defined(__OBJC__)
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
     JAVA_ARRAY a = (JAVA_ARRAY)b;
     JAVA_ARRAY_BYTE* arr = (JAVA_ARRAY_BYTE*)(*a).data;
@@ -497,6 +577,12 @@ JAVA_VOID java_io_NSLogOutputStream_write___byte_1ARRAY_int_int(CODENAME_ONE_THR
     // if we disable arc we will need to re-enable these
     [str release];
     [pool release];
+#else
+    JAVA_ARRAY a = (JAVA_ARRAY)b;
+    JAVA_ARRAY_BYTE* arr = (JAVA_ARRAY_BYTE*)(*a).data;
+    // Just print to stdout
+    for(int i=0; i<len; i++) putchar(arr[off+i]);
+#endif
 }
 
 JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT src, JAVA_INT srcOffset, JAVA_OBJECT dst, JAVA_INT dstOffset, JAVA_INT length) {
@@ -1047,7 +1133,7 @@ struct ThreadLocalData* getThreadLocalData() {
         CODENAME_ONE_ASSERT(threadOffset > -1);
         allThreads[threadOffset] = i;
         unlockCriticalSection();
-        //NSLog(@"Thread slot %d assigned to thread %d",threadOffset,(int)i->threadId);
+        //printf("Thread slot %d assigned to thread %d\n",threadOffset,(int)i->threadId);
     }
     return i;
 }
@@ -1159,10 +1245,10 @@ JAVA_VOID monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
         
 
     }
-    //NSLog(@"Locking mutex %i started from %@", (int)obj->__codenameOneMutex, [NSThread callStackSymbols]);
-    //NSLog(@"Locking mutex %i completed", (int)obj->__codenameOneMutex);
+    //printf("Locking mutex %i started from %@", (int)obj->__codenameOneMutex, [NSThread callStackSymbols]);
+    //printf("Locking mutex %i completed", (int)obj->__codenameOneMutex);
     if(err != 0) {
-        NSLog(@"Error with lock %i EINVAL %i, ETIMEDOUT %i, EPERM %i", err, EINVAL, ETIMEDOUT, EPERM);
+        printf("Error with lock %i EINVAL %i, ETIMEDOUT %i, EPERM %i\n", err, EINVAL, ETIMEDOUT, EPERM);
     }
 }
 
@@ -1178,7 +1264,7 @@ JAVA_VOID monitorEnterBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
 }
 
 JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
-    //NSLog(@"Unlocked mutex %i ", (int)obj->__codenameOneMutex);
+    //printf("Unlocked mutex %i ", (int)obj->__codenameOneMutex);
     // remove the ownership of the thread
     ((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter--;
     if(((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter > 0) {
@@ -1187,7 +1273,7 @@ JAVA_VOID monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
     ((struct CN1ThreadData*)obj->__codenameOneThreadData)->ownerThread = 0;
     int err = pthread_mutex_unlock(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneMutex);
     if(err != 0) {
-        NSLog(@"Error with unlock %i EINVAL %i, ETIMEDOUT %i, EPERM %i", err, EINVAL, ETIMEDOUT, EPERM);
+        printf("Error with unlock %i EINVAL %i, ETIMEDOUT %i, EPERM %i\n", err, EINVAL, ETIMEDOUT, EPERM);
     }
 }
 
@@ -1202,7 +1288,7 @@ JAVA_VOID monitorExitBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
 }
 
 JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_LONG timeout, JAVA_INT nanos) {
-    //NSLog(@"Waiting on mutex %i with timeout %i started", (int)obj->__codenameOneMutex, (int)timeout);
+    //printf("Waiting on mutex %i with timeout %i started", (int)obj->__codenameOneMutex, (int)timeout);
     threadStateData->threadActive = JAVA_FALSE;
     
     int counter;
@@ -1216,7 +1302,7 @@ JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
     if(timeout == 0 && nanos == 0) {
         errCode = pthread_cond_wait(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneCondition, &((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneMutex);
         if(errCode != 0) {
-            NSLog(@"Error with wait %i EINVAL %i, ETIMEDOUT %i, EPERM %i", errCode, EINVAL, ETIMEDOUT, EPERM);
+            printf("Error with wait %i EINVAL %i, ETIMEDOUT %i, EPERM %i\n", errCode, EINVAL, ETIMEDOUT, EPERM);
         }
     } else {
         struct timeval   tv;
@@ -1249,16 +1335,16 @@ JAVA_VOID java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJEC
     ((struct CN1ThreadData*)obj->__codenameOneThreadData)->counter = counter;
     
     threadStateData->threadActive = JAVA_TRUE;
-    //NSLog(@"Waiting on mutex %i with timeout %i finished", (int)obj->__codenameOneMutex, (int)timeout);
+    //printf("Waiting on mutex %i with timeout %i finished", (int)obj->__codenameOneMutex, (int)timeout);
 }
 
 JAVA_VOID java_lang_Object_notify__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
-    //NSLog(@"Notifying mutex %i", (int)obj->__codenameOneMutex);
+    //printf("Notifying mutex %i", (int)obj->__codenameOneMutex);
     pthread_cond_signal(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneCondition);
 }
 
 JAVA_VOID java_lang_Object_notifyAll__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {
-    //NSLog(@"Notifying all mutex threads %i", (int)obj->__codenameOneMutex);
+    //printf("Notifying all mutex threads %i", (int)obj->__codenameOneMutex);
     pthread_cond_broadcast(&((struct CN1ThreadData*)obj->__codenameOneThreadData)->__codenameOneCondition);
 }
 
@@ -1317,11 +1403,11 @@ void markDeadThread(struct ThreadLocalData *d)
    
     if(found>=0)
     {
-        //  NSLog(@"Deleting thread slot %i id %d", found,(int)d->threadId);
+        //  printf("Deleting thread slot %i id %d", found,(int)d->threadId);
     }
     else
     {
-        NSLog(@"Thread %d not found !!",(int)d->threadId);
+        printf("Thread %d not found !!\n",(int)d->threadId);
     }
 
 }
@@ -1333,9 +1419,9 @@ void* threadRunner(void *x)
     d->threadActive = JAVA_TRUE;
     d->currentThreadObject = t;
     
-   // NSLog(@"launching thread %d",(int)d->threadId);
+   // printf("launching thread %d",(int)d->threadId);
     java_lang_Thread_runImpl___long(d, t, (long)d); // pass the actual structure as threadid
-   // NSLog(@"terminate thread %d",(int)d->threadId);
+   // printf("terminate thread %d",(int)d->threadId);
     
     // we remove the thread here since this is the only place we can do this
     // we add the thread in the getThreadLocalData() method to handle native threads
@@ -1449,10 +1535,16 @@ void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginIn
 }
 
 JAVA_LONG java_lang_Runtime_totalMemoryImpl___R_long(CODENAME_ONE_THREAD_STATE) {
+#if defined(__APPLE__) && defined(__OBJC__)
     return [NSProcessInfo processInfo].physicalMemory;
+#else
+    // TODO: implement for other platforms
+    return 1024*1024*1024;
+#endif
 }
 
 JAVA_LONG java_lang_Runtime_freeMemoryImpl___R_long(CODENAME_ONE_THREAD_STATE) {
+#if defined(__APPLE__) && defined(__OBJC__)
     struct task_basic_info info;
     mach_msg_type_number_t size = sizeof(info);
     kern_return_t kerr = task_info(mach_task_self(),
@@ -1460,6 +1552,10 @@ JAVA_LONG java_lang_Runtime_freeMemoryImpl___R_long(CODENAME_ONE_THREAD_STATE) {
                                    (task_info_t)&info,
                                    &size);
     return [NSProcessInfo processInfo].physicalMemory - info.resident_size;
+#else
+    // TODO: implement for other platforms
+    return 1024*1024*1024;
+#endif
 }
 
 
@@ -1482,6 +1578,7 @@ JAVA_OBJECT java_util_HashMap_findNonNullKeyEntry___java_lang_Object_int_int_R_j
 }
 
 JAVA_OBJECT java_util_Locale_getOSLanguage___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
+#if defined(__APPLE__) && defined(__OBJC__)
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
     NSUserDefaults* defs = [NSUserDefaults standardUserDefaults];
     NSArray* languages = [defs objectForKey:@"AppleLanguages"];
@@ -1489,12 +1586,16 @@ JAVA_OBJECT java_util_Locale_getOSLanguage___R_java_lang_String(CODENAME_ONE_THR
     JAVA_OBJECT language = fromNSString(threadStateData, language_);
     [pool release];
     return language;
+#else
+    return newStringFromCString(threadStateData, "en");
+#endif
 }
 
 /*JAVA_OBJECT java_util_Locale_getOSCountry___R_java_lang_String(CODENAME_ONE_THREAD_STATE) {
 }*/
 
 JAVA_OBJECT java_text_DateFormat_format___java_util_Date_java_lang_StringBuffer_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {
+#if defined(__APPLE__) && defined(__OBJC__)
     struct obj__java_text_DateFormat* df = (struct obj__java_text_DateFormat*)__cn1ThisObject;
     POOL_BEGIN();
 #ifndef CN1_USE_ARC
@@ -1556,6 +1657,10 @@ JAVA_OBJECT java_text_DateFormat_format___java_util_Date_java_lang_StringBuffer_
     POOL_END();
 
     return str;
+#else
+    // TODO: Implement stub
+    return JAVA_NULL; // Stub
+#endif
 }
 
 
@@ -1660,6 +1765,7 @@ JAVA_VOID java_lang_String_getChars___int_int_char_1ARRAY_int(CODENAME_ONE_THREA
 }
 
 JAVA_OBJECT java_lang_String_toUpperCase___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject) {
+#if defined(__APPLE__) && defined(__OBJC__)
     enteringNativeAllocations();
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
     NSString *nsString = [toNSString(CN1_THREAD_STATE_PASS_ARG __cn1ThisObject) uppercaseString];
@@ -1667,9 +1773,14 @@ JAVA_OBJECT java_lang_String_toUpperCase___R_java_lang_String(CODENAME_ONE_THREA
     [pool release];
     finishedNativeAllocations();
     return jString;
+#else
+    // TODO: Implement stub
+    return __cn1ThisObject; // Stub
+#endif
 }
 
 JAVA_OBJECT java_lang_String_toLowerCase___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject) {
+#if defined(__APPLE__) && defined(__OBJC__)
     enteringNativeAllocations();
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
     NSString *nsString = [toNSString(CN1_THREAD_STATE_PASS_ARG __cn1ThisObject) lowercaseString];
@@ -1677,9 +1788,14 @@ JAVA_OBJECT java_lang_String_toLowerCase___R_java_lang_String(CODENAME_ONE_THREA
     [pool release];
     finishedNativeAllocations();
     return jString;
+#else
+    // TODO: Implement stub
+    return __cn1ThisObject; // Stub
+#endif
 }
 
 JAVA_OBJECT java_lang_String_format___java_lang_String_java_lang_Object_1ARRAY_R_java_lang_String(CODENAME_ONE_THREAD_STATE,  JAVA_OBJECT format, JAVA_OBJECT args) {
+#if defined(__APPLE__) && defined(__OBJC__)
     enteringNativeAllocations();
     JAVA_ARRAY argsArray = (JAVA_ARRAY)args;
     JAVA_ARRAY_OBJECT* objs = (JAVA_ARRAY_OBJECT*)argsArray->data;
@@ -1695,5 +1811,156 @@ JAVA_OBJECT java_lang_String_format___java_lang_String_java_lang_Object_1ARRAY_R
     JAVA_OBJECT out = fromNSString(CN1_THREAD_STATE_PASS_ARG [NSString init]);
     finishedNativeAllocations();
     return out;
-    
+#else
+    // TODO: Implement stub
+    return format; // Stub
+#endif
 }
+
+#ifndef __APPLE__
+
+// Additional Stubs for Linking
+
+struct clazz class_array1__JAVA_BOOLEAN = {0};
+struct clazz class_array1__JAVA_CHAR = {0};
+struct clazz class_array1__JAVA_BYTE = {0};
+struct clazz class_array1__JAVA_SHORT = {0};
+struct clazz class_array1__JAVA_INT = {0};
+struct clazz class_array1__JAVA_LONG = {0};
+struct clazz class_array1__JAVA_FLOAT = {0};
+struct clazz class_array1__JAVA_DOUBLE = {0};
+
+void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {} // TODO
+void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {} // TODO
+void arrayFinalizerFunction(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array) {} // TODO
+
+void** initVtableForInterface() { return 0; }
+JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {
+    JAVA_OBJECT o = (JAVA_OBJECT)calloc(1, size);
+    o->__codenameOneParentClsReference = parent;
+    return o;
+}
+void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { free(obj); }
+
+void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
+    if (exceptionArg != JAVA_NULL && exceptionArg->__codenameOneParentClsReference != 0) {
+        printf("Exception thrown: %s\n", exceptionArg->__codenameOneParentClsReference->clsName);
+    } else {
+        printf("Exception thrown: %p\n", exceptionArg);
+    }
+    exit(1);
+}
+JAVA_INT throwException_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
+    throwException(threadStateData, exceptionArg);
+    return 0;
+}
+JAVA_BOOLEAN throwException_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT exceptionArg) {
+    throwException(threadStateData, exceptionArg);
+    return 0;
+}
+
+void throwArrayIndexOutOfBoundsException(CODENAME_ONE_THREAD_STATE, int index) {
+    printf("ArrayIndexOutOfBoundsException: %d\n", index);
+    exit(1);
+}
+JAVA_BOOLEAN throwArrayIndexOutOfBoundsException_R_boolean(CODENAME_ONE_THREAD_STATE, int index) {
+    throwArrayIndexOutOfBoundsException(threadStateData, index);
+    return 0;
+}
+
+int byteSizeForArray(struct clazz* cls) {
+    return sizeof(JAVA_OBJECT); // Stub
+}
+
+JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim) {
+    int size = sizeof(struct JavaArrayPrototype) + (length * primitiveSize);
+    JAVA_ARRAY arr = (JAVA_ARRAY)calloc(1, size);
+    arr->__codenameOneParentClsReference = type;
+    arr->length = length;
+    arr->data = (char*)arr + sizeof(struct JavaArrayPrototype);
+    return (JAVA_OBJECT)arr;
+}
+
+JAVA_OBJECT __NEW_ARRAY_JAVA_CHAR(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
+    return allocArray(threadStateData, size, &class_array1__JAVA_CHAR, sizeof(JAVA_CHAR), 1);
+}
+JAVA_OBJECT __NEW_ARRAY_JAVA_BYTE(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
+    return allocArray(threadStateData, size, &class_array1__JAVA_BYTE, sizeof(JAVA_BYTE), 1);
+}
+JAVA_OBJECT __NEW_ARRAY_JAVA_INT(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
+    return allocArray(threadStateData, size, &class_array1__JAVA_INT, sizeof(JAVA_INT), 1);
+}
+JAVA_OBJECT __NEW_ARRAY_JAVA_LONG(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
+    return allocArray(threadStateData, size, &class_array1__JAVA_LONG, sizeof(JAVA_LONG), 1);
+}
+JAVA_OBJECT __NEW_ARRAY_JAVA_DOUBLE(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
+    return allocArray(threadStateData, size, &class_array1__JAVA_DOUBLE, sizeof(JAVA_DOUBLE), 1);
+}
+JAVA_OBJECT __NEW_ARRAY_JAVA_FLOAT(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
+    return allocArray(threadStateData, size, &class_array1__JAVA_FLOAT, sizeof(JAVA_FLOAT), 1);
+}
+JAVA_OBJECT __NEW_ARRAY_JAVA_SHORT(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
+    return allocArray(threadStateData, size, &class_array1__JAVA_SHORT, sizeof(JAVA_SHORT), 1);
+}
+JAVA_OBJECT __NEW_ARRAY_JAVA_BOOLEAN(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
+    return allocArray(threadStateData, size, &class_array1__JAVA_BOOLEAN, sizeof(JAVA_BOOLEAN), 1);
+}
+
+JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) { return JAVA_FALSE; }
+JAVA_OBJECT* constantPoolObjects = 0;
+
+int instanceofFunction(int sourceClass, int destId) { return 1; }
+
+void flushReleaseQueue() {} // TODO
+void codenameOneGCMark() {} // TODO
+void codenameOneGCSweep() {} // TODO
+JAVA_BOOLEAN lowMemoryMode = JAVA_FALSE;
+void collectThreadResources(struct ThreadLocalData *current) {} // TODO
+
+struct elementStruct* pop(struct elementStruct**sp) {
+    (*sp)--;
+    return *sp;
+}
+void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct**sp) {
+    (*sp) -= count;
+}
+
+extern JAVA_OBJECT __NEW_INSTANCE_java_lang_String(CODENAME_ONE_THREAD_STATE);
+
+JAVA_OBJECT newStringFromCString(CODENAME_ONE_THREAD_STATE, const char *str) {
+    if (str == NULL) return JAVA_NULL;
+    int len = strlen(str);
+    JAVA_OBJECT charArr = __NEW_ARRAY_JAVA_CHAR(threadStateData, len);
+    JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)charArr)->data;
+    for(int i=0; i<len; i++) chars[i] = str[i];
+
+    JAVA_OBJECT s = __NEW_INSTANCE_java_lang_String(threadStateData);
+    struct obj__java_lang_String* stringObj = (struct obj__java_lang_String*)s;
+    stringObj->java_lang_String_value = charArr;
+    stringObj->java_lang_String_count = len;
+    stringObj->java_lang_String_offset = 0;
+    return s;
+}
+
+const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {
+    if (str == JAVA_NULL) return NULL;
+    struct obj__java_lang_String* s = (struct obj__java_lang_String*)str;
+    JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)s->java_lang_String_value)->data;
+    int len = s->java_lang_String_count;
+    int offset = s->java_lang_String_offset;
+    char* buf = (char*)malloc(len + 1);
+    for(int i=0; i<len; i++) {
+        buf[i] = (char)chars[offset + i];
+    }
+    buf[len] = 0;
+    return buf;
+}
+
+void initConstantPool() {
+    // Allocate dummy pool to prevent segfaults, though contents will be null
+    constantPoolObjects = calloc(65536, sizeof(void*));
+}
+pthread_key_t recursionKey;
+int currentGcMarkValue = 0;
+
+#endif

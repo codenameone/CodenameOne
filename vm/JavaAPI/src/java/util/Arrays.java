@@ -38,7 +38,7 @@ public class Arrays {
      */
     public static void checkOffsetAndCount(int arrayLength, int offset, int count) {
         if ((offset | count) < 0 || offset > arrayLength || arrayLength - offset < count) {
-            throw new ArrayIndexOutOfBoundsException(offset);
+            throw new ArrayIndexOutOfBoundsException(String.valueOf(offset));
         }
     }
 
@@ -1902,15 +1902,15 @@ public class Arrays {
     private static void checkBounds(int arrLength, int start, int end) {
         if (start > end) {
             // luni.35=Start index ({0}) is greater than end index ({1})
-            throw new IllegalArgumentException("" + start + " out of: " + end);
+            throw new IllegalArgumentException("Start index greater than end index");
         }
         if (start < 0) {
             // luni.36=Array index out of range\: {0}
-            throw new IndexOutOfBoundsException("" + start);
+            throw new IndexOutOfBoundsException(String.valueOf(start));
         }
         if (end > arrLength) {
             // luni.36=Array index out of range\: {0}
-            throw new IndexOutOfBoundsException("" + end);
+            throw new IndexOutOfBoundsException(String.valueOf(end));
         }
     }
 

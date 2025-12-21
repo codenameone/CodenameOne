@@ -119,7 +119,7 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
     @Override
     public void add(int location, E object) {
         if (location < 0 || location > size) {
-            throw new IndexOutOfBoundsException("" + location + " out of: " + size);
+            throw new IndexOutOfBoundsException("Index out of bounds");
         }
         if (location == 0) {
             if (firstIndex == 0) {
@@ -185,7 +185,7 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
     @Override
     public boolean addAll(int location, Collection<? extends E> collection) {
         if (location < 0 || location > size) {
-            throw new IndexOutOfBoundsException("" + location + " out of: " + size);
+            throw new IndexOutOfBoundsException("Index out of bounds");
         }
 
         Object[] dumparray = toObjectArray(collection);
@@ -325,7 +325,7 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
     @Override
     public E get(int location) {
         if (location < 0 || location >= size) {
-            throw new IndexOutOfBoundsException("" + location + " out of: " + size);
+            throw new IndexOutOfBoundsException("Index out of bounds");
         }
         return array[firstIndex + location];
     }
@@ -472,7 +472,7 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
     public E remove(int location) {
         E result;
         if (location < 0 || location >= size) {
-            throw new IndexOutOfBoundsException("" + location + " out of: " + size);
+            throw new IndexOutOfBoundsException("Index out of bounds");
         }
         if (location == 0) {
             result = array[firstIndex];
@@ -531,11 +531,11 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
     protected void removeRange(int start, int end) {
         // REVIEW: does RI call this from remove(location)
         if (start < 0) {
-            throw new IndexOutOfBoundsException("" + start);
+            throw new IndexOutOfBoundsException("Index out of bounds");
         } else if (end > size) {
-            throw new IndexOutOfBoundsException("" + end + " out of: " + size);
+            throw new IndexOutOfBoundsException("Index out of bounds");
         } else if (start > end) {
-            throw new IndexOutOfBoundsException("" + start + " out of: " + end);
+            throw new IndexOutOfBoundsException("Index out of bounds");
         }
 
         if (start == end) {
@@ -573,7 +573,7 @@ public class ArrayList<E> extends AbstractList<E> implements List<E>, RandomAcce
     @Override
     public E set(int location, E object) {
         if (location < 0 || location >= size) {
-            throw new IndexOutOfBoundsException("" + location + " out of: " + size);
+            throw new IndexOutOfBoundsException("Index out of bounds");
         }
         E result = array[firstIndex + location];
         array[firstIndex + location] = object;

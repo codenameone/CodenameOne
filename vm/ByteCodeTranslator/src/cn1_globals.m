@@ -15,8 +15,13 @@
 #include "java_lang_Runnable.h"
 #include "java_lang_System.h"
 #include "java_lang_ArrayIndexOutOfBoundsException.h"
+#if defined(__APPLE__) && defined(__OBJC__)
 #import <mach/mach.h>
 #import <mach/mach_host.h>
+#else
+#include <time.h>
+#define NSLog(...) printf(__VA_ARGS__); printf("\n")
+#endif
 
 // The amount of memory allocated between GC cycle checks (generally 30 seconds)
 // that triggers "High-frequency" GC mode.  When "High-frequency" mode is triggered,
@@ -70,8 +75,9 @@ static JAVA_BOOLEAN isEdt(long threadId) {
 }
 
 // Gets the amount of free memory in the system.
- static natural_t get_free_memory(void)
+ static long get_free_memory(void)
  {
+#if defined(__APPLE__) && defined(__OBJC__)
    mach_port_t host_port;
    mach_msg_type_number_t host_size;
    vm_size_t pagesize;
@@ -85,8 +91,11 @@ static JAVA_BOOLEAN isEdt(long threadId) {
      return 0;
    }
    /* Stats in bytes */
-   natural_t mem_free = vm_stat.free_count * pagesize;
+   long mem_free = vm_stat.free_count * pagesize;
    return mem_free;
+#else
+   return 1024 * 1024 * 100; // Stub: 100MB
+#endif
  }
 
 // Initializes the GC thresholds based on the free memory on the device.
@@ -674,7 +683,9 @@ void preSweepCount(CODENAME_ONE_THREAD_STATE) {
 }
 
 void printObjectsPostSweep(CODENAME_ONE_THREAD_STATE) {
+#if defined(__APPLE__) && defined(__OBJC__)
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+#endif
     
     // this should be the last class used
     int classTypeCount[cn1_array_3_id_java_util_Vector + 1];
@@ -706,10 +717,14 @@ void printObjectsPostSweep(CODENAME_ONE_THREAD_STATE) {
         if(classTypeCount[iter] > 0) {
             if(classTypeCountPreSweep[iter] - classTypeCount[iter] > 0) {
                 if(iter > cn1_array_start_offset) {
+#if defined(__APPLE__) && defined(__OBJC__)
                     NSLog(@"There are %i instances of %@ taking up %i bytes, %i were cleaned which saved %i bytes", classTypeCount[iter], [NSString stringWithUTF8String:arrayOfNames[iter]], sizeInHeapForType[iter], classTypeCountPreSweep[iter] - classTypeCount[iter], sizeInHeapForTypePreSweep[iter] - sizeInHeapForType[iter]);
+#endif
                 } else {
                     JAVA_OBJECT str = STRING_FROM_CONSTANT_POOL_OFFSET(classNameLookup[iter]);
+#if defined(__APPLE__) && defined(__OBJC__)
                     NSLog(@"There are %i instances of %@ taking up %i bytes, %i were cleaned which saved %i bytes", classTypeCount[iter], toNSString(threadStateData, str), sizeInHeapForType[iter], classTypeCountPreSweep[iter] - classTypeCount[iter], sizeInHeapForTypePreSweep[iter] - sizeInHeapForType[iter]);
+#endif
                 }
             }
             actualTotalMemory += sizeInHeapForType[iter];
@@ -719,11 +734,15 @@ void printObjectsPostSweep(CODENAME_ONE_THREAD_STATE) {
     NSLog(@"**** GC cycle complete ****");
     
     free(arrayOfNames);
+#if defined(__APPLE__) && defined(__OBJC__)
     [pool release];
+#endif
 }
 
 void printObjectTypesInHeap(CODENAME_ONE_THREAD_STATE) {
+#if defined(__APPLE__) && defined(__OBJC__)
     NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+#endif
     
     // this should be the last class used
     int classTypeCount[cn1_array_3_id_java_util_Vector + 1];
@@ -756,10 +775,14 @@ void printObjectTypesInHeap(CODENAME_ONE_THREAD_STATE) {
             float f = ((float)classTypeCount[iter]) / ((float)t) * 100.0f;
             float f2 = ((float)sizeInHeapForType[iter]) / ((float)totalAllocatedHeap) * 100.0f;
             if(iter > cn1_array_start_offset) {
+#if defined(__APPLE__) && defined(__OBJC__)
                 NSLog(@"There are %i instances of %@ which is %i percent its %i bytes which is %i mem percent", classTypeCount[iter], [NSString stringWithUTF8String:arrayOfNames[iter]], (int)f, sizeInHeapForType[iter], (int)f2);
+#endif
             } else {
                 JAVA_OBJECT str = STRING_FROM_CONSTANT_POOL_OFFSET(classNameLookup[iter]);
+#if defined(__APPLE__) && defined(__OBJC__)
                 NSLog(@"There are %i instances of %@ which is %i percent its %i bytes which is %i mem percent", classTypeCount[iter], toNSString(threadStateData, str), (int)f, sizeInHeapForType[iter], (int)f2);
+#endif
             }
             actualTotalMemory += sizeInHeapForType[iter];
         }
@@ -767,7 +790,9 @@ void printObjectTypesInHeap(CODENAME_ONE_THREAD_STATE) {
     NSLog(@"Actual ram = %i vs total mallocs = %i", actualTotalMemory, totalAllocatedHeap);
     
     free(arrayOfNames);
+#if defined(__APPLE__) && defined(__OBJC__)
     [pool release];
+#endif
 }
 #endif
 
@@ -796,6 +821,7 @@ void codenameOneGCSweep() {
                     
 #ifdef DEBUG_GC_ALLOCATIONS
                     int classId = o->className;
+#if defined(__APPLE__) && defined(__OBJC__)
                     NSString* whereIs;
                     if(classId > 0) {
                         whereIs = (NSString*)((struct obj__java_lang_String*)STRING_FROM_CONSTANT_POOL_OFFSET(classId))->java_lang_String_nsString;
@@ -824,6 +850,7 @@ void codenameOneGCSweep() {
                         }
                         NSLog(@"Sweeping: %X, Mark: %i, Allocated: %@ %i , type: %@, toString: '%@'", (int)o, o->__codenameOneGcMark, whereIs, o->line, [NSString stringWithUTF8String:o->__codenameOneParentClsReference->clsName], ns);
                     }
+#endif
 #endif
                     
                     removeObjectFromHeapCollection(threadStateData, o);
@@ -1249,6 +1276,7 @@ void initConstantPool() {
 
 JAVA_OBJECT utf8String = NULL;
 
+#if defined(__APPLE__) && defined(__OBJC__)
 JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str) {
     if (str == nil) {
         return JAVA_NULL;
@@ -1274,6 +1302,7 @@ JAVA_OBJECT fromNSString(CODENAME_ONE_THREAD_STATE, NSString* str) {
     finishedNativeAllocations();
     return s;
 }
+#endif
 
 const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {
     if(str == NULL) {
@@ -1308,6 +1337,7 @@ const char* stringToUTF8(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {
     return cs;
 }
 
+#if defined(__APPLE__) && defined(__OBJC__)
 NSString* toNSString(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
     if(o == JAVA_NULL) {
         return 0;
@@ -1323,6 +1353,7 @@ NSString* toNSString(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT o) {
     str->java_lang_String_nsString = (JAVA_LONG)x;
     return st;
 }
+#endif
 
 JAVA_OBJECT __NEW_ARRAY_JAVA_BOOLEAN(CODENAME_ONE_THREAD_STATE, JAVA_INT size) {
     JAVA_OBJECT o = allocArray(threadStateData, size, &class_array1__JAVA_BOOLEAN, sizeof(JAVA_ARRAY_BOOLEAN), 1);

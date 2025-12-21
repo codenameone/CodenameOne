@@ -38,7 +38,7 @@ public class ArrayIndexOutOfBoundsException extends java.lang.IndexOutOfBoundsEx
      * index - the illegal index.
      */
     public ArrayIndexOutOfBoundsException(int index){
-         super("" + index);
+         super(String.valueOf(index));
     }
 
     /**
