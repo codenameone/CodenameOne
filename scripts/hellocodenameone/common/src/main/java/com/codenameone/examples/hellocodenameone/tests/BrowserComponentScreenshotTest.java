@@ -4,12 +4,15 @@ import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Form;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.UITimer;
+import com.codename1.util.SuccessCallback;
 
 public class BrowserComponentScreenshotTest extends BaseTest {
     private BrowserComponent browser;
     private boolean loaded;
     private Runnable readyRunnable;
     private Form form;
+    private boolean jsReady;
+    private boolean jsCheckPending;
 
     @Override
     public boolean runTest() throws Exception {
@@ -36,10 +39,25 @@ public class BrowserComponentScreenshotTest extends BaseTest {
     }
 
     private void checkReady() {
-        if (loaded && readyRunnable != null) {
-            UITimer.timer(500, false, form, readyRunnable);
-            readyRunnable = null;
+        if (!loaded || readyRunnable == null) {
+            return;
         }
+        if (!jsReady) {
+            if (!jsCheckPending) {
+                jsCheckPending = true;
+                // Verify content is actually present in the DOM
+                browser.execute("callback.onSuccess(document.body.innerText)", new SuccessCallback<BrowserComponent.JSRef>() {
+                    public void onSucess(BrowserComponent.JSRef result) {
+                        jsReady = true;
+                        checkReady();
+                    }
+                });
+            }
+            return;
+        }
+
+        UITimer.timer(2000, false, form, readyRunnable);
+        readyRunnable = null;
     }
 
     private static String buildHtml() {
