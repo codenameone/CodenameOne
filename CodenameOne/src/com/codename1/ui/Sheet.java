@@ -176,9 +176,6 @@ public class Sheet extends Container {
                 return;
             }
             Component cmp = f.getComponentAt(evt.getX(), evt.getY());
-            if (cmp == null) {
-                return;
-            }
             if (Sheet.this.contains(cmp) || Sheet.this == cmp || cmp.isOwnedBy(Sheet.this)) {
                 // do nothing.
             } else {

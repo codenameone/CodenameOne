@@ -109,8 +109,7 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
         int baseLine = c.getBaseline(width < 0 ? c.getWidth() : width, height < 0 ? c.getHeight() : height);
         if (baseLine != -1) {
             int[] visPad = getVisualPadding();
-            if (visPad != null)
-                baseLine += (visPad[2] - visPad[0] + 1) / 2;
+            baseLine += (visPad[2] - visPad[0] + 1) / 2;
         }
         return baseLine;
     }

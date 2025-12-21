@@ -939,9 +939,6 @@ public class Resources {
         }
         if (!(val instanceof Border)) {
             String[] value = (String[]) val;
-            if (value == null) {
-                throw new IllegalArgumentException("Couldn't find resource: " + key);
-            }
 
             // the resource was not already loaded when we loaded the theme
             // it must be loaded now so we can resolve the temporary name
@@ -1217,7 +1214,7 @@ public class Resources {
         boolean lookupIncluded = input.readBoolean();
         if (lookupIncluded) {
             String lookup = input.readUTF();
-            if (font == null && Font.isCreationByStringSupported()) {
+            if (Font.isCreationByStringSupported()) {
                 font = Font.create(lookup);
             }
         }
@@ -1673,7 +1670,7 @@ public class Resources {
             throw new IOException("Error while trying to read theme property: " + key);
         }
         if (enableMediaQueries) {
-            if (mediaRules != null && !mediaRules.isEmpty()) {
+            if (mediaRules != null) {
                 for (MediaRule rule : mediaRules.values()) {
                     theme.put(rule.translatedKey, theme.get(rule.rawKey));
                 }

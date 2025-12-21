@@ -454,29 +454,6 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         int x = cmpX + leftPadding;
         int y = cmpY + topPadding;
         boolean opposite = false;
-        if (stateIcon != null) {
-            stateIconSize = stateIcon.getWidth(); //square image width == height
-            preserveSpaceForState = stateIconSize + gap;
-            int tX = cmpX;
-            if (((Button) l).isOppositeSide()) {
-                if (rtl) {
-                    tX += leftPadding;
-                } else {
-                    tX = tX + cmpWidth - leftPadding - stateIconSize;
-                }
-                cmpWidth -= leftPadding - stateIconSize;
-                preserveSpaceForState = 0;
-                opposite = true;
-            } else {
-                x = cmpX + leftPadding + preserveSpaceForState;
-                if (rtl) {
-                    tX = tX + cmpWidth - leftPadding - stateIconSize;
-                } else {
-                    tX += leftPadding;
-                }
-            }
-
-        }
 
         //default for bottom left alignment
         int align = reverseAlignForBidi(l, style.getAlignment());

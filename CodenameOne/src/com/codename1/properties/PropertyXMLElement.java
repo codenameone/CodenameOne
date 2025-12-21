@@ -61,15 +61,13 @@ class PropertyXMLElement extends Element {
             return true;
         }
         Vector children = getChildren();
-        if (children != null) {
-            int i = 0;
-            while (i < children.size()) {
-                Element child = (Element) children.get(i);
-                if (child.contains(element)) {
-                    return true;
-                }
-                i++;
+        int i = 0;
+        while (i < children.size()) {
+            Element child = (Element) children.get(i);
+            if (child.contains(element)) {
+                return true;
             }
+            i++;
         }
         return false;
     }
@@ -193,17 +191,14 @@ class PropertyXMLElement extends Element {
             return this;
         }
         Vector children = getChildren();
-        if (children != null) {
-            int i = 0;
-            while (i < children.size()) {
-                Element child = (Element) children.get(i);
-                Element match = child.getElementById(id);
-                if (match != null) {
-                    return match;
-                }
-                i++;
+        int i = 0;
+        while (i < children.size()) {
+            Element child = (Element) children.get(i);
+            Element match = child.getElementById(id);
+            if (match != null) {
+                return match;
             }
-
+            i++;
         }
         return null;
     }
@@ -389,10 +384,8 @@ class PropertyXMLElement extends Element {
         }
         str += ">\n";
         Vector children = getChildren();
-        if (children != null) {
-            for (int i = 0; i < children.size(); i++) {
-                str += ((Element) children.get(i)).toString(spacing + ' ');
-            }
+        for (int i = 0; i < children.size(); i++) {
+            str += ((Element) children.get(i)).toString(spacing + ' ');
         }
         str += spacing + "</" + getTagName() + ">\n";
         return str;

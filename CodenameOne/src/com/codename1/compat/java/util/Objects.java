@@ -48,7 +48,7 @@ public final class Objects {
         if (a == b) {
             return true;
         }
-        return a == null ? b == null : a.equals(b);
+        return a != null && a.equals(b);
     }
 
     /**

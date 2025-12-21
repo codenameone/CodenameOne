@@ -464,10 +464,6 @@ class ResourceThreadQueue {
                     }
                 }
 
-                if (img == null) {
-                    threadQueue.threadFinished(this, false);
-                    return;
-                }
                 if (!cancelled) {
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {

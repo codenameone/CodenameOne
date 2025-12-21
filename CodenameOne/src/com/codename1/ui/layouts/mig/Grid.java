@@ -1618,8 +1618,8 @@ public final class Grid {
 
         // If absolute, use those coordinates instead.
         if (pos != null) {
-            UnitValue stUV = pos != null ? pos[isHor ? 0 : 1] : null;
-            UnitValue endUV = pos != null ? pos[isHor ? 2 : 3] : null;
+                UnitValue stUV = pos[isHor ? 0 : 1];
+                UnitValue endUV = pos[isHor ? 2 : 3];
 
             int minSz = cw.getSize(LayoutUtil.MIN, isHor);
             int maxSz = cw.getSize(LayoutUtil.MAX, isHor);

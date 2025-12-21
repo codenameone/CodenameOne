@@ -2438,9 +2438,7 @@ public class UIBuilder { //implements Externalizable {
         }
         Vector formNavigationStack = baseFormNavigationStack;
         if (sourceCommand != null && currentForm != null && currentForm.getBackCommand() == sourceCommand) {
-            if (currentForm != null) {
-                exitForm(currentForm);
-            }
+            exitForm(currentForm);
             if (formNavigationStack != null && formNavigationStack.size() > 0) {
                 String name = f.getName();
                 if (name != null && name.equals(homeForm)) {

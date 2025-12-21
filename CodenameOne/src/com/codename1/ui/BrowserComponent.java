@@ -1263,14 +1263,12 @@ public class BrowserComponent extends Container {
      * @return the string returned from the Javascript call
      */
     public String executeAndReturnString(String javaScript) {
-        if (internal == null) {
-            while (internal == null) {
-                CN.invokeAndBlock(new Runnable() {
-                    public void run() {
-                        Util.sleep(50);
-                    }
-                });
-            }
+        while (internal == null) {
+            CN.invokeAndBlock(new Runnable() {
+                public void run() {
+                    Util.sleep(50);
+                }
+            });
         }
         if (Display.impl.supportsBrowserExecuteAndReturnString(internal)) {
             return Display.impl.browserExecuteAndReturnString(internal, javaScript);

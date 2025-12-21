@@ -1608,7 +1608,7 @@ public final class Display extends CN1Constants {
                     // transitions which are a bit sensitive
                     if (current != null && (!(newForm instanceof Dialog))) {
                         Transition t = current.getTransitionOutAnimator();
-                        if (current != null && t != null) {
+                        if (t != null) {
                             transitionExists = initTransition(t.copy(reverse), current, newForm);
                         }
                     }
@@ -2360,7 +2360,7 @@ public final class Display extends CN1Constants {
 
                 // make sure the released event is sent to the same Form that got a
                 // pressed event
-                if (xy == f || (f != null && f.shouldSendPointerReleaseToOtherForm())) {
+                if (xy == f || f.shouldSendPointerReleaseToOtherForm()) {
                     int[] array1 = readArrayStackArgument(offset);
                     offset += array1.length + 1;
                     int[] array2 = readArrayStackArgument(offset);

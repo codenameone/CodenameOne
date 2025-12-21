@@ -3083,7 +3083,7 @@ public class Form extends Container {
             int game = Display.getInstance().getGameAction(keyCode);
             // this has issues in the WTK
             // Fix for issue 433: the focus might be changed by the key repeated method in a way that can turn it to null
-            if (focused != null && !focused.handlesInput()
+            if (!focused.handlesInput()
                     && (game == Display.GAME_DOWN || game == Display.GAME_UP || game == Display.GAME_LEFT || game == Display.GAME_RIGHT)) {
                 keyPressed(keyCode);
                 keyReleased(keyCode);

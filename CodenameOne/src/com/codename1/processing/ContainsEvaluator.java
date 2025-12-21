@@ -73,9 +73,6 @@ class ContainsEvaluator extends AbstractEvaluator {
      */
     protected Object evaluateLeftContainsRight(StructuredContent element, String lvalue, String rvalue) {
         String[] lvalues = _getLeftValue(element, lvalue);
-        if (lvalues == null) {
-            return null;
-        }
         // if the rvalue is wrapped with "()", the caller explicitly expects the lvalue to be an array of values,
         // otherwise try to do a "string contains" match first if there's only one lvalue
         if (rvalue.indexOf("(") == -1 && lvalues.length == 1) {

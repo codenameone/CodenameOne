@@ -521,9 +521,7 @@ public class SimpleDateFormat extends DateFormat {
 
                         throwInvalid("timezone", startIndex);
                     }
-                    if (res != null) {
-                        parsedTimeZone = res.timeZone;
-                    }
+                    parsedTimeZone = res.timeZone;
                     tzMinutes = ((tzMinutes == -1) ? 0 : tzMinutes) + v;
                     break;
                 case YEAR_LETTER:
@@ -844,10 +842,11 @@ public class SimpleDateFormat extends DateFormat {
         if (i == -1) {
             i = source.length();
         }
-        String fragment = readSubstring(source, ofs, i).toLowerCase();
+        String fragment = readSubstring(source, ofs, i);
         if (fragment == null) {
             return null;
         }
+        fragment = fragment.toLowerCase();
         DateFormatSymbols ds = getDateFormatSymbols();
         String[] markers = ds.getAmPmStrings();
         for (String marker : markers) {

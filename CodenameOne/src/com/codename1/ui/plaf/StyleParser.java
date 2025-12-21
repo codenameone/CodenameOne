@@ -599,9 +599,6 @@ public class StyleParser {
 
     static Border parseBorder(Resources theme, String args) {
         BorderInfo info = parseBorder(new BorderInfo(), args);
-        if (info == null) {
-            return null;
-        }
         return info.createBorder(theme);
 
     }

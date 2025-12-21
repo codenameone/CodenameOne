@@ -278,7 +278,7 @@ public class Command implements ActionListener {
                     ((Command) obj).materialIcon == materialIcon && ((Command) obj).materialIconSize == materialIconSize &&
                     (Objects.equals(clientProperties, ((Command) obj).clientProperties));
         } else {
-            return (obj != null) && obj.getClass() == getClass() && ((Command) obj).command.equals(command) &&
+            return obj.getClass() == getClass() && ((Command) obj).command.equals(command) &&
                     ((Command) obj).icon == icon && ((Command) obj).commandId == commandId &&
                     ((Command) obj).materialIcon == materialIcon && ((Command) obj).materialIconSize == materialIconSize &&
                     (Objects.equals(clientProperties, ((Command) obj).clientProperties));
