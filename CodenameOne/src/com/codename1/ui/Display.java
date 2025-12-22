@@ -5154,6 +5154,22 @@ public final class Display extends CN1Constants {
         impl.screenshot(callback);
     }
 
+    /**
+     * Notifies the platform that push notification processing is complete.
+     * This is useful on iOS where the app is woken up in the background to handle
+     * a push notification and needs to signal completion to avoid being suspended
+     * prematurely.
+     * <p>
+     * If the {@code ios.delayPushCompletion} build hint (or property) is set to "true",
+     * Codename One will NOT automatically signal completion after the {@link com.codename1.push.PushCallback#push(String)}
+     * method returns. Instead, the application MUST invoke this method manually
+     * when it has finished its background work (e.g. playing audio, downloading content).
+     * </p>
+     */
+    public void notifyPushCompletion() {
+        impl.notifyPushCompletion();
+    }
+
                            /**
      * Convenience method to schedule a task to run on the EDT after {@literal timeout}ms.
      *
