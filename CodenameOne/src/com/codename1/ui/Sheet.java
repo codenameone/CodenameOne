@@ -488,18 +488,26 @@ public class Sheet extends Container {
             }
         }
 
-        if (blocker == null) {
-            blocker = new Button();
-            blocker.setUIID("Container");
-            blocker.getAllStyles().setBgTransparency(0);
-            blocker.setPreferredSize(new com.codename1.ui.geom.Dimension(10000, 10000));
-            ((Button)blocker).addActionListener(new ActionListener() {
-                @Override
-                public void actionPerformed(ActionEvent evt) {
-                    hide(duration);
-                }
-            });
-            cnt.addComponent(0, BorderLayout.CENTER, blocker);
+        boolean needsBlocker = Form.activePeerCount > 0;
+        if (needsBlocker) {
+            if (blocker == null) {
+                blocker = new Button();
+                blocker.setUIID("Container");
+                blocker.getAllStyles().setBgTransparency(0);
+                blocker.setPreferredSize(new com.codename1.ui.geom.Dimension(10000, 10000));
+                ((Button) blocker).addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+                        hide(duration);
+                    }
+                });
+                cnt.addComponent(0, BorderLayout.CENTER, blocker);
+            }
+        } else {
+            if (blocker != null) {
+                cnt.removeComponent(blocker);
+                blocker = null;
+            }
         }
 
         if (foundSheet) {
