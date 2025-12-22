@@ -133,9 +133,8 @@ class CustomFont extends Font {
         Object newCache = colorCache.get(newColorKey);
         if (newCache != null) {
             Image i = (Image) newCache;
-            if (i != null) {
-                cache = i;
-                if (colorCache.size() > COLOR_CACHE_SIZE) {
+            cache = i;
+            if (colorCache.size() > COLOR_CACHE_SIZE) {
                     // remove a random cache element
                     colorCache.remove(colorCache.keys().nextElement());
                 }
@@ -143,7 +142,7 @@ class CustomFont extends Font {
             } else {
                 colorCache.remove(newColorKey);
             }
-        }
+
         if (colorCache.size() > COLOR_CACHE_SIZE) {
             // remove a random cache element
             colorCache.remove(colorCache.keys().nextElement());

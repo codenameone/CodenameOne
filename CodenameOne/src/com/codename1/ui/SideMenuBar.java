@@ -363,7 +363,7 @@ public class SideMenuBar extends MenuBar {
                     initialDragY = evt.getY();
                     if (sideSwipePotential || rightSideSwipePotential || topSwipePotential) {
                         Component c = Display.getInstance().getCurrent().getComponentAt(initialDragX, initialDragY);
-                        if (c != null && c.shouldBlockSideSwipe()) {
+                        if (c.shouldBlockSideSwipe()) {
                             sideSwipePotential = false;
                         }
                     }

@@ -4258,9 +4258,7 @@ public class Container extends Component implements Iterable<Component> {
             if (current != null) {
                 current.setLightweightMode(false);
             }
-            if (next != null) {
-                next.setLightweightMode(false);
-            }
+            next.setLightweightMode(false);
             if (thisContainer.cmpTransitions != null && thisContainer.cmpTransitions.size() == 0 && growSpeed > -1) {
                 if (growSpeed > 0) {
                     current.growShrink(growSpeed);

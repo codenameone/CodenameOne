@@ -80,9 +80,6 @@ class TextEvaluator extends AbstractEvaluator {
     protected Object evaluateLeftLessRight(StructuredContent element,
                                            String lvalue, String rvalue) {
         String[] v = _getLeftValue(element, lvalue);
-        if (v == null) {
-            return null;
-        }
         int vlen = v.length;
         for (int i = 0; i < vlen; i++) {
             if (isNumeric(rvalue) && isNumeric(v[i])) {
@@ -112,9 +109,6 @@ class TextEvaluator extends AbstractEvaluator {
     protected Object evaluateLeftGreaterRight(StructuredContent element,
                                               String lvalue, String rvalue) {
         String[] v = _getLeftValue(element, lvalue);
-        if (v == null) {
-            return null;
-        }
         int vlen = v.length;
         for (int i = 0; i < vlen; i++) {
             if (isNumeric(rvalue) && isNumeric(v[i])) {
@@ -144,9 +138,6 @@ class TextEvaluator extends AbstractEvaluator {
     protected Object evaluateLeftEqualsRight(StructuredContent element,
                                              String lvalue, String rvalue) {
         String[] v = _getLeftValue(element, lvalue);
-        if (v == null) {
-            return null;
-        }
         int vlen = v.length;
         for (int i = 0; i < vlen; i++) {
             if (isNumeric(rvalue) && isNumeric(v[i])) {

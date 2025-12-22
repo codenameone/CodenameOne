@@ -780,7 +780,7 @@ public final class CommonTransitions extends Transition {
                     Container sourcePane = ((Form) getSource()).getContentPane();
                     Container destPane = ((Form) getDestination()).getContentPane();
                     boolean dir = forward;
-                    if (sourceForm != null && sourceForm.getUIManager().getLookAndFeel().isRTL()) {
+                    if (sourceForm.getUIManager().getLookAndFeel().isRTL()) {
                         dir = !dir;
                     }
                     hideInterformContainers();

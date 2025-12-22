@@ -822,11 +822,6 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     public boolean setHTML(String htmlText, String encoding, String title, boolean isFullHTML) {
         boolean success = true;
         InputStreamReader isr = getStream(htmlText, encoding, title, isFullHTML);
-
-        if (isr == null) {
-            isr = getStream("Encoding error loading string", null, title, isFullHTML); //TODO - dynamic error messages
-            success = false;
-        }
         final InputStreamReader isReader = isr;
 
         Display.getInstance().startThread(new Runnable() {

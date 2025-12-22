@@ -914,22 +914,19 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
 
 
                     }
-                    if (mgr != null) {
-                        final AnimationManager fmgr = mgr;
-                        $(new Runnable() {
-                            public void run() {
-                                fmgr.addAnimation(ComponentAnimation.compoundAnimation(animations2.toArray(new ComponentAnimation[animations2.size()])), new Runnable() {
-                                    public void run() {
-                                        if (callback != null) {
-                                            callback.onSucess(ComponentSelector.this);
-                                        }
+                    final AnimationManager fmgr = mgr;
+                    $(new Runnable() {
+                        public void run() {
+                            fmgr.addAnimation(ComponentAnimation.compoundAnimation(animations2.toArray(new ComponentAnimation[animations2.size()])), new Runnable() {
+                                public void run() {
+                                    if (callback != null) {
+                                        callback.onSucess(ComponentSelector.this);
                                     }
+                                }
 
-                                });
-                            }
-                        });
-
-                    }
+                            });
+                        }
+                    });
 
 
                 }
@@ -1018,12 +1015,9 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
 
 
             }
-            if (mgr != null) {
-                mgr.addAnimationAndBlock(
-                        ComponentAnimation.compoundAnimation(animations2.toArray(new ComponentAnimation[animations2.size()]))
-                );
-
-            }
+            mgr.addAnimationAndBlock(
+                    ComponentAnimation.compoundAnimation(animations2.toArray(new ComponentAnimation[animations2.size()]))
+            );
         }
 
         return this;

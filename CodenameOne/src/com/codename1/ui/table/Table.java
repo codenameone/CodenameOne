@@ -234,10 +234,9 @@ public class Table extends Container {
                 if (value != null || includeNullValues()) {
                     boolean e = model.isCellEditable(r, c);
                     Component cell = createCellImpl(value, r, c, e);
-                    if (cell != null) {
-                        TableLayout.Constraint con = createCellConstraint(value, r, c);
+                    TableLayout.Constraint con = createCellConstraint(value, r, c);
 
-                        // returns the current row we iterate about
+                    // returns the current row we iterate about
                         int currentRow = ((TableLayout) getLayout()).getNextRow();
 
                         if (r > model.getRowCount()) {
@@ -247,7 +246,6 @@ public class Table extends Container {
                         if (r == selectionRow && c == selectionColumn) {
                             cell.requestFocus();
                         }
-                    }
                 }
             }
         }
@@ -373,7 +371,7 @@ public class Table extends Container {
                             w = getX() + actualWidth - x - 2;
                         }
                         Component comp = t.getComponentAt(row, col);
-                        if ((comp.isVisible()) &&
+                        if (comp != null && (comp.isVisible()) &&
                                 ((drawEmptyCellsBorder) ||
                                         ((comp.getWidth() - comp.getStyle().getPaddingRightNoRTL() - comp.getStyle().getPaddingLeftNoRTL() > 0) &&
                                                 (comp.getHeight() - comp.getStyle().getPaddingTop() - comp.getStyle().getPaddingBottom() > 0)))) {
@@ -510,9 +508,6 @@ public class Table extends Container {
                 header.addActionListener(new ActionListener() {
                     public void actionPerformed(ActionEvent evt) {
                         Comparator cmp = createColumnSortComparator(column);
-                        if (cmp == null) {
-                            return;
-                        }
                         if (column == sortedColumn) {
                             ascending = !ascending;
                         } else {

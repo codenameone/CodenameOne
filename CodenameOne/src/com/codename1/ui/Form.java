@@ -2967,10 +2967,6 @@ public class Form extends Container {
             if (focused.isEnabled()) {
                 focused.keyPressed(keyCode);
             }
-            if (focused == null) {
-                initFocused();
-                return;
-            }
             if (focused.handlesInput()) {
                 return;
             }
@@ -3083,7 +3079,7 @@ public class Form extends Container {
             int game = Display.getInstance().getGameAction(keyCode);
             // this has issues in the WTK
             // Fix for issue 433: the focus might be changed by the key repeated method in a way that can turn it to null
-            if (focused != null && !focused.handlesInput()
+            if (!focused.handlesInput()
                     && (game == Display.GAME_DOWN || game == Display.GAME_UP || game == Display.GAME_LEFT || game == Display.GAME_RIGHT)) {
                 keyPressed(keyCode);
                 keyReleased(keyCode);
@@ -3326,10 +3322,7 @@ public class Form extends Container {
     private void autoRelease(int x, int y) {
         if (componentsAwaitingRelease != null && componentsAwaitingRelease.size() == 1) {
             // special case allowing drag within a button
-            Component atXY = getComponentAt(x, y);
-            if (atXY != null) {
-                atXY = LeadUtil.leadParentImpl(atXY);
-            }
+            Component atXY = LeadUtil.leadParentImpl(getComponentAt(x, y));
             Component pendingC = componentsAwaitingRelease.get(0);
             if (pendingC != null) {
                 pendingC = LeadUtil.leadParentImpl(pendingC);

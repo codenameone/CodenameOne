@@ -547,7 +547,7 @@ public class RoundBorder extends Border {
                 return;
             }
             if (stroke && this.stroke != null) {
-                int sw = (int) Math.ceil((stroke && this.stroke != null) ? this.stroke.getLineWidth() : 0);
+                int sw = (int) Math.ceil(this.stroke.getLineWidth());
                 GeneralPath arc = new GeneralPath();
                 arc.arc(x + sw / 2, y + sw / 2, size - sw, size - sw, 0, 2 * Math.PI);
                 g.fillShape(arc);

@@ -1757,9 +1757,6 @@ public class Tabs extends Container {
                 return false;
             }
             final Component targetComponent = currentForm.getComponentAt(x, y);
-            if (targetComponent == null) {
-                return false;
-            }
             return !contentPane.equals(targetComponent) && !contentPane.contains(targetComponent);
         }
     }

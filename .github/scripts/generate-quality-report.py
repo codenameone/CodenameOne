@@ -754,6 +754,23 @@ def main() -> None:
     if not generate_html_only:
         REPORT_PATH.write_text(report + "\n", encoding="utf-8")
 
+    # Enforce quality gates
+    spotbugs, _, _ = parse_spotbugs()
+    if spotbugs:
+        forbidden_rules = {
+            "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE",
+            "RCN_REDUNDANT_NULLCHECK_OF_NULL_VALUE"
+        }
+        violations = [
+            f for f in spotbugs.findings
+            if f.rule in forbidden_rules
+        ]
+        if violations:
+            print("\n❌ Build failed due to forbidden SpotBugs violations:")
+            for v in violations:
+                print(f"  - {v.rule}: {v.location} - {v.message}")
+            exit(1)
+
 
 if __name__ == "__main__":
     main()

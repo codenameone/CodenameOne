@@ -2747,9 +2747,6 @@ public class ConnectionRequest implements IOProgressListener {
                         if (fs.exists(file)) {
                             try {
                                 EncodedImage img = EncodedImage.create(fs.openInputStream(file), (int) fs.getLength(file));
-                                if (img == null) {
-                                    throw new IOException("Failed to load image at " + file);
-                                }
                                 CallbackDispatcher.dispatchSuccess(onSuccess, img);
                             } catch (Exception ex) {
                                 CallbackDispatcher.dispatchError(onFail, ex);
@@ -2763,9 +2760,6 @@ public class ConnectionRequest implements IOProgressListener {
                         if (fs.exists(file)) {
                             try {
                                 EncodedImage img = EncodedImage.create(fs.createInputStream(file), fs.entrySize(file));
-                                if (img == null) {
-                                    throw new IOException("Failed to load image at " + file);
-                                }
                                 CallbackDispatcher.dispatchSuccess(onSuccess, img);
                             } catch (Exception ex) {
                                 CallbackDispatcher.dispatchError(onFail, ex);
