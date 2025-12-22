@@ -478,7 +478,31 @@ public class Sheet extends Container {
             cnt.revalidate();
 
         }
-        if (cnt.getComponentCount() > 0) {
+        boolean foundSheet = false;
+        Component blocker = null;
+        for (Component child : cnt) {
+            if (child instanceof Sheet) {
+                foundSheet = true;
+            } else {
+                blocker = child;
+            }
+        }
+
+        if (blocker == null) {
+            blocker = new Button();
+            blocker.setUIID("Container");
+            blocker.getAllStyles().setBgTransparency(0);
+            blocker.setPreferredSize(new com.codename1.ui.geom.Dimension(10000, 10000));
+            ((Button)blocker).addActionListener(new ActionListener() {
+                @Override
+                public void actionPerformed(ActionEvent evt) {
+                    hide(duration);
+                }
+            });
+            cnt.addComponent(0, BorderLayout.CENTER, blocker);
+        }
+
+        if (foundSheet) {
             $(".Sheet", cnt).each(new ComponentClosure() {
                 @Override
                 public void call(Component c) {
@@ -514,8 +538,18 @@ public class Sheet extends Container {
                 }
 
             });
-            Component existing = cnt.getComponentAt(0);
-            cnt.replace(existing, this, null);
+            Component existing = null;
+            for(Component c : cnt) {
+                if (c instanceof Sheet) {
+                    existing = c;
+                    break;
+                }
+            }
+            if (existing != null) {
+                cnt.replace(existing, this, null);
+            } else {
+                cnt.add(getPosition(), this);
+            }
             cnt.animateLayout(duration);
         } else {
             cnt.add(getPosition(), this);
