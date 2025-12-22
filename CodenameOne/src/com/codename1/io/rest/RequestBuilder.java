@@ -414,7 +414,6 @@ public class RequestBuilder {
      * Sets the request to be a gzip request
      *
      * @return RequestBuilder instance
-     * @deprecated this API was implemented incorrectly
      */
     public RequestBuilder gzip() {
         header("Accept-Encoding", "gzip");
