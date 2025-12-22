@@ -2957,6 +2957,14 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     /**
      * @inheritDoc
      */
+    @Override
+    public boolean canDial() {
+        return getContext().getPackageManager().hasSystemFeature(PackageManager.FEATURE_TELEPHONY);
+    }
+
+    /**
+     * @inheritDoc
+     */
     public String getProperty(String key, String defaultValue) {
         if(key.equalsIgnoreCase("cn1_push_prefix")) {
             /*if(!checkForPermission(Manifest.permission.READ_PHONE_STATE, "This is required to get notifications")){
