@@ -489,8 +489,8 @@ public class CSSTheme {
             }
             
             type = Style.BACKGROUND_GRADIENT_RADIAL;
-            gradientX = 1-(float)relX;
-            gradientY = 1-(float)relY;
+            gradientX = (float)relX;
+            gradientY = (float)relY;
             this.bgTransparency = (byte)alpha;
             this.startColor = color1;
             this.endColor = color2;
@@ -2920,7 +2920,17 @@ public class CSSTheme {
         }
         
         public boolean canBeAchievedWithRoundRectBorder(Map<String,LexicalUnit> styles) {
-            if (hasUnequalBorders() || this.hasGradient() || !isBorderLineOrNone() || !isNone(backgroundImageUrl) || hasBoxShadow() || hasBorderImage()) {
+            boolean supportedGradient = false;
+            if (this.hasGradient()) {
+                 LexicalUnit backgroundLU = styles.get("background");
+                 if (backgroundLU instanceof ScaledUnit) {
+                     ScaledUnit background = (ScaledUnit)backgroundLU;
+                     if (background != null && background.isCN1Gradient()) {
+                         supportedGradient = true;
+                     }
+                 }
+            }
+            if (hasUnequalBorders() || (this.hasGradient() && !supportedGradient) || !isBorderLineOrNone() || !isNone(backgroundImageUrl) || hasBoxShadow() || hasBorderImage()) {
                 return false;
             }
             
