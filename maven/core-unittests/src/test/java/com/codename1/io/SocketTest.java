@@ -67,7 +67,7 @@ class SocketTest extends UITestBase {
             }
         };
 
-        Socket.connect("unreachable", 8080, connection);
+        Socket.connect("unreachable.invalid", 8080, connection);
         assertTrue(latch.await(2, TimeUnit.SECONDS));
         assertFalse(connection.isConnected());
         assertEquals(-1, errorCode.get());
