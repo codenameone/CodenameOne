@@ -5083,7 +5083,7 @@ public class Component implements Animation, StyleListener, Editable {
                 Display.getInstance().callSerially(new Runnable() {
                     public void run() {
                         if (dragActivated) {
-                            lead.pointerDragged(x, y, currentPointerPress);
+                            lead.pointerDragged(oldx, oldy, currentPointerPress);
                         }
                         dragCallbacks--;
                     }
