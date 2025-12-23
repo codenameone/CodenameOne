@@ -2798,7 +2798,6 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     }
 
     @Override
-    @Override
     public void notifyPushCompletion() {
         if (pushWakeLock != null && pushWakeLock.isHeld()) {
             try {
@@ -2809,6 +2808,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    @Override
     public void notifyCommandBehavior(int commandBehavior) {
         if (commandBehavior == Display.COMMAND_BEHAVIOR_NATIVE) {
             if (getActivity() instanceof CodenameOneActivity) {
