@@ -8115,7 +8115,10 @@ public class IOSImplementation extends CodenameOneImplementation {
 
                         pushCallback.push(message);
                     } finally {
-                        nativeInstance.firePushCompletionHandler();
+                        if (!"true".equals(Display.getInstance().getProperty("delayPushCompletion", "false")) &&
+                            !"true".equals(Display.getInstance().getProperty("ios.delayPushCompletion", "false"))) {
+                            nativeInstance.firePushCompletionHandler();
+                        }
                     }
                 }
             });

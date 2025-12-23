@@ -109,9 +109,17 @@ public abstract class PushNotificationService extends Service implements PushCal
     public void push(final String value) {
         final PushCallback callback = getPushCallbackInstance();
         if(callback != null) {
+            AndroidImplementation.acquirePushWakeLock(30000);
             Display.getInstance().callSerially(new Runnable() {
                 public void run() {
-                    callback.push(value);
+                    try {
+                        callback.push(value);
+                    } finally {
+                        if (!"true".equals(Display.getInstance().getProperty("delayPushCompletion", "false")) &&
+                            !"true".equals(Display.getInstance().getProperty("android.delayPushCompletion", "false"))) {
+                            Display.getInstance().notifyPushCompletion();
+                        }
+                    }
                 }
             });
         } else {
