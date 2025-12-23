@@ -7,6 +7,7 @@ import com.codename1.ui.Button
 import com.codename1.ui.CheckBox
 import com.codename1.ui.Container
 import com.codename1.ui.Label
+import com.codename1.ui.Sheet
 import com.codename1.ui.Slider
 import com.codename1.ui.TextArea
 import com.codename1.ui.TextField
@@ -51,6 +52,11 @@ class KotlinUiTest : BaseTest() {
 
         kotlinForm.add(accordion)
         kotlinForm.show()
+
+        val sheet = Sheet(null, "Overlay Sheet")
+        sheet.contentPane.add(Label("This is a sheet covering part of the screen"))
+        sheet.show()
+
         return true
     }
 }

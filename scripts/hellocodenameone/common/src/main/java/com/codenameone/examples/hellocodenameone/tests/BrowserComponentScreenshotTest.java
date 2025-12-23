@@ -2,6 +2,8 @@ package com.codenameone.examples.hellocodenameone.tests;
 
 import com.codename1.ui.BrowserComponent;
 import com.codename1.ui.Form;
+import com.codename1.ui.Label;
+import com.codename1.ui.Sheet;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.ui.util.UITimer;
 import com.codename1.util.SuccessCallback;
@@ -55,6 +57,10 @@ public class BrowserComponentScreenshotTest extends BaseTest {
             }
             return;
         }
+
+        Sheet sheet = new Sheet(null, "Overlay Sheet");
+        sheet.getContentPane().add(new Label("This is a sheet covering part of the browser"));
+        sheet.show();
 
         UITimer.timer(2000, false, form, readyRunnable);
         readyRunnable = null;
