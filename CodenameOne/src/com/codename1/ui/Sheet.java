@@ -495,7 +495,8 @@ public class Sheet extends Container {
                 blocker.putClientProperty("SheetBlocker", Boolean.TRUE);
                 blocker.setUIID("Container");
                 blocker.getAllStyles().setBgTransparency(0);
-                blocker.setPreferredSize(new com.codename1.ui.geom.Dimension(10000, 10000));
+                int size = Math.max(CN.getDisplayWidth(), CN.getDisplayHeight()) * 2;
+                blocker.setPreferredSize(new com.codename1.ui.geom.Dimension(size, size));
                 ((Button) blocker).addActionListener(new ActionListener() {
                     @Override
                     public void actionPerformed(ActionEvent evt) {

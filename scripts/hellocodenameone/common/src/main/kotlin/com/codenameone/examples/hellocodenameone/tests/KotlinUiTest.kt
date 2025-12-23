@@ -12,6 +12,7 @@ import com.codename1.ui.Slider
 import com.codename1.ui.TextArea
 import com.codename1.ui.TextField
 import com.codename1.ui.layouts.BoxLayout
+import com.codename1.ui.util.UITimer
 
 class KotlinUiTest : BaseTest() {
     override fun runTest(): Boolean {
