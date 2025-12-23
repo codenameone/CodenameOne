@@ -452,9 +452,7 @@ LocationManager.getLocationManager()
 
 ===== Android Background Location Permissions (API 30+)
 
-On Android 11 (API level 30) and higher, requesting background location permission requires a two-step process. First, foreground location permissions must be granted. Then, the app must request background location access, which will direct the user to the system settings to select "Allow all the time".
-
-Codename One handles this flow automatically when you use `LocationManager`. You can enable the background permission request by setting the build hint `android.requiresBackgroundLocationPermissionForAPI29=true`.
+On Android 11 (API level 30) and higher, requesting background location permission requires a two-step process. First, foreground location permissions must be granted. Then, the app must request background location access, which will direct the user to the system settings to select "Allow all the time". Codename One handles this flow automatically when you use `LocationManager`. 
 
 For Android 11+ (API 30+), Codename One detects if background location is needed and presents a dialog explaining the requirement before redirecting the user to the app settings. You can customize the permission prompt message using the localization key `android.permission.ACCESS_BACKGROUND_LOCATION`.
 
