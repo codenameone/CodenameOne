@@ -2380,7 +2380,8 @@ public class IPhoneBuilder extends Executor {
             }
         }
         String backgroundModesStr = request.getArg("ios.background_modes", null);
-        if (includePush) {
+        if (includePush || "true".equals(request.getArg("ios.delayPushCompletion", "false")) ||
+                "true".equals(request.getArg("delayPushCompletion", "false"))) {
             if (backgroundModesStr == null || !backgroundModesStr.contains("remote-notification")) {
                 if (backgroundModesStr == null) {
                     backgroundModesStr = "";
