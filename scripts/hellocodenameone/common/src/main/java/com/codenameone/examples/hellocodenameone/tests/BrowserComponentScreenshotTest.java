@@ -60,7 +60,7 @@ public class BrowserComponentScreenshotTest extends BaseTest {
 
         Sheet sheet = new Sheet(null, "Overlay Sheet");
         sheet.getContentPane().add(new Label("This is a sheet covering part of the browser"));
-        sheet.show();
+        sheet.show(0);
 
         UITimer.timer(2000, false, form, readyRunnable);
         readyRunnable = null;

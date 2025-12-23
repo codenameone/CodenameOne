@@ -483,7 +483,7 @@ public class Sheet extends Container {
         for (Component child : cnt) {
             if (child instanceof Sheet) {
                 foundSheet = true;
-            } else {
+            } else if (Boolean.TRUE.equals(child.getClientProperty("SheetBlocker"))) {
                 blocker = child;
             }
         }
@@ -492,6 +492,7 @@ public class Sheet extends Container {
         if (needsBlocker) {
             if (blocker == null) {
                 blocker = new Button();
+                blocker.putClientProperty("SheetBlocker", Boolean.TRUE);
                 blocker.setUIID("Container");
                 blocker.getAllStyles().setBgTransparency(0);
                 blocker.setPreferredSize(new com.codename1.ui.geom.Dimension(10000, 10000));

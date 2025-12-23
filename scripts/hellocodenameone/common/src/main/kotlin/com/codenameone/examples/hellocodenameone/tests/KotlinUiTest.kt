@@ -55,7 +55,7 @@ class KotlinUiTest : BaseTest() {
 
         val sheet = Sheet(null, "Overlay Sheet")
         sheet.contentPane.add(Label("This is a sheet covering part of the screen"))
-        sheet.show()
+        sheet.show(0)
 
         return true
     }
