@@ -87,6 +87,44 @@ NOTE: On iOS, hidden push messages (push type 2) will not be delivered when the 
 
 TIP: You can set the `android.background_push_handling` build hint to "true" to deliver push messages on Android when the app is minimized (running in the background).  There is no equivalent setting on other platforms currently.
 
+[[delay-push-completion]]
+=== Handling Long-Running Background Push Tasks
+
+By default, the platform signals the completion of the push processing immediately after your `push(String)` callback returns.  However, some tasks, such as playing audio (e.g. for Push-To-Talk apps), require more time to complete.  If the app is in the background, the OS might suspend the app before the task completes if it thinks the push handling is finished.
+
+To handle this, you can opt-in to manually signaling the completion of the push task using the `delayPushCompletion` build hint.
+
+1.  Add the `delayPushCompletion=true` build hint to your `codenameone_settings.properties`.
+2.  In your `push(String)` callback, start your asynchronous task.
+3.  When your task is complete, call `Display.getInstance().notifyPushCompletion()`.
+
+Example:
+
+[source,java]
+----
+public void push(String message) {
+    if (isAudioMessage(message)) {
+        // Play audio asynchronously
+        playAudio(message, new Runnable() {
+            public void run() {
+                // Audio finished playing
+                Display.getInstance().notifyPushCompletion();
+            }
+        });
+    } else {
+        // For standard messages, we can notify immediately or let it timeout (safest to notify)
+        Display.getInstance().notifyPushCompletion();
+    }
+}
+----
+
+**How it works:**
+
+*   **Android:** The system acquires a `PARTIAL_WAKE_LOCK` when the push is received, keeping the CPU running even if the screen is off.  Calling `notifyPushCompletion()` releases this lock.  The lock has a safety timeout (e.g., 30 seconds) to prevent battery drain if you forget to call it.
+*   **iOS:** The system delays calling the completion handler passed to the push delegate.  This gives your app background execution time.  Calling `notifyPushCompletion()` invokes the system completion handler.
+
+NOTE: If you enable this feature, you **must** call `Display.getInstance().notifyPushCompletion()` in all code paths of your `push()` callback to ensure the device can sleep/suspend properly.
+
 
 === Testing Push Support
 

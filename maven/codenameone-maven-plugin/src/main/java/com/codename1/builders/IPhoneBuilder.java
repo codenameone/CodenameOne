@@ -956,8 +956,14 @@ public class IPhoneBuilder extends Executor {
                     + "    private boolean stopped = false;\n";
 
                 stubSourceCode += decodeFunction();
+                String delayPushCompletion = "";
+                if ("true".equals(request.getArg("ios.delayPushCompletion", "false")) ||
+                    "true".equals(request.getArg("delayPushCompletion", "false"))) {
+                    delayPushCompletion = "        Display.getInstance().setProperty(\"ios.delayPushCompletion\", \"true\");\n";
+                }
                 stubSourceCode += "    public void run() {\n"
                     + "        Display.getInstance().setProperty(\"package_name\", PACKAGE_NAME);\n"
+                    + delayPushCompletion
                     + "        Display.getInstance().setProperty(\"AppVersion\", APPLICATION_VERSION);\n"
                     + "        Display.getInstance().setProperty(\"AppName\", APPLICATION_NAME);\n"
                     + newStorage
