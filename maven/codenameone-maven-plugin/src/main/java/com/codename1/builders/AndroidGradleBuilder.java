@@ -1163,6 +1163,10 @@ public class AndroidGradleBuilder extends Executor {
         playFlag = "true";
 
         gpsPermission = request.getArg("android.gpsPermission", "false").equals("true");
+        if (request.getArg("android.delayPushCompletion", "false").equals("true") ||
+                request.getArg("delayPushCompletion", "false").equals("true")) {
+            wakeLock = true;
+        }
         mediaPlaybackPermission = false;
         try {
             scanClassesForPermissions(dummyClassesDir, new Executor.ClassScanner() {
@@ -3894,6 +3898,10 @@ public class AndroidGradleBuilder extends Executor {
 
     private String createPostInitCode(BuildRequest request) {
         String retVal = "";
+        if (request.getArg("android.delayPushCompletion", "false").equals("true") ||
+                request.getArg("delayPushCompletion", "false").equals("true")) {
+            retVal += "Display.getInstance().setProperty(\"android.delayPushCompletion\", \"true\");\n";
+        }
         return retVal;
     }
 

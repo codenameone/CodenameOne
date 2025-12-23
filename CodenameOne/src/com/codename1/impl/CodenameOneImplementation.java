@@ -1264,6 +1264,12 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Notifies the platform that push notification processing is complete.
+     */
+    public void notifyPushCompletion() {
+    }
+
+    /**
      * Returns true if the platform supports a native image cache.  The native image cache
      * is different than just {@link FileSystemStorage#hasCachesDir()}.  A native image cache
      * is an image cache that the platform provides that is full transparent to Codename One

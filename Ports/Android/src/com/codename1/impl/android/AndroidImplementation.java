@@ -53,6 +53,7 @@ import android.graphics.drawable.Drawable;
 import android.media.AudioManager;
 import android.net.Uri;
 import android.os.Vibrator;
+import android.os.PowerManager;
 import android.telephony.TelephonyManager;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -280,6 +281,19 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
     private int displayHeight;
     static CodenameOneActivity activity;
     static ComponentName activityComponentName;
+    private static PowerManager.WakeLock pushWakeLock;
+    public static void acquirePushWakeLock(long timeout) {
+        if (getContext() == null) return;
+        try {
+            if (pushWakeLock == null) {
+                PowerManager pm = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
+                pushWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "CN1:PushWakeLock");
+            }
+            pushWakeLock.acquire(timeout);
+        } catch (Exception ex) {
+            com.codename1.io.Log.e(ex);
+        }
+    }
     
     private static Context context;
     RelativeLayout relativeLayout;
@@ -2781,6 +2795,17 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
      */
     public void exitApplication() {
         android.os.Process.killProcess(android.os.Process.myPid());
+    }
+
+    @Override
+    public void notifyPushCompletion() {
+        if (pushWakeLock != null && pushWakeLock.isHeld()) {
+            try {
+                pushWakeLock.release();
+            } catch (Exception ex) {
+                com.codename1.io.Log.e(ex);
+            }
+        }
     }
 
     @Override
