@@ -10899,6 +10899,36 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             return true;
         }
 
+        if (android.os.Build.VERSION.SDK_INT >= 30 && "android.permission.ACCESS_BACKGROUND_LOCATION".equals(permission)) {
+            if (android.support.v4.content.ContextCompat.checkSelfPermission(getContext(), permission) == PackageManager.PERMISSION_GRANTED) {
+                return true;
+            }
+            if (getActivity() == null) {
+                return false;
+            }
+
+            String prompt = Display.getInstance().getProperty(permission, description);
+            String title = Display.getInstance().getProperty("android.permission.ACCESS_BACKGROUND_LOCATION.title", "Requires permission");
+            String settingsBtn = Display.getInstance().getProperty("android.permission.ACCESS_BACKGROUND_LOCATION.settings", "Settings");
+            String cancelBtn = Display.getInstance().getProperty("android.permission.ACCESS_BACKGROUND_LOCATION.cancel", "Cancel");
+
+            if(Dialog.show(title, prompt, settingsBtn, cancelBtn)){
+                Intent intent = new Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                Uri uri = Uri.fromParts("package", getContext().getPackageName(), null);
+                intent.setData(uri);
+                getActivity().startActivity(intent);
+
+                String explanationTitle = Display.getInstance().getProperty("android.permission.ACCESS_BACKGROUND_LOCATION.explanation_title", "Permission Required");
+                String explanationBody = Display.getInstance().getProperty("android.permission.ACCESS_BACKGROUND_LOCATION.explanation_body", "Please enable 'Allow all the time' in the settings, then press OK.");
+                String okBtn = Display.getInstance().getProperty("android.permission.ACCESS_BACKGROUND_LOCATION.ok", "OK");
+
+                Dialog.show(explanationTitle, explanationBody, okBtn, null);
+                return android.support.v4.content.ContextCompat.checkSelfPermission(getActivity(), permission) == PackageManager.PERMISSION_GRANTED;
+            } else {
+                return false;
+            }
+        }
+
         String prompt = Display.getInstance().getProperty(permission, description);
 
         if (android.support.v4.content.ContextCompat.checkSelfPermission(getContext(),
