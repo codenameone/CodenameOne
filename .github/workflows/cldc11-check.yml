@@ -1,0 +1,57 @@
+name: CLDC11 Compatibility Check
+
+on:
+  push:
+    paths:
+      - 'Ports/CLDC11/**'
+      - 'vm/JavaAPI/**'
+      - '.github/workflows/cldc11-check.yml'
+  pull_request:
+    paths:
+      - 'Ports/CLDC11/**'
+      - 'vm/JavaAPI/**'
+      - '.github/workflows/cldc11-check.yml'
+
+jobs:
+  check-cldc11:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/codenameone/codenameone/ci-container:latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build APIChecker
+        run: mvn package -f scripts/api-checker/pom.xml
+
+      - name: Build Ports/CLDC11
+        run: |
+          cd Ports/CLDC11
+          ant jar
+
+      - name: Build vm/JavaAPI
+        run: mvn package -f vm/JavaAPI/pom.xml -DskipTests
+
+      - name: Check CLDC11 vs JavaSE 11
+        run: |
+          $JAVA11_HOME/bin/java -jar scripts/api-checker/target/api-checker-1.0-SNAPSHOT.jar \
+            --subject Ports/CLDC11/dist/CLDC11.jar \
+            --reference java11
+
+      - name: Check CLDC11 vs vm/JavaAPI
+        run: |
+          $JAVA11_HOME/bin/java -jar scripts/api-checker/target/api-checker-1.0-SNAPSHOT.jar \
+            --subject Ports/CLDC11/dist/CLDC11.jar \
+            --reference vm/JavaAPI/target/classes \
+            --report extra_apis_report.json
+
+      - name: Upload Extra APIs Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: extra-apis-report
+          path: extra_apis_report.json
