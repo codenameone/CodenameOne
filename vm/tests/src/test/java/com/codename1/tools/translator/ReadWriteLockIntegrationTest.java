@@ -149,6 +149,30 @@ class ReadWriteLockIntegrationTest {
                 "    private int offset;\n" +
                 "    private int count;\n" +
                 "    public String(char[] v) { value = v; count=v.length; }\n" +
+                "    public static String valueOf(Object obj) { return obj == null ? \"null\" : obj.toString(); }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
+        // java.lang.StringBuilder
+        Files.write(lang.resolve("StringBuilder.java"), ("package java.lang;\n" +
+                "public class StringBuilder {\n" +
+                "    public StringBuilder() {}\n" +
+                "    public StringBuilder(String str) {}\n" +
+                "    public StringBuilder(int cap) {}\n" +
+                "    public StringBuilder append(String s) { return this; }\n" +
+                "    public StringBuilder append(Object o) { return this; }\n" +
+                "    public StringBuilder append(int i) { return this; }\n" +
+                "    public String toString() { return \"\"; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
+        // java.lang.StringBuffer
+        Files.write(lang.resolve("StringBuffer.java"), ("package java.lang;\n" +
+                "public class StringBuffer {\n" +
+                "    public StringBuffer() {}\n" +
+                "    public StringBuffer(String str) {}\n" +
+                "    public StringBuffer append(String s) { return this; }\n" +
+                "    public StringBuffer append(Object o) { return this; }\n" +
+                "    public StringBuffer append(int i) { return this; }\n" +
+                "    public String toString() { return \"\"; }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
         // java.lang.Class
