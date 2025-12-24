@@ -789,6 +789,7 @@ struct ThreadLocalData {
     char* utf8Buffer;
     int utf8BufferSize;
     JAVA_BOOLEAN threadKilled;      // we don't expect to see this in the GC
+    JAVA_BOOLEAN interrupted;
 };
 
 //#define BLOCK_FOR_GC() while(threadStateData->threadBlockedByGC) { usleep(500); }
