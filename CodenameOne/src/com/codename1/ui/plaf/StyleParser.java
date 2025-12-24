@@ -484,7 +484,9 @@ public class StyleParser {
                         out.color = Integer.parseInt(colorStr, 16) & 0xffffff;
                         out.setOpacity(255);
                     }
-                    rem = rem.substring(colorStr.length());
+                    if (rem.length() >= colorStr.length()) {
+                        rem = rem.substring(colorStr.length());
+                    }
 
 
                 }
@@ -2022,7 +2024,7 @@ public class StyleParser {
         }
 
         private void colorToString(StringBuilder sb) {
-            String hex = Integer.toHexString(color & 0xffffff);
+            String hex = color != null ? Integer.toHexString(color & 0xffffff) : "000000";
             while (hex.length() < 6) hex = "0" + hex;
 
             if (getOpacity() != null) {
@@ -2516,7 +2518,7 @@ public class StyleParser {
          * @return The thickness of the border.  Used with line, dashed, dotted, underline, and round borders.
          */
         public ScalarValue getThickness() {
-            return new ScalarValue(width, widthUnit);
+            return new ScalarValue(width == null ? 0 : width, widthUnit);
         }
 
         /**

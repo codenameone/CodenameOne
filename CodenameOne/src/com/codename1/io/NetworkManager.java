@@ -325,7 +325,9 @@ public class NetworkManager {
         running = false;
         if (networkThreads != null) {
             for (NetworkThread n : networkThreads) {
-                n.stopped = true;
+                if(n != null) {
+                    n.stopped = true;
+                }
             }
         }
         networkThreads = null;
@@ -793,7 +795,10 @@ public class NetworkManager {
 
         public void join() {
             try {
-                threadInstance.join();
+                Thread t = threadInstance;
+                if(t != null) {
+                    t.join();
+                }
             } catch (InterruptedException ex) {
                 ex.printStackTrace();
             }

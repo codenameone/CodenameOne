@@ -133,10 +133,14 @@ public class InfiniteScrollAdapter {
     }
 
     void reachedEnd() {
-        infiniteContainer.removeComponent(endMarker);
-        infiniteContainer.addComponent(ip);
-        infiniteContainer.revalidate();
-        Display.getInstance().callSerially(fetchMore);
+        if (infiniteContainer != null) {
+            infiniteContainer.removeComponent(endMarker);
+            infiniteContainer.addComponent(ip);
+            infiniteContainer.revalidate();
+        }
+        if (fetchMore != null) {
+            Display.getInstance().callSerially(fetchMore);
+        }
     }
 
     /**
@@ -147,6 +151,9 @@ public class InfiniteScrollAdapter {
      * @param areThereMore whether additional components exist
      */
     public void addMoreComponents(Component[] components, boolean areThereMore) {
+        if (infiniteContainer == null) {
+            return;
+        }
         infiniteContainer.removeComponent(ip);
         infiniteContainer.removeComponent(endMarker);
         for (Component c : components) {
@@ -177,7 +184,7 @@ public class InfiniteScrollAdapter {
      * user interaction see https://github.com/codenameone/CodenameOne/issues/2721
      */
     public void continueFetching() {
-        if (endMarker.getParent() == null) {
+        if (endMarker.getParent() == null && fetchMore != null) {
             fetchMore.run();
         }
     }

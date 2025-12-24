@@ -59,6 +59,7 @@ public class PreferencesObject {
      * @return this to enable builder pattern binding
      */
     public PreferencesObject bind() {
+        if (bo == null || bo.getPropertyIndex() == null) return this;
         for (PropertyBase pb : bo.getPropertyIndex()) {
             String name = (String) pb.getClientProperty("cn1-po-name");
             if (name == null) {

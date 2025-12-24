@@ -298,6 +298,7 @@ public class WebServiceProxyCall {
         protected void readResponse(InputStream input) throws IOException {
             DataInputStream dis = new DataInputStream(input);
 
+            if (def == null) return;
             switch (def.returnType) {
                 case TYPE_VOID:
                     return;
@@ -512,6 +513,7 @@ public class WebServiceProxyCall {
             dos.writeUTF(def.name);
             int alen = arguments.length;
             for (int iter = 0; iter < alen; iter++) {
+                if (def == null || def.arguments == null) continue;
                 switch (def.arguments[iter]) {
                     case TYPE_BYTE:
                         dos.writeByte(((Byte) arguments[iter]).byteValue());

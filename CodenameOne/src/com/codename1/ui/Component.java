@@ -8024,25 +8024,33 @@ public class Component implements Animation, StyleListener, Editable {
             int oAlpha = g.getAlpha();
             if (alpha == 0) {
                 unSelectedStyle = originalStyle;
-                original.paint(g, rect);
+                if(original != null) {
+                    original.paint(g, rect);
+                }
                 return;
             }
             if (alpha == 255) {
                 unSelectedStyle = destStyle;
-                dest.paint(g, rect);
+                if(dest != null) {
+                    dest.paint(g, rect);
+                }
                 unSelectedStyle = originalStyle;
                 return;
             }
             int opa = unSelectedStyle.getBgTransparency() & 0xff;
             unSelectedStyle.setBgTransparency(255 - alpha);
             g.setAlpha(255 - alpha);
-            original.paint(g, rect);
+            if(original != null) {
+                original.paint(g, rect);
+            }
             unSelectedStyle.setBgTransparency(opa);
             unSelectedStyle = destStyle;
             opa = unSelectedStyle.getBgTransparency() & 0xff;
             g.setAlpha(alpha);
             unSelectedStyle.setBgTransparency(alpha);
-            dest.paint(g, rect);
+            if(dest != null) {
+                dest.paint(g, rect);
+            }
             unSelectedStyle.setBgTransparency(opa);
             unSelectedStyle = originalStyle;
             g.setAlpha(oAlpha);

@@ -2142,7 +2142,7 @@ public class GroupLayout extends Layout {
 
         int getBaselineResizeBehavior() {
             if (isResizable(VERTICAL)) {
-                if (!baselineSpring.isResizable(VERTICAL)) {
+                if (baselineSpring != null && !baselineSpring.isResizable(VERTICAL)) {
                     // Spring to use for baseline isn't resizable. In this case
                     // baseline resize behavior can be determined based on how
                     // preceding springs resize.
@@ -2175,7 +2175,10 @@ public class GroupLayout extends Layout {
                     // If we get here, both leading and trailing springs are
                     // resizable. Fall through to OTHER.
                 } else {
-                    int brb = baselineSpring.getBaselineResizeBehavior();
+                    int brb = 0;
+                    if(baselineSpring != null) {
+                        brb = baselineSpring.getBaselineResizeBehavior();
+                    }
                     if (brb == Component.BRB_CONSTANT_ASCENT) {
                         for (int i = 0, max = springs.size(); i < max; i++) {
                             Spring spring = getSpring(i);

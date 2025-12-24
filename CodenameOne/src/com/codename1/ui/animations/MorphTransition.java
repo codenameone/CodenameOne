@@ -180,21 +180,23 @@ public class MorphTransition extends Transition {
     public boolean animate() {
         if (!finished) {
             // animate one last time
-            if (animationMotion.isFinished()) {
+            if (animationMotion != null && animationMotion.isFinished()) {
                 finished = true;
 
                 // restore forms to orignial states
-                for (CC c : fromToComponents) {
-                    if (c == null) {
-                        continue;
-                    }
-                    Container p = c.placeholderDest.getParent();
-                    c.dest.getParent().removeComponent(c.dest);
-                    p.replace(c.placeholderDest, c.dest, null);
+                if(fromToComponents != null) {
+                    for (CC c : fromToComponents) {
+                        if (c == null) {
+                            continue;
+                        }
+                        Container p = c.placeholderDest.getParent();
+                        c.dest.getParent().removeComponent(c.dest);
+                        p.replace(c.placeholderDest, c.dest, null);
 
-                    p = c.placeholderSrc.getParent();
-                    c.source.getParent().removeComponent(c.source);
-                    p.replace(c.placeholderSrc, c.source, null);
+                        p = c.placeholderSrc.getParent();
+                        c.source.getParent().removeComponent(c.source);
+                        p.replace(c.placeholderSrc, c.source, null);
+                    }
                 }
 
                 // remove potential memory leak
@@ -202,22 +204,24 @@ public class MorphTransition extends Transition {
 
                 return true;
             }
-            for (CC c : fromToComponents) {
-                if (c == null) {
-                    continue;
+            if(fromToComponents != null) {
+                for (CC c : fromToComponents) {
+                    if (c == null) {
+                        continue;
+                    }
+                    int x = c.xMotion.getValue();
+                    int y = c.yMotion.getValue();
+                    int w = c.wMotion.getValue();
+                    int h = c.hMotion.getValue();
+                    c.source.setX(x);
+                    c.source.setY(y);
+                    c.source.setWidth(w);
+                    c.source.setHeight(h);
+                    c.dest.setX(x);
+                    c.dest.setY(y);
+                    c.dest.setWidth(w);
+                    c.dest.setHeight(h);
                 }
-                int x = c.xMotion.getValue();
-                int y = c.yMotion.getValue();
-                int w = c.wMotion.getValue();
-                int h = c.hMotion.getValue();
-                c.source.setX(x);
-                c.source.setY(y);
-                c.source.setWidth(w);
-                c.source.setHeight(h);
-                c.dest.setX(x);
-                c.dest.setY(y);
-                c.dest.setWidth(w);
-                c.dest.setHeight(h);
             }
 
             return true;
@@ -231,7 +235,10 @@ public class MorphTransition extends Transition {
      */
     public void paint(Graphics g) {
         int oldAlpha = g.getAlpha();
-        int alpha = animationMotion.getValue();
+        int alpha = 0;
+        if(animationMotion != null) {
+            alpha = animationMotion.getValue();
+        }
         if (alpha < 255) {
             g.setAlpha(255 - alpha);
             getSource().paintComponent(g);
