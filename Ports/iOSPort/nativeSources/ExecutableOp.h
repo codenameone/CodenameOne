@@ -48,6 +48,11 @@ green:((float)((rgbValue >> 8) & 0xff))/255.0 blue:((float)(rgbValue & 0xff))/25
 
 #endif
 
+#ifdef CN1_USE_METAL
+@import Metal;
+@import simd;
+#endif
+
 @interface ExecutableOp : NSObject {
 
 }
@@ -58,4 +63,14 @@ green:((float)((rgbValue >> 8) & 0xff))/255.0 blue:((float)(rgbValue & 0xff))/25
 -(void)execute;
 -(void)executeWithLog;
 -(NSString*)getName;
+
+#ifdef CN1_USE_METAL
+// Metal helper methods (accessible to all ExecutableOp subclasses)
+-(id<MTLDevice>)device;
+-(id<MTLRenderCommandEncoder>)makeRenderCommandEncoder;
+-(void)applyClip:(id<MTLRenderCommandEncoder>)encoder;
+-(simd_float4x4)getMVPMatrix;
+-(simd_float4)colorToFloat4:(int)color alpha:(int)alpha;
+#endif
+
 @end
