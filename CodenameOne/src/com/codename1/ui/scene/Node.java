@@ -409,10 +409,12 @@ public class Node {
     }
 
     public Transform getLocalToScreenTransform() {
-        Transform newT = Transform.isPerspectiveSupported() && scene.camera.get() != null ?
+        Transform newT = Transform.isPerspectiveSupported() && scene != null && scene.camera.get() != null ?
                 scene.camera.get().getTransform() : Transform.makeIdentity();
-        newT.translate(getScene().getAbsoluteX(), getScene().getAbsoluteY());
-        newT.concatenate(getLocalToSceneTransform());
+        if (getScene() != null) {
+            newT.translate(getScene().getAbsoluteX(), getScene().getAbsoluteY());
+            newT.concatenate(getLocalToSceneTransform());
+        }
         return newT;
     }
 
@@ -428,12 +430,14 @@ public class Node {
         Transform existingT = Transform.makeIdentity();
         g.getTransform(existingT);
 
-        Transform newT = Transform.isPerspectiveSupported() && scene.camera.get() != null ?
+        Transform newT = Transform.isPerspectiveSupported() && scene != null && scene.camera.get() != null ?
                 scene.camera.get().getTransform() :
                 Transform.makeIdentity();
-        newT.translate(getScene().getAbsoluteX(), getScene().getAbsoluteY());
-        newT.concatenate(getLocalToSceneTransform());
-        newT.translate(-scene.getAbsoluteX(), -scene.getAbsoluteY());
+        if (getScene() != null) {
+            newT.translate(getScene().getAbsoluteX(), getScene().getAbsoluteY());
+            newT.concatenate(getLocalToSceneTransform());
+            newT.translate(-scene.getAbsoluteX(), -scene.getAbsoluteY());
+        }
         g.setTransform(newT);
         int alpha = g.getAlpha();
         int nodeAlpha = (int) Math.round(alpha * opacity.get());

@@ -123,10 +123,15 @@ public class SwipeBackSupport {
                             currentX += increments;
                             if (currentX > 0 && currentX >= destNumber || currentX < 0 && currentX <= destNumber) {
                                 currentX = destNumber;
-                                Transition t = destinationForm.getTransitionInAnimator();
-                                destinationForm.setTransitionInAnimator(CommonTransitions.createEmpty());
-                                destinationForm.show();
-                                destinationForm.setTransitionInAnimator(t);
+                                Transition t = null;
+                                if(destinationForm != null) {
+                                    t = destinationForm.getTransitionInAnimator();
+                                }
+                                if(destinationForm != null) {
+                                    destinationForm.setTransitionInAnimator(CommonTransitions.createEmpty());
+                                    destinationForm.show();
+                                    destinationForm.setTransitionInAnimator(t);
+                                }
                                 destinationForm = null;
                                 dragActivated = false;
                                 transitionRunning = false;

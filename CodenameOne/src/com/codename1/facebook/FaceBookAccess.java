@@ -1292,7 +1292,9 @@ public class FaceBookAccess {
      * Kills the current request.
      */
     public void killCurrentRequest() {
-        current.kill();
+        if (current != null) {
+            current.kill();
+        }
     }
 
     /**

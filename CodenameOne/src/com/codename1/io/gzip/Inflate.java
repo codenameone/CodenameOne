@@ -114,7 +114,9 @@ final class Inflate {
         z.msg = null;
         this.mode = HEAD;
         this.need_bytes = -1;
-        this.blocks.reset();
+        if(this.blocks != null) {
+            this.blocks.reset();
+        }
         return Z_OK;
     }
 
@@ -311,7 +313,9 @@ final class Inflate {
                     this.marker = 0;       // can try inflateSync
                     return Z_STREAM_ERROR;
                 case BLOCKS:
-                    r = this.blocks.proc(r);
+                    if (this.blocks != null) {
+                        r = this.blocks.proc(r);
+                    }
                     if (r == Z_DATA_ERROR) {
                         this.mode = BAD;
                         this.marker = 0;     // can try inflateSync
@@ -595,7 +599,9 @@ final class Inflate {
             length = (1 << this.wbits) - 1;
             index = dictLength - length;
         }
-        this.blocks.set_dictionary(dictionary, index, length);
+        if (this.blocks != null) {
+            this.blocks.set_dictionary(dictionary, index, length);
+        }
         this.mode = BLOCKS;
         return Z_OK;
     }

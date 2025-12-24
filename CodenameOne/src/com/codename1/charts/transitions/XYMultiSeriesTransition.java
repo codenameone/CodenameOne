@@ -69,9 +69,11 @@ public class XYMultiSeriesTransition extends SeriesTransition {
     protected void initTransition() {
 
         getBuffer(); // initializes the buffer and seriesTranslations
-        int len = seriesTransitions.length;
-        for (int i = 0; i < len; i++) {
-            seriesTransitions[i].initTransition();
+        if (seriesTransitions != null) {
+            int len = seriesTransitions.length;
+            for (int i = 0; i < len; i++) {
+                seriesTransitions[i].initTransition();
+            }
         }
         super.initTransition();
 
@@ -86,9 +88,11 @@ public class XYMultiSeriesTransition extends SeriesTransition {
     @Override
     protected void update(int progress) {
         getBuffer(); // initializes the buffer and seriesTranslations
-        int len = seriesTransitions.length;
-        for (int i = 0; i < len; i++) {
-            seriesTransitions[i].update(progress);
+        if (seriesTransitions != null) {
+            int len = seriesTransitions.length;
+            for (int i = 0; i < len; i++) {
+                seriesTransitions[i].update(progress);
+            }
         }
     }
 
@@ -99,9 +103,11 @@ public class XYMultiSeriesTransition extends SeriesTransition {
     protected void cleanup() {
         super.cleanup();
         getBuffer(); // initializes the buffer and seriesTranslations
-        int len = seriesTransitions.length;
-        for (int i = 0; i < len; i++) {
-            seriesTransitions[i].cleanup();
+        if (seriesTransitions != null) {
+            int len = seriesTransitions.length;
+            for (int i = 0; i < len; i++) {
+                seriesTransitions[i].cleanup();
+            }
         }
     }
 

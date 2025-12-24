@@ -201,10 +201,10 @@ final class Tree {
     //     not null.
     void gen_bitlen(Deflate s) {
         short[] tree = dyn_tree;
-        short[] stree = stat_desc.static_tree;
-        int[] extra = stat_desc.extra_bits;
-        int base = stat_desc.extra_base;
-        int max_length = stat_desc.max_length;
+        short[] stree = stat_desc != null ? stat_desc.static_tree : null;
+        int[] extra = stat_desc != null ? stat_desc.extra_bits : null;
+        int base = stat_desc != null ? stat_desc.extra_base : 0;
+        int max_length = stat_desc != null ? stat_desc.max_length : 0;
         int h;              // heap index
         int n, m;           // iterate over the tree elements
         int bits;           // bit length
@@ -275,8 +275,8 @@ final class Tree {
     //     also updated if stree is not null. The field max_code is set.
     void build_tree(Deflate s) {
         short[] tree = dyn_tree;
-        short[] stree = stat_desc.static_tree;
-        int elems = stat_desc.elems;
+        short[] stree = stat_desc != null ? stat_desc.static_tree : null;
+        int elems = stat_desc != null ? stat_desc.elems : 0;
         int n, m;          // iterate over heap elements
         int max_code = -1;   // largest code with non zero frequency
         int node;          // new node being created

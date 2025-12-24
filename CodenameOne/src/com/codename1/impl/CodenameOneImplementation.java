@@ -5636,7 +5636,10 @@ public abstract class CodenameOneImplementation {
      * @param content content of the message
      */
     protected void log(String content) {
-        logger.actionPerformed(new ActionEvent(content, ActionEvent.Type.Log));
+        ActionListener l = logger;
+        if(l != null) {
+            l.actionPerformed(new ActionEvent(content, ActionEvent.Type.Log));
+        }
     }
 
     /**

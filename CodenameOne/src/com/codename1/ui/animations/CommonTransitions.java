@@ -506,7 +506,7 @@ public final class CommonTransitions extends Transition {
 
             g.setClip(0, 0, buffer.getWidth() + source.getAbsoluteX(), buffer.getHeight() + source.getAbsoluteY());
 
-            if (timeline.getWidth() != buffer.getWidth() || timeline.getHeight() != buffer.getHeight()) {
+            if (timeline != null && buffer != null && (timeline.getWidth() != buffer.getWidth() || timeline.getHeight() != buffer.getHeight())) {
                 timeline = timeline.scaled(buffer.getWidth(), buffer.getHeight());
             }
 
@@ -722,11 +722,13 @@ public final class CommonTransitions extends Transition {
                 }
                 case TYPE_UNCOVER:
                     hideInterformContainers();
-                    int p = motion.getDestinationValue() - position;
-                    if (slideType == SLIDE_HORIZONTAL) {
-                        paintCoverAtPosition(g, p, 0);
-                    } else {
-                        paintCoverAtPosition(g, 0, p);
+                    if (motion != null) {
+                        int p = motion.getDestinationValue() - position;
+                        if (slideType == SLIDE_HORIZONTAL) {
+                            paintCoverAtPosition(g, p, 0);
+                        } else {
+                            paintCoverAtPosition(g, 0, p);
+                        }
                     }
                     paintInterformContainers(g);
 
@@ -747,9 +749,11 @@ public final class CommonTransitions extends Transition {
                     return;
                 case TYPE_TIMELINE:
                     hideInterformContainers();
-                    Object mask = timeline.createMask();
-                    paint(g, getSource(), 0, 0);
-                    g.drawImage(buffer.applyMask(mask), 0, 0);
+                    if (timeline != null && buffer != null) {
+                        Object mask = timeline.createMask();
+                        paint(g, getSource(), 0, 0);
+                        g.drawImage(buffer.applyMask(mask), 0, 0);
+                    }
                     paintInterformContainers(g);
                     return;
                 case TYPE_SLIDE_AND_FADE: {
@@ -760,7 +764,9 @@ public final class CommonTransitions extends Transition {
                     Container destTitleArea = destForm.getTitleArea();
                     if (titleArea == null || titleArea.isHidden(true) || destTitleArea == null || destTitleArea.isHidden(true)) {
                         hideInterformContainers();
-                        paintSlideAtPosition(g, motion2.getValue(), 0);
+                        if (motion2 != null) {
+                            paintSlideAtPosition(g, motion2.getValue(), 0);
+                        }
 
                         paintInterformContainers(g);
                         return;

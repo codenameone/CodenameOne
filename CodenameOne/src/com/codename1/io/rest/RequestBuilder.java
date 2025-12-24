@@ -784,6 +784,9 @@ public class RequestBuilder {
                 }
                 Response res = null;
                 Map response = (Map) evt.getMetaData();
+                if (response == null) {
+                    return;
+                }
                 List<Map> lst = (List<Map>) response.get(root);
                 if (lst == null) {
                     return;

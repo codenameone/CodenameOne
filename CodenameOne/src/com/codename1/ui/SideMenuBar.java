@@ -1648,7 +1648,7 @@ public class SideMenuBar extends MenuBar {
         public void paint(Graphics g) {
             if (Display.getInstance().areMutableImagesFast()) {
                 // workaround for Android issue where the VKB breaks on screen size change
-                if (buffer.getHeight() != Display.getInstance().getDisplayHeight()) {
+                if (buffer == null || buffer.getHeight() != Display.getInstance().getDisplayHeight()) {
                     if (fwd) {
                         buffer = updateRightPanelBgImage(placement, getSource());
                     } else {

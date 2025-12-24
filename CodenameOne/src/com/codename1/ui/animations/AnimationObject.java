@@ -197,7 +197,10 @@ public final class AnimationObject {
                     img = null;
                 }
             }
-            long time = motionX.getCurrentMotionTime();
+            long time = 0;
+            if(motionX != null) {
+                time = motionX.getCurrentMotionTime();
+            }
             int frameCount = Math.max(1, frames.length);
             int frame = Math.min(Math.max(0, (int) ((time / Math.max(1, frameDelay)) % frameCount)), frameCount - 1);
             return frames[frame];
@@ -212,8 +215,8 @@ public final class AnimationObject {
     }
 
     void setTime(int time) {
-        motionX.setCurrentMotionTime(time);
-        motionY.setCurrentMotionTime(time);
+        setTimeNotNull(motionX, time);
+        setTimeNotNull(motionY, time);
         setTimeNotNull(orientation, time);
         setTimeNotNull(width, time);
         setTimeNotNull(height, time);
@@ -322,6 +325,9 @@ public final class AnimationObject {
     }
 
     int getX() {
+        if(motionX == null) {
+            return 0;
+        }
         return motionX.getValue();
     }
 
@@ -329,6 +335,9 @@ public final class AnimationObject {
      * @return the motionY
      */
     int getY() {
+        if(motionY == null) {
+            return 0;
+        }
         return motionY.getValue();
     }
 
