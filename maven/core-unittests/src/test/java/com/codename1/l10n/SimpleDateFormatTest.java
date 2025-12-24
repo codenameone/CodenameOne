@@ -133,6 +133,58 @@ class SimpleDateFormatTest extends UITestBase {
         assertSame(symbols, clone.getDateFormatSymbols());
     }
 
+    @Test
+    void testQuotedStringLiteral() {
+        // "formats like yyyy.MM.dd G 'at' HH:mm:ss z yield illegal argument exception on the t char."
+        assertDoesNotThrow(() -> {
+            new SimpleDateFormat("yyyy.MM.dd G 'at' HH:mm:ss z");
+        }, "Should not throw exception for quoted literal 'at'");
+    }
+
+    @Test
+    void testEscapedSingleQuoteFormat() {
+        // "Also formats like: hh 'o''clock' yield exception for the c char."
+        SimpleDateFormat sdf = new SimpleDateFormat("hh 'o''clock'");
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.HOUR, 5);
+        String result = sdf.format(cal.getTime());
+        // Expected: 05 o'clock
+        assertTrue(result.contains("o'clock"), "Should contain single quote: " + result);
+    }
+
+    @Test
+    void testXXXFormat() {
+        // "yyyy-MM-dd'T'HH:mm:ss.SSSXXX (exception for X char, recent API level prerequisite)"
+        assertDoesNotThrow(() -> {
+            new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX");
+        }, "Should not throw exception for XXX format");
+
+        SimpleDateFormat sdf = new SimpleDateFormat("XXX");
+        // We cannot reliably test exact timezone string without controlling default timezone,
+        // but we can check it doesn't crash and produces something reasonable.
+        String result = sdf.format(new Date());
+        assertNotNull(result);
+        assertFalse(result.isEmpty());
+    }
+
+    @Test
+    void testYYYYAnduFormat() {
+        // "YYYY-'W'ww-u (exception for Y char)"
+        assertDoesNotThrow(() -> {
+            new SimpleDateFormat("YYYY-'W'ww-u");
+        }, "Should not throw exception for YYYY and u format");
+
+        SimpleDateFormat sdf = new SimpleDateFormat("u");
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
+        String result = sdf.format(cal.getTime());
+        assertEquals("1", result, "Monday should be 1");
+
+        cal.set(Calendar.DAY_OF_WEEK, Calendar.SUNDAY);
+        result = sdf.format(cal.getTime());
+        assertEquals("7", result, "Sunday should be 7");
+    }
+
     private static class StubL10NManager extends L10NManager {
         StubL10NManager() {
             super("en", "US");

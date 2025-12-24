@@ -119,6 +119,18 @@ public class SimpleDateFormat extends DateFormat {
      */
     private static final char TIMEZONE822_LETTER = 'Z';
     /**
+     * Pattern character for ISO 8601 timezone.
+     */
+    private static final char ISO_TIMEZONE_LETTER = 'X';
+    /**
+     * Pattern character for week year.
+     */
+    private static final char WEEK_YEAR_LETTER = 'Y';
+    /**
+     * Pattern character for day number of week.
+     */
+    private static final char DAY_NUMBER_OF_WEEK_LETTER = 'u';
+    /**
      * Internally used character for literal text.
      */
     private static final char LITERAL_LETTER = '*';
@@ -141,7 +153,7 @@ public class SimpleDateFormat extends DateFormat {
     /**
      * Pattern characters recognized by this implementation (same as JDK 1.6).
      */
-    private static final String PATTERN_LETTERS = "adDEFGHhKkMmsSwWyzZ";
+    private static final String PATTERN_LETTERS = "adDEFGHhKkMmsSwWyzZXYu";
     /**
      * TimeZone ID for Greenwich Mean Time
      */
@@ -371,7 +383,24 @@ public class SimpleDateFormat extends DateFormat {
                     toAppendTo.append(leftPad(v / 60, 2));
                     toAppendTo.append(leftPad(v % 60, 2));
                     break;
+                case ISO_TIMEZONE_LETTER:
+                    v = getOffsetInMinutes(calendar, calendar.getTimeZone());
+                    if (v < 0) {
+                        toAppendTo.append(SIGN_NEGATIVE);
+                        v = -v;
+                    } else {
+                        toAppendTo.append(SIGN_POSITIVE);
+                    }
+                    toAppendTo.append(leftPad(v / 60, 2));
+                    if (len >= 2) {
+                        if (len == 3) {
+                            toAppendTo.append(':');
+                        }
+                        toAppendTo.append(leftPad(v % 60, 2));
+                    }
+                    break;
                 case YEAR_LETTER:
+                case WEEK_YEAR_LETTER:
                     v = calendar.get(Calendar.YEAR);
                     if (len == 2) {
                         v %= 100;
@@ -439,6 +468,10 @@ public class SimpleDateFormat extends DateFormat {
                     break;
                 case DOW_IN_MONTH_LETTER:
                     v = calendar.get(DAY_OF_WEEK_IN_MONTH);
+                    toAppendTo.append(leftPad(v, len));
+                    break;
+                case DAY_NUMBER_OF_WEEK_LETTER:
+                    v = ((calendar.get(Calendar.DAY_OF_WEEK) + 5) % 7) + 1;
                     toAppendTo.append(leftPad(v, len));
                     break;
             }
@@ -515,6 +548,7 @@ public class SimpleDateFormat extends DateFormat {
                     break;
                 case TIMEZONE_LETTER:
                 case TIMEZONE822_LETTER:
+                case ISO_TIMEZONE_LETTER:
                     s = readTimeZone(source, startIndex);
                     TimeZoneResult res = new TimeZoneResult();
                     if (s == null || (v = parseTimeZone(s, startIndex, res)) == -1) {
@@ -525,6 +559,7 @@ public class SimpleDateFormat extends DateFormat {
                     tzMinutes = ((tzMinutes == -1) ? 0 : tzMinutes) + v;
                     break;
                 case YEAR_LETTER:
+                case WEEK_YEAR_LETTER:
                     s = readNumber(source, startIndex, token, adjacent);
                     calendar.set(Calendar.YEAR, parseYear(s, token, startIndex));
                     break;
@@ -571,6 +606,14 @@ public class SimpleDateFormat extends DateFormat {
                     s = readNumber(source, startIndex, token, adjacent);
                     calendar.set(DAY_OF_WEEK_IN_MONTH,
                             parseNumber(s, startIndex, "day of week in month", -5, 5));
+                    break;
+                case DAY_NUMBER_OF_WEEK_LETTER:
+                    s = readNumber(source, startIndex, token, adjacent);
+                    v = parseNumber(s, startIndex, "day number of week", 1, 7);
+                    // Map 1(Mon)-7(Sun) to Calendar 2(Mon)..1(Sun)
+                    // Mon=1 -> 2. Tue=2 -> 3. ... Sat=6 -> 7. Sun=7 -> 1.
+                    // v % 7 + 1
+                    calendar.set(Calendar.DAY_OF_WEEK, (v % 7) + 1);
                     break;
             }
             if (s != null) {
@@ -1186,14 +1229,27 @@ public class SimpleDateFormat extends DateFormat {
             char ch = pattern.charAt(i);
             // Handle literal text enclosed in quotes
             if (ch == EXPLICIT_LITERAL) {
-                int n = pattern.indexOf(EXPLICIT_LITERAL, i + 1);
-                if (n != -1) {
-                    if (tmp != null) {
-                        tokens.add(tmp.charAt(0) + tmp);
-                        tmp = null;
-                    }
-                    tokens.add(LITERAL_LETTER + pattern.substring(i + 1, n));
+                if (tmp != null) {
+                    tokens.add(tmp.charAt(0) + tmp);
+                    tmp = null;
                 }
+                StringBuilder sb = new StringBuilder();
+                int n = i + 1;
+                while (n < plen) {
+                    char c = pattern.charAt(n);
+                    if (c == EXPLICIT_LITERAL) {
+                        if (n + 1 < plen && pattern.charAt(n + 1) == EXPLICIT_LITERAL) {
+                            sb.append(EXPLICIT_LITERAL);
+                            n += 2;
+                            continue;
+                        } else {
+                            break;
+                        }
+                    }
+                    sb.append(c);
+                    n++;
+                }
+                tokens.add(LITERAL_LETTER + sb.toString());
                 i = n;
                 continue;
             }
@@ -1208,7 +1264,7 @@ public class SimpleDateFormat extends DateFormat {
                 int n;
                 for (n = i; n < plen; n++) {
                     ch = pattern.charAt(n);
-                    if (PATTERN_LETTERS.indexOf(ch) != -1) {
+                    if (PATTERN_LETTERS.indexOf(ch) != -1 || ch == EXPLICIT_LITERAL) {
                         break;
                     }
                     if (isAlpha(ch)) {
