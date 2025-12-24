@@ -23,15 +23,19 @@ public class ReentrantLock implements Lock, java.io.Serializable {
                 holdCount++;
                 return;
             }
+            boolean interrupted = false;
             while (owner != null) {
                 try {
                     sync.wait();
                 } catch (InterruptedException e) {
-                     Thread.currentThread().interrupt();
+                     interrupted = true;
                 }
             }
             owner = current;
             holdCount = 1;
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 

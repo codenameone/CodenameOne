@@ -199,6 +199,12 @@ class LockIntegrationTest {
         // java.util.Date
         Files.write(util.resolve("Date.java"), "package java.util; public class Date { public long getTime() { return 0; } }".getBytes(StandardCharsets.UTF_8));
 
+        // java.util.Objects
+        Files.write(util.resolve("Objects.java"), ("package java.util;\n" +
+                "public class Objects {\n" +
+                "    public static <T> T requireNonNull(T obj) { if (obj == null) throw new NullPointerException(); return obj; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
         // java.util.concurrent.TimeUnit
         Files.write(concurrent.resolve("TimeUnit.java"), ("package java.util.concurrent;\n" +
                 "public class TimeUnit {\n" +
