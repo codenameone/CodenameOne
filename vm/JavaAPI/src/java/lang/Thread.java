@@ -122,7 +122,20 @@ public class Thread implements java.lang.Runnable{
      * Interrupts this thread. In an implementation conforming to the CLDC Specification, this operation is not required to cancel or clean up any pending I/O operations that the thread may be waiting for.
      */
     public void interrupt(){
+        interrupt0();
     }
+
+    private native void interrupt0();
+
+    public static boolean interrupted() {
+        return currentThread().isInterrupted(true);
+    }
+
+    public boolean isInterrupted() {
+        return isInterrupted(false);
+    }
+
+    private native boolean isInterrupted(boolean clearInterrupted);
 
     /**
      * Tests if this thread is alive. A thread is alive if it has been started and has not yet died.
@@ -135,10 +148,44 @@ public class Thread implements java.lang.Runnable{
      * Waits for this thread to die.
      */
     public final void join() throws java.lang.InterruptedException{
-        // not very efficient but we don't use this method much...
-        while(alive) {
-            sleep(30);
+        join(0);
+    }
+
+    public final synchronized void join(long millis) throws java.lang.InterruptedException {
+        long base = System.currentTimeMillis();
+        long now = 0;
+
+        if (millis < 0) {
+            throw new IllegalArgumentException("timeout value is negative");
         }
+
+        if (millis == 0) {
+            while (isAlive()) {
+                wait(0);
+            }
+        } else {
+            while (isAlive()) {
+                long delay = millis - now;
+                if (delay <= 0) {
+                    break;
+                }
+                wait(delay);
+                now = System.currentTimeMillis() - base;
+            }
+        }
+    }
+
+    public final synchronized void join(long millis, int nanos) throws java.lang.InterruptedException {
+        if (millis < 0) {
+            throw new IllegalArgumentException("timeout value is negative");
+        }
+        if (nanos < 0 || nanos > 999999) {
+            throw new IllegalArgumentException("nanosecond timeout value out of range");
+        }
+        if (nanos >= 500000 || (nanos != 0 && millis == 0)) {
+            millis++;
+        }
+        join(millis);
     }
 
     /**
@@ -155,7 +202,10 @@ public class Thread implements java.lang.Runnable{
             t.printStackTrace();
         }
         activeThreads--;
-        alive = false;
+        synchronized(this) {
+            alive = false;
+            notifyAll();
+        }
     }
     
     /**
@@ -182,6 +232,19 @@ public class Thread implements java.lang.Runnable{
      * Causes the currently executing thread to sleep (temporarily cease execution) for the specified number of milliseconds. The thread does not lose ownership of any monitors.
      */
     public static native void sleep(long millis) throws java.lang.InterruptedException;
+
+    public static void sleep(long millis, int nanos) throws java.lang.InterruptedException {
+        if (millis < 0) {
+            throw new IllegalArgumentException("timeout value is negative");
+        }
+        if (nanos < 0 || nanos > 999999) {
+            throw new IllegalArgumentException("nanosecond timeout value out of range");
+        }
+        if (nanos >= 500000 || (nanos != 0 && millis == 0)) {
+            millis++;
+        }
+        sleep(millis);
+    }
 
     /**
      * Causes this thread to begin execution; the Java Virtual Machine calls the run method of this thread.
