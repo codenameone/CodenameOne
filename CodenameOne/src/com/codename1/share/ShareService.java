@@ -110,7 +110,9 @@ public abstract class ShareService extends Command {
      * method
      */
     public void finish() {
-        original.showBack();
+        if (original != null) {
+            original.showBack();
+        }
     }
 
 }

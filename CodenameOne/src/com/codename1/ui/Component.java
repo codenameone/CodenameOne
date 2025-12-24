@@ -3067,12 +3067,6 @@ public class Component implements Animation, StyleListener, Editable {
 
         paintGlassImpl(g);
 
-        if(original != null) {
-            original.paint(g, rect);
-        } else if(dest != null) {
-            dest.paint(g, rect);
-        }
-
         g.setClip(clipX, clipY, clipW, clipH);
         //g.popClip();
     }

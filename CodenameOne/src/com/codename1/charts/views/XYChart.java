@@ -687,6 +687,7 @@ public abstract class XYChart extends AbstractChart {
      * @param inverse if the inverse transform needs to be applied
      */
     private void transform(Canvas canvas, float angle, boolean inverse) {
+        if (mCenter == null) return;
         if (inverse) {
             canvas.scale(1 / mScale, mScale);
             canvas.translate(mTranslate, -mTranslate);

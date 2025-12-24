@@ -108,7 +108,9 @@ public class XYSeriesTransition extends SeriesTransition {
     @Override
     protected void cleanup() {
         super.cleanup();
-        this.cachedSeries.clear();
+        if (cachedSeries != null) {
+            this.cachedSeries.clear();
+        }
     }
 
 
@@ -119,6 +121,7 @@ public class XYSeriesTransition extends SeriesTransition {
      */
     protected void update(int progress) {
         double dProgress = progress;
+        if (endVals == null || startVals == null) return;
         int len = endVals.getItemCount(); // PMD Fix: UnusedLocalVariable removed unused endindex
         for (int i = 0; i < len; i++) {
             double x = endVals.getX(i);
