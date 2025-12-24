@@ -3,7 +3,6 @@ package java.util.concurrent.locks;
 import java.util.concurrent.TimeUnit;
 import java.util.Collection;
 import java.util.Date;
-import java.util.ArrayList;
 
 public class ReentrantLock implements Lock, java.io.Serializable {
     private static final long serialVersionUID = 7373984872572414699L;
@@ -15,12 +14,6 @@ public class ReentrantLock implements Lock, java.io.Serializable {
 
     public ReentrantLock(boolean fair) {
         // Fairness is not supported in this implementation
-    }
-
-    private void readObject(java.io.ObjectInputStream s) throws java.io.IOException, ClassNotFoundException {
-        s.defaultReadObject();
-        sync = new Object();
-        // holdCount and owner are transient, initialized to 0/null by default which is correct (unlocked state)
     }
 
     public void lock() {
@@ -194,11 +187,44 @@ public class ReentrantLock implements Lock, java.io.Serializable {
 
     private static class Node {
         boolean signalled = false;
+        Node next;
     }
 
     private class ConditionObject implements Condition {
         final ReentrantLock lock = ReentrantLock.this;
-        private ArrayList<Node> waitingNodes = new ArrayList<Node>();
+        private Node head;
+        private Node tail;
+        private int count;
+
+        private void add(Node node) {
+            if (head == null) {
+                head = tail = node;
+            } else {
+                tail.next = node;
+                tail = node;
+            }
+            count++;
+        }
+
+        private void remove(Node node) {
+            if (head == null) return;
+            if (head == node) {
+                head = head.next;
+                if (head == null) tail = null;
+                count--;
+                return;
+            }
+            Node prev = head;
+            while (prev.next != null) {
+                if (prev.next == node) {
+                    prev.next = node.next;
+                    if (prev.next == null) tail = prev;
+                    count--;
+                    return;
+                }
+                prev = prev.next;
+            }
+        }
 
         public void await() throws InterruptedException {
             if (Thread.interrupted()) throw new InterruptedException();
@@ -209,7 +235,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
                 savedHoldCount = holdCount;
                 holdCount = 0;
                 owner = null;
-                waitingNodes.add(node);
+                add(node);
                 sync.notify();
             }
 
@@ -219,7 +245,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
                          node.wait();
                      } catch (InterruptedException e) {
                          synchronized(sync) {
-                             waitingNodes.remove(node);
+                             remove(node);
                          }
                          throw e;
                      }
@@ -237,7 +263,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
                 savedHoldCount = holdCount;
                 holdCount = 0;
                 owner = null;
-                waitingNodes.add(node);
+                add(node);
                 sync.notify();
             }
 
@@ -261,7 +287,6 @@ public class ReentrantLock implements Lock, java.io.Serializable {
              int timeoutNanos = (int)(nanosTimeout % 1000000);
 
              if (timeoutMillis == 0 && timeoutNanos == 0) {
-                 // Should be covered by nanosTimeout <= 0 check, but safe guard
                  return 0;
              }
 
@@ -272,7 +297,7 @@ public class ReentrantLock implements Lock, java.io.Serializable {
                  savedHoldCount = holdCount;
                  holdCount = 0;
                  owner = null;
-                 waitingNodes.add(node);
+                 add(node);
                  sync.notify();
              }
 
@@ -284,21 +309,15 @@ public class ReentrantLock implements Lock, java.io.Serializable {
                           node.wait(timeoutMillis, timeoutNanos);
                       }
                  } catch (InterruptedException e) {
-                      synchronized(sync) { waitingNodes.remove(node); }
+                      synchronized(sync) { remove(node); }
                       throw e;
                  }
 
                  synchronized(sync) {
-                     if (waitingNodes.contains(node)) {
-                         // Still in queue -> timed out without signal
-                         waitingNodes.remove(node);
+                     if (!node.signalled) {
+                         remove(node);
                          timeLeft = 0;
                      } else {
-                         // Removed from queue -> Signalled
-                         // Or we removed it ourselves? No, we only remove if timeout.
-                         // But wait! If we timed out, we check if we were signalled concurrently.
-                         // Signal() removes from queue then sets signalled=true then notify.
-                         // If signal happened, node is not in waitingNodes.
                          long elapsed = System.currentTimeMillis() - start;
                          timeLeft = nanosTimeout - (elapsed * 1000000);
                      }
@@ -322,8 +341,12 @@ public class ReentrantLock implements Lock, java.io.Serializable {
         public void signal() {
             synchronized (sync) {
                 if (owner != Thread.currentThread()) throw new IllegalMonitorStateException();
-                if (!waitingNodes.isEmpty()) {
-                    Node node = waitingNodes.remove(0);
+                if (head != null) {
+                    Node node = head;
+                    head = head.next;
+                    if (head == null) tail = null;
+                    count--;
+
                     synchronized (node) {
                         node.signalled = true;
                         node.notify();
@@ -335,13 +358,16 @@ public class ReentrantLock implements Lock, java.io.Serializable {
         public void signalAll() {
             synchronized (sync) {
                 if (owner != Thread.currentThread()) throw new IllegalMonitorStateException();
-                for (Node node : waitingNodes) {
+                while (head != null) {
+                    Node node = head;
+                    head = head.next;
                     synchronized (node) {
                         node.signalled = true;
                         node.notify();
                     }
                 }
-                waitingNodes.clear();
+                tail = null;
+                count = 0;
             }
         }
 
@@ -362,14 +388,14 @@ public class ReentrantLock implements Lock, java.io.Serializable {
         protected boolean hasWaiters() {
             synchronized(sync) {
                 if (owner != Thread.currentThread()) throw new IllegalMonitorStateException();
-                return !waitingNodes.isEmpty();
+                return head != null;
             }
         }
 
         protected int getWaitQueueLength() {
              synchronized(sync) {
                 if (owner != Thread.currentThread()) throw new IllegalMonitorStateException();
-                return waitingNodes.size();
+                return count;
             }
         }
 

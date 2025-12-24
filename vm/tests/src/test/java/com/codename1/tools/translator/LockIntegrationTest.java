@@ -469,9 +469,6 @@ class LockIntegrationTest {
                 "struct clazz class_array1__JAVA_BYTE = {0};\n" +
                 "struct clazz class_array1__JAVA_SHORT = {0};\n" +
                 "struct clazz class_array1__JAVA_LONG = {0};\n" +
-                "JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim) {\n" +
-                "    return (JAVA_OBJECT)calloc(1, sizeof(struct JavaArrayPrototype) + length * (primitiveSize?primitiveSize:sizeof(void*)));\n" +
-                "}\n" +
                 "void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, int classNameId, int methodNameId) {}\n" +
                 "void releaseForReturn(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread) {}\n" +
                 "void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread, int methodBlockOffset) {}\n" +
@@ -523,7 +520,44 @@ class LockIntegrationTest {
                 "JAVA_OBJECT java_lang_Enum_valueOf___java_lang_Class_java_lang_String_R_java_lang_Enum(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls, JAVA_OBJECT name) { return JAVA_NULL; }\n" +
                 "JAVA_OBJECT java_util_HashMap_findNonNullKeyEntry___java_lang_Object_int_int_R_java_util_HashMap_Entry(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_OBJECT key, JAVA_INT hash, JAVA_INT index) { return JAVA_NULL; }\n" +
                 "JAVA_BOOLEAN java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT k1, JAVA_OBJECT k2) { return 0; }\n" +
-                "JAVA_OBJECT java_util_Locale_getOSLanguage___R_java_lang_String(CODENAME_ONE_THREAD_STATE) { return JAVA_NULL; }\n";
+                "JAVA_OBJECT java_util_Locale_getOSLanguage___R_java_lang_String(CODENAME_ONE_THREAD_STATE) { return JAVA_NULL; }\n" +
+                "JAVA_OBJECT java_lang_Integer_toString___int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_INT i) { return JAVA_NULL; }\n" +
+                "JAVA_OBJECT java_lang_StringBuilder_append___java_lang_Object_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_OBJECT obj) { return me; }\n" +
+                "JAVA_OBJECT java_lang_String_toUpperCase___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { return me; }\n" +
+                "JAVA_OBJECT java_text_DateFormat_format___java_util_Date_java_lang_StringBuffer_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_OBJECT date, JAVA_OBJECT buffer) { return JAVA_NULL; }\n" +
+                "JAVA_INT java_lang_Float_floatToIntBits___float_R_int(CODENAME_ONE_THREAD_STATE, JAVA_FLOAT f) { union { float f; int i; } u; u.f = f; return u.i; }\n" +
+                "JAVA_LONG java_lang_Double_doubleToLongBits___double_R_long(CODENAME_ONE_THREAD_STATE, JAVA_DOUBLE d) { union { double d; long long l; } u; u.d = d; return u.l; }\n" +
+                "JAVA_OBJECT java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_OBJECT str) { return me; }\n" +
+                "JAVA_CHAR* java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT b, JAVA_INT off, JAVA_INT len, JAVA_OBJECT encoding) { return NULL; }\n" +
+                "JAVA_OBJECT java_lang_String_charsToBytes___char_1ARRAY_char_1ARRAY_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT arr, JAVA_OBJECT encoding) { return NULL; }\n" +
+                "JAVA_INT java_lang_String_indexOf___int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT ch, JAVA_INT fromIndex) { return -1; }\n" +
+                "JAVA_INT java_lang_Math_min___int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_INT a, JAVA_INT b) { return a < b ? a : b; }\n" +
+                "JAVA_INT java_lang_String_hashCode___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { return 0; }\n" +
+                "JAVA_CHAR java_lang_String_charAt___int_R_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT index) { return 0; }\n" +
+                "JAVA_OBJECT java_lang_String_toString___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { return me; }\n" +
+                "void java_lang_Thread_releaseThreadNativeResources___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG id) {}\n" +
+                "JAVA_OBJECT java_lang_StringBuilder_getChars___int_int_char_1ARRAY_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT srcBegin, JAVA_INT srcEnd, JAVA_OBJECT dst, JAVA_INT dstBegin) { return JAVA_NULL; }\n" +
+                "JAVA_OBJECT java_lang_StringBuilder_append___char_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_CHAR c) { return me; }\n" +
+                "JAVA_OBJECT java_lang_StringBuilder_charAt___int_R_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT index) { return 0; }\n" +
+                "JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim) {\n" +
+                "    struct JavaArrayPrototype* arr = (struct JavaArrayPrototype*)calloc(1, sizeof(struct JavaArrayPrototype));\n" +
+                "    arr->__codenameOneParentClsReference = type;\n" +
+                "    arr->length = length;\n" +
+                "    arr->dimensions = dim;\n" +
+                "    arr->primitiveSize = primitiveSize;\n" +
+                "    int size = primitiveSize ? primitiveSize : sizeof(JAVA_OBJECT);\n" +
+                "    arr->data = calloc(length, size);\n" +
+                "    return (JAVA_OBJECT)arr;\n" +
+                "}\n" +
+                "void java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT src, JAVA_INT srcPos, JAVA_OBJECT dest, JAVA_INT destPos, JAVA_INT length) {\n" +
+                "    if (!src || !dest) return;\n" +
+                "    struct JavaArrayPrototype* s = (struct JavaArrayPrototype*)src;\n" +
+                "    struct JavaArrayPrototype* d = (struct JavaArrayPrototype*)dest;\n" +
+                "    int size = s->primitiveSize ? s->primitiveSize : sizeof(JAVA_OBJECT);\n" +
+                "    char* sData = (char*)s->data;\n" +
+                "    char* dData = (char*)d->data;\n" +
+                "    if (sData && dData) memmove(dData + destPos * size, sData + srcPos * size, length * size);\n" +
+                "}\n";
 
         Files.write(stubs, content.getBytes(StandardCharsets.UTF_8));
     }
