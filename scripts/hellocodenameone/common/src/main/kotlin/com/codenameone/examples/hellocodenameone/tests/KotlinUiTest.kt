@@ -4,6 +4,7 @@ import com.codename1.components.Accordion
 import com.codename1.components.MultiButton
 import com.codename1.components.Switch
 import com.codename1.ui.Button
+import com.codename1.ui.CN
 import com.codename1.ui.CheckBox
 import com.codename1.ui.Container
 import com.codename1.ui.Label
@@ -54,9 +55,11 @@ class KotlinUiTest : BaseTest() {
         kotlinForm.add(accordion)
         kotlinForm.show()
 
-        val sheet = Sheet(null, "Overlay Sheet")
-        sheet.contentPane.add(Label("This is a sheet covering part of the screen"))
-        sheet.show(0)
+        CN.callSerially {
+            val sheet = Sheet(null, "Overlay Sheet")
+            sheet.contentPane.add(Label("This is a sheet covering part of the screen"))
+            sheet.show(0)
+        }
 
         return true
     }

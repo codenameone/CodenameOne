@@ -347,6 +347,7 @@ ri_log "Running DeviceRunner on destination '$SIM_DESTINATION'"
 DERIVED_DATA_DIR="$SCREENSHOT_TMP_DIR/derived"
 rm -rf "$DERIVED_DATA_DIR"
 BUILD_LOG="$ARTIFACTS_DIR/xcodebuild-build.log"
+APP_CONSOLE_LOG="$ARTIFACTS_DIR/device-runner-console.log"
 
 ri_log "Building simulator app with xcodebuild"
 COMPILE_START=$(date +%s)
@@ -461,16 +462,17 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
   trap cleanup EXIT
 
   ri_log "Streaming simulator logs to $TEST_LOG"
+  CN1SS_PREDICATE='(eventMessage CONTAINS "CN1SS" OR composedMessage CONTAINS "CN1SS")'
   if [ -n "$SIM_DEVICE_ID" ]; then
     xcrun simctl terminate "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
     xcrun simctl uninstall "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1 || true
 
-    xcrun simctl spawn "$SIM_DEVICE_ID" \
+    stdbuf -oL xcrun simctl spawn "$SIM_DEVICE_ID" \
       log stream --style json --level debug \
-      --predicate 'eventMessage CONTAINS "CN1SS"' \
+      --predicate "$CN1SS_PREDICATE" \
       > "$TEST_LOG" 2>&1 &
   else
-    xcrun simctl spawn booted log stream --style compact --level debug --predicate 'composedMessage CONTAINS "CN1SS"' > "$TEST_LOG" 2>&1 &
+    stdbuf -oL xcrun simctl spawn booted log stream --style json --level debug --predicate "$CN1SS_PREDICATE" > "$TEST_LOG" 2>&1 &
   fi
   LOG_STREAM_PID=$!
   sleep 2
@@ -485,7 +487,8 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
     INSTALL_END=$(date +%s)
 
     LAUNCH_START=$(date +%s)
-    if ! xcrun simctl launch "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1; then
+    ri_log "Launching app with console capture -> $APP_CONSOLE_LOG"
+    if ! xcrun simctl launch --console-pty "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" 2>&1 | tee "$APP_CONSOLE_LOG"; then
       ri_log "FATAL: simctl launch failed"
       exit 11
     fi
@@ -498,7 +501,8 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
     INSTALL_END=$(date +%s)
 
     LAUNCH_START=$(date +%s)
-    if ! xcrun simctl launch booted "$BUNDLE_IDENTIFIER" >/dev/null 2>&1; then
+    ri_log "Launching app with console capture -> $APP_CONSOLE_LOG"
+    if ! xcrun simctl launch --console-pty booted "$BUNDLE_IDENTIFIER" 2>&1 | tee "$APP_CONSOLE_LOG"; then
       ri_log "FATAL: simctl launch failed"
       exit 11
     fi
@@ -547,12 +551,34 @@ declare -a CN1SS_SOURCES=("SIMLOG:$TEST_LOG")
 LOG_CHUNKS="$(cn1ss_count_chunks "$TEST_LOG")"; LOG_CHUNKS="${LOG_CHUNKS//[^0-9]/}"; : "${LOG_CHUNKS:=0}"
 ri_log "Chunk counts -> simulator log: ${LOG_CHUNKS}"
 
-if [ "${LOG_CHUNKS:-0}" = "0" ]; then
-  ri_log "STAGE:MARKERS_NOT_FOUND -> simulator output did not include CN1SS chunks"
-  ri_log "---- CN1SS lines (if any) ----"
-  (grep "CN1SS:" "$TEST_LOG" || true) | sed 's/^/[CN1SS] /'
-  exit 12
-fi
+  if [ "${LOG_CHUNKS:-0}" = "0" ]; then
+    COLLECTED_LOG_DIR="$ARTIFACTS_DIR/simulator-logs"
+    ensure_dir "$COLLECTED_LOG_DIR"
+    DEBUG_LOG="$COLLECTED_LOG_DIR/device-runner-debug.log"
+    if [ -n "$SIM_DEVICE_ID" ]; then
+      ri_log "Capturing simulator debug log to $DEBUG_LOG"
+      xcrun simctl spawn "$SIM_DEVICE_ID" log show --style syslog --last 30m > "$DEBUG_LOG" 2>/dev/null || true
+    else
+      ri_log "Capturing host simulator debug log to $DEBUG_LOG"
+      log show --style syslog --last 30m > "$DEBUG_LOG" 2>/dev/null || true
+    fi
+    CRASH_LOG_DIR="$COLLECTED_LOG_DIR/crash-reports"
+    ensure_dir "$CRASH_LOG_DIR"
+    ri_log "Collecting recent crash reports into $CRASH_LOG_DIR"
+    find "$HOME/Library/Logs/DiagnosticReports" -type f -name '*.crash' -mmin -120 -print -exec cp {} "$CRASH_LOG_DIR" \; 2>/dev/null || true
+    if [ -s "$FALLBACK_LOG" ]; then
+      ri_log "Appending fallback CN1SS log to $TEST_LOG"
+      {
+        echo "---- BEGIN FALLBACK CN1SS LOG ----"
+        cat "$FALLBACK_LOG"
+        echo "---- END FALLBACK CN1SS LOG ----"
+      } >> "$TEST_LOG" 2>/dev/null || true
+    fi
+    ri_log "STAGE:MARKERS_NOT_FOUND -> simulator output did not include CN1SS chunks"
+    ri_log "---- CN1SS lines (if any) ----"
+    (grep "CN1SS:" "$TEST_LOG" || true) | sed 's/^/[CN1SS] /'
+    exit 12
+  fi
 
 TEST_NAMES_RAW="$(cn1ss_list_tests "$TEST_LOG" 2>/dev/null | awk 'NF' | sort -u || true)"
 declare -a TEST_NAMES=()
@@ -657,6 +683,7 @@ comment_rc=$?
 
 cp -f "$BUILD_LOG" "$ARTIFACTS_DIR/xcodebuild-build.log" 2>/dev/null || true
 cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner.log" 2>/dev/null || true
+cp -f "$APP_CONSOLE_LOG" "$ARTIFACTS_DIR/device-runner-console.log" 2>/dev/null || true
 
 exit $comment_rc
 
