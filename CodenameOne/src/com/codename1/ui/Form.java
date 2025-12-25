@@ -1462,11 +1462,9 @@ public class Form extends Container {
             layeredPaneImpl.add(cnt);
         } else {
             if (componentCount > 0) {
-                if (componentCount > 0) {
-                    Integer z = (Integer) children.get(0).getClientProperty(Z_INDEX_PROP);
-                    if (z != null) {
-                        zIndex = z.intValue();
-                    }
+                Integer z = (Integer) children.get(0).getClientProperty(Z_INDEX_PROP);
+                if (z != null) {
+                    zIndex = z.intValue();
                 }
             }
             layeredPaneImpl.addComponent(0, cnt);
