@@ -481,7 +481,7 @@ public class Font extends CN {
         }
         // Its common to use a space character to create a label that takes up space but the value
         // of string width in this case becomes less important
-        if (str == " ") {
+        if (" ".equals(str)) {
             return 5;
         }
         return Display.impl.stringWidth(font, str);

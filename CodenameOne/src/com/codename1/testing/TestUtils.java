@@ -1990,7 +1990,7 @@ public class TestUtils {
         }
         Label l = (Label) findByName(name);
         assertBool(l != null, "Null label" + text);
-        assertBool(text == l.getText() || text.equals(l.getText()), name + " != " + text);
+        assertBool(Objects.equals(text, l.getText()), name + " != " + text);
     }
 
     /**
@@ -2005,7 +2005,7 @@ public class TestUtils {
         }
         Label l = (Label) getComponentByPath(path);
         assertBool(l != null, "Null label" + text);
-        assertBool(text == l.getText() || text.equals(l.getText()), (l.getText()) + " != " + text);
+        assertBool(Objects.equals(text, l.getText()), (l.getText()) + " != " + text);
     }
 
     /**

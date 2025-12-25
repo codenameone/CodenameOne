@@ -37,6 +37,7 @@ import com.codename1.ui.layouts.Layout;
 import com.codename1.ui.plaf.Style;
 import com.codename1.ui.plaf.UIManager;
 import com.codename1.ui.util.Resources;
+import com.codename1.compat.java.util.Objects;
 
 import java.util.Vector;
 
@@ -346,7 +347,7 @@ public class SideMenuBar extends MenuBar {
                         if (p == null) {
                             //has left menu
                             hasSideMenus[0] = true;
-                        } else if (p.equals(COMMAND_PLACEMENT_VALUE_RIGHT)) {
+                        } else if (COMMAND_PLACEMENT_VALUE_RIGHT.equals(p)) {
                             //has right menu
                             hasSideMenus[1] = true;
                         }
@@ -830,7 +831,7 @@ public class SideMenuBar extends MenuBar {
     }
 
     private void validateCommandPlacement(String placement) {
-        if (placement == COMMAND_PLACEMENT_VALUE_TOP) {
+        if (COMMAND_PLACEMENT_VALUE_TOP.equals(placement)) {
             ((BorderLayout) getTitleAreaContainer().getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);
             if (!(getTitleComponent() instanceof Button)) {
                 Button b = new Button(parent.getTitle());
@@ -844,7 +845,7 @@ public class SideMenuBar extends MenuBar {
             }
             return;
         }
-        if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {
+        if (COMMAND_PLACEMENT_VALUE_RIGHT.equals(placement)) {
             if (rightSideButton != null && rightSideButton.getParent() != null) {
                 return;
             }
@@ -886,7 +887,7 @@ public class SideMenuBar extends MenuBar {
 
     private void setMenuGlassPane(Form m, final String placement) {
         boolean isRTLValue = m.isRTL();
-        if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {
+        if (COMMAND_PLACEMENT_VALUE_RIGHT.equals(placement)) {
             isRTLValue = !isRTLValue;
         }
         final boolean isRTL = isRTLValue;
@@ -1027,7 +1028,7 @@ public class SideMenuBar extends MenuBar {
 
         for (int iter = commands.size() - 1; iter > -1; iter--) {
             Command c = (Command) commands.elementAt(iter);
-            if (c.getClientProperty(COMMAND_PLACEMENT_KEY) != placement) {
+            if (!Objects.equals(c.getClientProperty(COMMAND_PLACEMENT_KEY), placement)) {
                 continue;
             }
             Component cmp = (Component) c.getClientProperty(COMMAND_SIDE_COMPONENT);
@@ -1056,7 +1057,7 @@ public class SideMenuBar extends MenuBar {
             }
         }
         boolean isRTLValue = isRTL();
-        if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {
+        if (COMMAND_PLACEMENT_VALUE_RIGHT.equals(placement)) {
             isRTLValue = !isRTLValue;
         }
         UIManager uim = menu.getUIManager();
@@ -1081,12 +1082,12 @@ public class SideMenuBar extends MenuBar {
             shadowLabel.getStyle().setMargin(0, 0, 0, 0);
             shadowLabel.getStyle().setBgTransparency(0);
             Container c = new Container(new BorderLayout());
-            if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {
+            if (COMMAND_PLACEMENT_VALUE_RIGHT.equals(placement)) {
                 shadowLabel.setPreferredW(shadow.getWidth());
                 c.addComponent(BorderLayout.WEST, shadowLabel);
                 shadowLabel.getStyle().setBgImage(shadow.rotate180Degrees(true));
             } else {
-                if (placement == COMMAND_PLACEMENT_VALUE_TOP) {
+                if (COMMAND_PLACEMENT_VALUE_TOP.equals(placement)) {
                     //shadowLabel.setPreferredH(shadow.getHeight());
                     //c.addComponent(BorderLayout.SOUTH, shadowLabel);
                     //shadowLabel.getStyle().setBgImage(shadow.rotate90Degrees(true));
@@ -1377,7 +1378,7 @@ public class SideMenuBar extends MenuBar {
             };
         }
 
-        if (placement == COMMAND_PLACEMENT_VALUE_TOP) {
+        if (COMMAND_PLACEMENT_VALUE_TOP.equals(placement)) {
             int v = 0;
             if (Display.getInstance().isPortrait()) {
                 if (Display.getInstance().isTablet()) {
@@ -1427,7 +1428,7 @@ public class SideMenuBar extends MenuBar {
                 } else {
                     v = getUIManager().getThemeConstant("sideMenuSizePortraitInt", -1);
                     if (v < 0) {
-                        if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {
+                        if (COMMAND_PLACEMENT_VALUE_RIGHT.equals(placement)) {
                             if (isRTL()) {
                                 v = openButton.getWidth();
                             } else {
@@ -1466,11 +1467,11 @@ public class SideMenuBar extends MenuBar {
             sidePanel = null;
         }
         sidePanel = createSideNavigationComponent(getCommands(), placement);
-        if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {
+        if (COMMAND_PLACEMENT_VALUE_RIGHT.equals(placement)) {
             m.addComponent(BorderLayout.WEST, rightPanel);
             m.addComponent(BorderLayout.CENTER, sidePanel);
         } else {
-            if (placement == COMMAND_PLACEMENT_VALUE_TOP) {
+            if (COMMAND_PLACEMENT_VALUE_TOP.equals(placement)) {
                 m.addComponent(BorderLayout.NORTH, rightPanel);
                 m.addComponent(BorderLayout.CENTER, sidePanel);
                 Button button = new Button(" ");
@@ -1547,7 +1548,7 @@ public class SideMenuBar extends MenuBar {
 
         public void initTransition() {
             super.initTransition();
-            if (placement == COMMAND_PLACEMENT_VALUE_TOP) {
+            if (COMMAND_PLACEMENT_VALUE_TOP.equals(placement)) {
                 if (Display.getInstance().areMutableImagesFast()) {
                     if (fwd) {
                         buffer = updateRightPanelBgImage(placement, getSource());
@@ -1576,7 +1577,7 @@ public class SideMenuBar extends MenuBar {
                 }
             } else {
                 isRTL = (getSource().getUIManager().getLookAndFeel().isRTL());
-                if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {
+                if (COMMAND_PLACEMENT_VALUE_RIGHT.equals(placement)) {
                     isRTL = !isRTL;
                 }
                 if (Display.getInstance().areMutableImagesFast()) {
@@ -1618,7 +1619,7 @@ public class SideMenuBar extends MenuBar {
                 shadow = Resources.getSystemResource().getImage("sidemenu-shadow.png");
             }
             boolean isRTLValue = isRTL();
-            if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {
+            if (COMMAND_PLACEMENT_VALUE_RIGHT.equals(placement)) {
                 isRTLValue = !isRTLValue;
             }
             if (isRTLValue) {
@@ -1658,7 +1659,7 @@ public class SideMenuBar extends MenuBar {
             }
             Component src = getSource();
             Component dest = getDestination();
-            if (placement == COMMAND_PLACEMENT_VALUE_TOP) {
+            if (COMMAND_PLACEMENT_VALUE_TOP.equals(placement)) {
                 if (Display.getInstance().areMutableImagesFast()) {
                     if (fwd) {
                         dest.paintComponent(g, true);
