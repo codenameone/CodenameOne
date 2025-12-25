@@ -295,7 +295,7 @@ public class UiBinding {
             private boolean lock;
 
             public void actionPerformed(ActionEvent evt) {
-                if (isAutoCommit()) {
+                if (super.isAutoCommit()) {
                     if (lock) {
                         return;
                     }
@@ -306,7 +306,7 @@ public class UiBinding {
             }
 
             public void propertyChanged(PropertyBase p) {
-                if (isAutoCommit()) {
+                if (super.isAutoCommit()) {
                     if (lock) {
                         return;
                     }
@@ -318,7 +318,7 @@ public class UiBinding {
 
             @Override
             public void commit() {
-                if (isAutoCommit()) {
+                if (super.isAutoCommit()) {
                     throw new RuntimeException("Can't commit in autocommit mode");
                 }
                 ((Property) prop).set(adapt.getFrom(cmp));
@@ -326,7 +326,7 @@ public class UiBinding {
 
             @Override
             public void rollback() {
-                if (isAutoCommit()) {
+                if (super.isAutoCommit()) {
                     throw new RuntimeException("Can't rollback in autocommit mode");
                 }
                 adapt.assignTo(prop.get(), cmp);
