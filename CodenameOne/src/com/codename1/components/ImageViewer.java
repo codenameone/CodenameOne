@@ -307,7 +307,7 @@ public class ImageViewer extends Component {
                 new AnimatePanX(-1, getImageLeft(), getImageLeftPos());
                 return;
             }
-            if (gk == Display.GAME_RIGHT || gk == Display.GAME_RIGHT && (cycleRight || swipeableImages.getSelectedIndex() < getImageRightPos())) {
+            if (gk == Display.GAME_RIGHT && (cycleRight || swipeableImages.getSelectedIndex() < getImageRightPos())) {
                 new AnimatePanX(2, getImageRight(), getImageRightPos());
             }
         }

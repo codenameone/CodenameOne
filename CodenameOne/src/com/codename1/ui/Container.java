@@ -2975,10 +2975,8 @@ public class Container extends Component implements Iterable<Component> {
 
             }
         }
-        if (component == null || (!component.respondsToPointerEvents() && top != null)) {
-            if (top != null) {
-                return top;
-            }
+        if (top != null && (component == null || !component.respondsToPointerEvents())) {
+            return top;
         }
 
         if (component != null) {

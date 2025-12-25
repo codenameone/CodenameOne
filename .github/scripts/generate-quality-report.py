@@ -764,7 +764,8 @@ def main() -> None:
             "SF_SWITCH_NO_DEFAULT",
             "DM_DEFAULT_ENCODING",
             "EQ_CHECK_FOR_OPERAND_NOT_COMPATIBLE_WITH_THIS",
-            "IA_AMBIGUOUS_INVOCATION_OF_INHERITED_OR_OUTER_METHOD"
+            "IA_AMBIGUOUS_INVOCATION_OF_INHERITED_OR_OUTER_METHOD",
+            "RpC_REPEATED_CONDITIONAL_TEST"
         }
         violations = [
             f for f in spotbugs.findings
