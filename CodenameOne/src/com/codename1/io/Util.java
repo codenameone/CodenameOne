@@ -120,7 +120,7 @@ public class Util {
             return s.getBytes("UTF-8");
         } catch(UnsupportedEncodingException e) {
             // never happens
-            throw new RuntimeException(e);
+            throw new RuntimeException(e.toString());
         }
     }
 
@@ -134,7 +134,7 @@ public class Util {
             return new String(b, "UTF-8");
         } catch(UnsupportedEncodingException e) {
             // never happens
-            throw new RuntimeException(e);
+            throw new RuntimeException(e.toString());
         }
     }
 
@@ -150,7 +150,7 @@ public class Util {
             return new String(b, offset, length, "UTF-8");
         } catch(UnsupportedEncodingException e) {
             // never happens
-            throw new RuntimeException(e);
+            throw new RuntimeException(e.toString());
         }
     }
 
@@ -164,7 +164,7 @@ public class Util {
             return new InputStreamReader(in, "UTF-8");
         } catch(UnsupportedEncodingException e) {
             // never happens
-            throw new RuntimeException(e);
+            throw new RuntimeException(e.toString());
         }
     }
 
@@ -178,7 +178,7 @@ public class Util {
             return new OutputStreamWriter(out, "UTF-8");
         } catch(UnsupportedEncodingException e) {
             // never happens
-            throw new RuntimeException(e);
+            throw new RuntimeException(e.toString());
         }
     }
 
