@@ -94,7 +94,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
     public static void storeJSONList(String name, List<? extends PropertyBusinessObject> objs) {
         try {
             OutputStream os = Storage.getInstance().createOutputStream(name);
-            os.write(toJSONList(objs).getBytes());
+            os.write(Util.getBytes(toJSONList(objs)));
             os.close();
         } catch (IOException err) {
             Log.e(err);
@@ -341,7 +341,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                 if (val instanceof byte[]) {
                     p.setImpl(EncodedImage.create((byte[]) val));
                 } else {
-                    p.setImpl(EncodedImage.create(Base64.decode(((String) val).getBytes())));
+                    p.setImpl(EncodedImage.create(Base64.decode(Util.getBytes((String) val))));
                 }
             }
             return true;

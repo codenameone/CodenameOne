@@ -541,7 +541,7 @@ public class Oauth2 {
 
                     protected void readResponse(InputStream input) throws IOException {
                         byte[] tok = Util.readInputStream(input);
-                        String t = new String(tok);
+                        String t = Util.newString(tok);
                         boolean expiresRelative = true;
                         if (t.startsWith("{")) {
                             JSONParser p = new JSONParser();

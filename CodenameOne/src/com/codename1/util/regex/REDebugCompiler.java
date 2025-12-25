@@ -180,7 +180,13 @@ public class REDebugCompiler extends RECompiler {
      * Dumps the current program to a <code>System.out</code>.
      */
     public void dumpProgram() {
-        PrintStream w = new PrintStream(System.out);
+        PrintStream w;
+        try {
+            w = new PrintStream(System.out, true, "UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            // this should never happen with UTF-8
+            throw new RuntimeException(e);
+        }
         dumpProgram(w);
         w.flush();
     }

@@ -70,7 +70,7 @@ public class CSVParser {
      * @return array of rows and columns
      */
     public String[][] parse(InputStream r) throws IOException {
-        return parse(new InputStreamReader(r));
+        return parse(Util.getReader(r));
     }
 
     /**

@@ -872,7 +872,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             }
         }
         if (bais == null) { //encoding wasn't specified or failed
-            bais = new ByteArrayInputStream(htmlText.getBytes());
+            bais = new ByteArrayInputStream(com.codename1.io.Util.getBytes(htmlText));
         }
 
         InputStreamReader isr = null;
@@ -884,7 +884,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             }
         }
         if (isr == null) { //encoding wasn't specified or failed
-            isr = new InputStreamReader(bais);
+            isr = com.codename1.io.Util.getReader(bais);
         }
         return isr;
     }
@@ -1056,7 +1056,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             }
             if (cont) { //retry without the encoding
                 try {
-                    isr = new InputStreamReader(is);
+                    isr = com.codename1.io.Util.getReader(is);
                 } catch (Exception e) {
                     htmlCallback.parsingError(HTMLCallback.ERROR_ENCODING, null, null, null, "Page loading failed, probably due to wrong encoding. " + e.getMessage());
                     isr = getStream("Page loading failed, probably due to encoding mismatch.", null);

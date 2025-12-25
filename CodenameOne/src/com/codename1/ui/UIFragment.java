@@ -213,7 +213,7 @@ public class UIFragment {
     public static UIFragment parseXML(InputStream input) {
         try {
             XMLParser p = new XMLParser();
-            Element el = p.parse(new InputStreamReader(input));
+            Element el = p.parse(Util.getReader(input));
             return new UIFragment(el);
         } catch (Exception ex) {
             Log.e(ex);

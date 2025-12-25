@@ -218,7 +218,7 @@ public class InflaterInputStream extends FilterInputStream {
 
     public void readHeader() throws IOException {
 
-        byte[] empty = "".getBytes();
+        byte[] empty = com.codename1.io.Util.getBytes("");
         inflater.setInput(empty, 0, 0, false);
         inflater.setOutput(empty, 0, 0);
 

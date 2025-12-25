@@ -270,7 +270,7 @@ public class MultipartRequest extends ConnectionRequest {
                     try {
                         length += value.toString().getBytes("UTF-8").length;
                     } catch (UnsupportedEncodingException ex) {
-                        length += value.toString().getBytes().length;
+                        length += Util.getBytes(value.toString()).length;
                     }
                 } else {
                     if (base64Binaries) {
@@ -288,7 +288,7 @@ public class MultipartRequest extends ConnectionRequest {
                             try {
                                 length += s.toString().getBytes("UTF-8").length;
                             } catch (UnsupportedEncodingException ex) {
-                                length += value.toString().getBytes().length;
+                                length += Util.getBytes(value.toString()).length;
                             }
                         } else {
                             if (base64Binaries) {
@@ -304,7 +304,7 @@ public class MultipartRequest extends ConnectionRequest {
                     try {
                         length += ((String) filenames.get(key)).getBytes("UTF-8").length;
                     } catch (UnsupportedEncodingException ex) {
-                        length += ((String) filenames.get(key)).getBytes().length;
+                        length += Util.getBytes((String) filenames.get(key)).length;
                     }
                     length += ((String) mimeTypes.get(key)).length();
                     length += Long.parseLong((String) filesizes.get(key));

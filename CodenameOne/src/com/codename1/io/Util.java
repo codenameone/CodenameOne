@@ -50,8 +50,11 @@ import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.Reader;
+import java.io.Writer;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -105,6 +108,78 @@ public class Util {
      */
     public static void setIgnorCharsWhileEncoding(String s) {
         ignoreCharsWhenEncoding = s;
+    }
+
+    /**
+     * Helper to get bytes from string with UTF-8 encoding
+     * @param s the string
+     * @return the bytes
+     */
+    public static byte[] getBytes(String s) {
+        try {
+            return s.getBytes("UTF-8");
+        } catch(UnsupportedEncodingException e) {
+            // never happens
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Helper to get string from bytes with UTF-8 encoding
+     * @param b the bytes
+     * @return the string
+     */
+    public static String newString(byte[] b) {
+        try {
+            return new String(b, "UTF-8");
+        } catch(UnsupportedEncodingException e) {
+            // never happens
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Helper to get string from bytes with UTF-8 encoding
+     * @param b the bytes
+     * @param offset the offset
+     * @param length the length
+     * @return the string
+     */
+    public static String newString(byte[] b, int offset, int length) {
+        try {
+            return new String(b, offset, length, "UTF-8");
+        } catch(UnsupportedEncodingException e) {
+            // never happens
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Helper to get a reader from an input stream with UTF-8 encoding
+     * @param in the input stream
+     * @return the reader
+     */
+    public static Reader getReader(InputStream in) {
+        try {
+            return new InputStreamReader(in, "UTF-8");
+        } catch(UnsupportedEncodingException e) {
+            // never happens
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Helper to get a writer from an output stream with UTF-8 encoding
+     * @param out the output stream
+     * @return the writer
+     */
+    public static Writer getWriter(OutputStream out) {
+        try {
+            return new OutputStreamWriter(out, "UTF-8");
+        } catch(UnsupportedEncodingException e) {
+            // never happens
+            throw new RuntimeException(e);
+        }
     }
 
     /**

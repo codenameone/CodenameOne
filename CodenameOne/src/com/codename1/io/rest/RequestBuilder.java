@@ -446,7 +446,7 @@ public class RequestBuilder {
      * @return RequestBuilder instance
      */
     public RequestBuilder basicAuth(String username, String password) {
-        header("Authorization", "Basic " + Base64.encodeNoNewline((username + ":" + password).getBytes()));
+        header("Authorization", "Basic " + Base64.encodeNoNewline(com.codename1.io.Util.getBytes(username + ":" + password)));
         return this;
     }
 

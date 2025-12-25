@@ -56,7 +56,7 @@ class JSONContent extends MapContent {
      * @throws IOException on error reading/parsing string
      */
     public JSONContent(String content) throws IOException {
-        this(new InputStreamReader(new ByteArrayInputStream(content.getBytes("UTF-8")), "UTF-8"));
+        this(com.codename1.io.Util.getReader(new ByteArrayInputStream(com.codename1.io.Util.getBytes(content))));
     }
 
     /**
@@ -66,7 +66,7 @@ class JSONContent extends MapContent {
      * @throws IOException on error reading/parsing the stream
      */
     public JSONContent(InputStream content) throws IOException {
-        this(new JSONParser().parse(new InputStreamReader(content)));
+        this(new JSONParser().parse(com.codename1.io.Util.getReader(content)));
     }
 
     /**
