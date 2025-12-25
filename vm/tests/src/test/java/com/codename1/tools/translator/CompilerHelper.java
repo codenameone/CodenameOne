@@ -369,13 +369,8 @@ public class CompilerHelper {
                 "void java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_LONG ms, JAVA_INT ns) {}\n" +
                 "void java_lang_Object_notifyAll__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) {}\n" +
                 "void java_lang_Object_notify__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) {}\n" +
-                "static JAVA_OBJECT mainThread = JAVA_NULL;\n" +
                 "JAVA_OBJECT java_lang_Thread_currentThread___R_java_lang_Thread(CODENAME_ONE_THREAD_STATE) {\n" +
-                "    if (mainThread == JAVA_NULL) {\n" +
-                "       // Simple allocation for main thread stub. Pass 0 cast to clazz*\n" +
-                "       mainThread = codenameOneGcMalloc(threadStateData, 32, (struct clazz*)0);\n" +
-                "    }\n" +
-                "    return mainThread;\n" +
+                "    return JAVA_NULL; // Simplification\n" +
                 "}\n" +
                 "// void java_lang_Thread_interrupt__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) {}\n" +
                 "// void java_lang_Thread_yield__(CODENAME_ONE_THREAD_STATE) {}\n" +
@@ -451,12 +446,7 @@ public class CompilerHelper {
                 "JAVA_OBJECT java_lang_String_getChars___int_int_char_1ARRAY_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT srcBegin, JAVA_INT srcEnd, JAVA_OBJECT dst, JAVA_INT dstBegin) { return JAVA_NULL; }\n" +
                 "JAVA_CHAR java_lang_StringBuilder_charAt___int_R_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT index) { return 0; }\n" +
                 "void java_lang_Thread_releaseThreadNativeResources___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG l) {}\n" +
-                "void java_lang_Thread_setPriorityImpl___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT i) {}\n" +
-                "JAVA_OBJECT java_lang_Object_getClass___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { return JAVA_NULL; }\n" +
-                "JAVA_BOOLEAN java_lang_Object_equals___java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_OBJECT other) { return me == other; }\n" +
-                "void java_lang_Object_wait__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) {}\n" +
-                "void java_lang_Object_wait___long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_LONG ms) {}\n" +
-                "JAVA_OBJECT java_lang_Object_clone___R_java_lang_Object(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { return JAVA_NULL; }\n";
+                "void java_lang_Thread_setPriorityImpl___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT i) {}\n";
 
             java.nio.file.Files.write(stubs, content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
