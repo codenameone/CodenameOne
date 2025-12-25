@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -51,6 +52,17 @@ class ApiSurface:
 
 class JavapError(RuntimeError):
     pass
+
+
+@dataclass
+class ClassInfo:
+    """Metadata about a compiled class."""
+
+    name: str
+    api: ApiSurface
+    supers: List[str]
+    is_public: bool
+    kind: str
 
 
 def discover_classes(root: str) -> List[str]:
@@ -124,15 +136,95 @@ def parse_members(javap_output: str) -> ApiSurface:
     return api
 
 
-def collect_class_api_from_file(class_name: str, classes_root: str, javap_cmd: str) -> ApiSurface:
+def parse_class_info(javap_output: str) -> ClassInfo:
+    api = ApiSurface()
+    supers: List[str] = []
+    pending: Optional[Tuple[str, bool, str]] = None
+    class_name: Optional[str] = None
+    is_public = False
+    kind = "class"
+
+    header_pattern = re.compile(
+        r"(?P<visibility>public|protected)?\s*(?P<kind>class|interface|enum)\s+",
+        r"(?P<name>[\w.$]+)",
+        r"(?:\s+extends\s+(?P<extends>[^\{]+?))?",
+        r"(?:\s+implements\s+(?P<implements>[^\{]+))?",
+    )
+
+    for raw_line in javap_output.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("Compiled from"):
+            continue
+
+        if class_name is None:
+            match = header_pattern.search(line.rstrip("{"))
+            if match:
+                class_name = match.group("name")
+                kind = match.group("kind")
+                is_public = match.group("visibility") == "public"
+                extends_clause = match.group("extends")
+                implements_clause = match.group("implements")
+                for clause in (extends_clause, implements_clause):
+                    if not clause:
+                        continue
+                    supers.extend([part.strip() for part in clause.split(',') if part.strip()])
+            continue
+
+        if line.endswith("{"):
+            continue
+        if line.startswith("descriptor:"):
+            if pending is None:
+                continue
+            descriptor = line.split(":", 1)[1].strip()
+            name, is_static, kind = pending
+            api.add((name, descriptor, is_static, kind))
+            pending = None
+            continue
+
+        if line.startswith("Runtime") or line.startswith("Signature:") or line.startswith("Exceptions:"):
+            pending = None
+            continue
+
+        if "(" in line or line.endswith(";"):
+            if line.startswith("//"):
+                continue
+            if line.endswith(" class"):
+                continue
+            if line.endswith("interface"):
+                continue
+
+            is_static_member = " static " in f" {line} "
+            if "(" in line:
+                name_section = line.split("(")[0].strip()
+                name = name_section.split()[-1]
+                kind = "method"
+            else:
+                name = line.rstrip(";").split()[-1]
+                kind = "field"
+            pending = (name, is_static_member, kind)
+
+    if class_name is None:
+        raise ValueError("Unable to determine class name from javap output")
+
+    if not supers and kind == "class" and class_name != "java.lang.Object":
+        supers.append("java.lang.Object")
+
+    return ClassInfo(name=class_name, api=api, supers=supers, is_public=is_public, kind=kind)
+
+def collect_class_info_from_file(class_name: str, classes_root: str, javap_cmd: str) -> Optional[ClassInfo]:
     class_path = os.path.join(classes_root, *class_name.split(".")) + ".class"
+    if not os.path.exists(class_path):
+        return None
     output = run_javap(class_path, javap_cmd)
-    return parse_members(output)
+    return parse_class_info(output)
 
 
-def collect_class_api_from_jdk(class_name: str, javap_cmd: str) -> ApiSurface:
-    output = run_javap(class_name, javap_cmd)
-    return parse_members(output)
+def collect_class_info_from_jdk(class_name: str, javap_cmd: str) -> Optional[ClassInfo]:
+    try:
+        output = run_javap(class_name, javap_cmd)
+    except JavapError:
+        return None
+    return parse_class_info(output)
 
 
 def format_member(member: Member) -> str:
@@ -141,28 +233,52 @@ def format_member(member: Member) -> str:
     return f"{kind}: {static_prefix}{name} {descriptor}"
 
 
+def build_full_api(
+    class_name: str,
+    lookup,
+    cache: Dict[str, Optional[ApiSurface]],
+) -> Optional[ApiSurface]:
+    if class_name in cache:
+        return cache[class_name]
+
+    info = lookup(class_name)
+    if info is None:
+        cache[class_name] = None
+        return None
+
+    merged = ApiSurface(set(info.api.methods), set(info.api.fields))
+    for parent in info.supers:
+        parent_api = build_full_api(parent, lookup, cache)
+        if parent_api:
+            merged.methods |= parent_api.methods
+            merged.fields |= parent_api.fields
+
+    cache[class_name] = merged
+    return merged
+
+
 def ensure_subset(
     source_classes: List[str],
-    source_root: str,
+    source_lookup,
     target_lookup,
     target_label: str,
-    javap_cmd: str,
 ) -> Tuple[bool, List[str]]:
     ok = True
     messages: List[str] = []
+    source_cache: Dict[str, Optional[ApiSurface]] = {}
+    target_cache: Dict[str, Optional[ApiSurface]] = {}
 
     for index, class_name in enumerate(sorted(source_classes), start=1):
-        try:
-            source_api = collect_class_api_from_file(class_name, source_root, javap_cmd)
-        except JavapError as exc:
+        source_api = build_full_api(class_name, source_lookup, source_cache)
+        if source_api is None:
             ok = False
-            messages.append(f"Failed to read {class_name} from {source_root}: {exc}")
+            messages.append(f"Failed to read {class_name} from source classes")
             continue
 
         if index % 25 == 0:
             log(f"  Processed {index}/{len(source_classes)} classes for {target_label} subset check...")
 
-        target_api = target_lookup(class_name)
+        target_api = build_full_api(class_name, target_lookup, target_cache)
         if target_api is None:
             ok = False
             messages.append(f"Missing class in {target_label}: {class_name}")
@@ -178,19 +294,22 @@ def ensure_subset(
     return ok, messages
 
 
-def collect_javaapi_map(javaapi_root: str, javap_cmd: str) -> Dict[str, ApiSurface]:
+def collect_javaapi_map(javaapi_root: str, javap_cmd: str) -> Dict[str, ClassInfo]:
     classes = discover_classes(javaapi_root)
-    api_map: Dict[str, ApiSurface] = {}
+    api_map: Dict[str, ClassInfo] = {}
     for index, class_name in enumerate(classes, start=1):
-        api_map[class_name] = collect_class_api_from_file(class_name, javaapi_root, javap_cmd)
+        info = collect_class_info_from_file(class_name, javaapi_root, javap_cmd)
+        if info:
+            api_map[class_name] = info
         if index % 25 == 0:
             log(f"  Indexed {index}/{len(classes)} vm/JavaAPI classes...")
     return api_map
 
 
 def write_extra_report(
-    cldc_classes: Dict[str, ApiSurface],
-    javaapi_classes: Dict[str, ApiSurface],
+    cldc_classes: Dict[str, ClassInfo],
+    javaapi_classes: Dict[str, ClassInfo],
+    public_cldc: Set[str],
     report_path: str,
 ) -> None:
     lines: List[str] = [
@@ -198,17 +317,21 @@ def write_extra_report(
         "",
     ]
 
-    extra_classes = sorted(set(javaapi_classes) - set(cldc_classes))
+    extra_classes = sorted(
+        name
+        for name, info in javaapi_classes.items()
+        if info.is_public and name not in public_cldc
+    )
     if extra_classes:
         lines.append("Classes only in vm/JavaAPI:")
         lines.extend([f"  - {name}" for name in extra_classes])
         lines.append("")
 
-    shared_classes = set(javaapi_classes) & set(cldc_classes)
+    shared_classes = {name for name in javaapi_classes if name in public_cldc and javaapi_classes[name].is_public}
     extra_members: List[str] = []
     for class_name in sorted(shared_classes):
-        javaapi_api = javaapi_classes[class_name]
-        cldc_api = cldc_classes[class_name]
+        javaapi_api = javaapi_classes[class_name].api
+        cldc_api = cldc_classes[class_name].api
         extra_methods, extra_fields = javaapi_api.extras_over(cldc_api)
         if not extra_methods and not extra_fields:
             continue
@@ -249,45 +372,59 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
 
     javap_cmd = args.javap or "javap"
 
-    cldc_classes = discover_classes(args.cldc_classes)
-    if not cldc_classes:
+    cldc_class_names = discover_classes(args.cldc_classes)
+    if not cldc_class_names:
         print(f"No class files found under {args.cldc_classes}", file=sys.stderr)
         return 1
 
-    log(f"Discovered {len(cldc_classes)} CLDC11 classes; building API maps...")
+    log(f"Discovered {len(cldc_class_names)} CLDC11 classes; building API maps...")
 
     javaapi_map = collect_javaapi_map(args.javaapi_classes, javap_cmd)
     log(f"Collected API surface for {len(javaapi_map)} vm/JavaAPI classes")
 
-    def jdk_lookup(name: str) -> Optional[ApiSurface]:
-        try:
-            return collect_class_api_from_jdk(name, javap_cmd)
-        except JavapError:
-            return None
+    cldc_lookup_cache: Dict[str, Optional[ClassInfo]] = {}
+    java_lookup_cache: Dict[str, Optional[ClassInfo]] = {name: info for name, info in javaapi_map.items()}
+    jdk_lookup_cache: Dict[str, Optional[ClassInfo]] = {}
 
-    def javaapi_lookup(name: str) -> Optional[ApiSurface]:
-        return javaapi_map.get(name)
+    def cldc_lookup(name: str) -> Optional[ClassInfo]:
+        if name not in cldc_lookup_cache:
+            cldc_lookup_cache[name] = collect_class_info_from_file(name, args.cldc_classes, javap_cmd)
+        return cldc_lookup_cache[name]
+
+    def jdk_lookup(name: str) -> Optional[ClassInfo]:
+        if name not in jdk_lookup_cache:
+            jdk_lookup_cache[name] = collect_class_info_from_jdk(name, javap_cmd)
+        return jdk_lookup_cache[name]
+
+    def javaapi_lookup(name: str) -> Optional[ClassInfo]:
+        return java_lookup_cache.get(name)
+
+    public_cldc_classes = [
+        name for name in cldc_class_names if (cldc_lookup(name) and cldc_lookup_cache[name].is_public)
+    ]
+
+    if not public_cldc_classes:
+        print("No public classes discovered in CLDC11 output", file=sys.stderr)
+        return 1
 
     log("Validating CLDC11 API against Java SE 11...")
     java_ok, java_messages = ensure_subset(
-        cldc_classes,
-        args.cldc_classes,
+        public_cldc_classes,
+        cldc_lookup,
         jdk_lookup,
         "Java SE 11",
-        javap_cmd,
     )
 
     log("Validating CLDC11 API against vm/JavaAPI...")
     api_ok, api_messages = ensure_subset(
-        cldc_classes,
-        args.cldc_classes,
+        public_cldc_classes,
+        cldc_lookup,
         javaapi_lookup,
         "vm/JavaAPI",
-        javap_cmd,
     )
 
-    cldc_map = {name: collect_class_api_from_file(name, args.cldc_classes, javap_cmd) for name in cldc_classes}
-    write_extra_report(cldc_map, javaapi_map, args.extra_report)
+    cldc_map = {name: info for name, info in cldc_lookup_cache.items() if info is not None}
+    write_extra_report(cldc_map, javaapi_map, set(public_cldc_classes), args.extra_report)
     log(f"Wrote extra API report to {args.extra_report}")
 
     messages = java_messages + api_messages
