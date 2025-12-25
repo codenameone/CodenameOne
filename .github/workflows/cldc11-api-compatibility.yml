@@ -1,0 +1,59 @@
+name: CLDC11 API Compatibility
+
+on:
+  push:
+    paths:
+      - 'Ports/CLDC11/**'
+      - 'vm/JavaAPI/**'
+      - '.github/workflows/cldc11-api-compatibility.yml'
+      - 'scripts/cldc11_api_compat_check.py'
+  pull_request:
+    paths:
+      - 'Ports/CLDC11/**'
+      - 'vm/JavaAPI/**'
+      - '.github/workflows/cldc11-api-compatibility.yml'
+      - 'scripts/cldc11_api_compat_check.py'
+
+jobs:
+  api-compatibility:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 8 for builds
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      - name: Compile CLDC11 classes
+        run: |
+          mkdir -p Ports/CLDC11/build/classes
+          find Ports/CLDC11/src/java -name '*.java' > cldc11-sources.txt
+          javac -encoding windows-1252 -source 1.6 -target 1.6 -XDignore.symbol.file \
+            -d Ports/CLDC11/build/classes @cldc11-sources.txt
+
+      - name: Build vm/JavaAPI classes
+        run: mvn -f vm/pom.xml -pl JavaAPI -am package -DskipTests
+
+      - name: Set up JDK 11 for compatibility checks
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '11'
+
+      - name: Validate CLDC11 API subset
+        run: |
+          python scripts/cldc11_api_compat_check.py \
+            --cldc-classes Ports/CLDC11/build/classes \
+            --javaapi-classes vm/JavaAPI/target/classes \
+            --extra-report cldc11-extra-apis.txt
+
+      - name: Upload extra API report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cldc11-extra-apis
+          path: cldc11-extra-apis.txt
