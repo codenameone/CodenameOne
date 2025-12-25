@@ -120,6 +120,9 @@ public class VarOp extends Instruction implements AssignableExpression {
                 return ex.assignTo("dlocals_"+var+"_", b);
             case Opcodes.ASTORE: {
                 if(getMethod() != null && getMethod().isBarebone()) {
+                    if (!getMethod().isStatic() && var == 0) {
+                        return ex.assignTo("__cn1ThisObject", b);
+                    }
                     return ex.assignTo("olocals_" + var + "_", b);
                 }
                 StringBuilder sb = new StringBuilder();
@@ -172,7 +175,11 @@ public class VarOp extends Instruction implements AssignableExpression {
             case Opcodes.ASTORE: {
                 if(getMethod() != null && getMethod().isBarebone()) {
                     if (ex.appendExpression(sb)) {
-                        b.append("olocals_").append(var).append("_ = ").append(sb.toString().trim()).append(";\n");
+                        if (!getMethod().isStatic() && var == 0) {
+                            b.append("__cn1ThisObject = ").append(sb.toString().trim()).append(";\n");
+                        } else {
+                            b.append("olocals_").append(var).append("_ = ").append(sb.toString().trim()).append(";\n");
+                        }
                         return true;
                     }
                 }
@@ -239,9 +246,13 @@ public class VarOp extends Instruction implements AssignableExpression {
                 break;
             case Opcodes.ALOAD:
                 if (getMethod() != null && getMethod().isBarebone()) {
-                    b.append("PUSH_POINTER(olocals_");
-                    b.append(var);
-                    b.append("_); /* ALOAD */\n");
+                    if (!getMethod().isStatic() && var == 0) {
+                        b.append("PUSH_POINTER(__cn1ThisObject); /* ALOAD */\n");
+                    } else {
+                        b.append("PUSH_POINTER(olocals_");
+                        b.append(var);
+                        b.append("_); /* ALOAD */\n");
+                    }
                     return;
                 }
                 b.append("BC_ALOAD(");
@@ -284,9 +295,13 @@ public class VarOp extends Instruction implements AssignableExpression {
                 break;
             case Opcodes.ASTORE:
                 if(getMethod() != null && getMethod().isBarebone()) {
-                    b.append("olocals_");
-                    b.append(var);
-                    b.append("_ = POP_OBJ(); /* ASTORE */\n");
+                    if (!getMethod().isStatic() && var == 0) {
+                        b.append("__cn1ThisObject = POP_OBJ(); /* ASTORE */\n");
+                    } else {
+                        b.append("olocals_");
+                        b.append(var);
+                        b.append("_ = POP_OBJ(); /* ASTORE */\n");
+                    }
                     return;
                 }
                 b.append("BC_ASTORE(");
