@@ -269,19 +269,36 @@ def ensure_subset(
     target_cache: Dict[str, Optional[ApiSurface]] = {}
 
     for index, class_name in enumerate(sorted(source_classes), start=1):
-        source_api = build_full_api(class_name, source_lookup, source_cache)
-        if source_api is None:
+        source_info = source_lookup(class_name)
+        if source_info is None:
             ok = False
             messages.append(f"Failed to read {class_name} from source classes")
             continue
 
+        source_api = build_full_api(class_name, source_lookup, source_cache)
+        assert source_api is not None
+
         if index % 25 == 0:
             log(f"  Processed {index}/{len(source_classes)} classes for {target_label} subset check...")
+
+        target_info = target_lookup(class_name)
+        if target_info is None:
+            ok = False
+            messages.append(f"Missing class in {target_label}: {class_name}")
+            continue
 
         target_api = build_full_api(class_name, target_lookup, target_cache)
         if target_api is None:
             ok = False
-            messages.append(f"Missing class in {target_label}: {class_name}")
+            messages.append(f"Failed to read {class_name} from {target_label}")
+            continue
+
+        extra_supers = [stype for stype in source_info.supers if stype not in target_info.supers]
+        if extra_supers:
+            ok = False
+            messages.append(f"Incompatibilities for {class_name} against {target_label}:")
+            for stype in extra_supers:
+                messages.append(f"  - supertype: {stype} not present in {target_label} declaration")
             continue
 
         missing_methods, missing_fields = source_api.missing_from(target_api)
