@@ -145,9 +145,9 @@ def parse_class_info(javap_output: str) -> ClassInfo:
     kind = "class"
 
     header_pattern = re.compile(
-        r"(?P<visibility>public|protected)?\s*(?P<kind>class|interface|enum)\s+",
-        r"(?P<name>[\w.$]+)",
-        r"(?:\s+extends\s+(?P<extends>[^\{]+?))?",
+        r"(?P<visibility>public|protected)?\s*(?P<kind>class|interface|enum)\s+"
+        r"(?P<name>[\w.$]+)"
+        r"(?:\s+extends\s+(?P<extends>[^\{]+?))?"
         r"(?:\s+implements\s+(?P<implements>[^\{]+))?",
     )
 
