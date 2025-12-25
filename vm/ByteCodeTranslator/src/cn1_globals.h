@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <setjmp.h>
 #include <math.h>
+#include <stdatomic.h>
 
 //#define DEBUG_GC_ALLOCATIONS
 

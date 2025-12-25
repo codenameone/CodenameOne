@@ -694,14 +694,14 @@ public class ByteCodeClass {
                     }
                     b.append(";\n}\n\n");                    
                 } else {
-                    b.append(bf.getCDefinition());
+                    b.append(bf.getCStorageDefinition());
                     b.append(" STATIC_FIELD_");
                     b.append(clsName);
                     b.append("_");
                     b.append(bf.getFieldName());
                     b.append(" = 0;\n");
 
-                    // static getter 
+                    // static getter
                     b.append(bf.getCDefinition());
                     b.append(" get_static_");
                     b.append(clsName);
@@ -709,13 +709,21 @@ public class ByteCodeClass {
                     b.append(bf.getFieldName().replace('$', '_'));
                     b.append("(CODENAME_ONE_THREAD_STATE) {\n    __STATIC_INITIALIZER_");
                     b.append(bf.getClsName());
-                    b.append("(threadStateData);\n     return STATIC_FIELD_");
-                    b.append(bf.getClsName());
-                    b.append("_");
-                    b.append(bf.getFieldName());
-                    b.append(";\n}\n\n");
+                    if (bf.isVolatile()) {
+                        b.append("(threadStateData);\n     return atomic_load(&STATIC_FIELD_");
+                        b.append(bf.getClsName());
+                        b.append("_");
+                        b.append(bf.getFieldName());
+                        b.append(");\n}\n\n");
+                    } else {
+                        b.append("(threadStateData);\n     return STATIC_FIELD_");
+                        b.append(bf.getClsName());
+                        b.append("_");
+                        b.append(bf.getFieldName());
+                        b.append(";\n}\n\n");
+                    }
 
-                    // static setter 
+                    // static setter
                     b.append("void set_static_");
                     b.append(clsName);
                     b.append("_");
@@ -724,30 +732,31 @@ public class ByteCodeClass {
                     b.append(bf.getCDefinition());
                     b.append(" __cn1StaticVal) {\n    __STATIC_INITIALIZER_");
                     b.append(bf.getClsName());
-                    if(bf.isObjectType()) {
-                        if(bf.isFinal()) {
-                            b.append("(threadStateData);\n    STATIC_FIELD_");                        
-                        } else {
-                            b.append("(threadStateData);\n    STATIC_FIELD_");
-                        }
+                    if (bf.isVolatile()) {
+                        b.append("(threadStateData);\n    atomic_store(&STATIC_FIELD_");
+                        b.append(bf.getClsName());
+                        b.append("_");
+                        b.append(bf.getFieldName());
+                        b.append(", __cn1StaticVal);");
                     } else {
                         b.append("(threadStateData);\n    STATIC_FIELD_");
+                        b.append(bf.getClsName());
+                        b.append("_");
+                        b.append(bf.getFieldName());
+                        b.append(" = __cn1StaticVal;");
                     }
-                    b.append(bf.getClsName());
-                    b.append("_");
-                    b.append(bf.getFieldName());
                     if(bf.shouldRemoveFromHeapCollection()) {
                         if(bf.getType() != null && bf.getType().endsWith("String")) {
-                            b.append(" = __cn1StaticVal;\n    removeObjectFromHeapCollection(threadStateData, __cn1StaticVal);\n    if(__cn1StaticVal != 0) {\n        removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)__cn1StaticVal)->java_lang_String_value);\n    }\n}\n\n");
+                            b.append("\n    removeObjectFromHeapCollection(threadStateData, __cn1StaticVal);\n    if(__cn1StaticVal != 0) {\n        removeObjectFromHeapCollection(threadStateData, ((struct obj__java_lang_String*)__cn1StaticVal)->java_lang_String_value);\n    }\n}\n\n");
                         } else {
-                            b.append(" = __cn1StaticVal;\n    removeObjectFromHeapCollection(threadStateData, __cn1StaticVal);\n}\n\n");
+                            b.append("\n    removeObjectFromHeapCollection(threadStateData, __cn1StaticVal);\n}\n\n");
                         }
                     } else {
-                        b.append(" = __cn1StaticVal;\n}\n\n");
+                        b.append("\n}\n\n");
                     }
                 }
             }
-        }        
+        }
         
         if(isInterface) {
             b.append("int **classToInterfaceMap_");
@@ -768,13 +777,24 @@ public class ByteCodeClass {
             b.append(clsName);
             b.append("_");
             b.append(fld.getFieldName());
-            b.append("(JAVA_OBJECT __cn1T) {\n ").append(nullCheck).append(" return (*(struct obj__");
-            b.append(clsName);
-            b.append("*)__cn1T).");            
-            b.append(fld.getClsName());
-            b.append("_");
-            b.append(fld.getFieldName());
-            b.append(";\n}\n\n");
+            b.append("(JAVA_OBJECT __cn1T) {\n ").append(nullCheck).append("    ");
+            if (fld.isVolatile()) {
+                b.append("return atomic_load(&((struct obj__");
+                b.append(clsName);
+                b.append(")__cn1T)->");
+                b.append(fld.getClsName());
+                b.append("_");
+                b.append(fld.getFieldName());
+                b.append(");\n}\n\n");
+            } else {
+                b.append("return ((struct obj__");
+                b.append(clsName);
+                b.append(")__cn1T)->");
+                b.append(fld.getClsName());
+                b.append("_");
+                b.append(fld.getFieldName());
+                b.append(";\n}\n\n");
+            }
 
             b.append("void set_field_");
             b.append(clsName);
@@ -783,16 +803,27 @@ public class ByteCodeClass {
             b.append("(CODENAME_ONE_THREAD_STATE, ");
             b.append(fld.getCDefinition());
             if(fld.isObjectType()) {
-                b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n ").append(nullCheck).append("   (*(struct obj__");
+                b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n ").append(nullCheck).append("   ");
             } else {
-                b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n  ").append(nullCheck).append("  (*(struct obj__");
+                b.append(" __cn1Val, JAVA_OBJECT __cn1T) {\n  ").append(nullCheck).append("  ");
             }
-            b.append(clsName);
-            b.append("*)__cn1T).");            
-            b.append(fld.getClsName());
-            b.append("_");
-            b.append(fld.getFieldName());
-            b.append(" = __cn1Val;\n}\n\n");
+            if (fld.isVolatile()) {
+                b.append("atomic_store(&((struct obj__");
+                b.append(clsName);
+                b.append(")__cn1T)->");
+                b.append(fld.getClsName());
+                b.append("_");
+                b.append(fld.getFieldName());
+                b.append(", __cn1Val);\n}\n\n");
+            } else {
+                b.append("((struct obj__");
+                b.append(clsName);
+                b.append(")__cn1T)->");
+                b.append(fld.getClsName());
+                b.append("_");
+                b.append(fld.getFieldName());
+                b.append(" = __cn1Val;\n}\n\n");
+            }
         }
                 
         
@@ -824,10 +855,19 @@ public class ByteCodeClass {
         b.append("*)objToMark;\n");
         for(ByteCodeField fld : fullFieldList) {
             if(!fld.isStaticField() && fld.isObjectType() && fld.getClsName().equals(clsName)) {
-                b.append("    gcMarkObject(threadStateData, objInstance->");
-                b.append(fld.getClsName());
-                b.append("_");
-                b.append(fld.getFieldName());
+                b.append("    gcMarkObject(threadStateData, ");
+                if (fld.isVolatile()) {
+                    b.append("atomic_load(&objInstance->");
+                    b.append(fld.getClsName());
+                    b.append("_");
+                    b.append(fld.getFieldName());
+                    b.append(")");
+                } else {
+                    b.append("objInstance->");
+                    b.append(fld.getClsName());
+                    b.append("_");
+                    b.append(fld.getFieldName());
+                }
                 b.append(", force);\n");
             }
         }
@@ -1196,7 +1236,7 @@ public class ByteCodeClass {
         for(ByteCodeField bf : fields) {
             if(!bf.isStaticField()) {
                 b.append("    ");
-                b.append(bf.getCDefinition());
+                b.append(bf.getCStorageDefinition());
                 b.append(" ");
                 b.append(clsName);
                 b.append("_");
@@ -1335,7 +1375,7 @@ public class ByteCodeClass {
                     b.append("();\n");
                     if(!(bf.isFinal() && bf.getValue() != null && !writableFields.contains(bf.getFieldName()))) {
                         b.append("extern ");
-                        b.append(bf.getCDefinition());
+                        b.append(bf.getCStorageDefinition());
                         b.append(" STATIC_FIELD_");
                         b.append(clsName);
                         b.append("_");
@@ -1741,7 +1781,7 @@ public class ByteCodeClass {
         for(ByteCodeField bf : fields) {
             if(bf.isStaticField() && bf.isObjectType() && !bf.shouldRemoveFromHeapCollection()) {
                 b.append("extern ");
-                b.append(bf.getCDefinition());
+                b.append(bf.getCStorageDefinition());
                 b.append(" STATIC_FIELD_");
                 b.append(clsName);
                 b.append("_");
@@ -1767,10 +1807,19 @@ public class ByteCodeClass {
     public void appendStaticFieldsMark(StringBuilder b) {
         for(ByteCodeField bf : fields) {
             if(bf.isStaticField() && bf.isObjectType() && !bf.shouldRemoveFromHeapCollection()) {
-                b.append("    gcMarkObject(threadStateData, STATIC_FIELD_");
-                b.append(clsName);
-                b.append("_");
-                b.append(bf.getFieldName());
+                b.append("    gcMarkObject(threadStateData, ");
+                if (bf.isVolatile()) {
+                    b.append("atomic_load(&STATIC_FIELD_");
+                    b.append(clsName);
+                    b.append("_");
+                    b.append(bf.getFieldName());
+                    b.append(")");
+                } else {
+                    b.append("STATIC_FIELD_");
+                    b.append(clsName);
+                    b.append("_");
+                    b.append(bf.getFieldName());
+                }
                 b.append(", JAVA_TRUE);\n");
             }
         }
