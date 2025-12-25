@@ -598,6 +598,9 @@ public class NetworkManager {
                 case ConnectionRequest.PRIORITY_REDUNDANT:
                     addSortedToQueue(request, i);
                     break;
+                default:
+                    addSortedToQueue(request, i);
+                    break;
             }
             LOCK.notify();
         }
@@ -876,6 +879,8 @@ public class NetworkManager {
                         break;
                     case ConnectionRequest.PRIORITY_REDUNDANT:
                         Thread.currentThread().setPriority(Thread.MIN_PRIORITY);
+                        break;
+                    default:
                         break;
                 }
 

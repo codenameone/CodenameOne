@@ -869,6 +869,8 @@ public class RoundRectBorder extends Border {
                 case CN.RIGHT:
                     widthF -= ah;
                     break;
+                default:
+                    break;
             }
         }
 

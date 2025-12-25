@@ -81,6 +81,8 @@ public class TextPainter implements NodePainter {
             case Component.RIGHT:
                 x = innerX + innerW - textWidth;
                 break;
+            default:
+                break;
 
         }
         switch (vAlign) {
@@ -89,6 +91,8 @@ public class TextPainter implements NodePainter {
                 break;
             case Component.BOTTOM:
                 y = innerY + innerH - textHeight;
+                break;
+            default:
                 break;
         }
         g.setFont(font);

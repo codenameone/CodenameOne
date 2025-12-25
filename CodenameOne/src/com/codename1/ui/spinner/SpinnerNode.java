@@ -425,6 +425,8 @@ class SpinnerNode extends Node {
             case Component.RIGHT:
                 translateX.set(oldTranslateX - boundsInLocal.get().getWidth() * (magnification - 1.0) / 2 / magnification);
                 break;
+            default:
+                break;
         }
 
         selectedRowOverlay.visible.set(false);

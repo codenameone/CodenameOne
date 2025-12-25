@@ -466,6 +466,8 @@ public class FlowLayout extends Layout {
                     x = width;
                 }
                 break;
+            default:
+                break;
         }
         Style parentStyle = target.getStyle();
         int parentPadding = parentStyle.getHorizontalPadding();

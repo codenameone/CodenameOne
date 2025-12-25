@@ -174,6 +174,8 @@ public class Base64 {
                 out[index++] = map[((in[end + 1] & 0x0f) << 2)];
                 out[index++] = '=';
                 break;
+            default:
+                break;
         }
         return new String(out, 0, index);
     }
@@ -210,6 +212,8 @@ public class Base64 {
                         | ((in[end + 1] & 0xff) >> 4)];
                 out[index++] = map[((in[end + 1] & 0x0f) << 2)];
                 out[index++] = '=';
+                break;
+            default:
                 break;
         }
         return new String(out, 0, index);

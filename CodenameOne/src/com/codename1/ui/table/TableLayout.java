@@ -541,6 +541,8 @@ public class TableLayout extends Layout {
                     case Component.RIGHT:
                         a = Component.LEFT;
                         break;
+                    default:
+                        break;
                 }
             }
             switch (a) {
@@ -555,6 +557,8 @@ public class TableLayout extends Layout {
                 case Component.CENTER:
                     con.parent.setX(x + d / 2);
                     con.parent.setWidth(width - d);
+                    break;
+                default:
                     break;
             }
         }

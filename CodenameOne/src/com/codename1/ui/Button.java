@@ -631,6 +631,8 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
                     }
                 }
                 break;
+            default:
+                break;
         }
         return icon;
     }
@@ -1003,6 +1005,8 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
                     break;
                 case STATE_PRESSED:
                     a |= pressedIcon != null && pressedIcon.isAnimation() && pressedIcon.animate();
+                    break;
+                default:
                     break;
             }
         }

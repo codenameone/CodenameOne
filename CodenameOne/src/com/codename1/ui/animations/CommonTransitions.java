@@ -845,6 +845,9 @@ public final class CommonTransitions extends Transition {
                         paint(g, c, 0, 0);
                     }
                     g.setAlpha(alpha);
+                    break;
+                default:
+                    break;
             }
         } catch (Throwable t) {
             // end the transition now just to be safe

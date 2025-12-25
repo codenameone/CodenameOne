@@ -526,6 +526,8 @@ public class CSSBorder extends Border {
                 case CN.RIGHT:
                     width -= arrowHeightPixels;
                     break;
+                default:
+                    break;
             }
         }
         if (hasBorderRadius()) {
@@ -1659,6 +1661,8 @@ public class CSSBorder extends Border {
                     return "hidden";
                 case STYLE_NONE:
                     return "none";
+                default:
+                    break;
 
             }
             return "none";
@@ -2159,6 +2163,8 @@ public class CSSBorder extends Border {
                 case VPOSITION_CENTER:
                     sb.append("center").append(" ");
                     break;
+                default:
+                    break;
             }
             if (verticalPosition != null) {
                 sb.append(verticalPosition.toCSSString()).append(" ");
@@ -2174,6 +2180,8 @@ public class CSSBorder extends Border {
                     break;
                 case HPOSITION_CENTER:
                     sb.append("center").append(" ");
+                    break;
+                default:
                     break;
             }
 
@@ -2213,6 +2221,8 @@ public class CSSBorder extends Border {
                         w = floatPx(horizontalSize, c, contentRect, true);
                         h = floatPx(verticalSize, c, contentRect, false);
                         break;
+                    default:
+                        break;
 
                 }
 
@@ -2229,6 +2239,8 @@ public class CSSBorder extends Border {
                     case VPOSITION_OTHER:
                         y = contentRect.getY() + floatPx(verticalPosition, c, contentRect, false);
                         break;
+                    default:
+                        break;
                 }
 
                 switch (horizontalPositionType) {
@@ -2240,6 +2252,8 @@ public class CSSBorder extends Border {
                         break;
                     case HPOSITION_OTHER:
                         x = contentRect.getX() + floatPx(horizontalPosition, c, contentRect, true);
+                        break;
+                    default:
                         break;
                 }
 
@@ -2304,6 +2318,8 @@ public class CSSBorder extends Border {
                         g.tileImage(scaled, (int) (contentRect.getX() + offX), (int) (contentRect.getY() + offY), (int) (contentRect.getWidth() - offX), (int) (contentRect.getHeight() - offY));
                         break;
                     }
+                    default:
+                        break;
 
 
                 }

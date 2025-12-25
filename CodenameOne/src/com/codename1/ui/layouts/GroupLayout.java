@@ -997,6 +997,8 @@ public class GroupLayout extends Layout {
             case MAX_SIZE:
                 size = group.getMaximumSize(axis);
                 break;
+            default:
+                break;
         }
         group.setSize(axis, origin, size);
         group.calculateAutopadding(axis);
@@ -1500,6 +1502,8 @@ public class GroupLayout extends Layout {
                     return spring.getPreferredSize(axis);
                 case MAX_SIZE:
                     return spring.getMaximumSize(axis);
+                default:
+                    break;
             }
             //assert false;
             return 0;

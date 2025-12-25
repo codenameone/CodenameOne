@@ -2675,6 +2675,8 @@ public class Container extends Component implements Iterable<Component> {
                         x = 0;
                     }
                     break;
+                default:
+                    break;
             }
             f.setCyclicFocus(cyclic);
             //if the Form doesn't contain a focusable Component simply move the
@@ -4022,6 +4024,8 @@ public class Container extends Component implements Iterable<Component> {
                             break;
                         case QueuedChange.TYPE_REMOVE:
                             out.remove(change.component);
+                            break;
+                        default:
                             break;
                     }
                 }

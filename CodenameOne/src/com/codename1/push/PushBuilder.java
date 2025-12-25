@@ -183,6 +183,8 @@ public class PushBuilder {
             case 102:
                 sb.append(badge).append(";").append(title).append(";").append(body);
                 break;
+            default:
+                break;
         }
 
         if (isRichPush()) {

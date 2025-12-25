@@ -471,6 +471,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 case Label.TOP:
                     y = y + (cmpHeight - (topPadding + bottomPadding + ((icon != null) ? icon.getHeight() + gap : 0) + fontHeight)) / 2;
                     break;
+                default:
+                    break;
             }
         } else if (align == Component.CENTER) {
             switch (textPos) {
@@ -506,6 +508,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                             bottomPadding +
                             ((icon != null) ? icon.getHeight() + gap : 0) +
                             fontHeight)) / 2;
+                    break;
+                default:
                     break;
             }
         } else if (align == Component.RIGHT) {
@@ -547,6 +551,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     y = y + (cmpHeight - (topPadding +
                             bottomPadding +
                             ((icon != null) ? icon.getHeight() + gap : 0) + fontHeight)) / 2;
+                    break;
+                default:
                     break;
             }
         }
@@ -616,6 +622,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                         return calculateSpanForLabelString(sel, l, text, x, y, textSpaceW);
                         //g.drawImage(icon, x + iconStringWGap, y + fontHeight + gap);
                     }
+                    // break; // unreachable because of return
+                default:
+                    break;
 
             }
         }
@@ -1376,6 +1385,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 case Label.TOP:
                     y = y + (cmpHeight - (topPadding + bottomPadding + ((icon != null) ? icon.getHeight() + gap : 0) + fontHeight)) / 2;
                     break;
+                default:
+                    break;
             }
         } else if (align == Component.CENTER) {
             switch (textPos) {
@@ -1407,6 +1418,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                             ((icon != null) ? icon.getHeight() + gap : 0) +
                             fontHeight)) / 2;
                     break;
+                default:
+                    break;
             }
         } else if (align == Component.RIGHT) {
             switch (textPos) {
@@ -1436,6 +1449,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     y = y + (cmpHeight - (topPadding +
                             bottomPadding +
                             ((icon != null) ? icon.getHeight() + gap : 0) + fontHeight)) / 2;
+                    break;
+                default:
                     break;
             }
         }
@@ -1509,6 +1524,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                         drawLabelString(g, l, text, x, y, textSpaceX, textSpaceW);
                         g.drawImage(icon, x + iconStringWGap, y + fontHeight + gap);
                     }
+                    break;
+                default:
                     break;
             }
         }

@@ -472,6 +472,8 @@ public class SwipeableContainer extends Container {
                     }
                     break;
                 }
+                default:
+                    break;
             }
         }
     }

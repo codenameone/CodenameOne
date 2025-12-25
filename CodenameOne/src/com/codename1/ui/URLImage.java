@@ -764,6 +764,8 @@ public class URLImage extends EncodedImage {
                             }
                             break;
                         }
+                        default:
+                            break;
                     }
 
                     image = downloadedImage.getImage();

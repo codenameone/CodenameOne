@@ -2441,7 +2441,8 @@ public class Component implements Animation, StyleListener, Editable {
                 return dp2px(-42);
             case 24:
                 return dp2px(-65);
-
+            default:
+                break;
         }
         return 0;
     }
@@ -2658,7 +2659,8 @@ public class Component implements Animation, StyleListener, Editable {
                             //drawShadow(g, img, relativeX, relativeY, 0, 9, 46, 8, 0, 0.12f);
                             //drawShadow(g, img, relativeX, relativeY, 0, 11, 15, -7, 0, 0.2f);
                             break;
-
+                        default:
+                            break;
                     }
                     synchronized (this) {
                         cachedShadowImage = shadowImage;

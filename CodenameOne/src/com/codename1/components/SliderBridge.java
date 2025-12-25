@@ -149,6 +149,8 @@ public class SliderBridge extends Slider {
                             s.setInfinite(true);
                         }
                         break;
+                    default:
+                        break;
                 }
             }
         });

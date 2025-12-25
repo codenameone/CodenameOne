@@ -445,6 +445,8 @@ class Spinner extends List {
                                     return;
                                 }
                                 break;
+                            default:
+                                break;
                         }
 
                         int actual = seconds + minutes * 60 + hours * 60 * 60;
@@ -468,6 +470,8 @@ class Spinner extends List {
                                 case RIGHT:
                                     currentInputAlign = LEFT;
                                     lastKeyInteraction = -1;
+                                    break;
+                                default:
                                     break;
                             }
                         }
@@ -494,6 +498,8 @@ class Spinner extends List {
                                 int y = c.get(Calendar.YEAR);
                                 c.set(Calendar.YEAR, y - (y % 100) + Integer.parseInt(t));
                                 break;
+                            default:
+                                break;
                         }
                         setValue(c.getTime());
 
@@ -510,6 +516,8 @@ class Spinner extends List {
                                 case RIGHT:
                                     currentInputAlign = LEFT;
                                     lastKeyInteraction = -1;
+                                    break;
+                                default:
                                     break;
                             }
                         }

@@ -410,6 +410,8 @@ public class BoxLayout extends Layout {
                         dy = (containerBottomInner - lastCmpBottomOuter);
                         break;
                     }
+                    default:
+                        break;
                 }
                 if (dy > 0) {
                     for (int i = 0; i < numOfcomponents; i++) {
@@ -435,6 +437,8 @@ public class BoxLayout extends Layout {
                             dx = (lastCmpLeftOuter - containerLeftInner);
                             break;
                         }
+                        default:
+                            break;
                     }
                     if (dx > 0) {
                         for (int i = 0; i < numOfcomponents; i++) {
@@ -456,6 +460,8 @@ public class BoxLayout extends Layout {
                             dx = (containerRightInner - lastCmpRightOuter);
                             break;
                         }
+                        default:
+                            break;
                     }
                     if (dx > 0) {
                         for (int i = 0; i < numOfcomponents; i++) {

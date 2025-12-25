@@ -641,6 +641,8 @@ public class Slider extends Label implements ActionSource {
                         fireClicked();
                     }
                     break;
+                default:
+                    break;
             }
         } else {
             if (!Display.getInstance().isThirdSoftButton() &&

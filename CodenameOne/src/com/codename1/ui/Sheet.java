@@ -618,6 +618,8 @@ public class Sheet extends Container {
                     b.bottomLeftMode(true);
                     b.bottomRightMode(true);
                     break;
+                default:
+                    break;
 
             }
             getStyle().setBorder(b);

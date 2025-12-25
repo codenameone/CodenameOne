@@ -441,6 +441,8 @@ public class SimpleDateFormat extends DateFormat {
                     v = calendar.get(DAY_OF_WEEK_IN_MONTH);
                     toAppendTo.append(leftPad(v, len));
                     break;
+                default:
+                    break;
             }
         }
         return toAppendTo.toString();
@@ -571,6 +573,8 @@ public class SimpleDateFormat extends DateFormat {
                     s = readNumber(source, startIndex, token, adjacent);
                     calendar.set(DAY_OF_WEEK_IN_MONTH,
                             parseNumber(s, startIndex, "day of week in month", -5, 5));
+                    break;
+                default:
                     break;
             }
             if (s != null) {

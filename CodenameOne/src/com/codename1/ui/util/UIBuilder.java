@@ -534,6 +534,8 @@ public class UIBuilder { //implements Externalizable {
                 case PROPERTY_NEXT_FOCUS_RIGHT:
                     c.setNextFocusRight(findByName(in.readUTF(), parent));
                     break;
+                default:
+                    break;
             }
 
             name = in.readUTF();
@@ -776,6 +778,8 @@ public class UIBuilder { //implements Externalizable {
                             val.put(in.readUTF(), res.getImage(in.readUTF()));
                         }
                     }
+                    break;
+                default:
                     break;
             }
         }
@@ -1056,6 +1060,8 @@ public class UIBuilder { //implements Externalizable {
                         }
                     }
                     break;
+                default:
+                    break;
 
                 case PROPERTY_EMBED:
                     root.putClientProperty(EMBEDDED_FORM_FLAG, "");
@@ -1175,6 +1181,8 @@ public class UIBuilder { //implements Externalizable {
                             layout = b;
                             break;
                         }
+                        default:
+                            break;
                         case LAYOUT_BORDER: {
                             BorderLayout b = new BorderLayout();
                             if (in.readBoolean()) {

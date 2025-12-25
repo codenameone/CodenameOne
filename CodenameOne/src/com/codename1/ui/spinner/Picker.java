@@ -163,6 +163,8 @@ public class Picker extends Button {
                             metaData = "minuteStep=" + minuteStep;
                             break;
                         }
+                        default:
+                            break;
                     }
 
                     setEnabled(false);
@@ -204,6 +206,8 @@ public class Picker extends Button {
                             }
                             break;
                         }
+                        default:
+                            break;
                         case Display.PICKER_TYPE_CALENDAR:
                             showInteractionDialog();
                             evt.consume();
@@ -747,6 +751,8 @@ public class Picker extends Button {
             case Display.PICKER_TYPE_DURATION_MINUTES:
             case Display.PICKER_TYPE_CALENDAR:
                 return true;
+            default:
+                break;
         }
         return false;
     }
@@ -965,6 +971,8 @@ public class Picker extends Button {
                 if (!(value instanceof Long)) {
                     setDuration(0L);
                 }
+                break;
+            default:
                 break;
         }
     }
@@ -1293,6 +1301,8 @@ public class Picker extends Button {
                 }
                 break;
             }
+            default:
+                break;
 
         }
     }

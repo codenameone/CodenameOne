@@ -550,6 +550,8 @@ public class RECompiler {
                                 case RE.E_DIGIT:
                                     range.include('0', '9', include);
                                     break;
+                                default:
+                                    break;
                             }
 
                             // Make last char invalid (can't be a range start)
@@ -867,6 +869,9 @@ public class RECompiler {
                 if ((terminalFlags[0] & NODE_NULLABLE) != 0) {
                     syntaxError("Closure operand can't be nullable");
                 }
+                break;
+            default:
+                break;
         }
 
         // If the next character is a '?', make the closure non-greedy (reluctant)
@@ -954,6 +959,8 @@ public class RECompiler {
                     setNextOfEnd(n, ret);
                     break;
                 }
+                default:
+                    break;
             }
         } else {
             // Actually do the closure now
@@ -979,6 +986,8 @@ public class RECompiler {
                     setNextOfEnd(ret + RE.nodeSize, n);
                     break;
                 }
+                default:
+                    break;
             }
         }
 

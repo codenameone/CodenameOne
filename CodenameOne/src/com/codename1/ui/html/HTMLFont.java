@@ -316,6 +316,8 @@ class HTMLFont {
                     counterpartSize = (size == Font.SIZE_LARGE) ? Font.SIZE_MEDIUM : Font.SIZE_SMALL;
                     counterpartFonts[attribute] = new HTMLFont(null, Font.createSystemFont(font.getFace(), style, counterpartSize));
                     break;
+                default:
+                    break;
             }
         }
         return counterpartFonts[attribute];
