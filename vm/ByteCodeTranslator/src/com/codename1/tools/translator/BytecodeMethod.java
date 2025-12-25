@@ -748,6 +748,42 @@ public class BytecodeMethod implements SignatureSet {
         return false;
     }
     
+    private void fixUpBarebone() {
+        for (Instruction i : instructions) {
+            if (i instanceof CustomJump) {
+                CustomJump cj = (CustomJump)i;
+                String cmp = cj.getCustomCompareCode();
+                if (cmp != null) {
+                    cj.setCustomCompareCode(cmp.replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                }
+            } else if (i instanceof CustomIntruction) {
+                CustomIntruction ci = (CustomIntruction)i;
+                String code = ci.getCode();
+                if (code != null) {
+                    ci.setCode(code.replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                }
+                String complexCode = ci.getComplexCode();
+                if (complexCode != null) {
+                    ci.setComplexCode(complexCode.replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                }
+            } else if (i instanceof CustomInvoke) {
+                CustomInvoke ci = (CustomInvoke)i;
+                String target = ci.getTargetObjectLiteral();
+                if (target != null) {
+                    ci.setTargetObjectLiteral(target.replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                }
+                String[] args = ci.getLiteralArgs();
+                if (args != null) {
+                    for (int j=0; j<args.length; j++) {
+                        if (args[j] != null) {
+                            ci.setLiteralArg(j, args[j].replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     public void appendMethodC(StringBuilder b) {
         if(nativeMethod) {
             return;
@@ -772,6 +808,9 @@ public class BytecodeMethod implements SignatureSet {
         
         if(hasInstructions) {
             barebone = checkBarebone();
+            if (barebone) {
+                fixUpBarebone();
+            }
             Set<String> added = new HashSet<String>();
             for (LocalVariable lv : localVariables) {
                 String variableName = lv.getQualifier() + "locals_"+lv.getIndex()+"_";

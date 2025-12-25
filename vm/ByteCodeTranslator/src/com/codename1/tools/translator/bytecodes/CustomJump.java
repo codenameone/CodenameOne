@@ -72,4 +72,8 @@ public class CustomJump extends Instruction {
     public void setCustomCompareCode(String code) {
         this.customCompareCode = code;
     }
+
+    public String getCustomCompareCode() {
+        return customCompareCode;
+    }
 }
