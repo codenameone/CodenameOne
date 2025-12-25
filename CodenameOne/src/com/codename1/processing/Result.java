@@ -311,7 +311,10 @@ public class Result {
      * @see Object#equals(Object)
      */
     public boolean equals(final Object other) {
-        return root.equals(other);
+        if (other instanceof Result) {
+            return root.equals(((Result) other).root);
+        }
+        return false;
     }
 
     /**

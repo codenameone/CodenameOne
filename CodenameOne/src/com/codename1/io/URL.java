@@ -101,7 +101,7 @@ public class URL {
     }
 
     public boolean equals(java.lang.Object o) {
-        return o instanceof URL && ((URL) o).u.equals(o);
+        return o instanceof URL && u.equals(((URL) o).u);
     }
 
     public synchronized int hashCode() {
