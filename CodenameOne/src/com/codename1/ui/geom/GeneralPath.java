@@ -2574,6 +2574,8 @@ public final class GeneralPath implements Shape {
                             cross += crossLine(cx, cy, cx = mx, cy = my, x, y);
                         }
                         break;
+                    default:
+                        throw new IllegalStateException("Illegal General path segment: " + p.currentSegment(coords));
                 }
 
                 // checks if the point (x,y) is the vertex of shape with PathIterator p
@@ -2947,6 +2949,8 @@ public final class GeneralPath implements Shape {
                         cx = mx;
                         cy = my;
                         break;
+                    default:
+                        throw new IllegalStateException("Illegal General path segment: " + p.currentSegment(coords));
                 }
                 if (count == CROSSING) {
                     return CROSSING;

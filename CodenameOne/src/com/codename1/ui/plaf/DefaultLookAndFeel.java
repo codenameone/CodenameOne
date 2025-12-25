@@ -846,6 +846,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 break;
             case Component.BOTTOM:
                 topPadding += Math.max(0, (ta.getInnerHeight() - (ta.getRowsGap() + fontHeight) * line));
+                break;
+            default:
+                break;
         }
         //boolean shouldBreak = false;
         int posOffset = 0;
@@ -938,6 +941,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 break;
             case Component.BOTTOM:
                 topPadding += Math.max(0, (ta.getInnerHeight() - ta.getRowsGap() * (line - 1) - fontHeight * line));
+                break;
+            default:
+                break;
         }
         boolean shouldBreak = false;
 
@@ -1068,6 +1074,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 case Label.TOP:
                     prefW = Math.max(prefW, font.stringWidth(text));
                     prefH += font.getHeight();
+                    break;
+                default:
                     break;
             }
         }

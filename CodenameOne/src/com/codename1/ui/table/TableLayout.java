@@ -573,7 +573,8 @@ public class TableLayout extends Layout {
                     con.parent.setY(y + d);
                     con.parent.setHeight(height - d);
                     break;
-                case Component.CENTER:
+                default:
+                    // Component.CENTER:
                     con.parent.setY(y + d / 2);
                     con.parent.setHeight(height - d);
                     break;

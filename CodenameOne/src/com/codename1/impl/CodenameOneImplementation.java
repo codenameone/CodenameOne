@@ -7976,12 +7976,6 @@ public abstract class CodenameOneImplementation {
             int iH = bgImageOrig.getHeight();
             Object bgImage = bgImageOrig.getImage();
             switch (s.getBackgroundType()) {
-                case Style.BACKGROUND_NONE:
-                    if (s.getBgTransparency() != 0) {
-                        setColor(nativeGraphics, s.getBgColor());
-                        fillRect(nativeGraphics, x, y, width, height, s.getBgTransparency());
-                    }
-                    return;
                 case Style.BACKGROUND_IMAGE_SCALED:
                     if (isScaledImageDrawingSupported()) {
                         drawImage(nativeGraphics, bgImage, x, y, width, height);
@@ -8116,6 +8110,8 @@ public abstract class CodenameOneImplementation {
                 case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
                 case Style.BACKGROUND_GRADIENT_RADIAL:
                     drawGradientBackground(s, nativeGraphics, x, y, width, height);
+                default:
+                    return;
             }
         }
     }
@@ -8136,6 +8132,11 @@ public abstract class CodenameOneImplementation {
                         s.getBackgroundGradientRelativeSize());
                 return;
             default:
+                // Style.BACKGROUND_NONE
+                if (s.getBgTransparency() != 0) {
+                    setColor(nativeGraphics, s.getBgColor());
+                    fillRect(nativeGraphics, x, y, width, height, s.getBgTransparency());
+                }
                 break;
         }
         setColor(nativeGraphics, s.getBgColor());
