@@ -4640,7 +4640,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     public Style createProxyStyle() {
         HashSet<Style> styles = new HashSet<Style>();
         for (Component c : this) {
-            styles.add(getStyle(c));
+            styles.add(this.getStyle(c));
         }
         return Style.createProxyStyle(styles.toArray(new Style[styles.size()]));
     }

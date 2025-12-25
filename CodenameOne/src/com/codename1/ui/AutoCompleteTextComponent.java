@@ -95,7 +95,7 @@ public class AutoCompleteTextComponent extends TextComponent {
                 super.focusLostInternal();
                 if (isInitialized() && isFocusAnimation()) {
                     getLabel().setFocus(false);
-                    if (getText().length() == 0 && getLabel().isVisible()) {
+                    if (AutoCompleteTextComponent.this.getText().length() == 0 && AutoCompleteTextComponent.this.getLabel().isVisible()) {
                         final Label text = new Label(getLabel().getText(), getLabel().getUIID());
                         final Label placeholder = new Label();
                         Component.setSameSize(placeholder, getLabel());
