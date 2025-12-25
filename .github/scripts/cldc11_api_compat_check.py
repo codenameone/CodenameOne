@@ -16,6 +16,12 @@ from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 
+def log(message: str) -> None:
+    """Emit a progress message immediately."""
+
+    print(message, flush=True)
+
+
 Member = Tuple[str, str, bool, str]
 """
 A member descriptor in the form `(name, descriptor, is_static, kind)`.
@@ -145,13 +151,16 @@ def ensure_subset(
     ok = True
     messages: List[str] = []
 
-    for class_name in sorted(source_classes):
+    for index, class_name in enumerate(sorted(source_classes), start=1):
         try:
             source_api = collect_class_api_from_file(class_name, source_root, javap_cmd)
         except JavapError as exc:
             ok = False
             messages.append(f"Failed to read {class_name} from {source_root}: {exc}")
             continue
+
+        if index % 25 == 0:
+            log(f"  Processed {index}/{len(source_classes)} classes for {target_label} subset check...")
 
         target_api = target_lookup(class_name)
         if target_api is None:
@@ -172,8 +181,10 @@ def ensure_subset(
 def collect_javaapi_map(javaapi_root: str, javap_cmd: str) -> Dict[str, ApiSurface]:
     classes = discover_classes(javaapi_root)
     api_map: Dict[str, ApiSurface] = {}
-    for class_name in classes:
+    for index, class_name in enumerate(classes, start=1):
         api_map[class_name] = collect_class_api_from_file(class_name, javaapi_root, javap_cmd)
+        if index % 25 == 0:
+            log(f"  Indexed {index}/{len(classes)} vm/JavaAPI classes...")
     return api_map
 
 
@@ -227,7 +238,11 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     parser.add_argument("--extra-report", required=True, help="File path to write the extra API report")
     parser.add_argument(
         "--javap",
-        default=os.path.join(os.environ.get("JAVA_HOME", ""), "bin", "javap"),
+        default=(
+            os.path.join(os.environ.get("JAVA_HOME", ""), "bin", "javap")
+            if os.environ.get("JAVA_HOME")
+            else "javap"
+        ),
         help="Path to the javap executable from Java SE 11",
     )
     args = parser.parse_args(argv)
@@ -239,7 +254,10 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
         print(f"No class files found under {args.cldc_classes}", file=sys.stderr)
         return 1
 
+    log(f"Discovered {len(cldc_classes)} CLDC11 classes; building API maps...")
+
     javaapi_map = collect_javaapi_map(args.javaapi_classes, javap_cmd)
+    log(f"Collected API surface for {len(javaapi_map)} vm/JavaAPI classes")
 
     def jdk_lookup(name: str) -> Optional[ApiSurface]:
         try:
@@ -250,6 +268,7 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
     def javaapi_lookup(name: str) -> Optional[ApiSurface]:
         return javaapi_map.get(name)
 
+    log("Validating CLDC11 API against Java SE 11...")
     java_ok, java_messages = ensure_subset(
         cldc_classes,
         args.cldc_classes,
@@ -258,6 +277,7 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
         javap_cmd,
     )
 
+    log("Validating CLDC11 API against vm/JavaAPI...")
     api_ok, api_messages = ensure_subset(
         cldc_classes,
         args.cldc_classes,
@@ -268,6 +288,7 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
 
     cldc_map = {name: collect_class_api_from_file(name, args.cldc_classes, javap_cmd) for name in cldc_classes}
     write_extra_report(cldc_map, javaapi_map, args.extra_report)
+    log(f"Wrote extra API report to {args.extra_report}")
 
     messages = java_messages + api_messages
     if messages:

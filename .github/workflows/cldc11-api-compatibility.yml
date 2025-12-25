@@ -2,21 +2,24 @@ name: CLDC11 API Compatibility
 
 on:
   push:
+    branches: [master]
     paths:
       - 'Ports/CLDC11/**'
       - 'vm/JavaAPI/**'
       - '.github/workflows/cldc11-api-compatibility.yml'
-      - 'scripts/cldc11_api_compat_check.py'
+      - '.github/scripts/cldc11_api_compat_check.py'
   pull_request:
     paths:
       - 'Ports/CLDC11/**'
       - 'vm/JavaAPI/**'
       - '.github/workflows/cldc11-api-compatibility.yml'
-      - 'scripts/cldc11_api_compat_check.py'
+      - '.github/scripts/cldc11_api_compat_check.py'
 
 jobs:
   api-compatibility:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
@@ -46,7 +49,7 @@ jobs:
 
       - name: Validate CLDC11 API subset
         run: |
-          python scripts/cldc11_api_compat_check.py \
+          python .github/scripts/cldc11_api_compat_check.py \
             --cldc-classes Ports/CLDC11/build/classes \
             --javaapi-classes vm/JavaAPI/target/classes \
             --extra-report cldc11-extra-apis.txt
