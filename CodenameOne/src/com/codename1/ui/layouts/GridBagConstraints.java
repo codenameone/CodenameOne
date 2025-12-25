@@ -170,8 +170,8 @@ public class GridBagConstraints {
             // awt.9C=wrong value of GridBagConstraints: {0}
             throw new IllegalArgumentException("wrong value of GridBagConstraints: " + ipady); //$NON-NLS-1$ //$NON-NLS-2$
         }
-        if ((insets == null) || (insets.left < 0) || (insets.left < 0)
-                || (insets.left < 0) || (insets.left < 0)) {
+        if ((insets == null) || (insets.top < 0) || (insets.left < 0)
+                || (insets.bottom < 0) || (insets.right < 0)) {
             // awt.9C=wrong value of GridBagConstraints: {0}
             throw new IllegalArgumentException("wrong value of GridBagConstraints: " + insets); //$NON-NLS-1$ //$NON-NLS-2$
         }

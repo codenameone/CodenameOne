@@ -1134,7 +1134,7 @@ public class CSSBorder extends Border {
             if (part.indexOf("url(") == 0) {
                 part = part.substring(4, part.length() - 1);
             }
-            if (part.charAt(0) == '"' || part.charAt(0) == '"') {
+            if (part.charAt(0) == '"' || part.charAt(0) == '\'') {
                 part = part.substring(1, part.length() - 1);
             }
             if (part.indexOf("/") != -1) {
