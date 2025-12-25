@@ -1,5 +1,6 @@
 #include "cn1_globals.h"
 #include <assert.h>
+#include <unistd.h>
 #include "java_lang_Class.h"
 #include "java_lang_Object.h"
 #include "java_lang_Boolean.h"
@@ -14,6 +15,10 @@
 #include "java_lang_Float.h"
 #include "java_lang_Runnable.h"
 #include "java_lang_System.h"
+
+JAVA_BOOLEAN lowMemoryMode = JAVA_FALSE;
+int mallocWhileSuspended = 0;
+BOOL isAppSuspended = NO;
 #include "java_lang_ArrayIndexOutOfBoundsException.h"
 #if defined(__APPLE__) && defined(__OBJC__)
 #import <mach/mach.h>

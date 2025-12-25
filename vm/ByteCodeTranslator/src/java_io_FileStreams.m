@@ -21,7 +21,7 @@ static JAVA_LONG retainHandle(NSFileHandle* handle) {
     return (JAVA_LONG)(uintptr_t)handle;
 }
 
-JAVA_LONG java_io_FileInputStream_openImpl___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT path) {
+JAVA_LONG java_io_FileInputStream_openImpl___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {
     if (path == JAVA_NULL) {
         return 0;
     }
@@ -33,7 +33,7 @@ JAVA_LONG java_io_FileInputStream_openImpl___java_lang_String_R_long(CODENAME_ON
     return result;
 }
 
-JAVA_INT java_io_FileInputStream_readImpl___long_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG handle, JAVA_OBJECT buffer, JAVA_INT off, JAVA_INT len) {
+JAVA_INT java_io_FileInputStream_readImpl___long_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT buffer, JAVA_INT off, JAVA_INT len) {
     NSFileHandle* h = toHandle(handle);
     if (h == nil) {
         return -1;
@@ -48,7 +48,7 @@ JAVA_INT java_io_FileInputStream_readImpl___long_byte_1ARRAY_int_int_R_int(CODEN
     return count == 0 ? -1 : (JAVA_INT)count;
 }
 
-JAVA_LONG java_io_FileInputStream_skipImpl___long_long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG handle, JAVA_LONG n) {
+JAVA_LONG java_io_FileInputStream_skipImpl___long_long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_LONG n) {
     NSFileHandle* h = toHandle(handle);
     if (h == nil) {
         return 0;
@@ -63,7 +63,7 @@ JAVA_LONG java_io_FileInputStream_skipImpl___long_long_R_long(CODENAME_ONE_THREA
     return (JAVA_LONG)(updated - current);
 }
 
-JAVA_INT java_io_FileInputStream_availableImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG handle) {
+JAVA_INT java_io_FileInputStream_availableImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     NSFileHandle* h = toHandle(handle);
     if (h == nil) {
         return 0;
@@ -83,7 +83,7 @@ JAVA_INT java_io_FileInputStream_availableImpl___long_R_int(CODENAME_ONE_THREAD_
     return (JAVA_INT)diff;
 }
 
-JAVA_VOID java_io_FileInputStream_closeImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG handle) {
+JAVA_VOID java_io_FileInputStream_closeImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     NSFileHandle* h = toHandle(handle);
     if (h == nil) {
         return;
@@ -161,7 +161,7 @@ static int toFd(JAVA_LONG handle) {
     return (int)handle;
 }
 
-JAVA_LONG java_io_FileInputStream_openImpl___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT path) {
+JAVA_LONG java_io_FileInputStream_openImpl___java_lang_String_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path) {
     if (path == JAVA_NULL) {
         return 0;
     }
@@ -173,7 +173,7 @@ JAVA_LONG java_io_FileInputStream_openImpl___java_lang_String_R_long(CODENAME_ON
     return (JAVA_LONG)fd;
 }
 
-JAVA_INT java_io_FileInputStream_readImpl___long_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG handle, JAVA_OBJECT buffer, JAVA_INT off, JAVA_INT len) {
+JAVA_INT java_io_FileInputStream_readImpl___long_byte_1ARRAY_int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT buffer, JAVA_INT off, JAVA_INT len) {
     int fd = toFd(handle);
     if (fd < 0 || buffer == JAVA_NULL) {
         return -1;
@@ -185,7 +185,7 @@ JAVA_INT java_io_FileInputStream_readImpl___long_byte_1ARRAY_int_int_R_int(CODEN
     return (JAVA_INT)count;
 }
 
-JAVA_LONG java_io_FileInputStream_skipImpl___long_long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG handle, JAVA_LONG n) {
+JAVA_LONG java_io_FileInputStream_skipImpl___long_long_R_long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_LONG n) {
     int fd = toFd(handle);
     if (fd < 0 || n <= 0) {
         return 0;
@@ -201,7 +201,7 @@ JAVA_LONG java_io_FileInputStream_skipImpl___long_long_R_long(CODENAME_ONE_THREA
     return (JAVA_LONG)(target - current);
 }
 
-JAVA_INT java_io_FileInputStream_availableImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG handle) {
+JAVA_INT java_io_FileInputStream_availableImpl___long_R_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     int fd = toFd(handle);
     if (fd < 0) {
         return 0;
@@ -225,14 +225,14 @@ JAVA_INT java_io_FileInputStream_availableImpl___long_R_int(CODENAME_ONE_THREAD_
     return (JAVA_INT)diff;
 }
 
-JAVA_VOID java_io_FileInputStream_closeImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG handle) {
+JAVA_VOID java_io_FileInputStream_closeImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     int fd = toFd(handle);
     if (fd >= 0) {
         close(fd);
     }
 }
 
-JAVA_LONG java_io_FileOutputStream_openImpl___java_lang_String_boolean_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_OBJECT path, JAVA_BOOLEAN append) {
+JAVA_LONG java_io_FileOutputStream_openImpl___java_lang_String_boolean_R_long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT path, JAVA_BOOLEAN append) {
     if (path == JAVA_NULL) {
         return 0;
     }
@@ -250,7 +250,7 @@ JAVA_LONG java_io_FileOutputStream_openImpl___java_lang_String_boolean_R_long(CO
     return (JAVA_LONG)fd;
 }
 
-JAVA_VOID java_io_FileOutputStream_writeImpl___long_byte_1ARRAY_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG handle, JAVA_OBJECT buffer, JAVA_INT off, JAVA_INT len) {
+JAVA_VOID java_io_FileOutputStream_writeImpl___long_byte_1ARRAY_int_int(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle, JAVA_OBJECT buffer, JAVA_INT off, JAVA_INT len) {
     int fd = toFd(handle);
     if (fd < 0 || buffer == JAVA_NULL || len <= 0) {
         return;
@@ -259,14 +259,14 @@ JAVA_VOID java_io_FileOutputStream_writeImpl___long_byte_1ARRAY_int_int(CODENAME
     (void)written;
 }
 
-JAVA_VOID java_io_FileOutputStream_flushImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG handle) {
+JAVA_VOID java_io_FileOutputStream_flushImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     int fd = toFd(handle);
     if (fd >= 0) {
         fsync(fd);
     }
 }
 
-JAVA_VOID java_io_FileOutputStream_closeImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, JAVA_LONG handle) {
+JAVA_VOID java_io_FileOutputStream_closeImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG handle) {
     int fd = toFd(handle);
     if (fd >= 0) {
         close(fd);

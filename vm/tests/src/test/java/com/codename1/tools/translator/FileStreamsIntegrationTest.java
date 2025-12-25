@@ -131,6 +131,7 @@ public class FileStreamsIntegrationTest {
                 "                if (filtered == null || filtered.length == 0) System.exit(1);\n" +
                 "            }\n" +
                 "        } catch (Exception e) {\n" +
+                "            e.printStackTrace();\n" +
                 "            System.exit(1);\n" +
                 "        }\n" +
                 "    }\n" +
@@ -141,7 +142,7 @@ public class FileStreamsIntegrationTest {
         String content = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
         String replacement = content.replace(
                 "add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})",
-                "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m)"
+                "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m objc)"
         );
         Files.write(cmakeLists, replacement.getBytes(StandardCharsets.UTF_8));
     }

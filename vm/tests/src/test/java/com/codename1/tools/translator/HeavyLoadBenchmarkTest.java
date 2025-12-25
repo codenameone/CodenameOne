@@ -11,6 +11,7 @@ import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URL;
@@ -23,6 +24,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 
 @Tag("benchmark")
 public class HeavyLoadBenchmarkTest {
@@ -33,10 +36,7 @@ public class HeavyLoadBenchmarkTest {
     @Test
     public void benchmarkJavaAPITranslation() throws Exception {
         // Locate JavaAPI.jar
-        Path javaApiJar = Paths.get("..", "JavaAPI", "dist", "JavaAPI.jar").normalize().toAbsolutePath();
-        if (!Files.exists(javaApiJar)) {
-            javaApiJar = Paths.get("vm", "JavaAPI", "dist", "JavaAPI.jar").normalize().toAbsolutePath();
-        }
+        Path javaApiJar = resolveJavaApiJar();
         // Locate CodenameOne Core jar
         Path coreJar = findDependencyJar("codenameone-core");
 
@@ -297,6 +297,94 @@ public class HeavyLoadBenchmarkTest {
         if (Files.exists(p)) return p.normalize().toAbsolutePath();
 
         return null;
+    }
+
+    private Path resolveJavaApiJar() throws IOException {
+        List<Path> candidates = new ArrayList<>();
+        candidates.add(Paths.get("..", "JavaAPI", "dist", "JavaAPI.jar").normalize().toAbsolutePath());
+        candidates.add(Paths.get("vm", "JavaAPI", "dist", "JavaAPI.jar").normalize().toAbsolutePath());
+        candidates.add(firstJarInTarget(Paths.get("..", "JavaAPI", "target")));
+        candidates.add(firstJarInTarget(Paths.get("vm", "JavaAPI", "target")));
+
+        for (Path candidate : candidates) {
+            if (candidate != null && Files.exists(candidate)) {
+                return candidate;
+            }
+        }
+        Path srcRoot = findPath("JavaAPI", "src");
+        if (srcRoot == null) {
+            srcRoot = findPath("vm", "JavaAPI", "src");
+        }
+        Path built = buildJavaApiJar(srcRoot);
+        if (built != null) {
+            return built;
+        }
+        return candidates.get(0);
+    }
+
+    private Path firstJarInTarget(Path dir) throws IOException {
+        if (!Files.isDirectory(dir)) {
+            return null;
+        }
+        try (java.util.stream.Stream<Path> stream = Files.list(dir)) {
+            return stream.filter(p -> p.toString().endsWith(".jar")).findFirst().orElse(null);
+        }
+    }
+
+    private Path buildJavaApiJar(Path srcRoot) throws IOException {
+        if (srcRoot == null) {
+            return null;
+        }
+        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
+        if (compiler == null) {
+            return null;
+        }
+
+        List<String> sources;
+        try (java.util.stream.Stream<Path> stream = Files.walk(srcRoot)) {
+            sources = stream.filter(p -> p.toString().endsWith(".java"))
+                    .map(Path::toString)
+                    .collect(Collectors.toList());
+        }
+        if (sources.isEmpty()) {
+            return null;
+        }
+
+        Path classesDir = Files.createTempDirectory("javaapi-classes");
+        List<String> args = new ArrayList<>();
+        args.add("--release");
+        args.add("11");
+        args.add("--patch-module");
+        args.add("java.base=" + srcRoot.toString());
+        args.add("-Xlint:-options");
+        args.add("-Xlint:-module");
+        args.add("-d");
+        args.add(classesDir.toString());
+        args.addAll(sources);
+
+        int result = compiler.run(null, null, null, args.toArray(new String[0]));
+        if (result != 0) {
+            return null;
+        }
+
+        Path jar = Files.createTempFile("JavaAPI-", ".jar");
+        try (JarOutputStream jos = new JarOutputStream(Files.newOutputStream(jar))) {
+            try (java.util.stream.Stream<Path> stream = Files.walk(classesDir)) {
+                stream.filter(Files::isRegularFile).forEach(p -> {
+                    JarEntry entry = new JarEntry(classesDir.relativize(p).toString().replace(File.separatorChar, '/'));
+                    try {
+                        jos.putNextEntry(entry);
+                        Files.copy(p, jos);
+                        jos.closeEntry();
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                });
+            }
+        } catch (UncheckedIOException e) {
+            throw e.getCause();
+        }
+        return jar.toAbsolutePath();
     }
 
     private Path findDependencyJar(String namePart) {
