@@ -761,7 +761,8 @@ def main() -> None:
             "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE",
             "RCN_REDUNDANT_NULLCHECK_OF_NULL_VALUE",
             "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR",
-            "SF_SWITCH_NO_DEFAULT"
+            "SF_SWITCH_NO_DEFAULT",
+            "DM_DEFAULT_ENCODING"
         }
         violations = [
             f for f in spotbugs.findings

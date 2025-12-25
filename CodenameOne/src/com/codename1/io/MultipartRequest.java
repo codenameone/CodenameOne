@@ -29,6 +29,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
+import com.codename1.util.StringUtil;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -270,7 +271,7 @@ public class MultipartRequest extends ConnectionRequest {
                     try {
                         length += value.toString().getBytes("UTF-8").length;
                     } catch (UnsupportedEncodingException ex) {
-                        length += value.toString().getBytes().length;
+                        length += StringUtil.getBytes(value.toString()).length;
                     }
                 } else {
                     if (base64Binaries) {
@@ -288,7 +289,7 @@ public class MultipartRequest extends ConnectionRequest {
                             try {
                                 length += s.toString().getBytes("UTF-8").length;
                             } catch (UnsupportedEncodingException ex) {
-                                length += value.toString().getBytes().length;
+                                length += StringUtil.getBytes(value.toString()).length;
                             }
                         } else {
                             if (base64Binaries) {
@@ -304,7 +305,7 @@ public class MultipartRequest extends ConnectionRequest {
                     try {
                         length += ((String) filenames.get(key)).getBytes("UTF-8").length;
                     } catch (UnsupportedEncodingException ex) {
-                        length += ((String) filenames.get(key)).getBytes().length;
+                        length += StringUtil.getBytes((String) filenames.get(key)).length;
                     }
                     length += ((String) mimeTypes.get(key)).length();
                     length += Long.parseLong((String) filesizes.get(key));

@@ -177,7 +177,7 @@ public class Base64 {
             default:
                 break;
         }
-        return new String(out, 0, index);
+        return com.codename1.util.StringUtil.newString(out, 0, index);
     }
 
     /**
@@ -216,7 +216,7 @@ public class Base64 {
             default:
                 break;
         }
-        return new String(out, 0, index);
+        return com.codename1.util.StringUtil.newString(out, 0, index);
     }
 }
 

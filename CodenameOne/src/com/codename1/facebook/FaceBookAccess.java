@@ -188,7 +188,7 @@ public class FaceBookAccess {
         req.addArgument("grant_type", "client_credentials");
         NetworkManager.getInstance().addToQueueAndWait(req);
         if (req.getResponseData() != null) {
-            token = new String(req.getResponseData());
+            token = com.codename1.util.StringUtil.newString(req.getResponseData());
             token = token.substring(token.indexOf('=') + 1);
         }
     }

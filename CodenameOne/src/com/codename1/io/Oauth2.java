@@ -38,6 +38,7 @@ import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.html.DocumentInfo;
 import com.codename1.ui.layouts.BorderLayout;
 import com.codename1.util.AsyncResource;
+import com.codename1.util.StringUtil;
 import com.codename1.util.regex.StringReader;
 
 import java.io.IOException;
@@ -541,7 +542,7 @@ public class Oauth2 {
 
                     protected void readResponse(InputStream input) throws IOException {
                         byte[] tok = Util.readInputStream(input);
-                        String t = new String(tok);
+                        String t = StringUtil.newString(tok);
                         boolean expiresRelative = true;
                         if (t.startsWith("{")) {
                             JSONParser p = new JSONParser();

@@ -50,8 +50,11 @@ import java.io.DataOutputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.io.Reader;
+import java.io.Writer;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -105,6 +108,35 @@ public class Util {
      */
     public static void setIgnorCharsWhileEncoding(String s) {
         ignoreCharsWhenEncoding = s;
+    }
+
+
+    /**
+     * Helper to get a reader from an input stream with UTF-8 encoding
+     * @param in the input stream
+     * @return the reader
+     */
+    public static InputStreamReader getReader(InputStream in) {
+        try {
+            return new InputStreamReader(in, "UTF-8");
+        } catch(UnsupportedEncodingException e) {
+            // never happens
+            throw new RuntimeException(e.toString());
+        }
+    }
+
+    /**
+     * Helper to get a writer from an output stream with UTF-8 encoding
+     * @param out the output stream
+     * @return the writer
+     */
+    public static OutputStreamWriter getWriter(OutputStream out) {
+        try {
+            return new OutputStreamWriter(out, "UTF-8");
+        } catch(UnsupportedEncodingException e) {
+            // never happens
+            throw new RuntimeException(e.toString());
+        }
     }
 
     /**

@@ -15,11 +15,12 @@ public class REDebugCompilerTest extends UITestBase {
         REProgram program = compiler.compile("a*b");
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        PrintStream ps = new PrintStream(baos);
+        java.io.Writer w = com.codename1.io.Util.getWriter(baos);
 
-        compiler.dumpProgram(ps);
+        compiler.dumpProgram(w);
+        w.flush();
 
-        String output = baos.toString();
+        String output = new String(baos.toByteArray(), "UTF-8");
         Assertions.assertTrue(output.contains("OP_STAR"));
         Assertions.assertTrue(output.contains("OP_ATOM"));
     }

@@ -448,7 +448,7 @@ class ResourceThreadQueue {
                 } else {
                     if (cssDocInfo != null) { // CSS
                         if (HTMLComponent.SUPPORT_CSS) { // no need to also check if loadCSS is true, since if we got so far - it is...
-                            CSSElement result = CSSParser.getInstance().parseCSSSegment(new InputStreamReader(is), is, htmlC, cssDocInfo.getUrl());
+                            CSSElement result = CSSParser.getInstance().parseCSSSegment(com.codename1.io.Util.getReader(is), is, htmlC, cssDocInfo.getUrl());
                             result.setAttribute(result.getAttributeName(Integer.valueOf(CSSElement.CSS_PAGEURL)), cssDocInfo.getUrl());
                             htmlC.addToExternalCSS(result);
                         }

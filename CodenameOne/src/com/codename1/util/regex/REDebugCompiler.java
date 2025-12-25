@@ -108,71 +108,75 @@ public class REDebugCompiler extends RECompiler {
 
 
     /**
-     * Dumps the current program to a {@link PrintStream}.
+     * Dumps the current program to a {@link java.io.Writer}.
      *
-     * @param p PrintStream for program dump output
+     * @param p Writer for program dump output
      */
-    public void dumpProgram(PrintStream p) {
-        // Loop through the whole program
-        for (int i = 0; i < lenInstruction; ) {
-            // Get opcode, opdata and next fields of current program node
-            char opcode = instruction[i /* + RE.offsetOpcode */];
-            char opdata = instruction[i + RE.offsetOpdata];
-            int next = (short) instruction[i + RE.offsetNext];
+    public void dumpProgram(java.io.Writer p) {
+        try {
+            // Loop through the whole program
+            for (int i = 0; i < lenInstruction; ) {
+                // Get opcode, opdata and next fields of current program node
+                char opcode = instruction[i /* + RE.offsetOpcode */];
+                char opdata = instruction[i + RE.offsetOpdata];
+                int next = (short) instruction[i + RE.offsetNext];
 
-            // Display the current program node
-            p.print(i + ". " + nodeToString(i) + ", next = ");
+                // Display the current program node
+                p.write(i + ". " + nodeToString(i) + ", next = ");
 
-            // If there's no next, say 'none', otherwise give absolute index of next node
-            if (next == 0) {
-                p.print("none");
-            } else {
-                p.print(i + next);
-            }
+                // If there's no next, say 'none', otherwise give absolute index of next node
+                if (next == 0) {
+                    p.write("none");
+                } else {
+                    p.write(String.valueOf(i + next));
+                }
 
-            // Move past node
-            i += RE.nodeSize;
+                // Move past node
+                i += RE.nodeSize;
 
-            // If character class
-            if (opcode == RE.OP_ANYOF) {
-                // Opening bracket for start of char class
-                p.print(", [");
+                // If character class
+                if (opcode == RE.OP_ANYOF) {
+                    // Opening bracket for start of char class
+                    p.write(", [");
 
-                // Show each range in the char class
-                // int rangeCount = opdata;
-                for (int r = 0; r < opdata; r++) {
-                    // Get first and last chars in range
-                    char charFirst = instruction[i++];
-                    char charLast = instruction[i++];
+                    // Show each range in the char class
+                    // int rangeCount = opdata;
+                    for (int r = 0; r < opdata; r++) {
+                        // Get first and last chars in range
+                        char charFirst = instruction[i++];
+                        char charLast = instruction[i++];
 
-                    // Print range as X-Y, unless range encompasses only one char
-                    if (charFirst == charLast) {
-                        p.print(charToString(charFirst));
-                    } else {
-                        p.print(charToString(charFirst) + "-" + charToString(charLast));
+                        // Print range as X-Y, unless range encompasses only one char
+                        if (charFirst == charLast) {
+                            p.write(charToString(charFirst));
+                        } else {
+                            p.write(charToString(charFirst) + "-" + charToString(charLast));
+                        }
                     }
+
+                    // Annotate the end of the char class
+                    p.write("]");
                 }
 
-                // Annotate the end of the char class
-                p.print("]");
-            }
+                // If atom
+                if (opcode == RE.OP_ATOM) {
+                    // Open quote
+                    p.write(", \"");
 
-            // If atom
-            if (opcode == RE.OP_ATOM) {
-                // Open quote
-                p.print(", \"");
+                    // Print each character in the atom
+                    for (int len = opdata; len-- != 0; ) {
+                        p.write(charToString(instruction[i++]));
+                    }
 
-                // Print each character in the atom
-                for (int len = opdata; len-- != 0; ) {
-                    p.print(charToString(instruction[i++]));
+                    // Close quote
+                    p.write("\"");
                 }
 
-                // Close quote
-                p.print("\"");
+                // Print a newline
+                p.write('\n');
             }
-
-            // Print a newline
-            p.println();
+        } catch (java.io.IOException e) {
+            e.printStackTrace();
         }
     }
 
@@ -180,8 +184,12 @@ public class REDebugCompiler extends RECompiler {
      * Dumps the current program to a <code>System.out</code>.
      */
     public void dumpProgram() {
-        PrintStream w = new PrintStream(System.out);
+        java.io.OutputStreamWriter w = com.codename1.io.Util.getWriter(System.out);
         dumpProgram(w);
-        w.flush();
+        try {
+            w.flush();
+        } catch (java.io.IOException e) {
+            e.printStackTrace();
+        }
     }
 }

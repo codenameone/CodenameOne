@@ -126,9 +126,9 @@ public class TestReporting {
         while (e.hasMoreElements()) {
             String key = e.nextElement();
             if (testsExecuted.get(key)) {
-                os.write((key + " passed\n").getBytes());
+                os.write(com.codename1.util.StringUtil.getBytes(key + " passed\n"));
             } else {
-                os.write((key + " failed\n").getBytes());
+                os.write(com.codename1.util.StringUtil.getBytes(key + " failed\n"));
             }
         }
     }

@@ -332,7 +332,7 @@ public class Log {
                 if (instance.getFileURL() == null) {
                     instance.setFileURL("file:///" + FileSystemStorage.getInstance().getRoots()[0] + "/codenameOne.log");
                 }
-                Reader r = new InputStreamReader(FileSystemStorage.getInstance().openInputStream(instance.getFileURL()));
+                Reader r = Util.getReader(FileSystemStorage.getInstance().openInputStream(instance.getFileURL()));
                 char[] buffer = new char[1024];
                 int size = r.read(buffer);
                 while (size > -1) {
@@ -508,18 +508,18 @@ public class Log {
     protected Writer createWriter() throws IOException {
         try {
             if (getFileURL() == null) {
-                return new OutputStreamWriter(Storage.getInstance().createOutputStream("CN1Log__$"));
+                return Util.getWriter(Storage.getInstance().createOutputStream("CN1Log__$"));
             }
             if (FileSystemStorage.getInstance().exists(getFileURL())) {
-                return new OutputStreamWriter(FileSystemStorage.getInstance().openOutputStream(getFileURL(),
+                return Util.getWriter(FileSystemStorage.getInstance().openOutputStream(getFileURL(),
                         (int) FileSystemStorage.getInstance().getLength(getFileURL())));
             } else {
-                return new OutputStreamWriter(FileSystemStorage.getInstance().openOutputStream(getFileURL()));
+                return Util.getWriter(FileSystemStorage.getInstance().openOutputStream(getFileURL()));
             }
         } catch (Exception err) {
             setFileWriteEnabled(false);
             // currently return a "dummy" writer so we won't fail on device
-            return new OutputStreamWriter(new ByteArrayOutputStream());
+            return Util.getWriter(new ByteArrayOutputStream());
         }
     }
 

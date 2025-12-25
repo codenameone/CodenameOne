@@ -321,13 +321,13 @@ class CSSParser {
             ExtInputStreamReader segmentReader = null;
             if (encoding != null) {
                 try {
-                    segmentReader = new ExtInputStreamReader(new InputStreamReader(new ByteArrayInputStream(segment.toString().getBytes()), encoding));
+                    segmentReader = new ExtInputStreamReader(new InputStreamReader(new ByteArrayInputStream(com.codename1.util.StringUtil.getBytes(segment.toString())), encoding));
                 } catch (UnsupportedEncodingException uee) {
                     notifyError(ParserCallback.ERROR_ENCODING, "@media", null, encoding, "Encoding '" + encoding + "' failed for media segment. " + uee.getMessage());
                 }
             }
             if (segmentReader == null) { //either no encoding, or encoding failed
-                segmentReader = new ExtInputStreamReader(new InputStreamReader(new ByteArrayInputStream(segment.toString().getBytes())));
+                segmentReader = new ExtInputStreamReader(com.codename1.io.Util.getReader(new ByteArrayInputStream(com.codename1.util.StringUtil.getBytes(segment.toString()))));
             }
             return segmentReader;
         } else {

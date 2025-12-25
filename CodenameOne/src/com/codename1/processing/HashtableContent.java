@@ -65,7 +65,7 @@ class MapContent implements StructuredContent {
      * @throws IOException on error reading/parsing the string
      */
     public MapContent(String content) throws IOException {
-        this(new InputStreamReader(new ByteArrayInputStream(content.getBytes("UTF-8")), "UTF-8"));
+        this(com.codename1.io.Util.getReader(new ByteArrayInputStream(com.codename1.util.StringUtil.getBytes(content))));
     }
 
     /**
@@ -75,7 +75,7 @@ class MapContent implements StructuredContent {
      * @throws IOException on error reading/parsing the stream
      */
     public MapContent(InputStream content) throws IOException {
-        this(new JSONParser().parse(new InputStreamReader(content)));
+        this(new JSONParser().parse(com.codename1.io.Util.getReader(content)));
     }
 
     /**
