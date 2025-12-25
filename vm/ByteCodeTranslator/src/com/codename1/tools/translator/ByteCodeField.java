@@ -45,6 +45,7 @@ public class ByteCodeField {
     private boolean finalField;
     private Object value;
     private boolean privateField;
+    private final boolean volatileField;
     
     public ByteCodeField(String clsName, int access, String name, String desc, String signature, Object value) {
         this.clsName = clsName;
@@ -55,6 +56,7 @@ public class ByteCodeField {
         }
         staticField = (access & Opcodes.ACC_STATIC) == Opcodes.ACC_STATIC;
         finalField = (access & Opcodes.ACC_FINAL) == Opcodes.ACC_FINAL;
+        volatileField = (access & Opcodes.ACC_VOLATILE) == Opcodes.ACC_VOLATILE;
         fieldName = name.replace('$', '_');
 
         arrayDimensions = 0;
@@ -115,6 +117,13 @@ public class ByteCodeField {
         }
         return Util.getCType(primitiveType);
     }
+
+    public String getCStorageDefinition() {
+        if (volatileField) {
+            return "_Atomic " + getCDefinition();
+        }
+        return getCDefinition();
+    }
     
     public List<String> getDependentClasses() {
         return dependentClasses;
@@ -149,6 +158,10 @@ public class ByteCodeField {
     
     public boolean isObjectType() {
         return arrayDimensions > 0 || primitiveType == null;
+    }
+
+    public boolean isVolatile() {
+        return volatileField;
     }
     
     public boolean isFinal() {
