@@ -883,6 +883,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 case Component.CENTER:
                     x += (ta.getWidth() - leftPadding - rightPadding - f.stringWidth(displayText)) / 2;
                     break;
+                default:
+                    break;
             }
             //int nextY = ta.getY() +  topPadding + (ta.getRowsGap() + fontHeight) * (i + 2);
             //if this is the last line to display and there is more content and isEndsWith3Points() is true
@@ -971,6 +973,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                         break;
                     case Component.CENTER:
                         x += (ta.getWidth() - leftPadding - rightPadding - f.stringWidth(displayText)) / 2;
+                        break;
+                    default:
                         break;
                 }
                 int nextY = ta.getY() + topPadding + (ta.getRowsGap() + fontHeight) * (i + 2);
@@ -1095,6 +1099,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 case Label.BOTTOM:
                 case Label.TOP:
                     prefH += gap;
+                    break;
+                default:
                     break;
             }
         }

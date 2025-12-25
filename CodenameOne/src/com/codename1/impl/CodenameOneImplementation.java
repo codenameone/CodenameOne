@@ -7976,18 +7976,6 @@ public abstract class CodenameOneImplementation {
             int iH = bgImageOrig.getHeight();
             Object bgImage = bgImageOrig.getImage();
             switch (s.getBackgroundType()) {
-                case Style.BACKGROUND_IMAGE_SCALED:
-                    if (isScaledImageDrawingSupported()) {
-                        drawImage(nativeGraphics, bgImage, x, y, width, height);
-                    } else {
-                        if (iW != width || iH != height) {
-                            bgImageOrig = bgImageOrig.scaled(width, height);
-                            s.setBgImage(bgImageOrig, true);
-                            bgImage = bgImageOrig.getImage();
-                        }
-                        drawImage(nativeGraphics, bgImage, x, y);
-                    }
-                    return;
                 case Style.BACKGROUND_IMAGE_SCALED_FILL:
                     float r = Math.max(((float) width) / ((float) iW), ((float) height) / ((float) iH));
                     int bwidth = (int) (((float) iW) * r);
@@ -8110,8 +8098,19 @@ public abstract class CodenameOneImplementation {
                 case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
                 case Style.BACKGROUND_GRADIENT_RADIAL:
                     drawGradientBackground(s, nativeGraphics, x, y, width, height);
-                default:
                     return;
+                default:
+                    // Style.BACKGROUND_IMAGE_SCALED:
+                    if (isScaledImageDrawingSupported()) {
+                        drawImage(nativeGraphics, bgImage, x, y, width, height);
+                    } else {
+                        if (iW != width || iH != height) {
+                            bgImageOrig = bgImageOrig.scaled(width, height);
+                            s.setBgImage(bgImageOrig, true);
+                            bgImage = bgImageOrig.getImage();
+                        }
+                        drawImage(nativeGraphics, bgImage, x, y);
+                    }
             }
         }
     }
