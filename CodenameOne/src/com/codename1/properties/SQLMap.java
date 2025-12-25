@@ -663,7 +663,7 @@ public class SQLMap {
                 if (s == null) {
                     return null;
                 }
-                byte[] d = Base64.decode(Util.getBytes(s));
+                byte[] d = Base64.decode(com.codename1.util.StringUtil.getBytes(s));
                 Class t = base.getGenericType();
                 if (t == EncodedImage.class) {
                     return EncodedImage.create(d);

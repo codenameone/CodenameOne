@@ -105,7 +105,7 @@ public class TwitterRESTService extends ConnectionRequest {
         auth.setUrl("https://api.twitter.com/oauth2/token");
 
         // YOU MUST CHANGE THIS IF YOU BUILD YOUR OWN APP
-        String encoded = Base64.encodeNoNewline(com.codename1.io.Util.getBytes(consumerKey + ":" + consumerSecret));
+        String encoded = Base64.encodeNoNewline(com.codename1.util.StringUtil.getBytes(consumerKey + ":" + consumerSecret));
         auth.addRequestHeader("Authorization", "Basic " + encoded);
         auth.setContentType("application/x-www-form-urlencoded;charset=UTF-8");
         auth.addArgument("grant_type", "client_credentials");

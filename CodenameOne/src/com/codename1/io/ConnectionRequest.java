@@ -826,7 +826,7 @@ public class ConnectionRequest implements IOProgressListener {
             root = FileSystemStorage.getInstance().getAppHomePath() + "cn1ConCache/";
         }
         FileSystemStorage.getInstance().mkdir(root);
-        String fileName = Base64.encodeNoNewline(Util.getBytes(createRequestURL())).replace('/', '-').replace('+', '_');
+        String fileName = Base64.encodeNoNewline(StringUtil.getBytes(createRequestURL())).replace('/', '-').replace('+', '_');
 
         // limit file name length for portability: https://stackoverflow.com/questions/54644088/why-is-codenameone-rest-giving-me-file-name-too-long-error
         if (fileName.length() > 255) {

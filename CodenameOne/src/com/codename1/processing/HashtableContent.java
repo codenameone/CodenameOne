@@ -65,7 +65,7 @@ class MapContent implements StructuredContent {
      * @throws IOException on error reading/parsing the string
      */
     public MapContent(String content) throws IOException {
-        this(com.codename1.io.Util.getReader(new ByteArrayInputStream(com.codename1.io.Util.getBytes(content))));
+        this(com.codename1.io.Util.getReader(new ByteArrayInputStream(com.codename1.util.StringUtil.getBytes(content))));
     }
 
     /**

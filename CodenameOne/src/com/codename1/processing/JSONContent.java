@@ -56,7 +56,7 @@ class JSONContent extends MapContent {
      * @throws IOException on error reading/parsing string
      */
     public JSONContent(String content) throws IOException {
-        this(com.codename1.io.Util.getReader(new ByteArrayInputStream(com.codename1.io.Util.getBytes(content))));
+        this(com.codename1.io.Util.getReader(new ByteArrayInputStream(com.codename1.util.StringUtil.getBytes(content))));
     }
 
     /**

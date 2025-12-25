@@ -872,7 +872,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             }
         }
         if (bais == null) { //encoding wasn't specified or failed
-            bais = new ByteArrayInputStream(com.codename1.io.Util.getBytes(htmlText));
+            bais = new ByteArrayInputStream(com.codename1.util.StringUtil.getBytes(htmlText));
         }
 
         InputStreamReader isr = null;

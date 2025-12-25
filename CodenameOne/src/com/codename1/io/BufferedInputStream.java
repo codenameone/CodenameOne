@@ -24,6 +24,7 @@
 package com.codename1.io;
 
 import com.codename1.ui.Display;
+import com.codename1.util.StringUtil;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -357,7 +358,7 @@ public class BufferedInputStream extends InputStream {
                     actualAvailable = -1;
                 } else {
                     if (printInput) {
-                        System.out.print(Util.newString(b, off, val));
+                        System.out.print(StringUtil.newString(b, off, val));
                     }
                 }
                 return val;
@@ -371,7 +372,7 @@ public class BufferedInputStream extends InputStream {
         int cnt = (avail < len) ? avail : len;
         System.arraycopy(getBufIfOpen(), pos, b, off, cnt);
         if (printInput) {
-            System.out.print(Util.newString(b, off, cnt));
+            System.out.print(StringUtil.newString(b, off, cnt));
         }
         pos += cnt;
         return cnt;
@@ -438,7 +439,7 @@ public class BufferedInputStream extends InputStream {
             int v = getInIfOpen().read(b, off, len);
             if (v > -1) {
                 if (printInput) {
-                    System.out.print(Util.newString(b, off, v));
+                    System.out.print(StringUtil.newString(b, off, v));
                 }
 
                 totalBytesRead += v;

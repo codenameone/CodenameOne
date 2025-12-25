@@ -36,6 +36,7 @@ import com.codename1.util.Base64;
 import com.codename1.util.Callback;
 import com.codename1.util.FailureCallback;
 import com.codename1.util.OnComplete;
+import com.codename1.util.StringUtil;
 import com.codename1.util.SuccessCallback;
 
 import java.io.IOException;
@@ -446,7 +447,7 @@ public class RequestBuilder {
      * @return RequestBuilder instance
      */
     public RequestBuilder basicAuth(String username, String password) {
-        header("Authorization", "Basic " + Base64.encodeNoNewline(com.codename1.io.Util.getBytes(username + ":" + password)));
+        header("Authorization", "Basic " + Base64.encodeNoNewline(StringUtil.getBytes(username + ":" + password)));
         return this;
     }
 
