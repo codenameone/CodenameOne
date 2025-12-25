@@ -217,6 +217,15 @@ public class CompilerHelper {
                 "#include <math.h>\n" +
                 "#include <limits.h>\n" +
                 "\n" +
+                "struct my_java_lang_String {\n" +
+                "    JAVA_OBJECT __codenameOneParentClsReference;\n" +
+                "    JAVA_OBJECT value;\n" +
+                "    JAVA_INT offset;\n" +
+                "    JAVA_INT count;\n" +
+                "    JAVA_INT hashCode;\n" +
+                "    JAVA_LONG nsString;\n" +
+                "};\n" +
+                "extern struct clazz class__java_lang_String;\n" +
                 "static struct ThreadLocalData globalThreadData;\n" +
                 "static int runtimeInitialized = 0;\n" +
                 "\n" +
@@ -417,10 +426,34 @@ public class CompilerHelper {
                 "JAVA_OBJECT java_lang_StringBuilder_append___char_R_java_lang_StringBuilder(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_CHAR c) { return me; }\n" +
                 "JAVA_BOOLEAN java_lang_String_equals___java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_OBJECT other) { return 0; }\n" +
                 "JAVA_OBJECT java_lang_Enum_valueOf___java_lang_Class_java_lang_String_R_java_lang_Enum(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT enumType, JAVA_OBJECT name) { return JAVA_NULL; }\n" +
-                "JAVA_OBJECT java_lang_Integer_toString___int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_INT i) { return JAVA_NULL; }\n" +
+                "JAVA_OBJECT java_lang_Integer_toString___int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_INT i) {\n" +
+                "    char buf[32];\n" +
+                "    sprintf(buf, \"%d\", i);\n" +
+                "    int len = strlen(buf);\n" +
+                "    JAVA_OBJECT charArrObj = allocArray(threadStateData, len, &class_array1__JAVA_CHAR, sizeof(JAVA_CHAR), 1);\n" +
+                "    struct JavaArrayPrototype* charArr = (struct JavaArrayPrototype*)charArrObj;\n" +
+                "    JAVA_CHAR* dst = (JAVA_CHAR*)charArr->data;\n" +
+                "    for(int k=0; k<len; k++) dst[k] = buf[k];\n" +
+                "    JAVA_OBJECT strObj = codenameOneGcMalloc(threadStateData, sizeof(struct my_java_lang_String), &class__java_lang_String);\n" +
+                "    struct my_java_lang_String* str = (struct my_java_lang_String*)strObj;\n" +
+                "    str->value = charArrObj;\n" +
+                "    str->count = len;\n" +
+                "    str->offset = 0;\n" +
+                "    return strObj;\n" +
+                "}\n" +
                 "JAVA_OBJECT java_lang_String_toUpperCase___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { return me; }\n" +
+                "JAVA_OBJECT java_lang_String_toLowerCase___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { return me; }\n" +
                 "JAVA_OBJECT java_text_DateFormat_format___java_util_Date_java_lang_StringBuffer_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_OBJECT date, JAVA_OBJECT buffer) { return JAVA_NULL; }\n" +
-                "void java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT src, JAVA_INT srcPos, JAVA_OBJECT dest, JAVA_INT destPos, JAVA_INT length) {}\n" +
+                "void java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT src, JAVA_INT srcPos, JAVA_OBJECT dest, JAVA_INT destPos, JAVA_INT length) {\n" +
+                "    if (src == JAVA_NULL || dest == JAVA_NULL) return;\n" +
+                "    struct JavaArrayPrototype* s = (struct JavaArrayPrototype*)src;\n" +
+                "    struct JavaArrayPrototype* d = (struct JavaArrayPrototype*)dest;\n" +
+                "    int elementSize = s->primitiveSize;\n" +
+                "    if (elementSize == 0) elementSize = sizeof(JAVA_OBJECT);\n" +
+                "    char* srcPtr = (char*)s->data + srcPos * elementSize;\n" +
+                "    char* destPtr = (char*)d->data + destPos * elementSize;\n" +
+                "    memmove(destPtr, srcPtr, length * elementSize);\n" +
+                "}\n" +
                 "JAVA_BOOLEAN removeObjectFromHeapCollection(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { return 0; }\n" +
                 "JAVA_CHAR* java_io_InputStreamReader_bytesToChars___byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT b, JAVA_INT off, JAVA_INT len, JAVA_OBJECT enc) { return NULL; }\n" +
                 "void java_io_NSLogOutputStream_write___byte_1ARRAY_int_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_OBJECT b, JAVA_INT off, JAVA_INT len) {}\n" +
@@ -435,18 +468,62 @@ public class CompilerHelper {
                 "JAVA_OBJECT java_lang_Long_toString___long_int_R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_LONG l, JAVA_INT i) { return JAVA_NULL; }\n" +
                 "JAVA_OBJECT java_lang_Object_getClassImpl___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { return JAVA_NULL; }\n" +
                 "void java_lang_String_releaseNSString___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG l) {}\n" +
-                "JAVA_CHAR* java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT b, JAVA_INT off, JAVA_INT len, JAVA_OBJECT enc) { return NULL; }\n" +
+                "JAVA_OBJECT java_lang_String_bytesToChars___byte_1ARRAY_int_int_java_lang_String_R_char_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT b, JAVA_INT off, JAVA_INT len, JAVA_OBJECT enc) {\n" +
+                "    if (b == JAVA_NULL) return JAVA_NULL;\n" +
+                "    JAVA_OBJECT charArrObj = allocArray(threadStateData, len, &class_array1__JAVA_CHAR, sizeof(JAVA_CHAR), 1);\n" +
+                "    struct JavaArrayPrototype* charArr = (struct JavaArrayPrototype*)charArrObj;\n" +
+                "    struct JavaArrayPrototype* byteArr = (struct JavaArrayPrototype*)b;\n" +
+                "    JAVA_BYTE* src = (JAVA_BYTE*)byteArr->data;\n" +
+                "    JAVA_CHAR* dst = (JAVA_CHAR*)charArr->data;\n" +
+                "    for (int i=0; i<len; i++) dst[i] = (JAVA_CHAR)src[off + i];\n" +
+                "    return charArrObj;\n" +
+                "}\n" +
                 "void java_lang_StringBuilder_getChars___int_int_char_1ARRAY_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT srcBegin, JAVA_INT srcEnd, JAVA_OBJECT dst, JAVA_INT dstBegin) {}\n" +
                 "JAVA_INT java_lang_Math_min___int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_INT a, JAVA_INT b) { return a < b ? a : b; }\n" +
-                "JAVA_OBJECT java_lang_String_charsToBytes___char_1ARRAY_char_1ARRAY_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT c1, JAVA_OBJECT c2) { return JAVA_NULL; }\n" +
+                "JAVA_OBJECT java_lang_String_charsToBytes___char_1ARRAY_char_1ARRAY_R_byte_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT c1, JAVA_OBJECT c2) {\n" +
+                "    if (c1 == JAVA_NULL) return JAVA_NULL;\n" +
+                "    struct JavaArrayPrototype* charArr = (struct JavaArrayPrototype*)c1;\n" +
+                "    JAVA_INT len = charArr->length;\n" +
+                "    JAVA_OBJECT byteArrObj = allocArray(threadStateData, len, &class_array1__JAVA_BYTE, 1, 1);\n" +
+                "    struct JavaArrayPrototype* byteArr = (struct JavaArrayPrototype*)byteArrObj;\n" +
+                "    JAVA_CHAR* src = (JAVA_CHAR*)charArr->data;\n" +
+                "    JAVA_BYTE* dst = (JAVA_BYTE*)byteArr->data;\n" +
+                "    for (int i=0; i<len; i++) dst[i] = (JAVA_BYTE)src[i];\n" +
+                "    return byteArrObj;\n" +
+                "}\n" +
                 "JAVA_INT java_lang_String_indexOf___int_int_R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT ch, JAVA_INT fromIndex) { return -1; }\n" +
                 "JAVA_INT java_lang_String_hashCode___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { return 0; }\n" +
                 "JAVA_OBJECT java_lang_String_toString___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { return me; }\n" +
                 "JAVA_CHAR java_lang_String_charAt___int_R_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT index) { return 0; }\n" +
-                "JAVA_OBJECT java_lang_String_getChars___int_int_char_1ARRAY_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT srcBegin, JAVA_INT srcEnd, JAVA_OBJECT dst, JAVA_INT dstBegin) { return JAVA_NULL; }\n" +
+                "void java_lang_String_getChars___int_int_char_1ARRAY_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT srcBegin, JAVA_INT srcEnd, JAVA_OBJECT dst, JAVA_INT dstBegin) {\n" +
+                "    struct my_java_lang_String* s = (struct my_java_lang_String*)me;\n" +
+                "    if (s == JAVA_NULL || dst == JAVA_NULL) return;\n" +
+                "    struct JavaArrayPrototype* srcArr = (struct JavaArrayPrototype*)s->value;\n" +
+                "    struct JavaArrayPrototype* dstArr = (struct JavaArrayPrototype*)dst;\n" +
+                "    if (srcArr == JAVA_NULL) return;\n" +
+                "    JAVA_CHAR* srcData = (JAVA_CHAR*)srcArr->data;\n" +
+                "    JAVA_CHAR* dstData = (JAVA_CHAR*)dstArr->data;\n" +
+                "    int offset = s->offset;\n" +
+                "    int count = srcEnd - srcBegin;\n" +
+                "    for (int i=0; i<count; i++) {\n" +
+                "        dstData[dstBegin + i] = srcData[offset + srcBegin + i];\n" +
+                "    }\n" +
+                "}\n" +
                 "JAVA_CHAR java_lang_StringBuilder_charAt___int_R_char(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT index) { return 0; }\n" +
                 "void java_lang_Thread_releaseThreadNativeResources___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG l) {}\n" +
-                "void java_lang_Thread_setPriorityImpl___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT i) {}\n";
+                "void java_lang_Thread_setPriorityImpl___int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_INT i) {}\n" +
+                "void test_Main_print___java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) {\n" +
+                "    if (str == JAVA_NULL) return;\n" +
+                "    struct my_java_lang_String* s = (struct my_java_lang_String*)str;\n" +
+                "    struct JavaArrayPrototype* val = (struct JavaArrayPrototype*)s->value;\n" +
+                "    int len = s->count;\n" +
+                "    int off = s->offset;\n" +
+                "    JAVA_CHAR* chars = (JAVA_CHAR*)val->data;\n" +
+                "    for(int i=0; i<len; i++) {\n" +
+                "        printf(\"%c\", (char)chars[off+i]);\n" +
+                "    }\n" +
+                "    printf(\"\\n\");\n" +
+                "}\n";
 
             java.nio.file.Files.write(stubs, content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
