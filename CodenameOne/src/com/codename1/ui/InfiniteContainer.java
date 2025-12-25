@@ -124,8 +124,17 @@ public abstract class InfiniteContainer extends Container {
     }
 
     void refreshImpl() {
+        if (requestingResults) {
+            return;
+        }
         requestingResults = true;
-        Component[] components = fetchComponents(0, amount);
+        Component[] components;
+        try {
+            components = fetchComponents(0, amount);
+        } catch(RuntimeException err) {
+            requestingResults = false;
+            throw err;
+        }
         if (components == null) {
             components = new Component[0];
         }

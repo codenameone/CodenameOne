@@ -6977,6 +6977,7 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
             }
             if (msg.getMimeType().equals(Message.MIME_HTML)) {
                 emailIntent.putExtra(android.content.Intent.EXTRA_TEXT, Html.fromHtml(msg.getContent()));
+                emailIntent.putExtra("android.intent.extra.HTML_TEXT", msg.getContent());
             }else{
                 /*
                 // Attempted this workaround to fix the ClassCastException that occurs on android when
