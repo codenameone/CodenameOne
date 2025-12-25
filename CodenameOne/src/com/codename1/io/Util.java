@@ -159,7 +159,7 @@ public class Util {
      * @param in the input stream
      * @return the reader
      */
-    public static Reader getReader(InputStream in) {
+    public static InputStreamReader getReader(InputStream in) {
         try {
             return new InputStreamReader(in, "UTF-8");
         } catch(UnsupportedEncodingException e) {
@@ -173,7 +173,7 @@ public class Util {
      * @param out the output stream
      * @return the writer
      */
-    public static Writer getWriter(OutputStream out) {
+    public static OutputStreamWriter getWriter(OutputStream out) {
         try {
             return new OutputStreamWriter(out, "UTF-8");
         } catch(UnsupportedEncodingException e) {

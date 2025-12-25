@@ -336,7 +336,7 @@ public class Log {
                 char[] buffer = new char[1024];
                 int size = r.read(buffer);
                 while (size > -1) {
-                    text += Util.newString(buffer, 0, size);
+                    text += new String(buffer, 0, size);
                     size = r.read(buffer);
                 }
                 r.close();
