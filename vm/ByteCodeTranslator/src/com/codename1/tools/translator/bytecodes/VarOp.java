@@ -84,9 +84,15 @@ public class VarOp extends Instruction implements AssignableExpression {
                 if (getMethod() != null && !getMethod().isStatic() && var == 0) {
                     b.append("__cn1ThisObject");
                 } else {
-                    b.append("locals[");
-                    b.append(var);
-                    b.append("].data.o");
+                    if(getMethod() != null && getMethod().isBarebone()) {
+                        b.append("olocals_");
+                        b.append(var);
+                        b.append("_");
+                    } else {
+                        b.append("locals[");
+                        b.append(var);
+                        b.append("].data.o");
+                    }
                 }
                 break;
             default:
@@ -113,6 +119,9 @@ public class VarOp extends Instruction implements AssignableExpression {
             case Opcodes.DSTORE:
                 return ex.assignTo("dlocals_"+var+"_", b);
             case Opcodes.ASTORE: {
+                if(getMethod() != null && getMethod().isBarebone()) {
+                    return ex.assignTo("olocals_" + var + "_", b);
+                }
                 StringBuilder sb = new StringBuilder();
                 sb.append("locals[").append(var).append("].type=CN1_TYPE_INVALID;");
                 boolean res = ex.assignTo("locals["+var+"].data.o", sb);
@@ -161,6 +170,12 @@ public class VarOp extends Instruction implements AssignableExpression {
             break;
 
             case Opcodes.ASTORE: {
+                if(getMethod() != null && getMethod().isBarebone()) {
+                    if (ex.appendExpression(sb)) {
+                        b.append("olocals_").append(var).append("_ = ").append(sb.toString().trim()).append(";\n");
+                        return true;
+                    }
+                }
                 StringBuilder sb2 = new StringBuilder();
                 //sb2.append("locals[").append(var).append("].type=CN1_TYPE_INVALID; ");
                 if (ex.appendExpression(sb)) {
@@ -214,6 +229,12 @@ public class VarOp extends Instruction implements AssignableExpression {
                 b.append("BC_DSTORE(");
                 break;
             case Opcodes.ASTORE:
+                if(getMethod() != null && getMethod().isBarebone()) {
+                    b.append("olocals_");
+                    b.append(var);
+                    b.append("_ = POP_OBJ(); /* ASTORE */\n");
+                    return;
+                }
                 b.append("BC_ASTORE(");
                 break;
             case Opcodes.RET:

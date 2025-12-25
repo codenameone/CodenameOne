@@ -41,6 +41,14 @@ public class IInc extends Instruction {
 
     @Override
     public void appendInstruction(StringBuilder b) {
+        if(getMethod() != null && getMethod().isBarebone()) {
+            b.append("    ilocals_");
+            b.append(var);
+            b.append("_ += ");
+            b.append(num);
+            b.append(";\n");
+            return;
+        }
         b.append("    BC_IINC(");
         b.append(var);
         b.append(", ");
