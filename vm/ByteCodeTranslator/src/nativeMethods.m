@@ -1090,6 +1090,7 @@ struct ThreadLocalData* getThreadLocalData() {
         i->threadBlockedByGC = JAVA_FALSE;
         i->threadActive = JAVA_FALSE;
         i->threadKilled = JAVA_FALSE;
+        i->interrupted = JAVA_FALSE;
         
         i->currentThreadObject = 0;
         
@@ -1459,6 +1460,40 @@ JAVA_VOID java_lang_Thread_start__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT th) {
 
 JAVA_LONG java_lang_Thread_getNativeThreadId___R_long(CODENAME_ONE_THREAD_STATE) {
     return currentThreadId();
+}
+
+JAVA_VOID java_lang_Thread_interrupt0__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) {
+    lockCriticalSection();
+    for(int i=0; i<NUMBER_OF_SUPPORTED_THREADS; i++) {
+        struct ThreadLocalData* d = allThreads[i];
+        if(d && d->currentThreadObject == me) {
+            d->interrupted = JAVA_TRUE;
+            break;
+        }
+    }
+    unlockCriticalSection();
+}
+
+JAVA_BOOLEAN java_lang_Thread_isInterrupted___boolean_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me, JAVA_BOOLEAN clear) {
+    JAVA_BOOLEAN ret = JAVA_FALSE;
+    // optimization: checking current thread
+    if(threadStateData->currentThreadObject == me) {
+        ret = threadStateData->interrupted;
+        if(clear) threadStateData->interrupted = JAVA_FALSE;
+        return ret;
+    }
+
+    lockCriticalSection();
+    for(int i=0; i<NUMBER_OF_SUPPORTED_THREADS; i++) {
+        struct ThreadLocalData* d = allThreads[i];
+        if(d && d->currentThreadObject == me) {
+            ret = d->interrupted;
+            if(clear) d->interrupted = JAVA_FALSE;
+            break;
+        }
+    }
+    unlockCriticalSection();
+    return ret;
 }
 
 JAVA_DOUBLE java_lang_StringToReal_parseDblImpl___java_lang_String_int_R_double(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s, JAVA_INT e) {
