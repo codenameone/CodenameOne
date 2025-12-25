@@ -781,7 +781,7 @@ public class ByteCodeClass {
             if (fld.isVolatile()) {
                 b.append("return atomic_load(&((struct obj__");
                 b.append(clsName);
-                b.append(")__cn1T)->");
+                b.append("*)__cn1T)->");
                 b.append(fld.getClsName());
                 b.append("_");
                 b.append(fld.getFieldName());
@@ -789,7 +789,7 @@ public class ByteCodeClass {
             } else {
                 b.append("return ((struct obj__");
                 b.append(clsName);
-                b.append(")__cn1T)->");
+                b.append("*)__cn1T)->");
                 b.append(fld.getClsName());
                 b.append("_");
                 b.append(fld.getFieldName());
@@ -810,7 +810,7 @@ public class ByteCodeClass {
             if (fld.isVolatile()) {
                 b.append("atomic_store(&((struct obj__");
                 b.append(clsName);
-                b.append(")__cn1T)->");
+                b.append("*)__cn1T)->");
                 b.append(fld.getClsName());
                 b.append("_");
                 b.append(fld.getFieldName());
@@ -818,7 +818,7 @@ public class ByteCodeClass {
             } else {
                 b.append("((struct obj__");
                 b.append(clsName);
-                b.append(")__cn1T)->");
+                b.append("*)__cn1T)->");
                 b.append(fld.getClsName());
                 b.append("_");
                 b.append(fld.getFieldName());
