@@ -84,9 +84,15 @@ public class VarOp extends Instruction implements AssignableExpression {
                 if (getMethod() != null && !getMethod().isStatic() && var == 0) {
                     b.append("__cn1ThisObject");
                 } else {
-                    b.append("locals[");
-                    b.append(var);
-                    b.append("].data.o");
+                    if(getMethod() != null && getMethod().isBarebone()) {
+                        b.append("olocals_");
+                        b.append(var);
+                        b.append("_");
+                    } else {
+                        b.append("locals[");
+                        b.append(var);
+                        b.append("].data.o");
+                    }
                 }
                 break;
             default:
@@ -113,6 +119,12 @@ public class VarOp extends Instruction implements AssignableExpression {
             case Opcodes.DSTORE:
                 return ex.assignTo("dlocals_"+var+"_", b);
             case Opcodes.ASTORE: {
+                if(getMethod() != null && getMethod().isBarebone()) {
+                    if (!getMethod().isStatic() && var == 0) {
+                        return ex.assignTo("__cn1ThisObject", b);
+                    }
+                    return ex.assignTo("olocals_" + var + "_", b);
+                }
                 StringBuilder sb = new StringBuilder();
                 sb.append("locals[").append(var).append("].type=CN1_TYPE_INVALID;");
                 boolean res = ex.assignTo("locals["+var+"].data.o", sb);
@@ -161,6 +173,16 @@ public class VarOp extends Instruction implements AssignableExpression {
             break;
 
             case Opcodes.ASTORE: {
+                if(getMethod() != null && getMethod().isBarebone()) {
+                    if (ex.appendExpression(sb)) {
+                        if (!getMethod().isStatic() && var == 0) {
+                            b.append("__cn1ThisObject = ").append(sb.toString().trim()).append(";\n");
+                        } else {
+                            b.append("olocals_").append(var).append("_ = ").append(sb.toString().trim()).append(";\n");
+                        }
+                        return true;
+                    }
+                }
                 StringBuilder sb2 = new StringBuilder();
                 //sb2.append("locals[").append(var).append("].type=CN1_TYPE_INVALID; ");
                 if (ex.appendExpression(sb)) {
@@ -184,36 +206,104 @@ public class VarOp extends Instruction implements AssignableExpression {
         b.append("    ");
         switch(opcode) {
             case Opcodes.ILOAD:
+                if (getMethod() != null && getMethod().isBarebone()) {
+                    b.append("PUSH_INT(ilocals_");
+                    b.append(var);
+                    b.append("_); /* ILOAD */\n");
+                    return;
+                }
                 b.append("(*SP).type = CN1_TYPE_INT; /* ILOAD */ \n" +
                         "    (*SP).data.i = ilocals_");
                 b.append(var);
                 b.append("_; \n    SP++;\n");
                 return;
             case Opcodes.LLOAD:
+                if (getMethod() != null && getMethod().isBarebone()) {
+                    b.append("PUSH_LONG(llocals_");
+                    b.append(var);
+                    b.append("_); /* LLOAD */\n");
+                    return;
+                }
                 b.append("BC_LLOAD(");
                 break;
             case Opcodes.FLOAD:
+                if (getMethod() != null && getMethod().isBarebone()) {
+                    b.append("PUSH_FLOAT(flocals_");
+                    b.append(var);
+                    b.append("_); /* FLOAD */\n");
+                    return;
+                }
                 b.append("BC_FLOAD(");
                 break;
             case Opcodes.DLOAD:
+                if (getMethod() != null && getMethod().isBarebone()) {
+                    b.append("PUSH_DOUBLE(dlocals_");
+                    b.append(var);
+                    b.append("_); /* DLOAD */\n");
+                    return;
+                }
                 b.append("BC_DLOAD(");
                 break;
             case Opcodes.ALOAD:
+                if (getMethod() != null && getMethod().isBarebone()) {
+                    if (!getMethod().isStatic() && var == 0) {
+                        b.append("PUSH_POINTER(__cn1ThisObject); /* ALOAD */\n");
+                    } else {
+                        b.append("PUSH_POINTER(olocals_");
+                        b.append(var);
+                        b.append("_); /* ALOAD */\n");
+                    }
+                    return;
+                }
                 b.append("BC_ALOAD(");
                 break;
             case Opcodes.ISTORE:
+                if (getMethod() != null && getMethod().isBarebone()) {
+                    b.append("ilocals_");
+                    b.append(var);
+                    b.append("_ = POP_INT(); /* ISTORE */\n");
+                    return;
+                }
                 b.append("BC_ISTORE(");
                 break;
             case Opcodes.LSTORE:
+                if (getMethod() != null && getMethod().isBarebone()) {
+                    b.append("llocals_");
+                    b.append(var);
+                    b.append("_ = POP_LONG(); /* LSTORE */\n");
+                    return;
+                }
                 b.append("BC_LSTORE(");
                 break;
             case Opcodes.FSTORE:
+                if (getMethod() != null && getMethod().isBarebone()) {
+                    b.append("flocals_");
+                    b.append(var);
+                    b.append("_ = POP_FLOAT(); /* FSTORE */\n");
+                    return;
+                }
                 b.append("BC_FSTORE(");
                 break;
             case Opcodes.DSTORE:
+                if (getMethod() != null && getMethod().isBarebone()) {
+                    b.append("dlocals_");
+                    b.append(var);
+                    b.append("_ = POP_DOUBLE(); /* DSTORE */\n");
+                    return;
+                }
                 b.append("BC_DSTORE(");
                 break;
             case Opcodes.ASTORE:
+                if(getMethod() != null && getMethod().isBarebone()) {
+                    if (!getMethod().isStatic() && var == 0) {
+                        b.append("__cn1ThisObject = POP_OBJ(); /* ASTORE */\n");
+                    } else {
+                        b.append("olocals_");
+                        b.append(var);
+                        b.append("_ = POP_OBJ(); /* ASTORE */\n");
+                    }
+                    return;
+                }
                 b.append("BC_ASTORE(");
                 break;
             case Opcodes.RET:

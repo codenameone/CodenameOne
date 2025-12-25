@@ -499,6 +499,10 @@ public class CustomInvoke extends Instruction {
         }
         literalArgs[index] = arg;
     }
+
+    public String[] getLiteralArgs() {
+        return literalArgs;
+    }
     
     private int getNumLiteralArgs() {
         if (literalArgs == null) {

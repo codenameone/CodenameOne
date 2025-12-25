@@ -106,6 +106,7 @@ public class BytecodeMethod implements SignatureSet {
     private final static Set<String> virtualMethodsInvoked = new TreeSet<String>();    
     private String desc;
     private boolean eliminated;
+    private boolean barebone;
 
     
     static boolean optimizerOn;
@@ -114,6 +115,150 @@ public class BytecodeMethod implements SignatureSet {
         String op = System.getProperty("optimizer");
         optimizerOn = op == null || op.equalsIgnoreCase("on");
         //optimizerOn = false;
+    }
+
+    public boolean isBarebone() {
+        return barebone;
+    }
+
+    private boolean checkBarebone() {
+        if(synchronizedMethod || nativeMethod || hasExceptionHandlingOrMethodCalls() || localVariables.size() > 0) {
+            return false;
+        }
+        int argSlots = 0;
+        if(!staticMethod) {
+            argSlots++;
+        }
+        for(ByteCodeMethodArg arg : arguments) {
+            argSlots++;
+            if(arg.isDoubleOrLong()) {
+                argSlots++;
+            }
+        }
+        if(maxLocals > argSlots) {
+            return false;
+        }
+        for(Instruction i : instructions) {
+            if(i instanceof LabelInstruction || i instanceof LineNumber || i instanceof IInc ||
+                    i instanceof Jump || i instanceof CustomJump || i instanceof LocalVariable) {
+                continue;
+            }
+            if(i instanceof BasicInstruction) {
+                int op = i.getOpcode();
+                switch(op) {
+                    case Opcodes.SIPUSH:
+                    case Opcodes.BIPUSH:
+                    case Opcodes.ICONST_0:
+                    case Opcodes.ICONST_1:
+                    case Opcodes.ICONST_2:
+                    case Opcodes.ICONST_3:
+                    case Opcodes.ICONST_4:
+                    case Opcodes.ICONST_5:
+                    case Opcodes.ICONST_M1:
+                    case Opcodes.LCONST_0:
+                    case Opcodes.LCONST_1:
+                    case Opcodes.FCONST_0:
+                    case Opcodes.FCONST_1:
+                    case Opcodes.FCONST_2:
+                    case Opcodes.DCONST_0:
+                    case Opcodes.DCONST_1:
+                    case Opcodes.RETURN:
+                    case Opcodes.IRETURN:
+                    case Opcodes.LRETURN:
+                    case Opcodes.FRETURN:
+                    case Opcodes.DRETURN:
+                    case Opcodes.ARETURN:
+                    case Opcodes.NOP:
+                    case Opcodes.POP:
+                    case Opcodes.POP2:
+                    case Opcodes.DUP:
+                    case Opcodes.DUP2:
+                    case Opcodes.DUP_X1:
+                    case Opcodes.DUP2_X1:
+                    case Opcodes.DUP_X2:
+                    case Opcodes.DUP2_X2:
+                    case Opcodes.SWAP:
+                    case Opcodes.IADD:
+                    case Opcodes.LADD:
+                    case Opcodes.FADD:
+                    case Opcodes.DADD:
+                    case Opcodes.ISUB:
+                    case Opcodes.LSUB:
+                    case Opcodes.FSUB:
+                    case Opcodes.DSUB:
+                    case Opcodes.IMUL:
+                    case Opcodes.LMUL:
+                    case Opcodes.FMUL:
+                    case Opcodes.DMUL:
+                    case Opcodes.IDIV:
+                    case Opcodes.LDIV:
+                    case Opcodes.FDIV:
+                    case Opcodes.DDIV:
+                    case Opcodes.IREM:
+                    case Opcodes.LREM:
+                    case Opcodes.FREM:
+                    case Opcodes.DREM:
+                    case Opcodes.INEG:
+                    case Opcodes.LNEG:
+                    case Opcodes.FNEG:
+                    case Opcodes.DNEG:
+                    case Opcodes.ISHL:
+                    case Opcodes.LSHL:
+                    case Opcodes.ISHR:
+                    case Opcodes.LSHR:
+                    case Opcodes.IUSHR:
+                    case Opcodes.LUSHR:
+                    case Opcodes.IAND:
+                    case Opcodes.LAND:
+                    case Opcodes.IOR:
+                    case Opcodes.LOR:
+                    case Opcodes.IXOR:
+                    case Opcodes.LXOR:
+                    case Opcodes.I2L:
+                    case Opcodes.I2F:
+                    case Opcodes.I2D:
+                    case Opcodes.L2I:
+                    case Opcodes.L2F:
+                    case Opcodes.L2D:
+                    case Opcodes.F2I:
+                    case Opcodes.F2L:
+                    case Opcodes.F2D:
+                    case Opcodes.D2I:
+                    case Opcodes.D2L:
+                    case Opcodes.D2F:
+                    case Opcodes.I2B:
+                    case Opcodes.I2C:
+                    case Opcodes.I2S:
+                    case Opcodes.LCMP:
+                    case Opcodes.FCMPG:
+                    case Opcodes.FCMPL:
+                    case Opcodes.DCMPL:
+                    case Opcodes.DCMPG:
+                        continue;
+                }
+                return false;
+            }
+            if(i instanceof VarOp) {
+                continue;
+            }
+            if(i instanceof ArithmeticExpression) {
+                continue;
+            }
+            if(i instanceof Field) {
+                int op = i.getOpcode();
+                if(op == Opcodes.GETFIELD) {
+                    continue;
+                }
+                if(op == Opcodes.PUTFIELD) {
+                    if(((Field)i).isObject()) {
+                        return false;
+                    }
+                    continue;
+                }
+            }
+            return false;
+        }
+        return true;
     }
     
     public BytecodeMethod(String clsName, int access, String name, String desc, String signature, String[] exceptions) {
@@ -603,6 +748,42 @@ public class BytecodeMethod implements SignatureSet {
         return false;
     }
     
+    private void fixUpBarebone() {
+        for (Instruction i : instructions) {
+            if (i instanceof CustomJump) {
+                CustomJump cj = (CustomJump)i;
+                String cmp = cj.getCustomCompareCode();
+                if (cmp != null) {
+                    cj.setCustomCompareCode(cmp.replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                }
+            } else if (i instanceof CustomIntruction) {
+                CustomIntruction ci = (CustomIntruction)i;
+                String code = ci.getCode();
+                if (code != null) {
+                    ci.setCode(code.replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                }
+                String complexCode = ci.getComplexCode();
+                if (complexCode != null) {
+                    ci.setComplexCode(complexCode.replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                }
+            } else if (i instanceof CustomInvoke) {
+                CustomInvoke ci = (CustomInvoke)i;
+                String target = ci.getTargetObjectLiteral();
+                if (target != null) {
+                    ci.setTargetObjectLiteral(target.replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                }
+                String[] args = ci.getLiteralArgs();
+                if (args != null) {
+                    for (int j=0; j<args.length; j++) {
+                        if (args[j] != null) {
+                            ci.setLiteralArg(j, args[j].replaceAll("locals\\[(\\d+)\\]\\.data\\.o", "olocals_$1_"));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     public void appendMethodC(StringBuilder b) {
         if(nativeMethod) {
             return;
@@ -626,10 +807,14 @@ public class BytecodeMethod implements SignatureSet {
         }
         
         if(hasInstructions) {
+            barebone = checkBarebone();
+            if (barebone) {
+                fixUpBarebone();
+            }
             Set<String> added = new HashSet<String>();
             for (LocalVariable lv : localVariables) {
                 String variableName = lv.getQualifier() + "locals_"+lv.getIndex()+"_";
-                if (!added.contains(variableName) && lv.getQualifier() != 'o') {
+                if (!added.contains(variableName) && (barebone || lv.getQualifier() != 'o')) {
                     added.add(variableName);
                     b.append("    volatile ");
                     switch (lv.getQualifier()) {
@@ -641,30 +826,36 @@ public class BytecodeMethod implements SignatureSet {
                             b.append("JAVA_FLOAT"); break;
                         case 'd' :
                             b.append("JAVA_DOUBLE"); break;
+                        case 'o' :
+                            b.append("JAVA_OBJECT"); break;
                     }
                     b.append(" ").append(lv.getQualifier()).append("locals_").append(lv.getIndex()).append("_ = 0; /* ").append(lv.getOrigName()).append(" */\n");
                 }
             }
             
-            if(staticMethod) {
-                if(methodName.equals("__CLINIT__")) {
-                    b.append("    DEFINE_METHOD_STACK(");
+            if(!barebone) {
+                if(staticMethod) {
+                    if(methodName.equals("__CLINIT__")) {
+                        b.append("    DEFINE_METHOD_STACK(");
+                    } else {
+                        b.append("    __STATIC_INITIALIZER_");
+                        b.append(clsName.replace('/', '_').replace('$', '_'));
+                        b.append("(threadStateData);\n    DEFINE_METHOD_STACK(");
+                    }
                 } else {
-                    b.append("    __STATIC_INITIALIZER_");
-                    b.append(clsName.replace('/', '_').replace('$', '_'));
-                    b.append("(threadStateData);\n    DEFINE_METHOD_STACK(");
+                    b.append("    DEFINE_INSTANCE_METHOD_STACK(");
                 }
+                b.append(maxStack);
+                b.append(", ");
+                b.append(maxLocals);
+                b.append(", 0, ");
+                b.append(Parser.addToConstantPool(clsName));
+                b.append(", ");
+                b.append(Parser.addToConstantPool(methodName));
+                b.append(");\n");
             } else {
-                b.append("    DEFINE_INSTANCE_METHOD_STACK(");
+                b.append("    struct elementStruct* SP = &threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset];\n");
             }
-            b.append(maxStack);
-            b.append(", ");
-            b.append(maxLocals);
-            b.append(", 0, ");
-            b.append(Parser.addToConstantPool(clsName));
-            b.append(", ");
-            b.append(Parser.addToConstantPool(methodName));
-            b.append(");\n");
             int startOffset = 0;
             if(synchronizedMethod) {
                 if(staticMethod) {
@@ -676,25 +867,34 @@ public class BytecodeMethod implements SignatureSet {
                 }
             }
             if(!staticMethod) {
-                b.append("    locals[0].data.o = __cn1ThisObject; locals[0].type = CN1_TYPE_OBJECT; ");
+                if(!barebone) {
+                    b.append("    locals[0].data.o = __cn1ThisObject; locals[0].type = CN1_TYPE_OBJECT; ");
+                }
                 startOffset++;
             }
             int localsOffset = startOffset;
             for(int iter = 0 ; iter < arguments.size() ; iter++) {
                 ByteCodeMethodArg arg = arguments.get(iter);
                 if (arg.getQualifier() == 'o') {
-                    b.append("    locals[");
-                    b.append(localsOffset);
-                    b.append("].data.");
+                    if(barebone) {
+                        b.append("    JAVA_OBJECT olocals_");
+                        b.append(localsOffset);
+                        b.append("_ = __cn1Arg");
+                        b.append(iter + 1);
+                        b.append(";\n");
+                    } else {
+                        b.append("    locals[");
+                        b.append(localsOffset);
+                        b.append("].data.");
 
-                    b.append(arg.getQualifier());
-                    b.append(" = __cn1Arg");
-                    b.append(iter + 1);
-                    b.append(";\n");
-                    b.append("    locals[");
-                    b.append(localsOffset);
-                    b.append("].type = CN1_TYPE_OBJECT;\n");
-                   
+                        b.append(arg.getQualifier());
+                        b.append(" = __cn1Arg");
+                        b.append(iter + 1);
+                        b.append(";\n");
+                        b.append("    locals[");
+                        b.append(localsOffset);
+                        b.append("].type = CN1_TYPE_OBJECT;\n");
+                    }
                 } else {
                     b.append("    ");
                     if (!hasLocalVariableWithIndex(arg.getQualifier(), localsOffset)) {
@@ -739,6 +939,7 @@ public class BytecodeMethod implements SignatureSet {
         TryCatch.reset();
         BasicInstruction.setHasInstructions(hasInstructions);
         for(Instruction i : instructions) {
+            i.setMethod(this);
             i.setMaxes(maxStack, maxLocals);
             i.appendInstruction(b, instructions);
         }

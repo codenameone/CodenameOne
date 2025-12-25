@@ -532,9 +532,13 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
 //                    b.append(maxLocals);
 //                    b.append(", stack, locals, methodBlockOffset); \n    return SP[-1].data.i;\n");
                 } else {
-                    b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); return SP[-1].data.i;\n");
+                    if(getMethod() != null && getMethod().isBarebone()) {
+                        b.append("    return SP[-1].data.i;\n");
+                    } else {
+                        b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); return SP[-1].data.i;\n");
 //                    b.append(maxLocals);
 //                    b.append(", stack, locals); \n    return SP[-1].data.i;\n");
+                    }
                 }
                 break;                
                 
@@ -544,7 +548,11 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_LONG();\n");
                 } else {
-                    b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_LONG();\n");
+                    if(getMethod() != null && getMethod().isBarebone()) {
+                        b.append("    return POP_LONG();\n");
+                    } else {
+                        b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_LONG();\n");
+                    }
                 }
                 break;                
                 
@@ -554,7 +562,11 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_FLOAT();\n");
                 } else {
-                    b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_FLOAT();\n");
+                    if(getMethod() != null && getMethod().isBarebone()) {
+                        b.append("    return POP_FLOAT();\n");
+                    } else {
+                        b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_FLOAT();\n");
+                    }
                 }
                 break;                
                 
@@ -564,7 +576,11 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_DOUBLE();\n");
                 } else {
-                    b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_DOUBLE();\n");
+                    if(getMethod() != null && getMethod().isBarebone()) {
+                        b.append("    return POP_DOUBLE();\n");
+                    } else {
+                        b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_DOUBLE();\n");
+                    }
                 }
                 break;
                 
@@ -574,7 +590,11 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return POP_OBJ();\n");
                 } else {
-                    b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_OBJ();\n");
+                    if(getMethod() != null && getMethod().isBarebone()) {
+                        b.append("    return POP_OBJ();\n");
+                    } else {
+                        b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return POP_OBJ();\n");
+                    }
                 }
                 break;
                 
@@ -588,7 +608,11 @@ public class BasicInstruction extends Instruction implements AssignableExpressio
                 if(TryCatch.isTryCatchInMethod()) {
                     b.append("    releaseForReturnInException(threadStateData, cn1LocalsBeginInThread, methodBlockOffset); \n    return;\n");
                 } else {
-                    b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return;\n");
+                    if(getMethod() != null && getMethod().isBarebone()) {
+                        b.append("    return;\n");
+                    } else {
+                        b.append("    releaseForReturn(threadStateData, cn1LocalsBeginInThread); \n    return;\n");
+                    }
                 }
                 break;
                 

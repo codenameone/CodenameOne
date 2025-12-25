@@ -71,6 +71,22 @@ public class CustomIntruction extends Instruction implements AssignableExpressio
         return assignableExpression;
     }
 
+    public String getCode() {
+        return code;
+    }
+
+    public void setCode(String code) {
+        this.code = code;
+    }
+
+    public String getComplexCode() {
+        return complexCode;
+    }
+
+    public void setComplexCode(String complexCode) {
+        this.complexCode = complexCode;
+    }
+
     @Override
     public boolean assignTo(String varName, StringBuilder sb) {
         if (assignableExpression != null) {
