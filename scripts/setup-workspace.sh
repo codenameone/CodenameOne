@@ -68,7 +68,7 @@ fi
 
 JDK8_URL="https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u462-b08/OpenJDK8U-jdk_${arch_jdk8}_${os}_hotspot_8u462b08.tar.gz"
 JDK17_URL="https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.16%2B8/OpenJDK17U-jdk_${arch}_${os}_hotspot_17.0.16_8.tar.gz"
-MAVEN_URL="https://archive.apache.org/dist/maven/maven-3/3.9.6/binaries/apache-maven-3.9.6-bin.tar.gz"
+MAVEN_URL="https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.6/apache-maven-3.9.6-bin.tar.gz"
 
 install_jdk() {
   local url="$1" dest_var="$2"
@@ -78,7 +78,7 @@ install_jdk() {
     log "Using cached JDK archive $(basename "$archive")"
   else
     log "Downloading JDK from $url"
-    curl -fL "$url" -o "$archive"
+    curl -fL --retry 3 --retry-all-errors "$url" -o "$archive"
   fi
 
   local top
@@ -130,7 +130,7 @@ if [ -z "${MAVEN_HOME:-}" ] || ! [ -x "$MAVEN_HOME/bin/mvn" ]; then
     log "Using cached Maven archive $(basename "$mvn_archive")"
   else
     log "Downloading Maven from $MAVEN_URL"
-    curl -fL "$MAVEN_URL" -o "$mvn_archive"
+    curl -fL --retry 3 --retry-all-errors "$MAVEN_URL" -o "$mvn_archive"
   fi
   mvn_top=$(tar -tzf "$mvn_archive" 2>/dev/null | head -1 | cut -d/ -f1 || true)
   if [ -z "$mvn_top" ]; then

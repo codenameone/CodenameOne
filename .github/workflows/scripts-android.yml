@@ -117,6 +117,13 @@ jobs:
           echo "CN1SS_SKIP_COMMENT=1" >> $GITHUB_ENV
           echo "CN1SS_FAIL_ON_MISMATCH=1" >> $GITHUB_ENV
           echo "CN1SS_SKIP_COVERAGE=1" >> $GITHUB_ENV
+      - name: Cache codenameone-tools
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ hashFiles('scripts/setup-workspace.sh') }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
       - name: Setup workspace
         run: ./scripts/setup-workspace.sh -q -DskipTests
       - name: Build Android port
