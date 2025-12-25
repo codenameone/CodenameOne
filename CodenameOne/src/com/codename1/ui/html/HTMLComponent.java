@@ -1508,6 +1508,8 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             case HTMLElement.TAG_SMALL:
                 attribute = HTMLFont.SMALL;
                 break;
+            default:
+                break;
         }
         if (attribute == -1) {
             return font;
@@ -2660,6 +2662,8 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                 }
                 handleImage(element, align, submitCmd);
                 break;
+            default:
+                break;
         }
 
         if (cmp != null) {
@@ -2984,6 +2988,8 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     newLineIfNotEmpty(curAlign);
                     pushContainer(child);
                     break;
+                default:
+                    break;
                 case HTMLElement.TAG_FIELDSET:
                     newLineIfNotEmpty(curAlign);
                     Container newCont = new Container();
@@ -3297,7 +3303,6 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                         curTable.startSegment(HTMLTableModel.SEGMENT_TFOOT);
                     }
                     break;
-
             }
 
             if (child.getNumChildren() > 0) {
@@ -3626,6 +3631,8 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     if (curTable != null) {
                         curTable.endSegment();
                     }
+                    break;
+                default:
                     break;
 
             }

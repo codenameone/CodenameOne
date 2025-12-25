@@ -2301,6 +2301,9 @@ public class StyleParser {
                         break;
                     case Style.UNIT_TYPE_DIPS:
                         b.shadowSpread((float) sv.getValue());
+                        break;
+                    default:
+                        break;
                 }
             }
             if (getShadowX() != null) {

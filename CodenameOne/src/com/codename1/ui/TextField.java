@@ -1869,6 +1869,8 @@ public class TextField extends TextArea {
                     ev.consume();
                     editString();
                     break;
+                default:
+                    break;
             }
         }
     }

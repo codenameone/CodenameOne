@@ -796,6 +796,8 @@ public class UiBinding {
                         cmp.setSelectedString((String) toComponentType.convert(value));
                     }
                     break;
+                default:
+                    break;
             }
         }
 
@@ -812,8 +814,9 @@ public class UiBinding {
                         return (PropertyType) Integer.valueOf(cmp.getSelectedStringIndex());
                     }
                     return (PropertyType) toPropertyType.convert(cmp.getSelectedString());
+                default:
+                    throw new RuntimeException("Illegal state for picker binding");
             }
-            throw new RuntimeException("Illegal state for picker binding");
         }
 
         @Override

@@ -135,6 +135,8 @@ class Geometry {
                         prevX = buf[4];
                         prevY = buf[5];
                         break;
+                    default:
+                        break;
 
 
                 }

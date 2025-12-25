@@ -2350,6 +2350,8 @@ public class LayeredLayout extends Layout {
                         return "auto";
                     case UNIT_BASELINE:
                         return "baseline";
+                    default:
+                        break;
                 }
                 return null;
             }
@@ -2387,6 +2389,8 @@ public class LayeredLayout extends Layout {
                         return "auto";
                     case UNIT_BASELINE:
                         return "baseline";
+                    default:
+                        break;
                 }
                 return null;
             }
@@ -2969,6 +2973,7 @@ public class LayeredLayout extends Layout {
                             break;
                         default:
                             oppSide = Component.LEFT;
+                            break;
 
                     }
                     return cnst.insets[oppSide];
@@ -3470,6 +3475,8 @@ public class LayeredLayout extends Layout {
                         }
                         break;
                     }
+                    default:
+                        break;
 
                 }
                 //calculatedValue += delta;

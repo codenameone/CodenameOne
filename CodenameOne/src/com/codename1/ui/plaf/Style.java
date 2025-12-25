@@ -1732,6 +1732,8 @@ public class Style {
                 case Component.RIGHT:
                     orientation = Component.LEFT;
                     break;
+                default:
+                    break;
             }
         }
 
@@ -2348,6 +2350,8 @@ public class Style {
                     break;
                 case Component.RIGHT:
                     orientation = Component.LEFT;
+                    break;
+                default:
                     break;
             }
         }

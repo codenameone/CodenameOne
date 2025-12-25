@@ -2696,6 +2696,8 @@ public abstract class CodenameOneImplementation {
                 startX = Math.min(startX, 2f);
                 startY = Math.min(startY, 2f);
                 break;
+            default:
+                break;
         }
 
         // have we passed the motion threshold on the X axis?
@@ -5868,6 +5870,8 @@ public abstract class CodenameOneImplementation {
 
 
                         break;
+                    default:
+                        break;
                 }
             }
 
@@ -5926,6 +5930,8 @@ public abstract class CodenameOneImplementation {
             case Display.GALLERY_VIDEO:
             case Display.GALLERY_ALL:
                 return true;
+            default:
+                break;
         }
         return false;
     }
@@ -7970,24 +7976,6 @@ public abstract class CodenameOneImplementation {
             int iH = bgImageOrig.getHeight();
             Object bgImage = bgImageOrig.getImage();
             switch (s.getBackgroundType()) {
-                case Style.BACKGROUND_NONE:
-                    if (s.getBgTransparency() != 0) {
-                        setColor(nativeGraphics, s.getBgColor());
-                        fillRect(nativeGraphics, x, y, width, height, s.getBgTransparency());
-                    }
-                    return;
-                case Style.BACKGROUND_IMAGE_SCALED:
-                    if (isScaledImageDrawingSupported()) {
-                        drawImage(nativeGraphics, bgImage, x, y, width, height);
-                    } else {
-                        if (iW != width || iH != height) {
-                            bgImageOrig = bgImageOrig.scaled(width, height);
-                            s.setBgImage(bgImageOrig, true);
-                            bgImage = bgImageOrig.getImage();
-                        }
-                        drawImage(nativeGraphics, bgImage, x, y);
-                    }
-                    return;
                 case Style.BACKGROUND_IMAGE_SCALED_FILL:
                     float r = Math.max(((float) width) / ((float) iW), ((float) height) / ((float) iH));
                     int bwidth = (int) (((float) iW) * r);
@@ -8110,6 +8098,19 @@ public abstract class CodenameOneImplementation {
                 case Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL:
                 case Style.BACKGROUND_GRADIENT_RADIAL:
                     drawGradientBackground(s, nativeGraphics, x, y, width, height);
+                    return;
+                default:
+                    // Style.BACKGROUND_IMAGE_SCALED:
+                    if (isScaledImageDrawingSupported()) {
+                        drawImage(nativeGraphics, bgImage, x, y, width, height);
+                    } else {
+                        if (iW != width || iH != height) {
+                            bgImageOrig = bgImageOrig.scaled(width, height);
+                            s.setBgImage(bgImageOrig, true);
+                            bgImage = bgImageOrig.getImage();
+                        }
+                        drawImage(nativeGraphics, bgImage, x, y);
+                    }
             }
         }
     }
@@ -8129,6 +8130,13 @@ public abstract class CodenameOneImplementation {
                         x, y, width, height, s.getBackgroundGradientRelativeX(), s.getBackgroundGradientRelativeY(),
                         s.getBackgroundGradientRelativeSize());
                 return;
+            default:
+                // Style.BACKGROUND_NONE
+                if (s.getBgTransparency() != 0) {
+                    setColor(nativeGraphics, s.getBgColor());
+                    fillRect(nativeGraphics, x, y, width, height, s.getBgTransparency());
+                }
+                break;
         }
         setColor(nativeGraphics, s.getBgColor());
         fillRect(nativeGraphics, x, y, width, height, s.getBgTransparency());
@@ -8237,6 +8245,8 @@ public abstract class CodenameOneImplementation {
                     case Label.TOP:
                         y = y + (cmpHeight - (topPadding + bottomPadding + ((icon != null) ? iconHeight + gap : 0) + fontHeight)) / 2;
                         break;
+                    default:
+                        break;
                 }
                 break;
             case Component.CENTER:
@@ -8266,6 +8276,8 @@ public abstract class CodenameOneImplementation {
                                 + ((icon != null) ? iconHeight + gap : 0)
                                 + fontHeight)) / 2;
                         break;
+                    default:
+                        break;
                 }
                 break;
             case Component.RIGHT:
@@ -8294,6 +8306,8 @@ public abstract class CodenameOneImplementation {
                         y = y + (cmpHeight - (topPadding
                                 + bottomPadding
                                 + ((icon != null) ? iconHeight + gap : 0) + fontHeight)) / 2;
+                        break;
+                    default:
                         break;
                 }
                 break;
@@ -8380,6 +8394,8 @@ public abstract class CodenameOneImplementation {
                                 textDecoration, rtl, endsWith3Points, stringWidth, fontHeight);
                         drawImage(nativeGraphics, icon, x + iconStringWGap, y + fontHeight + gap);
                     }
+                    break;
+                default:
                     break;
             }
         }
@@ -8570,6 +8586,8 @@ public abstract class CodenameOneImplementation {
                     return Component.LEFT;
                 case Component.LEFT:
                     return Component.RIGHT;
+                default:
+                    break;
             }
         }
         return align;

@@ -434,6 +434,8 @@ public final class GeneralPath implements Shape {
                     case PathIterator.SEG_CUBICTO:
                     case PathIterator.SEG_QUADTO:
                         return false;
+                    default:
+                        break;
                 }
                 it.next();
             }
@@ -507,6 +509,8 @@ public final class GeneralPath implements Shape {
                         break;
                     case PathIterator.SEG_CLOSE:
                         sb.append(" CLOSE]");
+                        break;
+                    default:
                         break;
                 }
                 it.next();
@@ -1078,6 +1082,8 @@ public final class GeneralPath implements Shape {
                 case PathIterator.SEG_CLOSE:
                     closePath();
                     break;
+                default:
+                    break;
             }
             path.next();
             connect = false;
@@ -1308,6 +1314,8 @@ public final class GeneralPath implements Shape {
                             break;
                         case 3:
                             corners[i] = (x == bounds.getX() && y == bounds.getY() + bounds.getHeight());
+                            break;
+                        default:
                             break;
                     }
                 }
@@ -2566,6 +2574,8 @@ public final class GeneralPath implements Shape {
                             cross += crossLine(cx, cy, cx = mx, cy = my, x, y);
                         }
                         break;
+                    default:
+                        throw new IllegalStateException("Illegal General path segment: " + p.currentSegment(coords));
                 }
 
                 // checks if the point (x,y) is the vertex of shape with PathIterator p
@@ -2939,6 +2949,8 @@ public final class GeneralPath implements Shape {
                         cx = mx;
                         cy = my;
                         break;
+                    default:
+                        throw new IllegalStateException("Illegal General path segment: " + p.currentSegment(coords));
                 }
                 if (count == CROSSING) {
                     return CROSSING;

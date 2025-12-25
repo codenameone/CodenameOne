@@ -760,7 +760,8 @@ def main() -> None:
         forbidden_rules = {
             "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE",
             "RCN_REDUNDANT_NULLCHECK_OF_NULL_VALUE",
-            "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR"
+            "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR",
+            "SF_SWITCH_NO_DEFAULT"
         }
         violations = [
             f for f in spotbugs.findings

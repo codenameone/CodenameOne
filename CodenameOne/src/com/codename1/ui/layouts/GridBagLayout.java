@@ -362,6 +362,8 @@ public class GridBagLayout extends Layout {
                 case ComponentSide.POS_END:
                     s += insDispLength - compLength;
                     break;
+                default:
+                    break;
             }
             return s;
         }
@@ -454,6 +456,8 @@ public class GridBagLayout extends Layout {
                 break;
             case GridBagConstraints.LAST_LINE_END:
                 absAnchor = l2r ? GridBagConstraints.SOUTHEAST : GridBagConstraints.SOUTHWEST;
+                break;
+            default:
                 break;
         }
         return absAnchor;

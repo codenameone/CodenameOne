@@ -851,8 +851,9 @@ public class UIFragment {
                                         break;
                                     case 'o':
                                         m.put("overlay", m.get("o"));
-
-
+                                        break;
+                                    default:
+                                        break;
                                 }
                             }
                         }

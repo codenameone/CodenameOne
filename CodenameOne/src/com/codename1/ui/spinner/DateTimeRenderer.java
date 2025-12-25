@@ -158,6 +158,8 @@ class DateTimeRenderer extends SpinnerRenderer<Object> {
                 case Spinner.DATE_FORMAT_DOW_MON_DD_YY:
                     value = getLocalizedDay(c.get(Calendar.DAY_OF_WEEK) - 1) + separatorChar + getLocalizedMonth(month - 1) + separatorChar + twoDigits(day) + separatorChar + year;
                     break;
+                default:
+                    break;
             }
         } else {
             int v = ((Integer) value).intValue();

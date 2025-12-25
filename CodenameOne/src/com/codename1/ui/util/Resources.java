@@ -1278,6 +1278,8 @@ public class Resources {
 
             case 4: // pixels
                 break;
+            default:
+                break;
             case 5: // rem
                 fontSize = Font.getDefaultFont().getHeight() * fontSize;
                 break;
@@ -1605,6 +1607,8 @@ public class Resources {
                                 new Float(f2),
                                 new Float(radialSize)});
                         break;
+                    default:
+                        break;
                 }
                 continue;
             }
@@ -1899,6 +1903,8 @@ public class Resources {
                     Log.e(t);
                     return Border.createEmpty();
                 }
+            default:
+                break;
 
         }
         return null;

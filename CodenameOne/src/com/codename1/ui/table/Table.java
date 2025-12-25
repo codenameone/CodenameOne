@@ -1096,6 +1096,8 @@ public class Table extends Container {
                         case Display.PICKER_TYPE_STRINGS:
                             model.setValueAt(row, column, ((Picker) c).getSelectedString());
                             break;
+                        default:
+                            break;
                     }
                 } else {
                     if (c instanceof CheckBox) {

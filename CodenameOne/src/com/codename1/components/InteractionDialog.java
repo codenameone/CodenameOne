@@ -492,7 +492,8 @@ public class InteractionDialog extends Container {
                     case Component.BOTTOM:
                         setY(Display.getInstance().getDisplayHeight());
                         break;
-
+                    default:
+                        break;
                 }
 
                 if (animateShow) {

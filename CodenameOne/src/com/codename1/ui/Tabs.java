@@ -1746,6 +1746,8 @@ public class Tabs extends Container {
                     dragStarted = false;
                     break;
                 }
+                default:
+                    break;
             }
         }
 

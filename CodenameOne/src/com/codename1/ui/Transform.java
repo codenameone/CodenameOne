@@ -300,6 +300,8 @@ public class Transform {
                 case TYPE_IDENTITY:
                     impl.setTransformIdentity(nativeTransform);
                     break;
+                default:
+                    break;
             }
 
         }

@@ -176,6 +176,8 @@ public class AudioRecorderComponent extends Container implements ActionSource {
                         pause.setEnabled(true);
                         revalidateLater();
                         break;
+                    default:
+                        break;
                 }
             }
 

@@ -765,6 +765,8 @@ public final class CloudObject implements Externalizable {
                         status = STATUS_MODIFIED;
                         CloudStorage.getInstance().save(CloudObject.this);
                         break;
+                    default:
+                        break;
                 }
             }
         };

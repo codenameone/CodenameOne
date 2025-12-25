@@ -604,7 +604,10 @@ public class BorderLayout extends Layout {
                     h = targetHeight;
                     x = s.getPaddingLeft(rtl);
                     y = s.getPaddingTop();
+                    break;
                 }
+                default:
+                    break;
             }
             c.setWidth(w);
             c.setHeight(h);

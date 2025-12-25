@@ -289,6 +289,9 @@ public class ToastBar {
                         } else {
                             s.setProgress(-1);
                         }
+                        break;
+                    default:
+                        break;
                 }
             }
         };

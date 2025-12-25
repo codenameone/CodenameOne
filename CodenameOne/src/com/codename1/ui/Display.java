@@ -2295,6 +2295,8 @@ public final class Display extends CN1Constants {
                     offset++;
                 }
                 break;
+            default:
+                break;
             case POINTER_PRESSED:
                 if (recursivePointerReleaseA) {
                     recursivePointerReleaseB = true;

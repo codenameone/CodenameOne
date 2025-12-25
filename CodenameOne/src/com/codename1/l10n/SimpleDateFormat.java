@@ -474,6 +474,8 @@ public class SimpleDateFormat extends DateFormat {
                     v = ((calendar.get(Calendar.DAY_OF_WEEK) + 5) % 7) + 1;
                     toAppendTo.append(leftPad(v, len));
                     break;
+                default:
+                    break;
             }
         }
         return toAppendTo.toString();
@@ -614,6 +616,8 @@ public class SimpleDateFormat extends DateFormat {
                     // Mon=1 -> 2. Tue=2 -> 3. ... Sat=6 -> 7. Sun=7 -> 1.
                     // v % 7 + 1
                     calendar.set(Calendar.DAY_OF_WEEK, (v % 7) + 1);
+                    break;
+                default:
                     break;
             }
             if (s != null) {

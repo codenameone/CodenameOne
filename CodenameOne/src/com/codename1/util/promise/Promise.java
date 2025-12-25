@@ -275,6 +275,8 @@ public class Promise<T> {
                         case Pending:
                             promiseResult.then(p.promise.resolve, p.promise.reject);
                             break;
+                        default:
+                            break;
                     }
                 } else {
                     p.promise.resolve.call(result);
@@ -401,6 +403,8 @@ public class Promise<T> {
                 break;
             case Rejected:
                 processThens(error, false);
+                break;
+            default:
                 break;
         }
         return handler.promise;

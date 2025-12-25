@@ -638,6 +638,8 @@ class CSSEngine {
                     }
                     label.setText(newText);
                     break;
+                default:
+                    break;
             }
         }
 
@@ -1050,6 +1052,8 @@ class CSSEngine {
                 return;
             case DISPLAY_MARQUEE: // Animate component (ticker-like)
                 htmlC.marqueeComponents.addElement(ui);
+                break;
+            default:
                 break;
             //TODO - support also: block, inline and list-item (All mandatory in WCSS)
         }
@@ -1872,6 +1876,8 @@ class CSSEngine {
                     border = Border.createDashedBorder(borderWidth, borderColor);
                 }
 
+                break;
+            default:
                 break;
         }
 

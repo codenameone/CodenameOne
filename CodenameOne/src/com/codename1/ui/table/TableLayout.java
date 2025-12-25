@@ -541,6 +541,8 @@ public class TableLayout extends Layout {
                     case Component.RIGHT:
                         a = Component.LEFT;
                         break;
+                    default:
+                        break;
                 }
             }
             switch (a) {
@@ -556,6 +558,8 @@ public class TableLayout extends Layout {
                     con.parent.setX(x + d / 2);
                     con.parent.setWidth(width - d);
                     break;
+                default:
+                    break;
             }
         }
         if (pHeight < height) {
@@ -569,7 +573,8 @@ public class TableLayout extends Layout {
                     con.parent.setY(y + d);
                     con.parent.setHeight(height - d);
                     break;
-                case Component.CENTER:
+                default:
+                    // Component.CENTER:
                     con.parent.setY(y + d / 2);
                     con.parent.setHeight(height - d);
                     break;

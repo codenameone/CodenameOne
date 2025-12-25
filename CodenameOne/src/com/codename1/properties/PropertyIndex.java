@@ -980,6 +980,8 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                                 ((MapProperty) pb).setMap((Map) data);
                             }
                             break;
+                        default:
+                            break;
                     }
                 }
             }
