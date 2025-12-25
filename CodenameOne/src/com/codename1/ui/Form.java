@@ -1552,10 +1552,10 @@ public class Form extends Container {
                 @Override
                 protected void paintBackground(Graphics g) {
                     if (getComponentCount() > 0) {
-                        if (isVisible()) {
-                            this.setVisible(false);
+                        if (super.isVisible()) {
+                            super.setVisible(false);
                             Form.this.paint(g);
-                            setVisible(true);
+                            super.setVisible(true);
                         }
                     }
                 }

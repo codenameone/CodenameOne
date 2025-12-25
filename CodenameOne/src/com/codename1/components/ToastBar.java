@@ -1021,7 +1021,7 @@ public class ToastBar {
             this.getAllStyles().setBgColor(0x0);
             this.getAllStyles().setBackgroundType(Style.BACKGROUND_NONE);
             this.getAllStyles().setBgTransparency(128);
-            this.setVisible(false);
+            super.setVisible(false);
             label = new TextArea();
             label.setUIID(defaultMessageUIID);
             label.setEditable(false);

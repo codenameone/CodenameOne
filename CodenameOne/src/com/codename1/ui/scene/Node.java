@@ -626,7 +626,7 @@ public class Node {
                 paint(g);
                 paintBorder(g);
                 g.setColor(0xff0000);
-                int alpha = g.concatenateAlpha(this.getStyle().getFgAlpha());
+                int alpha = g.concatenateAlpha(super.getStyle().getFgAlpha());
                 g.drawRect(getX(), getY(), getWidth() - 1, getHeight() - 1);
                 g.setAlpha(alpha);
             } catch (Throwable t) {
