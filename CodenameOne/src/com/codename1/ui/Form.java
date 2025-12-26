@@ -1584,11 +1584,7 @@ public class Form extends Container {
             cnt.setWidth(getWidth());
             cnt.setHeight(getHeight());
             cnt.setShouldLayout(false);
-            if (c != null) {
-                cnt.setName("FormLayer: " + c.getName());
-            } else {
-                cnt.setName("FormLayer: null");
-            }
+            cnt.setName("FormLayer: null");
             flp.add(cnt);
             return cnt;
         }
