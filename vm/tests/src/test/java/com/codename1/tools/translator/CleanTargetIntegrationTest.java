@@ -108,8 +108,7 @@ class CleanTargetIntegrationTest {
                 "cmake",
                 "-S", distDir.toString(),
                 "-B", buildDir.toString(),
-                "-DCMAKE_C_COMPILER=clang",
-                "-DCMAKE_OBJC_COMPILER=clang"
+                "-DCMAKE_C_COMPILER=clang"
         ), distDir);
 
         runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);

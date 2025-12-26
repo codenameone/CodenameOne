@@ -76,7 +76,7 @@ public class FileStreamsIntegrationTest {
         Path srcRoot = distDir.resolve("FileStreamApp-src");
         CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
 
-        assertTrue(Files.exists(srcRoot.resolve("java_io_FileStreams.m")), "java_io_FileStreams.m should exist");
+        assertTrue(Files.exists(srcRoot.resolve("java_io_FileStreams.c")), "java_io_FileStreams.c should exist");
 
         replaceLibraryWithExecutableTarget(cmakeLists);
 
@@ -87,8 +87,7 @@ public class FileStreamsIntegrationTest {
                 "cmake",
                 "-S", distDir.toString(),
                 "-B", buildDir.toString(),
-                "-DCMAKE_C_COMPILER=clang",
-                "-DCMAKE_OBJC_COMPILER=clang"
+                "-DCMAKE_C_COMPILER=clang"
         ), distDir);
 
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
@@ -142,7 +141,7 @@ public class FileStreamsIntegrationTest {
         String content = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
         String replacement = content.replace(
                 "add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})",
-                "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m objc)"
+                "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m)"
         );
         Files.write(cmakeLists, replacement.getBytes(StandardCharsets.UTF_8));
     }
