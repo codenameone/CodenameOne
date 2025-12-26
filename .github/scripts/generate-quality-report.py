@@ -769,7 +769,8 @@ def main() -> None:
             "RpC_REPEATED_CONDITIONAL_TEST",
             "ES_COMPARING_PARAMETER_STRING_WITH_EQ",
             "FE_FLOATING_POINT_EQUALITY",
-            "FE_TEST_IF_EQUAL_TO_NOT_A_NUMBER"
+            "FE_TEST_IF_EQUAL_TO_NOT_A_NUMBER",
+            "SA_FIELD_SELF_ASSIGNMENT"
         }
         violations = [
             f for f in spotbugs.findings
