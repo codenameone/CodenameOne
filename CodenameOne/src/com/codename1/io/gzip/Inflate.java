@@ -641,9 +641,6 @@ final class Inflate {
         z.total_in += p - z.next_in_index;
         z.next_in_index = p;
         z.avail_in = n;
-        if (this.marker != m) {
-            this.marker = m;
-        }
 
         // return no joy or set up to restart on a new block
         if (m != 4) {
