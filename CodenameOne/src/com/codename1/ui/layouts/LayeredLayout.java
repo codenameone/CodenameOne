@@ -3256,7 +3256,7 @@ public class LayeredLayout extends Layout {
                 //    // This could potentially affect the opposite inset if it is a percentage
                 //    referenceComponent(newRef).referencePosition(pos);
                 //} else {
-                if (newRef != referenceComponent || pos != referencePosition) {
+                if (newRef != referenceComponent || Float.compare(pos, referencePosition) != 0) {
                     // This may potentially affect both this inset
                     // and the opposite inset if it is either flexible or
                     // percent.
