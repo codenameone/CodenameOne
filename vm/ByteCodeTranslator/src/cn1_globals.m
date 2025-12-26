@@ -23,9 +23,11 @@ BOOL isAppSuspended = NO;
 #if defined(__APPLE__) && defined(__OBJC__)
 #import <mach/mach.h>
 #import <mach/mach_host.h>
+#define CN1_LOG(fmt, ...) NSLog(@fmt, ##__VA_ARGS__)
 #else
 #include <time.h>
-#define NSLog(...) printf(__VA_ARGS__); printf("\n")
+#include <stdio.h>
+#define CN1_LOG(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
 #endif
 
 // The amount of memory allocated between GC cycle checks (generally 30 seconds)
@@ -591,8 +593,8 @@ void codenameOneGCMark() {
                         {   long later = time(0)-now;
                             if(later>10000)
                             {
-                            NSLog(@"GC trapped for %d seconds waiting for thread %d in slot %d (%d)",
-                                  (int)(later/1000),(int)t->threadId,iter,t->threadKilled);
+                            CN1_LOG("GC trapped for %d seconds waiting for thread %d in slot %d (%d)",
+                                    (int)(later/1000),(int)t->threadId,iter,t->threadKilled);
                             }
                         }
                     }
@@ -627,7 +629,7 @@ void codenameOneGCMark() {
                 }
                 if (CN1_EDT_THREAD_ID == t->threadId && agressiveAllocator) {
                     long freeMemory = get_free_memory();
-                    NSLog(@"[GC] Blocking EDT as aggressive allocator, free memory=%lld", freeMemory);
+                    CN1_LOG("[GC] Blocking EDT as aggressive allocator, free memory=%lld", freeMemory);
                     
                 }
                 
@@ -717,7 +719,7 @@ void printObjectsPostSweep(CODENAME_ONE_THREAD_STATE) {
         }
     }
     int actualTotalMemory = 0;
-    NSLog(@"\n\n**** There are %i - %i = %i nulls available entries out of %i objects in heap which take up %i, sweep saved %i ****", nullSpaces, nullSpacesPreSweep, nullSpaces - nullSpacesPreSweep, t, totalAllocatedHeap, preSweepRam - totalAllocatedHeap);
+    CN1_LOG("\n\n**** There are %i - %i = %i nulls available entries out of %i objects in heap which take up %i, sweep saved %i ****", nullSpaces, nullSpacesPreSweep, nullSpaces - nullSpacesPreSweep, t, totalAllocatedHeap, preSweepRam - totalAllocatedHeap);
     for(int iter = 0 ; iter < cn1_array_3_id_java_util_Vector ; iter++) {
         if(classTypeCount[iter] > 0) {
             if(classTypeCountPreSweep[iter] - classTypeCount[iter] > 0) {
@@ -736,7 +738,7 @@ void printObjectsPostSweep(CODENAME_ONE_THREAD_STATE) {
         }
     }
     //NSLog(@"Actual ram = %i vs total mallocs = %i", actualTotalMemory, totalAllocatedHeap);
-    NSLog(@"**** GC cycle complete ****");
+    CN1_LOG("**** GC cycle complete ****");
     
     free(arrayOfNames);
 #if defined(__APPLE__) && defined(__OBJC__)
@@ -774,7 +776,7 @@ void printObjectTypesInHeap(CODENAME_ONE_THREAD_STATE) {
         }
     }
     int actualTotalMemory = 0;
-    NSLog(@"There are %i null available entries out of %i objects in heap which take up %i", nullSpaces, t, totalAllocatedHeap);
+    CN1_LOG("There are %i null available entries out of %i objects in heap which take up %i", nullSpaces, t, totalAllocatedHeap);
     for(int iter = 0 ; iter < cn1_array_3_id_java_util_Vector ; iter++) {
         if(classTypeCount[iter] > 0) {
             float f = ((float)classTypeCount[iter]) / ((float)t) * 100.0f;
@@ -792,7 +794,7 @@ void printObjectTypesInHeap(CODENAME_ONE_THREAD_STATE) {
             actualTotalMemory += sizeInHeapForType[iter];
         }
     }
-    NSLog(@"Actual ram = %i vs total mallocs = %i", actualTotalMemory, totalAllocatedHeap);
+    CN1_LOG("Actual ram = %i vs total mallocs = %i", actualTotalMemory, totalAllocatedHeap);
     
     free(arrayOfNames);
 #if defined(__APPLE__) && defined(__OBJC__)

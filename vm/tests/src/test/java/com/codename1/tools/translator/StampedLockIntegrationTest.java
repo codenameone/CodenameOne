@@ -144,6 +144,7 @@ class StampedLockIntegrationTest {
                 "    private int count;\n" +
                 "    public String(char[] v) { value = v; count=v.length; }\n" +
                 "    public static String valueOf(Object obj) { return obj == null ? \"null\" : obj.toString(); }\n" +
+                "    public byte[] getBytes(String charset) { return new byte[0]; }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
         // java.lang.StringBuilder
@@ -236,7 +237,10 @@ class StampedLockIntegrationTest {
         // java.lang.System
         Files.write(lang.resolve("System.java"), ("package java.lang;\n" +
                 "public final class System {\n" +
-                "    public static native long currentTimeMillis();\n" +
+                "    public static long currentTimeMillis() { return 0L; }\n" +
+                "    public static void gc() {}\n" +
+                "    public static void startGCThread() {}\n" +
+                "    public static Thread gcThreadInstance;\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
         // Exceptions

@@ -300,6 +300,8 @@ class CleanTargetIntegrationTest {
                 "struct clazz class_array1__JAVA_BYTE = {0};\n" +
                 "struct clazz class_array1__JAVA_SHORT = {0};\n" +
                 "struct clazz class_array1__JAVA_LONG = {0};\n" +
+                "struct clazz class_array1__java_lang_String = {0};\n" +
+                "struct clazz class_array2__java_lang_String = {0};\n" +
                 "\n" +
                 "static JAVA_OBJECT allocArrayInternal(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim) {\n" +
                 "    struct JavaArrayPrototype* arr = (struct JavaArrayPrototype*)calloc(1, sizeof(struct JavaArrayPrototype));\n" +
