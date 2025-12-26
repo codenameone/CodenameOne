@@ -158,6 +158,56 @@ class StampedLockIntegrationTest {
                 "    public String toString() { return \"\"; }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
+        // Primitive wrappers
+        Files.write(lang.resolve("Boolean.java"), ("package java.lang;\n" +
+                "public final class Boolean {\n" +
+                "    private boolean value;\n" +
+                "    public Boolean(boolean value) { this.value = value; }\n" +
+                "    public boolean booleanValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Byte.java"), ("package java.lang;\n" +
+                "public final class Byte {\n" +
+                "    private byte value;\n" +
+                "    public Byte(byte value) { this.value = value; }\n" +
+                "    public byte byteValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Short.java"), ("package java.lang;\n" +
+                "public final class Short {\n" +
+                "    private short value;\n" +
+                "    public Short(short value) { this.value = value; }\n" +
+                "    public short shortValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Character.java"), ("package java.lang;\n" +
+                "public final class Character {\n" +
+                "    private char value;\n" +
+                "    public Character(char value) { this.value = value; }\n" +
+                "    public char charValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Integer.java"), ("package java.lang;\n" +
+                "public final class Integer {\n" +
+                "    private int value;\n" +
+                "    public Integer(int value) { this.value = value; }\n" +
+                "    public int intValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Long.java"), ("package java.lang;\n" +
+                "public final class Long {\n" +
+                "    private long value;\n" +
+                "    public Long(long value) { this.value = value; }\n" +
+                "    public long longValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Float.java"), ("package java.lang;\n" +
+                "public final class Float {\n" +
+                "    private float value;\n" +
+                "    public Float(float value) { this.value = value; }\n" +
+                "    public float floatValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Double.java"), ("package java.lang;\n" +
+                "public final class Double {\n" +
+                "    private double value;\n" +
+                "    public Double(double value) { this.value = value; }\n" +
+                "    public double doubleValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
         // java.lang.Class
         Files.write(lang.resolve("Class.java"), ("package java.lang;\n" +
                 "public final class Class<T> {}\n").getBytes(StandardCharsets.UTF_8));
@@ -193,6 +243,7 @@ class StampedLockIntegrationTest {
         Files.write(lang.resolve("Throwable.java"), "package java.lang; public class Throwable { public Throwable() {} public Throwable(String s) {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("Exception.java"), "package java.lang; public class Exception extends Throwable { public Exception() {} public Exception(String s) {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("RuntimeException.java"), "package java.lang; public class RuntimeException extends Exception { public RuntimeException() {} public RuntimeException(String s) {} }".getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("ArrayIndexOutOfBoundsException.java"), "package java.lang; public class ArrayIndexOutOfBoundsException extends RuntimeException { public ArrayIndexOutOfBoundsException() {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("InterruptedException.java"), "package java.lang; public class InterruptedException extends Exception { public InterruptedException() {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("NullPointerException.java"), "package java.lang; public class NullPointerException extends RuntimeException { public NullPointerException() {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("IllegalMonitorStateException.java"), "package java.lang; public class IllegalMonitorStateException extends RuntimeException { public IllegalMonitorStateException() {} }".getBytes(StandardCharsets.UTF_8));
