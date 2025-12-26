@@ -3256,7 +3256,7 @@ public class LayeredLayout extends Layout {
                 //    // This could potentially affect the opposite inset if it is a percentage
                 //    referenceComponent(newRef).referencePosition(pos);
                 //} else {
-                if (newRef != referenceComponent || pos != referencePosition) {
+                if (newRef != referenceComponent || com.codename1.util.MathUtil.compare(pos, referencePosition) != 0) {
                     // This may potentially affect both this inset
                     // and the opposite inset if it is either flexible or
                     // percent.
@@ -3437,7 +3437,7 @@ public class LayeredLayout extends Layout {
                                 return this;
                             }
                             float percentDelta = delta / relH * 100f;
-                            if (percentDelta == Float.NEGATIVE_INFINITY || percentDelta == Float.POSITIVE_INFINITY) {
+                            if (com.codename1.util.MathUtil.compare(percentDelta, Float.NEGATIVE_INFINITY) == 0 || com.codename1.util.MathUtil.compare(percentDelta, Float.POSITIVE_INFINITY) == 0) {
                                 percentDelta = 0f;
                             }
                             value += percentDelta;
@@ -3450,7 +3450,7 @@ public class LayeredLayout extends Layout {
                             }
                             float percentDelta = delta / relH * 100f;
                             //System.out.println("percentDelta="+percentDelta);
-                            if (percentDelta == Float.NEGATIVE_INFINITY || percentDelta == Float.POSITIVE_INFINITY) {
+                            if (com.codename1.util.MathUtil.compare(percentDelta, Float.NEGATIVE_INFINITY) == 0 || com.codename1.util.MathUtil.compare(percentDelta, Float.POSITIVE_INFINITY) == 0) {
                                 percentDelta = 0f;
                             }
                             value += percentDelta;

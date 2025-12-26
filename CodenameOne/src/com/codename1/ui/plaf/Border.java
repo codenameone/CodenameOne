@@ -1102,7 +1102,7 @@ public class Border {
 
             boolean v = ((themeColors == b.themeColors) &&
                     (type == b.type) &&
-                    (thickness == b.thickness) &&
+                    (com.codename1.util.MathUtil.compare(thickness, b.thickness) == 0) &&
                     (colorA == b.colorA) &&
                     (colorB == b.colorB) &&
                     (colorC == b.colorC) &&

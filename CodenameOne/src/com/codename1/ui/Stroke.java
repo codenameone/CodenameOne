@@ -227,7 +227,7 @@ public class Stroke {
     public boolean equals(Object obj) {
         if (obj instanceof Stroke) {
             Stroke s = (Stroke) obj;
-            return (s.miterLimit == miterLimit && s.capStyle == capStyle && s.joinStyle == joinStyle && s.lineWidth == lineWidth);
+            return (com.codename1.util.MathUtil.compare(s.miterLimit, miterLimit) == 0 && s.capStyle == capStyle && s.joinStyle == joinStyle && com.codename1.util.MathUtil.compare(s.lineWidth, lineWidth) == 0);
         }
         return false;
     }

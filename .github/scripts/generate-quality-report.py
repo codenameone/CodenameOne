@@ -766,7 +766,8 @@ def main() -> None:
             "EQ_CHECK_FOR_OPERAND_NOT_COMPATIBLE_WITH_THIS",
             "IA_AMBIGUOUS_INVOCATION_OF_INHERITED_OR_OUTER_METHOD",
             "RpC_REPEATED_CONDITIONAL_TEST",
-            "ES_COMPARING_PARAMETER_STRING_WITH_EQ"
+            "ES_COMPARING_PARAMETER_STRING_WITH_EQ",
+            "FE_FLOATING_POINT_EQUALITY"
         }
         violations = [
             f for f in spotbugs.findings

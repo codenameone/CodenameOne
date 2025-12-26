@@ -330,7 +330,7 @@ public class RoundRectBorder extends Border {
      */
     public RoundRectBorder stroke(float stroke, boolean mm) {
         strokeThickness = stroke;
-        if (strokeThickness == 0) {
+        if (com.codename1.util.MathUtil.compare(strokeThickness, 0f) == 0) {
             this.stroke = null;
             return this;
         }
@@ -350,7 +350,7 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder shadowSpread(float shadowSpread) {
-        if (shadowSpread != this.shadowSpread) {
+        if (com.codename1.util.MathUtil.compare(shadowSpread, this.shadowSpread) != 0) {
             this.shadowSpread = shadowSpread;
             dirty = true;
         }
@@ -404,7 +404,7 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder shadowX(float shadowX) {
-        if (shadowX != this.shadowX) {
+        if (com.codename1.util.MathUtil.compare(shadowX, this.shadowX) != 0) {
             this.shadowX = shadowX;
             dirty = true;
         }
@@ -418,7 +418,7 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder shadowY(float shadowY) {
-        if (shadowY != this.shadowY) {
+        if (com.codename1.util.MathUtil.compare(shadowY, this.shadowY) != 0) {
             this.shadowY = shadowY;
             dirty = true;
         }
@@ -432,7 +432,7 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder shadowBlur(float shadowBlur) {
-        if (shadowBlur != this.shadowBlur) {
+        if (com.codename1.util.MathUtil.compare(shadowBlur, this.shadowBlur) != 0) {
             this.shadowBlur = shadowBlur;
             dirty = true;
         }
@@ -446,7 +446,7 @@ public class RoundRectBorder extends Border {
      * @return border instance so these calls can be chained
      */
     public RoundRectBorder cornerRadius(float cornerRadius) {
-        if (cornerRadius != this.cornerRadius) {
+        if (com.codename1.util.MathUtil.compare(cornerRadius, this.cornerRadius) != 0) {
             this.cornerRadius = cornerRadius;
             dirty = true;
         }

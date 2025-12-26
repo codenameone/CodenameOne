@@ -1345,7 +1345,7 @@ public class CSSBorder extends Border {
         public boolean equals(Object obj) {
             if (obj instanceof ScalarUnit) {
                 ScalarUnit u = (ScalarUnit) obj;
-                return u.value == 0 && value == 0 || u.value == value && u.type == type;
+                return com.codename1.util.MathUtil.compare(u.value, 0f) == 0 && com.codename1.util.MathUtil.compare(value, 0f) == 0 || com.codename1.util.MathUtil.compare(u.value, value) == 0 && u.type == type;
             }
             return false;
         }
