@@ -758,6 +758,7 @@ def main() -> None:
     spotbugs, _, _ = parse_spotbugs()
     if spotbugs:
         forbidden_rules = {
+            "NP_ALWAYS_NULL",
             "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE",
             "RCN_REDUNDANT_NULLCHECK_OF_NULL_VALUE",
             "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR",

@@ -912,6 +912,7 @@ public class UIFragment {
                             el.addChild(buildXMLFromJSONNotation(first));
                         }
                     } else {
+                        el = new Element("flow");
                         el.addChild(buildXMLFromJSONNotation(first));
                     }
                     for (int i = 1; i < len; i++) {
