@@ -623,15 +623,14 @@ final class Inflate {
             return Z_BUF_ERROR;
 
         p = z.next_in_index;
-        m = this.marker;
         // search
-        while (n != 0 && m < 4) {
-            if (z.next_in[p] == mark[m]) {
-                m++;
+        while (n != 0 && this.marker < 4) {
+            if (z.next_in[p] == mark[this.marker]) {
+                this.marker++;
             } else if (z.next_in[p] != 0) {
-                m = 0;
+                this.marker = 0;
             } else {
-                m = 4 - m;
+                this.marker = 4 - this.marker;
             }
             p++;
             n--;
@@ -641,10 +640,9 @@ final class Inflate {
         z.total_in += p - z.next_in_index;
         z.next_in_index = p;
         z.avail_in = n;
-        this.marker = m;
 
         // return no joy or set up to restart on a new block
-        if (m != 4) {
+        if (this.marker != 4) {
             return Z_DATA_ERROR;
         }
         r = z.total_in;
