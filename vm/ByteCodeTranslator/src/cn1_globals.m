@@ -268,6 +268,11 @@ struct clazz class_array1__JAVA_DOUBLE = {
     DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, 0, 0, cn1_array_1_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 1, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
 
+// Minimal stubs for String array classes so clean-target builds that only
+// reference primitive wrappers still have constant pool backing storage.
+struct clazz class_array1__java_lang_String = {0};
+struct clazz class_array2__java_lang_String = {0};
+
 struct clazz class_array2__JAVA_DOUBLE = {
    DEBUG_GC_INIT 0, 999999, 0, 0, 0, 0, 0, 0, &gcMarkArrayObject, 0, cn1_array_2_id_JAVA_DOUBLE, "double[]", JAVA_TRUE, 2, &class__java_lang_Double, JAVA_TRUE, &class__java_lang_Object, EMPTY_INTERFACES, 0, 0, 0
 };
@@ -629,7 +634,7 @@ void codenameOneGCMark() {
                 }
                 if (CN1_EDT_THREAD_ID == t->threadId && agressiveAllocator) {
                     long freeMemory = get_free_memory();
-                    CN1_LOG("[GC] Blocking EDT as aggressive allocator, free memory=%lld", freeMemory);
+                    CN1_LOG("[GC] Blocking EDT as aggressive allocator, free memory=%ld", freeMemory);
                     
                 }
                 
