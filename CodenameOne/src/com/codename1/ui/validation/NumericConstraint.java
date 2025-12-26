@@ -82,13 +82,13 @@ public class NumericConstraint implements Constraint {
     }
 
     private boolean checkRange(double v) {
-        if (minimum != Double.NaN) {
-            if (maximum != Double.NaN) {
+        if (!Double.isNaN(minimum)) {
+            if (!Double.isNaN(maximum)) {
                 return v >= minimum && v <= maximum;
             }
             return v >= minimum;
         } else {
-            if (maximum != Double.NaN) {
+            if (!Double.isNaN(maximum)) {
                 return v <= maximum;
             }
         }
@@ -105,13 +105,13 @@ public class NumericConstraint implements Constraint {
             if (!dec) {
                 round = "round ";
             }
-            if (minimum != Double.NaN) {
-                if (maximum != Double.NaN) {
+            if (!Double.isNaN(minimum)) {
+                if (!Double.isNaN(maximum)) {
                     return "The value must be a valid " + round + "number between " + minimum + " and " + maximum;
                 }
                 return "The value must be a valid " + round + "number larger than " + minimum;
             } else {
-                if (maximum != Double.NaN) {
+                if (!Double.isNaN(maximum)) {
                     return "The value must be a valid " + round + "number larger than " + maximum;
                 }
             }
