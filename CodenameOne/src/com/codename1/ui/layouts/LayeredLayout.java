@@ -3437,7 +3437,7 @@ public class LayeredLayout extends Layout {
                                 return this;
                             }
                             float percentDelta = delta / relH * 100f;
-                            if (percentDelta == Float.NEGATIVE_INFINITY || percentDelta == Float.POSITIVE_INFINITY) {
+                            if (Float.compare(percentDelta, Float.NEGATIVE_INFINITY) == 0 || Float.compare(percentDelta, Float.POSITIVE_INFINITY) == 0) {
                                 percentDelta = 0f;
                             }
                             value += percentDelta;
@@ -3450,7 +3450,7 @@ public class LayeredLayout extends Layout {
                             }
                             float percentDelta = delta / relH * 100f;
                             //System.out.println("percentDelta="+percentDelta);
-                            if (percentDelta == Float.NEGATIVE_INFINITY || percentDelta == Float.POSITIVE_INFINITY) {
+                            if (Float.compare(percentDelta, Float.NEGATIVE_INFINITY) == 0 || Float.compare(percentDelta, Float.POSITIVE_INFINITY) == 0) {
                                 percentDelta = 0f;
                             }
                             value += percentDelta;

@@ -94,7 +94,7 @@ public class XYValueSeries extends XYSeries {
     public void remove(int index) {
         super.remove(index);
         double removedValue = mValue.remove(index);
-        if (removedValue == mMinValue || removedValue == mMaxValue) {
+        if (Double.compare(removedValue, mMinValue) == 0 || Double.compare(removedValue, mMaxValue) == 0) {
             initRange();
         }
     }

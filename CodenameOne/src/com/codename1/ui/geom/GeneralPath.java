@@ -2224,7 +2224,7 @@ public final class GeneralPath implements Shape {
                 float minX = Math.min(x1, x2);
                 float maxX = Math.max(x1, x2);
                 int i = 0;
-                if (dx == 0) {
+                if (isZero(dx)) {
                     if (ry1 > minY && ry1 < maxY) {
                         num++;
                         x[i++] = ry1;
@@ -2255,7 +2255,7 @@ public final class GeneralPath implements Shape {
                     out[8] = num;
 
 
-                } else if (dy == 0) {
+                } else if (isZero(dy)) {
                     if (rx1 > minX && rx1 < maxX) {
                         num++;
                         x[i++] = rx1;
@@ -2344,8 +2344,8 @@ public final class GeneralPath implements Shape {
             double b = eqn[1];
             double c = eqn[0];
             int rc = 0;
-            if (a == 0.0) {
-                if (b == 0.0) {
+            if (isZero(a)) {
+                if (isZero(b)) {
                     return -1;
                 }
                 res[rc++] = -c / b;
@@ -2358,7 +2358,7 @@ public final class GeneralPath implements Shape {
                 d = Math.sqrt(d);
                 res[rc++] = (-b + d) / (a * 2.0);
                 // d != 0.0
-                if (d != 0.0) {
+                if (!isZero(d)) {
                     res[rc++] = (-b - d) / (a * 2.0);
                 }
             }
@@ -2374,7 +2374,7 @@ public final class GeneralPath implements Shape {
          */
         public static int solveCubic(double[] eqn, double[] res) {
             double d = eqn[3];
-            if (d == 0) {
+            if (isZero(d)) {
                 return solveQuad(eqn, res);
             }
             double a = eqn[2] / d;
@@ -2453,7 +2453,7 @@ public final class GeneralPath implements Shape {
             if ((x < x1 && x < x2) ||
                     (x > x1 && x > x2) ||
                     (y > y1 && y > y2) ||
-                    (x1 == x2)) {
+                    (isZero(x1 - x2))) {
                 return 0;
             }
 
@@ -3025,14 +3025,14 @@ public final class GeneralPath implements Shape {
                     }
                     // CURVE-START
                     if (t < DELTA) {
-                        if (py1 < 0.0 && (bx != 0.0 ? bx : ax - bx) < 0.0) {
+                        if (py1 < 0.0 && (!isZero(bx) ? bx : ax - bx) < 0.0) {
                             cross--;
                         }
                         continue;
                     }
                     // CURVE-END
                     if (t > 1 - DELTA) {
-                        if (py1 < ay && (ax != bx ? ax - bx : bx) > 0.0) {
+                        if (py1 < ay && (!isZero(ax - bx) ? ax - bx : bx) > 0.0) {
                             cross++;
                         }
                         continue;
@@ -3060,10 +3060,10 @@ public final class GeneralPath implements Shape {
 
             int solveExtrem(double[] res) {
                 int rc = 0;
-                if (Ax != 0.0) {
+                if (!isZero(Ax)) {
                     res[rc++] = -Bx / (Ax + Ax);
                 }
-                if (Ay != 0.0) {
+                if (!isZero(Ay)) {
                     res[rc++] = -By / (Ay + Ay);
                 }
                 return rc;
@@ -3130,14 +3130,14 @@ public final class GeneralPath implements Shape {
                     }
                     // CURVE-START
                     if (t < DELTA) {
-                        if (py1 < 0.0 && (bx != 0.0 ? bx : (cx != bx ? cx - bx : ax - cx)) < 0.0) {
+                        if (py1 < 0.0 && (!isZero(bx) ? bx : (!isZero(cx - bx) ? cx - bx : ax - cx)) < 0.0) {
                             cross--;
                         }
                         continue;
                     }
                     // CURVE-END
                     if (t > 1 - DELTA) {
-                        if (py1 < ay && (ax != cx ? ax - cx : (cx != bx ? cx - bx : bx)) > 0.0) {
+                        if (py1 < ay && (!isZero(ax - cx) ? ax - cx : (!isZero(cx - bx) ? cx - bx : bx)) > 0.0) {
                             cross++;
                         }
                         continue;
