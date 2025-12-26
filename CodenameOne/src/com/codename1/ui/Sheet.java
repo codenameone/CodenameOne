@@ -475,7 +475,41 @@ public class Sheet extends Container {
             cnt.revalidate();
 
         }
-        if (cnt.getComponentCount() > 0) {
+        boolean foundSheet = false;
+        Component blocker = null;
+        for (Component child : cnt) {
+            if (child instanceof Sheet) {
+                foundSheet = true;
+            } else if (Boolean.TRUE.equals(child.getClientProperty("SheetBlocker"))) {
+                blocker = child;
+            }
+        }
+
+        boolean needsBlocker = Form.activePeerCount > 0;
+        if (needsBlocker) {
+            if (blocker == null) {
+                blocker = new Button();
+                blocker.putClientProperty("SheetBlocker", Boolean.TRUE);
+                blocker.setUIID("Container");
+                blocker.getAllStyles().setBgTransparency(0);
+                int size = Math.max(CN.getDisplayWidth(), CN.getDisplayHeight()) * 2;
+                blocker.setPreferredSize(new com.codename1.ui.geom.Dimension(size, size));
+                ((Button) blocker).addActionListener(new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent evt) {
+                        hide(duration);
+                    }
+                });
+                cnt.addComponent(0, BorderLayout.CENTER, blocker);
+            }
+        } else {
+            if (blocker != null) {
+                cnt.removeComponent(blocker);
+                blocker = null;
+            }
+        }
+
+        if (foundSheet) {
             $(".Sheet", cnt).each(new ComponentClosure() {
                 @Override
                 public void call(Component c) {
@@ -511,8 +545,18 @@ public class Sheet extends Container {
                 }
 
             });
-            Component existing = cnt.getComponentAt(0);
-            cnt.replace(existing, this, null);
+            Component existing = null;
+            for(Component c : cnt) {
+                if (c instanceof Sheet) {
+                    existing = c;
+                    break;
+                }
+            }
+            if (existing != null) {
+                cnt.replace(existing, this, null);
+            } else {
+                cnt.add(getPosition(), this);
+            }
             cnt.animateLayout(duration);
         } else {
             cnt.add(getPosition(), this);
