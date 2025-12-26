@@ -1568,12 +1568,13 @@ public class Form extends Container {
             formLayeredPane.setHeight(getHeight());
             formLayeredPane.setShouldLayout(false);
         }
+        Container flp = formLayeredPane;
         if (c == null) {
             // NOTE: We need to use getChildrenAsList(true) rather than simply iterating
             // over layeredPaneImpl because the latter won't find components while an animation
             // is in progress.... We could end up adding a whole bunch of layered panes
             // by accident
-            for (Component cmp : formLayeredPane.getChildrenAsList(true)) {
+            for (Component cmp : flp.getChildrenAsList(true)) {
                 if (cmp.getClientProperty("cn1$_cls") == null) {
                     return (Container) cmp;
                 }
@@ -1583,8 +1584,8 @@ public class Form extends Container {
             cnt.setWidth(getWidth());
             cnt.setHeight(getHeight());
             cnt.setShouldLayout(false);
-            cnt.setName("FormLayer: " + c.getName());
-            formLayeredPane.add(cnt);
+            cnt.setName("FormLayer: null");
+            flp.add(cnt);
             return cnt;
         }
         String n = c.getName();
@@ -1592,7 +1593,7 @@ public class Form extends Container {
         // over layeredPaneImpl because the latter won't find components while an animation
         // is in progress.... We could end up adding a whole bunch of layered panes
         // by accident
-        for (Component cmp : formLayeredPane.getChildrenAsList(true)) {
+        for (Component cmp : flp.getChildrenAsList(true)) {
             if (n.equals(cmp.getClientProperty("cn1$_cls"))) {
                 return (Container) cmp;
             }
@@ -1603,9 +1604,9 @@ public class Form extends Container {
         cnt.setShouldLayout(false);
         cnt.setName("FormLayer: " + c.getName());
         if (top) {
-            formLayeredPane.add(cnt);
+            flp.add(cnt);
         } else {
-            formLayeredPane.addComponent(0, cnt);
+            flp.addComponent(0, cnt);
         }
         cnt.putClientProperty("cn1$_cls", n);
         return cnt;
