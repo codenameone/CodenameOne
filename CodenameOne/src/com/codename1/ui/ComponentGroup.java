@@ -263,10 +263,7 @@ public class ComponentGroup extends Container {
             return groupFlag;
         }
         if (name.equals("forceGroup")) {
-            if (forceGroup) {
-                return Boolean.TRUE;
-            }
-            return Boolean.FALSE;
+            return forceGroup ? Boolean.TRUE : Boolean.FALSE;
         }
         return null;
     }

@@ -176,8 +176,7 @@ public class RECharacter {
     }
 
     public static boolean isJavaIdentifierStart(char c) {
-        byte type = getType(c);
-        return isLetter(c) || type == LETTER_NUMBER || c == '$' || c == '_';
+        return isLetter(c) || getType(c) == LETTER_NUMBER || c == '$' || c == '_';
     }
 
     public static boolean isJavaIdentifierPart(char c) {

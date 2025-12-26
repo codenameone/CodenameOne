@@ -538,7 +538,7 @@ public abstract class MathUtil {
         iy = hy & 0x7fffffff;
 
         /* y==zero: x**0 = 1 */
-        if ((iy | ly) == 0) {
+        if (y == 0.0) {
             return one;
         }
 

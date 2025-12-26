@@ -102,7 +102,7 @@ class CSSParser {
         char c = r.readCharFromReader();
         if (c == '*') {
             char lastC = '\0';
-            while ((c != '/') || (lastC != '*')) {
+            while (!(c == '/' && lastC == '*')) {
                 lastC = c;
                 c = r.readCharFromReader();
             }

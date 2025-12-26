@@ -234,8 +234,6 @@ public final class UnitValue {
 
     UnitValue(boolean isHor, int oper, UnitValue sub1, UnitValue sub2, String createString) {
         this(0, "", -1, isHor, oper, sub1, sub2, createString);
-        if (sub1 == null || sub2 == null)
-            throw new IllegalArgumentException("Sub units is null!");
     }
 
     private UnitValue(float value, String unitStr, int unit, boolean isHor, int oper, UnitValue sub1, UnitValue sub2, String createString) {

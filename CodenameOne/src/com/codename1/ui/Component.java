@@ -5816,10 +5816,7 @@ public class Component implements Animation, StyleListener, Editable {
                 return;
             }
 
-            int scroll = scrollY;
-            if (shouldScrollX) {
-                scroll = scrollX;
-            }
+            int scroll = shouldScrollX ? scrollX : scrollY;
             float speed = getDragSpeed(!shouldScrollX);
             int tl;
             if (getTensileLength() > -1) {

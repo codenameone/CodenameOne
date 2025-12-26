@@ -2227,7 +2227,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                             for (int j = 0; j < spacesPerWord; j++) {
                                 newStr += ' ';
                             }
-                            if (i <= addtlSpaces) {
+                            if (i - 1 < addtlSpaces) {
                                 newStr += ' ';
                             }
                             newStr += ' ' + (String) words.elementAt(i);

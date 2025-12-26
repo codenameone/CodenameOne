@@ -446,7 +446,7 @@ class ResourceThreadQueue {
                         htmlC.getHTMLCallback().parsingError(cssDocInfo != null ? HTMLCallback.ERROR_CSS_NOT_FOUND : HTMLCallback.ERROR_IMAGE_NOT_FOUND, null, null, null, (cssDocInfo != null ? "CSS" : "Image") + " not found at " + (cssDocInfo != null ? cssDocInfo.getUrl() : imageUrl));
                     }
                 } else {
-                    if (cssDocInfo != null) { // CSS
+                    if (this.cssDocInfo != null) { // CSS
                         if (HTMLComponent.SUPPORT_CSS) { // no need to also check if loadCSS is true, since if we got so far - it is...
                             CSSElement result = CSSParser.getInstance().parseCSSSegment(com.codename1.io.Util.getReader(is), is, htmlC, cssDocInfo.getUrl());
                             result.setAttribute(result.getAttributeName(Integer.valueOf(CSSElement.CSS_PAGEURL)), cssDocInfo.getUrl());

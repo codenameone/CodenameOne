@@ -752,7 +752,6 @@ public class MenuBar extends Container implements ActionListener {
                 c = result;
                 // a touch menu will always send its commands on its own...
                 if (!isTouchMenus()) {
-                    c = result;
                     if (c != null) {
                         ActionEvent e = new ActionEvent(c, ActionEvent.Type.Command);
                         c.actionPerformed(e);

@@ -288,7 +288,7 @@ public final class Grid {
                 setCell(cellXY[1], cellXY[0], cell);
 
                 // Add a rectangle so we can know that spanned cells occupy more space.
-                if (spanx > 1 || spany > 1) {
+                if (spanx != 1 || spany != 1) {
                     spannedRects.add(new int[]{cellXY[0], cellXY[1], spanx, spany});
                 }
             }

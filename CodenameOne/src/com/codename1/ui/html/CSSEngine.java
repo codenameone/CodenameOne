@@ -1669,9 +1669,8 @@ class CSSEngine {
     }
 
     private void addOutlineToStyle(Style style, Border outline) {
-        Border curBorder = style.getBorder();
-        if (curBorder != null) {
-            curBorder.addOuterBorder(outline);
+        if (style.getBorder() != null) {
+            style.getBorder().addOuterBorder(outline);
         } else {
             style.setBorder(outline);
         }

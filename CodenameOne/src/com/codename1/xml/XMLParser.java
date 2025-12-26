@@ -699,7 +699,7 @@ public class XMLParser {
                 c = (char) read(is);
             }
 
-            if (c == '>') { // tag close char shouldn't be found here, but if the XML is slightly malformed we return the element
+            if ((char)c == '>') { // tag close char shouldn't be found here, but if the XML is slightly malformed we return the element
                 notifyError(ParserCallback.ERROR_UNEXPECTED_TAG_CLOSING, tn, curAttribute.toString(), null, "Unexpected tag closing in tag " + tagName + ", attribute=" + curAttribute);
                 if (!isEmptyTag(tn)) {
                     parseTagContent(element, is);
