@@ -188,7 +188,7 @@ public class XYSeries {
         XYEntry<Double, Double> removedEntry = mXY.removeByIndex(index);
         double removedX = removedEntry.getKey();
         double removedY = removedEntry.getValue();
-        if (Double.compare(removedX, mMinX) == 0 || Double.compare(removedX, mMaxX) == 0 || Double.compare(removedY, mMinY) == 0 || Double.compare(removedY, mMaxY) == 0) {
+        if (com.codename1.util.MathUtil.compare(removedX, mMinX) == 0 || com.codename1.util.MathUtil.compare(removedX, mMaxX) == 0 || com.codename1.util.MathUtil.compare(removedY, mMinY) == 0 || com.codename1.util.MathUtil.compare(removedY, mMaxY) == 0) {
             initRange();
         }
     }

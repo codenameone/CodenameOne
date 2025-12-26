@@ -294,7 +294,7 @@ public class Location {
      */
     boolean equalsLatLng(Location l) {
 
-        return l != null && Double.compare(l.latitude, latitude) == 0 && Double.compare(l.longitude, longitude) == 0;
+        return l != null && com.codename1.util.MathUtil.compare(l.latitude, latitude) == 0 && com.codename1.util.MathUtil.compare(l.longitude, longitude) == 0;
 
     }
 }
