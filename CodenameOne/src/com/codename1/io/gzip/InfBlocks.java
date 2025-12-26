@@ -150,18 +150,12 @@ final class InfBlocks {
                         if (n != 0) {
                             r = Z_OK;
                         } else {
-                            if (bitb != b) {
-                                bitb = b;
-                            }
-                            if (bitk != k) {
-                                bitk = k;
-                            }
+                            bitb = b;
+                            bitk = k;
                             z.avail_in = n;
                             z.total_in += p - z.next_in_index;
                             z.next_in_index = p;
-                            if (write != q) {
-                                write = q;
-                            }
+                            write = q;
                             return inflate_flush(r);
                         }
                         n--;
@@ -565,18 +559,12 @@ final class InfBlocks {
                     q = write;
                     m = q < read ? read - q - 1 : end - q;
                     if (read != write) {
-                        if (bitb != b) {
-                            bitb = b;
-                        }
-                        if (bitk != k) {
-                            bitk = k;
-                        }
+                        bitb = b;
+                        bitk = k;
                         z.avail_in = n;
                         z.total_in += p - z.next_in_index;
                         z.next_in_index = p;
-                        if (write != q) {
-                            write = q;
-                        }
+                        write = q;
                         return inflate_flush(r);
                     }
                     mode = DONE;
