@@ -150,7 +150,7 @@ public class RECharacter {
         return ((type == SPACE_SEPARATOR || type == LINE_SEPARATOR ||
                 type == PARAGRAPH_SEPARATOR) && !(c == 0x00A0 || c == 0x2007 ||
                 c == 0x202F)) || c == 0x0009 || c == 0x000A || c == 0x000B ||
-                c == 0x000C || c == 0x000D || c == 0x0009 || c == 0x001C ||
+                c == 0x000C || c == 0x000D || c == 0x001C ||
                 c == 0x001D || c == 0x001E || c == 0x001F;
     }
 
@@ -176,8 +176,7 @@ public class RECharacter {
     }
 
     public static boolean isJavaIdentifierStart(char c) {
-        byte type = getType(c);
-        return isLetter(c) || type == LETTER_NUMBER || c == '$' || c == '_';
+        return isLetter(c) || getType(c) == LETTER_NUMBER || c == '$' || c == '_';
     }
 
     public static boolean isJavaIdentifierPart(char c) {
@@ -196,7 +195,7 @@ public class RECharacter {
 //#             }
 //#         }
 //#else
-        if (c < CHAR_CLASSES.length) {
+        if (c < 128) {
             return CHAR_CLASSES[c];
         }
 //#endif

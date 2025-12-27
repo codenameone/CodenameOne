@@ -1,16 +1,3 @@
-package com.codename1.ui.layouts.mig;
-
-import com.codename1.compat.java.util.Objects;
-import com.codename1.ui.Display;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.TreeSet;
 /*
  * License (BSD):
  * ==============
@@ -44,6 +31,20 @@ import java.util.TreeSet;
  * @author Mikael Grev, MiG InfoCom AB
  *         Date: 2006-sep-08
  */
+
+package com.codename1.ui.layouts.mig;
+
+import com.codename1.compat.java.util.Objects;
+import com.codename1.ui.Display;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.TreeSet;
 
 /**
  * Holds components in a grid. Does most of the logic behind the layout manager.
@@ -197,10 +198,12 @@ public final class Grid {
                 continue;   // The "external" component should not be handled further.
             }
 
-            if (rootCc.getHorizontal().getSizeGroup() != null) {
+            String sgX = rootCc.getHorizontal().getSizeGroup();
+            if (sgX != null) {
                 sizeGroupsX++;
             }
-            if (rootCc.getVertical().getSizeGroup() != null) {
+            String sgY = rootCc.getVertical().getSizeGroup();
+            if (sgY != null) {
                 sizeGroupsY++;
             }
 
@@ -255,16 +258,8 @@ public final class Grid {
                 }
             } else {
                 if (cx >= 0 && cy >= 0) {
-                    if (cy >= 0) {
-                        cellXY[0] = cx;
-                        cellXY[1] = cy;
-                    } else {    // Only one coordinate is specified. Use the current row (flowx) or column (flowy) to fill in.
-                        if (lc.isFlowX()) {
-                            cellXY[0] = cx;
-                        } else {
-                            cellXY[1] = cx;
-                        }
-                    }
+                    cellXY[0] = cx;
+                    cellXY[1] = cy;
                 }
                 cell = getCell(cellXY[1], cellXY[0]);   // Might be null
             }

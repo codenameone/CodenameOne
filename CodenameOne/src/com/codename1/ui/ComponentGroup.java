@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.Layout;
 
 /**
  * <p>A component group is a container that applies the given UIID to a set of components within it
@@ -104,7 +105,10 @@ public class ComponentGroup extends Container {
      */
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
-        if (!getUIManager().isThemeConstant(groupFlag, false) && !forceGroup) {
+        boolean ignoreGroup = getUIManager().isThemeConstant(groupFlag, false);
+        if (ignoreGroup || forceGroup) {
+            updateUIIDs();
+        } else {
             if (uiidsDirty) {
                 uiidsDirty = false;
                 int count = getComponentCount();
@@ -112,8 +116,6 @@ public class ComponentGroup extends Container {
                     restoreUIID(getComponentAt(iter));
                 }
             }
-        } else {
-            updateUIIDs();
         }
     }
 
@@ -137,7 +139,7 @@ public class ComponentGroup extends Container {
     }
 
     private void updateUIIDs() {
-        if (!getUIManager().isThemeConstant(groupFlag, false) && !forceGroup) {
+        if (!(getUIManager().isThemeConstant(groupFlag, false) || forceGroup)) {
             return;
         }
         int count = getComponentCount();
@@ -149,13 +151,11 @@ public class ComponentGroup extends Container {
             } else {
                 Component c = getComponentAt(0);
                 updateUIID(elementPrefix(c) + "First", c);
-                if (count > 1) {
-                    c = getComponentAt(count - 1);
-                    updateUIID(elementPrefix(c) + "Last", c);
-                    for (int iter = 1; iter < count - 1; iter++) {
-                        c = getComponentAt(iter);
-                        updateUIID(elementPrefix(c), c);
-                    }
+                c = getComponentAt(count - 1);
+                updateUIID(elementPrefix(c) + "Last", c);
+                for (int iter = 1; iter < count - 1; iter++) {
+                    c = getComponentAt(iter);
+                    updateUIID(elementPrefix(c), c);
                 }
             }
         }
@@ -184,7 +184,11 @@ public class ComponentGroup extends Container {
      * @return the horizontal
      */
     public boolean isHorizontal() {
-        return getLayout() instanceof BoxLayout && ((BoxLayout) getLayout()).getAxis() == BoxLayout.X_AXIS;
+        Layout l = getLayout();
+        if (l instanceof BoxLayout) {
+            return ((BoxLayout) l).getAxis() == BoxLayout.X_AXIS;
+        }
+        return false;
     }
 
     /**
@@ -263,10 +267,7 @@ public class ComponentGroup extends Container {
             return groupFlag;
         }
         if (name.equals("forceGroup")) {
-            if (forceGroup) {
-                return Boolean.TRUE;
-            }
-            return Boolean.FALSE;
+            return forceGroup ? Boolean.TRUE : Boolean.FALSE;
         }
         return null;
     }

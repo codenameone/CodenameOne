@@ -3651,7 +3651,7 @@ public abstract class CodenameOneImplementation {
     }
 
     private boolean isWhitespace(char c) {
-        return c == ' ' || (c == '\n') || (c == '\t') || (c == 10) || (c == 13);
+        return c == ' ' || (c == '\n') || (c == '\t') || (c == 13);
     }
 
     /**
@@ -7447,9 +7447,10 @@ public abstract class CodenameOneImplementation {
      * @param commandBehavior the commandBehavior to set
      */
     public void setCommandBehavior(int commandBehavior) {
-        // PMD Fix (CollapsibleIfStatements): Combine touch capability and behavior checks.
-        if (!isTouchDevice() && commandBehavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR) {
-            commandBehavior = Display.COMMAND_BEHAVIOR_SOFTKEY;
+        if (commandBehavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR) {
+            if (!isTouchDevice()) {
+                commandBehavior = Display.COMMAND_BEHAVIOR_SOFTKEY;
+            }
         }
         this.commandBehavior = commandBehavior;
         notifyCommandBehavior(commandBehavior);
@@ -8475,14 +8476,14 @@ public abstract class CodenameOneImplementation {
                 // Instead we simple reposition the text, and draw the 3 points, this is quite simple, but
                 // the downside is that a part of a letter may be shown here as well.
 
-                if (rtl && !isTickerRunning && endsWith3Points) {
-                    // PMD Fix (CollapsibleIfStatements): Separate combined RTL and ticker checks into a single conditional.
-                    String points = "...";
-                    int pointsW = stringWidth(nativeFont, points);
-                    drawString(nativeGraphics, nativeFont, points, shiftText + x, y, textDecoration, fontHeight);
-                    clipRect(nativeGraphics, pointsW + shiftText + x, y, textSpaceW - pointsW, fontHeight);
-                }
                 if (rtl) {
+                    if (!isTickerRunning && endsWith3Points) {
+                        // PMD Fix (CollapsibleIfStatements): Separate combined RTL and ticker checks into a single conditional.
+                        String points = "...";
+                        int pointsW = stringWidth(nativeFont, points);
+                        drawString(nativeGraphics, nativeFont, points, shiftText + x, y, textDecoration, fontHeight);
+                        clipRect(nativeGraphics, pointsW + shiftText + x, y, textSpaceW - pointsW, fontHeight);
+                    }
                     x = x - txtW + textSpaceW;
                 } else if (endsWith3Points) {
                     String points = "...";

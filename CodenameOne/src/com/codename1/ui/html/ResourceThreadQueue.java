@@ -360,7 +360,7 @@ class ResourceThreadQueue {
         String imageUrl;
         DocumentRequestHandler handler;
         ResourceThreadQueue threadQueue;
-        boolean cancelled;
+        volatile boolean cancelled;
         HTMLComponent htmlC;
         Image img;
         DocumentInfo cssDocInfo;
@@ -446,7 +446,7 @@ class ResourceThreadQueue {
                         htmlC.getHTMLCallback().parsingError(cssDocInfo != null ? HTMLCallback.ERROR_CSS_NOT_FOUND : HTMLCallback.ERROR_IMAGE_NOT_FOUND, null, null, null, (cssDocInfo != null ? "CSS" : "Image") + " not found at " + (cssDocInfo != null ? cssDocInfo.getUrl() : imageUrl));
                     }
                 } else {
-                    if (cssDocInfo != null) { // CSS
+                    if (this.cssDocInfo != null) { // CSS
                         if (HTMLComponent.SUPPORT_CSS) { // no need to also check if loadCSS is true, since if we got so far - it is...
                             CSSElement result = CSSParser.getInstance().parseCSSSegment(com.codename1.io.Util.getReader(is), is, htmlC, cssDocInfo.getUrl());
                             result.setAttribute(result.getAttributeName(Integer.valueOf(CSSElement.CSS_PAGEURL)), cssDocInfo.getUrl());
@@ -540,9 +540,8 @@ class ResourceThreadQueue {
                     height = img.getHeight() * width / img.getWidth();
                 }
             } else if (height != 0) {
-                if (width == 0) { // If only height was specified, width should be calculated so the image keeps its aspect ratio
-                    width = img.getWidth() * height / img.getHeight();
-                }
+                // If only height was specified, width should be calculated so the image keeps its aspect ratio
+                width = img.getWidth() * height / img.getHeight();
             }
 
             if (width != 0) { // if any of width or height were not 0, the other one was set to non-zero above, so this check suffices

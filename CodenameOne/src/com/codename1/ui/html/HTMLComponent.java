@@ -1801,7 +1801,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             //newLine(Component.LEFT); //flush buffer
             mainContainer.applyRTL((dir != null) && (dir.equalsIgnoreCase("rtl")));
 
-            if ((SUPPORT_CSS) && (loadCSS)) {
+            if (loadCSS) {
                 body.setAssociatedComponents(mainContainer);
                 if (threadQueue.getCSSCount() == -1) { // If there are no pending external CSS, we can already process the CSS
                     applyAllCSS(); // Note that this doesn't have to be on EDT as the main container is still not displayed
@@ -2028,7 +2028,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                 }
                 word = "";
             } else {
-                if ((ch == ' ') || (ch == 10) || (ch == 13) || (ch == '\t') || (ch == '\n')) {
+                if ((ch == ' ') || (ch == '\n') || (ch == '\r') || (ch == '\t')) {
                     if (word.length() != 0) {
                         if (returnComps) {
                             words.addElement(addString(leadSpace + word + ' ', align));
@@ -2192,9 +2192,8 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         lbl.getSelectedStyle().setFgColor(color);
 
         //lbl.setVerticalAlignment(Component.BOTTOM); //TODO - This still doesn't align as label alignment in Codename One refers to the text alignment in relation to its icon (if exists)
-        if(font != null) {
-            lbl.getUnselectedStyle().setFont(font.getFont());
-        }
+        // font is always initialized to defaultFont
+        lbl.getUnselectedStyle().setFont(font.getFont());
         lbl.getUnselectedStyle().setBgTransparency(0);
         lbl.setGap(0);
         lbl.setTickerEnabled(false);
@@ -2227,7 +2226,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                             for (int j = 0; j < spacesPerWord; j++) {
                                 newStr += ' ';
                             }
-                            if (i <= addtlSpaces) {
+                            if (i - 1 < addtlSpaces) {
                                 newStr += ' ';
                             }
                             newStr += ' ' + (String) words.elementAt(i);
@@ -2969,9 +2968,9 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                 case HTMLElement.TAG_H4:
                 case HTMLElement.TAG_H5:
                 case HTMLElement.TAG_H6:
-                    font = (HTMLFont) fonts.get(child.getTagName());
-                    if (font == null) {
-                        font = oldFont;
+                    HTMLFont headerFont = (HTMLFont) fonts.get(child.getTagName());
+                    if (headerFont != null) {
+                        font = headerFont;
                     }
                     // No break here intentionally
                 case HTMLElement.TAG_P:

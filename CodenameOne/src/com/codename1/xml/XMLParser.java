@@ -522,7 +522,7 @@ public class XMLParser {
      * @return true if the character is a white space, false otherwise
      */
     protected boolean isWhiteSpace(char ch) {
-        return ((ch == ' ') || (ch == '\n') || (ch == '\t') || (ch == 10) || (ch == 13));
+        return ((ch == ' ') || (ch == '\n') || (ch == '\t') || (ch == '\r'));
     }
 
     /**
@@ -653,9 +653,7 @@ public class XMLParser {
                         }
                         c = (char) i;
 
-                        if ((c >= 'A') && (c <= 'Z')) {
-                            c = (char) (c - 'A' + 'a');
-                        }
+                        c = Character.toLowerCase(c);
                         if (c == endTag.charAt(index)) {
                             index++;
                         } else {

@@ -595,7 +595,7 @@ public class MenuBar extends Container implements ActionListener {
             // the list for the menu sent the event
             if (src instanceof Button) {
                 for (int iter = 0; iter < soft.length; iter++) {
-                    if (src == soft[iter]) {
+                    if (soft[iter].equals(src)) {
                         Container parent = commandList.getParent();
                         while (parent != null) {
                             if (parent instanceof Dialog) {
@@ -751,12 +751,9 @@ public class MenuBar extends Container implements ActionListener {
             } else {
                 c = result;
                 // a touch menu will always send its commands on its own...
-                if (!isTouchMenus()) {
-                    c = result;
-                    if (c != null) {
-                        ActionEvent e = new ActionEvent(c, ActionEvent.Type.Command);
-                        c.actionPerformed(e);
-                    }
+                if (!isTouchMenus() && c != null) {
+                    ActionEvent e = new ActionEvent(c, ActionEvent.Type.Command);
+                    c.actionPerformed(e);
                 }
             }
             // menu item was handled internally in a touch interface that is not a touch menu
@@ -1058,9 +1055,7 @@ public class MenuBar extends Container implements ActionListener {
                     return;
                 }
                 if (parent.getBackCommand() != cmd) {
-                    if ((behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK ||
-                            behavior == Display.COMMAND_BEHAVIOR_ICS ||
-                            behavior == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION)
+                    if ((behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK)
                             && parent.getTitle() != null && parent.getTitle().length() > 0) {
                         synchronizeCommandsWithButtonsInBackbutton();
                         return;
@@ -1500,17 +1495,11 @@ public class MenuBar extends Container implements ActionListener {
             marginRight = marginLeft;
             marginLeft = 0;
         }
-        if (getCommandBehavior() == Display.COMMAND_BEHAVIOR_ICS) {
-            menu.setTransitionOutAnimator(transitionIn);
-            menu.setTransitionInAnimator(transitionOut);
-            int th = getTitleAreaContainer().getHeight();
-            return menu.show(th, height - th, marginLeft, marginRight, true);
+
+        if (manager.getLookAndFeel().isTouchMenus() && manager.isThemeConstant("PackTouchMenuBool", true)) {
+            return menu.showPacked(BorderLayout.SOUTH, true);
         } else {
-            if (manager.getLookAndFeel().isTouchMenus() && manager.isThemeConstant("PackTouchMenuBool", true)) {
-                return menu.showPacked(BorderLayout.SOUTH, true);
-            } else {
-                return menu.show(height, 0, marginLeft, marginRight, true);
-            }
+            return menu.show(height, 0, marginLeft, marginRight, true);
         }
     }
 

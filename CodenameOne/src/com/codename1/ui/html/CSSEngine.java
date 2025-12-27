@@ -467,7 +467,7 @@ class CSSEngine {
      * @param htmlC    The HTMLComponent
      */
     private void applyStyle(HTMLElement element, CSSElement selector, HTMLComponent htmlC) {
-        if ((element.getUi() != null) && (element.getUi().size() > 0)) {
+        if (element.getUi().size() > 0) {
             if (!HTMLComponent.PROCESS_HTML_MP1_ONLY) {
                 String reset = selector.getAttributeById(CSSElement.CSS_COUNTER_RESET);
                 if (reset != null) {
@@ -807,7 +807,7 @@ class CSSEngine {
                 String newText = "";
                 for (int c = 0; c < text.length(); c++) {
                     char ch = text.charAt(c);
-                    if ((ch == ' ') || (ch == 10) || (ch == 13) || (ch == '\t') || (ch == '\n')) {
+                    if ((ch == ' ') || (ch == '\n') || (ch == '\r') || (ch == '\t')) {
                         if (!word.equals("")) {
                             newText += word + " ";
                             word = "";
@@ -1338,9 +1338,7 @@ class CSSEngine {
 
         // Text indentation
         int indent = selector.getAttrLengthVal(CSSElement.CSS_TEXT_INDENT, ui, htmlC.getWidth());
-        if (indent >= 0) { // Only positive (0 also as it may cancel previous margins)
-            setTextIndentationRecursive(ui, indent);
-        }
+        setTextIndentationRecursive(ui, indent);
 
         //
         // Font
@@ -1362,7 +1360,7 @@ class CSSEngine {
         int fontWeight = selector.getAttrVal(CSSElement.CSS_FONT_WEIGHT);
 
         int fontSize = selector.getAttrLengthVal(CSSElement.CSS_FONT_SIZE, ui, ui.getStyle().getFont().getHeight());
-        if (fontSize < -1) {
+        if (fontSize < 0 && fontSize != -1) {
             int curSize = ui.getStyle().getFont().getHeight();
             if (fontSize == CSSElement.FONT_SIZE_LARGER) {
                 fontSize = curSize + 2;
@@ -1462,8 +1460,9 @@ class CSSEngine {
                 if ((styles & STYLE_PRESSED) != 0) {
                     borderUi.getPressedStyle().setBorder(border);
                 }
-                if (borderUi.getParent() != null) {
-                    borderUi.getParent().revalidate();
+                Container borderUiParent = borderUi.getParent();
+                if (borderUiParent != null) {
+                    borderUiParent.revalidate();
                 } else if (borderUi instanceof Container) {
                     ((Container) borderUi).revalidate();
                 }
@@ -1669,9 +1668,8 @@ class CSSEngine {
     }
 
     private void addOutlineToStyle(Style style, Border outline) {
-        Border curBorder = style.getBorder();
-        if (curBorder != null) {
-            curBorder.addOuterBorder(outline);
+        if (style.getBorder() != null) {
+            style.getBorder().addOuterBorder(outline);
         } else {
             style.setBorder(outline);
         }

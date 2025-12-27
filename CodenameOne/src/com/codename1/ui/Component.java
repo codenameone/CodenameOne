@@ -3548,20 +3548,11 @@ public class Component implements Animation, StyleListener, Editable {
      * @see #contains(int, int)
      */
     public boolean visibleBoundsContains(int x, int y) {
-        boolean contains = isVisible() && contains(x, y);
-        if (contains) {
-            Container parent = getParent();
-            while (parent != null) {
-                if (!parent.visibleBoundsContains(x, y)) {
-                    contains = false;
-                }
-                if (!contains) {
-                    break;
-                }
-                parent = parent.getParent();
-            }
+        if (!isVisible() || !contains(x, y)) {
+            return false;
         }
-        return contains;
+        Container parent = getParent();
+        return parent == null || parent.visibleBoundsContains(x, y);
     }
 
     /**
@@ -5142,8 +5133,8 @@ public class Component implements Animation, StyleListener, Editable {
                 view = new Rectangle(getScrollX(), getScrollY(), w, h - invisibleAreaUnderVKB);
                 //if the dragging component is out of bounds move the scrollable parent
                 if (!view.contains(draggedx - scrollParent.getAbsoluteX(), draggedy - scrollParent.getAbsoluteY(), getWidth(), getHeight())) {
-                    if ((scrollParent.isScrollableY() && scrollParent.getScrollY() >= 0 && scrollParent.getScrollY() + (draggedy + getHeight()) < scrollParent.getScrollDimension().getHeight()) ||
-                            (scrollParent.isScrollableX() && scrollParent.getScrollX() >= 0 && scrollParent.getScrollX() + (draggedx + getWidth()) < scrollParent.getScrollDimension().getWidth())) {
+                    if ((scrollParent.isScrollableY() && scrollParent.getScrollY() + (draggedy + getHeight()) < scrollParent.getScrollDimension().getHeight()) ||
+                            (scrollParent.isScrollableX() && scrollParent.getScrollX() + (draggedx + getWidth()) < scrollParent.getScrollDimension().getWidth())) {
                         int yposition = draggedy - scrollParent.getAbsoluteY() - 40;
                         if (yposition < 0) {
                             yposition = 0;
@@ -5816,10 +5807,7 @@ public class Component implements Animation, StyleListener, Editable {
                 return;
             }
 
-            int scroll = scrollY;
-            if (shouldScrollX) {
-                scroll = scrollX;
-            }
+            int scroll = shouldScrollX ? scrollX : scrollY;
             float speed = getDragSpeed(!shouldScrollX);
             int tl;
             if (getTensileLength() > -1) {
@@ -6557,7 +6545,7 @@ public class Component implements Animation, StyleListener, Editable {
         }
 
         if (!animateBackground && (destScrollY == -1 || destScrollY == scrollY) &&
-                !animateBackground && m == null && draggedMotionY == null &&
+                m == null && draggedMotionY == null &&
                 draggedMotionX == null && !dragActivated) {
             tryDeregisterAnimated();
         }
@@ -7393,15 +7381,12 @@ public class Component implements Animation, StyleListener, Editable {
             paintInternalImpl(((Image) paintLockImage).getGraphics(), false);
             setX(x);
             setY(y);
-            if (hardLock) {
-                return (Image) paintLockImage;
-            } else {
+            if (!hardLock) {
                 paintLockImage = Display.getInstance().createSoftWeakRef(paintLockImage);
             }
-        } else {
-            if (hardLock) {
-                return (Image) paintLockImage;
-            }
+        }
+        if (hardLock) {
+            return (Image) paintLockImage;
         }
         return null;
     }

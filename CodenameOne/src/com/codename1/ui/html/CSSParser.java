@@ -87,7 +87,7 @@ class CSSParser {
      * @return true if the character is a white space, false otherwise
      */
     static boolean isWhiteSpace(char ch) {
-        return ((ch == ' ') || (ch == '\n') || (ch == '\t') || (ch == 10) || (ch == 13));
+        return ((ch == ' ') || (ch == '\n') || (ch == '\t') || (ch == '\r'));
     }
 
 
@@ -102,12 +102,12 @@ class CSSParser {
         char c = r.readCharFromReader();
         if (c == '*') {
             char lastC = '\0';
-            while ((c != '/') || (lastC != '*')) {
+            while (!(c == '/' && lastC == '*')) {
                 lastC = c;
                 c = r.readCharFromReader();
             }
             c = r.readCharFromReader();
-            while (((byte) c) != -1 && isWhiteSpace(c)) { //skip white spaces
+            while (c != (char)-1 && isWhiteSpace(c)) { //skip white spaces
                 c = r.readCharFromReader();
             }
         } else {
@@ -134,7 +134,7 @@ class CSSParser {
         char c = r.readCharFromReader();
 
         // read the next token from the CSS stream
-        while (((byte) c) != -1 && isWhiteSpace(c)) {
+        while (c != (char) -1 && isWhiteSpace(c)) {
             newline = newline || (c == 10 || c == 13 || c == ';' || ((c == ',') && (!ignoreCommas)) || (c == '>') || (c == '+'));
             if (!readNewline && newline) {
                 return null;
@@ -143,7 +143,7 @@ class CSSParser {
         }
         if (c == ';' && readNewline) { //leftover from compound operation
             c = r.readCharFromReader();
-            while (((byte) c) != -1 && isWhiteSpace(c)) { // This was added since after reading ; there might be some more white spaces. However there needs to be a way to combine this with the previous white spaces code or with the revised newline detection and unreading char below
+            while (c != (char) -1 && isWhiteSpace(c)) { // This was added since after reading ; there might be some more white spaces. However there needs to be a way to combine this with the previous white spaces code or with the revised newline detection and unreading char below
                 newline = newline || (c == 10 || c == 13 || c == ';' || ((c == ',') && (!ignoreCommas)) || (c == '>') || (c == '+'));
                 c = r.readCharFromReader();
             }
@@ -151,7 +151,7 @@ class CSSParser {
 
         }
         char segment = '\0'; // segment of (...) or "..." or '...'
-        while (((byte) c) != -1 && ((!isWhiteSpace(c)) || (segment != '\0') || (ignoreWhiteSpaces)) && c != ';' && ((c != ':') ||
+        while (c != (char) -1 && ((!isWhiteSpace(c)) || (segment != '\0') || (ignoreWhiteSpaces)) && c != ';' && ((c != ':') ||
                 (segment != '\0') || (ignoreColons)) && ((c != ',') || (segment != '\0') ||
                 (ignoreCommas)) && (((c != '>') && (c != '+')) || (segment != '\0'))) { //- : denotes pseudo-classes, would like to keep them as one token
 

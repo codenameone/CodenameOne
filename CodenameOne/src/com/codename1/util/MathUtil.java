@@ -423,9 +423,8 @@ public abstract class MathUtil {
             }
             x = hi - lo;
         } else if (hx < 0x3e300000) { /* when |x|<2**-28 */
-            if (huge + x > one) {
-                return one + x;/* trigger inexact */
-            }
+            // trigger inexact
+            return one + x;
         }
         //else k = 0; // handled at declaration
 
@@ -538,7 +537,7 @@ public abstract class MathUtil {
         iy = hy & 0x7fffffff;
 
         /* y==zero: x**0 = 1 */
-        if ((iy | ly) == 0) {
+        if (y == 0.0) {
             return one;
         }
 
@@ -620,7 +619,7 @@ public abstract class MathUtil {
             }
         }
 
-        n = (hx >>> 31) + 1;
+        n = (hx >> 31) + 1;
 
         /* (x<0)**(non-int) is NaN */
         if ((n | yisint) == 0) {
@@ -638,9 +637,7 @@ public abstract class MathUtil {
                 if (ix <= 0x3fefffff) {
                     return (hy < 0) ? huge * huge : tiny * tiny;
                 }
-                if (ix >= 0x3ff00000) {
-                    return (hy > 0) ? huge * huge : tiny * tiny;
-                }
+                return (hy > 0) ? huge * huge : tiny * tiny;
             }
             /* over/underflow if x is not close to one */
             if (ix < 0x3fefffff) {
@@ -901,9 +898,7 @@ public abstract class MathUtil {
             return 1.0;   /* asin(|x|>1) is NaN */
         } else if (ix < 0x3fe00000) { /* |x|<0.5 */
             if (ix < 0x3e400000) {   /* if |x| < 2**-27 */
-                if (huge + x > one) {
-                    return x;/* return x with inexact if x!=0*/
-                }
+                return x;/* return x with inexact if x!=0*/
             } else {
                 t = x * x;
                 p = t * (pS0 + t * (pS1 + t * (pS2 + t * (pS3 + t * (pS4 + t * pS5)))));
@@ -931,7 +926,7 @@ public abstract class MathUtil {
             q = pio4_hi - 2.0 * w;
             t = pio4_hi - (p - q);
         }
-        if (hx > 0) {
+        if (x > 0) {
             return t;
         } else {
             return -t;
@@ -957,9 +952,7 @@ public abstract class MathUtil {
         }
         if (ix < 0x3fdc0000) {  /* |x| < 0.4375 */
             if (ix < 0x3e200000) {  /* |x| < 2^-29 */
-                if (huge + x > one) {
-                    return x;  /* raise inexact */
-                }
+                return x;/* return x with inexact if x!=0*/
             }
             id = -1;
         } else {
