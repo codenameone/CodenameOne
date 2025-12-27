@@ -2192,9 +2192,8 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         lbl.getSelectedStyle().setFgColor(color);
 
         //lbl.setVerticalAlignment(Component.BOTTOM); //TODO - This still doesn't align as label alignment in Codename One refers to the text alignment in relation to its icon (if exists)
-        if(font != null) {
-            lbl.getUnselectedStyle().setFont(font.getFont());
-        }
+        // font is always initialized to defaultFont
+        lbl.getUnselectedStyle().setFont(font.getFont());
         lbl.getUnselectedStyle().setBgTransparency(0);
         lbl.setGap(0);
         lbl.setTickerEnabled(false);

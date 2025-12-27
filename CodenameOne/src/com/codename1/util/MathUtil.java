@@ -423,9 +423,8 @@ public abstract class MathUtil {
             }
             x = hi - lo;
         } else if (hx < 0x3e300000) { /* when |x|<2**-28 */
-            if (huge + x > one) {
-                return one + x;/* trigger inexact */
-            }
+            // trigger inexact
+            return one + x;
         }
         //else k = 0; // handled at declaration
 

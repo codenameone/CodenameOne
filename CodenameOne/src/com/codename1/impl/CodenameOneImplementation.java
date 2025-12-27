@@ -2635,7 +2635,7 @@ public abstract class CodenameOneImplementation {
         if (getCurrentForm() == null) {
             return false;
         }
-        if (dragActivationCounter == 0) {
+        if (dragActivationCounter <= 0) {
             dragActivationX = x;
             dragActivationY = y;
             dragActivationCounter++;

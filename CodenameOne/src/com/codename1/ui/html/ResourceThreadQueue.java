@@ -360,7 +360,7 @@ class ResourceThreadQueue {
         String imageUrl;
         DocumentRequestHandler handler;
         ResourceThreadQueue threadQueue;
-        boolean cancelled;
+        volatile boolean cancelled;
         HTMLComponent htmlC;
         Image img;
         DocumentInfo cssDocInfo;

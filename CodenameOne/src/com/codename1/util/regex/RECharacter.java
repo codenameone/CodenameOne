@@ -195,7 +195,7 @@ public class RECharacter {
 //#             }
 //#         }
 //#else
-        if (c < CHAR_CLASSES.length) {
+        if (c < 128) {
             return CHAR_CLASSES[c];
         }
 //#endif

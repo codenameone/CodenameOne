@@ -5142,8 +5142,8 @@ public class Component implements Animation, StyleListener, Editable {
                 view = new Rectangle(getScrollX(), getScrollY(), w, h - invisibleAreaUnderVKB);
                 //if the dragging component is out of bounds move the scrollable parent
                 if (!view.contains(draggedx - scrollParent.getAbsoluteX(), draggedy - scrollParent.getAbsoluteY(), getWidth(), getHeight())) {
-                    if ((scrollParent.isScrollableY() && scrollParent.getScrollY() >= 0 && scrollParent.getScrollY() + (draggedy + getHeight()) < scrollParent.getScrollDimension().getHeight()) ||
-                            (scrollParent.isScrollableX() && scrollParent.getScrollX() >= 0 && scrollParent.getScrollX() + (draggedx + getWidth()) < scrollParent.getScrollDimension().getWidth())) {
+                    if ((scrollParent.isScrollableY() && scrollParent.getScrollY() + (draggedy + getHeight()) < scrollParent.getScrollDimension().getHeight()) ||
+                            (scrollParent.isScrollableX() && scrollParent.getScrollX() + (draggedx + getWidth()) < scrollParent.getScrollDimension().getWidth())) {
                         int yposition = draggedy - scrollParent.getAbsoluteY() - 40;
                         if (yposition < 0) {
                             yposition = 0;

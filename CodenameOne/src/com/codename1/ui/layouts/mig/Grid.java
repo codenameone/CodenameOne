@@ -197,10 +197,12 @@ public final class Grid {
                 continue;   // The "external" component should not be handled further.
             }
 
-            if (rootCc.getHorizontal().getSizeGroup() != null) {
+            String sgX = rootCc.getHorizontal().getSizeGroup();
+            if (sgX != null) {
                 sizeGroupsX++;
             }
-            if (rootCc.getVertical().getSizeGroup() != null) {
+            String sgY = rootCc.getVertical().getSizeGroup();
+            if (sgY != null) {
                 sizeGroupsY++;
             }
 

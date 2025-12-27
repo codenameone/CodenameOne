@@ -1462,8 +1462,9 @@ class CSSEngine {
                 if ((styles & STYLE_PRESSED) != 0) {
                     borderUi.getPressedStyle().setBorder(border);
                 }
-                if (borderUi.getParent() != null) {
-                    borderUi.getParent().revalidate();
+                Container borderUiParent = borderUi.getParent();
+                if (borderUiParent != null) {
+                    borderUiParent.revalidate();
                 } else if (borderUi instanceof Container) {
                     ((Container) borderUi).revalidate();
                 }

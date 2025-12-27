@@ -653,9 +653,7 @@ public class XMLParser {
                         }
                         c = (char) i;
 
-                        if ((c >= 'A') && (c <= 'Z')) {
-                            c = (char) (c - 'A' + 'a');
-                        }
+                        c = Character.toLowerCase(c);
                         if (c == endTag.charAt(index)) {
                             index++;
                         } else {

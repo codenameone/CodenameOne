@@ -184,7 +184,11 @@ public class ComponentGroup extends Container {
      * @return the horizontal
      */
     public boolean isHorizontal() {
-        return getLayout() instanceof BoxLayout && ((BoxLayout) getLayout()).getAxis() == BoxLayout.X_AXIS;
+        Layout l = getLayout();
+        if (l instanceof BoxLayout) {
+            return ((BoxLayout) l).getAxis() == BoxLayout.X_AXIS;
+        }
+        return false;
     }
 
     /**
