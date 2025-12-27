@@ -240,7 +240,7 @@ public final class UnitValue {
         if (oper < STATIC || oper > MID)
             throw new IllegalArgumentException("Unknown Operation: " + oper);
 
-        if (oper > STATIC && oper <= MID && (sub1 == null || sub2 == null))
+        if (oper > STATIC && (sub1 == null || sub2 == null))
             throw new IllegalArgumentException(oper + " Operation may not have null sub-UnitValues.");
 
         this.value = value;

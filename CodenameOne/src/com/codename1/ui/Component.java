@@ -3548,20 +3548,11 @@ public class Component implements Animation, StyleListener, Editable {
      * @see #contains(int, int)
      */
     public boolean visibleBoundsContains(int x, int y) {
-        boolean contains = isVisible() && contains(x, y);
-        if (contains) {
-            Container parent = getParent();
-            while (parent != null) {
-                if (!parent.visibleBoundsContains(x, y)) {
-                    contains = false;
-                }
-                if (!contains) {
-                    break;
-                }
-                parent = parent.getParent();
-            }
+        if (!isVisible() || !contains(x, y)) {
+            return false;
         }
-        return contains;
+        Container parent = getParent();
+        return parent == null || parent.visibleBoundsContains(x, y);
     }
 
     /**

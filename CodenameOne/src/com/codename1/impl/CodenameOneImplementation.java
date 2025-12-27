@@ -7960,7 +7960,7 @@ public abstract class CodenameOneImplementation {
      * @param s              the style object to draw
      */
     public void paintComponentBackground(Object nativeGraphics, int x, int y, int width, int height, Style s) {
-        if (width <= 0 || height <= 0) {
+        if (width < 1 || height < 1) {
             return;
         }
         Image bgImageOrig = s.getBgImage();

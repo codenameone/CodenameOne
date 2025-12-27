@@ -595,7 +595,7 @@ public class MenuBar extends Container implements ActionListener {
             // the list for the menu sent the event
             if (src instanceof Button) {
                 for (int iter = 0; iter < soft.length; iter++) {
-                    if (src == soft[iter]) {
+                    if (soft[iter].equals(src)) {
                         Container parent = commandList.getParent();
                         while (parent != null) {
                             if (parent instanceof Dialog) {

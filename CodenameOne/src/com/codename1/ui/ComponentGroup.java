@@ -105,7 +105,8 @@ public class ComponentGroup extends Container {
      */
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
-        if (!getUIManager().isThemeConstant(groupFlag, false) && !forceGroup) {
+        boolean ignoreGroup = getUIManager().isThemeConstant(groupFlag, false);
+        if (!ignoreGroup && !forceGroup) {
             if (uiidsDirty) {
                 uiidsDirty = false;
                 int count = getComponentCount();

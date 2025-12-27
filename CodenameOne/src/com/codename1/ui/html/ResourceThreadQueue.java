@@ -459,7 +459,7 @@ class ResourceThreadQueue {
                     }
                 }
 
-                if (!cancelled) {
+                if (cancelled == false) {
                     Display.getInstance().callSerially(new Runnable() {
                         public void run() {
                             // prevent a redirect or another thread from breaking the UI

@@ -2968,8 +2968,10 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                 case HTMLElement.TAG_H4:
                 case HTMLElement.TAG_H5:
                 case HTMLElement.TAG_H6:
-                    font = (HTMLFont) fonts.get(child.getTagName());
-                    if (font == null) {
+                    HTMLFont f = (HTMLFont) fonts.get(child.getTagName());
+                    if (f != null) {
+                        font = f;
+                    } else {
                         font = oldFont;
                     }
                     // No break here intentionally
