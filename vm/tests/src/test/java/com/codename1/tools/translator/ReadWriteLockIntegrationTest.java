@@ -295,6 +295,60 @@ class ReadWriteLockIntegrationTest {
         // java.io.Serializable
         Files.write(io.resolve("Serializable.java"), "package java.io; public interface Serializable {}".getBytes(StandardCharsets.UTF_8));
 
+        // Minimal java.io.File to satisfy translator native headers
+        Files.write(io.resolve("File.java"), ("package java.io;\n" +
+                "public class File {\n" +
+                "    public static final String separator = \"/\";\n" +
+                "    public static final char separatorChar = '/';\n" +
+                "    public static final String pathSeparator = \":\";\n" +
+                "    public static final char pathSeparatorChar = ':';\n" +
+                "    private String path;\n" +
+                "    public File(String pathname) { this.path = pathname == null ? \"\" : pathname; }\n" +
+                "    public File(File parent, String child) { this(parent == null ? child : parent.getPath() + separator + child); }\n" +
+                "    public File(String parent, String child) { this(parent == null ? child : parent + separator + child); }\n" +
+                "    public String getPath() { return path; }\n" +
+                "    public boolean exists() { return existsImpl(path); }\n" +
+                "    public boolean isDirectory() { return isDirectoryImpl(path); }\n" +
+                "    public boolean isFile() { return isFileImpl(path); }\n" +
+                "    public boolean isHidden() { return isHiddenImpl(path); }\n" +
+                "    public long lastModified() { return lastModifiedImpl(path); }\n" +
+                "    public long length() { return lengthImpl(path); }\n" +
+                "    public boolean createNewFile() { return createNewFileImpl(path); }\n" +
+                "    public boolean delete() { return deleteImpl(path); }\n" +
+                "    public String[] list() { return listImpl(path); }\n" +
+                "    public boolean mkdir() { return mkdirImpl(path); }\n" +
+                "    public boolean renameTo(File dest) { return renameToImpl(path, dest == null ? null : dest.getPath()); }\n" +
+                "    public boolean setReadOnly() { return setReadOnlyImpl(path); }\n" +
+                "    public boolean setWritable(boolean writable) { return setWritableImpl(path, writable); }\n" +
+                "    public boolean setReadable(boolean readable) { return setReadableImpl(path, readable); }\n" +
+                "    public boolean setExecutable(boolean executable) { return setExecutableImpl(path, executable); }\n" +
+                "    public long getTotalSpace() { return getTotalSpaceImpl(path); }\n" +
+                "    public long getFreeSpace() { return getFreeSpaceImpl(path); }\n" +
+                "    public long getUsableSpace() { return getUsableSpaceImpl(path); }\n" +
+                "    public String getAbsolutePath() { return getAbsolutePathImpl(path); }\n" +
+                "    public String getCanonicalPath() { return getCanonicalPathImpl(path); }\n" +
+                "    private native String getAbsolutePathImpl(String path);\n" +
+                "    private native String getCanonicalPathImpl(String path);\n" +
+                "    private native boolean existsImpl(String path);\n" +
+                "    private native boolean isDirectoryImpl(String path);\n" +
+                "    private native boolean isFileImpl(String path);\n" +
+                "    private native boolean isHiddenImpl(String path);\n" +
+                "    private native long lastModifiedImpl(String path);\n" +
+                "    private native long lengthImpl(String path);\n" +
+                "    private native boolean createNewFileImpl(String path);\n" +
+                "    private native boolean deleteImpl(String path);\n" +
+                "    private native String[] listImpl(String path);\n" +
+                "    private native boolean mkdirImpl(String path);\n" +
+                "    private native boolean renameToImpl(String source, String dest);\n" +
+                "    private native boolean setReadOnlyImpl(String path);\n" +
+                "    private native boolean setWritableImpl(String path, boolean writable);\n" +
+                "    private native boolean setReadableImpl(String path, boolean readable);\n" +
+                "    private native boolean setExecutableImpl(String path, boolean executable);\n" +
+                "    private native long getTotalSpaceImpl(String path);\n" +
+                "    private native long getFreeSpaceImpl(String path);\n" +
+                "    private native long getUsableSpaceImpl(String path);\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
         // java.util.Collection
         Files.write(util.resolve("Collection.java"), "package java.util; public interface Collection<E> {}".getBytes(StandardCharsets.UTF_8));
 
