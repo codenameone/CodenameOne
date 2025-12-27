@@ -92,6 +92,7 @@ class ReadWriteLockIntegrationTest {
 
         Path srcRoot = distDir.resolve("ReadWriteLockTestApp-src");
         CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
+        CleanTargetIntegrationTest.patchFileHeader(srcRoot);
         writeRuntimeStubs(srcRoot);
 
         replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());

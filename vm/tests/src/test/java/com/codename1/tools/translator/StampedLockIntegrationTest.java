@@ -89,6 +89,7 @@ class StampedLockIntegrationTest {
 
         Path srcRoot = distDir.resolve("StampedLockTestApp-src");
         CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
+        CleanTargetIntegrationTest.patchFileHeader(srcRoot);
         writeRuntimeStubs(srcRoot);
         patchHashMapNativeSupport(srcRoot);
 

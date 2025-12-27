@@ -260,6 +260,20 @@ class CleanTargetIntegrationTest {
         }
     }
 
+    static void patchFileHeader(Path srcRoot) throws IOException {
+        Path fileHeader = srcRoot.resolve("java_io_File.h");
+        if (!Files.exists(fileHeader)) {
+            return;
+        }
+        String content = new String(Files.readAllBytes(fileHeader), StandardCharsets.UTF_8);
+        String updated = content
+                .replace("get_static_java_io_File_separator();", "get_static_java_io_File_separator(CODENAME_ONE_THREAD_STATE);")
+                .replace("get_static_java_io_File_separatorChar();", "get_static_java_io_File_separatorChar(CODENAME_ONE_THREAD_STATE);");
+        if (!updated.equals(content)) {
+            Files.write(fileHeader, updated.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
     static void writeRuntimeStubs(Path srcRoot) throws IOException {
         Path objectHeader = srcRoot.resolve("java_lang_Object.h");
         if (!Files.exists(objectHeader)) {
