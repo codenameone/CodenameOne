@@ -164,6 +164,12 @@ class StampedLockIntegrationTest {
                 "    public String(char[] v) { value = v; count=v.length; }\n" +
                 "    public String(char[] v, int off, int len) { value = v; offset = off; count = len; }\n" +
                 "    public static String valueOf(Object obj) { return obj == null ? \"null\" : obj.toString(); }\n" +
+                "    public static String valueOf(int i) { return new String(new char[0]); }\n" +
+                "    public static String valueOf(long i) { return new String(new char[0]); }\n" +
+                "    public static String valueOf(boolean b) { return new String(new char[0]); }\n" +
+                "    public static String valueOf(char c) { return new String(new char[]{c}); }\n" +
+                "    public static String valueOf(float f) { return new String(new char[0]); }\n" +
+                "    public static String valueOf(double d) { return new String(new char[0]); }\n" +
                 "    public byte[] getBytes() { return new byte[0]; }\n" +
                 "    public byte[] getBytes(String charset) { return new byte[0]; }\n" +
                 "    public void getChars(int srcBegin, int srcEnd, char[] dst, int dstBegin) {\n" +
