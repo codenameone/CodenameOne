@@ -258,16 +258,8 @@ public final class Grid {
                 }
             } else {
                 if (cx >= 0 && cy >= 0) {
-                    if (cy >= 0) {
-                        cellXY[0] = cx;
-                        cellXY[1] = cy;
-                    } else {    // Only one coordinate is specified. Use the current row (flowx) or column (flowy) to fill in.
-                        if (lc.isFlowX()) {
-                            cellXY[0] = cx;
-                        } else {
-                            cellXY[1] = cx;
-                        }
-                    }
+                    cellXY[0] = cx;
+                    cellXY[1] = cy;
                 }
                 cell = getCell(cellXY[1], cellXY[0]);   // Might be null
             }
