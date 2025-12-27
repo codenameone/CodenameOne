@@ -262,7 +262,7 @@ class StampedLockIntegrationTest {
                 "public class File {\n" +
                 "    public static final String separator = \"/\";\n" +
                 "    public static final char separatorChar = '/';\n" +
-                "    public static final String pathSeparator = \":";\n" +
+                "    public static final String pathSeparator = \":\";\n" +
                 "    public static final char pathSeparatorChar = ':';\n" +
                 "    private String path;\n" +
                 "    public File(String pathname) { this.path = pathname == null ? \"\" : pathname; }\n" +
