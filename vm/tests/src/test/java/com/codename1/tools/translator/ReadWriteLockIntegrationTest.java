@@ -286,6 +286,7 @@ class ReadWriteLockIntegrationTest {
         Files.write(lang.resolve("NullPointerException.java"), "package java.lang; public class NullPointerException extends RuntimeException { public NullPointerException() {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("IllegalMonitorStateException.java"), "package java.lang; public class IllegalMonitorStateException extends RuntimeException { public IllegalMonitorStateException() {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("IllegalArgumentException.java"), "package java.lang; public class IllegalArgumentException extends RuntimeException { public IllegalArgumentException(String s) {} }".getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("ArrayIndexOutOfBoundsException.java"), "package java.lang; public class ArrayIndexOutOfBoundsException extends RuntimeException { public ArrayIndexOutOfBoundsException() {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("UnsupportedOperationException.java"), "package java.lang; public class UnsupportedOperationException extends RuntimeException { public UnsupportedOperationException() {} }".getBytes(StandardCharsets.UTF_8));
 
         // java.io.Serializable
