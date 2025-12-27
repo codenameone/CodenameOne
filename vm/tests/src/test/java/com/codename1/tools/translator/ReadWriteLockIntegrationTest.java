@@ -149,7 +149,40 @@ class ReadWriteLockIntegrationTest {
                 "    private int offset;\n" +
                 "    private int count;\n" +
                 "    public String(char[] v) { value = v; count=v.length; }\n" +
+                "    public String(char[] v, int off, int len) { value = v; offset = off; count = len; }\n" +
                 "    public static String valueOf(Object obj) { return obj == null ? \"null\" : obj.toString(); }\n" +
+                "    public byte[] getBytes() { return new byte[0]; }\n" +
+                "    public byte[] getBytes(String charset) { return new byte[0]; }\n" +
+                "    public void getChars(int srcBegin, int srcEnd, char[] dst, int dstBegin) {\n" +
+                "        for (int i = srcBegin; i < srcEnd; i++) { dst[dstBegin + i - srcBegin] = value[offset + i]; }\n" +
+                "    }\n" +
+                "    public int length() { return count; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
+        // Primitive wrappers
+        Files.write(lang.resolve("Boolean.java"), ("package java.lang;\n" +
+                "public final class Boolean {\n" +
+                "    private final boolean value;\n" +
+                "    public Boolean(boolean value) { this.value = value; }\n" +
+                "    public boolean booleanValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Byte.java"), ("package java.lang;\n" +
+                "public final class Byte {\n" +
+                "    private final byte value;\n" +
+                "    public Byte(byte value) { this.value = value; }\n" +
+                "    public byte byteValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Short.java"), ("package java.lang;\n" +
+                "public final class Short {\n" +
+                "    private final short value;\n" +
+                "    public Short(short value) { this.value = value; }\n" +
+                "    public short shortValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Character.java"), ("package java.lang;\n" +
+                "public final class Character {\n" +
+                "    private final char value;\n" +
+                "    public Character(char value) { this.value = value; }\n" +
+                "    public char charValue() { return value; }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
         // java.lang.StringBuilder
@@ -214,6 +247,29 @@ class ReadWriteLockIntegrationTest {
                 "    public static Integer valueOf(int i) { return new Integer(i); }\n" +
                 "    public int intValue() { return value; }\n" +
                 "    public String toString() { return \"\"+value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
+        // Additional primitive wrappers
+        Files.write(lang.resolve("Long.java"), ("package java.lang;\n" +
+                "public final class Long extends Number {\n" +
+                "    private final long value;\n" +
+                "    public Long(long value) { this.value = value; }\n" +
+                "    public long longValue() { return value; }\n" +
+                "    public int intValue() { return (int)value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Float.java"), ("package java.lang;\n" +
+                "public final class Float extends Number {\n" +
+                "    private final float value;\n" +
+                "    public Float(float value) { this.value = value; }\n" +
+                "    public float floatValue() { return value; }\n" +
+                "    public int intValue() { return (int)value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Double.java"), ("package java.lang;\n" +
+                "public final class Double extends Number {\n" +
+                "    private final double value;\n" +
+                "    public Double(double value) { this.value = value; }\n" +
+                "    public double doubleValue() { return value; }\n" +
+                "    public int intValue() { return (int)value; }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
         // java.lang.Number
