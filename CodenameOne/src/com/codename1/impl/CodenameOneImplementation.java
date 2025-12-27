@@ -3651,7 +3651,7 @@ public abstract class CodenameOneImplementation {
     }
 
     private boolean isWhitespace(char c) {
-        return c == ' ' || (c == '\n') || (c == '\t') || (c == 10) || (c == 13);
+        return c == ' ' || (c == '\n') || (c == '\t') || (c == 13);
     }
 
     /**

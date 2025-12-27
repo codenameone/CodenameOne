@@ -637,9 +637,7 @@ public abstract class MathUtil {
                 if (ix <= 0x3fefffff) {
                     return (hy < 0) ? huge * huge : tiny * tiny;
                 }
-                if (ix >= 0x3ff00000) {
-                    return (hy > 0) ? huge * huge : tiny * tiny;
-                }
+                return (hy > 0) ? huge * huge : tiny * tiny;
             }
             /* over/underflow if x is not close to one */
             if (ix < 0x3fefffff) {
