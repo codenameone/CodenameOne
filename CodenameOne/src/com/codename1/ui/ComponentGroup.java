@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.Layout;
 
 /**
  * <p>A component group is a container that applies the given UIID to a set of components within it
