@@ -90,19 +90,20 @@ class StampedLockIntegrationTest {
         Path srcRoot = distDir.resolve("StampedLockTestApp-src");
         CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
         writeRuntimeStubs(srcRoot);
+        patchHashMapNativeSupport(srcRoot);
 
-        replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
+        CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
 
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
 
-        CleanTargetIntegrationTest.runCommand(Arrays.asList(
+        List<String> cmakeCommand = new ArrayList<>(Arrays.asList(
                 "cmake",
                 "-S", distDir.toString(),
-                "-B", buildDir.toString(),
-                "-DCMAKE_C_COMPILER=clang",
-                "-DCMAKE_OBJC_COMPILER=clang"
-        ), distDir);
+                "-B", buildDir.toString()
+        ));
+        cmakeCommand.addAll(CleanTargetIntegrationTest.cmakeCompilerArgs());
+        CleanTargetIntegrationTest.runCommand(cmakeCommand, distDir);
 
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
@@ -121,6 +122,20 @@ class StampedLockIntegrationTest {
         Files.createDirectories(util);
         Files.createDirectories(concurrent);
         Files.createDirectories(io);
+
+        // java.util.HashMap (needed for generated native stubs)
+        Files.write(util.resolve("HashMap.java"), ("package java.util;\n" +
+                "public class HashMap<K,V> {\n" +
+                "    public HashMap() {}\n" +
+                "    public V put(K key, V value) { return value; }\n" +
+                "    public V get(Object key) { return null; }\n" +
+                "    public int size() { return 0; }\n" +
+                "    public static class Entry<K,V> {\n" +
+                "        public K key;\n" +
+                "        public V value;\n" +
+                "        public Entry(K key, V value) { this.key = key; this.value = value; }\n" +
+                "    }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
 
         // java.lang.Object
         Files.write(lang.resolve("Object.java"), ("package java.lang;\n" +
@@ -143,20 +158,32 @@ class StampedLockIntegrationTest {
                 "    private int offset;\n" +
                 "    private int count;\n" +
                 "    public String(char[] v) { value = v; count=v.length; }\n" +
+                "    public String(char[] v, int off, int len) { value = v; offset = off; count = len; }\n" +
                 "    public static String valueOf(Object obj) { return obj == null ? \"null\" : obj.toString(); }\n" +
+                "    public byte[] getBytes() { return new byte[0]; }\n" +
                 "    public byte[] getBytes(String charset) { return new byte[0]; }\n" +
+                "    public void getChars(int srcBegin, int srcEnd, char[] dst, int dstBegin) {\n" +
+                "        for (int i = srcBegin; i < srcEnd; i++) { dst[dstBegin + i - srcBegin] = value[offset + i]; }\n" +
+                "    }\n" +
+                "    public int length() { return count; }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
         // java.lang.StringBuilder
         Files.write(lang.resolve("StringBuilder.java"), ("package java.lang;\n" +
                 "public class StringBuilder {\n" +
-                "    public StringBuilder() {}\n" +
-                "    public StringBuilder(String str) {}\n" +
-                "    public StringBuilder(int cap) {}\n" +
-                "    public StringBuilder append(String s) { return this; }\n" +
-                "    public StringBuilder append(Object o) { return this; }\n" +
-                "    public StringBuilder append(int i) { return this; }\n" +
-                "    public String toString() { return \"\"; }\n" +
+                "    char[] value;\n" +
+                "    int count;\n" +
+                "    public StringBuilder() { this(16); }\n" +
+                "    public StringBuilder(String str) { this(16); append(str); }\n" +
+                "    public StringBuilder(int cap) { value = new char[cap]; }\n" +
+                "    private void ensureCapacity(int cap) { if (cap > value.length) { char[] n = new char[cap]; System.arraycopy(value, 0, n, 0, count); value = n; } }\n" +
+                "    public StringBuilder append(String s) { if (s == null) return append(\"null\"); int len = s.length(); ensureCapacity(count + len); s.getChars(0, len, value, count); count += len; return this; }\n" +
+                "    public StringBuilder append(Object o) { return append(String.valueOf(o)); }\n" +
+                "    public StringBuilder append(int i) { return append(String.valueOf(i)); }\n" +
+                "    public StringBuilder append(char c) { ensureCapacity(count + 1); value[count++] = c; return this; }\n" +
+                "    public void getChars(int srcBegin, int srcEnd, char[] dst, int dstBegin) { System.arraycopy(value, srcBegin, dst, dstBegin, srcEnd - srcBegin); }\n" +
+                "    public int length() { return count; }\n" +
+                "    public String toString() { return new String(value, 0, count); }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
         // Primitive wrappers
@@ -238,6 +265,7 @@ class StampedLockIntegrationTest {
         Files.write(lang.resolve("System.java"), ("package java.lang;\n" +
                 "public final class System {\n" +
                 "    public static long currentTimeMillis() { return 0L; }\n" +
+                "    public static void arraycopy(Object src, int srcPos, Object dest, int destPos, int length) {}\n" +
                 "    public static void gc() {}\n" +
                 "    public static void startGCThread() {}\n" +
                 "    public static Thread gcThreadInstance;\n" +
@@ -311,6 +339,46 @@ class StampedLockIntegrationTest {
                 "    private native long getUsableSpaceImpl(String path);\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
+        Files.write(io.resolve("FileInputStream.java"), ("package java.io;\n" +
+                "public class FileInputStream {\n" +
+                "    public FileInputStream(String name) { open(name); }\n" +
+                "    public FileInputStream(File file) { open(file); }\n" +
+                "    public native int read();\n" +
+                "    public native int read(byte[] b, int off, int len);\n" +
+                "    public native long skip(long n);\n" +
+                "    public native int available();\n" +
+                "    public native void close();\n" +
+                "    private native void open(String name);\n" +
+                "    private native void open(File file);\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
+        Files.write(io.resolve("FileOutputStream.java"), ("package java.io;\n" +
+                "public class FileOutputStream {\n" +
+                "    public FileOutputStream(String name) { open(name, false); }\n" +
+                "    public FileOutputStream(String name, boolean append) { open(name, append); }\n" +
+                "    public FileOutputStream(File file) { open(file.getPath(), false); }\n" +
+                "    public FileOutputStream(File file, boolean append) { open(file.getPath(), append); }\n" +
+                "    public native void write(int b);\n" +
+                "    public native void write(byte[] b, int off, int len);\n" +
+                "    public native void flush();\n" +
+                "    public native void close();\n" +
+                "    private native void open(String name, boolean append);\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
+        Files.write(io.resolve("FileWriter.java"), ("package java.io;\n" +
+                "public class FileWriter {\n" +
+                "    private final FileOutputStream out;\n" +
+                "    public FileWriter(String name) { this.out = new FileOutputStream(name); }\n" +
+                "    public FileWriter(File file) { this.out = new FileOutputStream(file); }\n" +
+                "    public void write(String s) throws java.io.IOException {\n" +
+                "        if (s == null) return;\n" +
+                "        byte[] data = s.getBytes();\n" +
+                "        out.write(data, 0, data.length);\n" +
+                "    }\n" +
+                "    public void flush() { out.flush(); }\n" +
+                "    public void close() { out.close(); }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
         // java.util.concurrent.TimeUnit
         Files.write(concurrent.resolve("TimeUnit.java"), ("package java.util.concurrent;\n" +
                 "public class TimeUnit {\n" +
@@ -322,13 +390,27 @@ class StampedLockIntegrationTest {
     private String stampedLockTestAppSource() {
         return "import java.util.concurrent.locks.*;\n" +
                "import java.util.concurrent.TimeUnit;\n" +
+               "import java.io.*;\n" +
                "public class StampedLockTestApp {\n" +
                "    private static native void report(String msg);\n" +
                "    \n" +
                "    public static void main(String[] args) {\n" +
+               "        touchFileStreams();\n" +
+               "        java.util.HashMap<Object,Object> map = new java.util.HashMap<Object,Object>();\n" +
+               "        map.put(\"k\", \"v\");\n" +
+               "        map.get(\"k\");\n" +
                "        testBasic();\n" +
                "        testOptimisticRead();\n" +
                "        testWriteLockExclusion();\n" +
+               "    }\n" +
+               "    private static void touchFileStreams() {\n" +
+               "        try {\n" +
+               "            File f = new File(\"fs-touch.tmp\");\n" +
+               "            new FileInputStream(f).close();\n" +
+               "            new FileOutputStream(f).close();\n" +
+               "            new FileWriter(f).close();\n" +
+               "        } catch (Exception ignore) {\n" +
+               "        }\n" +
                "    }\n" +
                "    \n" +
                "    private static void testBasic() {\n" +
@@ -427,18 +509,6 @@ class StampedLockIntegrationTest {
                 "        fflush(stdout);\n" +
                 "    }\n" +
                 "}\n";
-    }
-
-    static void replaceLibraryWithExecutableTarget(Path cmakeLists, String sourceDirName) throws java.io.IOException {
-        String content = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
-        String globWithObjc = String.format("file(GLOB TRANSLATOR_SOURCES \"%s/*.c\" \"%s/*.m\")", sourceDirName, sourceDirName);
-        String globCOnly = String.format("file(GLOB TRANSLATOR_SOURCES \"%s/*.c\")", sourceDirName);
-        content = content.replace(globWithObjc, globCOnly);
-        String replacement = content.replace(
-                "add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})",
-                "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m pthread)"
-        );
-        Files.write(cmakeLists, replacement.getBytes(StandardCharsets.UTF_8));
     }
 
     private void writeRuntimeStubs(Path srcRoot) throws java.io.IOException {
@@ -650,5 +720,120 @@ class StampedLockIntegrationTest {
                 "JAVA_OBJECT java_lang_Object_getClass___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { return NULL; }\n";
 
         Files.write(stubs, content.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private void patchHashMapNativeSupport(Path srcRoot) throws java.io.IOException {
+        Path hashMapHeader = srcRoot.resolve("java_util_HashMap.h");
+        if (Files.exists(hashMapHeader)) {
+            String content = new String(Files.readAllBytes(hashMapHeader), StandardCharsets.UTF_8);
+            if (!content.contains("java_util_HashMap_elementData")) {
+                String structDef = "struct obj__java_util_HashMap {\n" +
+                        "    DEBUG_GC_VARIABLES\n" +
+                        "    struct clazz *__codenameOneParentClsReference;\n" +
+                        "    int __codenameOneReferenceCount;\n" +
+                        "    void* __codenameOneThreadData;\n" +
+                        "    int __codenameOneGcMark;\n" +
+                        "    void* __ownerThread;\n" +
+                        "    int __heapPosition;\n" +
+                        "    JAVA_OBJECT java_util_HashMap_elementData;\n" +
+                        "};";
+                content = content.replace("struct obj__java_util_HashMap {\n" +
+                        "    DEBUG_GC_VARIABLES\n" +
+                        "    struct clazz *__codenameOneParentClsReference;\n" +
+                        "    int __codenameOneReferenceCount;\n" +
+                        "    void* __codenameOneThreadData;\n" +
+                        "    int __codenameOneGcMark;\n" +
+                        "    void* __ownerThread;\n" +
+                        "    int __heapPosition;\n" +
+                        "};", structDef);
+                Files.write(hashMapHeader, content.getBytes(StandardCharsets.UTF_8));
+            }
+        }
+
+        Path entryHeader = srcRoot.resolve("java_util_HashMap_Entry.h");
+        if (!Files.exists(entryHeader)) {
+            String entryContent = "#ifndef __JAVA_UTIL_HASHMAP_ENTRY__\n" +
+                    "#define __JAVA_UTIL_HASHMAP_ENTRY__\n\n" +
+                    "#include \"cn1_globals.h\"\n" +
+                    "#include \"java_lang_Object.h\"\n\n" +
+                    "extern struct clazz class__java_util_HashMap_Entry;\n\n" +
+                    "struct obj__java_util_HashMap_Entry {\n" +
+                    "    DEBUG_GC_VARIABLES\n" +
+                    "    struct clazz *__codenameOneParentClsReference;\n" +
+                    "    int __codenameOneReferenceCount;\n" +
+                    "    void* __codenameOneThreadData;\n" +
+                    "    int __codenameOneGcMark;\n" +
+                    "    void* __ownerThread;\n" +
+                    "    int __heapPosition;\n" +
+                    "    JAVA_OBJECT java_util_MapEntry_key;\n" +
+                    "    JAVA_OBJECT java_util_MapEntry_value;\n" +
+                    "    JAVA_INT java_util_HashMap_Entry_origKeyHash;\n" +
+                    "    JAVA_OBJECT java_util_HashMap_Entry_next;\n" +
+                    "};\n\n" +
+                    "#endif\n";
+            Files.write(entryHeader, entryContent.getBytes(StandardCharsets.UTF_8));
+        }
+
+        Path dateHeader = srcRoot.resolve("java_util_Date.h");
+        if (!Files.exists(dateHeader)) {
+            String dateContent = "#ifndef __JAVA_UTIL_DATE__\n" +
+                    "#define __JAVA_UTIL_DATE__\n\n" +
+                    "#include \"cn1_globals.h\"\n" +
+                    "#include \"java_lang_Object.h\"\n\n" +
+                    "extern struct clazz class__java_util_Date;\n\n" +
+                    "struct obj__java_util_Date {\n" +
+                    "    DEBUG_GC_VARIABLES\n" +
+                    "    struct clazz *__codenameOneParentClsReference;\n" +
+                    "    int __codenameOneReferenceCount;\n" +
+                    "    void* __codenameOneThreadData;\n" +
+                    "    int __codenameOneGcMark;\n" +
+                    "    void* __ownerThread;\n" +
+                    "    int __heapPosition;\n" +
+                    "    JAVA_LONG java_util_Date_date;\n" +
+                    "};\n\n" +
+                    "#endif\n";
+            Files.write(dateHeader, dateContent.getBytes(StandardCharsets.UTF_8));
+        }
+
+        Path dateFormatHeader = srcRoot.resolve("java_text_DateFormat.h");
+        if (!Files.exists(dateFormatHeader)) {
+            String dateFormatContent = "#ifndef __JAVA_TEXT_DATEFORMAT__\n" +
+                    "#define __JAVA_TEXT_DATEFORMAT__\n\n" +
+                    "#include \"cn1_globals.h\"\n" +
+                    "#include \"java_lang_Object.h\"\n\n" +
+                    "extern struct clazz class__java_text_DateFormat;\n\n" +
+                    "struct obj__java_text_DateFormat {\n" +
+                    "    DEBUG_GC_VARIABLES\n" +
+                    "    struct clazz *__codenameOneParentClsReference;\n" +
+                    "    int __codenameOneReferenceCount;\n" +
+                    "    void* __codenameOneThreadData;\n" +
+                    "    int __codenameOneGcMark;\n" +
+                    "    void* __ownerThread;\n" +
+                    "    int __heapPosition;\n" +
+                    "    JAVA_INT java_text_DateFormat_dateStyle;\n" +
+                    "};\n\n" +
+                    "#endif\n";
+            Files.write(dateFormatHeader, dateFormatContent.getBytes(StandardCharsets.UTF_8));
+        }
+
+        Path stringToRealHeader = srcRoot.resolve("java_lang_StringToReal.h");
+        if (!Files.exists(stringToRealHeader)) {
+            String strContent = "#ifndef __JAVA_LANG_STRINGTOREAL__\n" +
+                    "#define __JAVA_LANG_STRINGTOREAL__\n\n" +
+                    "#include \"cn1_globals.h\"\n" +
+                    "#include \"java_lang_Object.h\"\n\n" +
+                    "extern struct clazz class__java_lang_StringToReal;\n\n" +
+                    "struct obj__java_lang_StringToReal {\n" +
+                    "    DEBUG_GC_VARIABLES\n" +
+                    "    struct clazz *__codenameOneParentClsReference;\n" +
+                    "    int __codenameOneReferenceCount;\n" +
+                    "    void* __codenameOneThreadData;\n" +
+                    "    int __codenameOneGcMark;\n" +
+                    "    void* __ownerThread;\n" +
+                    "    int __heapPosition;\n" +
+                    "};\n\n" +
+                    "#endif\n";
+            Files.write(stringToRealHeader, strContent.getBytes(StandardCharsets.UTF_8));
+        }
     }
 }

@@ -7,6 +7,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.reflect.InvocationTargetException;
@@ -17,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -104,12 +106,13 @@ class CleanTargetIntegrationTest {
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
 
-        runCommand(Arrays.asList(
+        List<String> cmakeCommand = new ArrayList<>(Arrays.asList(
                 "cmake",
                 "-S", distDir.toString(),
-                "-B", buildDir.toString(),
-                "-DCMAKE_C_COMPILER=clang"
-        ), distDir);
+                "-B", buildDir.toString()
+        ));
+        cmakeCommand.addAll(cmakeCompilerArgs());
+        runCommand(cmakeCommand, distDir);
 
         runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
@@ -180,11 +183,54 @@ class CleanTargetIntegrationTest {
         String globWithObjc = String.format("file(GLOB TRANSLATOR_SOURCES \"%s/*.c\" \"%s/*.m\")", sourceDirName, sourceDirName);
         String globCOnly = String.format("file(GLOB TRANSLATOR_SOURCES \"%s/*.c\")", sourceDirName);
         content = content.replace(globWithObjc, globCOnly);
+        content = content.replace(" LANGUAGES C OBJC", " LANGUAGES C");
+        content = content.replace("enable_language(OBJC OPTIONAL)\n", "");
         String replacement = content.replace(
                 "add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})",
-                "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m)"
+                "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m pthread)"
         );
         Files.write(cmakeLists, replacement.getBytes(StandardCharsets.UTF_8));
+    }
+
+    static List<String> cmakeCompilerArgs() {
+        String cCompiler = findCompiler("clang", "gcc", "cc");
+        if (cCompiler == null) {
+            cCompiler = "cc";
+        }
+        String objcCompiler = findCompiler("clang");
+        List<String> args = new ArrayList<>();
+        args.add("-DCMAKE_C_COMPILER=" + cCompiler);
+        if (objcCompiler != null) {
+            args.add("-DCMAKE_OBJC_COMPILER=" + objcCompiler);
+        }
+        return args;
+    }
+
+    private static String findCompiler(String... candidates) {
+        String path = System.getenv("PATH");
+        List<String> searchPaths = new ArrayList<>();
+        if (path != null && !path.isEmpty()) {
+            searchPaths.addAll(Arrays.asList(path.split(File.pathSeparator)));
+        }
+
+        for (String candidate : candidates) {
+            if (candidate == null || candidate.isEmpty()) {
+                continue;
+            }
+            Path candidatePath = Paths.get(candidate);
+            if (!candidatePath.isAbsolute()) {
+                for (String dir : searchPaths) {
+                    Path resolved = Paths.get(dir, candidate);
+                    if (Files.isExecutable(resolved)) {
+                        return resolved.toString();
+                    }
+                }
+            } else if (Files.isExecutable(candidatePath)) {
+                return candidatePath.toString();
+            }
+        }
+
+        return null;
     }
 
     static String runCommand(List<String> command, Path workingDir) throws Exception {

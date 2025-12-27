@@ -83,12 +83,13 @@ public class FileStreamsIntegrationTest {
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
 
-        CleanTargetIntegrationTest.runCommand(Arrays.asList(
+        List<String> cmakeCommand = new ArrayList<>(Arrays.asList(
                 "cmake",
                 "-S", distDir.toString(),
-                "-B", buildDir.toString(),
-                "-DCMAKE_C_COMPILER=clang"
-        ), distDir);
+                "-B", buildDir.toString()
+        ));
+        cmakeCommand.addAll(CleanTargetIntegrationTest.cmakeCompilerArgs());
+        CleanTargetIntegrationTest.runCommand(cmakeCommand, distDir);
 
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
