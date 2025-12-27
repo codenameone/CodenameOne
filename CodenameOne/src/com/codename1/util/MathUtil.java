@@ -928,7 +928,7 @@ public abstract class MathUtil {
             q = pio4_hi - 2.0 * w;
             t = pio4_hi - (p - q);
         }
-        if (hx > 0) {
+        if (x > 0) {
             return t;
         } else {
             return -t;

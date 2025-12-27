@@ -540,9 +540,8 @@ class ResourceThreadQueue {
                     height = img.getHeight() * width / img.getWidth();
                 }
             } else if (height != 0) {
-                if (width == 0) { // If only height was specified, width should be calculated so the image keeps its aspect ratio
-                    width = img.getWidth() * height / img.getHeight();
-                }
+                // If only height was specified, width should be calculated so the image keeps its aspect ratio
+                width = img.getWidth() * height / img.getHeight();
             }
 
             if (width != 0) { // if any of width or height were not 0, the other one was set to non-zero above, so this check suffices

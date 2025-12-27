@@ -7448,7 +7448,8 @@ public abstract class CodenameOneImplementation {
      */
     public void setCommandBehavior(int commandBehavior) {
         // PMD Fix (CollapsibleIfStatements): Combine touch capability and behavior checks.
-        if (!isTouchDevice() && commandBehavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR) {
+        boolean touch = isTouchDevice();
+        if (!touch && commandBehavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR) {
             commandBehavior = Display.COMMAND_BEHAVIOR_SOFTKEY;
         }
         this.commandBehavior = commandBehavior;
