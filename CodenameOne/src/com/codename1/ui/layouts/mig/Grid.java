@@ -1,16 +1,3 @@
-package com.codename1.ui.layouts.mig;
-
-import com.codename1.compat.java.util.Objects;
-import com.codename1.ui.Display;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.TreeSet;
 /*
  * License (BSD):
  * ==============
@@ -44,6 +31,20 @@ import java.util.TreeSet;
  * @author Mikael Grev, MiG InfoCom AB
  *         Date: 2006-sep-08
  */
+
+package com.codename1.ui.layouts.mig;
+
+import com.codename1.compat.java.util.Objects;
+import com.codename1.ui.Display;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.TreeSet;
 
 /**
  * Holds components in a grid. Does most of the logic behind the layout manager.
@@ -256,7 +257,7 @@ public final class Grid {
                     }
                 }
             } else {
-                if (cx >= 0 || cy >= 0) {
+                if (cx >= 0 && cy >= 0) {
                     if (cy >= 0) {
                         cellXY[0] = cx;
                         cellXY[1] = cy;
@@ -290,7 +291,7 @@ public final class Grid {
                 setCell(cellXY[1], cellXY[0], cell);
 
                 // Add a rectangle so we can know that spanned cells occupy more space.
-                if (spanx != 1 || spany != 1) {
+                if (spanx > 1 || spany > 1) {
                     spannedRects.add(new int[]{cellXY[0], cellXY[1], spanx, spany});
                 }
             }

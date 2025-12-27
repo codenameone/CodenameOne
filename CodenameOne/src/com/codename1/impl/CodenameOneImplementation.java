@@ -2635,7 +2635,7 @@ public abstract class CodenameOneImplementation {
         if (getCurrentForm() == null) {
             return false;
         }
-        if (dragActivationCounter <= 0) {
+        if (dragActivationCounter == 0) {
             dragActivationX = x;
             dragActivationY = y;
             dragActivationCounter++;
@@ -7961,6 +7961,9 @@ public abstract class CodenameOneImplementation {
      * @param s              the style object to draw
      */
     public void paintComponentBackground(Object nativeGraphics, int x, int y, int width, int height, Style s) {
+        if (width <= 0 || height <= 0) {
+            return;
+        }
         Image bgImageOrig = s.getBgImage();
         if (bgImageOrig == null) {
             if (s.getBackgroundType() >= Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL) {
