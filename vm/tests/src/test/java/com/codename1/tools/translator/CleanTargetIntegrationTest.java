@@ -268,7 +268,9 @@ class CleanTargetIntegrationTest {
         String content = new String(Files.readAllBytes(fileHeader), StandardCharsets.UTF_8);
         String updated = content
                 .replace("get_static_java_io_File_separator();", "get_static_java_io_File_separator(CODENAME_ONE_THREAD_STATE);")
-                .replace("get_static_java_io_File_separatorChar();", "get_static_java_io_File_separatorChar(CODENAME_ONE_THREAD_STATE);");
+                .replace("get_static_java_io_File_separatorChar();", "get_static_java_io_File_separatorChar(CODENAME_ONE_THREAD_STATE);")
+                .replace("get_static_java_io_File_pathSeparator();", "get_static_java_io_File_pathSeparator(CODENAME_ONE_THREAD_STATE);")
+                .replace("get_static_java_io_File_pathSeparatorChar();", "get_static_java_io_File_pathSeparatorChar(CODENAME_ONE_THREAD_STATE);");
         if (!updated.equals(content)) {
             Files.write(fileHeader, updated.getBytes(StandardCharsets.UTF_8));
         }
