@@ -125,7 +125,7 @@ public abstract class XYChart extends AbstractChart {
         if (paint.getTypeface() == null
                 || (mRenderer.getTextTypeface() != null && paint.getTypeface().equals(
                 mRenderer.getTextTypeface()))
-                || !paint.getTypeface().toString().equals(mRenderer.getTextTypefaceName())
+                || paint.getTypeface().getFace() != mRenderer.getTextTypefaceName()
                 || paint.getTypeface().getStyle() != mRenderer.getTextTypefaceStyle()) {
             if (mRenderer.getTextTypeface() != null) {
                 paint.setTypeface(mRenderer.getTextTypeface());
