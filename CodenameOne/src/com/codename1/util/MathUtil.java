@@ -619,9 +619,17 @@ public abstract class MathUtil {
             }
         }
 
-        n = (hx >>> 31) + 1;
+        n = (hx >> 31) + 1;
+
+        /* (x<0)**(non-int) is NaN */
+        if ((n | yisint) == 0) {
+            return 1.0;
+        }
 
         s = one; /* s (sign of result -ve**odd) = -1 else = 1 */
+        if ((n | (yisint - 1)) == 0) {
+            s = -one;/* (-ve)**(odd int) */
+        }
 
         /* |y| is huge */
         if (iy > 0x41e00000) { /* if |y| > 2**31 */
