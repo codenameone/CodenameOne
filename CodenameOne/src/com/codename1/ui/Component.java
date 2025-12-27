@@ -7378,15 +7378,12 @@ public class Component implements Animation, StyleListener, Editable {
             paintInternalImpl(((Image) paintLockImage).getGraphics(), false);
             setX(x);
             setY(y);
-            if (hardLock) {
-                return (Image) paintLockImage;
-            } else {
+            if (!hardLock) {
                 paintLockImage = Display.getInstance().createSoftWeakRef(paintLockImage);
             }
-        } else {
-            if (hardLock) {
-                return (Image) paintLockImage;
-            }
+        }
+        if (hardLock) {
+            return (Image) paintLockImage;
         }
         return null;
     }

@@ -954,9 +954,7 @@ public abstract class MathUtil {
         }
         if (ix < 0x3fdc0000) {  /* |x| < 0.4375 */
             if (ix < 0x3e200000) {  /* |x| < 2^-29 */
-                if (huge + x > one) {
-                    return x;  /* raise inexact */
-                }
+                return x;/* return x with inexact if x!=0*/
             }
             id = -1;
         } else {

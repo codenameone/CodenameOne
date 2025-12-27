@@ -1360,7 +1360,7 @@ class CSSEngine {
         int fontWeight = selector.getAttrVal(CSSElement.CSS_FONT_WEIGHT);
 
         int fontSize = selector.getAttrLengthVal(CSSElement.CSS_FONT_SIZE, ui, ui.getStyle().getFont().getHeight());
-        if (fontSize < -1) {
+        if (fontSize < 0 && fontSize != -1) {
             int curSize = ui.getStyle().getFont().getHeight();
             if (fontSize == CSSElement.FONT_SIZE_LARGER) {
                 fontSize = curSize + 2;

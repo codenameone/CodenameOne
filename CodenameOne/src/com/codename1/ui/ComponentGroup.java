@@ -139,7 +139,7 @@ public class ComponentGroup extends Container {
     }
 
     private void updateUIIDs() {
-        if (!getUIManager().isThemeConstant(groupFlag, false) && !forceGroup) {
+        if (!(getUIManager().isThemeConstant(groupFlag, false) || forceGroup)) {
             return;
         }
         int count = getComponentCount();

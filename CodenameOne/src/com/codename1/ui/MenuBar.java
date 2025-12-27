@@ -1497,18 +1497,12 @@ public class MenuBar extends Container implements ActionListener {
             marginRight = marginLeft;
             marginLeft = 0;
         }
-        /*if (getCommandBehavior() == Display.COMMAND_BEHAVIOR_ICS) {
-            menu.setTransitionOutAnimator(transitionIn);
-            menu.setTransitionInAnimator(transitionOut);
-            int th = getTitleAreaContainer().getHeight();
-            return menu.show(th, height - th, marginLeft, marginRight, true);
-        } else {*/
-            if (manager.getLookAndFeel().isTouchMenus() && manager.isThemeConstant("PackTouchMenuBool", true)) {
-                return menu.showPacked(BorderLayout.SOUTH, true);
-            } else {
-                return menu.show(height, 0, marginLeft, marginRight, true);
-            }
-        //}
+
+        if (manager.getLookAndFeel().isTouchMenus() && manager.isThemeConstant("PackTouchMenuBool", true)) {
+            return menu.showPacked(BorderLayout.SOUTH, true);
+        } else {
+            return menu.show(height, 0, marginLeft, marginRight, true);
+        }
     }
 
     /**
