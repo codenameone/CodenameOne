@@ -107,7 +107,7 @@ class CSSParser {
                 c = r.readCharFromReader();
             }
             c = r.readCharFromReader();
-            while (((int) c) != -1 && isWhiteSpace(c)) { //skip white spaces
+            while (c != (char) -1 && isWhiteSpace(c)) { //skip white spaces
                 c = r.readCharFromReader();
             }
         } else {

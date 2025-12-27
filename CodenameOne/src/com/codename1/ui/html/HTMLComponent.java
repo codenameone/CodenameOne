@@ -1801,7 +1801,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             //newLine(Component.LEFT); //flush buffer
             mainContainer.applyRTL((dir != null) && (dir.equalsIgnoreCase("rtl")));
 
-            if ((SUPPORT_CSS) && (loadCSS)) {
+            if (loadCSS) {
                 body.setAssociatedComponents(mainContainer);
                 if (threadQueue.getCSSCount() == -1) { // If there are no pending external CSS, we can already process the CSS
                     applyAllCSS(); // Note that this doesn't have to be on EDT as the main container is still not displayed
@@ -2968,9 +2968,9 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                 case HTMLElement.TAG_H4:
                 case HTMLElement.TAG_H5:
                 case HTMLElement.TAG_H6:
-                    HTMLFont f = (HTMLFont) fonts.get(child.getTagName());
-                    if (f != null) {
-                        font = f;
+                    HTMLFont headerFont = (HTMLFont) fonts.get(child.getTagName());
+                    if (headerFont != null) {
+                        font = headerFont;
                     } else {
                         font = oldFont;
                     }

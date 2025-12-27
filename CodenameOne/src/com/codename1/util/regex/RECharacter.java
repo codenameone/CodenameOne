@@ -150,7 +150,7 @@ public class RECharacter {
         return ((type == SPACE_SEPARATOR || type == LINE_SEPARATOR ||
                 type == PARAGRAPH_SEPARATOR) && !(c == 0x00A0 || c == 0x2007 ||
                 c == 0x202F)) || c == 0x0009 || c == 0x000A || c == 0x000B ||
-                c == 0x000C || c == 0x000D || c == 0x0009 || c == 0x001C ||
+                c == 0x000C || c == 0x000D || c == 0x001C ||
                 c == 0x001D || c == 0x001E || c == 0x001F;
     }
 

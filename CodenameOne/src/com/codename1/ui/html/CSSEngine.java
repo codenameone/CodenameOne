@@ -1338,9 +1338,7 @@ class CSSEngine {
 
         // Text indentation
         int indent = selector.getAttrLengthVal(CSSElement.CSS_TEXT_INDENT, ui, htmlC.getWidth());
-        if (indent >= 0) { // Only positive (0 also as it may cancel previous margins)
-            setTextIndentationRecursive(ui, indent);
-        }
+        setTextIndentationRecursive(ui, indent);
 
         //
         // Font
