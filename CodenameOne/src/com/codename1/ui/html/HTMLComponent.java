@@ -2971,8 +2971,6 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     HTMLFont headerFont = (HTMLFont) fonts.get(child.getTagName());
                     if (headerFont != null) {
                         font = headerFont;
-                    } else {
-                        font = oldFont;
                     }
                     // No break here intentionally
                 case HTMLElement.TAG_P:

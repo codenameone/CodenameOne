@@ -7960,9 +7960,6 @@ public abstract class CodenameOneImplementation {
      * @param s              the style object to draw
      */
     public void paintComponentBackground(Object nativeGraphics, int x, int y, int width, int height, Style s) {
-        if (width < 1 || height < 1) {
-            return;
-        }
         Image bgImageOrig = s.getBgImage();
         if (bgImageOrig == null) {
             if (s.getBackgroundType() >= Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL) {

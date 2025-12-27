@@ -3219,9 +3219,6 @@ public class Component implements Animation, StyleListener, Editable {
      * @param g the component graphics
      */
     void paintComponentBackground(Graphics g) {
-        if (isFlatten() || !opaque) {
-            return;
-        }
         paintBackgroundImpl(g);
     }
 

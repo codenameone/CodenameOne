@@ -467,7 +467,7 @@ class CSSEngine {
      * @param htmlC    The HTMLComponent
      */
     private void applyStyle(HTMLElement element, CSSElement selector, HTMLComponent htmlC) {
-        if ((element.getUi() != null) && (element.getUi().size() > 0)) {
+        if (element.getUi().size() > 0) {
             if (!HTMLComponent.PROCESS_HTML_MP1_ONLY) {
                 String reset = selector.getAttributeById(CSSElement.CSS_COUNTER_RESET);
                 if (reset != null) {

@@ -900,9 +900,7 @@ public abstract class MathUtil {
             return 1.0;   /* asin(|x|>1) is NaN */
         } else if (ix < 0x3fe00000) { /* |x|<0.5 */
             if (ix < 0x3e400000) {   /* if |x| < 2**-27 */
-                if (huge + x > one) {
-                    return x;/* return x with inexact if x!=0*/
-                }
+                return x;/* return x with inexact if x!=0*/
             } else {
                 t = x * x;
                 p = t * (pS0 + t * (pS1 + t * (pS2 + t * (pS3 + t * (pS4 + t * pS5)))));
