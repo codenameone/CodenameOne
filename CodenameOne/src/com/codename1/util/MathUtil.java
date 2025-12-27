@@ -619,7 +619,7 @@ public abstract class MathUtil {
             }
         }
 
-        n = (hx >>> 31) + 1;
+        n = (hx >> 31) + 1;
 
         /* (x<0)**(non-int) is NaN */
         if ((n | yisint) == 0) {

@@ -6542,7 +6542,7 @@ public class Component implements Animation, StyleListener, Editable {
         }
 
         if (!animateBackground && (destScrollY == -1 || destScrollY == scrollY) &&
-                !animateBackground && m == null && draggedMotionY == null &&
+                m == null && draggedMotionY == null &&
                 draggedMotionX == null && !dragActivated) {
             tryDeregisterAnimated();
         }

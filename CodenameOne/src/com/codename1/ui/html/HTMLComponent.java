@@ -2028,7 +2028,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                 }
                 word = "";
             } else {
-                if ((ch == ' ') || (ch == 10) || (ch == 13) || (ch == '\t') || (ch == '\n')) {
+                if ((ch == ' ') || (ch == '\n') || (ch == '\r') || (ch == '\t')) {
                     if (word.length() != 0) {
                         if (returnComps) {
                             words.addElement(addString(leadSpace + word + ' ', align));

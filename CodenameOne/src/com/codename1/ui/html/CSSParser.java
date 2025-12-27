@@ -87,7 +87,7 @@ class CSSParser {
      * @return true if the character is a white space, false otherwise
      */
     static boolean isWhiteSpace(char ch) {
-        return ((ch == ' ') || (ch == '\n') || (ch == '\t') || (ch == 10) || (ch == 13));
+        return ((ch == ' ') || (ch == '\n') || (ch == '\t') || (ch == '\r'));
     }
 
 

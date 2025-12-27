@@ -1056,7 +1056,6 @@ public class MenuBar extends Container implements ActionListener {
                 }
                 if (parent.getBackCommand() != cmd) {
                     if ((behavior == Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK ||
-                            behavior == Display.COMMAND_BEHAVIOR_ICS ||
                             behavior == Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION)
                             && parent.getTitle() != null && parent.getTitle().length() > 0) {
                         synchronizeCommandsWithButtonsInBackbutton();

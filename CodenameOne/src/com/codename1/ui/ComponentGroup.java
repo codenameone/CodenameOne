@@ -151,13 +151,11 @@ public class ComponentGroup extends Container {
             } else {
                 Component c = getComponentAt(0);
                 updateUIID(elementPrefix(c) + "First", c);
-                if (count > 1) {
-                    c = getComponentAt(count - 1);
-                    updateUIID(elementPrefix(c) + "Last", c);
-                    for (int iter = 1; iter < count - 1; iter++) {
-                        c = getComponentAt(iter);
-                        updateUIID(elementPrefix(c), c);
-                    }
+                c = getComponentAt(count - 1);
+                updateUIID(elementPrefix(c) + "Last", c);
+                for (int iter = 1; iter < count - 1; iter++) {
+                    c = getComponentAt(iter);
+                    updateUIID(elementPrefix(c), c);
                 }
             }
         }

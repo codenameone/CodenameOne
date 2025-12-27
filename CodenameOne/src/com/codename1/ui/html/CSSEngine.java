@@ -807,7 +807,7 @@ class CSSEngine {
                 String newText = "";
                 for (int c = 0; c < text.length(); c++) {
                     char ch = text.charAt(c);
-                    if ((ch == ' ') || (ch == 10) || (ch == 13) || (ch == '\t') || (ch == '\n')) {
+                    if ((ch == ' ') || (ch == '\n') || (ch == '\r') || (ch == '\t')) {
                         if (!word.equals("")) {
                             newText += word + " ";
                             word = "";
