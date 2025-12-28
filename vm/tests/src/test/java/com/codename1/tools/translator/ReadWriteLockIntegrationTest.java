@@ -467,38 +467,55 @@ class ReadWriteLockIntegrationTest {
         // java.util.HashMap
         Files.write(util.resolve("HashMap.java"), ("package java.util;\n" +
                 "public class HashMap<K,V> implements Map<K,V> {\n" +
-                "    private Object[] keys = new Object[16];\n" +
-                "    private Object[] values = new Object[16];\n" +
+                "    public static class Entry<K,V> {\n" +
+                "        public K key;\n" +
+                "        public V value;\n" +
+                "        public int hash;\n" +
+                "        public int origKeyHash;\n" +
+                "        public Entry<K,V> next;\n" +
+                "        public Entry(K key, V value, int hash, Entry<K,V> next) {\n" +
+                "            this.key = key;\n" +
+                "            this.value = value;\n" +
+                "            this.hash = hash;\n" +
+                "            this.origKeyHash = hash;\n" +
+                "            this.next = next;\n" +
+                "        }\n" +
+                "    }\n" +
+                "    private Entry[] elementData = new Entry[16];\n" +
                 "    private int size = 0;\n" +
                 "    public V get(Object key) {\n" +
-                "        for(int i=0; i<size; i++) if(keys[i] == key) return (V)values[i];\n" +
+                "        int h = key == null ? 0 : key.hashCode();\n" +
+                "        int idx = (h & 0x7fffffff) % elementData.length;\n" +
+                "        for (Entry e = elementData[idx]; e != null; e = e.next) {\n" +
+                "            if (e.key == key) return (V)e.value;\n" +
+                "        }\n" +
                 "        return null;\n" +
                 "    }\n" +
                 "    public V put(K key, V value) {\n" +
-                "        for(int i=0; i<size; i++) {\n" +
-                "            if(keys[i] == key) {\n" +
-                "                V old = (V)values[i];\n" +
-                "                values[i] = value;\n" +
-                "                return old;\n" +
-                "            }\n" +
+                "        int h = key == null ? 0 : key.hashCode();\n" +
+                "        int idx = (h & 0x7fffffff) % elementData.length;\n" +
+                "        Entry e = elementData[idx];\n" +
+                "        while (e != null) {\n" +
+                "            if (e.key == key) { V old = (V)e.value; e.value = value; return old; }\n" +
+                "            e = e.next;\n" +
                 "        }\n" +
-                "        if (size >= keys.length) return null;\n" + // overflow ignored for mock
-                "        keys[size] = key;\n" +
-                "        values[size] = value;\n" +
+                "        elementData[idx] = new Entry(key, value, h, elementData[idx]);\n" +
                 "        size++;\n" +
                 "        return null;\n" +
                 "    }\n" +
                 "    public V remove(Object key) {\n" +
-                "        for(int i=0; i<size; i++) {\n" +
-                "            if(keys[i] == key) {\n" +
-                "                V old = (V)values[i];\n" +
+                "        int h = key == null ? 0 : key.hashCode();\n" +
+                "        int idx = (h & 0x7fffffff) % elementData.length;\n" +
+                "        Entry prev = null;\n" +
+                "        Entry e = elementData[idx];\n" +
+                "        while (e != null) {\n" +
+                "            if (e.key == key) {\n" +
+                "                if (prev == null) elementData[idx] = e.next; else prev.next = e.next;\n" +
                 "                size--;\n" +
-                "                keys[i] = keys[size];\n" +
-                "                values[i] = values[size];\n" +
-                "                keys[size] = null;\n" +
-                "                values[size] = null;\n" +
-                "                return old;\n" +
+                "                return (V)e.value;\n" +
                 "            }\n" +
+                "            prev = e;\n" +
+                "            e = e.next;\n" +
                 "        }\n" +
                 "        return null;\n" +
                 "    }\n" +

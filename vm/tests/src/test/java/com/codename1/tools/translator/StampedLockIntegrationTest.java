@@ -127,15 +127,44 @@ class StampedLockIntegrationTest {
         // java.util.HashMap (needed for generated native stubs)
         Files.write(util.resolve("HashMap.java"), ("package java.util;\n" +
                 "public class HashMap<K,V> {\n" +
-                "    public HashMap() {}\n" +
-                "    public V put(K key, V value) { return value; }\n" +
-                "    public V get(Object key) { return null; }\n" +
-                "    public int size() { return 0; }\n" +
                 "    public static class Entry<K,V> {\n" +
                 "        public K key;\n" +
                 "        public V value;\n" +
-                "        public Entry(K key, V value) { this.key = key; this.value = value; }\n" +
+                "        public int hash;\n" +
+                "        public int origKeyHash;\n" +
+                "        public Entry<K,V> next;\n" +
+                "        public Entry(K key, V value, int hash, Entry<K,V> next) {\n" +
+                "            this.key = key;\n" +
+                "            this.value = value;\n" +
+                "            this.hash = hash;\n" +
+                "            this.origKeyHash = hash;\n" +
+                "            this.next = next;\n" +
+                "        }\n" +
                 "    }\n" +
+                "    private Entry[] elementData = new Entry[16];\n" +
+                "    private int size = 0;\n" +
+                "    public HashMap() {}\n" +
+                "    public V put(K key, V value) {\n" +
+                "        int h = key == null ? 0 : key.hashCode();\n" +
+                "        int idx = (h & 0x7fffffff) % elementData.length;\n" +
+                "        Entry e = elementData[idx];\n" +
+                "        while (e != null) {\n" +
+                "            if (e.key == key) { V old = (V)e.value; e.value = value; return old; }\n" +
+                "            e = e.next;\n" +
+                "        }\n" +
+                "        elementData[idx] = new Entry(key, value, h, elementData[idx]);\n" +
+                "        size++;\n" +
+                "        return null;\n" +
+                "    }\n" +
+                "    public V get(Object key) {\n" +
+                "        int h = key == null ? 0 : key.hashCode();\n" +
+                "        int idx = (h & 0x7fffffff) % elementData.length;\n" +
+                "        for (Entry e = elementData[idx]; e != null; e = e.next) {\n" +
+                "            if (e.key == key) return (V)e.value;\n" +
+                "        }\n" +
+                "        return null;\n" +
+                "    }\n" +
+                "    public int size() { return size; }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
         // java.lang.Object
