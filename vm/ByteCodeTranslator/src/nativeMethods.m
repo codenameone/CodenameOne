@@ -27,6 +27,7 @@
 #include "java_lang_NullPointerException.h"
 #include "java_lang_Class.h"
 #include "java_lang_System.h"
+#include "java_lang_StackOverflowError.h"
 
 #if defined(__APPLE__) && defined(__OBJC__)
 #import <Foundation/Foundation.h>
@@ -1552,7 +1553,11 @@ void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int
 #endif
     memset(&threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset], 0, sizeof(struct elementStruct) * (localsStackSize + stackSize));
     threadStateData->threadObjectStackOffset += localsStackSize + stackSize;
-    CODENAME_ONE_ASSERT(threadStateData->callStackOffset < CN1_MAX_STACK_CALL_DEPTH - 1);
+    if(threadStateData->callStackOffset >= CN1_MAX_STACK_CALL_DEPTH - 1) {
+        JAVA_OBJECT ex = __NEW_java_lang_StackOverflowError(CN1_THREAD_STATE_PASS_SINGLE_ARG);
+        java_lang_StackOverflowError___INIT__(CN1_THREAD_STATE_PASS_ARG ex);
+        throwException(threadStateData, ex);
+    }
     threadStateData->callStackClass[threadStateData->callStackOffset] = classNameId;
     threadStateData->callStackMethod[threadStateData->callStackOffset] = methodNameId;
     threadStateData->callStackOffset++;
