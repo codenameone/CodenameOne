@@ -144,9 +144,9 @@ public class InnerActive extends AdsService { // PMD Fix: UnusedPrivateField rem
         String[] keywords = ads.getKeywords();
         if (keywords != null && keywords.length > 0) {
             int klen = keywords.length;
-            String k = "";
+            StringBuilder k = new StringBuilder();
             for (int i = 0; i < klen; i++) {
-                k += "," + keywords[i];
+                k.append(",").append(keywords[i]);
             }
             addParam(this, "k", k.substring(1));
         }

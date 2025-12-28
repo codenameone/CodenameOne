@@ -1137,7 +1137,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
             if (useStringWidth || actAsLabel) {
                 // fix for an infinite loop issue: http://forums.java.net/jive/thread.jspa?messageID=482802
                 //currentRowWidth = 0;
-                String currentRow = "";
+                StringBuilder currentRowBuilder = new StringBuilder();
 
                 // search for "space" character at close as possible to the end of the row
                 for (i = to; i < textLength && fastCharWidthCheck(text, from, i - from + 1, textAreaWidth, charWidth, font); i++) {
@@ -1145,17 +1145,17 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                     /*if(updateRowWidth(c, font) >= textAreaWidth) {
                         break;
                     }*/
-                    currentRow += c;
+                    currentRowBuilder.append(c);
                     if (i < textLength - 1 && Character.isSurrogatePair(c, text[i + 1])) {
                         // Surrogate pairs (e.g. emojis) shouldn't be split up.
-                        currentRow += text[++i];
+                        currentRowBuilder.append(text[++i]);
                         maxLength += 2;
-                        if (font.stringWidth(currentRow) >= textAreaWidth) {
+                        if (font.stringWidth(currentRowBuilder.toString()) >= textAreaWidth) {
                             break;
                         }
                         continue;
                     }
-                    if (font.stringWidth(currentRow) >= textAreaWidth) {
+                    if (font.stringWidth(currentRowBuilder.toString()) >= textAreaWidth) {
                         break;
                     }
                     if (unsupported.indexOf(c) > -1) {

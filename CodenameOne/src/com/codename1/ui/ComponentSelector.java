@@ -2229,12 +2229,13 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
                 existing = "";
             }
 
+            StringBuilder existingBuilder = new StringBuilder(existing);
             for (String tag : tags) {
-                if (existing.indexOf(" " + tag + " ") == -1) {
-                    existing += " " + tag + " ";
+                if (existingBuilder.indexOf(" " + tag + " ") == -1) {
+                    existingBuilder.append(" ").append(tag).append(" ");
                 }
             }
-            c.putClientProperty(PROPERTY_TAG, existing);
+            c.putClientProperty(PROPERTY_TAG, existingBuilder.toString());
 
         }
         return this;
@@ -2266,10 +2267,11 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
                 c.putClientProperty(PROPERTY_TAG, null);
                 continue;
             }
+            StringBuilder existingBuilder = new StringBuilder(existing);
             for (String tag : existingSet) {
-                existing += " " + tag + " ";
+                existingBuilder.append(" ").append(tag).append(" ");
             }
-            c.putClientProperty(PROPERTY_TAG, existing);
+            c.putClientProperty(PROPERTY_TAG, existingBuilder.toString());
         }
         return this;
     }

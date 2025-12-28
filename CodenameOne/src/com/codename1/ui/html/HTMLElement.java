@@ -1427,9 +1427,9 @@ public class HTMLElement extends Element {
      * @return the printout of this tag
      */
     public String toString(String spacing) {
-        String str = spacing;
+        StringBuilder str = new StringBuilder(spacing);
         if (!isTextElement()) {
-            str += "<" + getTagName();
+            str.append("<").append(getTagName());
             Hashtable attributes = getAttributes();
             if (attributes != null) {
                 for (Enumeration e = attributes.keys(); e.hasMoreElements(); ) {
@@ -1437,22 +1437,22 @@ public class HTMLElement extends Element {
                     String attrStr = getAttributeName(attrKey);
 
                     String val = (String) attributes.get(attrKey);
-                    str += " " + attrStr + "='" + val + "' (" + attrKey + ")";
+                    str.append(" ").append(attrStr).append("='").append(val).append("' (").append(attrKey).append(")");
                 }
             }
-            str += ">\n";
+            str.append(">\n");
 
             Vector children = getChildren();
             if (children != null) {
                 for (int i = 0; i < children.size(); i++) {
-                    str += ((HTMLElement) children.elementAt(i)).toString(spacing + ' ');
+                    str.append(((HTMLElement) children.elementAt(i)).toString(spacing + ' '));
                 }
             }
-            str += spacing + "</" + getTagName() + ">\n";
+            str.append(spacing).append("</").append(getTagName()).append(">\n");
         } else {
-            str += "'" + getText() + "'\n";
+            str.append("'").append(getText()).append("'\n");
         }
-        return str;
+        return str.toString();
     }
 
     /**

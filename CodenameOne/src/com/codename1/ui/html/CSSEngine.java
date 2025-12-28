@@ -622,7 +622,7 @@ class CSSEngine {
 
                     String text = label.getText();
 
-                    String newText = "";
+                    StringBuilder newText = new StringBuilder();
                     boolean capNextLetter = true;
                     for (int i = 0; i < text.length(); i++) {
                         char c = text.charAt(i);
@@ -634,9 +634,9 @@ class CSSEngine {
                             }
                             capNextLetter = false;
                         }
-                        newText += c;
+                        newText.append(c);
                     }
-                    label.setText(newText);
+                    label.setText(newText.toString());
                     break;
                 default:
                     break;
@@ -803,25 +803,25 @@ class CSSEngine {
             String text = element.getText();
             final Vector ui = element.getUi();
             if ((text != null) && (ui != null) && (ui.size() > 1)) { //If it's just one word or already no-wrapped, no need to process
-                String word = "";
-                String newText = "";
+                StringBuilder word = new StringBuilder();
+                StringBuilder newText = new StringBuilder();
                 for (int c = 0; c < text.length(); c++) {
                     char ch = text.charAt(c);
                     if ((ch == ' ') || (ch == '\n') || (ch == '\r') || (ch == '\t')) {
-                        if (!word.equals("")) {
-                            newText += word + " ";
-                            word = "";
+                        if (word.length() > 0) {
+                            newText.append(word).append(" ");
+                            word.setLength(0);
                         }
                     } else {
-                        word += ch;
+                        word.append(ch);
                     }
                 }
-                if (!word.equals("")) {
-                    newText += word + " ";
+                if (word.length() > 0) {
+                    newText.append(word).append(" ");
                 }
 
                 final Label label = (Label) ui.elementAt(0);
-                setNowrapText(label, ui, newText, element);
+                setNowrapText(label, ui, newText.toString(), element);
             }
         }
 

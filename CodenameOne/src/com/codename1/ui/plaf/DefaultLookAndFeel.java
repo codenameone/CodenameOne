@@ -869,9 +869,11 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             String displayText = "";
             if ((ta.getConstraint() & TextArea.PASSWORD) != 0) {
                 int rlen = rowText.length();
+                StringBuilder displayTextBuilder = new StringBuilder();
                 for (int j = 0; j < rlen; j++) {
-                    displayText += passwordChar;
+                    displayTextBuilder.append(passwordChar);
                 }
+                displayText = displayTextBuilder.toString();
             } else {
                 displayText = rowText;
             }
@@ -960,9 +962,11 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 String displayText = "";
                 if ((ta.getConstraint() & TextArea.PASSWORD) != 0) {
                     int rlen = rowText.length();
+                    StringBuilder displayTextBuilder = new StringBuilder();
                     for (int j = 0; j < rlen; j++) {
-                        displayText += passwordChar;
+                        displayTextBuilder.append(passwordChar);
                     }
+                    displayText = displayTextBuilder.toString();
                 } else {
                     displayText = rowText;
                 }
@@ -1285,12 +1289,12 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         prefH = (f.getHeight() + ta.getRowsGap()) * rows;
         if (!ta.isActAsLabel()) {
             int columns = ta.getColumns();
-            String str = "";
+            StringBuilder str = new StringBuilder();
             for (int iter = 0; iter < columns; iter++) {
-                str += TextArea.getWidestChar();
+                str.append(TextArea.getWidestChar());
             }
             if (columns > 0) {
-                prefW = Math.max(prefW, f.stringWidth(str));
+                prefW = Math.max(prefW, f.stringWidth(str.toString()));
             }
         }
         prefH = Math.max(prefH, rows * f.getHeight());
@@ -1882,19 +1886,21 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         String displayText = "";
         if ((ta.getConstraint() & TextArea.PASSWORD) != 0) {
             // show the last character in a password field
+            StringBuilder displayTextBuilder = new StringBuilder();
             if (ta.isPendingCommit()) {
                 if (text.length() > 0) {
                     int tlen = text.length();
                     for (int j = 0; j < tlen - 1; j++) {
-                        displayText += passwordChar;
+                        displayTextBuilder.append(passwordChar);
                     }
-                    displayText += text.charAt(text.length() - 1);
+                    displayTextBuilder.append(text.charAt(text.length() - 1));
                 }
             } else {
                 for (int j = 0; j < text.length(); j++) {
-                    displayText += passwordChar;
+                    displayTextBuilder.append(passwordChar);
                 }
             }
+            displayText = displayTextBuilder.toString();
         } else {
             displayText = text;
         }

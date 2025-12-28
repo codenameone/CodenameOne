@@ -2009,8 +2009,8 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     Vector getWords(String text, int align, boolean returnComps) {
         Vector words = new Vector();
-        String word = "";
-        String leadSpace = "";
+        StringBuilder word = new StringBuilder();
+        StringBuilder leadSpace = new StringBuilder();
         for (int c = 0; c < text.length(); c++) {
             char ch = text.charAt(c);
             if ((CJK_SUPPORT) &&
@@ -2020,40 +2020,42 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                             //((ch>=0x20000) && (ch<=0x2a6df)) || //CJK Unified Ideographs Extension B (Rare, historic)
                             //((ch>=0x2f800) && (ch<=0x2fa1f)) //CJK Compatibility Ideographs Supplement (Unifiable variants)
                     )) { // CJK (Chinese, Japanese, Korean)
-                word += ch;
+                word.append(ch);
                 if (returnComps) {
-                    words.addElement(addString(word, align));
+                    words.addElement(addString(word.toString(), align));
                 } else {
-                    words.addElement(word);
+                    words.addElement(word.toString());
                 }
-                word = "";
+                word.setLength(0);
             } else {
                 if ((ch == ' ') || (ch == '\n') || (ch == '\r') || (ch == '\t')) {
                     if (word.length() != 0) {
                         if (returnComps) {
-                            words.addElement(addString(leadSpace + word + ' ', align));
-                            leadSpace = "";
+                            words.addElement(addString(leadSpace.toString() + word.toString() + ' ', align));
+                            leadSpace.setLength(0);
                         } else {
-                            words.addElement(word);
+                            words.addElement(word.toString());
                         }
-                        word = "";
+                        word.setLength(0);
                     } else if ((words.isEmpty()) && (text.length() > 1)) { // The first word can have a leading space (only one, all whitespaces are aggregated to one space) - Unless this is just a space with no text
-                        leadSpace = " ";
+                        leadSpace.setLength(0);
+                        leadSpace.append(' ');
                     }
-                } else if ((!returnComps) && (font.stringWidth(word + ch) > width - leftIndent)) { //break words that are longer than the component's width
-                    words.addElement(word);
-                    word = "" + ch;
+                } else if ((!returnComps) && (font.stringWidth(word.toString() + ch) > width - leftIndent)) { //break words that are longer than the component's width
+                    words.addElement(word.toString());
+                    word.setLength(0);
+                    word.append(ch);
                 } else {
-                    word += ch;
+                    word.append(ch);
                 }
             }
         }
         if ((word.length() != 0) || (leadSpace.length() != 0)) {
             if (returnComps) {
-                words.addElement(addString(leadSpace + word, align));
+                words.addElement(addString(leadSpace.toString() + word.toString(), align));
             } else {
                 if (word.length() != 0) {
-                    words.addElement(word);
+                    words.addElement(word.toString());
                 }
             }
         }

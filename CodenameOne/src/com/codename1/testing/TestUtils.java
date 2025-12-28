@@ -262,12 +262,12 @@ public class TestUtils {
         if (p.length == 0) {
             return "{}";
         }
-        String s = "{" + p[0];
+        StringBuilder s = new StringBuilder("{" + p[0]);
         for (int iter = 1; iter < p.length; iter++) {
-            s += ", " + p[iter];
+            s.append(", ").append(p[iter]);
 
         }
-        return s + "}";
+        return s.append("}").toString();
     }
 
     /**

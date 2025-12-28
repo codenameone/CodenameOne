@@ -710,27 +710,27 @@ public class Element implements Iterable<Element> {
      */
     public String toString(String spacing) {
 
-        String str = spacing;
+        StringBuilder str = new StringBuilder(spacing);
         if (!textElement) {
-            str += "<" + getTagName();
+            str.append("<").append(getTagName());
             if (attributes != null) {
                 for (Enumeration e = attributes.keys(); e.hasMoreElements(); ) {
                     String attrStr = (String) e.nextElement();
                     String val = (String) attributes.get(attrStr);
-                    str += " " + attrStr + "='" + val + "'";
+                    str.append(" ").append(attrStr).append("='").append(val).append("'");
                 }
             }
-            str += ">\n";
+            str.append(">\n");
             if (children != null) {
                 for (int i = 0; i < children.size(); i++) {
-                    str += children.get(i).toString(spacing + ' ');
+                    str.append(children.get(i).toString(spacing + ' '));
                 }
             }
-            str += spacing + "</" + getTagName() + ">\n";
+            str.append(spacing).append("</").append(getTagName()).append(">\n");
         } else {
-            str += "'" + name + "'\n";
+            str.append("'").append(name).append("'\n");
         }
-        return str;
+        return str.toString();
     }
 
     /**
