@@ -971,11 +971,11 @@ public class HTMLElement extends Element {
         }
 
         if (colorStr.length() == 3) { // shortened format rgb - translated to rrggbb
-            String newColStr = "";
+            StringBuilder newColStr = new StringBuilder();
             for (int i = 0; i < 3; i++) {
-                newColStr += colorStr.charAt(i) + "" + colorStr.charAt(i);
+                newColStr.append(colorStr.charAt(i)).append("").append(colorStr.charAt(i));
             }
-            colorStr = newColStr;
+            colorStr = newColStr.toString();
         }
 
         try {
@@ -1159,23 +1159,23 @@ public class HTMLElement extends Element {
         if ((id < 0) || (id >= TAG_ATTRIBUTES.length)) {
             return "Unknown";
         }
-        String list = "";
+        StringBuilder list = new StringBuilder();
         for (int a = 0; a < TAG_ATTRIBUTES[id].length; a++) {
-            list += ATTRIBUTE_NAMES[TAG_ATTRIBUTES[id][a]] + ",";
+            list.append(ATTRIBUTE_NAMES[TAG_ATTRIBUTES[id][a]]).append(",");
         }
         if (supportsCoreAttributes()) {
             for (int a = 0; a < COMMON_ATTRIBUTES.length; a++) {
-                list += ATTRIBUTE_NAMES[COMMON_ATTRIBUTES[a]] + ",";
+                list.append(ATTRIBUTE_NAMES[COMMON_ATTRIBUTES[a]]).append(",");
             }
         }
 
-        if (list.endsWith(",")) {
-            list = list.substring(0, list.length() - 1);
+        if (list.length() > 0 && list.charAt(list.length() - 1) == ',') {
+            list.setLength(list.length() - 1);
         }
-        if (list.equals("")) {
-            list = "None";
+        if (list.length() == 0) {
+            return "None";
         }
-        return list;
+        return list.toString();
     }
 
     /**

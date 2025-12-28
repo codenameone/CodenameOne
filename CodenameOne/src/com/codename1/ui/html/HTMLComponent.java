@@ -2223,17 +2223,17 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                         int spacesToAdd = (width - lbl.getPreferredW()) / spaceW;
                         int spacesPerWord = spacesToAdd / (words.size() - 1);
                         int addtlSpaces = spacesToAdd % (words.size() - 1);
-                        String newStr = (String) words.elementAt(0);
+                        StringBuilder newStr = new StringBuilder((String) words.elementAt(0));
                         for (int i = 1; i < words.size(); i++) {
                             for (int j = 0; j < spacesPerWord; j++) {
-                                newStr += ' ';
+                                newStr.append(' ');
                             }
                             if (i - 1 < addtlSpaces) {
-                                newStr += ' ';
+                                newStr.append(' ');
                             }
-                            newStr += ' ' + (String) words.elementAt(i);
+                            newStr.append(' ').append((String) words.elementAt(i));
                         }
-                        lbl.setText(newStr);
+                        lbl.setText(newStr.toString());
                     }
                 } else {
                     lbl.setPreferredW(width);
