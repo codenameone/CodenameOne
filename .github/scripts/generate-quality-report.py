@@ -771,7 +771,9 @@ def main() -> None:
             "FE_FLOATING_POINT_EQUALITY",
             "FE_TEST_IF_EQUAL_TO_NOT_A_NUMBER",
             "SA_FIELD_SELF_ASSIGNMENT",
-            "UC_USELESS_CONDITION"
+            "UC_USELESS_CONDITION",
+            "EC_UNRELATED_TYPES",
+            "EQ_ALWAYS_FALSE"
         }
         violations = [
             f for f in spotbugs.findings

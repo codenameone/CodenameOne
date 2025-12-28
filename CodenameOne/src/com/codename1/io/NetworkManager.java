@@ -1061,7 +1061,7 @@ public class NetworkManager {
         }
 
         public boolean equals(Object o) {
-            return false;
+            return this == o;
         }
 
     }
