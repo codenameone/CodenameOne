@@ -423,7 +423,7 @@ class HTMLForm {
      *
      * @author Ofir Leitner
      */
-    class NamedCommand extends Command {
+    static class NamedCommand extends Command {
 
         HTMLForm htmlForm;
         String key;   // The key is taken from the NAME attribute of the INPUT tag. It is called key to avoid mixup with the command's name (i.e. display name which is in fact 'value')

@@ -4059,7 +4059,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      *
      * @author Ofir Leitner
      */
-    class RedirectThread implements Runnable {
+    static class RedirectThread implements Runnable {
 
         int seconds;
         String url;
@@ -4101,7 +4101,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      *
      * @author Ofir Leitner
      */
-    class ForLabel extends Label {
+    static class ForLabel extends Label {
 
         String id;
         HTMLComponent htmlC;
@@ -4131,7 +4131,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    class HTMLListIndex extends HTMLListItem {
+    static class HTMLListIndex extends HTMLListItem {
 
         /**
          * Numeric ordered list type (1 ,2, 3)
@@ -4239,7 +4239,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      *
      * @author Ofir Leitner
      */
-    class HTMLBullet extends HTMLListItem {
+    static class HTMLBullet extends HTMLListItem {
 
 
         // Unordered list types
@@ -4335,7 +4335,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      *
      * @author Ofir Leitner
      */
-    class HTMLComboBox extends ComboBox {
+    static class HTMLComboBox extends ComboBox {
 
         /**
          * {{@inheritDoc}}

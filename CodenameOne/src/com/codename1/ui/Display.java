@@ -5234,7 +5234,7 @@ public final class Display extends CN1Constants {
         return impl.getSharedJavscriptContext();
     }
 
-    private class EdtException extends RuntimeException {
+    private static class EdtException extends RuntimeException {
         private Throwable cause;
         private EdtException parent;
 
@@ -5283,13 +5283,13 @@ public final class Display extends CN1Constants {
 
         DebugRunnable(Runnable internal) {
             this.internal = internal;
-            this.parentContext = currentEdtContext;
+            this.parentContext = INSTANCE.currentEdtContext;
             if (parentContext != null) {
                 depth = parentContext.depth + 1;
                 totalDepth = parentContext.totalDepth + 1;
             }
 
-            if (isEnableAsyncStackTraces()) {
+            if (INSTANCE.isEnableAsyncStackTraces()) {
                 exceptionWrapper = new EdtException();
 
                 if (parentContext != null) {
@@ -5310,7 +5310,7 @@ public final class Display extends CN1Constants {
         public void run() {
             if (exceptionWrapper != null) {
                 try {
-                    currentEdtContext = this;
+                    INSTANCE.currentEdtContext = this;
                     internal.run();
                 } catch (RuntimeException t) {
                     exceptionWrapper.throwRoot(t);

@@ -774,7 +774,8 @@ def main() -> None:
             "UC_USELESS_CONDITION",
             "EC_UNRELATED_TYPES",
             "EQ_ALWAYS_FALSE",
-            "SBSC_USE_STRINGBUFFER_CONCATENATION"
+            "SBSC_USE_STRINGBUFFER_CONCATENATION",
+            "SIC_INNER_SHOULD_BE_STATIC"
         }
         violations = [
             f for f in spotbugs.findings

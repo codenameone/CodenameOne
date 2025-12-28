@@ -353,7 +353,7 @@ class ResourceThreadQueue {
      *
      * @author Ofir Leitner
      */
-    class ResourceThread implements Runnable, IOCallback {
+    static class ResourceThread implements Runnable, IOCallback {
 
         Component imgLabel;
         Vector labels;

@@ -2229,7 +2229,7 @@ public class BrowserComponent extends Container {
 
     }
 
-    private class ExecuteResult {
+    private static class ExecuteResult {
         JSRef value;
         Throwable error;
         boolean complete;

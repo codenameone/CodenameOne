@@ -2938,7 +2938,7 @@ public class ConnectionRequest implements IOProgressListener {
      * @see #setCheckSSLCertificates(boolean)
      * @see #checkSSLCertificates(com.codename1.io.ConnectionRequest.SSLCertificate[])
      */
-    public final class SSLCertificate {
+    public static final class SSLCertificate {
 
         private String certificateUniqueKey;
         private String certificateAlgorithm;

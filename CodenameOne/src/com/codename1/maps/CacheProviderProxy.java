@@ -89,7 +89,7 @@ class CacheProviderProxy extends MapProvider {
         _cache.clear();
     }
 
-    class AgeableTile extends Tile {
+    static class AgeableTile extends Tile {
 
         public int age;
         private final Tile tile;

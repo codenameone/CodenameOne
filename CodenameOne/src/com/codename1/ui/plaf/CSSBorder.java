@@ -1255,7 +1255,7 @@ public class CSSBorder extends Border {
             return null;
         }
 
-        return new Arrow(c);
+        return new Arrow(c, getTrackComponent());
     }
 
     private interface Decorator {
@@ -1274,7 +1274,7 @@ public class CSSBorder extends Border {
                 this.value = Float.parseFloat(unit.substring(0, unit.length() - 2));
                 this.type = UNIT_MM;
             } else if (unit.endsWith("px")) {
-                this.value = Integer.parseInt(unit.substring(0, unit.length() - 2));
+                this.value = Float.parseFloat(unit.substring(0, unit.length() - 2));
                 this.type = UNIT_PIXELS;
             } else if (unit.endsWith("em")) {
                 this.value = Float.parseFloat(unit.substring(0, unit.length() - 2));
@@ -2376,7 +2376,7 @@ public class CSSBorder extends Border {
 
     }
 
-    private class Arrow {
+    private static class Arrow {
         int direction = -1;
         float size = 1.5f;
         float position = -1;
@@ -2384,32 +2384,32 @@ public class CSSBorder extends Border {
         float trackComponentHorizontalPosition = -1;
         float trackComponentVerticalPosition = -1;
 
-        Arrow(Component c) {
-            if (getTrackComponent() != null) {
+        Arrow(Component c, Component trackComponent) {
+            if (trackComponent != null) {
                 int cabsY = c.getAbsoluteY();
-                int trackY = getTrackComponent().getY();
-                int trackX = getTrackComponent().getX();
+                int trackY = trackComponent.getY();
+                int trackX = trackComponent.getX();
                 int cabsX = c.getAbsoluteX();
                 int arrowWH = CN.convertToPixels(size);
-                if (cabsY >= trackY + getTrackComponent().getHeight()) {
+                if (cabsY >= trackY + trackComponent.getHeight()) {
                     // we are below the component
                     direction = CN.TOP;
-                    position = (trackX + getTrackComponent().getWidth() / 2) - cabsX - arrowWH / 2;
+                    position = (trackX + trackComponent.getWidth() / 2) - cabsX - arrowWH / 2;
                 } else {
                     if (trackComponentSide == CN.BOTTOM || cabsY + c.getHeight() <= trackY) {
                         // we are above the component
                         direction = CN.BOTTOM;
-                        position = (trackX + getTrackComponent().getWidth() / 2) - cabsX - arrowWH / 2;
+                        position = (trackX + trackComponent.getWidth() / 2) - cabsX - arrowWH / 2;
                     } else {
-                        if (cabsX >= trackX + getTrackComponent().getWidth()) {
+                        if (cabsX >= trackX + trackComponent.getWidth()) {
                             // we are to the right of the component
                             direction = CN.LEFT;
-                            position = (trackY + getTrackComponent().getHeight() / 2) - cabsY - arrowWH / 2;
+                            position = (trackY + trackComponent.getHeight() / 2) - cabsY - arrowWH / 2;
                         } else {
                             if (cabsX + c.getWidth() <= trackX) {
                                 // we are to the left of the component
                                 direction = CN.RIGHT;
-                                position = (trackY + getTrackComponent().getHeight() / 2) - cabsY - arrowWH / 2;
+                                position = (trackY + trackComponent.getHeight() / 2) - cabsY - arrowWH / 2;
                             }
                         }
                     }

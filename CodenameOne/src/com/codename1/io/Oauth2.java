@@ -662,7 +662,7 @@ public class Oauth2 {
         return retVal;
     }
 
-    public class RefreshTokenRequest extends AsyncResource<AccessToken> {
+    public static class RefreshTokenRequest extends AsyncResource<AccessToken> {
 
     }
 }
