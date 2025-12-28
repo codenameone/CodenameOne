@@ -41,7 +41,7 @@ class WebBrowserTest extends UITestBase {
     void testLoadingInnerClass() {
         WebBrowser browser = new WebBrowser();
         com.codename1.ui.Form f = new com.codename1.ui.Form();
-        WebBrowser.Loading loading = browser.new Loading(f);
+        WebBrowser.Loading loading = new WebBrowser.Loading(f);
 
         assertTrue(loading.animate());
 
