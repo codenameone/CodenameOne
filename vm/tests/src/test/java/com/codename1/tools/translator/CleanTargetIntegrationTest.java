@@ -21,6 +21,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -190,6 +191,22 @@ class CleanTargetIntegrationTest {
                 "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m pthread)"
         );
         Files.write(cmakeLists, replacement.getBytes(StandardCharsets.UTF_8));
+    }
+
+    static void copyObjcSourcesAsC(Path srcRoot) throws IOException {
+        try (Stream<Path> files = Files.list(srcRoot)) {
+            files.filter(p -> p.getFileName().toString().endsWith(".m"))
+                    .forEach(p -> {
+                        Path asC = p.resolveSibling(p.getFileName().toString().replaceAll("\\.m$", ".c"));
+                        if (!Files.exists(asC)) {
+                            try {
+                                Files.copy(p, asC);
+                            } catch (IOException ignore) {
+                                // Best-effort copy for clean targets; failures are tolerated during tests.
+                            }
+                        }
+                    });
+        }
     }
 
     static List<String> cmakeCompilerArgs() {

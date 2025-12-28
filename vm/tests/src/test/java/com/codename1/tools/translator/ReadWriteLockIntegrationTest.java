@@ -93,6 +93,7 @@ class ReadWriteLockIntegrationTest {
         assertTrue(Files.exists(cmakeLists));
 
         Path srcRoot = distDir.resolve("ReadWriteLockTestApp-src");
+        CleanTargetIntegrationTest.copyObjcSourcesAsC(srcRoot);
         CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
         CleanTargetIntegrationTest.patchFileHeader(srcRoot);
         patchHashMapNativeSupport(srcRoot);
@@ -654,16 +655,18 @@ class ReadWriteLockIntegrationTest {
                 + "#include \"java_lang_StringToReal.h\"\n"
                 + "#include \"java_lang_ArrayIndexOutOfBoundsException.h\"\n"
                 + "#include \"java_lang_Thread.h\"\n\n"
-                + "int *classInstanceOf[] = { 0 };\n"
-                + "struct clazz* classesList[] = { 0 };\n"
-                + "int classListSize = 0;\n"
-                + "JAVA_OBJECT* constantPoolObjects = NULL;\n\n"
+                + "extern int *classInstanceOf[];\n"
+                + "extern struct clazz* classesList[];\n"
+                + "extern int classListSize;\n\n"
                 + "JAVA_OBJECT java_lang_String_toCharNoCopy___R_char_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) { return JAVA_NULL; }\n"
                 + "JAVA_OBJECT java_lang_StringToReal_invalidReal___java_lang_String_boolean_R_java_lang_NumberFormatException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s, JAVA_BOOLEAN strict) { return JAVA_NULL; }\n"
                 + "JAVA_VOID java_lang_Thread_runImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT t, JAVA_LONG id) { }\n"
                 + "JAVA_VOID java_lang_ArrayIndexOutOfBoundsException___INIT_____int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_INT idx) { }\n"
                 + "JAVA_OBJECT get_field_java_lang_Throwable_stack(JAVA_OBJECT t) { return JAVA_NULL; }\n"
-                + "void set_field_java_lang_Throwable_stack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT val, JAVA_OBJECT t) { }\n";
+                + "void set_field_java_lang_Throwable_stack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT val, JAVA_OBJECT t) { }\n"
+                + "JAVA_VOID java_lang_Thread_start0__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT t) { }\n"
+                + "JAVA_VOID java_lang_Thread_sleep0___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG millis) { }\n"
+                + "JAVA_OBJECT java_lang_Object_getClass___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { return JAVA_NULL; }\n";
         Files.write(stubs, content.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -766,6 +769,34 @@ class ReadWriteLockIntegrationTest {
 
         content = content.replaceFirst("#include \\\"java_lang_System.h\\\"\\n\\n",
                 "#include \"java_lang_System.h\"\n\nJAVA_OBJECT java_lang_Class_getName___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls);\nJAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT t);\n\n");
+
+        String[][] duplicateRuntimeSymbols = new String[][] {
+                {"JAVA_BOOLEAN java_lang_String_equals___java_lang_Object_R_boolean", "JAVA_BOOLEAN java_lang_String_equals___java_lang_Object_R_boolean\\(.*?\n}\\n"},
+                {"JAVA_OBJECT java_lang_Object_toString___R_java_lang_String", "JAVA_OBJECT java_lang_Object_toString___R_java_lang_String\\(.*?\n}\\n"},
+                {"JAVA_OBJECT java_lang_String_toString___R_java_lang_String", "JAVA_OBJECT java_lang_String_toString___R_java_lang_String\\(.*?\n}\\n"},
+                {"JAVA_VOID java_lang_String_getChars___int_int_char_1ARRAY_int", "JAVA_VOID java_lang_String_getChars___int_int_char_1ARRAY_int\\(.*?\n}\\n"},
+                {"JAVA_OBJECT java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder", "JAVA_OBJECT java_lang_StringBuilder_append___java_lang_String_R_java_lang_StringBuilder\\(.*?\n}\\n"},
+                {"JAVA_OBJECT java_lang_StringBuilder_append___java_lang_Object_R_java_lang_StringBuilder", "JAVA_OBJECT java_lang_StringBuilder_append___java_lang_Object_R_java_lang_StringBuilder\\(.*?\n}\\n"},
+                {"JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int", "JAVA_VOID java_lang_System_arraycopy___java_lang_Object_int_java_lang_Object_int_int\\(.*?\n}\\n"},
+                {"JAVA_LONG java_lang_System_currentTimeMillis___R_long", "JAVA_LONG java_lang_System_currentTimeMillis___R_long\\(.*?\n}\\n"},
+                {"JAVA_VOID java_lang_StringBuilder_getChars___int_int_char_1ARRAY_int", "JAVA_VOID java_lang_StringBuilder_getChars___int_int_char_1ARRAY_int\\(.*?\n}\\n"},
+                {"JAVA_OBJECT java_lang_StringBuilder_append___char_R_java_lang_StringBuilder", "JAVA_OBJECT java_lang_StringBuilder_append___char_R_java_lang_StringBuilder\\(.*?\n}\\n"},
+                {"JAVA_VOID java_lang_Thread_sleep___long", "JAVA_VOID java_lang_Thread_sleep___long\\(.*?\n}\\n"},
+                {"JAVA_VOID java_lang_Thread_start__", "JAVA_VOID java_lang_Thread_start__\\(.*?\n}\\n"},
+                {"JAVA_BOOLEAN java_lang_Thread_isInterrupted___boolean_R_boolean", "JAVA_BOOLEAN java_lang_Thread_isInterrupted___boolean_R_boolean\\(.*?\n}\\n"}
+        };
+
+        for (String[] pattern : duplicateRuntimeSymbols) {
+            Pattern p = Pattern.compile(pattern[1], Pattern.DOTALL);
+            Matcher m = p.matcher(content);
+            if (m.find()) {
+                content = m.replaceFirst("\n");
+            }
+        }
+
+        content = content.replace("JAVA_OBJECT* constantPoolObjects = 0;", "extern JAVA_OBJECT* constantPoolObjects;");
+        content = content.replace("void initConstantPool() {\n    // Allocate dummy pool to prevent segfaults, though contents will be null\n    constantPoolObjects = calloc(65536, sizeof(void*));\n}\n",
+                "void initConstantPool() {}\n");
 
         Pattern areEqualKeys = Pattern.compile(
                 "JAVA_BOOLEAN java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_R_boolean\\(.*?\n}\n",
