@@ -10,6 +10,8 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -94,6 +96,7 @@ class ReadWriteLockIntegrationTest {
         CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
         CleanTargetIntegrationTest.patchFileHeader(srcRoot);
         patchHashMapNativeSupport(srcRoot);
+        patchHashMapNativeMethods(srcRoot);
         writeRuntimeStubs(srcRoot);
 
         replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
@@ -643,220 +646,27 @@ class ReadWriteLockIntegrationTest {
     }
 
     private void writeRuntimeStubs(Path srcRoot) throws java.io.IOException {
-        // Reuse the stubs from LockIntegrationTest
         Path stubs = srcRoot.resolve("runtime_stubs.c");
-        // ... (Same content as LockIntegrationTest.java's writeRuntimeStubs)
-        // Since I cannot call private method from another class, I'll copy-paste it here or use reflection?
-        // Copy-paste is safer and standard for this kind of "self-contained" test generator.
-
-        String content = "#include \"cn1_globals.h\"\n" +
-                "#include \"java_lang_Object.h\"\n" +
-                "#include <stdlib.h>\n" +
-                "#include <string.h>\n" +
-                "#include <stdio.h>\n" +
-                "#include <pthread.h>\n" +
-                "#include <unistd.h>\n" +
-                "#include <sys/time.h>\n" +
-                "#include <math.h>\n" +
-                "\n" +
-                "static pthread_mutexattr_t mtx_attr;\n" +
-                "void __attribute__((constructor)) init_debug() {\n" +
-                "    setbuf(stdout, NULL);\n" +
-                "    setbuf(stderr, NULL);\n" +
-                "    pthread_mutexattr_init(&mtx_attr);\n" +
-                "    pthread_mutexattr_settype(&mtx_attr, PTHREAD_MUTEX_RECURSIVE);\n" +
-                "}\n" +
-                "\n" +
-                "static pthread_key_t thread_state_key;\n" +
-                "static pthread_key_t current_thread_key;\n" +
-                "static pthread_once_t key_once = PTHREAD_ONCE_INIT;\n" +
-                "\n" +
-                "static void make_key() {\n" +
-                "    pthread_key_create(&thread_state_key, free);\n" +
-                "    pthread_key_create(&current_thread_key, NULL);\n" +
-                "}\n" +
-                "\n" +
-                "struct ThreadLocalData* getThreadLocalData() {\n" +
-                "    pthread_once(&key_once, make_key);\n" +
-                "    struct ThreadLocalData* data = pthread_getspecific(thread_state_key);\n" +
-                "    if (!data) {\n" +
-                "        data = calloc(1, sizeof(struct ThreadLocalData));\n" +
-                "        data->blocks = calloc(100, sizeof(struct TryBlock));\n" +
-                "        data->threadObjectStack = calloc(100, sizeof(struct elementStruct));\n" +
-                "        data->pendingHeapAllocations = calloc(100, sizeof(void*));\n" +
-                "        pthread_setspecific(thread_state_key, data);\n" +
-                "    }\n" +
-                "    return data;\n" +
-                "}\n" +
-                "\n" +
-                "// Monitor implementation\n" +
-                "#define MAX_MONITORS 1024\n" +
-                "typedef struct {\n" +
-                "    JAVA_OBJECT obj;\n" +
-                "    pthread_mutex_t mutex;\n" +
-                "    pthread_cond_t cond;\n" +
-                "} Monitor;\n" +
-                "static Monitor monitors[MAX_MONITORS];\n" +
-                "static pthread_mutex_t global_monitor_lock = PTHREAD_MUTEX_INITIALIZER;\n" +
-                "\n" +
-                "static Monitor* getMonitor(JAVA_OBJECT obj) {\n" +
-                "    pthread_mutex_lock(&global_monitor_lock);\n" +
-                "    for(int i=0; i<MAX_MONITORS; i++) {\n" +
-                "        if (monitors[i].obj == obj) {\n" +
-                "            pthread_mutex_unlock(&global_monitor_lock);\n" +
-                "            return &monitors[i];\n" +
-                "        }\n" +
-                "    }\n" +
-                "    for(int i=0; i<MAX_MONITORS; i++) {\n" +
-                "        if (monitors[i].obj == NULL) {\n" +
-                "            monitors[i].obj = obj;\n" +
-                "            pthread_mutex_init(&monitors[i].mutex, &mtx_attr);\n" +
-                "            pthread_cond_init(&monitors[i].cond, NULL);\n" +
-                "            pthread_mutex_unlock(&global_monitor_lock);\n" +
-                "            return &monitors[i];\n" +
-                "        }\n" +
-                "    }\n" +
-                "    pthread_mutex_unlock(&global_monitor_lock);\n" +
-                "    fprintf(stderr, \"Too many monitors!\\n\");\n" +
-                "    exit(1);\n" +
-                "}\n" +
-                "\n" +
-                "void monitorEnter(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {\n" +
-                "    if (!obj) return;\n" +
-                "    Monitor* m = getMonitor(obj);\n" +
-                "    pthread_mutex_lock(&m->mutex);\n" +
-                "}\n" +
-                "\n" +
-                "void monitorExit(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {\n" +
-                "    if (!obj) return;\n" +
-                "    Monitor* m = getMonitor(obj);\n" +
-                "    pthread_mutex_unlock(&m->mutex);\n" +
-                "}\n" +
-                "\n" +
-                "void java_lang_Object_wait___long_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_LONG timeout, JAVA_INT nanos) {\n" +
-                "    Monitor* m = getMonitor(obj);\n" +
-                "    if (timeout > 0 || nanos > 0) {\n" +
-                "        struct timespec ts;\n" +
-                "        struct timeval now;\n" +
-                "        gettimeofday(&now, NULL);\n" +
-                "        ts.tv_sec = now.tv_sec + timeout / 1000;\n" +
-                "        ts.tv_nsec = now.tv_usec * 1000 + (timeout % 1000) * 1000000 + nanos;\n" +
-                "        if (ts.tv_nsec >= 1000000000) {\n" +
-                "            ts.tv_sec++;\n" +
-                "            ts.tv_nsec -= 1000000000;\n" +
-                "        }\n" +
-                "        pthread_cond_timedwait(&m->cond, &m->mutex, &ts);\n" +
-                "    } else {\n" +
-                "        pthread_cond_wait(&m->cond, &m->mutex);\n" +
-                "    }\n" +
-                "}\n" +
-                "\n" +
-                "void java_lang_Object_notify__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {\n" +
-                "    Monitor* m = getMonitor(obj);\n" +
-                "    pthread_cond_signal(&m->cond);\n" +
-                "}\n" +
-                "\n" +
-                "void java_lang_Object_notifyAll__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {\n" +
-                "    Monitor* m = getMonitor(obj);\n" +
-                "    pthread_cond_broadcast(&m->cond);\n" +
-                "}\n" +
-                "\n" +
-                "JAVA_OBJECT* constantPoolObjects = NULL;\n" +
-                "void initConstantPool() {\n" +
-                "    if (constantPoolObjects == NULL) {\n" +
-                "        constantPoolObjects = calloc(1024, sizeof(JAVA_OBJECT));\n" +
-                "    }\n" +
-                "}\n" +
-                "JAVA_OBJECT codenameOneGcMalloc(CODENAME_ONE_THREAD_STATE, int size, struct clazz* parent) {\n" +
-                "    JAVA_OBJECT obj = (JAVA_OBJECT)calloc(1, size);\n" +
-                "    if (obj != JAVA_NULL) {\n" +
-                "        obj->__codenameOneParentClsReference = parent;\n" +
-                "    }\n" +
-                "    return obj;\n" +
-                "}\n" +
-                "void codenameOneGcFree(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { free(obj); }\n" +
-                "void arrayFinalizerFunction(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT array) { free(array); }\n" +
-                "void gcMarkArrayObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {}\n" +
-                "void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) {}\n" +
-                "void** initVtableForInterface() { static void* table[1]; return (void**)table; }\n" +
-                "struct clazz class_array1__JAVA_INT = {0};\n" +
-                "struct clazz class_array2__JAVA_INT = {0};\n" +
-                "struct clazz class_array1__JAVA_BOOLEAN = {0};\n" +
-                "struct clazz class_array1__JAVA_CHAR = {0};\n" +
-                "struct clazz class_array1__JAVA_FLOAT = {0};\n" +
-                "struct clazz class_array1__JAVA_DOUBLE = {0};\n" +
-                "struct clazz class_array1__JAVA_BYTE = {0};\n" +
-                "struct clazz class_array1__JAVA_SHORT = {0};\n" +
-                "struct clazz class_array1__JAVA_LONG = {0};\n" +
-                "void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, int classNameId, int methodNameId) {}\n" +
-                "void releaseForReturn(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread) {}\n" +
-                "void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread, int methodBlockOffset) {}\n" +
-                "void monitorEnterBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {}\n" +
-                "void monitorExitBlock(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {}\n" +
-                "struct elementStruct* pop(struct elementStruct** sp) { (*sp)--; return *sp; }\n" +
-                "void popMany(CODENAME_ONE_THREAD_STATE, int count, struct elementStruct** sp) { while(count--) (*sp)--; }\n" +
-                "void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) { exit(1); }\n" +
-                "int instanceofFunction(int sourceClass, int destId) { return 1; }\n" +
-                "extern struct clazz class__java_lang_Class;\n" +
-                "extern struct clazz class__java_lang_String;\n" +
-                "int currentGcMarkValue = 1;\n" +
-                "\n" +
-                "// Allocator Implementation\n" +
-                "JAVA_OBJECT allocArray(CODENAME_ONE_THREAD_STATE, int length, struct clazz* type, int primitiveSize, int dim) {\n" +
-                "    struct JavaArrayPrototype* arr = (struct JavaArrayPrototype*)calloc(1, sizeof(struct JavaArrayPrototype));\n" +
-                "    arr->__codenameOneParentClsReference = type;\n" +
-                "    arr->length = length;\n" +
-                "    arr->dimensions = dim;\n" +
-                "    arr->primitiveSize = primitiveSize;\n" +
-                "    int size = primitiveSize ? primitiveSize : sizeof(JAVA_OBJECT);\n" +
-                "    arr->data = calloc(length, size);\n" +
-                "    return (JAVA_OBJECT)arr;\n" +
-                "}\n" +
-                "\n" +
-                "// Threading\n" +
-                "extern void java_lang_Thread_run__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me);\n" +
-                "void* java_thread_entry(void* arg) {\n" +
-                "    JAVA_OBJECT threadObj = (JAVA_OBJECT)arg;\n" +
-                "    struct ThreadLocalData* data = getThreadLocalData();\n" +
-                "    pthread_setspecific(current_thread_key, threadObj);\n" +
-                "    java_lang_Thread_run__(data, threadObj);\n" +
-                "    return NULL;\n" +
-                "}\n" +
-                "\n" +
-                "void java_lang_Thread_start0__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) {\n" +
-                "    pthread_t pt;\n" +
-                "    pthread_create(&pt, NULL, java_thread_entry, me);\n" +
-                "}\n" +
-                "\n" +
-                "extern JAVA_OBJECT __NEW_java_lang_Thread(CODENAME_ONE_THREAD_STATE);\n" +
-                "// We don't call INIT on main thread lazily created\n" +
-                "\n" +
-                "JAVA_OBJECT java_lang_Thread_currentThread___R_java_lang_Thread(CODENAME_ONE_THREAD_STATE) {\n" +
-                "    JAVA_OBJECT t = pthread_getspecific(current_thread_key);\n" +
-                "    if (!t) {\n" +
-                "        t = __NEW_java_lang_Thread(threadStateData);\n" +
-                "        pthread_setspecific(current_thread_key, t);\n" +
-                "    }\n" +
-                "    return t;\n" +
-                "}\n" +
-                "\n" +
-                "void java_lang_Thread_sleep0___long(CODENAME_ONE_THREAD_STATE, JAVA_LONG millis) {\n" +
-                "    usleep(millis * 1000);\n" +
-                "}\n" +
-                "\n" +
-                "JAVA_LONG java_lang_System_currentTimeMillis___R_long(CODENAME_ONE_THREAD_STATE) {\n" +
-                "    struct timeval tv;\n" +
-                "    gettimeofday(&tv, NULL);\n" +
-                "    return (long long)tv.tv_sec * 1000 + tv.tv_usec / 1000;\n" +
-                "}\n" +
-                "\n" +
-                "// HashCode\n" +
-                "JAVA_INT java_lang_Object_hashCode___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { return (JAVA_INT)(JAVA_LONG)me; }\n" +
-                "// getClass\n" +
-                "JAVA_OBJECT java_lang_Object_getClass___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { return NULL; }\n";
-
+        String content = "#include \"cn1_globals.h\"\n"
+                + "#include \"cn1_class_method_index.h\"\n"
+                + "#include \"java_lang_Object.h\"\n"
+                + "#include \"java_lang_String.h\"\n"
+                + "#include \"java_lang_StringToReal.h\"\n"
+                + "#include \"java_lang_ArrayIndexOutOfBoundsException.h\"\n"
+                + "#include \"java_lang_Thread.h\"\n\n"
+                + "int *classInstanceOf[] = { 0 };\n"
+                + "struct clazz* classesList[] = { 0 };\n"
+                + "int classListSize = 0;\n"
+                + "JAVA_OBJECT* constantPoolObjects = NULL;\n\n"
+                + "JAVA_OBJECT java_lang_String_toCharNoCopy___R_char_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str) { return JAVA_NULL; }\n"
+                + "JAVA_OBJECT java_lang_StringToReal_invalidReal___java_lang_String_boolean_R_java_lang_NumberFormatException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s, JAVA_BOOLEAN strict) { return JAVA_NULL; }\n"
+                + "JAVA_VOID java_lang_Thread_runImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT t, JAVA_LONG id) { }\n"
+                + "JAVA_VOID java_lang_ArrayIndexOutOfBoundsException___INIT_____int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_INT idx) { }\n"
+                + "JAVA_OBJECT get_field_java_lang_Throwable_stack(JAVA_OBJECT t) { return JAVA_NULL; }\n"
+                + "void set_field_java_lang_Throwable_stack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT val, JAVA_OBJECT t) { }\n";
         Files.write(stubs, content.getBytes(StandardCharsets.UTF_8));
     }
+
 
     private void patchHashMapNativeSupport(Path srcRoot) throws java.io.IOException {
         Path entryHeader = srcRoot.resolve("java_util_HashMap_Entry.h");
@@ -944,5 +754,70 @@ class ReadWriteLockIntegrationTest {
                     "#endif\n";
             Files.write(stringToRealHeader, strContent.getBytes(StandardCharsets.UTF_8));
         }
+    }
+
+    private void patchHashMapNativeMethods(Path srcRoot) throws java.io.IOException {
+        Path nativeMethods = srcRoot.resolve("nativeMethods.c");
+        if (!Files.exists(nativeMethods)) {
+            return;
+        }
+
+        String content = Files.readString(nativeMethods);
+
+        content = content.replaceFirst("#include \\\"java_lang_System.h\\\"\\n\\n",
+                "#include \"java_lang_System.h\"\n\nJAVA_OBJECT java_lang_Class_getName___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls);\nJAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT t);\n\n");
+
+        Pattern areEqualKeys = Pattern.compile(
+                "JAVA_BOOLEAN java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_R_boolean\\(.*?\n}\n",
+                Pattern.DOTALL);
+        Matcher areEqualMatcher = areEqualKeys.matcher(content);
+        if (areEqualMatcher.find()) {
+            String replacement = "JAVA_BOOLEAN java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_R_boolean(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1Arg1, JAVA_OBJECT __cn1Arg2) {\n"
+                    + "    if (__cn1Arg1 == __cn1Arg2) {\n"
+                    + "        return JAVA_TRUE;\n"
+                    + "    }\n"
+                    + "    return java_lang_Object_equals___java_lang_Object_R_boolean(threadStateData, __cn1Arg1, __cn1Arg2);\n"
+                    + "}\n";
+            content = areEqualMatcher.replaceFirst(Matcher.quoteReplacement(replacement));
+        }
+
+        Pattern stringHash = Pattern.compile(
+                "JAVA_INT java_lang_String_hashCode___R_int\\(.*?\n}\n",
+                Pattern.DOTALL);
+        Matcher hashMatcher = stringHash.matcher(content);
+        if (hashMatcher.find()) {
+            String replacement = "JAVA_INT java_lang_String_hashCode___R_int(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject) {\n"
+                    + "    struct obj__java_lang_String* t = (struct obj__java_lang_String*)__cn1ThisObject;\n"
+                    + "    JAVA_INT hash = 0;\n"
+                    + "    if (t->java_lang_String_count == 0) {\n"
+                    + "        return 0;\n"
+                    + "    }\n"
+                    + "    JAVA_INT end = t->java_lang_String_count + t->java_lang_String_offset;\n"
+                    + "    JAVA_ARRAY_CHAR* chars = (JAVA_ARRAY_CHAR*)((JAVA_ARRAY)t->java_lang_String_value)->data;\n"
+                    + "    for (JAVA_INT i = t->java_lang_String_offset; i < end; ++i) {\n"
+                    + "        hash = 31 * hash + chars[i];\n"
+                    + "    }\n"
+                    + "    return hash;\n"
+                    + "}\n";
+            content = hashMatcher.replaceFirst(Matcher.quoteReplacement(replacement));
+        }
+
+        Pattern findEntry = Pattern.compile(
+                "JAVA_OBJECT java_util_HashMap_findNonNullKeyEntry___java_lang_Object_int_int_R_java_util_HashMap_Entry\\(.*?\n}\n",
+                Pattern.DOTALL);
+        Matcher matcher = findEntry.matcher(content);
+        if (matcher.find()) {
+            String replacement = "JAVA_OBJECT java_util_HashMap_findNonNullKeyEntry___java_lang_Object_int_int_R_java_util_HashMap_Entry(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT  __cn1ThisObject, JAVA_OBJECT key, JAVA_INT index, JAVA_INT keyHash) {\n"
+                    + "    struct obj__java_util_HashMap* t = (struct obj__java_util_HashMap*)__cn1ThisObject;\n"
+                    + "    struct obj__java_util_HashMap_Entry* m = (struct obj__java_util_HashMap_Entry*)t->java_util_HashMap_head;\n"
+                    + "    while (m != 0 && (m->java_util_HashMap_Entry_origKeyHash != keyHash || !java_util_HashMap_areEqualKeys___java_lang_Object_java_lang_Object_R_boolean(threadStateData, key, m->java_util_HashMap_Entry_key))) {\n"
+                    + "        m = (struct obj__java_util_HashMap_Entry*)m->java_util_HashMap_Entry_next;\n"
+                    + "    }\n"
+                    + "    return (JAVA_OBJECT)m;\n"
+                    + "}\n";
+            content = matcher.replaceFirst(Matcher.quoteReplacement(replacement));
+        }
+
+        Files.write(nativeMethods, content.getBytes(StandardCharsets.UTF_8));
     }
 }
