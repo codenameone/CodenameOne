@@ -275,17 +275,17 @@ public class XMLParser {
             notifyError(ParserCallback.ERROR_NO_ROOTS, null, null, null, "XML document contains no root element.");
             return null;
         } else if (rootElement.getNumChildren() > 1) {
-            String roots = "";
+            StringBuilder roots = new StringBuilder();
             for (int i = 1; i < rootElement.getNumChildren(); i++) {
                 Element elem = rootElement.getChildAt(i);
                 if (elem.isTextElement()) {
-                    roots += "Text (" + elem.getText() + "),";
+                    roots.append("Text (").append(elem.getText()).append("),");
                 } else {
-                    roots += elem.getTagName() + ",";
+                    roots.append(elem.getTagName()).append(",");
                 }
             }
-            if (roots.endsWith(",")) {
-                roots = roots.substring(0, roots.length() - 1);
+            if (roots.length() > 0 && roots.charAt(roots.length() - 1) == ',') {
+                roots.setLength(roots.length() - 1);
             }
 
             Element firstRoot = rootElement.getChildAt(0);

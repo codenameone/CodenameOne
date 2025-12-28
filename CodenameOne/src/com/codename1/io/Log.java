@@ -335,10 +335,12 @@ public class Log {
                 Reader r = Util.getReader(FileSystemStorage.getInstance().openInputStream(instance.getFileURL()));
                 char[] buffer = new char[1024];
                 int size = r.read(buffer);
+                StringBuilder textBuilder = new StringBuilder();
                 while (size > -1) {
-                    text += new String(buffer, 0, size);
+                    textBuilder.append(new String(buffer, 0, size));
                     size = r.read(buffer);
                 }
+                text = textBuilder.toString();
                 r.close();
             }
             return text;

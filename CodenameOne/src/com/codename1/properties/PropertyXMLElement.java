@@ -372,22 +372,22 @@ class PropertyXMLElement extends Element {
     @Override
     public String toString(String spacing) {
 
-        String str = spacing;
-        str += "<" + getTagName();
+        StringBuilder str = new StringBuilder(spacing);
+        str.append("<").append(getTagName());
         Hashtable attributes = getAttributes();
         if (attributes != null) {
             for (Enumeration e = attributes.keys(); e.hasMoreElements(); ) {
                 String attrStr = (String) e.nextElement();
                 String val = (String) attributes.get(attrStr);
-                str += " " + attrStr + "='" + val + "'";
+                str.append(" ").append(attrStr).append("='").append(val).append("'");
             }
         }
-        str += ">\n";
+        str.append(">\n");
         Vector children = getChildren();
         for (int i = 0; i < children.size(); i++) {
-            str += ((Element) children.get(i)).toString(spacing + ' ');
+            str.append(((Element) children.get(i)).toString(spacing + ' '));
         }
-        str += spacing + "</" + getTagName() + ">\n";
-        return str;
+        str.append(spacing).append("</").append(getTagName()).append(">\n");
+        return str.toString();
     }
 }

@@ -773,7 +773,8 @@ def main() -> None:
             "SA_FIELD_SELF_ASSIGNMENT",
             "UC_USELESS_CONDITION",
             "EC_UNRELATED_TYPES",
-            "EQ_ALWAYS_FALSE"
+            "EQ_ALWAYS_FALSE",
+            "SBSC_USE_STRINGBUFFER_CONCATENATION"
         }
         violations = [
             f for f in spotbugs.findings

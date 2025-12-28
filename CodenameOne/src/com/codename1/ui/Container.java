@@ -3095,18 +3095,18 @@ public class Container extends Component implements Iterable<Component> {
      * @return the container components objects as list of Strings
      */
     private String getComponentsNames() {
-        String ret = "[";
+        StringBuilder ret = new StringBuilder("[");
         int componentCount = components.size();
         for (int iter = 0; iter < componentCount; iter++) {
             Component cmp = components.get(iter);
             String className = cmp.getClass().getName();
-            ret += className.substring(className.lastIndexOf('.') + 1) + ", ";
+            ret.append(className.substring(className.lastIndexOf('.') + 1)).append(", ");
         }
         if (ret.length() > 1) {
-            ret = ret.substring(0, ret.length() - 2);
+            ret.setLength(ret.length() - 2);
         }
-        ret = ret + "]";
-        return ret;
+        ret.append("]");
+        return ret.toString();
     }
 
     /**

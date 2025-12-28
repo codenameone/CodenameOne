@@ -1856,13 +1856,14 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                         if (seperator != -1) {
                             String tempUrl = content.substring(seperator + 1);
 
-                            redirectURL = "";
+                            StringBuilder redirectURLBuilder = new StringBuilder();
                             for (int i = 0; i < tempUrl.length(); i++) {
                                 char ch = tempUrl.charAt(i);
                                 if (!CSSParser.isWhiteSpace(ch)) {
-                                    redirectURL += ch;
+                                    redirectURLBuilder.append(ch);
                                 }
                             }
+                            redirectURL = redirectURLBuilder.toString();
 
                             if (redirectURL.startsWith("url=")) { // i.e. 10;url=http://....
                                 redirectURL = redirectURL.substring(4);
@@ -1986,22 +1987,22 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             return comps; //no text to show
         }
 
-        String line = "";
+        StringBuilder line = new StringBuilder();
         for (int c = 0; c < text.length(); c++) {
             char ch = text.charAt(c);
             if ((ch == 10) || (ch == 13)) {
-                if (!line.equals("")) {
-                    comps.addElement(addString(line, align));
+                if (line.length() > 0) {
+                    comps.addElement(addString(line.toString(), align));
                     newLine(align);
-                    line = "";
+                    line.setLength(0);
                 }
             } else {
-                line += ch;
+                line.append(ch);
             }
 
         }
-        if (!line.equals("")) {
-            comps.addElement(addString(line, align));
+        if (line.length() > 0) {
+            comps.addElement(addString(line.toString(), align));
             newLine(align);
         }
         return comps;
@@ -2009,8 +2010,8 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     Vector getWords(String text, int align, boolean returnComps) {
         Vector words = new Vector();
-        String word = "";
-        String leadSpace = "";
+        StringBuilder word = new StringBuilder();
+        StringBuilder leadSpace = new StringBuilder();
         for (int c = 0; c < text.length(); c++) {
             char ch = text.charAt(c);
             if ((CJK_SUPPORT) &&
@@ -2020,40 +2021,42 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                             //((ch>=0x20000) && (ch<=0x2a6df)) || //CJK Unified Ideographs Extension B (Rare, historic)
                             //((ch>=0x2f800) && (ch<=0x2fa1f)) //CJK Compatibility Ideographs Supplement (Unifiable variants)
                     )) { // CJK (Chinese, Japanese, Korean)
-                word += ch;
+                word.append(ch);
                 if (returnComps) {
-                    words.addElement(addString(word, align));
+                    words.addElement(addString(word.toString(), align));
                 } else {
-                    words.addElement(word);
+                    words.addElement(word.toString());
                 }
-                word = "";
+                word.setLength(0);
             } else {
                 if ((ch == ' ') || (ch == '\n') || (ch == '\r') || (ch == '\t')) {
                     if (word.length() != 0) {
                         if (returnComps) {
-                            words.addElement(addString(leadSpace + word + ' ', align));
-                            leadSpace = "";
+                            words.addElement(addString(leadSpace.toString() + word.toString() + ' ', align));
+                            leadSpace.setLength(0);
                         } else {
-                            words.addElement(word);
+                            words.addElement(word.toString());
                         }
-                        word = "";
+                        word.setLength(0);
                     } else if ((words.isEmpty()) && (text.length() > 1)) { // The first word can have a leading space (only one, all whitespaces are aggregated to one space) - Unless this is just a space with no text
-                        leadSpace = " ";
+                        leadSpace.setLength(0);
+                        leadSpace.append(' ');
                     }
-                } else if ((!returnComps) && (font.stringWidth(word + ch) > width - leftIndent)) { //break words that are longer than the component's width
-                    words.addElement(word);
-                    word = "" + ch;
+                } else if ((!returnComps) && (font.stringWidth(word.toString() + ch) > width - leftIndent)) { //break words that are longer than the component's width
+                    words.addElement(word.toString());
+                    word.setLength(0);
+                    word.append(ch);
                 } else {
-                    word += ch;
+                    word.append(ch);
                 }
             }
         }
         if ((word.length() != 0) || (leadSpace.length() != 0)) {
             if (returnComps) {
-                words.addElement(addString(leadSpace + word, align));
+                words.addElement(addString(leadSpace.toString() + word.toString(), align));
             } else {
                 if (word.length() != 0) {
-                    words.addElement(word);
+                    words.addElement(word.toString());
                 }
             }
         }
@@ -2084,32 +2087,33 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
         if (words.size() > 0) {
             int w = 0;
-            String wordStr = "";
+            StringBuilder wordStr = new StringBuilder();
             if ((CSSParser.isWhiteSpace(text.charAt(0))) && (curLine.getComponentCount() != 0)) { //leading space is trimmed if it is in the first component of the line
-                wordStr = " "; //leading space
+                wordStr.append(" "); //leading space
             }
 
             while (w < words.size()) {
                 String nextWord = (String) words.elementAt(w);
                 String space = "";
-                if ((!wordStr.equals("")) && (!wordStr.equals(" "))) {
+                if ((wordStr.length() > 0) && (!wordStr.toString().equals(" "))) {
                     space = " ";
                 }
-                if (font.stringWidth(wordStr + space + nextWord) > spaceW - 2) {
-                    comps.addElement(addString(wordStr, align));
+                if (font.stringWidth(wordStr.toString() + space + nextWord) > spaceW - 2) {
+                    comps.addElement(addString(wordStr.toString(), align));
                     newLineIfNotEmpty(align);
                     spaceW = width - x;
-                    wordStr = nextWord;
+                    wordStr.setLength(0);
+                    wordStr.append(nextWord);
                 } else {
-                    wordStr += space + nextWord;
+                    wordStr.append(space).append(nextWord);
                 }
                 w++;
             }
             if (CSSParser.isWhiteSpace(text.charAt(text.length() - 1))) {
-                wordStr += " "; //trailing space
+                wordStr.append(" "); //trailing space
             }
 
-            comps.addElement(addString(wordStr, align));
+            comps.addElement(addString(wordStr.toString(), align));
         }
 
         return comps;
@@ -2221,17 +2225,17 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                         int spacesToAdd = (width - lbl.getPreferredW()) / spaceW;
                         int spacesPerWord = spacesToAdd / (words.size() - 1);
                         int addtlSpaces = spacesToAdd % (words.size() - 1);
-                        String newStr = (String) words.elementAt(0);
+                        StringBuilder newStr = new StringBuilder((String) words.elementAt(0));
                         for (int i = 1; i < words.size(); i++) {
                             for (int j = 0; j < spacesPerWord; j++) {
-                                newStr += ' ';
+                                newStr.append(' ');
                             }
                             if (i - 1 < addtlSpaces) {
-                                newStr += ' ';
+                                newStr.append(' ');
                             }
-                            newStr += ' ' + (String) words.elementAt(i);
+                            newStr.append(' ').append((String) words.elementAt(i));
                         }
-                        lbl.setText(newStr);
+                        lbl.setText(newStr.toString());
                     }
                 } else {
                     lbl.setPreferredW(width);
@@ -2457,7 +2461,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     supportedShape = true;
                     String coordsStr = areaTag.getAttributeById(HTMLElement.ATTR_COORDS);
                     if ((coordsStr != null) && (hrefStr != null)) {
-                        String curValStr = "";
+                        StringBuilder curValStr = new StringBuilder();
                         int[] coords = new int[4];
                         int curCoord = 0;
                         boolean error = true;
@@ -2465,15 +2469,15 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                             for (int c = 0; c < coordsStr.length(); c++) {
                                 char ch = coordsStr.charAt(c);
                                 if (ch != ',') {
-                                    curValStr += ch;
+                                    curValStr.append(ch);
                                 } else {
-                                    coords[curCoord] = Integer.parseInt(curValStr);
+                                    coords[curCoord] = Integer.parseInt(curValStr.toString());
                                     curCoord++;
-                                    curValStr = "";
+                                    curValStr.setLength(0);
                                 }
                             }
                             if (curValStr.length() > 0) {
-                                coords[curCoord] = Integer.parseInt(curValStr);
+                                coords[curCoord] = Integer.parseInt(curValStr.toString());
                                 curCoord++;
                             }
                             if (shape.equalsIgnoreCase("rect")) {

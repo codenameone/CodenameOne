@@ -320,30 +320,30 @@ class ResourceThreadQueue {
      * @return a printout of the threads queue
      */
     public String toString() {
-        String str = ("---- Running ----\n");
+        StringBuilder str = new StringBuilder("---- Running ----\n");
         int i = 1;
         for (Enumeration e = running.elements(); e.hasMoreElements(); ) {
             ResourceThread t = (ResourceThread) e.nextElement();
             if (t.imageUrl != null) {
-                str += "#" + i + ": " + t.imageUrl + "\n";
+                str.append("#").append(i).append(": ").append(t.imageUrl).append("\n");
             } else {
-                str += "#" + i + ": CSS - " + t.cssDocInfo.getUrl() + "\n";
+                str.append("#").append(i).append(": CSS - ").append(t.cssDocInfo.getUrl()).append("\n");
             }
             i++;
         }
         i = 1;
-        str += "Queue:\n";
+        str.append("Queue:\n");
         for (Enumeration e = queue.elements(); e.hasMoreElements(); ) {
             ResourceThread t = (ResourceThread) e.nextElement();
             if (t.imageUrl != null) {
-                str += "#" + i + ": " + t.imageUrl + "\n";
+                str.append("#").append(i).append(": ").append(t.imageUrl).append("\n");
             } else {
-                str += "#" + i + ": CSS - " + t.cssDocInfo.getUrl() + "\n";
+                str.append("#").append(i).append(": CSS - ").append(t.cssDocInfo.getUrl()).append("\n");
             }
             i++;
         }
-        str += "---- count:" + threadCount + " ----\n";
-        return str;
+        str.append("---- count:").append(threadCount).append(" ----\n");
+        return str.toString();
     }
 
     // Inner classes:

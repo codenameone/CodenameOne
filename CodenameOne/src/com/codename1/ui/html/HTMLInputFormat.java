@@ -323,7 +323,7 @@ class HTMLInputFormat {
      * @return a printout of a user-friendly string describing the format
      */
     public String toString() {
-        String str = "";
+        StringBuilder str = new StringBuilder();
         String followedBy = "";
         int lastType = -1;
         String lastString = "";
@@ -333,7 +333,7 @@ class HTMLInputFormat {
             if (constraint.count == FormatConstraint.COUNT_EXACTLY_ONE) {
                 if (lastType != -1) {
                     if (lastType != constraint.type) {
-                        str += followedBy + singlesCount + lastString;
+                        str.append(followedBy).append(singlesCount).append(lastString);
                         followedBy = " followed by ";
                         singlesCount = 1;
                         lastType = constraint.type;
@@ -348,13 +348,13 @@ class HTMLInputFormat {
                 }
             } else {
                 if (lastType != -1) {
-                    str += followedBy + singlesCount + lastString;
+                    str.append(followedBy).append(singlesCount).append(lastString);
                     followedBy = " followed by ";
                     lastType = -1;
                     singlesCount = 0;
                     lastString = "";
                 }
-                str += followedBy + constraint;
+                str.append(followedBy).append(constraint);
                 followedBy = " followed by ";
 
             }
@@ -363,10 +363,10 @@ class HTMLInputFormat {
         }
 
         if (lastType != -1) {
-            str += followedBy + singlesCount + lastString;
+            str.append(followedBy).append(singlesCount).append(lastString);
         }
 
-        return str;
+        return str.toString();
     }
 
     // Inner classes:
@@ -448,45 +448,45 @@ class HTMLInputFormat {
          * @return a printout of a user-friendly string describing this constraint
          */
         public String toString() {
-            String str = "";
+            StringBuilder str = new StringBuilder();
             if (count == COUNT_EXACTLY_ONE) {
-                //str+="";
+                //str.append("");
             } else if (count == COUNT_NO_LIMIT) {
-                str += UIManager.getInstance().localize("html.format.anynumber", "any number of");
+                str.append(UIManager.getInstance().localize("html.format.anynumber", "any number of"));
             } else {
-                str += UIManager.getInstance().localize("html.format.upto", "up to") + " " + count;
+                str.append(UIManager.getInstance().localize("html.format.upto", "up to")).append(" ").append(count);
             }
-            str += " ";
+            str.append(" ");
             String orString = " " + UIManager.getInstance().localize("html.format.or", "or") + " ";
             String or = "";
             if ((type & TYPE_ANY) != 0) {
-                str += "any";
+                str.append("any");
             } else {
                 if ((type & TYPE_LOWERCASE) != 0) {
-                    str += UIManager.getInstance().localize("html.format.lowercase", "lowercase");
+                    str.append(UIManager.getInstance().localize("html.format.lowercase", "lowercase"));
                     or = orString;
                 }
                 if ((type & TYPE_UPPERCASE) != 0) {
-                    str += or + UIManager.getInstance().localize("html.format.uppercase", "uppercase");
+                    str.append(or).append(UIManager.getInstance().localize("html.format.uppercase", "uppercase"));
                     or = orString;
                 }
                 if ((type & TYPE_NUMERIC) != 0) {
-                    str += or + UIManager.getInstance().localize("html.format.numeric", "numeric");
+                    str.append(or).append(UIManager.getInstance().localize("html.format.numeric", "numeric"));
                     or = orString;
                 }
                 if ((type & TYPE_SYMBOL) != 0) {
-                    str += or + UIManager.getInstance().localize("html.format.symbol", "symbol");
+                    str.append(or).append(UIManager.getInstance().localize("html.format.symbol", "symbol"));
                 }
             }
-            str += " ";
+            str.append(" ");
 
             if ((count != COUNT_EXACTLY_ONE) && (count != 1)) {
-                str += UIManager.getInstance().localize("html.format.chars", "characters");
+                str.append(UIManager.getInstance().localize("html.format.chars", "characters"));
             } else {
-                str += UIManager.getInstance().localize("html.format.char", "character");
+                str.append(UIManager.getInstance().localize("html.format.char", "character"));
             }
 
-            return str;
+            return str.toString();
         }
 
     }

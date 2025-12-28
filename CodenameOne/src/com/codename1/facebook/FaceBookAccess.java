@@ -218,10 +218,12 @@ public class FaceBookAccess {
         String scope = "";
         if (permissions != null && permissions.length > 0) {
             int plen = permissions.length;
+            StringBuilder scopeBuilder = new StringBuilder();
             for (int i = 0; i < plen; i++) {
                 String permission = permissions[i];
-                scope += permission + ",";
+                scopeBuilder.append(permission).append(",");
             }
+            scope = scopeBuilder.toString();
             scope = scope.substring(0, scope.length() - 1);
         }
         Hashtable additionalParams = new Hashtable();
@@ -1221,21 +1223,21 @@ public class FaceBookAccess {
         checkAuthentication();
 
         final FacebookRESTService con = new FacebookRESTService(token, "https://api.facebook.com/method/users.getInfo", false);
-        String ids = usersIds[0];
+        StringBuilder ids = new StringBuilder(usersIds[0]);
         int ulen = usersIds.length;
         for (int i = 1; i < ulen; i++) {
-            ids += "," + usersIds[i];
+            ids.append(",").append(usersIds[i]);
 
         }
-        con.addArgumentNoEncoding("uids", ids);
+        con.addArgumentNoEncoding("uids", ids.toString());
 
-        String fieldsStr = fields[0];
+        StringBuilder fieldsStr = new StringBuilder(fields[0]);
         int flen = fields.length;
         for (int i = 1; i < flen; i++) {
-            fieldsStr += "," + fields[i];
+            fieldsStr.append(",").append(fields[i]);
 
         }
-        con.addArgumentNoEncoding("fields", fieldsStr);
+        con.addArgumentNoEncoding("fields", fieldsStr.toString());
         con.addArgument("format", "json");
 
         con.addResponseListener(new ActionListener() {

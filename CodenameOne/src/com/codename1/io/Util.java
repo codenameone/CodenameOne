@@ -2492,11 +2492,12 @@ public class Util {
 
         private static String append(String a, long in, int length) {
             int lim = (length << 2) - 4;
+            StringBuilder sb = new StringBuilder(a);
             while (lim >= 0) {
-                a += (DIGITS[(byte) (in >> lim) & 0x0f]);
+                sb.append((DIGITS[(byte) (in >> lim) & 0x0f]));
                 lim -= 4;
             }
-            return a;
+            return sb.toString();
         }
 
         private static long getUniqueDeviceID() {
@@ -2537,13 +2538,13 @@ public class Util {
          * @return
          */
         private static String sanitizeString(String input) {
-            String result = "";
+            StringBuilder result = new StringBuilder();
             for (char myChar : input.toCharArray()) {
                 if ((myChar >= '0' && myChar <= '9') || (myChar >= 'a' && myChar <= 'z') || (myChar >= 'A' && myChar <= 'Z')) {
-                    result += myChar;
+                    result.append(myChar);
                 }
             }
-            return result.substring(0, Math.min(10, result.length())).toUpperCase();
+            return result.toString().substring(0, Math.min(10, result.length())).toUpperCase();
         }
 
         /**

@@ -385,15 +385,15 @@ public class Oauth2 {
     }
 
     private String buildURL() {
-        String URL = oauth2URL + "?client_id=" + Util.encodeUrl(clientId)
-                + "&redirect_uri=" + Util.encodeUrl(redirectURI);
+        StringBuilder URL = new StringBuilder(oauth2URL + "?client_id=" + Util.encodeUrl(clientId)
+                + "&redirect_uri=" + Util.encodeUrl(redirectURI));
         if (scope != null) {
-            URL += "&scope=" + Util.encodeUrl(scope);
+            URL.append("&scope=").append(Util.encodeUrl(scope));
         }
         if (clientSecret != null) {
-            URL += "&response_type=code";
+            URL.append("&response_type=code");
         } else {
-            URL += "&response_type=token";
+            URL.append("&response_type=token");
         }
 
         if (additionalParams != null) {
@@ -401,10 +401,10 @@ public class Oauth2 {
             while (e.hasMoreElements()) {
                 String key = (String) e.nextElement();
                 String val = additionalParams.get(key).toString();
-                URL += "&" + Util.encodeUrl(key) + "=" + Util.encodeUrl(val);
+                URL.append("&").append(Util.encodeUrl(key)).append("=").append(Util.encodeUrl(val));
             }
         }
-        return URL;
+        return URL.toString();
     }
 
     private Component createLoginComponent(final ActionListener al, final Form frm, final Form backToForm, final Dialog progress) {

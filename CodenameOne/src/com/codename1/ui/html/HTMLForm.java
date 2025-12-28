@@ -262,7 +262,7 @@ class HTMLForm {
         String url = action;
         String params = null;
         if (comps.size() > 0) {
-            params = "";
+            StringBuilder paramsBuilder = new StringBuilder();
             for (Enumeration e = comps.keys(); e.hasMoreElements(); ) {
                 String key = (String) e.nextElement();
                 Object input = comps.get(key);
@@ -270,13 +270,13 @@ class HTMLForm {
                 String value = "";
                 if (input instanceof String) { //hidden
                     value = HTMLUtils.encodeString((String) input);
-                    params += key + "=" + value + "&";
+                    paramsBuilder.append(key).append("=").append(value).append("&");
                 } else if (input instanceof Hashtable) { //checkbox / radiobutton
                     Hashtable options = (Hashtable) input;
                     for (Enumeration e2 = options.keys(); e2.hasMoreElements(); ) {
                         Button b = (Button) e2.nextElement();
                         if (b.isSelected()) {
-                            params += key + "=" + HTMLUtils.encodeString((String) options.get(b)) + "&";
+                            paramsBuilder.append(key).append("=").append(HTMLUtils.encodeString((String) options.get(b))).append("&");
                         }
                     }
                 } else if (input instanceof TextArea) { //catches both textareas and text input fields
@@ -318,13 +318,13 @@ class HTMLForm {
                         text = htmlC.getHTMLCallback().fieldSubmitted(htmlC, tf, url, key, text, type, errorMsg);
                     }
                     if (errorMsg == null) {
-                        params += key + "=" + HTMLUtils.encodeString(text) + "&";
+                        paramsBuilder.append(key).append("=").append(HTMLUtils.encodeString(text)).append("&");
                     }
                 } else if (input instanceof ComboBox) { // drop down lists (single selection)
                     Object item = ((ComboBox) input).getSelectedItem();
                     if (item instanceof OptionItem) {
                         value = ((OptionItem) item).getValue();
-                        params += key + "=" + HTMLUtils.encodeString(value) + "&";
+                        paramsBuilder.append(key).append("=").append(HTMLUtils.encodeString(value)).append("&");
                     } // if not - value may be an OPTGROUP label in an only optgroup combobox
                 } else if (input instanceof MultiComboBox) { // drop down lists (multiple selection)
                     Vector selected = ((MultiComboBox) input).getSelected();
@@ -332,16 +332,17 @@ class HTMLForm {
                         Object item = selected.elementAt(i);
                         if (item instanceof OptionItem) {
                             value = ((OptionItem) item).getValue();
-                            params += key + "=" + HTMLUtils.encodeString(value) + "&";
+                            paramsBuilder.append(key).append("=").append(HTMLUtils.encodeString(value)).append("&");
                         } // if not - value may be an OPTGROUP label in an only optgroup combobox
                     }
                 }
 
             }
 
-            if (params.endsWith("&")) { //trim the extra &
-                params = params.substring(0, params.length() - 1);
+            if (paramsBuilder.length() > 0 && paramsBuilder.charAt(paramsBuilder.length() - 1) == '&') { //trim the extra &
+                paramsBuilder.setLength(paramsBuilder.length() - 1);
             }
+            params = paramsBuilder.toString();
         }
 
         // Add the submit button param, only if the key is non-null (unnamed submit buttons are not passed as parameters)
