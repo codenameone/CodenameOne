@@ -31,10 +31,9 @@ public class NodeTest extends UITestBase {
         Class<?>[] declaredClasses = Node.class.getDeclaredClasses();
         for (Class<?> cls : declaredClasses) {
             if (cls.getSimpleName().equals("RenderableContainer")) {
-                java.lang.reflect.Constructor<?> ctor = cls.getDeclaredConstructor(Node.class);
+                java.lang.reflect.Constructor<?> ctor = cls.getDeclaredConstructor();
                 ctor.setAccessible(true);
-                Node node = new Node();
-                Object instance = ctor.newInstance(node); // inner class needs outer instance
+                Object instance = ctor.newInstance();
 
                 // Invoke render method
                 java.lang.reflect.Method render = cls.getDeclaredMethod("render", Graphics.class);
