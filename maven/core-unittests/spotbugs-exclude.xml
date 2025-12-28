@@ -78,4 +78,8 @@
         <Class name="~com\.codename1\.io\.Socket.*" />
         <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE" />
     </Match>
+    <Match>
+        <Class name="~com\.codename1\.io\.gzip\.InfBlocks.*" />
+        <Bug pattern="SA_FIELD_SELF_ASSIGNMENT" />
+    </Match>
 </FindBugsFilter>
