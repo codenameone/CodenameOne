@@ -2231,7 +2231,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
 
             StringBuilder existingBuilder = new StringBuilder(existing);
             for (String tag : tags) {
-                if (existingBuilder.indexOf(" " + tag + " ") == -1) {
+                if (existingBuilder.toString().indexOf(" " + tag + " ") == -1) {
                     existingBuilder.append(" ").append(tag).append(" ");
                 }
             }
