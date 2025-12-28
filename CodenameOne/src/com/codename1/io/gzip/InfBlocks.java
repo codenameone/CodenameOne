@@ -150,12 +150,18 @@ final class InfBlocks {
                         if (n != 0) {
                             r = Z_OK;
                         } else {
-                            bitb = b;
-                            bitk = k;
+                            if (bitb != b) {
+                                bitb = b;
+                            }
+                            if (bitk != k) {
+                                bitk = k;
+                            }
                             z.avail_in = n;
                             z.total_in += p - z.next_in_index;
                             z.next_in_index = p;
-                            write = q;
+                            if (write != q) {
+                                write = q;
+                            }
                             return inflate_flush(r);
                         }
                         n--;
@@ -214,7 +220,6 @@ final class InfBlocks {
                         z.avail_in = n;
                         z.total_in += p - z.next_in_index;
                         z.next_in_index = p;
-                        write = q;
                         return inflate_flush(r);
                     }
                     break;
@@ -247,7 +252,9 @@ final class InfBlocks {
                         z.avail_in = n;
                         z.total_in += p - z.next_in_index;
                         z.next_in_index = p;
-                        write = q;
+                        if (write != q) {
+                            write = q;
+                        }
                         return inflate_flush(r);
                     }
                     left = (b & 0xffff);
@@ -261,7 +268,9 @@ final class InfBlocks {
                         z.avail_in = n;
                         z.total_in += p - z.next_in_index;
                         z.next_in_index = p;
-                        write = q;
+                        if (write != q) {
+                            write = q;
+                        }
                         return inflate_flush(r);
                     }
 
@@ -564,7 +573,9 @@ final class InfBlocks {
                         z.avail_in = n;
                         z.total_in += p - z.next_in_index;
                         z.next_in_index = p;
-                        write = q;
+                        if (write != q) {
+                            write = q;
+                        }
                         return inflate_flush(r);
                     }
                     mode = DONE;

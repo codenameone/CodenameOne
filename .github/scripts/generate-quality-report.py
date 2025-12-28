@@ -778,7 +778,6 @@ def main() -> None:
         violations = [
             f for f in spotbugs.findings
             if f.rule in forbidden_rules
-            and not (f.rule == "SA_FIELD_SELF_ASSIGNMENT" and "InfBlocks.java" in f.location)
         ]
         if violations:
             print("\n❌ Build failed due to forbidden SpotBugs violations:")
