@@ -1856,13 +1856,14 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                         if (seperator != -1) {
                             String tempUrl = content.substring(seperator + 1);
 
-                            redirectURL = "";
+                            StringBuilder redirectURLBuilder = new StringBuilder();
                             for (int i = 0; i < tempUrl.length(); i++) {
                                 char ch = tempUrl.charAt(i);
                                 if (!CSSParser.isWhiteSpace(ch)) {
-                                    redirectURL += ch;
+                                    redirectURLBuilder.append(ch);
                                 }
                             }
+                            redirectURL = redirectURLBuilder.toString();
 
                             if (redirectURL.startsWith("url=")) { // i.e. 10;url=http://....
                                 redirectURL = redirectURL.substring(4);
@@ -1986,22 +1987,22 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             return comps; //no text to show
         }
 
-        String line = "";
+        StringBuilder line = new StringBuilder();
         for (int c = 0; c < text.length(); c++) {
             char ch = text.charAt(c);
             if ((ch == 10) || (ch == 13)) {
-                if (!line.equals("")) {
-                    comps.addElement(addString(line, align));
+                if (line.length() > 0) {
+                    comps.addElement(addString(line.toString(), align));
                     newLine(align);
-                    line = "";
+                    line.setLength(0);
                 }
             } else {
-                line += ch;
+                line.append(ch);
             }
 
         }
-        if (!line.equals("")) {
-            comps.addElement(addString(line, align));
+        if (line.length() > 0) {
+            comps.addElement(addString(line.toString(), align));
             newLine(align);
         }
         return comps;
@@ -2086,32 +2087,33 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
         if (words.size() > 0) {
             int w = 0;
-            String wordStr = "";
+            StringBuilder wordStr = new StringBuilder();
             if ((CSSParser.isWhiteSpace(text.charAt(0))) && (curLine.getComponentCount() != 0)) { //leading space is trimmed if it is in the first component of the line
-                wordStr = " "; //leading space
+                wordStr.append(" "); //leading space
             }
 
             while (w < words.size()) {
                 String nextWord = (String) words.elementAt(w);
                 String space = "";
-                if ((!wordStr.equals("")) && (!wordStr.equals(" "))) {
+                if ((wordStr.length() > 0) && (!wordStr.toString().equals(" "))) {
                     space = " ";
                 }
-                if (font.stringWidth(wordStr + space + nextWord) > spaceW - 2) {
-                    comps.addElement(addString(wordStr, align));
+                if (font.stringWidth(wordStr.toString() + space + nextWord) > spaceW - 2) {
+                    comps.addElement(addString(wordStr.toString(), align));
                     newLineIfNotEmpty(align);
                     spaceW = width - x;
-                    wordStr = nextWord;
+                    wordStr.setLength(0);
+                    wordStr.append(nextWord);
                 } else {
-                    wordStr += space + nextWord;
+                    wordStr.append(space).append(nextWord);
                 }
                 w++;
             }
             if (CSSParser.isWhiteSpace(text.charAt(text.length() - 1))) {
-                wordStr += " "; //trailing space
+                wordStr.append(" "); //trailing space
             }
 
-            comps.addElement(addString(wordStr, align));
+            comps.addElement(addString(wordStr.toString(), align));
         }
 
         return comps;
@@ -2459,7 +2461,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     supportedShape = true;
                     String coordsStr = areaTag.getAttributeById(HTMLElement.ATTR_COORDS);
                     if ((coordsStr != null) && (hrefStr != null)) {
-                        String curValStr = "";
+                        StringBuilder curValStr = new StringBuilder();
                         int[] coords = new int[4];
                         int curCoord = 0;
                         boolean error = true;
@@ -2467,15 +2469,15 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                             for (int c = 0; c < coordsStr.length(); c++) {
                                 char ch = coordsStr.charAt(c);
                                 if (ch != ',') {
-                                    curValStr += ch;
+                                    curValStr.append(ch);
                                 } else {
-                                    coords[curCoord] = Integer.parseInt(curValStr);
+                                    coords[curCoord] = Integer.parseInt(curValStr.toString());
                                     curCoord++;
-                                    curValStr = "";
+                                    curValStr.setLength(0);
                                 }
                             }
                             if (curValStr.length() > 0) {
-                                coords[curCoord] = Integer.parseInt(curValStr);
+                                coords[curCoord] = Integer.parseInt(curValStr.toString());
                                 curCoord++;
                             }
                             if (shape.equalsIgnoreCase("rect")) {
