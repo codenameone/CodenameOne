@@ -1,0 +1,2571 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Util.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">Util.java</span></div><h1>Util.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.io;
+
+import com.codename1.components.InfiniteProgress;
+import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.io.gzip.GZConnectionRequest;
+import com.codename1.l10n.ParseException;
+import com.codename1.l10n.SimpleDateFormat;
+import com.codename1.properties.PropertyBusinessObject;
+import com.codename1.ui.CN;
+import com.codename1.ui.Dialog;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Image;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.util.AsyncResource;
+import com.codename1.util.Base64;
+import com.codename1.util.CallbackAdapter;
+import com.codename1.util.EasyThread;
+import com.codename1.util.FailureCallback;
+import com.codename1.util.OnComplete;
+import com.codename1.util.SuccessCallback;
+import com.codename1.util.Wrapper;
+
+import java.io.ByteArrayOutputStream;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Reader;
+import java.io.Writer;
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Hashtable;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.Vector;
+
+/**
+ * Various utility methods used for HTTP/IO operations
+ *
+ * @author Shai Almog
+ */
+<span class="nc" id="L76">public class Util {</span>
+<span class="fc" id="L77">    private static final Random downloadUrlSafelyRandom = new Random(System.currentTimeMillis());</span>
+    private static CodenameOneImplementation implInstance;
+<span class="fc" id="L79">    private static Hashtable externalizables = new Hashtable();</span>
+    private static boolean charArrayBugTested;
+    private static boolean charArrayBug;
+    /**
+     * Fix for RFE 427: http://java.net/jira/browse/LWUIT-427
+     * Allows determining chars that should not be encoded
+     */
+<span class="fc" id="L86">    private static String ignoreCharsWhenEncoding = &quot;&quot;;</span>
+    private static SimpleDateFormat dateFormatter;
+
+    static {
+<span class="fc" id="L90">        register(&quot;EncodedImage&quot;, EncodedImage.class);</span>
+<span class="fc" id="L91">    }</span>
+
+    /**
+     * These chars will not be encoded by the encoding method in this class
+     * as requested in RFE 427 http://java.net/jira/browse/LWUIT-427
+     *
+     * @return chars skipped
+     */
+    public static String getIgnorCharsWhileEncoding() {
+<span class="fc" id="L100">        return ignoreCharsWhenEncoding;</span>
+    }
+
+    /**
+     * These chars will not be encoded by the encoding method in this class
+     * as requested in RFE 427 http://java.net/jira/browse/LWUIT-427
+     *
+     * @param s set of characters to skip when encoding
+     */
+    public static void setIgnorCharsWhileEncoding(String s) {
+<span class="fc" id="L110">        ignoreCharsWhenEncoding = s;</span>
+<span class="fc" id="L111">    }</span>
+
+
+    /**
+     * Helper to get a reader from an input stream with UTF-8 encoding
+     * @param in the input stream
+     * @return the reader
+     */
+    public static InputStreamReader getReader(InputStream in) {
+        try {
+<span class="fc" id="L121">            return new InputStreamReader(in, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L122">        } catch(UnsupportedEncodingException e) {</span>
+            // never happens
+<span class="nc" id="L124">            throw new RuntimeException(e.toString());</span>
+        }
+    }
+
+    /**
+     * Helper to get a writer from an output stream with UTF-8 encoding
+     * @param out the output stream
+     * @return the writer
+     */
+    public static OutputStreamWriter getWriter(OutputStream out) {
+        try {
+<span class="fc" id="L135">            return new OutputStreamWriter(out, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L136">        } catch(UnsupportedEncodingException e) {</span>
+            // never happens
+<span class="nc" id="L138">            throw new RuntimeException(e.toString());</span>
+        }
+    }
+
+    /**
+     * Copy the input stream into the output stream, closes both streams when finishing or in
+     * a case of an exception
+     *
+     * @param i source
+     * @param o destination
+     */
+    public static void copy(InputStream i, OutputStream o) throws IOException {
+<span class="fc" id="L150">        copy(i, o, 8192);</span>
+<span class="fc" id="L151">    }</span>
+
+    /**
+     * Copy the input stream into the output stream, without closing the streams when done
+     *
+     * @param i          source
+     * @param o          destination
+     * @param bufferSize the size of the buffer, which should be a power of 2 large enough
+     */
+    public static void copyNoClose(InputStream i, OutputStream o, int bufferSize) throws IOException {
+<span class="fc" id="L161">        copyNoClose(i, o, bufferSize, null);</span>
+<span class="fc" id="L162">    }</span>
+
+    /**
+     * Copy the input stream into the output stream, without closing the streams when done
+     *
+     * @param i          source
+     * @param o          destination
+     * @param bufferSize the size of the buffer, which should be a power of 2 large enough
+     * @param callback   called after each copy step
+     */
+    public static void copyNoClose(InputStream i, OutputStream o, int bufferSize, IOProgressListener callback) throws IOException {
+
+<span class="fc" id="L174">        byte[] buffer = new byte[bufferSize];</span>
+<span class="fc" id="L175">        int size = i.read(buffer);</span>
+<span class="fc" id="L176">        int total = 0;</span>
+<span class="fc bfc" id="L177" title="All 2 branches covered.">        while (size &gt; -1) {</span>
+<span class="fc" id="L178">            o.write(buffer, 0, size);</span>
+<span class="fc bfc" id="L179" title="All 2 branches covered.">            if (callback != null) {</span>
+<span class="fc" id="L180">                callback.ioStreamUpdate(i, total += size);</span>
+            }
+<span class="fc" id="L182">            size = i.read(buffer);</span>
+        }
+<span class="fc" id="L184">    }</span>
+
+    /**
+     * Copy the input stream into the output stream, closes both streams when finishing or in
+     * a case of an exception
+     *
+     * @param i          source
+     * @param o          destination
+     * @param bufferSize the size of the buffer, which should be a power of 2 large enough
+     */
+    public static void copy(InputStream i, OutputStream o, int bufferSize) throws IOException {
+        try {
+<span class="fc" id="L196">            copyNoClose(i, o, bufferSize);</span>
+        } finally {
+<span class="fc" id="L198">            Util.getImplementation().cleanup(o);</span>
+<span class="fc" id="L199">            Util.getImplementation().cleanup(i);</span>
+        }
+<span class="fc" id="L201">    }</span>
+
+    /**
+     * Closes the object (connection, stream etc.) without throwing any exception, even if the
+     * object is null
+     *
+     * @param o Connection, Stream or other closeable object
+     */
+    public static void cleanup(Object o) {
+<span class="fc" id="L210">        Util.getImplementation().cleanup(o);</span>
+<span class="fc" id="L211">    }</span>
+
+    /**
+     * Reads an input stream to a string
+     *
+     * @param i the input stream
+     * @return a UTF-8 string
+     * @throws IOException thrown by the stream
+     */
+    public static String readToString(InputStream i) throws IOException {
+<span class="fc" id="L221">        return readToString(i, &quot;UTF-8&quot;);</span>
+    }
+
+    /**
+     * Reads the contents of a file to a string.
+     *
+     * @param file    The file to read.
+     * @param charset The Charset to use to write the file.
+     * @return The string read from the file.
+     * @throws IOException If the file does not exist, or cannot be read for some reason.
+     * @since 8.0
+     */
+    public static String readToString(File file, String charset) throws IOException {
+<span class="nc bnc" id="L234" title="All 2 branches missed.">        if (charset == null) charset = &quot;UTF-8&quot;;</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        if (!file.exists()) {</span>
+<span class="nc" id="L236">            throw new IOException(&quot;Failed to read file &quot; + file + &quot; because it does not exist.&quot;);</span>
+        }
+<span class="nc" id="L238">        return Util.readToString(FileSystemStorage.getInstance().openInputStream(file.getAbsolutePath()), charset);</span>
+    }
+
+    /**
+     * Reads the contents of a file to a string.  Uses UTF-8 encoding.
+     *
+     * @param file The file to read.
+     * @return The string read from the file.
+     * @throws IOException If the file does not exist, or cannot be read for some reason.
+     * @since 8.0
+     */
+    public static String readToString(File file) throws IOException {
+<span class="nc" id="L250">        return readToString(file, &quot;UTF-8&quot;);</span>
+    }
+
+    /**
+     * Writes a string to a file using UTF-8 encoding.
+     *
+     * @param file     The file to write to.
+     * @param contents The contents to write to the file.
+     * @throws IOException If it cannot write to the file for some reason.
+     * @since 8.0
+     */
+    public static void writeStringToFile(File file, String contents) throws IOException {
+<span class="nc" id="L262">        writeStringToFile(file, contents, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L263">    }</span>
+
+    /**
+     * Writes a string to a file.
+     *
+     * @param file     The file to write to.
+     * @param contents The contents to write to the file.
+     * @param charset  The charset to use.  If null, it defaults to UTF-8
+     * @throws IOException If it cannot write to the file for some reason.
+     * @since 8.0
+     */
+    public static void writeStringToFile(File file, String contents, String charset) throws IOException {
+<span class="nc bnc" id="L275" title="All 2 branches missed.">        if (charset == null) charset = &quot;UTF-8&quot;;</span>
+<span class="nc" id="L276">        OutputStream output = null;</span>
+        try {
+<span class="nc" id="L278">            output = FileSystemStorage.getInstance().openOutputStream(file.getAbsolutePath());</span>
+<span class="nc" id="L279">            output.write(contents.getBytes(charset));</span>
+        } finally {
+<span class="nc bnc" id="L281" title="All 2 branches missed.">            if (output != null) {</span>
+                try {
+<span class="nc" id="L283">                    output.close();</span>
+<span class="nc" id="L284">                } catch (Exception ex) {</span>
+<span class="nc" id="L285">                }</span>
+            }
+        }
+<span class="nc" id="L288">    }</span>
+
+    /**
+     * Reads an input stream to a string
+     *
+     * @param i        the input stream
+     * @param encoding the encoding of the stream
+     * @return a string
+     * @throws IOException thrown by the stream
+     */
+    public static String readToString(InputStream i, String encoding) throws IOException {
+<span class="fc" id="L299">        byte[] b = readInputStream(i);</span>
+<span class="fc" id="L300">        return new String(b, 0, b.length, encoding);</span>
+    }
+
+    /**
+     * Reads a reader to a string
+     *
+     * @param i        the input stream
+     * @param encoding the encoding of the stream
+     * @return a string
+     * @throws IOException thrown by the stream
+     * @since 7.0
+     */
+    public static String readToString(Reader reader) throws IOException {
+<span class="fc" id="L313">        StringBuilder sb = new StringBuilder();</span>
+<span class="fc" id="L314">        char[] buf = new char[1024];</span>
+        int len;
+<span class="fc bfc" id="L316" title="All 2 branches covered.">        while ((len = reader.read(buf)) != -1) {</span>
+<span class="fc" id="L317">            sb.append(buf, 0, len);</span>
+        }
+<span class="fc" id="L319">        return sb.toString();</span>
+    }
+
+    /**
+     * Converts a small input stream to a byte array
+     *
+     * @param i the stream to convert
+     * @return byte array of the content of the stream
+     */
+    public static byte[] readInputStream(InputStream i) throws IOException {
+<span class="fc" id="L329">        ByteArrayOutputStream b = new ByteArrayOutputStream();</span>
+<span class="fc" id="L330">        copy(i, b);</span>
+<span class="fc" id="L331">        return b.toByteArray();</span>
+    }
+
+    /**
+     * &lt;p&gt;Registers this externalizable so readObject will be able to load such objects.&lt;/p&gt;
+     * &lt;p&gt;
+     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
+     * &lt;/p&gt;
+     * &lt;script src=&quot;https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js&quot;&gt;&lt;/script&gt;
+     *
+     * @param e the externalizable instance
+     */
+    public static void register(Externalizable e) {
+<span class="fc" id="L344">        externalizables.put(e.getObjectId(), e.getClass());</span>
+<span class="fc" id="L345">    }</span>
+
+    /**
+     * &lt;p&gt;Registers this externalizable so readObject will be able to load such objects.&lt;/p&gt;
+     *
+     * &lt;p&gt;
+     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
+     * &lt;/p&gt;
+     * &lt;script src=&quot;https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js&quot;&gt;&lt;/script&gt;
+     *
+     * @param id id of the externalizable
+     * @param c  the class for the externalizable
+     */
+    public static void register(String id, Class c) {
+<span class="fc" id="L359">        externalizables.put(id, c);</span>
+<span class="fc" id="L360">    }</span>
+
+    /**
+     * &lt;p&gt;Writes an object to the given output stream, notice that it should be externalizable or one of
+     * the supported types.&lt;/p&gt;
+     *
+     * &lt;p&gt;
+     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
+     * &lt;/p&gt;
+     * &lt;script src=&quot;https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js&quot;&gt;&lt;/script&gt;
+     *
+     * @param o   the object to write which can be null
+     * @param out the destination output stream
+     * @throws IOException thrown by the stream
+     */
+    public static void writeObject(Object o, DataOutputStream out) throws IOException {
+<span class="fc bfc" id="L376" title="All 2 branches covered.">        if (o == null) {</span>
+<span class="fc" id="L377">            out.writeBoolean(false);</span>
+<span class="fc" id="L378">            return;</span>
+        }
+<span class="fc" id="L380">        out.writeBoolean(true);</span>
+<span class="fc bfc" id="L381" title="All 2 branches covered.">        if (o instanceof Externalizable) {</span>
+<span class="fc" id="L382">            Externalizable e = (Externalizable) o;</span>
+<span class="fc" id="L383">            out.writeUTF(e.getObjectId());</span>
+<span class="fc" id="L384">            out.writeInt(e.getVersion());</span>
+<span class="fc" id="L385">            e.externalize(out);</span>
+<span class="fc" id="L386">            return;</span>
+        }
+<span class="pc bpc" id="L388" title="1 of 2 branches missed.">        if (o instanceof PropertyBusinessObject) {</span>
+<span class="nc" id="L389">            Externalizable e = ((PropertyBusinessObject) o).getPropertyIndex().asExternalizable();</span>
+<span class="nc" id="L390">            out.writeUTF(e.getObjectId());</span>
+<span class="nc" id="L391">            out.writeInt(e.getVersion());</span>
+<span class="nc" id="L392">            e.externalize(out);</span>
+<span class="nc" id="L393">            return;</span>
+        }
+
+<span class="fc bfc" id="L396" title="All 2 branches covered.">        if (o instanceof Vector) {</span>
+<span class="fc" id="L397">            Vector v = (Vector) o;</span>
+<span class="fc" id="L398">            out.writeUTF(&quot;java.util.Vector&quot;);</span>
+<span class="fc" id="L399">            int size = v.size();</span>
+<span class="fc" id="L400">            out.writeInt(size);</span>
+<span class="fc bfc" id="L401" title="All 2 branches covered.">            for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="fc" id="L402">                writeObject(v.elementAt(iter), out);</span>
+            }
+<span class="fc" id="L404">            return;</span>
+        }
+
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">        if (o instanceof Set) {</span>
+<span class="nc" id="L408">            Collection v = (Collection) o;</span>
+<span class="nc" id="L409">            out.writeUTF(&quot;java.util.Set&quot;);</span>
+<span class="nc" id="L410">            int size = v.size();</span>
+<span class="nc" id="L411">            out.writeInt(size);</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">            for (Object cur : v) {</span>
+<span class="nc" id="L413">                writeObject(cur, out);</span>
+<span class="nc" id="L414">            }</span>
+<span class="nc" id="L415">            return;</span>
+        }
+
+<span class="fc bfc" id="L418" title="All 2 branches covered.">        if (o instanceof Collection) {</span>
+<span class="fc" id="L419">            Collection v = (Collection) o;</span>
+<span class="fc" id="L420">            out.writeUTF(&quot;java.util.Collection&quot;);</span>
+<span class="fc" id="L421">            int size = v.size();</span>
+<span class="fc" id="L422">            out.writeInt(size);</span>
+<span class="fc bfc" id="L423" title="All 2 branches covered.">            for (Object cur : v) {</span>
+<span class="fc" id="L424">                writeObject(cur, out);</span>
+<span class="fc" id="L425">            }</span>
+<span class="fc" id="L426">            return;</span>
+        }
+
+<span class="fc bfc" id="L429" title="All 2 branches covered.">        if (o instanceof Hashtable) {</span>
+<span class="fc" id="L430">            Hashtable v = (Hashtable) o;</span>
+<span class="fc" id="L431">            out.writeUTF(&quot;java.util.Hashtable&quot;);</span>
+<span class="fc" id="L432">            out.writeInt(v.size());</span>
+<span class="fc" id="L433">            Enumeration k = v.keys();</span>
+<span class="fc bfc" id="L434" title="All 2 branches covered.">            while (k.hasMoreElements()) {</span>
+<span class="fc" id="L435">                Object key = k.nextElement();</span>
+<span class="fc" id="L436">                writeObject(key, out);</span>
+<span class="fc" id="L437">                writeObject(v.get(key), out);</span>
+<span class="fc" id="L438">            }</span>
+<span class="fc" id="L439">            return;</span>
+        }
+<span class="fc bfc" id="L441" title="All 2 branches covered.">        if (o instanceof Map) {</span>
+<span class="fc" id="L442">            Map v = (Map) o;</span>
+<span class="fc" id="L443">            out.writeUTF(&quot;java.util.Map&quot;);</span>
+<span class="fc" id="L444">            out.writeInt(v.size());</span>
+<span class="fc bfc" id="L445" title="All 2 branches covered.">            for (Object entryObj : v.entrySet()) {</span>
+<span class="fc" id="L446">                Map.Entry entry = (Map.Entry) entryObj;</span>
+<span class="fc" id="L447">                writeObject(entry.getKey(), out);</span>
+<span class="fc" id="L448">                writeObject(entry.getValue(), out);</span>
+<span class="fc" id="L449">            }</span>
+<span class="fc" id="L450">            return;</span>
+        }
+
+<span class="fc bfc" id="L453" title="All 2 branches covered.">        if (o instanceof String) {</span>
+<span class="fc" id="L454">            String v = (String) o;</span>
+<span class="fc" id="L455">            out.writeUTF(&quot;String&quot;);</span>
+<span class="fc" id="L456">            out.writeUTF(v);</span>
+<span class="fc" id="L457">            return;</span>
+        }
+
+<span class="fc bfc" id="L460" title="All 2 branches covered.">        if (o instanceof Date) {</span>
+<span class="fc" id="L461">            Date v = (Date) o;</span>
+<span class="fc" id="L462">            out.writeUTF(&quot;Date&quot;);</span>
+<span class="fc" id="L463">            out.writeLong(v.getTime());</span>
+<span class="fc" id="L464">            return;</span>
+        }
+
+<span class="fc bfc" id="L467" title="All 2 branches covered.">        if (o instanceof Integer) {</span>
+<span class="fc" id="L468">            Integer v = (Integer) o;</span>
+<span class="fc" id="L469">            out.writeUTF(&quot;int&quot;);</span>
+<span class="fc" id="L470">            out.writeInt(v.intValue());</span>
+<span class="fc" id="L471">            return;</span>
+        }
+<span class="fc bfc" id="L473" title="All 2 branches covered.">        if (o instanceof Long) {</span>
+<span class="fc" id="L474">            Long v = (Long) o;</span>
+<span class="fc" id="L475">            out.writeUTF(&quot;long&quot;);</span>
+<span class="fc" id="L476">            out.writeLong(v.longValue());</span>
+<span class="fc" id="L477">            return;</span>
+        }
+
+<span class="pc bpc" id="L480" title="1 of 2 branches missed.">        if (o instanceof Byte) {</span>
+<span class="nc" id="L481">            Byte v = (Byte) o;</span>
+<span class="nc" id="L482">            out.writeUTF(&quot;byte&quot;);</span>
+<span class="nc" id="L483">            out.writeByte(v.byteValue());</span>
+<span class="nc" id="L484">            return;</span>
+        }
+
+<span class="pc bpc" id="L487" title="1 of 2 branches missed.">        if (o instanceof Short) {</span>
+<span class="nc" id="L488">            Short v = (Short) o;</span>
+<span class="nc" id="L489">            out.writeUTF(&quot;short&quot;);</span>
+<span class="nc" id="L490">            out.writeShort(v.shortValue());</span>
+<span class="nc" id="L491">            return;</span>
+        }
+
+<span class="fc bfc" id="L494" title="All 2 branches covered.">        if (o instanceof Float) {</span>
+<span class="fc" id="L495">            Float v = (Float) o;</span>
+<span class="fc" id="L496">            out.writeUTF(&quot;float&quot;);</span>
+<span class="fc" id="L497">            out.writeFloat(v.floatValue());</span>
+<span class="fc" id="L498">            return;</span>
+        }
+
+<span class="fc bfc" id="L501" title="All 2 branches covered.">        if (o instanceof Double) {</span>
+<span class="fc" id="L502">            Double v = (Double) o;</span>
+<span class="fc" id="L503">            out.writeUTF(&quot;double&quot;);</span>
+<span class="fc" id="L504">            out.writeDouble(v.doubleValue());</span>
+<span class="fc" id="L505">            return;</span>
+        }
+
+<span class="fc bfc" id="L508" title="All 2 branches covered.">        if (o instanceof Boolean) {</span>
+<span class="fc" id="L509">            Boolean v = (Boolean) o;</span>
+<span class="fc" id="L510">            out.writeUTF(&quot;bool&quot;);</span>
+<span class="fc" id="L511">            out.writeBoolean(v.booleanValue());</span>
+<span class="fc" id="L512">            return;</span>
+        }
+
+<span class="pc bpc" id="L515" title="1 of 2 branches missed.">        if (o instanceof EncodedImage) {</span>
+<span class="nc" id="L516">            out.writeUTF(&quot;EncodedImage&quot;);</span>
+<span class="nc" id="L517">            EncodedImage e = (EncodedImage) o;</span>
+<span class="nc" id="L518">            out.writeInt(e.getWidth());</span>
+<span class="nc" id="L519">            out.writeInt(e.getHeight());</span>
+<span class="nc" id="L520">            out.writeBoolean(e.isOpaque());</span>
+<span class="nc" id="L521">            byte[] b = e.getImageData();</span>
+<span class="nc" id="L522">            out.writeInt(b.length);</span>
+<span class="nc" id="L523">            out.write(b);</span>
+<span class="nc" id="L524">            return;</span>
+        }
+
+<span class="fc bfc" id="L527" title="All 2 branches covered.">        if (instanceofObjArray(o)) {</span>
+<span class="fc" id="L528">            Object[] v = (Object[]) o;</span>
+<span class="fc" id="L529">            out.writeUTF(&quot;ObjectArray&quot;);</span>
+<span class="fc" id="L530">            int size = v.length;</span>
+<span class="fc" id="L531">            out.writeInt(size);</span>
+<span class="fc bfc" id="L532" title="All 2 branches covered.">            for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="fc" id="L533">                writeObject(v[iter], out);</span>
+            }
+<span class="fc" id="L535">            return;</span>
+        }
+<span class="pc bpc" id="L537" title="1 of 2 branches missed.">        if (instanceofByteArray(o)) {</span>
+<span class="fc" id="L538">            byte[] v = (byte[]) o;</span>
+<span class="fc" id="L539">            out.writeUTF(&quot;ByteArray&quot;);</span>
+<span class="fc" id="L540">            int size = v.length;</span>
+<span class="fc" id="L541">            out.writeInt(size);</span>
+<span class="fc" id="L542">            out.write(v);</span>
+<span class="fc" id="L543">            return;</span>
+        }
+<span class="nc bnc" id="L545" title="All 2 branches missed.">        if (instanceofShortArray(o)) {</span>
+<span class="nc" id="L546">            short[] v = (short[]) o;</span>
+<span class="nc" id="L547">            out.writeUTF(&quot;ShortArray&quot;);</span>
+<span class="nc" id="L548">            int size = v.length;</span>
+<span class="nc" id="L549">            out.writeInt(size);</span>
+<span class="nc bnc" id="L550" title="All 2 branches missed.">            for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc" id="L551">                out.writeShort(v[iter]);</span>
+            }
+<span class="nc" id="L553">            return;</span>
+        }
+<span class="nc bnc" id="L555" title="All 2 branches missed.">        if (instanceofDoubleArray(o)) {</span>
+<span class="nc" id="L556">            double[] v = (double[]) o;</span>
+<span class="nc" id="L557">            out.writeUTF(&quot;DoubleArray&quot;);</span>
+<span class="nc" id="L558">            int size = v.length;</span>
+<span class="nc" id="L559">            out.writeInt(size);</span>
+<span class="nc bnc" id="L560" title="All 2 branches missed.">            for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc" id="L561">                out.writeDouble(v[iter]);</span>
+            }
+<span class="nc" id="L563">            return;</span>
+        }
+<span class="nc bnc" id="L565" title="All 2 branches missed.">        if (instanceofFloatArray(o)) {</span>
+<span class="nc" id="L566">            float[] v = (float[]) o;</span>
+<span class="nc" id="L567">            out.writeUTF(&quot;FloatArray&quot;);</span>
+<span class="nc" id="L568">            int size = v.length;</span>
+<span class="nc" id="L569">            out.writeInt(size);</span>
+<span class="nc bnc" id="L570" title="All 2 branches missed.">            for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc" id="L571">                out.writeFloat(v[iter]);</span>
+            }
+<span class="nc" id="L573">            return;</span>
+        }
+<span class="nc bnc" id="L575" title="All 2 branches missed.">        if (instanceofIntArray(o)) {</span>
+<span class="nc" id="L576">            int[] v = (int[]) o;</span>
+<span class="nc" id="L577">            out.writeUTF(&quot;IntArray&quot;);</span>
+<span class="nc" id="L578">            int size = v.length;</span>
+<span class="nc" id="L579">            out.writeInt(size);</span>
+<span class="nc bnc" id="L580" title="All 2 branches missed.">            for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc" id="L581">                out.writeInt(v[iter]);</span>
+            }
+<span class="nc" id="L583">            return;</span>
+        }
+<span class="nc bnc" id="L585" title="All 2 branches missed.">        if (instanceofLongArray(o)) {</span>
+<span class="nc" id="L586">            long[] v = (long[]) o;</span>
+<span class="nc" id="L587">            out.writeUTF(&quot;LongArray&quot;);</span>
+<span class="nc" id="L588">            int size = v.length;</span>
+<span class="nc" id="L589">            out.writeInt(size);</span>
+<span class="nc bnc" id="L590" title="All 2 branches missed.">            for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc" id="L591">                out.writeLong(v[iter]);</span>
+            }
+<span class="nc" id="L593">            return;</span>
+        }
+
+<span class="nc" id="L596">        throw new IOException(&quot;Object type not supported: &quot; + o.getClass().getName()</span>
+                + &quot; value: &quot; + o);
+    }
+
+    /**
+     * This method allows working around &lt;a href=&quot;http://code.google.com/p/codenameone/issues/detail?id=58&quot;&gt;issue 58&lt;/a&gt;
+     *
+     * @param o object to test
+     * @return true if it matches the state
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
+     * once the bug is fixed
+     */
+    public static boolean instanceofObjArray(Object o) {
+<span class="fc" id="L609">        return getImplementation().instanceofObjArray(o);</span>
+    }
+
+    /**
+     * This method allows working around &lt;a href=&quot;http://code.google.com/p/codenameone/issues/detail?id=58&quot;&gt;issue 58&lt;/a&gt;
+     *
+     * @param o object to test
+     * @return true if it matches the state
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
+     * once the bug is fixed
+     */
+    public static boolean instanceofByteArray(Object o) {
+<span class="fc" id="L621">        return getImplementation().instanceofByteArray(o);</span>
+    }
+
+    /**
+     * This method allows working around &lt;a href=&quot;http://code.google.com/p/codenameone/issues/detail?id=58&quot;&gt;issue 58&lt;/a&gt;
+     *
+     * @param o object to test
+     * @return true if it matches the state
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
+     * once the bug is fixed
+     */
+    public static boolean instanceofShortArray(Object o) {
+<span class="nc" id="L633">        return getImplementation().instanceofShortArray(o);</span>
+    }
+
+    /**
+     * This method allows working around &lt;a href=&quot;http://code.google.com/p/codenameone/issues/detail?id=58&quot;&gt;issue 58&lt;/a&gt;
+     *
+     * @param o object to test
+     * @return true if it matches the state
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
+     * once the bug is fixed
+     */
+    public static boolean instanceofLongArray(Object o) {
+<span class="nc" id="L645">        return getImplementation().instanceofLongArray(o);</span>
+    }
+
+    /**
+     * This method allows working around &lt;a href=&quot;http://code.google.com/p/codenameone/issues/detail?id=58&quot;&gt;issue 58&lt;/a&gt;
+     *
+     * @param o object to test
+     * @return true if it matches the state
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
+     * once the bug is fixed
+     */
+    public static boolean instanceofIntArray(Object o) {
+<span class="nc" id="L657">        return getImplementation().instanceofIntArray(o);</span>
+    }
+
+    /**
+     * This method allows working around &lt;a href=&quot;http://code.google.com/p/codenameone/issues/detail?id=58&quot;&gt;issue 58&lt;/a&gt;
+     *
+     * @param o object to test
+     * @return true if it matches the state
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
+     * once the bug is fixed
+     */
+    public static boolean instanceofFloatArray(Object o) {
+<span class="nc" id="L669">        return getImplementation().instanceofFloatArray(o);</span>
+    }
+
+    /**
+     * This method allows working around &lt;a href=&quot;http://code.google.com/p/codenameone/issues/detail?id=58&quot;&gt;issue 58&lt;/a&gt;
+     *
+     * @param o object to test
+     * @return true if it matches the state
+     * @deprecated this method serves as a temporary workaround for an XMLVM bug and will be removed
+     * once the bug is fixed
+     */
+    public static boolean instanceofDoubleArray(Object o) {
+<span class="nc" id="L681">        return getImplementation().instanceofDoubleArray(o);</span>
+    }
+
+    /**
+     * &lt;p&gt;Reads an object from the stream, notice that this is the inverse of the
+     * {@link #writeObject(java.lang.Object, java.io.DataOutputStream)}.&lt;/p&gt;
+     *
+     * &lt;p&gt;
+     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
+     * &lt;/p&gt;
+     * &lt;script src=&quot;https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js&quot;&gt;&lt;/script&gt;
+     *
+     * @param input the source input stream
+     * @throws IOException thrown by the stream
+     */
+    public static Object readObject(DataInputStream input) throws IOException {
+        try {
+<span class="fc bfc" id="L698" title="All 2 branches covered.">            if (!input.readBoolean()) {</span>
+<span class="fc" id="L699">                return null;</span>
+            }
+<span class="fc" id="L701">            String type = input.readUTF();</span>
+<span class="fc bfc" id="L702" title="All 2 branches covered.">            if (&quot;int&quot;.equals(type)) {</span>
+<span class="fc" id="L703">                return new Integer(input.readInt());</span>
+            }
+<span class="pc bpc" id="L705" title="1 of 2 branches missed.">            if (&quot;byte&quot;.equals(type)) {</span>
+<span class="nc" id="L706">                return new Byte(input.readByte());</span>
+            }
+<span class="pc bpc" id="L708" title="1 of 2 branches missed.">            if (&quot;short&quot;.equals(type)) {</span>
+<span class="nc" id="L709">                return new Short(input.readShort());</span>
+            }
+<span class="pc bpc" id="L711" title="1 of 2 branches missed.">            if (&quot;long&quot;.equals(type)) {</span>
+<span class="nc" id="L712">                return new Long(input.readLong());</span>
+            }
+<span class="pc bpc" id="L714" title="1 of 2 branches missed.">            if (&quot;float&quot;.equals(type)) {</span>
+<span class="nc" id="L715">                return new Float(input.readFloat());</span>
+            }
+<span class="pc bpc" id="L717" title="1 of 2 branches missed.">            if (&quot;double&quot;.equals(type)) {</span>
+<span class="nc" id="L718">                return new Double(input.readDouble());</span>
+            }
+<span class="pc bpc" id="L720" title="1 of 2 branches missed.">            if (&quot;bool&quot;.equals(type)) {</span>
+<span class="nc" id="L721">                return new Boolean(input.readBoolean());</span>
+            }
+<span class="fc bfc" id="L723" title="All 2 branches covered.">            if (&quot;String&quot;.equals(type)) {</span>
+<span class="fc" id="L724">                return input.readUTF();</span>
+            }
+<span class="fc bfc" id="L726" title="All 2 branches covered.">            if (&quot;Date&quot;.equals(type)) {</span>
+<span class="fc" id="L727">                return new Date(input.readLong());</span>
+            }
+
+<span class="pc bpc" id="L730" title="1 of 2 branches missed.">            if (&quot;ObjectArray&quot;.equals(type)) {</span>
+<span class="nc" id="L731">                Object[] v = new Object[input.readInt()];</span>
+<span class="nc" id="L732">                int vlen = v.length;</span>
+<span class="nc bnc" id="L733" title="All 2 branches missed.">                for (int iter = 0; iter &lt; vlen; iter++) {</span>
+<span class="nc" id="L734">                    v[iter] = readObject(input);</span>
+                }
+<span class="nc" id="L736">                return v;</span>
+            }
+<span class="pc bpc" id="L738" title="1 of 2 branches missed.">            if (&quot;ByteArray&quot;.equals(type)) {</span>
+<span class="nc" id="L739">                byte[] v = new byte[input.readInt()];</span>
+<span class="nc" id="L740">                input.readFully(v);</span>
+<span class="nc" id="L741">                return v;</span>
+            }
+<span class="pc bpc" id="L743" title="1 of 2 branches missed.">            if (&quot;LongArray&quot;.equals(type)) {</span>
+<span class="nc" id="L744">                long[] v = new long[input.readInt()];</span>
+<span class="nc" id="L745">                int vlen = v.length;</span>
+<span class="nc bnc" id="L746" title="All 2 branches missed.">                for (int iter = 0; iter &lt; vlen; iter++) {</span>
+<span class="nc" id="L747">                    v[iter] = input.readLong();</span>
+                }
+<span class="nc" id="L749">                return v;</span>
+            }
+<span class="pc bpc" id="L751" title="1 of 2 branches missed.">            if (&quot;ShortArray&quot;.equals(type)) {</span>
+<span class="nc" id="L752">                short[] v = new short[input.readInt()];</span>
+<span class="nc" id="L753">                int vlen = v.length;</span>
+<span class="nc bnc" id="L754" title="All 2 branches missed.">                for (int iter = 0; iter &lt; vlen; iter++) {</span>
+<span class="nc" id="L755">                    v[iter] = input.readShort();</span>
+                }
+<span class="nc" id="L757">                return v;</span>
+            }
+<span class="pc bpc" id="L759" title="1 of 2 branches missed.">            if (&quot;DoubleArray&quot;.equals(type)) {</span>
+<span class="nc" id="L760">                double[] v = new double[input.readInt()];</span>
+<span class="nc" id="L761">                int vlen = v.length;</span>
+<span class="nc bnc" id="L762" title="All 2 branches missed.">                for (int iter = 0; iter &lt; vlen; iter++) {</span>
+<span class="nc" id="L763">                    v[iter] = input.readDouble();</span>
+                }
+<span class="nc" id="L765">                return v;</span>
+            }
+<span class="pc bpc" id="L767" title="1 of 2 branches missed.">            if (&quot;FloatArray&quot;.equals(type)) {</span>
+<span class="nc" id="L768">                float[] v = new float[input.readInt()];</span>
+<span class="nc" id="L769">                int vlen = v.length;</span>
+<span class="nc bnc" id="L770" title="All 2 branches missed.">                for (int iter = 0; iter &lt; vlen; iter++) {</span>
+<span class="nc" id="L771">                    v[iter] = input.readFloat();</span>
+                }
+<span class="nc" id="L773">                return v;</span>
+            }
+<span class="pc bpc" id="L775" title="1 of 2 branches missed.">            if (&quot;IntArray&quot;.equals(type)) {</span>
+<span class="nc" id="L776">                int[] v = new int[input.readInt()];</span>
+<span class="nc" id="L777">                int vlen = v.length;</span>
+<span class="nc bnc" id="L778" title="All 2 branches missed.">                for (int iter = 0; iter &lt; vlen; iter++) {</span>
+<span class="nc" id="L779">                    v[iter] = input.readInt();</span>
+                }
+<span class="nc" id="L781">                return v;</span>
+            }
+<span class="fc bfc" id="L783" title="All 2 branches covered.">            if (&quot;java.util.Vector&quot;.equals(type)) {</span>
+<span class="fc" id="L784">                Vector v = new Vector();</span>
+<span class="fc" id="L785">                int size = input.readInt();</span>
+<span class="fc bfc" id="L786" title="All 2 branches covered.">                for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="fc" id="L787">                    v.addElement(readObject(input));</span>
+                }
+<span class="fc" id="L789">                return v;</span>
+            }
+<span class="pc bpc" id="L791" title="1 of 2 branches missed.">            if (&quot;java.util.Hashtable&quot;.equals(type)) {</span>
+<span class="nc" id="L792">                Hashtable v = new Hashtable();</span>
+<span class="nc" id="L793">                int size = input.readInt();</span>
+<span class="nc bnc" id="L794" title="All 2 branches missed.">                for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc" id="L795">                    v.put(readObject(input), readObject(input));</span>
+                }
+<span class="nc" id="L797">                return v;</span>
+            }
+<span class="pc bpc" id="L799" title="1 of 2 branches missed.">            if (&quot;java.util.Set&quot;.equals(type)) {</span>
+<span class="nc" id="L800">                Collection v = new HashSet();</span>
+<span class="nc" id="L801">                int size = input.readInt();</span>
+<span class="nc bnc" id="L802" title="All 2 branches missed.">                for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc" id="L803">                    v.add(readObject(input));</span>
+                }
+<span class="nc" id="L805">                return v;</span>
+            }
+<span class="pc bpc" id="L807" title="1 of 2 branches missed.">            if (&quot;java.util.Collection&quot;.equals(type)) {</span>
+<span class="nc" id="L808">                Collection v = new ArrayList();</span>
+<span class="nc" id="L809">                int size = input.readInt();</span>
+<span class="nc bnc" id="L810" title="All 2 branches missed.">                for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc" id="L811">                    v.add(readObject(input));</span>
+                }
+<span class="nc" id="L813">                return v;</span>
+            }
+<span class="pc bpc" id="L815" title="1 of 2 branches missed.">            if (&quot;java.util.Map&quot;.equals(type)) {</span>
+<span class="fc" id="L816">                Map v = new HashMap();</span>
+<span class="fc" id="L817">                int size = input.readInt();</span>
+<span class="fc bfc" id="L818" title="All 2 branches covered.">                for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="fc" id="L819">                    v.put(readObject(input), readObject(input));</span>
+                }
+<span class="fc" id="L821">                return v;</span>
+            }
+<span class="nc bnc" id="L823" title="All 2 branches missed.">            if (&quot;EncodedImage&quot;.equals(type)) {</span>
+<span class="nc" id="L824">                int width = input.readInt();</span>
+<span class="nc" id="L825">                int height = input.readInt();</span>
+<span class="nc" id="L826">                boolean op = input.readBoolean();</span>
+<span class="nc" id="L827">                byte[] data = new byte[input.readInt()];</span>
+<span class="nc" id="L828">                input.readFully(data);</span>
+<span class="nc" id="L829">                return EncodedImage.create(data, width, height, op);</span>
+            }
+<span class="nc" id="L831">            Class cls = (Class) externalizables.get(type);</span>
+<span class="nc bnc" id="L832" title="All 2 branches missed.">            if (cls != null) {</span>
+<span class="nc" id="L833">                Object o = cls.newInstance();</span>
+<span class="nc bnc" id="L834" title="All 2 branches missed.">                if (o instanceof Externalizable) {</span>
+<span class="nc" id="L835">                    Externalizable ex = (Externalizable) o;</span>
+<span class="nc" id="L836">                    ex.internalize(input.readInt(), input);</span>
+<span class="nc" id="L837">                    return ex;</span>
+                } else {
+<span class="nc" id="L839">                    PropertyBusinessObject pb = (PropertyBusinessObject) o;</span>
+<span class="nc" id="L840">                    pb.getPropertyIndex().asExternalizable().internalize(input.readInt(), input);</span>
+<span class="nc" id="L841">                    return pb;</span>
+                }
+            }
+<span class="nc" id="L844">            throw new IOException(&quot;Object type not supported: &quot; + type);</span>
+<span class="nc" id="L845">        } catch (InstantiationException ex1) {</span>
+<span class="nc" id="L846">            Log.e(ex1);</span>
+<span class="nc" id="L847">            throw new IOException(ex1.getClass().getName() + &quot;: &quot; + ex1.getMessage());</span>
+<span class="nc" id="L848">        } catch (IllegalAccessException ex1) {</span>
+<span class="nc" id="L849">            Log.e(ex1);</span>
+<span class="nc" id="L850">            throw new IOException(ex1.getClass().getName() + &quot;: &quot; + ex1.getMessage());</span>
+        }
+    }
+
+    /**
+     * Encode a string for HTML requests
+     *
+     * @param str none encoded string
+     * @return encoded string
+     */
+    public static String encodeUrl(final String str) {
+<span class="fc" id="L861">        return encode(str, &quot;%20&quot;);</span>
+    }
+
+    /**
+     * Encodes the provided string as a URL (with %20 for spaces).
+     *
+     * @param str              The URL to encode
+     * @param doNotEncodeChars A string whose characters will not be encoded.
+     * @return
+     */
+    public static String encodeUrl(final String str, String doNotEncodeChars) {
+<span class="nc" id="L872">        return encode(str.toCharArray(), &quot;%20&quot;, doNotEncodeChars);</span>
+    }
+
+    /**
+     * toCharArray should return a new array always, however some devices might
+     * suffer a bug that allows mutating a String (serious security hole in the JVM)
+     * hence this method simulates the proper behavior
+     *
+     * @param s a string
+     * @return the contents of the string as a char array guaranteed to be a copy of the current array
+     */
+    public static char[] toCharArray(String s) {
+        // toCharArray should return a new array always, however some devices might
+        // suffer a bug that allows mutating a String (serious security hole in the JVM)
+        // hence this method simulates the proper behavior
+<span class="fc bfc" id="L887" title="All 2 branches covered.">        if (!charArrayBugTested) {</span>
+<span class="fc" id="L888">            charArrayBugTested = true;</span>
+<span class="pc bpc" id="L889" title="1 of 2 branches missed.">            if (s.toCharArray() == s.toCharArray()) {</span>
+<span class="nc" id="L890">                charArrayBug = true;</span>
+            }
+        }
+<span class="pc bpc" id="L893" title="1 of 2 branches missed.">        if (charArrayBug) {</span>
+<span class="nc" id="L894">            char[] c = new char[s.length()];</span>
+<span class="nc" id="L895">            System.arraycopy(s.toCharArray(), 0, c, 0, c.length);</span>
+<span class="nc" id="L896">            return c;</span>
+        }
+<span class="fc" id="L898">        return s.toCharArray();</span>
+    }
+
+    private static String encode(String str, String spaceChar) {
+<span class="fc bfc" id="L902" title="All 2 branches covered.">        if (str == null) {</span>
+<span class="fc" id="L903">            return null;</span>
+        }
+<span class="fc" id="L905">        return encode(toCharArray(str), spaceChar);</span>
+    }
+
+    /**
+     * Decodes a String URL encoded URL
+     *
+     * @param s           the string
+     * @param enc         the encoding (defaults to UTF-8 if null)
+     * @param plusToSpace true if plus signs be converted to spaces
+     * @return a decoded string
+     */
+    public static String decode(String s, String enc, boolean plusToSpace) {
+<span class="fc" id="L917">        boolean modified = false;</span>
+<span class="pc bpc" id="L918" title="2 of 4 branches missed.">        if (enc == null || enc.length() == 0) {</span>
+<span class="nc" id="L919">            enc = &quot;UTF-8&quot;;</span>
+        }
+<span class="fc" id="L921">        int numChars = s.length();</span>
+<span class="pc bpc" id="L922" title="1 of 2 branches missed.">        StringBuilder sb = new StringBuilder(numChars &gt; 500 ? numChars / 2 : numChars);</span>
+<span class="fc" id="L923">        int i = 0;</span>
+
+        char c;
+<span class="fc" id="L926">        byte[] bytes = null;</span>
+<span class="fc bfc" id="L927" title="All 2 branches covered.">        while (i &lt; numChars) {</span>
+<span class="fc" id="L928">            c = s.charAt(i);</span>
+<span class="pc bpc" id="L929" title="1 of 3 branches missed.">            switch (c) {</span>
+                case '+':
+<span class="nc bnc" id="L931" title="All 2 branches missed.">                    if (plusToSpace) {</span>
+<span class="nc" id="L932">                        sb.append(' ');</span>
+                    } else {
+<span class="nc" id="L934">                        sb.append('+');</span>
+                    }
+<span class="nc" id="L936">                    i++;</span>
+<span class="nc" id="L937">                    modified = true;</span>
+<span class="nc" id="L938">                    break;</span>
+
+                case '%':
+                    try {
+<span class="pc bpc" id="L942" title="1 of 2 branches missed.">                        if (bytes == null) {</span>
+<span class="fc" id="L943">                            bytes = new byte[(numChars - i) / 3];</span>
+                        }
+
+<span class="fc" id="L946">                        int pos = 0;</span>
+
+<span class="pc bpc" id="L948" title="1 of 4 branches missed.">                        while (((i + 2) &lt; numChars) &amp;&amp; (c == '%')) {</span>
+<span class="fc" id="L949">                            bytes[pos++] = (byte) Integer.parseInt(s.substring(i + 1, i + 3), 16);</span>
+<span class="fc" id="L950">                            i += 3;</span>
+<span class="pc bpc" id="L951" title="1 of 2 branches missed.">                            if (i &lt; numChars) {</span>
+<span class="fc" id="L952">                                c = s.charAt(i);</span>
+                            }
+                        }
+
+<span class="pc bpc" id="L956" title="2 of 4 branches missed.">                        if ((i &lt; numChars) &amp;&amp; (c == '%')) {</span>
+<span class="nc" id="L957">                            throw new IllegalArgumentException(&quot;Illegal URL % character: &quot; + s);</span>
+                        }
+
+                        try {
+<span class="fc" id="L961">                            sb.append(new String(bytes, 0, pos, enc));</span>
+<span class="nc" id="L962">                        } catch (UnsupportedEncodingException e) {</span>
+<span class="nc" id="L963">                            throw new RuntimeException(e.toString());</span>
+<span class="fc" id="L964">                        }</span>
+<span class="nc" id="L965">                    } catch (NumberFormatException e) {</span>
+<span class="nc" id="L966">                        throw new IllegalArgumentException(&quot;Illegal URL encoding: &quot; + s);</span>
+<span class="fc" id="L967">                    }</span>
+<span class="fc" id="L968">                    modified = true;</span>
+<span class="fc" id="L969">                    break;</span>
+
+                default:
+<span class="fc" id="L972">                    sb.append(c);</span>
+<span class="fc" id="L973">                    i++;</span>
+<span class="fc" id="L974">                    break;</span>
+            }
+        }
+
+<span class="pc bpc" id="L978" title="1 of 2 branches missed.">        if (modified) {</span>
+<span class="fc" id="L979">            return sb.toString();</span>
+        }
+<span class="nc" id="L981">        return s;</span>
+    }
+
+    private static String encode(char[] buf, String spaceChar) {
+<span class="fc" id="L985">        return encode(buf, spaceChar, null);</span>
+    }
+
+    private static String encode(char[] buf, String spaceChar, String doNotEncode) {
+<span class="fc" id="L989">        final StringBuilder sbuf = new StringBuilder(buf.length * 3);</span>
+<span class="fc" id="L990">        int blen = buf.length;</span>
+<span class="fc bfc" id="L991" title="All 2 branches covered.">        for (int i = 0; i &lt; blen; i++) {</span>
+<span class="fc" id="L992">            final char ch = buf[i];</span>
+
+<span class="pc bpc" id="L994" title="7 of 30 branches missed.">            if ((ch &gt;= 'A' &amp;&amp; ch &lt;= 'Z') || (ch &gt;= 'a' &amp;&amp; ch &lt;= 'z') || (ch &gt;= '0' &amp;&amp; ch &lt;= '9') ||</span>
+                    (ch == '-' || ch == '_' || ch == '.' || ch == '~' || ch == '!'
+<span class="pc bpc" id="L996" title="4 of 6 branches missed.">                            || ch == '*' || ch == '\'' || ch == '(' || ch == ')' || ignoreCharsWhenEncoding.indexOf(ch) &gt; -1) || (doNotEncode != null &amp;&amp; doNotEncode.indexOf(ch) &gt; -1)) {</span>
+<span class="fc" id="L997">                sbuf.append(ch);</span>
+<span class="fc bfc" id="L998" title="All 2 branches covered.">            } else if (ch == ' ') {</span>
+<span class="fc" id="L999">                sbuf.append(spaceChar);</span>
+            } else {
+<span class="fc" id="L1001">                appendHex(sbuf, ch);</span>
+            }
+        }
+<span class="fc" id="L1004">        return sbuf.toString();</span>
+    }
+
+    /**
+     * Encode a string for HTML post requests matching the style used in application/x-www-form-urlencoded
+     *
+     * @param str none encoded string
+     * @return encoded string
+     */
+    public static String encodeBody(final String str) {
+<span class="fc" id="L1014">        return encode(str, &quot;+&quot;);</span>
+    }
+
+    /**
+     * Encode a string for HTML requests
+     *
+     * @param buf none encoded string
+     * @return encoded string
+     * @deprecated use encodeUrl(char[]) instead
+     */
+    public static String encodeUrl(final byte[] buf) {
+<span class="nc" id="L1025">        char[] b = new char[buf.length];</span>
+<span class="nc bnc" id="L1026" title="All 2 branches missed.">        for (int iter = 0; iter &lt; buf.length; iter++) {</span>
+<span class="nc" id="L1027">            b[iter] = (char) buf[iter];</span>
+        }
+<span class="nc" id="L1029">        return encode(b, &quot;%20&quot;);</span>
+    }
+
+    /**
+     * Encode a string for HTML requests
+     *
+     * @param buf none encoded string
+     * @return encoded string
+     */
+    public static String encodeUrl(final char[] buf) {
+<span class="nc" id="L1039">        return encode(buf, &quot;%20&quot;);</span>
+    }
+
+    /**
+     * Encode a string for HTML post requests matching the style used in application/x-www-form-urlencoded
+     *
+     * @param buf none encoded string
+     * @return encoded string
+     */
+    public static String encodeBody(final char[] buf) {
+<span class="nc" id="L1049">        return encode(buf, &quot;+&quot;);</span>
+    }
+
+    /**
+     * Encode a string for HTML post requests matching the style used in application/x-www-form-urlencoded
+     *
+     * @param buf none encoded string
+     * @return encoded string
+     * @deprecated use encodeUrl(char[]) instead
+     */
+    public static String encodeBody(final byte[] buf) {
+<span class="nc" id="L1060">        char[] b = new char[buf.length];</span>
+<span class="nc" id="L1061">        int blen = buf.length;</span>
+<span class="nc bnc" id="L1062" title="All 2 branches missed.">        for (int iter = 0; iter &lt; blen; iter++) {</span>
+<span class="nc" id="L1063">            b[iter] = (char) buf[iter];</span>
+        }
+<span class="nc" id="L1065">        return encode(b, &quot;+&quot;);</span>
+    }
+
+    private static void appendHex(StringBuilder sbuf, char ch) {
+<span class="fc" id="L1069">        int firstLiteral = ch / 256;</span>
+<span class="fc" id="L1070">        int secLiteral = ch % 256;</span>
+<span class="pc bpc" id="L1071" title="2 of 4 branches missed.">        if (firstLiteral == 0 &amp;&amp; secLiteral &lt; 127) {</span>
+<span class="fc" id="L1072">            sbuf.append(&quot;%&quot;);</span>
+<span class="fc" id="L1073">            String s = Integer.toHexString(secLiteral).toUpperCase();</span>
+<span class="pc bpc" id="L1074" title="1 of 2 branches missed.">            if (s.length() == 1) {</span>
+<span class="nc" id="L1075">                sbuf.append(&quot;0&quot;);</span>
+            }
+<span class="fc" id="L1077">            sbuf.append(s);</span>
+<span class="fc" id="L1078">            return;</span>
+        }
+<span class="nc bnc" id="L1080" title="All 2 branches missed.">        if (ch &lt;= 0x07ff) {</span>
+            // 2 literals unicode
+<span class="nc" id="L1082">            firstLiteral = 192 + (firstLiteral &lt;&lt; 2) + (secLiteral &gt;&gt; 6);</span>
+<span class="nc" id="L1083">            secLiteral = 128 + (secLiteral &amp; 63);</span>
+<span class="nc" id="L1084">            sbuf.append(&quot;%&quot;);</span>
+<span class="nc" id="L1085">            sbuf.append(Integer.toHexString(firstLiteral).toUpperCase());</span>
+<span class="nc" id="L1086">            sbuf.append(&quot;%&quot;);</span>
+<span class="nc" id="L1087">            sbuf.append(Integer.toHexString(secLiteral).toUpperCase());</span>
+        } else {
+            // 3 literals unicode
+<span class="nc" id="L1090">            int thirdLiteral = 128 + (secLiteral &amp; 63);</span>
+<span class="nc" id="L1091">            secLiteral = 128 + ((firstLiteral % 16) &lt;&lt; 2) + (secLiteral &gt;&gt; 6);</span>
+<span class="nc" id="L1092">            firstLiteral = 224 + (firstLiteral &gt;&gt; 4);</span>
+<span class="nc" id="L1093">            sbuf.append(&quot;%&quot;);</span>
+<span class="nc" id="L1094">            sbuf.append(Integer.toHexString(firstLiteral).toUpperCase());</span>
+<span class="nc" id="L1095">            sbuf.append(&quot;%&quot;);</span>
+<span class="nc" id="L1096">            sbuf.append(Integer.toHexString(secLiteral).toUpperCase());</span>
+<span class="nc" id="L1097">            sbuf.append(&quot;%&quot;);</span>
+<span class="nc" id="L1098">            sbuf.append(Integer.toHexString(thirdLiteral).toUpperCase());</span>
+        }
+<span class="nc" id="L1100">    }</span>
+
+    /**
+     * Converts a relative url e.g.: /myfile.html to an absolute url
+     *
+     * @param baseURL     a source URL whose properties should be used to construct the actual URL
+     * @param relativeURL relative address
+     * @return an absolute URL
+     */
+    public static String relativeToAbsolute(String baseURL, String relativeURL) {
+<span class="nc bnc" id="L1110" title="All 2 branches missed.">        if (relativeURL.startsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L1111">            return getURLProtocol(baseURL) + &quot;://&quot; + getURLHost(baseURL) + relativeURL;</span>
+        } else {
+<span class="nc" id="L1113">            return getURLProtocol(baseURL) + &quot;://&quot; + getURLHost(baseURL) + getURLBasePath(baseURL) + relativeURL;</span>
+        }
+    }
+
+    /**
+     * Returns the protocol of an absolute URL e.g. http, https etc.
+     *
+     * @param url absolute URL
+     * @return protocol
+     */
+    public static String getURLProtocol(String url) {
+<span class="nc" id="L1124">        int index = url.indexOf(&quot;://&quot;);</span>
+<span class="nc bnc" id="L1125" title="All 2 branches missed.">        if (index != -1) {</span>
+<span class="nc" id="L1126">            return url.substring(0, index);</span>
+        }
+<span class="nc" id="L1128">        return null;</span>
+    }
+
+    /**
+     * Returns the URL's host portion
+     *
+     * @param url absolute URL
+     * @return the domain of the URL
+     */
+    public static String getURLHost(String url) {
+<span class="nc" id="L1138">        int start = url.indexOf(&quot;://&quot;);</span>
+<span class="nc" id="L1139">        int end = url.indexOf('/', start + 3);</span>
+<span class="nc bnc" id="L1140" title="All 2 branches missed.">        if (end != -1) {</span>
+<span class="nc" id="L1141">            return url.substring(start + 3, end);</span>
+        } else {
+<span class="nc" id="L1143">            return url.substring(start + 3);</span>
+        }
+    }
+
+    /**
+     * Returns the URL's path
+     *
+     * @param url absolute URL
+     * @return the path within the host
+     */
+    public static String getURLPath(String url) {
+<span class="nc" id="L1154">        int start = url.indexOf('/', url.indexOf(&quot;://&quot;) + 3);</span>
+<span class="nc bnc" id="L1155" title="All 2 branches missed.">        if (start != -1) {</span>
+<span class="nc" id="L1156">            return url.substring(start + 1);</span>
+        }
+<span class="nc" id="L1158">        return &quot;/&quot;;</span>
+    }
+
+    /**
+     * Returns the URL's base path, which is the same as the path only without an ending file e.g.:
+     * http://domain.com/f/f.html would return as: /f/
+     *
+     * @param url absolute URL
+     * @return the path within the host
+     */
+    public static String getURLBasePath(String url) {
+<span class="nc" id="L1169">        int start = url.indexOf('/', url.indexOf(&quot;://&quot;) + 3);</span>
+<span class="nc" id="L1170">        int end = url.lastIndexOf('/');</span>
+<span class="nc bnc" id="L1171" title="All 4 branches missed.">        if (start != -1 &amp;&amp; end &gt; start) {</span>
+<span class="nc" id="L1172">            return url.substring(start, end + 1);</span>
+        }
+<span class="nc" id="L1174">        return &quot;/&quot;;</span>
+    }
+
+    /**
+     * Writes a string with a null flag, this allows a String which may be null
+     *
+     * @param s the string to write
+     * @param d the destination output stream
+     * @throws java.io.IOException
+     */
+    public static void writeUTF(String s, DataOutputStream d) throws IOException {
+<span class="fc bfc" id="L1185" title="All 2 branches covered.">        if (s == null) {</span>
+<span class="fc" id="L1186">            d.writeBoolean(false);</span>
+<span class="fc" id="L1187">            return;</span>
+        }
+<span class="fc" id="L1189">        d.writeBoolean(true);</span>
+<span class="fc" id="L1190">        d.writeUTF(s);</span>
+<span class="fc" id="L1191">    }</span>
+
+    /**
+     * Reads a UTF string that may be null previously written by writeUTF
+     *
+     * @param d the stream
+     * @return a string or null
+     * @throws java.io.IOException
+     */
+    public static String readUTF(DataInputStream d) throws IOException {
+<span class="fc bfc" id="L1201" title="All 2 branches covered.">        if (d.readBoolean()) {</span>
+<span class="fc" id="L1202">            return d.readUTF();</span>
+        }
+<span class="fc" id="L1204">        return null;</span>
+    }
+
+    /**
+     * The read fully method from data input stream is very useful for all types of
+     * streams...
+     *
+     * @param b the buffer into which the data is read.
+     * @throws IOException the stream has been closed and the contained
+     *                     input stream does not support reading after close, or
+     *                     another I/O error occurs.
+     */
+    public static void readFully(InputStream i, byte b[]) throws IOException {
+<span class="fc" id="L1217">        readFully(i, b, 0, b.length);</span>
+<span class="fc" id="L1218">    }</span>
+
+    /**
+     * The read fully method from data input stream is very useful for all types of
+     * streams...
+     *
+     * @param b   the buffer into which the data is read.
+     * @param off the start offset of the data.
+     * @param len the number of bytes to read.
+     * @throws IOException the stream has been closed and the contained
+     *                     input stream does not support reading after close, or
+     *                     another I/O error occurs.
+     */
+    public static final void readFully(InputStream i, byte b[], int off, int len) throws IOException {
+<span class="pc bpc" id="L1232" title="1 of 2 branches missed.">        if (len &lt; 0) {</span>
+<span class="nc" id="L1233">            throw new IndexOutOfBoundsException();</span>
+        }
+<span class="fc" id="L1235">        int n = 0;</span>
+<span class="fc bfc" id="L1236" title="All 2 branches covered.">        while (n &lt; len) {</span>
+<span class="fc" id="L1237">            int count = i.read(b, off + n, len - n);</span>
+<span class="fc bfc" id="L1238" title="All 2 branches covered.">            if (count &lt; 0) {</span>
+<span class="fc" id="L1239">                throw new EOFException();</span>
+            }
+<span class="fc" id="L1241">            n += count;</span>
+<span class="fc" id="L1242">        }</span>
+<span class="fc" id="L1243">    }</span>
+
+    /**
+     * Reads until the array is full or until the stream ends
+     *
+     * @param b the buffer into which the data is read.
+     * @return the amount read
+     * @throws IOException the stream has been closed and the contained
+     *                     input stream does not support reading after close, or
+     *                     another I/O error occurs.
+     */
+    public static int readAll(InputStream i, byte b[]) throws IOException {
+<span class="fc" id="L1255">        int len = b.length;</span>
+<span class="fc" id="L1256">        int n = 0;</span>
+<span class="pc bpc" id="L1257" title="1 of 2 branches missed.">        while (n &lt; len) {</span>
+<span class="fc" id="L1258">            int count = i.read(b, n, len - n);</span>
+<span class="fc bfc" id="L1259" title="All 2 branches covered.">            if (count &lt; 0) {</span>
+<span class="fc" id="L1260">                return n;</span>
+            }
+<span class="fc" id="L1262">            n += count;</span>
+<span class="fc" id="L1263">        }</span>
+<span class="nc" id="L1264">        return n;</span>
+    }
+
+    /**
+     * Provides a utility method breaks a given String to array of String according
+     * to the given separator
+     *
+     * @param original  the String to break
+     * @param separator the pattern to look in the original String
+     * @return array of Strings from the original String
+     */
+    public static String[] split(String original, String separator) {
+
+<span class="fc" id="L1277">        Vector nodes = new Vector();</span>
+
+<span class="fc" id="L1279">        int index = original.indexOf(separator);</span>
+<span class="fc bfc" id="L1280" title="All 2 branches covered.">        while (index &gt;= 0) {</span>
+<span class="fc" id="L1281">            nodes.addElement(original.substring(0, index));</span>
+<span class="fc" id="L1282">            original = original.substring(index + separator.length());</span>
+<span class="fc" id="L1283">            index = original.indexOf(separator);</span>
+        }
+<span class="fc" id="L1285">        nodes.addElement(original);</span>
+
+<span class="fc" id="L1287">        String[] ret = new String[nodes.size()];</span>
+<span class="fc bfc" id="L1288" title="All 2 branches covered.">        for (int i = 0; i &lt; nodes.size(); i++) {</span>
+<span class="fc" id="L1289">            ret[i] = (String) nodes.elementAt(i);</span>
+        }
+<span class="fc" id="L1291">        return ret;</span>
+    }
+
+    static CodenameOneImplementation getImplementation() {
+<span class="fc" id="L1295">        return implInstance;</span>
+    }
+
+    /**
+     * Invoked internally from Display, this method is for internal use only
+     *
+     * @param impl implementation instance
+     */
+    public static void setImplementation(CodenameOneImplementation impl) {
+<span class="fc" id="L1304">        implInstance = impl;</span>
+<span class="fc" id="L1305">    }</span>
+
+    /**
+     * Merges arrays into one larger array
+     */
+    public static void mergeArrays(Object[] arr1, Object[] arr2, Object[] destinationArray) {
+<span class="fc" id="L1311">        System.arraycopy(arr1, 0, destinationArray, 0, arr1.length);</span>
+<span class="fc" id="L1312">        System.arraycopy(arr2, 0, destinationArray, arr1.length, arr2.length);</span>
+<span class="fc" id="L1313">    }</span>
+
+    /**
+     * Removes the object at the source array offset and copies all other objects to the destination array
+     *
+     * @param sourceArray      the source array
+     * @param destinationArray the resulting array which should be of the length sourceArray.length - 1
+     * @param o                the object to remove from the array
+     */
+    public static void removeObjectAtOffset(Object[] sourceArray, Object[] destinationArray, Object o) {
+<span class="fc" id="L1323">        int off = indexOf(sourceArray, o);</span>
+<span class="fc" id="L1324">        removeObjectAtOffset(sourceArray, destinationArray, off);</span>
+<span class="fc" id="L1325">    }</span>
+
+    /**
+     * Removes the object at the source array offset and copies all other objects to the destination array
+     *
+     * @param sourceArray      the source array
+     * @param destinationArray the resulting array which should be of the length sourceArray.length - 1
+     * @param offset           the offset of the array
+     */
+    public static void removeObjectAtOffset(Object[] sourceArray, Object[] destinationArray, int offset) {
+<span class="fc" id="L1335">        System.arraycopy(sourceArray, 0, destinationArray, 0, offset);</span>
+<span class="fc" id="L1336">        System.arraycopy(sourceArray, offset + 1, destinationArray, offset, sourceArray.length - offset - 1);</span>
+<span class="fc" id="L1337">    }</span>
+
+    /**
+     * Inserts the object at the destination array offset
+     *
+     * @param sourceArray      the source array
+     * @param destinationArray the resulting array which should be of the length sourceArray.length + 1
+     * @param offset           the offset of the array
+     * @param o                the object
+     */
+    public static void insertObjectAtOffset(Object[] sourceArray, Object[] destinationArray, int offset, Object o) {
+<span class="pc bpc" id="L1348" title="1 of 2 branches missed.">        if (offset == 0) {</span>
+<span class="nc" id="L1349">            destinationArray[0] = o;</span>
+<span class="nc" id="L1350">            System.arraycopy(sourceArray, 0, destinationArray, 1, sourceArray.length);</span>
+        } else {
+<span class="pc bpc" id="L1352" title="1 of 2 branches missed.">            if (offset == sourceArray.length) {</span>
+<span class="nc" id="L1353">                System.arraycopy(sourceArray, 0, destinationArray, 0, sourceArray.length);</span>
+<span class="nc" id="L1354">                destinationArray[sourceArray.length] = o;</span>
+            } else {
+<span class="fc" id="L1356">                System.arraycopy(sourceArray, 0, destinationArray, 0, offset);</span>
+<span class="fc" id="L1357">                destinationArray[offset] = o;</span>
+<span class="fc" id="L1358">                System.arraycopy(sourceArray, offset, destinationArray, offset + 1, sourceArray.length - offset);</span>
+            }
+        }
+<span class="fc" id="L1361">    }</span>
+
+    /**
+     * Finds the object at the given offset while using the == operator and not the equals method call, it doesn't
+     * rely on the ordering of the elements like the Arrays method.
+     *
+     * @param arr   the array
+     * @param value the value to search
+     * @return the offset or -1
+     */
+    public static int indexOf(Object[] arr, Object value) {
+<span class="fc" id="L1372">        int l = arr.length;</span>
+<span class="pc bpc" id="L1373" title="1 of 2 branches missed.">        for (int iter = 0; iter &lt; l; iter++) {</span>
+<span class="fc bfc" id="L1374" title="All 2 branches covered.">            if (arr[iter] == value) {</span>
+<span class="fc" id="L1375">                return iter;</span>
+            }
+        }
+<span class="nc" id="L1378">        return -1;</span>
+    }
+
+    /**
+     * Blocking method that will download the given URL to storage and return when the
+     * operation completes
+     *
+     * @param url          the URL
+     * @param fileName     the storage file name
+     * @param showProgress whether to block the UI until download completes/fails
+     * @return true on success false on error
+     */
+    public static boolean downloadUrlToStorage(String url, String fileName, boolean showProgress) {
+<span class="nc" id="L1391">        return downloadUrlTo(url, fileName, showProgress, false, true, null);</span>
+    }
+
+    /**
+     * Blocking method that will download the given URL to the file system storage and return when the
+     * operation completes
+     *
+     * @param url          the URL
+     * @param fileName     the file name
+     * @param showProgress whether to block the UI until download completes/fails
+     * @return true on success false on error
+     */
+    public static boolean downloadUrlToFile(String url, String fileName, boolean showProgress) {
+<span class="nc" id="L1404">        return downloadUrlTo(url, fileName, showProgress, false, false, null);</span>
+    }
+
+    /**
+     * &lt;p&gt;Non-blocking method that will download the given URL to storage in the background and return
+     * immediately. This method can be used to fetch data dynamically and asynchronously e.g. in this code it is used
+     * to fetch book covers for the {@link com.codename1.components.ImageViewer}:&lt;/p&gt;
+     *
+     * &lt;script src=&quot;https://gist.github.com/codenameone/305c3f5426b0e2e80833.js&quot;&gt;&lt;/script&gt;
+     * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-imageviewer-dynamic.png&quot; alt=&quot;Image viewer with dynamic URL fetching model&quot; /&gt;
+     *
+     * @param url      the URL
+     * @param fileName the storage file name
+     */
+    public static void downloadUrlToStorageInBackground(String url, String fileName) {
+<span class="nc" id="L1419">        downloadUrlTo(url, fileName, false, true, true, null);</span>
+<span class="nc" id="L1420">    }</span>
+
+    /**
+     * Non-blocking method that will download the given URL to file system storage in the background and return immediately
+     *
+     * @param url      the URL
+     * @param fileName the file name
+     */
+    public static void downloadUrlToFileSystemInBackground(String url, String fileName) {
+<span class="nc" id="L1429">        downloadUrlTo(url, fileName, false, true, false, null);</span>
+<span class="nc" id="L1430">    }</span>
+
+    /**
+     * Non-blocking method that will download the given URL to storage in the background and return immediately
+     *
+     * @param url          the URL
+     * @param fileName     the storage file name
+     * @param onCompletion invoked when download completes
+     */
+    public static void downloadUrlToStorageInBackground(String url, String fileName, ActionListener onCompletion) {
+<span class="nc" id="L1440">        downloadUrlTo(url, fileName, false, true, true, onCompletion);</span>
+<span class="nc" id="L1441">    }</span>
+
+    /**
+     * Non-blocking method that will download the given URL to file system storage in the background and return immediately
+     *
+     * @param url          the URL
+     * @param fileName     the file name
+     * @param onCompletion invoked when download completes
+     */
+    public static void downloadUrlToFileSystemInBackground(String url, String fileName, ActionListener onCompletion) {
+<span class="nc" id="L1451">        downloadUrlTo(url, fileName, false, true, false, onCompletion);</span>
+<span class="nc" id="L1452">    }</span>
+
+    /**
+     * Downloads an image to the file system asynchronously.  If the image is already downloaded it will just load it directly from
+     * the file system.
+     *
+     * @param url       The URL to download the image from.
+     * @param fileName  The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the
+     *                  network request altogether.
+     * @param onSuccess Callback called on success.
+     * @param onFail    Callback called if we fail to load the image.
+     * @see ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback)
+     * @since 3.4
+     */
+    public static void downloadImageToFileSystem(String url, String fileName, SuccessCallback&lt;Image&gt; onSuccess, FailureCallback&lt;Image&gt; onFail) {
+<span class="nc" id="L1467">        implInstance.downloadImageToFileSystem(url, fileName, onSuccess, onFail);</span>
+<span class="nc" id="L1468">    }</span>
+
+    /**
+     * Downloads an image to the file system asynchronously.  If the image is already downloaded it will just load it directly from
+     * the file system.
+     *
+     * @param url      The URL to download the image from.
+     * @param fileName The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the
+     *                 network request altogether.
+     * @see ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback)
+     * @since 7.0
+     */
+    public static AsyncResource&lt;Image&gt; downloadImageToFileSystem(String url, String fileName) {
+<span class="nc" id="L1481">        final AsyncResource&lt;Image&gt; out = new AsyncResource&lt;Image&gt;();</span>
+<span class="nc" id="L1482">        downloadImageToFileSystem(url, fileName, new SuccessCallback&lt;Image&gt;() {</span>
+                    @Override
+                    public void onSucess(Image value) {
+<span class="nc" id="L1485">                        out.complete(value);</span>
+<span class="nc" id="L1486">                    }</span>
+
+                },
+<span class="nc" id="L1489">                new FailureCallback&lt;Image&gt;() {</span>
+                    @Override
+                    public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+<span class="nc" id="L1492">                        out.error(err);</span>
+<span class="nc" id="L1493">                    }</span>
+                }
+        );
+<span class="nc" id="L1496">        return out;</span>
+    }
+
+    /**
+     * Downloads an image to the file system asynchronously.  If the image is already downloaded it will just load it directly from
+     * the file system.
+     *
+     * @param url       The URL to download the image from.
+     * @param fileName  The the path to the file where the image should be downloaded.  If this file already exists, it will simply load this file and skip the
+     *                  network request altogether.
+     * @param onSuccess Callback called on success.
+     * @see ConnectionRequest#downloadImageToFileSystem(java.lang.String, com.codename1.util.SuccessCallback)
+     * @since 3.4
+     */
+    public static void downloadImageToFileSystem(String url, String fileName, SuccessCallback&lt;Image&gt; onSuccess) {
+<span class="nc" id="L1511">        downloadImageToFileSystem(url, fileName, onSuccess, new CallbackAdapter&lt;Image&gt;());</span>
+<span class="nc" id="L1512">    }</span>
+
+    /**
+     * Downloads an image to storage asynchronously.  If the image is already downloaded it will just load it directly from
+     * storage.
+     *
+     * @param url       The URL to download the image from.
+     * @param fileName  The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the
+     *                  network request altogether.
+     * @param onSuccess Callback called on success.
+     * @param onFail    Callback called if we fail to load the image.
+     * @see ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback)
+     * @since 3.4
+     */
+    public static void downloadImageToStorage(String url, String fileName, SuccessCallback&lt;Image&gt; onSuccess, FailureCallback&lt;Image&gt; onFail) {
+<span class="fc" id="L1527">        implInstance.downloadImageToStorage(url, fileName, onSuccess, onFail);</span>
+<span class="fc" id="L1528">    }</span>
+
+    /**
+     * Downloads an image to storage asynchronously.  If the image is already downloaded it will just load it directly from
+     * storage.
+     *
+     * @param url      The URL to download the image from.
+     * @param fileName The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the
+     *                 network request altogether.
+     * @see ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback, com.codename1.util.FailureCallback)
+     * @since 7.0
+     */
+    public static AsyncResource&lt;Image&gt; downloadImageToStorage(String url, String fileName) {
+<span class="nc" id="L1541">        final AsyncResource&lt;Image&gt; out = new AsyncResource&lt;Image&gt;();</span>
+<span class="nc" id="L1542">        downloadImageToStorage(url, fileName, new SuccessCallback&lt;Image&gt;() {</span>
+                    @Override
+                    public void onSucess(Image value) {
+<span class="nc" id="L1545">                        out.complete(value);</span>
+<span class="nc" id="L1546">                    }</span>
+
+                },
+<span class="nc" id="L1549">                new FailureCallback&lt;Image&gt;() {</span>
+                    @Override
+                    public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+<span class="nc" id="L1552">                        out.error(err);</span>
+<span class="nc" id="L1553">                    }</span>
+                }
+        );
+<span class="nc" id="L1556">        return out;</span>
+    }
+
+    /**
+     * Downloads an image to the cache asynchronously.
+     *
+     * @param url       The URL to download.
+     * @param onSuccess Callback to run on successful completion.
+     * @param onFail    Callback to run if download fails.
+     */
+    public static void downloadImageToCache(String url, SuccessCallback&lt;Image&gt; onSuccess, FailureCallback&lt;Image&gt; onFail) {
+<span class="fc" id="L1567">        implInstance.downloadImageToCache(url, onSuccess, onFail);</span>
+
+<span class="fc" id="L1569">    }</span>
+
+    /**
+     * Downloads an image to the cache asynchronously.
+     *
+     * @param url The URL of the image to download.
+     * @return AsyncResource to wrap the Image.
+     * @since 7.0
+     */
+    public static AsyncResource&lt;Image&gt; downloadImageToCache(String url) {
+<span class="nc" id="L1579">        final AsyncResource&lt;Image&gt; out = new AsyncResource&lt;Image&gt;();</span>
+<span class="nc" id="L1580">        downloadImageToCache(url, new SuccessCallback&lt;Image&gt;() {</span>
+                    @Override
+                    public void onSucess(Image value) {
+<span class="nc" id="L1583">                        out.complete(value);</span>
+<span class="nc" id="L1584">                    }</span>
+
+                },
+<span class="nc" id="L1587">                new FailureCallback&lt;Image&gt;() {</span>
+                    @Override
+                    public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+<span class="nc" id="L1590">                        out.error(err);</span>
+<span class="nc" id="L1591">                    }</span>
+                }
+        );
+<span class="nc" id="L1594">        return out;</span>
+    }
+
+    /**
+     * Downloads an image to storage asynchronously.  If the image is already downloaded it will just load it directly from
+     * storage.
+     *
+     * @param url       The URL to download the image from.
+     * @param fileName  The the storage file to save the image to.  If this file already exists, it will simply load this file and skip the
+     *                  network request altogether.
+     * @param onSuccess Callback called on success.
+     * @see ConnectionRequest#downloadImageToStorage(java.lang.String, com.codename1.util.SuccessCallback)
+     * @since 3.4
+     */
+    public static void downloadImageToStorage(String url, String fileName, SuccessCallback&lt;Image&gt; onSuccess) {
+<span class="fc" id="L1609">        downloadImageToStorage(url, fileName, onSuccess, new CallbackAdapter&lt;Image&gt;());</span>
+<span class="fc" id="L1610">    }</span>
+
+    private static boolean downloadUrlTo(String url, String fileName, boolean showProgress, boolean background, boolean storage, ActionListener callback) {
+<span class="nc" id="L1613">        ConnectionRequest cr = new ConnectionRequest();</span>
+<span class="nc" id="L1614">        cr.setPost(false);</span>
+<span class="nc" id="L1615">        cr.setFailSilently(true);</span>
+<span class="nc" id="L1616">        cr.setReadResponseForErrors(false);</span>
+<span class="nc" id="L1617">        cr.setDuplicateSupported(true);</span>
+<span class="nc" id="L1618">        cr.setUrl(url);</span>
+<span class="nc bnc" id="L1619" title="All 2 branches missed.">        if (callback != null) {</span>
+<span class="nc" id="L1620">            cr.addResponseListener(callback);</span>
+        }
+<span class="nc bnc" id="L1622" title="All 2 branches missed.">        if (storage) {</span>
+<span class="nc" id="L1623">            cr.setDestinationStorage(fileName);</span>
+        } else {
+<span class="nc" id="L1625">            cr.setDestinationFile(fileName);</span>
+        }
+<span class="nc bnc" id="L1627" title="All 2 branches missed.">        if (background) {</span>
+<span class="nc" id="L1628">            NetworkManager.getInstance().addToQueue(cr);</span>
+<span class="nc" id="L1629">            return true;</span>
+        }
+<span class="nc bnc" id="L1631" title="All 2 branches missed.">        if (showProgress) {</span>
+<span class="nc" id="L1632">            InfiniteProgress ip = new InfiniteProgress();</span>
+<span class="nc" id="L1633">            Dialog d = ip.showInifiniteBlocking();</span>
+<span class="nc" id="L1634">            NetworkManager.getInstance().addToQueueAndWait(cr);</span>
+<span class="nc" id="L1635">            d.dispose();</span>
+<span class="nc" id="L1636">        } else {</span>
+<span class="nc" id="L1637">            NetworkManager.getInstance().addToQueueAndWait(cr);</span>
+        }
+<span class="nc bnc" id="L1639" title="All 2 branches missed.">        if (cr.getContentLength() &gt; 0) {</span>
+            // verify the resulting file has the same size as the content length
+<span class="nc bnc" id="L1641" title="All 2 branches missed.">            if (storage) {</span>
+<span class="nc bnc" id="L1642" title="All 2 branches missed.">                if (Storage.getInstance().entrySize(fileName) &lt; cr.getContentLength()) {</span>
+<span class="nc" id="L1643">                    return false;</span>
+                }
+            } else {
+<span class="nc bnc" id="L1646" title="All 2 branches missed.">                if (FileSystemStorage.getInstance().getLength(fileName) &lt; cr.getContentLength()) {</span>
+<span class="nc" id="L1647">                    return false;</span>
+                }
+            }
+        }
+<span class="nc" id="L1651">        int rc = cr.getResponseCode();</span>
+<span class="nc bnc" id="L1652" title="All 4 branches missed.">        return rc == 200 || rc == 201;</span>
+    }
+
+    /**
+     * Shorthand method for Thread sleep that doesn't throw the stupid interrupted checked exception
+     *
+     * @param t the time
+     */
+    public static void sleep(int t) {
+        try {
+<span class="fc" id="L1662">            Thread.sleep(t);</span>
+<span class="nc" id="L1663">        } catch (InterruptedException e) {</span>
+<span class="fc" id="L1664">        }</span>
+<span class="fc" id="L1665">    }</span>
+
+    /**
+     * Shorthand method wait method that doesn't throw the stupid interrupted checked exception, it also
+     * includes the synchronized block to further reduce code clutter
+     *
+     * @param o the object to wait on
+     * @param t the time
+     */
+    public static void wait(Object o, int t) {
+<span class="fc" id="L1675">        synchronized (o) {</span>
+<span class="fc" id="L1676">            long end = System.currentTimeMillis() + t;</span>
+            while (true) {
+<span class="fc" id="L1678">                long remaining = end - System.currentTimeMillis();</span>
+<span class="pc bpc" id="L1679" title="1 of 2 branches missed.">                if (remaining &lt;= 0) {</span>
+<span class="nc" id="L1680">                    return;</span>
+                }
+                try {
+<span class="fc" id="L1683">                    o.wait(remaining);</span>
+<span class="fc" id="L1684">                    return;</span>
+<span class="nc" id="L1685">                } catch (InterruptedException e) {</span>
+                    // retry until timeout elapses
+                }
+<span class="nc" id="L1688">            }</span>
+        }
+    }
+
+    /**
+     * Shorthand method wait method that doesn't throw the stupid interrupted checked exception, it also
+     * includes the synchronized block to further reduce code clutter
+     *
+     * @param o the object to wait on
+     */
+    public static void wait(Object o) {
+<span class="fc" id="L1699">        synchronized (o) {</span>
+<span class="fc" id="L1700">            boolean waiting = true;</span>
+<span class="fc bfc" id="L1701" title="All 2 branches covered.">            while (waiting) {</span>
+                try {
+<span class="fc" id="L1703">                    o.wait();</span>
+<span class="fc" id="L1704">                    waiting = false;</span>
+<span class="nc" id="L1705">                } catch (InterruptedException e) {</span>
+                    // ignore and continue waiting
+<span class="pc" id="L1707">                }</span>
+            }
+<span class="fc" id="L1709">        }</span>
+<span class="fc" id="L1710">    }</span>
+
+    /**
+     * Returns true or false based on a &quot;soft&quot; object
+     *
+     * @param val a boolean value as a Boolean object, String or number
+     * @return true or false
+     */
+    public static boolean toBooleanValue(Object val) {
+<span class="nc bnc" id="L1719" title="All 2 branches missed.">        if (val == null) {</span>
+<span class="nc" id="L1720">            return false;</span>
+        }
+<span class="nc bnc" id="L1722" title="All 2 branches missed.">        if (val instanceof Boolean) {</span>
+<span class="nc" id="L1723">            return ((Boolean) val).booleanValue();</span>
+        }
+<span class="nc bnc" id="L1725" title="All 2 branches missed.">        if (val instanceof String) {</span>
+<span class="nc" id="L1726">            String sl = ((String) val).toLowerCase();</span>
+<span class="nc bnc" id="L1727" title="All 4 branches missed.">            return sl.startsWith(&quot;t&quot;) || sl.equals(&quot;1&quot;);</span>
+        }
+<span class="nc bnc" id="L1729" title="All 2 branches missed.">        return toIntValue(val) != 0;</span>
+    }
+
+    /**
+     * Returns the number object as an int
+     *
+     * @param number this can be a String or any number type
+     * @return an int value or an exception
+     */
+    public static int toIntValue(Object number) {
+<span class="pc bpc" id="L1739" title="1 of 2 branches missed.">        if (number == null) {</span>
+<span class="nc" id="L1740">            return 0;</span>
+        }
+        // we should convert this to use Number
+<span class="fc bfc" id="L1743" title="All 2 branches covered.">        if (number instanceof Integer) {</span>
+<span class="fc" id="L1744">            return ((Integer) number).intValue();</span>
+        }
+<span class="fc bfc" id="L1746" title="All 2 branches covered.">        if (number instanceof String) {</span>
+<span class="fc" id="L1747">            String n = (String) number;</span>
+<span class="pc bpc" id="L1748" title="2 of 4 branches missed.">            if (n.length() == 0 || n.equals(&quot; &quot;)) {</span>
+<span class="nc" id="L1749">                return 0;</span>
+            }
+<span class="fc" id="L1751">            return Integer.parseInt(n);</span>
+        }
+<span class="fc bfc" id="L1753" title="All 2 branches covered.">        if (number instanceof Double) {</span>
+<span class="fc" id="L1754">            return ((Double) number).intValue();</span>
+        }
+<span class="pc bpc" id="L1756" title="1 of 2 branches missed.">        if (number instanceof Float) {</span>
+<span class="nc" id="L1757">            return ((Float) number).intValue();</span>
+        }
+<span class="pc bpc" id="L1759" title="1 of 2 branches missed.">        if (number instanceof Long) {</span>
+<span class="fc" id="L1760">            return ((Long) number).intValue();</span>
+        }
+        /*if(number instanceof Short) {
+            return ((Short)number).intValue();
+        }
+        if(number instanceof Byte) {
+            return ((Byte)number).intValue();
+        }*/
+<span class="nc bnc" id="L1768" title="All 2 branches missed.">        if (number instanceof Boolean) {</span>
+<span class="nc" id="L1769">            Boolean b = (Boolean) number;</span>
+<span class="nc bnc" id="L1770" title="All 2 branches missed.">            if (b.booleanValue()) {</span>
+<span class="nc" id="L1771">                return 1;</span>
+            }
+<span class="nc" id="L1773">            return 0;</span>
+        }
+<span class="nc" id="L1775">        throw new IllegalArgumentException(&quot;Not a number: &quot; + number);</span>
+    }
+
+    /**
+     * Returns the number object as a long
+     *
+     * @param number this can be a String or any number type
+     * @return a long value or an exception
+     */
+    public static long toLongValue(Object number) {
+        // we should convert this to use Number
+<span class="fc bfc" id="L1786" title="All 2 branches covered.">        if (number instanceof Long) {</span>
+<span class="fc" id="L1787">            return ((Long) number).longValue();</span>
+        }
+<span class="pc bpc" id="L1789" title="1 of 2 branches missed.">        if (number instanceof Integer) {</span>
+<span class="nc" id="L1790">            return ((Integer) number).longValue();</span>
+        }
+<span class="fc bfc" id="L1792" title="All 2 branches covered.">        if (number instanceof String) {</span>
+<span class="fc" id="L1793">            return Long.parseLong((String) number);</span>
+        }
+<span class="pc bpc" id="L1795" title="1 of 2 branches missed.">        if (number instanceof Double) {</span>
+<span class="fc" id="L1796">            return ((Double) number).longValue();</span>
+        }
+<span class="nc bnc" id="L1798" title="All 2 branches missed.">        if (number instanceof Float) {</span>
+<span class="nc" id="L1799">            return ((Float) number).longValue();</span>
+        }
+<span class="nc bnc" id="L1801" title="All 2 branches missed.">        if (number instanceof Date) {</span>
+<span class="nc" id="L1802">            return ((Date) number).getTime();</span>
+        }
+        /*if(number instanceof Short) {
+            return ((Short)number).longValue();
+        }
+        if(number instanceof Byte) {
+            return ((Byte)number).longValue();
+        }*/
+<span class="nc bnc" id="L1810" title="All 2 branches missed.">        if (number instanceof Boolean) {</span>
+<span class="nc" id="L1811">            Boolean b = (Boolean) number;</span>
+<span class="nc bnc" id="L1812" title="All 2 branches missed.">            if (b.booleanValue()) {</span>
+<span class="nc" id="L1813">                return 1;</span>
+            }
+<span class="nc" id="L1815">            return 0;</span>
+        }
+<span class="nc" id="L1817">        throw new IllegalArgumentException(&quot;Not a number: &quot; + number);</span>
+    }
+
+    /**
+     * Returns the number object as a float
+     *
+     * @param number this can be a String or any number type
+     * @return a float value or an exception
+     */
+    public static float toFloatValue(Object number) {
+        // we should convert this to use Number
+<span class="fc bfc" id="L1828" title="All 2 branches covered.">        if (number instanceof Float) {</span>
+<span class="fc" id="L1829">            return ((Float) number).floatValue();</span>
+        }
+<span class="pc bpc" id="L1831" title="1 of 2 branches missed.">        if (number instanceof Long) {</span>
+<span class="nc" id="L1832">            return ((Long) number).floatValue();</span>
+        }
+<span class="pc bpc" id="L1834" title="1 of 2 branches missed.">        if (number instanceof Integer) {</span>
+<span class="nc" id="L1835">            return ((Integer) number).floatValue();</span>
+        }
+<span class="pc bpc" id="L1837" title="1 of 2 branches missed.">        if (number instanceof String) {</span>
+<span class="fc" id="L1838">            return Float.parseFloat((String) number);</span>
+        }
+<span class="nc bnc" id="L1840" title="All 2 branches missed.">        if (number instanceof Double) {</span>
+<span class="nc" id="L1841">            return ((Double) number).floatValue();</span>
+        }
+        /*if(number instanceof Short) {
+            return ((Short)number).floatValue();
+        }
+        if(number instanceof Byte) {
+            return ((Byte)number).floatValue();
+        }*/
+<span class="nc bnc" id="L1849" title="All 2 branches missed.">        if (number instanceof Boolean) {</span>
+<span class="nc" id="L1850">            Boolean b = (Boolean) number;</span>
+<span class="nc bnc" id="L1851" title="All 2 branches missed.">            if (b.booleanValue()) {</span>
+<span class="nc" id="L1852">                return 1;</span>
+            }
+<span class="nc" id="L1854">            return 0;</span>
+        }
+<span class="nc" id="L1856">        throw new IllegalArgumentException(&quot;Not a number: &quot; + number);</span>
+    }
+
+    /**
+     * Returns the number object as a double
+     *
+     * @param number this can be a String or any number type
+     * @return a double value or an exception
+     */
+    public static double toDoubleValue(Object number) {
+        // we should convert this to use Number
+<span class="fc bfc" id="L1867" title="All 2 branches covered.">        if (number instanceof Double) {</span>
+<span class="fc" id="L1868">            return ((Double) number).doubleValue();</span>
+        }
+<span class="pc bpc" id="L1870" title="1 of 2 branches missed.">        if (number instanceof Float) {</span>
+<span class="nc" id="L1871">            return ((Float) number).doubleValue();</span>
+        }
+<span class="pc bpc" id="L1873" title="1 of 2 branches missed.">        if (number instanceof Long) {</span>
+<span class="nc" id="L1874">            return ((Long) number).doubleValue();</span>
+        }
+<span class="fc bfc" id="L1876" title="All 2 branches covered.">        if (number instanceof Integer) {</span>
+<span class="fc" id="L1877">            return ((Integer) number).doubleValue();</span>
+        }
+<span class="pc bpc" id="L1879" title="1 of 2 branches missed.">        if (number instanceof String) {</span>
+<span class="fc" id="L1880">            return Double.parseDouble((String) number);</span>
+        }
+        /*if(number instanceof Short) {
+            return ((Short)number).doubleValue();
+        }
+        if(number instanceof Byte) {
+            return ((Byte)number).doubleValue();
+        }*/
+<span class="nc bnc" id="L1888" title="All 2 branches missed.">        if (number instanceof Boolean) {</span>
+<span class="nc" id="L1889">            Boolean b = (Boolean) number;</span>
+<span class="nc bnc" id="L1890" title="All 2 branches missed.">            if (b.booleanValue()) {</span>
+<span class="nc" id="L1891">                return 1;</span>
+            }
+<span class="nc" id="L1893">            return 0;</span>
+        }
+<span class="nc" id="L1895">        throw new IllegalArgumentException(&quot;Not a number: &quot; + number);</span>
+    }
+
+    /**
+     * Sets a custom formatter to use when toDateValue is invoked
+     *
+     * @param formatter the formatter to use
+     */
+    public static void setDateFormatter(SimpleDateFormat formatter) {
+<span class="nc" id="L1904">        dateFormatter = formatter;</span>
+<span class="nc" id="L1905">    }</span>
+
+    /**
+     * Tries to convert an arbitrary object to a date
+     *
+     * @param o an object that can be a string, number or date
+     * @return a Date object
+     */
+    public static Date toDateValue(Object o) {
+<span class="pc bpc" id="L1914" title="1 of 2 branches missed.">        if (o == null) {</span>
+<span class="nc" id="L1915">            return null;</span>
+        }
+<span class="fc bfc" id="L1917" title="All 2 branches covered.">        if (o instanceof Date) {</span>
+<span class="fc" id="L1918">            return (Date) o;</span>
+        }
+<span class="pc bpc" id="L1920" title="1 of 2 branches missed.">        if (o instanceof String) {</span>
+<span class="pc bpc" id="L1921" title="1 of 2 branches missed.">            if (dateFormatter != null) {</span>
+                try {
+<span class="nc" id="L1923">                    return dateFormatter.parse((String) o);</span>
+<span class="nc" id="L1924">                } catch (ParseException e) {</span>
+                    // falls back to the default formatting
+<span class="nc" id="L1926">                    Log.e(e);</span>
+                }
+            }
+            try {
+<span class="fc" id="L1930">                return new SimpleDateFormat(&quot;yyyy-MM-dd'T'HH:mm:ss.SSS&quot;).parse((String) o);</span>
+<span class="nc" id="L1931">            } catch (ParseException e) {</span>
+<span class="nc" id="L1932">                throw new IllegalArgumentException(&quot;Not a supported date, we use this format 'yyyy-MM-dd'T'HH:mm:ss.SSS': &quot; + o);</span>
+            }
+        }
+<span class="nc" id="L1935">        return new Date(toLongValue(o));</span>
+    }
+
+    /**
+     * Encodes a string in a way that makes it harder to read it &quot;as is&quot; this makes it possible for Strings to be
+     * &quot;encoded&quot; within the app and thus harder to discover by a casual search.
+     *
+     * @param s the string to decode
+     * @return the decoded string
+     */
+    public static String xorDecode(String s) {
+        try {
+<span class="nc" id="L1947">            byte[] dat = Base64.decode(s.getBytes(&quot;UTF-8&quot;));</span>
+<span class="nc bnc" id="L1948" title="All 2 branches missed.">            for (int iter = 0; iter &lt; dat.length; iter++) {</span>
+<span class="nc" id="L1949">                dat[iter] = (byte) (dat[iter] ^ (iter % 254 + 1));</span>
+            }
+<span class="nc" id="L1951">            return new String(dat, &quot;UTF-8&quot;);</span>
+<span class="nc" id="L1952">        } catch (UnsupportedEncodingException err) {</span>
+            // will never happen damn stupid exception
+<span class="nc" id="L1954">            err.printStackTrace();</span>
+<span class="nc" id="L1955">            return null;</span>
+        }
+    }
+
+    /**
+     * The inverse method of xorDecode, this is normally unnecessary and is here mostly for completeness
+     *
+     * @param s a regular string
+     * @return a String that can be used in the xorDecode method
+     */
+    public static String xorEncode(String s) {
+        try {
+<span class="nc" id="L1967">            byte[] dat = s.getBytes(&quot;UTF-8&quot;);</span>
+<span class="nc bnc" id="L1968" title="All 2 branches missed.">            for (int iter = 0; iter &lt; dat.length; iter++) {</span>
+<span class="nc" id="L1969">                dat[iter] = (byte) (dat[iter] ^ (iter % 254 + 1));</span>
+            }
+<span class="nc" id="L1971">            return Base64.encodeNoNewline(dat);</span>
+<span class="nc" id="L1972">        } catch (UnsupportedEncodingException err) {</span>
+            // will never happen damn stupid exception
+<span class="nc" id="L1974">            err.printStackTrace();</span>
+<span class="nc" id="L1975">            return null;</span>
+        }
+    }
+
+    /**
+     * Tries to determine the mime type of a file based on its first
+     * bytes.Direct inspection of the bytes to determine the content type is
+     * often more accurate than believing the content type claimed by the
+     * &lt;code&gt;http&lt;/code&gt; server or by the file extension.
+     *
+     * @param sourceFile, it automatically choose Storage API or
+     *                    FileSystemStorage API
+     * @return the detected mime type, or &quot;application/octet-stream&quot; if the type
+     * is not detected
+     * @throws IOException
+     */
+    public static String guessMimeType(String sourceFile) throws IOException {
+        InputStream inputStream;
+<span class="nc bnc" id="L1993" title="All 2 branches missed.">        if (sourceFile.indexOf('/') &gt; -1) {</span>
+<span class="nc" id="L1994">            inputStream = FileSystemStorage.getInstance().openInputStream(sourceFile);</span>
+        } else {
+            // Storage is a flat file system
+<span class="nc" id="L1997">            inputStream = Storage.getInstance().createInputStream(sourceFile);</span>
+        }
+
+<span class="nc" id="L2000">        return guessMimeType(inputStream);</span>
+    }
+
+    /**
+     * Tries to determine the mime type of an InputStream based on its first
+     * bytes.Direct inspection of the bytes to determine the content type is
+     * often more accurate than believing the content type claimed by the
+     * &lt;code&gt;http&lt;/code&gt; server or by the file extension.
+     *
+     * @param in
+     * @return the detected mime type, or &quot;application/octet-stream&quot; if the type
+     * is not detected
+     * @throws IOException
+     */
+    public static String guessMimeType(InputStream in) throws IOException {
+<span class="nc" id="L2015">        byte[] header = new byte[11];</span>
+<span class="nc" id="L2016">        in.read(header, 0, 11);</span>
+<span class="nc" id="L2017">        return guessMimeType(header);</span>
+    }
+
+    /**
+     * Tries to determine the mime type of a byte array based on its first
+     * bytes.Direct inspection of the bytes to determine the content type is
+     * often more accurate than believing the content type claimed by the
+     * &lt;code&gt;http&lt;/code&gt; server or by the file extension.
+     *
+     * @param data
+     * @return the detected mime type, or &quot;application/octet-stream&quot; if the type
+     * is not detected
+     */
+    public static String guessMimeType(byte[] data) {
+        // I took the most of header codes from: https://github.com/Servoy/servoy-client/blob/e7f5bce3c3dc0f0eb1cd240fce48c75143a25432/servoy_shared/src/com/servoy/j2db/util/MimeTypes.java
+        // For further reference, the header codes used by OpenJDK8 are here: https://github.com/frohoff/jdk8u-dev-jdk/blob/master/src/share/classes/java/net/URLConnection.java
+        // This method can be improved according to the needs.
+
+<span class="nc bnc" id="L2035" title="All 4 branches missed.">        if (data == null || data.length == 0) {</span>
+<span class="nc" id="L2036">            throw new IllegalArgumentException(&quot;guessMimeType(byte[] data) -&gt; data cannot be empty or null&quot;);</span>
+        }
+        // If you change the number of byte, REMEMBER to change that number also in the method guessMimeType(InputStream in)
+<span class="nc" id="L2039">        byte[] header = new byte[11];</span>
+<span class="nc" id="L2040">        System.arraycopy(data, 0, header, 0, Math.min(data.length, header.length));</span>
+<span class="nc" id="L2041">        int c1 = header[0] &amp; 0xff;</span>
+<span class="nc" id="L2042">        int c2 = header[1] &amp; 0xff;</span>
+<span class="nc" id="L2043">        int c3 = header[2] &amp; 0xff;</span>
+<span class="nc" id="L2044">        int c4 = header[3] &amp; 0xff;</span>
+<span class="nc" id="L2045">        int c5 = header[4] &amp; 0xff;</span>
+<span class="nc" id="L2046">        int c6 = header[5] &amp; 0xff;</span>
+<span class="nc" id="L2047">        int c7 = header[6] &amp; 0xff;</span>
+<span class="nc" id="L2048">        int c8 = header[7] &amp; 0xff;</span>
+<span class="nc" id="L2049">        int c9 = header[8] &amp; 0xff;</span>
+<span class="nc" id="L2050">        int c10 = header[9] &amp; 0xff;</span>
+<span class="nc" id="L2051">        int c11 = header[10] &amp; 0xff;</span>
+
+<span class="nc bnc" id="L2053" title="All 8 branches missed.">        if (c1 == 0xCA &amp;&amp; c2 == 0xFE &amp;&amp; c3 == 0xBA &amp;&amp; c4 == 0xBE) {</span>
+<span class="nc" id="L2054">            return &quot;application/java-vm&quot;;</span>
+        }
+
+<span class="nc bnc" id="L2057" title="All 16 branches missed.">        if (c1 == 0xD0 &amp;&amp; c2 == 0xCF &amp;&amp; c3 == 0x11 &amp;&amp; c4 == 0xE0 &amp;&amp; c5 == 0xA1 &amp;&amp; c6 == 0xB1 &amp;&amp; c7 == 0x1A &amp;&amp; c8 == 0xE1) {</span>
+<span class="nc" id="L2058">            return &quot;application/msword&quot;;</span>
+        }
+<span class="nc bnc" id="L2060" title="All 14 branches missed.">        if (c1 == 0x25 &amp;&amp; c2 == 0x50 &amp;&amp; c3 == 0x44 &amp;&amp; c4 == 0x46 &amp;&amp; c5 == 0x2d &amp;&amp; c6 == 0x31 &amp;&amp; c7 == 0x2e) {</span>
+<span class="nc" id="L2061">            return &quot;application/pdf&quot;;</span>
+        }
+
+<span class="nc bnc" id="L2064" title="All 12 branches missed.">        if (c1 == 0x38 &amp;&amp; c2 == 0x42 &amp;&amp; c3 == 0x50 &amp;&amp; c4 == 0x53 &amp;&amp; c5 == 0x00 &amp;&amp; c6 == 0x01) {</span>
+<span class="nc" id="L2065">            return &quot;image/photoshop&quot;;</span>
+        }
+
+<span class="nc bnc" id="L2068" title="All 8 branches missed.">        if (c1 == 0x25 &amp;&amp; c2 == 0x21 &amp;&amp; c3 == 0x50 &amp;&amp; c4 == 0x53) {</span>
+<span class="nc" id="L2069">            return &quot;application/postscript&quot;;</span>
+        }
+
+<span class="nc bnc" id="L2072" title="All 6 branches missed.">        if (c1 == 0xff &amp;&amp; c2 == 0xfb &amp;&amp; c3 == 0x30) {</span>
+<span class="nc" id="L2073">            return &quot;audio/mp3&quot;;</span>
+        }
+
+<span class="nc bnc" id="L2076" title="All 6 branches missed.">        if (c1 == 0x49 &amp;&amp; c2 == 0x44 &amp;&amp; c3 == 0x33) {</span>
+<span class="nc" id="L2077">            return &quot;audio/mp3&quot;;</span>
+        }
+
+<span class="nc bnc" id="L2080" title="All 4 branches missed.">        if (c1 == 0xAC &amp;&amp; c2 == 0xED) {</span>
+            // next two bytes are version number, currently 0x00 0x05
+<span class="nc" id="L2082">            return &quot;application/x-java-serialized-object&quot;;</span>
+        }
+
+<span class="nc bnc" id="L2085" title="All 2 branches missed.">        if (c1 == '&lt;') {</span>
+<span class="nc bnc" id="L2086" title="All 46 branches missed.">            if (c2 == '!'</span>
+                    || ((c2 == 'h' &amp;&amp; (c3 == 't' &amp;&amp; c4 == 'm' &amp;&amp; c5 == 'l' || c3 == 'e' &amp;&amp; c4 == 'a' &amp;&amp; c5 == 'd') || (c2 == 'b' &amp;&amp; c3 == 'o' &amp;&amp; c4 == 'd' &amp;&amp; c5 == 'y')))
+                    || ((c2 == 'H' &amp;&amp; (c3 == 'T' &amp;&amp; c4 == 'M' &amp;&amp; c5 == 'L' || c3 == 'E' &amp;&amp; c4 == 'A' &amp;&amp; c5 == 'D') || (c2 == 'B' &amp;&amp; c3 == 'O' &amp;&amp; c4 == 'D' &amp;&amp; c5 == 'Y')))) {
+<span class="nc" id="L2089">                return &quot;text/html&quot;;</span>
+            }
+
+<span class="nc bnc" id="L2092" title="All 10 branches missed.">            if (c2 == '?' &amp;&amp; c3 == 'x' &amp;&amp; c4 == 'm' &amp;&amp; c5 == 'l' &amp;&amp; c6 == ' ') {</span>
+<span class="nc" id="L2093">                return &quot;application/xml&quot;;</span>
+            }
+        }
+
+        // big and little endian UTF-16 encodings, with byte order mark
+<span class="nc bnc" id="L2098" title="All 4 branches missed.">        if (c1 == 0xfe &amp;&amp; c2 == 0xff) {</span>
+<span class="nc bnc" id="L2099" title="All 12 branches missed.">            if (c3 == 0 &amp;&amp; c4 == '&lt;' &amp;&amp; c5 == 0 &amp;&amp; c6 == '?' &amp;&amp; c7 == 0 &amp;&amp; c8 == 'x') {</span>
+<span class="nc" id="L2100">                return &quot;application/xml&quot;;</span>
+            }
+        }
+
+<span class="nc bnc" id="L2104" title="All 4 branches missed.">        if (c1 == 0xff &amp;&amp; c2 == 0xfe) {</span>
+<span class="nc bnc" id="L2105" title="All 12 branches missed.">            if (c3 == '&lt;' &amp;&amp; c4 == 0 &amp;&amp; c5 == '?' &amp;&amp; c6 == 0 &amp;&amp; c7 == 'x' &amp;&amp; c8 == 0) {</span>
+<span class="nc" id="L2106">                return &quot;application/xml&quot;;</span>
+            }
+        }
+
+<span class="nc bnc" id="L2110" title="All 4 branches missed.">        if (c1 == 'B' &amp;&amp; c2 == 'M') {</span>
+<span class="nc" id="L2111">            return &quot;image/bmp&quot;;</span>
+        }
+
+<span class="nc bnc" id="L2114" title="All 8 branches missed.">        if (c1 == 0x49 &amp;&amp; c2 == 0x49 &amp;&amp; c3 == 0x2a &amp;&amp; c4 == 0x00) {</span>
+<span class="nc" id="L2115">            return &quot;image/tiff&quot;;</span>
+        }
+
+<span class="nc bnc" id="L2118" title="All 8 branches missed.">        if (c1 == 0x4D &amp;&amp; c2 == 0x4D &amp;&amp; c3 == 0x00 &amp;&amp; c4 == 0x2a) {</span>
+<span class="nc" id="L2119">            return &quot;image/tiff&quot;;</span>
+        }
+
+<span class="nc bnc" id="L2122" title="All 8 branches missed.">        if (c1 == 'G' &amp;&amp; c2 == 'I' &amp;&amp; c3 == 'F' &amp;&amp; c4 == '8') {</span>
+<span class="nc" id="L2123">            return &quot;image/gif&quot;;</span>
+        }
+
+<span class="nc bnc" id="L2126" title="All 8 branches missed.">        if (c1 == '#' &amp;&amp; c2 == 'd' &amp;&amp; c3 == 'e' &amp;&amp; c4 == 'f') {</span>
+<span class="nc" id="L2127">            return &quot;image/x-bitmap&quot;;</span>
+        }
+
+<span class="nc bnc" id="L2130" title="All 12 branches missed.">        if (c1 == '!' &amp;&amp; c2 == ' ' &amp;&amp; c3 == 'X' &amp;&amp; c4 == 'P' &amp;&amp; c5 == 'M' &amp;&amp; c6 == '2') {</span>
+<span class="nc" id="L2131">            return &quot;image/x-pixmap&quot;;</span>
+        }
+
+<span class="nc bnc" id="L2134" title="All 16 branches missed.">        if (c1 == 137 &amp;&amp; c2 == 80 &amp;&amp; c3 == 78 &amp;&amp; c4 == 71 &amp;&amp; c5 == 13 &amp;&amp; c6 == 10 &amp;&amp; c7 == 26 &amp;&amp; c8 == 10) {</span>
+<span class="nc" id="L2135">            return &quot;image/png&quot;;</span>
+        }
+
+<span class="nc bnc" id="L2138" title="All 6 branches missed.">        if (c1 == 0xFF &amp;&amp; c2 == 0xD8 &amp;&amp; c3 == 0xFF) {</span>
+<span class="nc bnc" id="L2139" title="All 2 branches missed.">            if (c4 == 0xE0) {</span>
+<span class="nc" id="L2140">                return &quot;image/jpeg&quot;;</span>
+            }
+
+            /**
+             * File format used by digital cameras to store images. Exif Format
+             * can be read by any application supporting JPEG. Exif Spec can be
+             * found at:
+             * http://www.pima.net/standards/it10/PIMA15740/Exif_2-1.PDF
+             */
+<span class="nc bnc" id="L2149" title="All 12 branches missed.">            if ((c4 == 0xE1) &amp;&amp; (c7 == 'E' &amp;&amp; c8 == 'x' &amp;&amp; c9 == 'i' &amp;&amp; c10 == 'f' &amp;&amp; c11 == 0)) {</span>
+<span class="nc" id="L2150">                return &quot;image/jpeg&quot;;</span>
+            }
+
+<span class="nc bnc" id="L2153" title="All 2 branches missed.">            if (c4 == 0xEE) {</span>
+<span class="nc" id="L2154">                return &quot;image/jpg&quot;;</span>
+            }
+        }
+
+        /**
+         * According to
+         * http://www.opendesign.com/files/guestdownloads/OpenDesign_Specification_for_.dwg_files.pdf
+         * first 6 bytes are of type &quot;AC1018&quot; (for example) and the next 5 bytes
+         * are 0x00.
+         */
+<span class="nc bnc" id="L2164" title="All 14 branches missed.">        if ((c1 == 0x41 &amp;&amp; c2 == 0x43) &amp;&amp; (c7 == 0x00 &amp;&amp; c8 == 0x00 &amp;&amp; c9 == 0x00 &amp;&amp; c10 == 0x00 &amp;&amp; c11 == 0x00)) {</span>
+<span class="nc" id="L2165">            return &quot;application/acad&quot;;</span>
+        }
+
+<span class="nc bnc" id="L2168" title="All 8 branches missed.">        if (c1 == 0x2E &amp;&amp; c2 == 0x73 &amp;&amp; c3 == 0x6E &amp;&amp; c4 == 0x64) {</span>
+<span class="nc" id="L2169">            return &quot;audio/basic&quot;; // .au</span>
+            // format,
+            // big
+            // endian
+        }
+
+<span class="nc bnc" id="L2175" title="All 8 branches missed.">        if (c1 == 0x64 &amp;&amp; c2 == 0x6E &amp;&amp; c3 == 0x73 &amp;&amp; c4 == 0x2E) {</span>
+<span class="nc" id="L2176">            return &quot;audio/basic&quot;; // .au</span>
+            // format,
+            // little
+            // endian
+        }
+
+<span class="nc bnc" id="L2182" title="All 8 branches missed.">        if (c1 == 'R' &amp;&amp; c2 == 'I' &amp;&amp; c3 == 'F' &amp;&amp; c4 == 'F') {</span>
+            /*
+             * I don't know if this is official but evidence suggests that .wav files start with &quot;RIFF&quot; - brown
+             */
+<span class="nc" id="L2186">            return &quot;audio/x-wav&quot;;</span>
+        }
+
+<span class="nc bnc" id="L2189" title="All 4 branches missed.">        if (c1 == 'P' &amp;&amp; c2 == 'K') {</span>
+<span class="nc" id="L2190">            return &quot;application/zip&quot;;</span>
+        }
+
+<span class="nc" id="L2193">        return &quot;application/octet-stream&quot;; // unknown file type</span>
+    }
+
+    /**
+     * Returns -1 if the content length is unknown, a value greater than 0 if
+     * the Content-Length is known.
+     *
+     * @param url
+     * @return Content-Length if known
+     */
+    public static long getFileSizeWithoutDownload(final String url) {
+<span class="nc" id="L2204">        return getFileSizeWithoutDownload(url, false);</span>
+    }
+
+    /**
+     * Returns -2 if the server doesn't accept partial downloads (and if
+     * checkPartialDownloadSupport is true), -1 if the content length is unknow,
+     * a value greater than 0 if the Content-Length is known.
+     *
+     * @param url
+     * @param checkPartialDownloadSupport if true returns -2 if the server
+     *                                    doesn't accept partial downloads.
+     * @return Content-Length if known
+     */
+    public static long getFileSizeWithoutDownload(final String url, final boolean checkPartialDownloadSupport) {
+        // documentation about the headers: https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests
+        // code discussed here: https://stackoverflow.com/a/62130371
+<span class="nc" id="L2220">        final Wrapper&lt;Long&gt; result = new Wrapper&lt;Long&gt;(0l);</span>
+<span class="nc" id="L2221">        ConnectionRequest cr = new GZConnectionRequest() {</span>
+            @Override
+            protected void readHeaders(Object connection) throws IOException {
+<span class="nc" id="L2224">                String acceptRanges = getHeader(connection, &quot;Accept-Ranges&quot;);</span>
+<span class="nc bnc" id="L2225" title="All 6 branches missed.">                if (checkPartialDownloadSupport &amp;&amp; (acceptRanges == null || !acceptRanges.equals(&quot;bytes&quot;))) {</span>
+                    // Log.p(&quot;The partial downloads of &quot; + url + &quot; are not supported.&quot;, Log.WARNING);
+<span class="nc" id="L2227">                    result.set(-2l);</span>
+                } else {
+<span class="nc" id="L2229">                    String contentLength = getHeader(connection, &quot;Content-Length&quot;);</span>
+<span class="nc bnc" id="L2230" title="All 2 branches missed.">                    if (contentLength != null) {</span>
+<span class="nc" id="L2231">                        result.set(Long.parseLong(contentLength));</span>
+                    } else {
+                        // Log.p(&quot;The Content-Length of &quot; + url + &quot; is unknown.&quot;, Log.WARNING);
+<span class="nc" id="L2234">                        result.set(-1l);</span>
+                    }
+                }
+<span class="nc" id="L2237">            }</span>
+        };
+<span class="nc" id="L2239">        cr.setUrl(url);</span>
+<span class="nc" id="L2240">        cr.setHttpMethod(&quot;HEAD&quot;);</span>
+<span class="nc" id="L2241">        cr.setPost(false);</span>
+<span class="nc" id="L2242">        NetworkManager.getInstance().addToQueueAndWait(cr);</span>
+<span class="nc" id="L2243">        return result.get();</span>
+    }
+
+    /**
+     * &lt;p&gt;
+     * Safely download the given URL to the Storage or to the FileSystemStorage:
+     * this method is resistant to network errors and capable of resume the
+     * download as soon as network conditions allow and in a completely
+     * transparent way for the user; note that in the global network error
+     * handling, there must be an automatic
+     * &lt;pre&gt;.retry()&lt;/pre&gt;, as in the code example below.&lt;/p&gt;
+     * &lt;p&gt;
+     * This method is useful if the server correctly returns Content-Length and
+     * if it supports partial downloads: if not, it works like a normal
+     * download.&lt;/p&gt;
+     * &lt;p&gt;
+     * Pros: always allows you to complete downloads, even if very heavy (e.g.
+     * 100MB), even if the connection is unstable (network errors) and even if
+     * the app goes temporarily in the background (on some platforms the
+     * download will continue in the background, on others it will be
+     * temporarily suspended).&lt;/p&gt;
+     * &lt;p&gt;
+     * Cons: since this method is based on splitting the download into small
+     * parts (512kbytes is the default), this approach causes many GET requests
+     * that slightly slow down the download and cause more traffic than normally
+     * needed.&lt;/p&gt;
+     * &lt;p&gt;
+     * Usage example:&lt;/p&gt;
+     * &lt;script src=&quot;https://gist.github.com/jsfan3/554590a12c3102a3d77e17533e7eca98.js&quot;&gt;&lt;/script&gt;
+     *
+     * @param url
+     * @param fileName           must be a valid Storage file name or FileSystemStorage
+     *                           file path
+     * @param percentageCallback invoked (in EDT) during the download to notify
+     *                           the progress (from 0 to 100); it can be null if you are not interested in
+     *                           monitoring the progress
+     * @param filesavedCallback  invoked (in EDT) only when the download is
+     *                           finished; if null, no action is taken
+     * @throws IOException
+     */
+    public static void downloadUrlSafely(String url, final String fileName, final OnComplete&lt;Integer&gt; percentageCallback, final OnComplete&lt;String&gt; filesavedCallback) throws IOException {
+        // Code discussion here: https://stackoverflow.com/a/62137379/1277576
+<span class="nc" id="L2285">        String partialDownloadsDir = FileSystemStorage.getInstance().getAppHomePath() + FileSystemStorage.getInstance().getFileSystemSeparator() + &quot;partialDownloads&quot;;</span>
+<span class="nc bnc" id="L2286" title="All 2 branches missed.">        if (!FileSystemStorage.getInstance().isDirectory(partialDownloadsDir)) {</span>
+<span class="nc" id="L2287">            FileSystemStorage.getInstance().mkdir(partialDownloadsDir);</span>
+        }
+<span class="nc" id="L2289">        final String uniqueId = url.hashCode() + &quot;&quot; + downloadUrlSafelyRandom.nextInt(); // do its best to be unique if there are parallel downloads</span>
+<span class="nc" id="L2290">        final String partialDownloadPath = partialDownloadsDir + FileSystemStorage.getInstance().getFileSystemSeparator() + uniqueId;</span>
+<span class="nc bnc" id="L2291" title="All 2 branches missed.">        final boolean isStorage = fileName.indexOf(&quot;/&quot;) &lt; 0; // as discussed here: https://stackoverflow.com/a/57984257</span>
+<span class="nc" id="L2292">        final long fileSize = getFileSizeWithoutDownload(url, true); // total expected download size, with a check partial download support</span>
+<span class="nc" id="L2293">        final int splittingSize = 512 * 1024; // 512 kbyte, size of each small download</span>
+<span class="nc" id="L2294">        final Wrapper&lt;Long&gt; downloadedTotalBytes = new Wrapper&lt;Long&gt;(0l);</span>
+        final OutputStream out;
+<span class="nc bnc" id="L2296" title="All 2 branches missed.">        if (isStorage) {</span>
+<span class="nc" id="L2297">            out = Storage.getInstance().createOutputStream(fileName); // leave it open to append partial downloads</span>
+        } else {
+<span class="nc" id="L2299">            out = FileSystemStorage.getInstance().openOutputStream(fileName);</span>
+        }
+<span class="nc" id="L2301">        final EasyThread mergeFilesThread = EasyThread.start(&quot;mergeFilesThread&quot;); // Codename One thread that supports crash protection and similar Codename One features.</span>
+
+<span class="nc" id="L2303">        final ConnectionRequest cr = new GZConnectionRequest();</span>
+<span class="nc" id="L2304">        cr.setUrl(url);</span>
+<span class="nc" id="L2305">        cr.setPost(false);</span>
+<span class="nc bnc" id="L2306" title="All 2 branches missed.">        if (fileSize &gt; splittingSize) {</span>
+            // Which byte should the download start from?
+<span class="nc" id="L2308">            cr.addRequestHeader(&quot;Range&quot;, &quot;bytes=0-&quot; + splittingSize);</span>
+<span class="nc" id="L2309">            cr.setDestinationFile(partialDownloadPath);</span>
+        } else {
+<span class="nc" id="L2311">            Util.cleanup(out);</span>
+<span class="nc bnc" id="L2312" title="All 2 branches missed.">            if (isStorage) {</span>
+<span class="nc" id="L2313">                cr.setDestinationStorage(fileName);</span>
+            } else {
+<span class="nc" id="L2315">                cr.setDestinationFile(fileName);</span>
+            }
+        }
+<span class="nc" id="L2318">        cr.addResponseListener(new ActionListener&lt;NetworkEvent&gt;() {</span>
+            @Override
+            public void actionPerformed(NetworkEvent evt) {
+<span class="nc" id="L2321">                mergeFilesThread.run(new Runnable() {</span>
+                    @Override
+                    public void run() {
+                        try {
+                            // We append the just saved partial download to the fileName, if it exists
+<span class="nc bnc" id="L2326" title="All 2 branches missed.">                            if (FileSystemStorage.getInstance().exists(partialDownloadPath)) {</span>
+<span class="nc" id="L2327">                                InputStream in = FileSystemStorage.getInstance().openInputStream(partialDownloadPath);</span>
+<span class="nc" id="L2328">                                Util.copyNoClose(in, out, 8192);</span>
+<span class="nc" id="L2329">                                Util.cleanup(in);</span>
+                                // before deleting the file, we check and update how much data we have actually downloaded
+<span class="nc" id="L2331">                                downloadedTotalBytes.set(downloadedTotalBytes.get() + FileSystemStorage.getInstance().getLength(partialDownloadPath));</span>
+<span class="nc" id="L2332">                                FileSystemStorage.getInstance().delete(partialDownloadPath);</span>
+                            }
+                            // Is the download finished?
+<span class="nc bnc" id="L2335" title="All 2 branches missed.">                            if (downloadedTotalBytes.get() &gt; fileSize) {</span>
+<span class="nc" id="L2336">                                throw new IllegalStateException(&quot;More content has been downloaded than the file length, check the code.&quot;);</span>
+                            }
+<span class="nc bnc" id="L2338" title="All 4 branches missed.">                            if (fileSize &lt;= 0 || downloadedTotalBytes.get() == fileSize) {</span>
+                                // yes, download finished
+<span class="nc" id="L2340">                                Util.cleanup(out);</span>
+<span class="nc bnc" id="L2341" title="All 2 branches missed.">                                if (filesavedCallback != null) {</span>
+<span class="nc" id="L2342">                                    CN.callSerially(new Runnable() {</span>
+                                        @Override
+                                        public void run() {
+<span class="nc" id="L2345">                                            filesavedCallback.completed(fileName);</span>
+<span class="nc" id="L2346">                                        }</span>
+                                    });
+                                }
+                            } else {
+                                // no, it's not finished, we repeat the request after updating the &quot;Range&quot; header
+<span class="nc" id="L2351">                                cr.addRequestHeader(&quot;Range&quot;, &quot;bytes=&quot; + downloadedTotalBytes.get() + &quot;-&quot; + (Math.min(downloadedTotalBytes.get() + splittingSize, fileSize)));</span>
+<span class="nc" id="L2352">                                NetworkManager.getInstance().addToQueue(cr);</span>
+                            }
+
+<span class="nc" id="L2355">                        } catch (IOException ex) {</span>
+<span class="nc" id="L2356">                            Log.p(&quot;Error in appending splitted file to output file&quot;, Log.ERROR);</span>
+<span class="nc" id="L2357">                            Log.e(ex);</span>
+<span class="nc" id="L2358">                            Log.sendLogAsync();</span>
+<span class="nc" id="L2359">                        }</span>
+<span class="nc" id="L2360">                    }</span>
+                });
+<span class="nc" id="L2362">            }</span>
+        });
+<span class="nc" id="L2364">        NetworkManager.getInstance().addToQueue(cr);</span>
+<span class="nc" id="L2365">        NetworkManager.getInstance().addProgressListener(new ActionListener&lt;NetworkEvent&gt;() {</span>
+            @Override
+            public void actionPerformed(NetworkEvent evt) {
+<span class="nc bnc" id="L2368" title="All 4 branches missed.">                if (cr == evt.getConnectionRequest() &amp;&amp; fileSize &gt; 0) {</span>
+                    // the following casting to long is necessary when the file is bigger than 21MB, otherwise the result of the calculation is wrong
+<span class="nc bnc" id="L2370" title="All 2 branches missed.">                    if (percentageCallback != null) {</span>
+<span class="nc" id="L2371">                        CN.callSerially(new Runnable() {</span>
+                            @Override
+                            public void run() {
+<span class="nc" id="L2374">                                percentageCallback.completed((int) ((long) downloadedTotalBytes.get() * 100 / fileSize));</span>
+<span class="nc" id="L2375">                            }</span>
+                        });
+                    }
+                }
+<span class="nc" id="L2379">            }</span>
+        });
+<span class="nc" id="L2381">    }</span>
+
+    /**
+     * &lt;p&gt;
+     * Creates a new UUID, that is a 128-bit number used to identify information
+     * in computer systems. UUIDs aim to be unique for practical purposes.&lt;/p&gt;
+     *
+     * &lt;p&gt;
+     * This implementation uses the system clock and some device info as seeds
+     * for random data, that are enough for practical usage. More specifically,
+     * two instances of Random, instantiated with different seeds, are used. The
+     * first seed corresponds to the timestamp in which the first object of the
+     * static class UUID is created, the second seed is a number (long type)
+     * that identifies the current installation of the app and is assumed to be
+     * as different as possible from other installations of the app. A unique
+     * identifier (long type) associated with the current app installation can
+     * be specified by the developer via the Preference &quot;CustomDeviceId__$&quot; (as
+     * in the following example) BEFORE the generation of the first UIID, or -
+     * if it is not specified - it is obtained from an internal Codename One
+     * implementation; in the worst case, if an identifier has not been
+     * specified by the developer and Codename One is unable to distinguish the
+     * current installation of the app from other installations, an internal
+     * algorithm will be used that will generate a number based on some hardware
+     * and software characteristics of the device: the number thus generated
+     * will be the same on identical models of the same device and with the same
+     * version of the operating system, but will vary between different models.
+     * Even in the worst case scenario, the probability that two app
+     * installations with identical device identifiers will generate the first
+     * UIID in the same timestamp is very low.&lt;/p&gt;
+     *
+     * &lt;p&gt;
+     * As a tip, consider that any alphanumeric text string (corresponding for
+     * example to a username) can be converted into a long type number,
+     * considering this string as a number based on 36, provided it does not
+     * exceed 12 characters. This suggestion is applied in the following
+     * example.&lt;/p&gt;
+     *
+     * &lt;p&gt;
+     * Code example:&lt;/p&gt;
+     * &lt;script src=&quot;https://gist.github.com/jsfan3/2fdc5fae2b723cba40e65faab923e552.js&quot;&gt;&lt;/script&gt;
+     *
+     * @return a pseudo-random Universally Unique Identifier in its canonical
+     * textual representation
+     */
+    public static String getUUID() {
+<span class="fc" id="L2426">        return new Util.UUID().toString();</span>
+    }
+
+    /**
+     * Creates a custom UUID, from the given two &lt;code&gt;long&lt;/code&gt; values.
+     *
+     * @param time            the upper 64 bits
+     * @param clockSeqAndNode the lower 64 bits
+     * @return a Universally Unique Identifier in its canonical textual
+     * representation
+     */
+    public static String getUUID(long time, long clockSeqAndNode) {
+<span class="fc" id="L2438">        return new Util.UUID(time, clockSeqAndNode).toString();</span>
+    }
+
+    /**
+     * This class represents an UUID according to the DCE Universal Token
+     * Identifier specification.
+     * &lt;p&gt;
+     * All you need to know:
+     * &lt;pre&gt;
+     * UUID u = new UUID().toString();
+     * &lt;/pre&gt;
+     */
+    static class UUID {
+
+        /*
+         * UUID - an implementation of the UUID specification for Codename One
+         * by Francesco Galgani
+         *
+         * You can use this class as you want (public-domain license).
+         */
+<span class="fc" id="L2458">        private static final char[] DIGITS = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};</span>
+<span class="fc" id="L2459">        private static final Random randomTime = new Random(System.currentTimeMillis());</span>
+<span class="fc" id="L2460">        private static final Random randomClockSeqAndNode = new Random(getUniqueDeviceID());</span>
+
+<span class="fc" id="L2462">        private long time = 0l;</span>
+<span class="fc" id="L2463">        private long clockSeqAndNode = 0l;</span>
+
+        /**
+         * Constructor for UUID, it uses the system clock and some device info
+         * as seeds for random data, that are enough for practical usage.
+         */
+<span class="fc" id="L2469">        public UUID() {</span>
+<span class="fc" id="L2470">            this.time = randomTime.nextLong();</span>
+<span class="fc" id="L2471">            this.clockSeqAndNode = randomClockSeqAndNode.nextLong();</span>
+<span class="fc" id="L2472">        }</span>
+
+        /**
+         * Constructs a UUID from two &lt;code&gt;long&lt;/code&gt; values.
+         *
+         * @param time            the upper 64 bits
+         * @param clockSeqAndNode the lower 64 bits
+         */
+<span class="fc" id="L2480">        public UUID(long time, long clockSeqAndNode) {</span>
+<span class="fc" id="L2481">            this.time = time;</span>
+<span class="fc" id="L2482">            this.clockSeqAndNode = clockSeqAndNode;</span>
+<span class="fc" id="L2483">        }</span>
+
+        private static String append(String a, short in) {
+<span class="fc" id="L2486">            return append(a, (long) in, 4);</span>
+        }
+
+        private static String append(String a, int in) {
+<span class="fc" id="L2490">            return append(a, (long) in, 8);</span>
+        }
+
+        private static String append(String a, long in, int length) {
+<span class="fc" id="L2494">            int lim = (length &lt;&lt; 2) - 4;</span>
+<span class="fc bfc" id="L2495" title="All 2 branches covered.">            while (lim &gt;= 0) {</span>
+<span class="fc" id="L2496">                a += (DIGITS[(byte) (in &gt;&gt; lim) &amp; 0x0f]);</span>
+<span class="fc" id="L2497">                lim -= 4;</span>
+            }
+<span class="fc" id="L2499">            return a;</span>
+        }
+
+        private static long getUniqueDeviceID() {
+<span class="fc" id="L2503">            long id = Preferences.get(&quot;CustomDeviceId__$&quot;, (long) -1);</span>
+<span class="pc bpc" id="L2504" title="1 of 2 branches missed.">            if (id == -1) {</span>
+<span class="fc" id="L2505">                id = Preferences.get(&quot;DeviceId__$&quot;, (long) -1);</span>
+            }
+<span class="pc bpc" id="L2507" title="1 of 2 branches missed.">            if (id == -1) {</span>
+<span class="fc" id="L2508">                id = generateLongFromDeviceInfo();</span>
+            }
+<span class="fc" id="L2510">            return id;</span>
+        }
+
+        /**
+         * Generates a long number using some device info: the same type of
+         * device (a specific model of a specific brand, with the same OS
+         * version) will always produce the same number, while different devices
+         * will most likely produce different numbers.
+         *
+         * @return
+         */
+        private static long generateLongFromDeviceInfo() {
+<span class="fc" id="L2522">            long random = CN.getDeviceDensity()</span>
+<span class="fc" id="L2523">                    * CN.getDisplayHeight()</span>
+<span class="fc" id="L2524">                    * CN.getDisplayWidth()</span>
+<span class="fc" id="L2525">                    * CN.convertToPixels(10)</span>
+<span class="fc" id="L2526">                    * Long.parseLong(sanitizeString(CN.getPlatformName()), 36)</span>
+<span class="fc" id="L2527">                    * Long.parseLong(sanitizeString(CN.getProperty(&quot;User-Agent&quot;, &quot;1&quot;)), 36)</span>
+<span class="fc" id="L2528">                    * Long.parseLong(sanitizeString(CN.getProperty(&quot;OSVer&quot;, &quot;1&quot;)), 36);</span>
+<span class="fc" id="L2529">            return random;</span>
+        }
+
+        /**
+         * Removes all non-alphanumeric characters from a string and returns the
+         * first 10 characters.
+         *
+         * @param input
+         * @return
+         */
+        private static String sanitizeString(String input) {
+<span class="fc" id="L2540">            String result = &quot;&quot;;</span>
+<span class="fc bfc" id="L2541" title="All 2 branches covered.">            for (char myChar : input.toCharArray()) {</span>
+<span class="pc bpc" id="L2542" title="7 of 12 branches missed.">                if ((myChar &gt;= '0' &amp;&amp; myChar &lt;= '9') || (myChar &gt;= 'a' &amp;&amp; myChar &lt;= 'z') || (myChar &gt;= 'A' &amp;&amp; myChar &lt;= 'Z')) {</span>
+<span class="fc" id="L2543">                    result += myChar;</span>
+                }
+            }
+<span class="fc" id="L2546">            return result.substring(0, Math.min(10, result.length())).toUpperCase();</span>
+        }
+
+        /**
+         * Returns this UUID as a String.
+         *
+         * @return a String, never &lt;code&gt;null&lt;/code&gt;
+         */
+        @Override
+        public final String toString() {
+<span class="fc" id="L2556">            return toCanonicalForm();</span>
+        }
+
+        private String toCanonicalForm() {
+<span class="fc" id="L2560">            String out = &quot;&quot;;</span>
+<span class="fc" id="L2561">            out = append(out, (int) (time &gt;&gt; 32)) + '-'</span>
+<span class="fc" id="L2562">                    + append(out, (short) (time &gt;&gt; 16)) + '-'</span>
+<span class="fc" id="L2563">                    + append(out, (short) time) + '-'</span>
+<span class="fc" id="L2564">                    + append(out, (short) (clockSeqAndNode &gt;&gt; 48)) + '-'</span>
+<span class="fc" id="L2565">                    + append(out, clockSeqAndNode, 12);</span>
+<span class="fc" id="L2566">            return out;</span>
+        }
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

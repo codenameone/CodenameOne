@@ -1,0 +1,1714 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Deflate.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.gzip</a> &gt; <span class="el_source">Deflate.java</span></div><h1>Deflate.java</h1><pre class="source lang-java linenums">/* -*-mode:java; c-basic-offset:2; -*- */
+/*
+Copyright (c) 2000-2011 ymnk, JCraft,Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+  1. Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright 
+     notice, this list of conditions and the following disclaimer in 
+     the documentation and/or other materials provided with the distribution.
+
+  3. The names of the authors may not be used to endorse or promote products
+     derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL JCRAFT,
+INC. OR ANY CONTRIBUTORS TO THIS SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
+ * This program is based on zlib-1.1.3, so all credit should go authors
+ * Jean-loup Gailly(jloup@gzip.org) and Mark Adler(madler@alumni.caltech.edu)
+ * and contributors of zlib.
+ */
+
+package com.codename1.io.gzip;
+
+public
+final class Deflate {
+
+    static final private int MAX_MEM_LEVEL = 9;
+
+    static final private int Z_DEFAULT_COMPRESSION = -1;
+
+    static final private int MAX_WBITS = 15;            // 32K LZ77 window
+    static final private int DEF_MEM_LEVEL = 8;
+    static final private int STORED = 0;
+    static final private int FAST = 1;
+    static final private int SLOW = 2;
+    static final private Config[] config_table;
+<span class="fc" id="L50">    static final private String[] z_errmsg = {</span>
+            &quot;need dictionary&quot;,     // Z_NEED_DICT       2
+            &quot;stream end&quot;,          // Z_STREAM_END      1
+            &quot;&quot;,                    // Z_OK              0
+            &quot;file error&quot;,          // Z_ERRNO         (-1)
+            &quot;stream error&quot;,        // Z_STREAM_ERROR  (-2)
+            &quot;data error&quot;,          // Z_DATA_ERROR    (-3)
+            &quot;insufficient memory&quot;, // Z_MEM_ERROR     (-4)
+            &quot;buffer error&quot;,        // Z_BUF_ERROR     (-5)
+            &quot;incompatible version&quot;,// Z_VERSION_ERROR (-6)
+            &quot;&quot;
+    };
+    // block not completed, need more input or more output
+    static final private int NeedMore = 0;
+    // block flush performed
+    static final private int BlockDone = 1;
+    // finish started, need only more output at next deflate
+    static final private int FinishStarted = 2;
+    // finish done, accept no more input or output
+    static final private int FinishDone = 3;
+    // preset dictionary flag in zlib header
+    static final private int PRESET_DICT = 0x20;
+    static final private int Z_FILTERED = 1;
+    static final private int Z_HUFFMAN_ONLY = 2;
+    static final private int Z_DEFAULT_STRATEGY = 0;
+    static final private int Z_NO_FLUSH = 0;
+    static final private int Z_PARTIAL_FLUSH = 1;
+    static final private int Z_SYNC_FLUSH = 2;
+    static final private int Z_FULL_FLUSH = 3;
+    static final private int Z_FINISH = 4;
+    static final private int Z_OK = 0;
+    static final private int Z_STREAM_END = 1;
+    static final private int Z_NEED_DICT = 2;
+    static final private int Z_ERRNO = -1;
+    static final private int Z_STREAM_ERROR = -2;
+    static final private int Z_DATA_ERROR = -3;
+    static final private int Z_MEM_ERROR = -4;
+    static final private int Z_BUF_ERROR = -5;
+    static final private int Z_VERSION_ERROR = -6;
+    static final private int INIT_STATE = 42;
+    static final private int BUSY_STATE = 113;
+    static final private int FINISH_STATE = 666;
+    // The deflate compression method
+    static final private int Z_DEFLATED = 8;
+    static final private int STORED_BLOCK = 0;
+    static final private int STATIC_TREES = 1;
+    static final private int DYN_TREES = 2;
+    // The three kinds of block type
+    static final private int Z_BINARY = 0;
+    static final private int Z_ASCII = 1;
+    static final private int Z_UNKNOWN = 2;
+    static final private int Buf_size = 8 * 2;
+    // repeat previous bit length 3-6 times (2 bits of repeat count)
+    static final private int REP_3_6 = 16;
+    // repeat a zero length 3-10 times  (3 bits of repeat count)
+    static final private int REPZ_3_10 = 17;
+    // repeat a zero length 11-138 times  (7 bits of repeat count)
+    static final private int REPZ_11_138 = 18;
+    static final private int MIN_MATCH = 3;
+    static final private int MAX_MATCH = 258;
+    static final private int MIN_LOOKAHEAD = (MAX_MATCH + MIN_MATCH + 1);
+    static final private int MAX_BITS = 15;
+    static final private int D_CODES = 30;
+    static final private int BL_CODES = 19;
+    static final private int LENGTH_CODES = 29;
+    static final private int LITERALS = 256;
+    static final private int L_CODES = (LITERALS + 1 + LENGTH_CODES);
+    static final private int HEAP_SIZE = (2 * L_CODES + 1);
+    static final private int END_BLOCK = 256;
+
+    static {
+<span class="fc" id="L121">        config_table = new Config[10];</span>
+        //                         good  lazy  nice  chain
+<span class="fc" id="L123">        config_table[0] = new Config(0, 0, 0, 0, STORED);</span>
+<span class="fc" id="L124">        config_table[1] = new Config(4, 4, 8, 4, FAST);</span>
+<span class="fc" id="L125">        config_table[2] = new Config(4, 5, 16, 8, FAST);</span>
+<span class="fc" id="L126">        config_table[3] = new Config(4, 6, 32, 32, FAST);</span>
+
+<span class="fc" id="L128">        config_table[4] = new Config(4, 4, 16, 16, SLOW);</span>
+<span class="fc" id="L129">        config_table[5] = new Config(8, 16, 32, 32, SLOW);</span>
+<span class="fc" id="L130">        config_table[6] = new Config(8, 16, 128, 128, SLOW);</span>
+<span class="fc" id="L131">        config_table[7] = new Config(8, 32, 128, 256, SLOW);</span>
+<span class="fc" id="L132">        config_table[8] = new Config(32, 128, 258, 1024, SLOW);</span>
+<span class="fc" id="L133">        config_table[9] = new Config(32, 258, 258, 4096, SLOW);</span>
+<span class="fc" id="L134">    }</span>
+
+    ZStream strm;        // pointer back to this zlib stream
+    int status;           // as the name implies
+    byte[] pending_buf;   // output still pending
+    int pending_buf_size; // size of pending_buf
+    int pending_out;      // next pending byte to output to the stream
+    int pending;          // nb of bytes in the pending buffer
+<span class="fc" id="L142">    int wrap = 1;</span>
+    byte data_type;       // UNKNOWN, BINARY or ASCII
+    byte method;          // STORED (for zip only) or DEFLATED
+    int last_flush;       // value of flush param for previous deflate call
+    int w_size;           // LZ77 window size (32K by default)
+    int w_bits;           // log2(w_size)  (8..16)
+    int w_mask;           // w_size - 1
+    byte[] window;
+    int window_size;
+    // Sliding window. Input bytes are read into the second half of the window,
+    // and move to the first half later to keep a dictionary of at least wSize
+    // bytes. With this organization, matches are limited to a distance of
+    // wSize-MAX_MATCH bytes, but this ensures that IO is always
+    // performed with a length multiple of the block size. Also, it limits
+    // the window size to 64K, which is quite useful on MSDOS.
+    // To do: use the user input buffer as sliding window.
+    short[] prev;
+    // Actual size of window: 2*wSize, except when the user input buffer
+    // is directly used as sliding window.
+    short[] head; // Heads of the hash chains or NIL.
+    // Link to older string with same hash index. To limit the size of this
+    // array to 64K, this link is maintained only for the last 32K strings.
+    // An index in this array is thus a window index modulo 32K.
+    int ins_h;          // hash index of string to be inserted
+    int hash_size;      // number of elements in hash table
+    int hash_bits;      // log2(hash_size)
+    int hash_mask;      // hash_size-1
+    // Number of bits by which ins_h must be shifted at each input
+    // step. It must be such that after MIN_MATCH steps, the oldest
+    // byte no longer takes part in the hash key, that is:
+    // hash_shift * MIN_MATCH &gt;= hash_bits
+    int hash_shift;
+    int block_start;
+
+    // Window position at the beginning of the current output block. Gets
+    // negative when the window is moved backwards.
+    int match_length;           // length of best match
+    int prev_match;             // previous match
+    int match_available;        // set if previous match exists
+    int strstart;               // start of string to insert
+    int match_start;            // start of matching string
+    int lookahead;              // number of valid bytes ahead in window
+    // Length of the best match at previous step. Matches not greater than this
+    // are discarded. This is used in the lazy match evaluation.
+    int prev_length;
+    // To speed up deflation, hash chains are never searched beyond this
+    // length.  A higher limit improves compression ratio but degrades the speed.
+    int max_chain_length;
+    // Attempt to find a better match only when the current match is strictly
+    // smaller than this value. This mechanism is used only for compression
+    // levels &gt;= 4.
+    int max_lazy_match;
+    int level;    // compression level (1..9)
+
+    // Insert new strings in the hash table only if the match length is not
+    // greater than this length. This saves time but degrades compression.
+    // max_insert_length is used only for compression levels &lt;= 3.
+    int strategy; // favor or force Huffman coding
+    // Use a faster search when the previous match is longer than this
+    int good_match;
+    // Stop searching when current match exceeds this
+    int nice_match;
+    short[] dyn_ltree;       // literal and length tree
+    short[] dyn_dtree;       // distance tree
+    short[] bl_tree;         // Huffman tree for bit lengths
+<span class="fc" id="L207">    Tree l_desc = new Tree();  // desc for literal tree</span>
+<span class="fc" id="L208">    Tree d_desc = new Tree();  // desc for distance tree</span>
+<span class="fc" id="L209">    Tree bl_desc = new Tree(); // desc for bit length tree</span>
+    // number of codes at each bit length for an optimal tree
+<span class="fc" id="L211">    short[] bl_count = new short[MAX_BITS + 1];</span>
+    // working area to be used in Tree#gen_codes()
+<span class="fc" id="L213">    short[] next_code = new short[MAX_BITS + 1];</span>
+    // heap used to build the Huffman trees
+<span class="fc" id="L215">    int[] heap = new int[2 * L_CODES + 1];</span>
+    int heap_len;               // number of elements in the heap
+    int heap_max;               // element of largest frequency
+    // Depth of each subtree used as tie breaker for trees of equal frequency
+<span class="fc" id="L219">    byte[] depth = new byte[2 * L_CODES + 1];</span>
+    // The sons of heap[n] are heap[2*n] and heap[2*n+1]. heap[0] is not used.
+    // The same heap array is used to build all trees.
+    int l_buf;               // index for literals or lengths */
+    // Size of match buffer for literals/lengths.  There are 4 reasons for
+    // limiting lit_bufsize to 64K:
+    //   - frequencies can be kept in 16 bit counters
+    //   - if compression is not successful for the first block, all input
+    //     data is still in the window so we can still emit a stored block even
+    //     when input comes from standard input.  (This can also be done for
+    //     all blocks if lit_bufsize is not greater than 32K.)
+    //   - if compression is not successful for a file smaller than 64K, we can
+    //     even emit a stored file instead of a stored block (saving 5 bytes).
+    //     This is applicable only for zip (not gzip or zlib).
+    //   - creating new Huffman trees less frequently may not provide fast
+    //     adaptation to changes in the input data statistics. (Take for
+    //     example a binary file with poorly compressible code followed by
+    //     a highly compressible string table.) Smaller buffer sizes give
+    //     fast adaptation but have of course the overhead of transmitting
+    //     trees more frequently.
+    //   - I can't count above 4
+    int lit_bufsize;
+    int last_lit;      // running index in l_buf
+    int d_buf;         // index of pendig_buf
+
+    // Buffer for distances. To simplify the code, d_buf and l_buf have
+    // the same number of elements. To use different lengths, an extra flag
+    // array would be necessary.
+    int opt_len;        // bit length of current block with optimal trees
+    int static_len;     // bit length of current block with static trees
+    int matches;        // number of string matches in current block
+    int last_eob_len;   // bit length of EOB code for last block
+    // Output buffer. bits are inserted starting at the bottom (least
+    // significant bits).
+    short bi_buf;
+    // Number of valid bits in bi_buf.  All bits above the last valid bit
+    // are always zero.
+    int bi_valid;
+<span class="fc" id="L257">    GZIPHeader gheader = null;</span>
+
+<span class="fc" id="L259">    Deflate(ZStream strm) {</span>
+<span class="fc" id="L260">        this.strm = strm;</span>
+<span class="fc" id="L261">        dyn_ltree = new short[HEAP_SIZE * 2];</span>
+<span class="fc" id="L262">        dyn_dtree = new short[(2 * D_CODES + 1) * 2]; // distance tree</span>
+<span class="fc" id="L263">        bl_tree = new short[(2 * BL_CODES + 1) * 2];  // Huffman tree for bit lengths</span>
+<span class="fc" id="L264">    }</span>
+
+    static boolean smaller(short[] tree, int n, int m, byte[] depth) {
+<span class="fc" id="L267">        short tn2 = tree[n * 2];</span>
+<span class="fc" id="L268">        short tm2 = tree[m * 2];</span>
+<span class="fc bfc" id="L269" title="All 6 branches covered.">        return (tn2 &lt; tm2 ||</span>
+                (tn2 == tm2 &amp;&amp; depth[n] &lt;= depth[m]));
+    }
+
+    static int deflateCopy(ZStream dest, ZStream src) {
+
+<span class="nc bnc" id="L275" title="All 2 branches missed.">        if (src.dstate == null) {</span>
+<span class="nc" id="L276">            return Z_STREAM_ERROR;</span>
+        }
+
+<span class="nc bnc" id="L279" title="All 2 branches missed.">        if (src.next_in != null) {</span>
+<span class="nc" id="L280">            dest.next_in = new byte[src.next_in.length];</span>
+<span class="nc" id="L281">            System.arraycopy(src.next_in, 0, dest.next_in, 0, src.next_in.length);</span>
+        }
+<span class="nc" id="L283">        dest.next_in_index = src.next_in_index;</span>
+<span class="nc" id="L284">        dest.avail_in = src.avail_in;</span>
+<span class="nc" id="L285">        dest.total_in = src.total_in;</span>
+
+<span class="nc bnc" id="L287" title="All 2 branches missed.">        if (src.next_out != null) {</span>
+<span class="nc" id="L288">            dest.next_out = new byte[src.next_out.length];</span>
+<span class="nc" id="L289">            System.arraycopy(src.next_out, 0, dest.next_out, 0, src.next_out.length);</span>
+        }
+
+<span class="nc" id="L292">        dest.next_out_index = src.next_out_index;</span>
+<span class="nc" id="L293">        dest.avail_out = src.avail_out;</span>
+<span class="nc" id="L294">        dest.total_out = src.total_out;</span>
+
+<span class="nc" id="L296">        dest.msg = src.msg;</span>
+<span class="nc" id="L297">        dest.data_type = src.data_type;</span>
+<span class="nc" id="L298">        dest.adler = src.adler.copy();</span>
+
+<span class="nc" id="L300">        dest.dstate = (Deflate) src.dstate.clone();</span>
+<span class="nc" id="L301">        dest.dstate.strm = dest;</span>
+<span class="nc" id="L302">        return Z_OK;</span>
+    }
+
+    void lm_init() {
+<span class="fc" id="L306">        window_size = 2 * w_size;</span>
+
+<span class="fc" id="L308">        head[hash_size - 1] = 0;</span>
+<span class="fc bfc" id="L309" title="All 2 branches covered.">        for (int i = 0; i &lt; hash_size - 1; i++) {</span>
+<span class="fc" id="L310">            head[i] = 0;</span>
+        }
+
+        // Set the default configuration parameters:
+<span class="fc" id="L314">        max_lazy_match = Deflate.config_table[level].max_lazy;</span>
+<span class="fc" id="L315">        good_match = Deflate.config_table[level].good_length;</span>
+<span class="fc" id="L316">        nice_match = Deflate.config_table[level].nice_length;</span>
+<span class="fc" id="L317">        max_chain_length = Deflate.config_table[level].max_chain;</span>
+
+<span class="fc" id="L319">        strstart = 0;</span>
+<span class="fc" id="L320">        block_start = 0;</span>
+<span class="fc" id="L321">        lookahead = 0;</span>
+<span class="fc" id="L322">        match_length = prev_length = MIN_MATCH - 1;</span>
+<span class="fc" id="L323">        match_available = 0;</span>
+<span class="fc" id="L324">        ins_h = 0;</span>
+<span class="fc" id="L325">    }</span>
+
+    // Initialize the tree data structures for a new zlib stream.
+    void tr_init() {
+
+<span class="fc" id="L330">        l_desc.dyn_tree = dyn_ltree;</span>
+<span class="fc" id="L331">        l_desc.stat_desc = StaticTree.static_l_desc;</span>
+
+<span class="fc" id="L333">        d_desc.dyn_tree = dyn_dtree;</span>
+<span class="fc" id="L334">        d_desc.stat_desc = StaticTree.static_d_desc;</span>
+
+<span class="fc" id="L336">        bl_desc.dyn_tree = bl_tree;</span>
+<span class="fc" id="L337">        bl_desc.stat_desc = StaticTree.static_bl_desc;</span>
+
+<span class="fc" id="L339">        bi_buf = 0;</span>
+<span class="fc" id="L340">        bi_valid = 0;</span>
+<span class="fc" id="L341">        last_eob_len = 8; // enough lookahead for inflate</span>
+
+        // Initialize the first block of the first file:
+<span class="fc" id="L344">        init_block();</span>
+<span class="fc" id="L345">    }</span>
+
+    void init_block() {
+        // Initialize the trees.
+<span class="fc bfc" id="L349" title="All 2 branches covered.">        for (int i = 0; i &lt; L_CODES; i++) dyn_ltree[i * 2] = 0;</span>
+<span class="fc bfc" id="L350" title="All 2 branches covered.">        for (int i = 0; i &lt; D_CODES; i++) dyn_dtree[i * 2] = 0;</span>
+<span class="fc bfc" id="L351" title="All 2 branches covered.">        for (int i = 0; i &lt; BL_CODES; i++) bl_tree[i * 2] = 0;</span>
+
+<span class="fc" id="L353">        dyn_ltree[END_BLOCK * 2] = 1;</span>
+<span class="fc" id="L354">        opt_len = static_len = 0;</span>
+<span class="fc" id="L355">        last_lit = matches = 0;</span>
+<span class="fc" id="L356">    }</span>
+
+    // Restore the heap property by moving down the tree starting at node k,
+    // exchanging a node with the smallest of its two sons if necessary, stopping
+    // when the heap property is re-established (each father smaller than its
+    // two sons).
+    void pqdownheap(short[] tree,  // the tree to restore
+                    int k          // node to move down
+    ) {
+<span class="fc" id="L365">        int v = heap[k];</span>
+<span class="fc" id="L366">        int j = k &lt;&lt; 1;  // left son of k</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">        while (j &lt;= heap_len) {</span>
+            // Set j to the smallest of the two sons:
+<span class="fc bfc" id="L369" title="All 2 branches covered.">            if (j &lt; heap_len &amp;&amp;</span>
+<span class="fc bfc" id="L370" title="All 2 branches covered.">                    smaller(tree, heap[j + 1], heap[j], depth)) {</span>
+<span class="fc" id="L371">                j++;</span>
+            }
+            // Exit if v is smaller than both sons
+<span class="fc bfc" id="L374" title="All 2 branches covered.">            if (smaller(tree, v, heap[j], depth)) break;</span>
+
+            // Exchange v with the smallest son
+<span class="fc" id="L377">            heap[k] = heap[j];</span>
+<span class="fc" id="L378">            k = j;</span>
+            // And continue down the tree, setting j to the left son of k
+<span class="fc" id="L380">            j &lt;&lt;= 1;</span>
+        }
+<span class="fc" id="L382">        heap[k] = v;</span>
+<span class="fc" id="L383">    }</span>
+
+    // Scan a literal or distance tree to determine the frequencies of the codes
+    // in the bit length tree.
+    void scan_tree(short[] tree,// the tree to be scanned
+                   int max_code // and its largest code of non zero frequency
+    ) {
+        int n;                     // iterates over all tree elements
+<span class="fc" id="L391">        int prevlen = -1;          // last emitted length</span>
+        int curlen;                // length of current code
+<span class="fc" id="L393">        int nextlen = tree[1]; // length of next code</span>
+<span class="fc" id="L394">        int count = 0;             // repeat count of the current code</span>
+<span class="fc" id="L395">        int max_count = 7;         // max repeat count</span>
+<span class="fc" id="L396">        int min_count = 4;         // min repeat count</span>
+
+<span class="fc bfc" id="L398" title="All 2 branches covered.">        if (nextlen == 0) {</span>
+<span class="fc" id="L399">            max_count = 138;</span>
+<span class="fc" id="L400">            min_count = 3;</span>
+        }
+<span class="fc" id="L402">        tree[(max_code + 1) * 2 + 1] = (short) 0xffff; // guard</span>
+
+<span class="fc bfc" id="L404" title="All 2 branches covered.">        for (n = 0; n &lt;= max_code; n++) {</span>
+<span class="fc" id="L405">            curlen = nextlen;</span>
+<span class="fc" id="L406">            nextlen = tree[(n + 1) * 2 + 1];</span>
+<span class="fc bfc" id="L407" title="All 4 branches covered.">            if (++count &lt; max_count &amp;&amp; curlen == nextlen) {</span>
+<span class="fc" id="L408">                continue;</span>
+<span class="fc bfc" id="L409" title="All 2 branches covered.">            } else if (count &lt; min_count) {</span>
+<span class="fc" id="L410">                bl_tree[curlen * 2] += count;</span>
+<span class="pc bpc" id="L411" title="1 of 2 branches missed.">            } else if (curlen != 0) {</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">                if (curlen != prevlen) bl_tree[curlen * 2]++;</span>
+<span class="nc" id="L413">                bl_tree[REP_3_6 * 2]++;</span>
+<span class="fc bfc" id="L414" title="All 2 branches covered.">            } else if (count &lt;= 10) {</span>
+<span class="fc" id="L415">                bl_tree[REPZ_3_10 * 2]++;</span>
+            } else {
+<span class="fc" id="L417">                bl_tree[REPZ_11_138 * 2]++;</span>
+            }
+<span class="fc" id="L419">            count = 0;</span>
+<span class="fc" id="L420">            prevlen = curlen;</span>
+<span class="fc bfc" id="L421" title="All 2 branches covered.">            if (nextlen == 0) {</span>
+<span class="fc" id="L422">                max_count = 138;</span>
+<span class="fc" id="L423">                min_count = 3;</span>
+<span class="pc bpc" id="L424" title="1 of 2 branches missed.">            } else if (curlen == nextlen) {</span>
+<span class="nc" id="L425">                max_count = 6;</span>
+<span class="nc" id="L426">                min_count = 3;</span>
+            } else {
+<span class="fc" id="L428">                max_count = 7;</span>
+<span class="fc" id="L429">                min_count = 4;</span>
+            }
+        }
+<span class="fc" id="L432">    }</span>
+
+    // Construct the Huffman tree for the bit lengths and return the index in
+    // bl_order of the last bit length code to send.
+    int build_bl_tree() {
+        int max_blindex;  // index of last bit length code of non zero freq
+
+        // Determine the bit length frequencies for literal and distance trees
+<span class="fc" id="L440">        scan_tree(dyn_ltree, l_desc.max_code);</span>
+<span class="fc" id="L441">        scan_tree(dyn_dtree, d_desc.max_code);</span>
+
+        // Build the bit length tree:
+<span class="fc" id="L444">        bl_desc.build_tree(this);</span>
+        // opt_len now includes the length of the tree representations, except
+        // the lengths of the bit lengths codes and the 5+5+4 bits for the counts.
+
+        // Determine the number of bit length codes to send. The pkzip format
+        // requires that at least 4 bit length codes be sent. (appnote.txt says
+        // 3 but the actual value used is 4.)
+<span class="pc bpc" id="L451" title="1 of 2 branches missed.">        for (max_blindex = BL_CODES - 1; max_blindex &gt;= 3; max_blindex--) {</span>
+<span class="fc bfc" id="L452" title="All 2 branches covered.">            if (bl_tree[Tree.bl_order[max_blindex] * 2 + 1] != 0) break;</span>
+        }
+        // Update opt_len to include the bit length tree and counts
+<span class="fc" id="L455">        opt_len += 3 * (max_blindex + 1) + 5 + 5 + 4;</span>
+
+<span class="fc" id="L457">        return max_blindex;</span>
+    }
+
+
+    // Send the header for a block using dynamic Huffman trees: the counts, the
+    // lengths of the bit length codes, the literal tree and the distance tree.
+    // IN assertion: lcodes &gt;= 257, dcodes &gt;= 1, blcodes &gt;= 4.
+    void send_all_trees(int lcodes, int dcodes, int blcodes) {
+        int rank;                    // index in bl_order
+
+<span class="nc" id="L467">        send_bits(lcodes - 257, 5); // not +255 as stated in appnote.txt</span>
+<span class="nc" id="L468">        send_bits(dcodes - 1, 5);</span>
+<span class="nc" id="L469">        send_bits(blcodes - 4, 4); // not -3 as stated in appnote.txt</span>
+<span class="nc bnc" id="L470" title="All 2 branches missed.">        for (rank = 0; rank &lt; blcodes; rank++) {</span>
+<span class="nc" id="L471">            send_bits(bl_tree[Tree.bl_order[rank] * 2 + 1], 3);</span>
+        }
+<span class="nc" id="L473">        send_tree(dyn_ltree, lcodes - 1); // literal tree</span>
+<span class="nc" id="L474">        send_tree(dyn_dtree, dcodes - 1); // distance tree</span>
+<span class="nc" id="L475">    }</span>
+
+    // Send a literal or distance tree in compressed form, using the codes in
+    // bl_tree.
+    void send_tree(short[] tree,// the tree to be sent
+                   int max_code // and its largest code of non zero frequency
+    ) {
+        int n;                     // iterates over all tree elements
+<span class="nc" id="L483">        int prevlen = -1;          // last emitted length</span>
+        int curlen;                // length of current code
+<span class="nc" id="L485">        int nextlen = tree[1]; // length of next code</span>
+<span class="nc" id="L486">        int count = 0;             // repeat count of the current code</span>
+<span class="nc" id="L487">        int max_count = 7;         // max repeat count</span>
+<span class="nc" id="L488">        int min_count = 4;         // min repeat count</span>
+
+<span class="nc bnc" id="L490" title="All 2 branches missed.">        if (nextlen == 0) {</span>
+<span class="nc" id="L491">            max_count = 138;</span>
+<span class="nc" id="L492">            min_count = 3;</span>
+        }
+
+<span class="nc bnc" id="L495" title="All 2 branches missed.">        for (n = 0; n &lt;= max_code; n++) {</span>
+<span class="nc" id="L496">            curlen = nextlen;</span>
+<span class="nc" id="L497">            nextlen = tree[(n + 1) * 2 + 1];</span>
+<span class="nc bnc" id="L498" title="All 4 branches missed.">            if (++count &lt; max_count &amp;&amp; curlen == nextlen) {</span>
+<span class="nc" id="L499">                continue;</span>
+<span class="nc bnc" id="L500" title="All 2 branches missed.">            } else if (count &lt; min_count) {</span>
+                do {
+<span class="nc" id="L502">                    send_code(curlen, bl_tree);</span>
+<span class="nc bnc" id="L503" title="All 2 branches missed.">                } while (--count != 0);</span>
+<span class="nc bnc" id="L504" title="All 2 branches missed.">            } else if (curlen != 0) {</span>
+<span class="nc bnc" id="L505" title="All 2 branches missed.">                if (curlen != prevlen) {</span>
+<span class="nc" id="L506">                    send_code(curlen, bl_tree);</span>
+<span class="nc" id="L507">                    count--;</span>
+                }
+<span class="nc" id="L509">                send_code(REP_3_6, bl_tree);</span>
+<span class="nc" id="L510">                send_bits(count - 3, 2);</span>
+<span class="nc bnc" id="L511" title="All 2 branches missed.">            } else if (count &lt;= 10) {</span>
+<span class="nc" id="L512">                send_code(REPZ_3_10, bl_tree);</span>
+<span class="nc" id="L513">                send_bits(count - 3, 3);</span>
+            } else {
+<span class="nc" id="L515">                send_code(REPZ_11_138, bl_tree);</span>
+<span class="nc" id="L516">                send_bits(count - 11, 7);</span>
+            }
+<span class="nc" id="L518">            count = 0;</span>
+<span class="nc" id="L519">            prevlen = curlen;</span>
+<span class="nc bnc" id="L520" title="All 2 branches missed.">            if (nextlen == 0) {</span>
+<span class="nc" id="L521">                max_count = 138;</span>
+<span class="nc" id="L522">                min_count = 3;</span>
+<span class="nc bnc" id="L523" title="All 2 branches missed.">            } else if (curlen == nextlen) {</span>
+<span class="nc" id="L524">                max_count = 6;</span>
+<span class="nc" id="L525">                min_count = 3;</span>
+            } else {
+<span class="nc" id="L527">                max_count = 7;</span>
+<span class="nc" id="L528">                min_count = 4;</span>
+            }
+        }
+<span class="nc" id="L531">    }</span>
+
+    // Output a byte on the stream.
+    // IN assertion: there is enough room in pending_buf.
+    void put_byte(byte[] p, int start, int len) {
+<span class="fc" id="L536">        System.arraycopy(p, start, pending_buf, pending, len);</span>
+<span class="fc" id="L537">        pending += len;</span>
+<span class="fc" id="L538">    }</span>
+
+    void put_byte(byte c) {
+<span class="fc" id="L541">        pending_buf[pending++] = c;</span>
+<span class="fc" id="L542">    }</span>
+
+    void put_short(int w) {
+<span class="fc" id="L545">        put_byte((byte) (w/*&amp;0xff*/));</span>
+<span class="fc" id="L546">        put_byte((byte) (w &gt;&gt;&gt; 8));</span>
+<span class="fc" id="L547">    }</span>
+
+    void putShortMSB(int b) {
+<span class="nc" id="L550">        put_byte((byte) (b &gt;&gt; 8));</span>
+<span class="nc" id="L551">        put_byte((byte) (b/*&amp;0xff*/));</span>
+<span class="nc" id="L552">    }</span>
+
+    void send_code(int c, short[] tree) {
+<span class="fc" id="L555">        int c2 = c * 2;</span>
+<span class="fc" id="L556">        send_bits((tree[c2] &amp; 0xffff), (tree[c2 + 1] &amp; 0xffff));</span>
+<span class="fc" id="L557">    }</span>
+
+    void send_bits(int value, int length) {
+<span class="fc" id="L560">        int len = length;</span>
+<span class="fc bfc" id="L561" title="All 2 branches covered.">        if (bi_valid &gt; Buf_size - len) {</span>
+<span class="fc" id="L562">            int val = value;</span>
+//      bi_buf |= (val &lt;&lt; bi_valid);
+<span class="fc" id="L564">            bi_buf |= ((val &lt;&lt; bi_valid) &amp; 0xffff);</span>
+<span class="fc" id="L565">            put_short(bi_buf);</span>
+<span class="fc" id="L566">            bi_buf = (short) (val &gt;&gt;&gt; (Buf_size - bi_valid));</span>
+<span class="fc" id="L567">            bi_valid += len - Buf_size;</span>
+<span class="fc" id="L568">        } else {</span>
+//      bi_buf |= (value) &lt;&lt; bi_valid;
+<span class="fc" id="L570">            bi_buf |= (((value) &lt;&lt; bi_valid) &amp; 0xffff);</span>
+<span class="fc" id="L571">            bi_valid += len;</span>
+        }
+<span class="fc" id="L573">    }</span>
+
+    // Send one empty static block to give enough lookahead for inflate.
+    // This takes 10 bits, of which 7 may remain in the bit buffer.
+    // The current inflate code requires 9 bits of lookahead. If the
+    // last two codes for the previous block (real code plus EOB) were coded
+    // on 5 bits or less, inflate may have only 5+3 bits of lookahead to decode
+    // the last real code. In this case we send two empty static blocks instead
+    // of one. (There are no problems if the previous block is stored or fixed.)
+    // To simplify the code, we assume the worst case of last real code encoded
+    // on one bit only.
+    void _tr_align() {
+<span class="nc" id="L585">        send_bits(STATIC_TREES &lt;&lt; 1, 3);</span>
+<span class="nc" id="L586">        send_code(END_BLOCK, StaticTree.static_ltree);</span>
+
+<span class="nc" id="L588">        bi_flush();</span>
+
+        // Of the 10 bits for the empty block, we have already sent
+        // (10 - bi_valid) bits. The lookahead for the last real code (before
+        // the EOB of the previous block) was thus at least one plus the length
+        // of the EOB plus what we have just sent of the empty static block.
+<span class="nc bnc" id="L594" title="All 2 branches missed.">        if (1 + last_eob_len + 10 - bi_valid &lt; 9) {</span>
+<span class="nc" id="L595">            send_bits(STATIC_TREES &lt;&lt; 1, 3);</span>
+<span class="nc" id="L596">            send_code(END_BLOCK, StaticTree.static_ltree);</span>
+<span class="nc" id="L597">            bi_flush();</span>
+        }
+<span class="nc" id="L599">        last_eob_len = 7;</span>
+<span class="nc" id="L600">    }</span>
+
+
+    // Save the match info and tally the frequency counts. Return true if
+    // the current block must be flushed.
+    boolean _tr_tally(int dist, // distance of matched string
+                      int lc // match length-MIN_MATCH or unmatched char (if dist==0)
+    ) {
+
+<span class="fc" id="L609">        pending_buf[d_buf + last_lit * 2] = (byte) (dist &gt;&gt;&gt; 8);</span>
+<span class="fc" id="L610">        pending_buf[d_buf + last_lit * 2 + 1] = (byte) dist;</span>
+
+<span class="fc" id="L612">        pending_buf[l_buf + last_lit] = (byte) lc;</span>
+<span class="fc" id="L613">        last_lit++;</span>
+
+<span class="pc bpc" id="L615" title="1 of 2 branches missed.">        if (dist == 0) {</span>
+            // lc is the unmatched char
+<span class="fc" id="L617">            dyn_ltree[lc * 2]++;</span>
+        } else {
+<span class="nc" id="L619">            matches++;</span>
+            // Here, lc is the match length - MIN_MATCH
+<span class="nc" id="L621">            dist--;             // dist = match distance - 1</span>
+<span class="nc" id="L622">            dyn_ltree[(Tree._length_code[lc] + LITERALS + 1) * 2]++;</span>
+<span class="nc" id="L623">            dyn_dtree[Tree.d_code(dist) * 2]++;</span>
+        }
+
+<span class="pc bpc" id="L626" title="3 of 4 branches missed.">        if ((last_lit &amp; 0x1fff) == 0 &amp;&amp; level &gt; 2) {</span>
+            // Compute an upper bound for the compressed length
+<span class="nc" id="L628">            int out_length = last_lit * 8;</span>
+<span class="nc" id="L629">            int in_length = strstart - block_start;</span>
+            int dcode;
+<span class="nc bnc" id="L631" title="All 2 branches missed.">            for (dcode = 0; dcode &lt; D_CODES; dcode++) {</span>
+<span class="nc" id="L632">                out_length += (int) dyn_dtree[dcode * 2] *</span>
+                        (5L + Tree.extra_dbits[dcode]);
+            }
+<span class="nc" id="L635">            out_length &gt;&gt;&gt;= 3;</span>
+<span class="nc bnc" id="L636" title="All 4 branches missed.">            if ((matches &lt; (last_lit / 2)) &amp;&amp; out_length &lt; in_length / 2) return true;</span>
+        }
+
+<span class="pc bpc" id="L639" title="1 of 2 branches missed.">        return (last_lit == lit_bufsize - 1);</span>
+        // We avoid equality with lit_bufsize because of wraparound at 64K
+        // on 16 bit machines and because stored blocks are restricted to
+        // 64K-1 bytes.
+    }
+
+    // Send the block data compressed using the given Huffman trees
+    void compress_block(short[] ltree, short[] dtree) {
+        int dist;      // distance of matched string
+        int lc;         // match length or unmatched char (if dist == 0)
+<span class="fc" id="L649">        int lx = 0;     // running index in l_buf</span>
+        int code;       // the code to send
+        int extra;      // number of extra bits to send
+
+<span class="pc bpc" id="L653" title="1 of 2 branches missed.">        if (last_lit != 0) {</span>
+            do {
+<span class="fc" id="L655">                dist = ((pending_buf[d_buf + lx * 2] &lt;&lt; 8) &amp; 0xff00) |</span>
+                        (pending_buf[d_buf + lx * 2 + 1] &amp; 0xff);
+<span class="fc" id="L657">                lc = (pending_buf[l_buf + lx]) &amp; 0xff;</span>
+<span class="fc" id="L658">                lx++;</span>
+
+<span class="pc bpc" id="L660" title="1 of 2 branches missed.">                if (dist == 0) {</span>
+<span class="fc" id="L661">                    send_code(lc, ltree); // send a literal byte</span>
+                } else {
+                    // Here, lc is the match length - MIN_MATCH
+<span class="nc" id="L664">                    code = Tree._length_code[lc];</span>
+
+<span class="nc" id="L666">                    send_code(code + LITERALS + 1, ltree); // send the length code</span>
+<span class="nc" id="L667">                    extra = Tree.extra_lbits[code];</span>
+<span class="nc bnc" id="L668" title="All 2 branches missed.">                    if (extra != 0) {</span>
+<span class="nc" id="L669">                        lc -= Tree.base_length[code];</span>
+<span class="nc" id="L670">                        send_bits(lc, extra);       // send the extra length bits</span>
+                    }
+<span class="nc" id="L672">                    dist--; // dist is now the match distance - 1</span>
+<span class="nc" id="L673">                    code = Tree.d_code(dist);</span>
+
+<span class="nc" id="L675">                    send_code(code, dtree);       // send the distance code</span>
+<span class="nc" id="L676">                    extra = Tree.extra_dbits[code];</span>
+<span class="nc bnc" id="L677" title="All 2 branches missed.">                    if (extra != 0) {</span>
+<span class="nc" id="L678">                        dist -= Tree.base_dist[code];</span>
+<span class="nc" id="L679">                        send_bits(dist, extra);   // send the extra distance bits</span>
+                    }
+                } // literal or match pair ?
+
+                // Check that the overlay between pending_buf and d_buf+l_buf is ok:
+            }
+<span class="fc bfc" id="L685" title="All 2 branches covered.">            while (lx &lt; last_lit);</span>
+        }
+
+<span class="fc" id="L688">        send_code(END_BLOCK, ltree);</span>
+<span class="fc" id="L689">        last_eob_len = ltree[END_BLOCK * 2 + 1];</span>
+<span class="fc" id="L690">    }</span>
+
+    // Set the data type to ASCII or BINARY, using a crude approximation:
+    // binary if more than 20% of the bytes are &lt;= 6 or &gt;= 128, ascii otherwise.
+    // IN assertion: the fields freq of dyn_ltree are set and the total of all
+    // frequencies does not exceed 64K (to fit in an int on 16 bit machines).
+    void set_data_type() {
+<span class="nc" id="L697">        int n = 0;</span>
+<span class="nc" id="L698">        int ascii_freq = 0;</span>
+<span class="nc" id="L699">        int bin_freq = 0;</span>
+<span class="nc bnc" id="L700" title="All 2 branches missed.">        while (n &lt; 7) {</span>
+<span class="nc" id="L701">            bin_freq += dyn_ltree[n * 2];</span>
+<span class="nc" id="L702">            n++;</span>
+        }
+<span class="nc bnc" id="L704" title="All 2 branches missed.">        while (n &lt; 128) {</span>
+<span class="nc" id="L705">            ascii_freq += dyn_ltree[n * 2];</span>
+<span class="nc" id="L706">            n++;</span>
+        }
+<span class="nc bnc" id="L708" title="All 2 branches missed.">        while (n &lt; LITERALS) {</span>
+<span class="nc" id="L709">            bin_freq += dyn_ltree[n * 2];</span>
+<span class="nc" id="L710">            n++;</span>
+        }
+<span class="nc bnc" id="L712" title="All 2 branches missed.">        data_type = (byte) (bin_freq &gt; (ascii_freq &gt;&gt;&gt; 2) ? Z_BINARY : Z_ASCII);</span>
+<span class="nc" id="L713">    }</span>
+
+    // Flush the bit buffer, keeping at most 7 bits in it.
+    void bi_flush() {
+<span class="nc bnc" id="L717" title="All 2 branches missed.">        if (bi_valid == 16) {</span>
+<span class="nc" id="L718">            put_short(bi_buf);</span>
+<span class="nc" id="L719">            bi_buf = 0;</span>
+<span class="nc" id="L720">            bi_valid = 0;</span>
+<span class="nc bnc" id="L721" title="All 2 branches missed.">        } else if (bi_valid &gt;= 8) {</span>
+<span class="nc" id="L722">            put_byte((byte) bi_buf);</span>
+<span class="nc" id="L723">            bi_buf &gt;&gt;&gt;= 8;</span>
+<span class="nc" id="L724">            bi_valid -= 8;</span>
+        }
+<span class="nc" id="L726">    }</span>
+
+    // Flush the bit buffer and align the output on a byte boundary
+    void bi_windup() {
+<span class="fc bfc" id="L730" title="All 2 branches covered.">        if (bi_valid &gt; 8) {</span>
+<span class="fc" id="L731">            put_short(bi_buf);</span>
+<span class="pc bpc" id="L732" title="1 of 2 branches missed.">        } else if (bi_valid &gt; 0) {</span>
+<span class="fc" id="L733">            put_byte((byte) bi_buf);</span>
+        }
+<span class="fc" id="L735">        bi_buf = 0;</span>
+<span class="fc" id="L736">        bi_valid = 0;</span>
+<span class="fc" id="L737">    }</span>
+
+    // Copy a stored block, storing first the length and its
+    // one's complement if requested.
+    void copy_block(int buf,         // the input data
+                    int len,         // its length
+                    boolean header   // true if block header must be written
+    ) {
+<span class="nc" id="L745">        int index = 0;</span>
+<span class="nc" id="L746">        bi_windup();      // align on byte boundary</span>
+<span class="nc" id="L747">        last_eob_len = 8; // enough lookahead for inflate</span>
+
+<span class="nc bnc" id="L749" title="All 2 branches missed.">        if (header) {</span>
+<span class="nc" id="L750">            put_short((short) len);</span>
+<span class="nc" id="L751">            put_short((short) ~len);</span>
+        }
+
+        //  while(len--!=0) {
+        //    put_byte(window[buf+index]);
+        //    index++;
+        //  }
+<span class="nc" id="L758">        put_byte(window, buf, len);</span>
+<span class="nc" id="L759">    }</span>
+
+    void flush_block_only(boolean eof) {
+<span class="pc bpc" id="L762" title="1 of 2 branches missed.">        _tr_flush_block(block_start &gt;= 0 ? block_start : -1,</span>
+                strstart - block_start,
+                eof);
+<span class="fc" id="L765">        block_start = strstart;</span>
+<span class="fc" id="L766">        strm.flush_pending();</span>
+<span class="fc" id="L767">    }</span>
+
+    // Copy without compression as much as possible from the input stream, return
+    // the current block state.
+    // This function does not insert new strings in the dictionary since
+    // uncompressible data is probably not useful. This function is used
+    // only for the level=0 compression option.
+    // NOTE: this function should be optimized to avoid extra copying from
+    // window to pending_buf.
+    int deflate_stored(int flush) {
+        // Stored blocks are limited to 0xffff bytes, pending_buf is limited
+        // to pending_buf_size, and each stored block has a 5 byte header:
+
+<span class="nc" id="L780">        int max_block_size = 0xffff;</span>
+        int max_start;
+
+<span class="nc bnc" id="L783" title="All 2 branches missed.">        if (max_block_size &gt; pending_buf_size - 5) {</span>
+<span class="nc" id="L784">            max_block_size = pending_buf_size - 5;</span>
+        }
+
+        // Copy as much as possible from input to output:
+        while (true) {
+            // Fill the window as much as possible:
+<span class="nc bnc" id="L790" title="All 2 branches missed.">            if (lookahead &lt;= 1) {</span>
+<span class="nc" id="L791">                fill_window();</span>
+<span class="nc bnc" id="L792" title="All 4 branches missed.">                if (lookahead == 0 &amp;&amp; flush == Z_NO_FLUSH) return NeedMore;</span>
+<span class="nc bnc" id="L793" title="All 2 branches missed.">                if (lookahead == 0) break; // flush the current block</span>
+            }
+
+<span class="nc" id="L796">            strstart += lookahead;</span>
+<span class="nc" id="L797">            lookahead = 0;</span>
+
+            // Emit a stored block if pending_buf will be full:
+<span class="nc" id="L800">            max_start = block_start + max_block_size;</span>
+<span class="nc bnc" id="L801" title="All 4 branches missed.">            if (strstart == 0 || strstart &gt;= max_start) {</span>
+                // strstart == 0 is possible when wraparound on 16-bit machine
+<span class="nc" id="L803">                lookahead = strstart - max_start;</span>
+<span class="nc" id="L804">                strstart = max_start;</span>
+
+<span class="nc" id="L806">                flush_block_only(false);</span>
+<span class="nc bnc" id="L807" title="All 2 branches missed.">                if (strm.avail_out == 0) return NeedMore;</span>
+
+            }
+
+            // Flush if we may have to slide, otherwise block_start may become
+            // negative and the data will be gone:
+<span class="nc bnc" id="L813" title="All 2 branches missed.">            if (strstart - block_start &gt;= w_size - MIN_LOOKAHEAD) {</span>
+<span class="nc" id="L814">                flush_block_only(false);</span>
+<span class="nc bnc" id="L815" title="All 2 branches missed.">                if (strm.avail_out == 0) return NeedMore;</span>
+            }
+        }
+
+<span class="nc bnc" id="L819" title="All 2 branches missed.">        flush_block_only(flush == Z_FINISH);</span>
+<span class="nc bnc" id="L820" title="All 2 branches missed.">        if (strm.avail_out == 0)</span>
+<span class="nc bnc" id="L821" title="All 2 branches missed.">            return (flush == Z_FINISH) ? FinishStarted : NeedMore;</span>
+
+<span class="nc bnc" id="L823" title="All 2 branches missed.">        return flush == Z_FINISH ? FinishDone : BlockDone;</span>
+    }
+
+    // Send a stored block
+    void _tr_stored_block(int buf,        // input block
+                          int stored_len, // length of input block
+                          boolean eof     // true if this is the last block for a file
+    ) {
+<span class="nc bnc" id="L831" title="All 2 branches missed.">        send_bits((eof ? 1 : 0), 3);  // send block type</span>
+<span class="nc" id="L832">        copy_block(buf, stored_len, true);          // with header</span>
+<span class="nc" id="L833">    }</span>
+
+    // Determine the best encoding for the current block: dynamic trees, static
+    // trees or store, and output the encoded block to the zip file.
+    void _tr_flush_block(int buf,        // input block, or NULL if too old
+                         int stored_len, // length of input block
+                         boolean eof     // true if this is the last block for a file
+    ) {
+        int opt_lenb, static_lenb;// opt_len and static_len in bytes
+<span class="fc" id="L842">        int max_blindex = 0;      // index of last bit length code of non zero freq</span>
+
+        // Build the Huffman trees unless a stored block is forced
+<span class="pc bpc" id="L845" title="1 of 2 branches missed.">        if (level &gt; 0) {</span>
+            // Check if the file is ascii or binary
+<span class="pc bpc" id="L847" title="1 of 2 branches missed.">            if (data_type == Z_UNKNOWN) set_data_type();</span>
+
+            // Construct the literal and distance trees
+<span class="fc" id="L850">            l_desc.build_tree(this);</span>
+
+<span class="fc" id="L852">            d_desc.build_tree(this);</span>
+
+            // At this point, opt_len and static_len are the total bit lengths of
+            // the compressed block data, excluding the tree representations.
+
+            // Build the bit length tree for the above two trees, and get the index
+            // in bl_order of the last bit length code to send.
+<span class="fc" id="L859">            max_blindex = build_bl_tree();</span>
+
+            // Determine the best encoding. Compute first the block length in bytes
+<span class="fc" id="L862">            opt_lenb = (opt_len + 3 + 7) &gt;&gt;&gt; 3;</span>
+<span class="fc" id="L863">            static_lenb = (static_len + 3 + 7) &gt;&gt;&gt; 3;</span>
+
+<span class="pc bpc" id="L865" title="1 of 2 branches missed.">            if (static_lenb &lt;= opt_lenb) opt_lenb = static_lenb;</span>
+        } else {
+<span class="nc" id="L867">            opt_lenb = static_lenb = stored_len + 5; // force a stored block</span>
+        }
+
+<span class="pc bpc" id="L870" title="3 of 4 branches missed.">        if (stored_len + 4 &lt;= opt_lenb &amp;&amp; buf != -1) {</span>
+            // 4: two words for the lengths
+            // The test buf != NULL is only necessary if LIT_BUFSIZE &gt; WSIZE.
+            // Otherwise we can't have processed more than WSIZE input bytes since
+            // the last block flush, because compression would have been
+            // successful. If LIT_BUFSIZE &lt;= WSIZE, it is never too late to
+            // transform a block into a stored block.
+<span class="nc" id="L877">            _tr_stored_block(buf, stored_len, eof);</span>
+<span class="pc bpc" id="L878" title="1 of 2 branches missed.">        } else if (static_lenb == opt_lenb) {</span>
+<span class="pc bpc" id="L879" title="1 of 2 branches missed.">            send_bits((STATIC_TREES &lt;&lt; 1) + (eof ? 1 : 0), 3);</span>
+<span class="fc" id="L880">            compress_block(StaticTree.static_ltree, StaticTree.static_dtree);</span>
+        } else {
+<span class="nc bnc" id="L882" title="All 2 branches missed.">            send_bits((DYN_TREES &lt;&lt; 1) + (eof ? 1 : 0), 3);</span>
+<span class="nc" id="L883">            send_all_trees(l_desc.max_code + 1, d_desc.max_code + 1, max_blindex + 1);</span>
+<span class="nc" id="L884">            compress_block(dyn_ltree, dyn_dtree);</span>
+        }
+
+        // The above check is made mod 2^32, for files larger than 512 MB
+        // and uLong implemented on 32 bits.
+
+<span class="fc" id="L890">        init_block();</span>
+
+<span class="pc bpc" id="L892" title="1 of 2 branches missed.">        if (eof) {</span>
+<span class="fc" id="L893">            bi_windup();</span>
+        }
+<span class="fc" id="L895">    }</span>
+
+    // Fill the window when the lookahead becomes insufficient.
+    // Updates strstart and lookahead.
+    //
+    // IN assertion: lookahead &lt; MIN_LOOKAHEAD
+    // OUT assertions: strstart &lt;= window_size-MIN_LOOKAHEAD
+    //    At least one byte has been read, or avail_in == 0; reads are
+    //    performed for at least two bytes (required for the zip translate_eol
+    //    option -- not supported here).
+    void fill_window() {
+        int n, m;
+        int p;
+        int more;    // Amount of free space at the end of the window.
+
+        do {
+<span class="fc" id="L911">            more = (window_size - lookahead - strstart);</span>
+
+            // Deal with !@#$% 64K limit:
+<span class="pc bpc" id="L914" title="5 of 6 branches missed.">            if (more == 0 &amp;&amp; strstart == 0 &amp;&amp; lookahead == 0) {</span>
+<span class="nc" id="L915">                more = w_size;</span>
+<span class="pc bpc" id="L916" title="1 of 2 branches missed.">            } else if (more == -1) {</span>
+                // Very unlikely, but possible on 16 bit machine if strstart == 0
+                // and lookahead == 1 (input done one byte at time)
+<span class="nc" id="L919">                more--;</span>
+
+                // If the window is almost full and there is insufficient lookahead,
+                // move the upper half to the lower one to make room in the upper half.
+<span class="pc bpc" id="L923" title="1 of 2 branches missed.">            } else if (strstart &gt;= w_size + w_size - MIN_LOOKAHEAD) {</span>
+<span class="nc" id="L924">                System.arraycopy(window, w_size, window, 0, w_size);</span>
+<span class="nc" id="L925">                match_start -= w_size;</span>
+<span class="nc" id="L926">                strstart -= w_size; // we now have strstart &gt;= MAX_DIST</span>
+<span class="nc" id="L927">                block_start -= w_size;</span>
+
+                // Slide the hash table (could be avoided with 32 bit values
+                // at the expense of memory usage). We slide even when level == 0
+                // to keep the hash table consistent if we switch back to level &gt; 0
+                // later. (Using level 0 permanently is not an optimal usage of
+                // zlib, so we don't care about this pathological case.)
+
+<span class="nc" id="L935">                n = hash_size;</span>
+<span class="nc" id="L936">                p = n;</span>
+                do {
+<span class="nc" id="L938">                    m = (head[--p] &amp; 0xffff);</span>
+<span class="nc bnc" id="L939" title="All 2 branches missed.">                    head[p] = (m &gt;= w_size ? (short) (m - w_size) : 0);</span>
+                }
+<span class="nc bnc" id="L941" title="All 2 branches missed.">                while (--n != 0);</span>
+
+<span class="nc" id="L943">                n = w_size;</span>
+<span class="nc" id="L944">                p = n;</span>
+                do {
+<span class="nc" id="L946">                    m = (prev[--p] &amp; 0xffff);</span>
+<span class="nc bnc" id="L947" title="All 2 branches missed.">                    prev[p] = (m &gt;= w_size ? (short) (m - w_size) : 0);</span>
+                    // If n is not on any hash chain, prev[n] is garbage but
+                    // its value will never be used.
+                }
+<span class="nc bnc" id="L951" title="All 2 branches missed.">                while (--n != 0);</span>
+<span class="nc" id="L952">                more += w_size;</span>
+            }
+
+<span class="fc bfc" id="L955" title="All 2 branches covered.">            if (strm.avail_in == 0) return;</span>
+
+            // If there was no sliding:
+            //    strstart &lt;= WSIZE+MAX_DIST-1 &amp;&amp; lookahead &lt;= MIN_LOOKAHEAD - 1 &amp;&amp;
+            //    more == window_size - lookahead - strstart
+            // =&gt; more &gt;= window_size - (MIN_LOOKAHEAD-1 + WSIZE + MAX_DIST-1)
+            // =&gt; more &gt;= window_size - 2*WSIZE + 2
+            // In the BIG_MEM or MMAP case (not yet supported),
+            //   window_size == input_size + MIN_LOOKAHEAD  &amp;&amp;
+            //   strstart + s-&gt;lookahead &lt;= input_size =&gt; more &gt;= MIN_LOOKAHEAD.
+            // Otherwise, window_size == 2*WSIZE so more &gt;= 2.
+            // If there was sliding, more &gt;= WSIZE. So in all cases, more &gt;= 2.
+
+<span class="fc" id="L968">            n = strm.read_buf(window, strstart + lookahead, more);</span>
+<span class="fc" id="L969">            lookahead += n;</span>
+
+            // Initialize the hash value now that we have some input:
+<span class="pc bpc" id="L972" title="1 of 2 branches missed.">            if (lookahead &gt;= MIN_MATCH) {</span>
+<span class="fc" id="L973">                ins_h = window[strstart] &amp; 0xff;</span>
+<span class="fc" id="L974">                ins_h = (((ins_h) &lt;&lt; hash_shift) ^ (window[strstart + 1] &amp; 0xff)) &amp; hash_mask;</span>
+            }
+            // If the whole input has less than MIN_MATCH bytes, ins_h is garbage,
+            // but this is not important since only literal bytes will be emitted.
+        }
+<span class="pc bpc" id="L979" title="2 of 4 branches missed.">        while (lookahead &lt; MIN_LOOKAHEAD &amp;&amp; strm.avail_in != 0);</span>
+<span class="fc" id="L980">    }</span>
+
+    // Compress as much as possible from the input stream, return the current
+    // block state.
+    // This function does not perform lazy evaluation of matches and inserts
+    // new strings in the dictionary only for unmatched strings or for short
+    // matches. It is used only for the fast compression options.
+    int deflate_fast(int flush) {
+//    short hash_head = 0; // head of the hash chain
+<span class="nc" id="L989">        int hash_head = 0; // head of the hash chain</span>
+        boolean bflush;      // set if current block must be flushed
+
+        while (true) {
+            // Make sure that we always have enough lookahead, except
+            // at the end of the input file. We need MAX_MATCH bytes
+            // for the next match, plus MIN_MATCH bytes to insert the
+            // string following the next match.
+<span class="nc bnc" id="L997" title="All 2 branches missed.">            if (lookahead &lt; MIN_LOOKAHEAD) {</span>
+<span class="nc" id="L998">                fill_window();</span>
+<span class="nc bnc" id="L999" title="All 4 branches missed.">                if (lookahead &lt; MIN_LOOKAHEAD &amp;&amp; flush == Z_NO_FLUSH) {</span>
+<span class="nc" id="L1000">                    return NeedMore;</span>
+                }
+<span class="nc bnc" id="L1002" title="All 2 branches missed.">                if (lookahead == 0) break; // flush the current block</span>
+            }
+
+            // Insert the string window[strstart .. strstart+2] in the
+            // dictionary, and set hash_head to the head of the hash chain:
+<span class="nc bnc" id="L1007" title="All 2 branches missed.">            if (lookahead &gt;= MIN_MATCH) {</span>
+<span class="nc" id="L1008">                ins_h = (((ins_h) &lt;&lt; hash_shift) ^ (window[(strstart) + (MIN_MATCH - 1)] &amp; 0xff)) &amp; hash_mask;</span>
+
+//	prev[strstart&amp;w_mask]=hash_head=head[ins_h];
+<span class="nc" id="L1011">                hash_head = (head[ins_h] &amp; 0xffff);</span>
+<span class="nc" id="L1012">                prev[strstart &amp; w_mask] = head[ins_h];</span>
+<span class="nc" id="L1013">                head[ins_h] = (short) strstart;</span>
+            }
+
+            // Find the longest match, discarding those &lt;= prev_length.
+            // At this point we have always match_length &lt; MIN_MATCH
+
+<span class="nc bnc" id="L1019" title="All 4 branches missed.">            if (hash_head != 0L &amp;&amp;</span>
+                    ((strstart - hash_head) &amp; 0xffff) &lt;= w_size - MIN_LOOKAHEAD
+            ) {
+                // To simplify the code, we prevent matches with the string
+                // of window index 0 (in particular we have to avoid a match
+                // of the string with itself at the start of the input file).
+<span class="nc bnc" id="L1025" title="All 2 branches missed.">                if (strategy != Z_HUFFMAN_ONLY) {</span>
+<span class="nc" id="L1026">                    match_length = longest_match(hash_head);</span>
+                }
+                // longest_match() sets match_start
+            }
+<span class="nc bnc" id="L1030" title="All 2 branches missed.">            if (match_length &gt;= MIN_MATCH) {</span>
+                //        check_match(strstart, match_start, match_length);
+
+<span class="nc" id="L1033">                bflush = _tr_tally(strstart - match_start, match_length - MIN_MATCH);</span>
+
+<span class="nc" id="L1035">                lookahead -= match_length;</span>
+
+                // Insert new strings in the hash table only if the match length
+                // is not too large. This saves time but degrades compression.
+<span class="nc bnc" id="L1039" title="All 4 branches missed.">                if (match_length &lt;= max_lazy_match &amp;&amp;</span>
+                        lookahead &gt;= MIN_MATCH) {
+<span class="nc" id="L1041">                    match_length--; // string at strstart already in hash table</span>
+                    do {
+<span class="nc" id="L1043">                        strstart++;</span>
+
+<span class="nc" id="L1045">                        ins_h = ((ins_h &lt;&lt; hash_shift) ^ (window[(strstart) + (MIN_MATCH - 1)] &amp; 0xff)) &amp; hash_mask;</span>
+//	    prev[strstart&amp;w_mask]=hash_head=head[ins_h];
+<span class="nc" id="L1047">                        hash_head = (head[ins_h] &amp; 0xffff);</span>
+<span class="nc" id="L1048">                        prev[strstart &amp; w_mask] = head[ins_h];</span>
+<span class="nc" id="L1049">                        head[ins_h] = (short) strstart;</span>
+
+                        // strstart never exceeds WSIZE-MAX_MATCH, so there are
+                        // always MIN_MATCH bytes ahead.
+                    }
+<span class="nc bnc" id="L1054" title="All 2 branches missed.">                    while (--match_length != 0);</span>
+<span class="nc" id="L1055">                    strstart++;</span>
+                } else {
+<span class="nc" id="L1057">                    strstart += match_length;</span>
+<span class="nc" id="L1058">                    match_length = 0;</span>
+<span class="nc" id="L1059">                    ins_h = window[strstart] &amp; 0xff;</span>
+
+<span class="nc" id="L1061">                    ins_h = (((ins_h) &lt;&lt; hash_shift) ^ (window[strstart + 1] &amp; 0xff)) &amp; hash_mask;</span>
+                    // If lookahead &lt; MIN_MATCH, ins_h is garbage, but it does not
+                    // matter since it will be recomputed at next deflate call.
+                }
+            } else {
+                // No match, output a literal byte
+
+<span class="nc" id="L1068">                bflush = _tr_tally(0, window[strstart] &amp; 0xff);</span>
+<span class="nc" id="L1069">                lookahead--;</span>
+<span class="nc" id="L1070">                strstart++;</span>
+            }
+<span class="nc bnc" id="L1072" title="All 2 branches missed.">            if (bflush) {</span>
+
+<span class="nc" id="L1074">                flush_block_only(false);</span>
+<span class="nc bnc" id="L1075" title="All 2 branches missed.">                if (strm.avail_out == 0) return NeedMore;</span>
+            }
+        }
+
+<span class="nc bnc" id="L1079" title="All 2 branches missed.">        flush_block_only(flush == Z_FINISH);</span>
+<span class="nc bnc" id="L1080" title="All 2 branches missed.">        if (strm.avail_out == 0) {</span>
+<span class="nc bnc" id="L1081" title="All 2 branches missed.">            if (flush == Z_FINISH) return FinishStarted;</span>
+<span class="nc" id="L1082">            else return NeedMore;</span>
+        }
+<span class="nc bnc" id="L1084" title="All 2 branches missed.">        return flush == Z_FINISH ? FinishDone : BlockDone;</span>
+    }
+
+    // Same as above, but achieves better compression. We use a lazy
+    // evaluation for matches: a match is finally adopted only if there is
+    // no better match at the next window position.
+    int deflate_slow(int flush) {
+//    short hash_head = 0;    // head of hash chain
+<span class="fc" id="L1092">        int hash_head = 0;    // head of hash chain</span>
+        boolean bflush;         // set if current block must be flushed
+
+        // Process the input block.
+        while (true) {
+            // Make sure that we always have enough lookahead, except
+            // at the end of the input file. We need MAX_MATCH bytes
+            // for the next match, plus MIN_MATCH bytes to insert the
+            // string following the next match.
+
+<span class="pc bpc" id="L1102" title="1 of 2 branches missed.">            if (lookahead &lt; MIN_LOOKAHEAD) {</span>
+<span class="fc" id="L1103">                fill_window();</span>
+<span class="pc bpc" id="L1104" title="1 of 4 branches missed.">                if (lookahead &lt; MIN_LOOKAHEAD &amp;&amp; flush == Z_NO_FLUSH) {</span>
+<span class="fc" id="L1105">                    return NeedMore;</span>
+                }
+<span class="fc bfc" id="L1107" title="All 2 branches covered.">                if (lookahead == 0) break; // flush the current block</span>
+            }
+
+            // Insert the string window[strstart .. strstart+2] in the
+            // dictionary, and set hash_head to the head of the hash chain:
+
+<span class="fc bfc" id="L1113" title="All 2 branches covered.">            if (lookahead &gt;= MIN_MATCH) {</span>
+<span class="fc" id="L1114">                ins_h = (((ins_h) &lt;&lt; hash_shift) ^ (window[(strstart) + (MIN_MATCH - 1)] &amp; 0xff)) &amp; hash_mask;</span>
+//	prev[strstart&amp;w_mask]=hash_head=head[ins_h];
+<span class="fc" id="L1116">                hash_head = (head[ins_h] &amp; 0xffff);</span>
+<span class="fc" id="L1117">                prev[strstart &amp; w_mask] = head[ins_h];</span>
+<span class="fc" id="L1118">                head[ins_h] = (short) strstart;</span>
+            }
+
+            // Find the longest match, discarding those &lt;= prev_length.
+<span class="fc" id="L1122">            prev_length = match_length;</span>
+<span class="fc" id="L1123">            prev_match = match_start;</span>
+<span class="fc" id="L1124">            match_length = MIN_MATCH - 1;</span>
+
+<span class="pc bpc" id="L1126" title="5 of 6 branches missed.">            if (hash_head != 0 &amp;&amp; prev_length &lt; max_lazy_match &amp;&amp;</span>
+                    ((strstart - hash_head) &amp; 0xffff) &lt;= w_size - MIN_LOOKAHEAD
+            ) {
+                // To simplify the code, we prevent matches with the string
+                // of window index 0 (in particular we have to avoid a match
+                // of the string with itself at the start of the input file).
+
+<span class="nc bnc" id="L1133" title="All 2 branches missed.">                if (strategy != Z_HUFFMAN_ONLY) {</span>
+<span class="nc" id="L1134">                    match_length = longest_match(hash_head);</span>
+                }
+                // longest_match() sets match_start
+
+<span class="nc bnc" id="L1138" title="All 8 branches missed.">                if (match_length &lt;= 5 &amp;&amp; (strategy == Z_FILTERED ||</span>
+                        (match_length == MIN_MATCH &amp;&amp;
+                                strstart - match_start &gt; 4096))) {
+
+                    // If prev_match is also MIN_MATCH, match_start is garbage
+                    // but we will ignore the current match anyway.
+<span class="nc" id="L1144">                    match_length = MIN_MATCH - 1;</span>
+                }
+            }
+
+            // If there was a match at the previous step and the current
+            // match is not better, output the previous match:
+<span class="pc bpc" id="L1150" title="3 of 4 branches missed.">            if (prev_length &gt;= MIN_MATCH &amp;&amp; match_length &lt;= prev_length) {</span>
+<span class="nc" id="L1151">                int max_insert = strstart + lookahead - MIN_MATCH;</span>
+                // Do not insert strings in hash table beyond this.
+
+                //          check_match(strstart-1, prev_match, prev_length);
+
+<span class="nc" id="L1156">                bflush = _tr_tally(strstart - 1 - prev_match, prev_length - MIN_MATCH);</span>
+
+                // Insert in hash table all strings up to the end of the match.
+                // strstart-1 and strstart are already inserted. If there is not
+                // enough lookahead, the last two strings are not inserted in
+                // the hash table.
+<span class="nc" id="L1162">                lookahead -= prev_length - 1;</span>
+<span class="nc" id="L1163">                prev_length -= 2;</span>
+                do {
+<span class="nc bnc" id="L1165" title="All 2 branches missed.">                    if (++strstart &lt;= max_insert) {</span>
+<span class="nc" id="L1166">                        ins_h = (((ins_h) &lt;&lt; hash_shift) ^ (window[(strstart) + (MIN_MATCH - 1)] &amp; 0xff)) &amp; hash_mask;</span>
+                        //prev[strstart&amp;w_mask]=hash_head=head[ins_h];
+<span class="nc" id="L1168">                        hash_head = (head[ins_h] &amp; 0xffff);</span>
+<span class="nc" id="L1169">                        prev[strstart &amp; w_mask] = head[ins_h];</span>
+<span class="nc" id="L1170">                        head[ins_h] = (short) strstart;</span>
+                    }
+                }
+<span class="nc bnc" id="L1173" title="All 2 branches missed.">                while (--prev_length != 0);</span>
+<span class="nc" id="L1174">                match_available = 0;</span>
+<span class="nc" id="L1175">                match_length = MIN_MATCH - 1;</span>
+<span class="nc" id="L1176">                strstart++;</span>
+
+<span class="nc bnc" id="L1178" title="All 2 branches missed.">                if (bflush) {</span>
+<span class="nc" id="L1179">                    flush_block_only(false);</span>
+<span class="nc bnc" id="L1180" title="All 2 branches missed.">                    if (strm.avail_out == 0) return NeedMore;</span>
+                }
+<span class="pc bfc" id="L1182" title="All 2 branches covered.">            } else if (match_available != 0) {</span>
+
+                // If there was no match at the previous position, output a
+                // single literal. If there was a match but the current match
+                // is longer, truncate the previous match to a single literal.
+
+<span class="fc" id="L1188">                bflush = _tr_tally(0, window[strstart - 1] &amp; 0xff);</span>
+
+<span class="pc bpc" id="L1190" title="1 of 2 branches missed.">                if (bflush) {</span>
+<span class="nc" id="L1191">                    flush_block_only(false);</span>
+                }
+<span class="fc" id="L1193">                strstart++;</span>
+<span class="fc" id="L1194">                lookahead--;</span>
+<span class="pc bpc" id="L1195" title="1 of 2 branches missed.">                if (strm.avail_out == 0) return NeedMore;</span>
+            } else {
+                // There is no previous match to compare with, wait for
+                // the next step to decide.
+
+<span class="fc" id="L1200">                match_available = 1;</span>
+<span class="fc" id="L1201">                strstart++;</span>
+<span class="fc" id="L1202">                lookahead--;</span>
+            }
+        }
+
+<span class="pc bpc" id="L1206" title="1 of 2 branches missed.">        if (match_available != 0) {</span>
+<span class="fc" id="L1207">            _tr_tally(0, window[strstart - 1] &amp; 0xff);</span>
+<span class="fc" id="L1208">            match_available = 0;</span>
+        }
+<span class="pc bpc" id="L1210" title="1 of 2 branches missed.">        flush_block_only(flush == Z_FINISH);</span>
+
+<span class="pc bpc" id="L1212" title="1 of 2 branches missed.">        if (strm.avail_out == 0) {</span>
+<span class="nc bnc" id="L1213" title="All 2 branches missed.">            if (flush == Z_FINISH) return FinishStarted;</span>
+<span class="nc" id="L1214">            else return NeedMore;</span>
+        }
+
+<span class="pc bpc" id="L1217" title="1 of 2 branches missed.">        return flush == Z_FINISH ? FinishDone : BlockDone;</span>
+    }
+
+    int longest_match(int cur_match) {
+<span class="nc" id="L1221">        int chain_length = max_chain_length; // max hash chain length</span>
+<span class="nc" id="L1222">        int scan = strstart;                 // current string</span>
+        int match;                           // matched string
+        int len;                             // length of current match
+<span class="nc" id="L1225">        int best_len = prev_length;          // best match length so far</span>
+<span class="nc bnc" id="L1226" title="All 2 branches missed.">        int limit = strstart &gt; (w_size - MIN_LOOKAHEAD) ?</span>
+                strstart - (w_size - MIN_LOOKAHEAD) : 0;
+<span class="nc" id="L1228">        int nice_match = this.nice_match;</span>
+
+        // Stop when cur_match becomes &lt;= limit. To simplify the code,
+        // we prevent matches with the string of window index 0.
+
+<span class="nc" id="L1233">        int wmask = w_mask;</span>
+
+<span class="nc" id="L1235">        int strend = strstart + MAX_MATCH;</span>
+<span class="nc" id="L1236">        byte scan_end1 = window[scan + best_len - 1];</span>
+<span class="nc" id="L1237">        byte scan_end = window[scan + best_len];</span>
+
+        // The code is optimized for HASH_BITS &gt;= 8 and MAX_MATCH-2 multiple of 16.
+        // It is easy to get rid of this optimization if necessary.
+
+        // Do not waste too much time if we already have a good match:
+<span class="nc bnc" id="L1243" title="All 2 branches missed.">        if (prev_length &gt;= good_match) {</span>
+<span class="nc" id="L1244">            chain_length &gt;&gt;= 2;</span>
+        }
+
+        // Do not look for matches beyond the end of the input. This is necessary
+        // to make deflate deterministic.
+<span class="nc bnc" id="L1249" title="All 2 branches missed.">        if (nice_match &gt; lookahead) nice_match = lookahead;</span>
+
+        do {
+<span class="nc" id="L1252">            match = cur_match;</span>
+
+            // Skip to next match if the match length cannot increase
+            // or if the match length is less than 2:
+<span class="nc bnc" id="L1256" title="All 8 branches missed.">            if (window[match + best_len] != scan_end ||</span>
+                    window[match + best_len - 1] != scan_end1 ||
+                    window[match] != window[scan] ||
+<span class="nc" id="L1259">                    window[++match] != window[scan + 1]) continue;</span>
+
+            // The check at best_len-1 can be removed because it will be made
+            // again later. (This heuristic is not always a win.)
+            // It is not necessary to compare scan[2] and match[2] since they
+            // are always equal when the other bytes match, given that
+            // the hash keys are equal and that HASH_BITS &gt;= 8.
+<span class="nc" id="L1266">            scan += 2;</span>
+<span class="nc" id="L1267">            match++;</span>
+
+            // We check for insufficient lookahead only every 8th comparison;
+            // the 256th check will be made at strstart+258.
+            do {
+<span class="nc bnc" id="L1272" title="All 18 branches missed.">            } while (window[++scan] == window[++match] &amp;&amp;</span>
+                    window[++scan] == window[++match] &amp;&amp;
+                    window[++scan] == window[++match] &amp;&amp;
+                    window[++scan] == window[++match] &amp;&amp;
+                    window[++scan] == window[++match] &amp;&amp;
+                    window[++scan] == window[++match] &amp;&amp;
+                    window[++scan] == window[++match] &amp;&amp;
+                    window[++scan] == window[++match] &amp;&amp;
+                    scan &lt; strend);
+
+<span class="nc" id="L1282">            len = MAX_MATCH - (strend - scan);</span>
+<span class="nc" id="L1283">            scan = strend - MAX_MATCH;</span>
+
+<span class="nc bnc" id="L1285" title="All 2 branches missed.">            if (len &gt; best_len) {</span>
+<span class="nc" id="L1286">                match_start = cur_match;</span>
+<span class="nc" id="L1287">                best_len = len;</span>
+<span class="nc bnc" id="L1288" title="All 2 branches missed.">                if (len &gt;= nice_match) break;</span>
+<span class="nc" id="L1289">                scan_end1 = window[scan + best_len - 1];</span>
+<span class="nc" id="L1290">                scan_end = window[scan + best_len];</span>
+            }
+
+<span class="nc bnc" id="L1293" title="All 4 branches missed.">        } while ((cur_match = (prev[cur_match &amp; wmask] &amp; 0xffff)) &gt; limit</span>
+                &amp;&amp; --chain_length != 0);
+
+<span class="nc bnc" id="L1296" title="All 2 branches missed.">        if (best_len &lt;= lookahead) return best_len;</span>
+<span class="nc" id="L1297">        return lookahead;</span>
+    }
+
+    int deflateInit(int level, int bits, int memlevel) {
+<span class="nc" id="L1301">        return deflateInit(level, Z_DEFLATED, bits, memlevel,</span>
+                Z_DEFAULT_STRATEGY);
+    }
+
+    int deflateInit(int level, int bits) {
+<span class="fc" id="L1306">        return deflateInit(level, Z_DEFLATED, bits, DEF_MEM_LEVEL,</span>
+                Z_DEFAULT_STRATEGY);
+    }
+
+    int deflateInit(int level) {
+<span class="nc" id="L1311">        return deflateInit(level, MAX_WBITS);</span>
+    }
+
+    private int deflateInit(int level, int method, int windowBits,
+                            int memLevel, int strategy) {
+<span class="fc" id="L1316">        int wrap = 1;</span>
+        //    byte[] my_version=ZLIB_VERSION;
+
+        //
+        //  if (version == null || version[0] != my_version[0]
+        //  || stream_size != sizeof(z_stream)) {
+        //  return Z_VERSION_ERROR;
+        //  }
+
+<span class="fc" id="L1325">        strm.msg = null;</span>
+
+<span class="pc bpc" id="L1327" title="1 of 2 branches missed.">        if (level == Z_DEFAULT_COMPRESSION) level = 6;</span>
+
+<span class="pc bpc" id="L1329" title="1 of 2 branches missed.">        if (windowBits &lt; 0) { // undocumented feature: suppress zlib header</span>
+<span class="nc" id="L1330">            wrap = 0;</span>
+<span class="nc" id="L1331">            windowBits = -windowBits;</span>
+<span class="pc bpc" id="L1332" title="1 of 2 branches missed.">        } else if (windowBits &gt; 15) {</span>
+<span class="fc" id="L1333">            wrap = 2;</span>
+<span class="fc" id="L1334">            windowBits -= 16;</span>
+<span class="fc" id="L1335">            strm.adler = new CRC32();</span>
+        }
+
+<span class="pc bpc" id="L1338" title="9 of 18 branches missed.">        if (memLevel &lt; 1 || memLevel &gt; MAX_MEM_LEVEL ||</span>
+                method != Z_DEFLATED ||
+                windowBits &lt; 9 || windowBits &gt; 15 || level &lt; 0 || level &gt; 9 ||
+                strategy &lt; 0 || strategy &gt; Z_HUFFMAN_ONLY) {
+<span class="nc" id="L1342">            return Z_STREAM_ERROR;</span>
+        }
+
+<span class="fc" id="L1345">        strm.dstate = this;</span>
+
+<span class="fc" id="L1347">        this.wrap = wrap;</span>
+<span class="fc" id="L1348">        w_bits = windowBits;</span>
+<span class="fc" id="L1349">        w_size = 1 &lt;&lt; w_bits;</span>
+<span class="fc" id="L1350">        w_mask = w_size - 1;</span>
+
+<span class="fc" id="L1352">        hash_bits = memLevel + 7;</span>
+<span class="fc" id="L1353">        hash_size = 1 &lt;&lt; hash_bits;</span>
+<span class="fc" id="L1354">        hash_mask = hash_size - 1;</span>
+<span class="fc" id="L1355">        hash_shift = ((hash_bits + MIN_MATCH - 1) / MIN_MATCH);</span>
+
+<span class="fc" id="L1357">        window = new byte[w_size * 2];</span>
+<span class="fc" id="L1358">        prev = new short[w_size];</span>
+<span class="fc" id="L1359">        head = new short[hash_size];</span>
+
+<span class="fc" id="L1361">        lit_bufsize = 1 &lt;&lt; (memLevel + 6); // 16K elements by default</span>
+
+        // We overlay pending_buf and d_buf+l_buf. This works since the average
+        // output size for (length,distance) codes is &lt;= 24 bits.
+<span class="fc" id="L1365">        pending_buf = new byte[lit_bufsize * 4];</span>
+<span class="fc" id="L1366">        pending_buf_size = lit_bufsize * 4;</span>
+
+<span class="fc" id="L1368">        d_buf = lit_bufsize / 2;</span>
+<span class="fc" id="L1369">        l_buf = (1 + 2) * lit_bufsize;</span>
+
+<span class="fc" id="L1371">        this.level = level;</span>
+
+<span class="fc" id="L1373">        this.strategy = strategy;</span>
+<span class="fc" id="L1374">        this.method = (byte) method;</span>
+
+<span class="fc" id="L1376">        return deflateReset();</span>
+    }
+
+    int deflateReset() {
+<span class="fc" id="L1380">        strm.total_in = strm.total_out = 0;</span>
+<span class="fc" id="L1381">        strm.msg = null; //</span>
+<span class="fc" id="L1382">        strm.data_type = Z_UNKNOWN;</span>
+
+<span class="fc" id="L1384">        pending = 0;</span>
+<span class="fc" id="L1385">        pending_out = 0;</span>
+
+<span class="pc bpc" id="L1387" title="1 of 2 branches missed.">        if (wrap &lt; 0) {</span>
+<span class="nc" id="L1388">            wrap = -wrap;</span>
+        }
+<span class="pc bpc" id="L1390" title="1 of 2 branches missed.">        status = (wrap == 0) ? BUSY_STATE : INIT_STATE;</span>
+<span class="fc" id="L1391">        strm.adler.reset();</span>
+
+<span class="fc" id="L1393">        last_flush = Z_NO_FLUSH;</span>
+
+<span class="fc" id="L1395">        tr_init();</span>
+<span class="fc" id="L1396">        lm_init();</span>
+<span class="fc" id="L1397">        return Z_OK;</span>
+    }
+
+    int deflateEnd() {
+<span class="pc bpc" id="L1401" title="3 of 6 branches missed.">        if (status != INIT_STATE &amp;&amp; status != BUSY_STATE &amp;&amp; status != FINISH_STATE) {</span>
+<span class="nc" id="L1402">            return Z_STREAM_ERROR;</span>
+        }
+        // Deallocate in reverse order of allocations:
+<span class="fc" id="L1405">        pending_buf = null;</span>
+<span class="fc" id="L1406">        head = null;</span>
+<span class="fc" id="L1407">        prev = null;</span>
+<span class="fc" id="L1408">        window = null;</span>
+        // free
+        // dstate=null;
+<span class="pc bpc" id="L1411" title="1 of 2 branches missed.">        return status == BUSY_STATE ? Z_DATA_ERROR : Z_OK;</span>
+    }
+
+    int deflateParams(int _level, int _strategy) {
+<span class="nc" id="L1415">        int err = Z_OK;</span>
+
+<span class="nc bnc" id="L1417" title="All 2 branches missed.">        if (_level == Z_DEFAULT_COMPRESSION) {</span>
+<span class="nc" id="L1418">            _level = 6;</span>
+        }
+<span class="nc bnc" id="L1420" title="All 8 branches missed.">        if (_level &lt; 0 || _level &gt; 9 ||</span>
+                _strategy &lt; 0 || _strategy &gt; Z_HUFFMAN_ONLY) {
+<span class="nc" id="L1422">            return Z_STREAM_ERROR;</span>
+        }
+
+<span class="nc bnc" id="L1425" title="All 4 branches missed.">        if (config_table[level].func != config_table[_level].func &amp;&amp;</span>
+                strm.total_in != 0) {
+            // Flush the last buffer:
+<span class="nc" id="L1428">            err = strm.deflate(Z_PARTIAL_FLUSH);</span>
+        }
+
+<span class="nc bnc" id="L1431" title="All 2 branches missed.">        if (level != _level) {</span>
+<span class="nc" id="L1432">            level = _level;</span>
+<span class="nc" id="L1433">            max_lazy_match = config_table[level].max_lazy;</span>
+<span class="nc" id="L1434">            good_match = config_table[level].good_length;</span>
+<span class="nc" id="L1435">            nice_match = config_table[level].nice_length;</span>
+<span class="nc" id="L1436">            max_chain_length = config_table[level].max_chain;</span>
+        }
+<span class="nc" id="L1438">        strategy = _strategy;</span>
+<span class="nc" id="L1439">        return err;</span>
+    }
+
+    int deflateSetDictionary(byte[] dictionary, int dictLength) {
+<span class="nc" id="L1443">        int length = dictLength;</span>
+<span class="nc" id="L1444">        int index = 0;</span>
+
+<span class="nc bnc" id="L1446" title="All 4 branches missed.">        if (dictionary == null || status != INIT_STATE)</span>
+<span class="nc" id="L1447">            return Z_STREAM_ERROR;</span>
+
+<span class="nc" id="L1449">        strm.adler.update(dictionary, 0, dictLength);</span>
+
+<span class="nc bnc" id="L1451" title="All 2 branches missed.">        if (length &lt; MIN_MATCH) return Z_OK;</span>
+<span class="nc bnc" id="L1452" title="All 2 branches missed.">        if (length &gt; w_size - MIN_LOOKAHEAD) {</span>
+<span class="nc" id="L1453">            length = w_size - MIN_LOOKAHEAD;</span>
+<span class="nc" id="L1454">            index = dictLength - length; // use the tail of the dictionary</span>
+        }
+<span class="nc" id="L1456">        System.arraycopy(dictionary, index, window, 0, length);</span>
+<span class="nc" id="L1457">        strstart = length;</span>
+<span class="nc" id="L1458">        block_start = length;</span>
+
+        // Insert all strings in the hash table (except for the last two bytes).
+        // s-&gt;lookahead stays null, so s-&gt;ins_h will be recomputed at the next
+        // call of fill_window.
+
+<span class="nc" id="L1464">        ins_h = window[0] &amp; 0xff;</span>
+<span class="nc" id="L1465">        ins_h = (((ins_h) &lt;&lt; hash_shift) ^ (window[1] &amp; 0xff)) &amp; hash_mask;</span>
+
+<span class="nc bnc" id="L1467" title="All 2 branches missed.">        for (int n = 0; n &lt;= length - MIN_MATCH; n++) {</span>
+<span class="nc" id="L1468">            ins_h = (((ins_h) &lt;&lt; hash_shift) ^ (window[(n) + (MIN_MATCH - 1)] &amp; 0xff)) &amp; hash_mask;</span>
+<span class="nc" id="L1469">            prev[n &amp; w_mask] = head[ins_h];</span>
+<span class="nc" id="L1470">            head[ins_h] = (short) n;</span>
+        }
+<span class="nc" id="L1472">        return Z_OK;</span>
+    }
+
+    int deflate(int flush) {
+        int old_flush;
+
+<span class="pc bpc" id="L1478" title="2 of 4 branches missed.">        if (flush &gt; Z_FINISH || flush &lt; 0) {</span>
+<span class="nc" id="L1479">            return Z_STREAM_ERROR;</span>
+        }
+
+<span class="pc bpc" id="L1482" title="7 of 10 branches missed.">        if (strm.next_out == null ||</span>
+                (strm.next_in == null &amp;&amp; strm.avail_in != 0) ||
+                (status == FINISH_STATE &amp;&amp; flush != Z_FINISH)) {
+<span class="nc" id="L1485">            strm.msg = z_errmsg[Z_NEED_DICT - (Z_STREAM_ERROR)];</span>
+<span class="nc" id="L1486">            return Z_STREAM_ERROR;</span>
+        }
+<span class="pc bpc" id="L1488" title="1 of 2 branches missed.">        if (strm.avail_out == 0) {</span>
+<span class="nc" id="L1489">            strm.msg = z_errmsg[Z_NEED_DICT - (Z_BUF_ERROR)];</span>
+<span class="nc" id="L1490">            return Z_BUF_ERROR;</span>
+        }
+
+<span class="fc" id="L1493">        old_flush = last_flush;</span>
+<span class="fc" id="L1494">        last_flush = flush;</span>
+
+        // Write the zlib header
+<span class="fc bfc" id="L1497" title="All 2 branches covered.">        if (status == INIT_STATE) {</span>
+<span class="pc bpc" id="L1498" title="1 of 2 branches missed.">            if (wrap == 2) {</span>
+<span class="fc" id="L1499">                getGZIPHeader().put(this);</span>
+<span class="fc" id="L1500">                status = BUSY_STATE;</span>
+<span class="fc" id="L1501">                strm.adler.reset();</span>
+            } else {
+<span class="nc" id="L1503">                int header = (Z_DEFLATED + ((w_bits - 8) &lt;&lt; 4)) &lt;&lt; 8;</span>
+<span class="nc" id="L1504">                int level_flags = ((level - 1) &amp; 0xff) &gt;&gt; 1;</span>
+
+<span class="nc bnc" id="L1506" title="All 2 branches missed.">                if (level_flags &gt; 3) level_flags = 3;</span>
+<span class="nc" id="L1507">                header |= (level_flags &lt;&lt; 6);</span>
+<span class="nc bnc" id="L1508" title="All 2 branches missed.">                if (strstart != 0) header |= PRESET_DICT;</span>
+<span class="nc" id="L1509">                header += 31 - (header % 31);</span>
+
+<span class="nc" id="L1511">                status = BUSY_STATE;</span>
+<span class="nc" id="L1512">                putShortMSB(header);</span>
+
+
+                // Save the adler32 of the preset dictionary:
+<span class="nc bnc" id="L1516" title="All 2 branches missed.">                if (strstart != 0) {</span>
+<span class="nc" id="L1517">                    long adler = strm.adler.getValue();</span>
+<span class="nc" id="L1518">                    putShortMSB((int) (adler &gt;&gt;&gt; 16));</span>
+<span class="nc" id="L1519">                    putShortMSB((int) (adler &amp; 0xffff));</span>
+                }
+<span class="nc" id="L1521">                strm.adler.reset();</span>
+            }
+        }
+
+        // Flush as much pending output as possible
+<span class="fc bfc" id="L1526" title="All 2 branches covered.">        if (pending != 0) {</span>
+<span class="fc" id="L1527">            strm.flush_pending();</span>
+<span class="pc bpc" id="L1528" title="1 of 2 branches missed.">            if (strm.avail_out == 0) {</span>
+                // Since avail_out is 0, deflate will be called again with
+                // more output space, but possibly with both pending and
+                // avail_in equal to zero. There won't be anything to do,
+                // but this is not an error situation so make sure we
+                // return OK instead of BUF_ERROR at next call of deflate:
+<span class="nc" id="L1534">                last_flush = -1;</span>
+<span class="nc" id="L1535">                return Z_OK;</span>
+            }
+
+            // Make sure there is something to do and avoid duplicate consecutive
+            // flushes. For repeated and useless calls with Z_FINISH, we keep
+            // returning Z_STREAM_END instead of Z_BUFF_ERROR.
+<span class="pc bpc" id="L1541" title="4 of 6 branches missed.">        } else if (strm.avail_in == 0 &amp;&amp; flush &lt;= old_flush &amp;&amp;</span>
+                flush != Z_FINISH) {
+<span class="nc" id="L1543">            strm.msg = z_errmsg[Z_NEED_DICT - (Z_BUF_ERROR)];</span>
+<span class="nc" id="L1544">            return Z_BUF_ERROR;</span>
+        }
+
+        // User must not provide more input after the first FINISH:
+<span class="pc bpc" id="L1548" title="3 of 4 branches missed.">        if (status == FINISH_STATE &amp;&amp; strm.avail_in != 0) {</span>
+<span class="nc" id="L1549">            strm.msg = z_errmsg[Z_NEED_DICT - (Z_BUF_ERROR)];</span>
+<span class="nc" id="L1550">            return Z_BUF_ERROR;</span>
+        }
+
+        // Start a new block or continue the current one.
+<span class="pc bpc" id="L1554" title="5 of 8 branches missed.">        if (strm.avail_in != 0 || lookahead != 0 ||</span>
+                (flush != Z_NO_FLUSH &amp;&amp; status != FINISH_STATE)) {
+<span class="fc" id="L1556">            int bstate = -1;</span>
+<span class="pc bpc" id="L1557" title="3 of 4 branches missed.">            switch (config_table[level].func) {</span>
+                case STORED:
+<span class="nc" id="L1559">                    bstate = deflate_stored(flush);</span>
+<span class="nc" id="L1560">                    break;</span>
+                case FAST:
+<span class="nc" id="L1562">                    bstate = deflate_fast(flush);</span>
+<span class="nc" id="L1563">                    break;</span>
+                case SLOW:
+<span class="fc" id="L1565">                    bstate = deflate_slow(flush);</span>
+<span class="fc" id="L1566">                    break;</span>
+                default:
+            }
+
+<span class="pc bpc" id="L1570" title="1 of 4 branches missed.">            if (bstate == FinishStarted || bstate == FinishDone) {</span>
+<span class="fc" id="L1571">                status = FINISH_STATE;</span>
+            }
+<span class="pc bpc" id="L1573" title="1 of 4 branches missed.">            if (bstate == NeedMore || bstate == FinishStarted) {</span>
+<span class="pc bpc" id="L1574" title="1 of 2 branches missed.">                if (strm.avail_out == 0) {</span>
+<span class="nc" id="L1575">                    last_flush = -1; // avoid BUF_ERROR next call, see above</span>
+                }
+<span class="fc" id="L1577">                return Z_OK;</span>
+                // If flush != Z_NO_FLUSH &amp;&amp; avail_out == 0, the next call
+                // of deflate should use the same flush parameter to make sure
+                // that the flush is complete. So we don't have to output an
+                // empty block here, this will be done at next call. This also
+                // ensures that for a very small output buffer, we emit at most
+                // one empty block.
+            }
+
+<span class="pc bpc" id="L1586" title="1 of 2 branches missed.">            if (bstate == BlockDone) {</span>
+<span class="nc bnc" id="L1587" title="All 2 branches missed.">                if (flush == Z_PARTIAL_FLUSH) {</span>
+<span class="nc" id="L1588">                    _tr_align();</span>
+                } else { // FULL_FLUSH or SYNC_FLUSH
+<span class="nc" id="L1590">                    _tr_stored_block(0, 0, false);</span>
+                    // For a full flush, this empty block will be recognized
+                    // as a special marker by inflate_sync().
+<span class="nc bnc" id="L1593" title="All 2 branches missed.">                    if (flush == Z_FULL_FLUSH) {</span>
+                        //state.head[s.hash_size-1]=0;
+<span class="nc bnc" id="L1595" title="All 2 branches missed.">                        for (int i = 0; i &lt; hash_size/*-1*/; i++)  // forget history</span>
+<span class="nc" id="L1596">                            head[i] = 0;</span>
+                    }
+                }
+<span class="nc" id="L1599">                strm.flush_pending();</span>
+<span class="nc bnc" id="L1600" title="All 2 branches missed.">                if (strm.avail_out == 0) {</span>
+<span class="nc" id="L1601">                    last_flush = -1; // avoid BUF_ERROR at next call, see above</span>
+<span class="nc" id="L1602">                    return Z_OK;</span>
+                }
+            }
+        }
+
+<span class="pc bpc" id="L1607" title="1 of 2 branches missed.">        if (flush != Z_FINISH) return Z_OK;</span>
+<span class="pc bpc" id="L1608" title="1 of 2 branches missed.">        if (wrap &lt;= 0) return Z_STREAM_END;</span>
+
+<span class="pc bpc" id="L1610" title="1 of 2 branches missed.">        if (wrap == 2) {</span>
+<span class="fc" id="L1611">            long adler = strm.adler.getValue();</span>
+<span class="fc" id="L1612">            put_byte((byte) (adler &amp; 0xff));</span>
+<span class="fc" id="L1613">            put_byte((byte) ((adler &gt;&gt; 8) &amp; 0xff));</span>
+<span class="fc" id="L1614">            put_byte((byte) ((adler &gt;&gt; 16) &amp; 0xff));</span>
+<span class="fc" id="L1615">            put_byte((byte) ((adler &gt;&gt; 24) &amp; 0xff));</span>
+<span class="fc" id="L1616">            put_byte((byte) (strm.total_in &amp; 0xff));</span>
+<span class="fc" id="L1617">            put_byte((byte) ((strm.total_in &gt;&gt; 8) &amp; 0xff));</span>
+<span class="fc" id="L1618">            put_byte((byte) ((strm.total_in &gt;&gt; 16) &amp; 0xff));</span>
+<span class="fc" id="L1619">            put_byte((byte) ((strm.total_in &gt;&gt; 24) &amp; 0xff));</span>
+
+<span class="fc" id="L1621">            getGZIPHeader().setCRC(adler);</span>
+<span class="fc" id="L1622">        } else {</span>
+            // Write the zlib trailer (adler32)
+<span class="nc" id="L1624">            long adler = strm.adler.getValue();</span>
+<span class="nc" id="L1625">            putShortMSB((int) (adler &gt;&gt;&gt; 16));</span>
+<span class="nc" id="L1626">            putShortMSB((int) (adler &amp; 0xffff));</span>
+        }
+
+<span class="fc" id="L1629">        strm.flush_pending();</span>
+
+        // If avail_out is zero, the application will call deflate again
+        // to flush the rest.
+
+<span class="pc bpc" id="L1634" title="1 of 2 branches missed.">        if (wrap &gt; 0) wrap = -wrap; // write the trailer only once!</span>
+<span class="pc bpc" id="L1635" title="1 of 2 branches missed.">        return pending != 0 ? Z_OK : Z_STREAM_END;</span>
+    }
+
+    public Object clone() {
+<span class="nc" id="L1639">        Deflate dest = new Deflate(strm);</span>
+
+<span class="nc" id="L1641">        dest.pending_buf = dup(dest.pending_buf);</span>
+<span class="nc" id="L1642">        dest.window = dup(dest.window);</span>
+
+<span class="nc" id="L1644">        dest.prev = dup(dest.prev);</span>
+<span class="nc" id="L1645">        dest.head = dup(dest.head);</span>
+<span class="nc" id="L1646">        dest.dyn_ltree = dup(dest.dyn_ltree);</span>
+<span class="nc" id="L1647">        dest.dyn_dtree = dup(dest.dyn_dtree);</span>
+<span class="nc" id="L1648">        dest.bl_tree = dup(dest.bl_tree);</span>
+
+<span class="nc" id="L1650">        dest.bl_count = dup(dest.bl_count);</span>
+<span class="nc" id="L1651">        dest.next_code = dup(dest.next_code);</span>
+<span class="nc" id="L1652">        dest.heap = dup(dest.heap);</span>
+<span class="nc" id="L1653">        dest.depth = dup(dest.depth);</span>
+
+<span class="nc" id="L1655">        dest.l_desc.dyn_tree = dest.dyn_ltree;</span>
+<span class="nc" id="L1656">        dest.d_desc.dyn_tree = dest.dyn_dtree;</span>
+<span class="nc" id="L1657">        dest.bl_desc.dyn_tree = dest.bl_tree;</span>
+
+    /*
+    dest.l_desc.stat_desc = StaticTree.static_l_desc;
+    dest.d_desc.stat_desc = StaticTree.static_d_desc;
+    dest.bl_desc.stat_desc = StaticTree.static_bl_desc;
+    */
+
+<span class="nc bnc" id="L1665" title="All 2 branches missed.">        if (dest.gheader != null) {</span>
+<span class="nc" id="L1666">            dest.gheader = (GZIPHeader) dest.gheader.clone();</span>
+        }
+
+<span class="nc" id="L1669">        return dest;</span>
+    }
+
+    private byte[] dup(byte[] buf) {
+<span class="nc" id="L1673">        byte[] foo = new byte[buf.length];</span>
+<span class="nc" id="L1674">        System.arraycopy(buf, 0, foo, 0, foo.length);</span>
+<span class="nc" id="L1675">        return foo;</span>
+    }
+
+    private short[] dup(short[] buf) {
+<span class="nc" id="L1679">        short[] foo = new short[buf.length];</span>
+<span class="nc" id="L1680">        System.arraycopy(buf, 0, foo, 0, foo.length);</span>
+<span class="nc" id="L1681">        return foo;</span>
+    }
+
+    private int[] dup(int[] buf) {
+<span class="nc" id="L1685">        int[] foo = new int[buf.length];</span>
+<span class="nc" id="L1686">        System.arraycopy(buf, 0, foo, 0, foo.length);</span>
+<span class="nc" id="L1687">        return foo;</span>
+    }
+
+    synchronized GZIPHeader getGZIPHeader() {
+<span class="fc bfc" id="L1691" title="All 2 branches covered.">        if (gheader == null) {</span>
+<span class="fc" id="L1692">            gheader = new GZIPHeader();</span>
+        }
+<span class="fc" id="L1694">        return gheader;</span>
+    }
+
+    static class Config {
+        int good_length; // reduce lazy search above this match length
+        int max_lazy;    // do not perform lazy search above this match length
+        int nice_length; // quit search above this match length
+        int max_chain;
+        int func;
+
+        Config(int good_length, int max_lazy,
+<span class="fc" id="L1705">               int nice_length, int max_chain, int func) {</span>
+<span class="fc" id="L1706">            this.good_length = good_length;</span>
+<span class="fc" id="L1707">            this.max_lazy = max_lazy;</span>
+<span class="fc" id="L1708">            this.nice_length = nice_length;</span>
+<span class="fc" id="L1709">            this.max_chain = max_chain;</span>
+<span class="fc" id="L1710">            this.func = func;</span>
+<span class="fc" id="L1711">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileTree.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">FileTree.java</span></div><h1>FileTree.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.components;
+
+import com.codename1.ui.tree.Tree;
+
+/**
+ * Simple class showing off the filesystem as a tree component
+ *
+ * @author Shai Almog
+ */
+public class FileTree extends Tree {
+
+    /**
+     * Default constructor
+     */
+    public FileTree() {
+<span class="fc" id="L40">        super(new FileTreeModel(true));</span>
+<span class="fc" id="L41">        setUIID(&quot;FileTree&quot;);</span>
+<span class="fc" id="L42">    }</span>
+
+    /**
+     * Constructor with a model
+     */
+    public FileTree(FileTreeModel model) {
+<span class="fc" id="L48">        super(model);</span>
+<span class="fc" id="L49">        setUIID(&quot;FileTree&quot;);</span>
+<span class="fc" id="L50">    }</span>
+
+    protected String childToDisplayLabel(Object child) {
+<span class="fc" id="L53">        String s = child.toString();</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">        if (s.equals(&quot;/&quot;)) {</span>
+<span class="fc" id="L55">            return &quot;Root&quot;;</span>
+        }
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        if (s.endsWith(&quot;/&quot;)) {</span>
+<span class="nc" id="L58">            s = s.substring(0, s.length() - 1);</span>
+        }
+<span class="nc" id="L60">        int l = s.lastIndexOf('/');</span>
+<span class="nc" id="L61">        return s.substring(l + 1);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

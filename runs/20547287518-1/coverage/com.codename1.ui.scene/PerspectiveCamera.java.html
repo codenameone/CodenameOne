@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PerspectiveCamera.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.scene</a> &gt; <span class="el_source">PerspectiveCamera.java</span></div><h1>PerspectiveCamera.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Codename One in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.scene;
+
+import com.codename1.io.Log;
+import com.codename1.properties.Property;
+import com.codename1.ui.Display;
+import com.codename1.ui.Transform;
+
+import java.util.Arrays;
+
+/**
+ * @author shannah
+ * @deprecated Internal use only
+ */
+public class PerspectiveCamera extends Camera {
+    public final Property&lt;Double, Camera&gt; verticalFieldOfView;
+    private final Scene scene;
+
+
+    public PerspectiveCamera(Scene scene, double fovY, double zNear, double zFar) {
+<span class="fc" id="L42">        super(zNear, zFar);</span>
+<span class="fc" id="L43">        this.scene = scene;</span>
+<span class="fc" id="L44">        verticalFieldOfView = new Property&lt;Double, Camera&gt;(&quot;verticalFieldOfView&quot;, 0.25);</span>
+<span class="fc" id="L45">    }</span>
+
+    @Override
+    public Transform getTransform() {
+<span class="fc" id="L49">        Display d = Display.getInstance();</span>
+<span class="fc" id="L50">        float zNear = (float) nearClip.get().doubleValue();</span>
+<span class="fc" id="L51">        double dw = d.getDisplayWidth();</span>
+<span class="fc" id="L52">        double dh = d.getDisplayHeight();</span>
+<span class="fc" id="L53">        int x = scene.getAbsoluteX();</span>
+<span class="fc" id="L54">        int y = scene.getAbsoluteY();</span>
+<span class="fc" id="L55">        int w = scene.getWidth();</span>
+<span class="fc" id="L56">        int h = scene.getHeight();</span>
+<span class="nc" id="L57">        Transform perspectiveT = Transform.makePerspective((float) verticalFieldOfView.get().doubleValue(), (float) (dw / dh), zNear, (float) farClip.get().doubleValue());</span>
+<span class="nc" id="L58">        float displayH = Display.getInstance().getDisplayHeight();</span>
+<span class="nc" id="L59">        float displayW = (float) dw;</span>
+        //double midX = (float)x+(float)w/2.0;
+        //double midY = (float)y+(float)h/2.0;
+
+        //if (perspectiveT == null) {
+        //    perspectiveT = Transform.makeIdentity();
+        //}
+        //makePerspectiveTransform(perspectiveT);
+<span class="nc" id="L67">        float[] bottomRight = perspectiveT.transformPoint(new float[]{displayW, displayH, zNear});</span>
+<span class="nc" id="L68">        Transform currTransform = Transform.makeIdentity();</span>
+
+
+<span class="nc" id="L71">        float xfactor = -displayW / bottomRight[0];</span>
+<span class="nc" id="L72">        float yfactor = -displayH / bottomRight[1];</span>
+
+<span class="nc" id="L74">        currTransform.translate((float) dw / 2, y + h / 2, zNear);</span>
+<span class="nc" id="L75">        currTransform.scale(xfactor, yfactor, 1f);</span>
+
+        //currTransform.translate((float)dw/2/xfactor, (y+h/2)/yfactor, 0);
+
+<span class="nc" id="L79">        currTransform.concatenate(perspectiveT);</span>
+<span class="nc" id="L80">        float zState = 0f;</span>
+<span class="nc" id="L81">        float cameraZ = -zNear - w / 2 * zState;</span>
+<span class="nc" id="L82">        float cameraX = (float) -dw / 2;//-x-w/2;</span>
+<span class="nc" id="L83">        float cameraY = -y - h / 2;</span>
+<span class="nc" id="L84">        currTransform.translate(cameraX, cameraY, cameraZ);</span>
+
+        //if ( transitionState == STATE_FLIP){
+        //currTransform.translate((float)midX, y, 0);
+        //}
+<span class="nc" id="L89">        float[] tl = new float[3];</span>
+<span class="nc" id="L90">        float[] tr = new float[3];</span>
+<span class="nc" id="L91">        float[] bl = new float[3];</span>
+<span class="nc" id="L92">        float[] br = new float[3];</span>
+<span class="nc" id="L93">        currTransform.transformPoint(new float[]{x, y, 0}, tl);</span>
+<span class="nc" id="L94">        currTransform.transformPoint(new float[]{x + w, y, 0}, tr);</span>
+<span class="nc" id="L95">        currTransform.transformPoint(new float[]{x + w, y + h, 0}, br);</span>
+<span class="nc" id="L96">        currTransform.transformPoint(new float[]{x, y + h, 0}, bl);</span>
+<span class="nc" id="L97">        Log.p(&quot;Camera transform &quot; + x + &quot;, &quot; + y + &quot;, &quot; + 0 + &quot;-&gt;&quot; + Arrays.toString(tl));</span>
+<span class="nc" id="L98">        Log.p(&quot;Camera transform &quot; + (x + w) + &quot;, &quot; + y + &quot;, &quot; + 0 + &quot;-&gt;&quot; + Arrays.toString(tr));</span>
+<span class="nc" id="L99">        Log.p(&quot;Camera transform &quot; + (x + w) + &quot;, &quot; + (y + h) + &quot;, &quot; + 0 + &quot;-&gt;&quot; + Arrays.toString(br));</span>
+<span class="nc" id="L100">        Log.p(&quot;Camera transform &quot; + (x) + &quot;, &quot; + (y + h) + &quot;, &quot; + 0 + &quot;-&gt;&quot; + Arrays.toString(bl));</span>
+
+<span class="nc" id="L102">        return currTransform;</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

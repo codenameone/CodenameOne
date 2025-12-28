@@ -1,0 +1,771 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Element.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.xml</a> &gt; <span class="el_source">Element.java</span></div><h1>Element.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.xml;
+
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.Hashtable;
+import java.util.Iterator;
+import java.util.Vector;
+
+/**
+ * The Element class defines a single XML element with its attributes and children.
+ * Due to its hierarchial nature, this class can be used for a single &quot;leaf&quot; Element, for more complex elements (with child elements), and up to describing the entire document.
+ *
+ * @author Ofir Leitner
+ */
+public class Element implements Iterable&lt;Element&gt; {
+
+    /**
+     * A constant that can be used for the get descendants methods to denote infinite recursion
+     */
+    public static final int DEPTH_INFINITE = Integer.MAX_VALUE;
+    boolean isComment;
+    boolean caseSensitive;
+    /**
+     * True if this is a text element, false otherwise
+     */
+    private boolean textElement;
+    /**
+     * The element's name (or text for text elements)
+     */
+    private String name;
+    /**
+     * A vector containing this element's children
+     */
+    private ArrayList&lt;Element&gt; children;
+    /**
+     * This element's parent
+     */
+    private Element parent;
+    /**
+     * A hashtable containing this element's attributes
+     */
+    private Hashtable attributes;
+
+    /**
+     * Constructs and Element without specifying a name
+     * This can be used by subclasses that do not require name assigments.
+     */
+<span class="fc" id="L71">    protected Element() {</span>
+<span class="fc" id="L72">    }</span>
+
+
+    /**
+     * Constructs an Element with the specified name
+     *
+     * @param tagName The tag name
+     */
+<span class="fc" id="L80">    public Element(String tagName) {</span>
+<span class="fc" id="L81">        this.name = tagName;</span>
+<span class="fc" id="L82">    }</span>
+
+    /**
+     * Constructs an Element (or a text element) with the specified name or text.
+     *
+     * @param tagName       The tag name, or in the case of a text element the element's text
+     * @param isTextElement true for a text element, false otherwise
+     */
+    public Element(String tagName, boolean isTextElement) {
+<span class="fc" id="L91">        this(tagName);</span>
+<span class="fc" id="L92">        textElement = isTextElement;</span>
+<span class="fc" id="L93">    }</span>
+
+    /**
+     * Compares a name to a tag. Returns true if the tag has that name, or if tagName = '*'.
+     *
+     * @param tagName The tag name to compare, or '*' to match any tag.
+     * @param tag     The element whose tag we are comparing.
+     * @return True if tagName='*' or if the tagName matches the tag name of tag.
+     */
+    private static boolean cmpTagName(String tagName, Element tag) {
+<span class="pc bpc" id="L103" title="1 of 2 branches missed.">        if (&quot;*&quot;.equals(tagName)) {</span>
+<span class="nc" id="L104">            return true;</span>
+        }
+<span class="fc" id="L106">        return tagName.equalsIgnoreCase(tag.getTagName());</span>
+    }
+
+    /**
+     * Returns true if this is a text element, false otherwise
+     *
+     * @return true if this is a text element, false otherwise
+     */
+    public boolean isTextElement() {
+<span class="fc" id="L115">        return textElement;</span>
+    }
+
+    /**
+     * Sets this element as a text element
+     *
+     * @param textElement true to set this as a text element, false otherwise
+     */
+    protected void setTextElement(boolean textElement) {
+<span class="fc" id="L124">        this.textElement = textElement;</span>
+<span class="fc" id="L125">    }</span>
+
+    /**
+     * Returns this Element's tag name
+     *
+     * @return the Element's tag name
+     * @throws IllegalStateException if this is a text element
+     */
+    public String getTagName() {
+<span class="pc bpc" id="L134" title="1 of 2 branches missed.">        if (textElement) {</span>
+<span class="nc" id="L135">            throw new IllegalStateException(&quot;Text elements do not have a tag name&quot;);</span>
+        }
+<span class="fc" id="L137">        return name;</span>
+    }
+
+    /**
+     * Sets the name or text (for text elements) of this tag
+     *
+     * @param name The name or text of this tag
+     */
+    protected void setTagName(String name) {
+<span class="fc" id="L146">        this.name = name;</span>
+<span class="fc" id="L147">    }</span>
+
+    /**
+     * Returns the attributes Hashtable
+     *
+     * @return the attributes Hashtable
+     */
+    public Hashtable getAttributes() {
+<span class="fc" id="L155">        return attributes;</span>
+    }
+
+    /**
+     * Adds the specified attribute and value to this Element if it is supported for the Element and has a valid value.
+     * This method allows creating a key that is non-string to be used by subclasses that optimize attributes retrieval
+     *
+     * @param id    The attribute ID
+     * @param value The attribute value
+     */
+    protected void setAttribute(Object id, String value) {
+<span class="fc bfc" id="L166" title="All 2 branches covered.">        if (attributes == null) {</span>
+<span class="fc" id="L167">            attributes = new Hashtable();</span>
+        }
+<span class="fc" id="L169">        attributes.put(id, value);</span>
+<span class="fc" id="L170">    }</span>
+
+    /**
+     * Adds the specified Element as a child to this element.
+     * If the specified element was found to be unsupported (i.e. it's ID is TAG_UNSUPPORTED, it is not added.
+     *
+     * @param childElement The child element
+     */
+    public void addChild(Element childElement) {
+<span class="fc" id="L179">        setChildParent(childElement);</span>
+<span class="fc" id="L180">        children.add(childElement);</span>
+        //childElement.setParent(this);
+<span class="fc" id="L182">    }</span>
+
+    /**
+     * Returns this Element's parent
+     *
+     * @return this Element's parent
+     */
+    public Element getParent() {
+<span class="fc" id="L190">        return parent;</span>
+    }
+
+    /**
+     * Sets this element parent, done interanlly in addChild
+     *
+     * @param parent The element's parent
+     */
+    protected void setParent(Element parent) {
+<span class="fc" id="L199">        this.parent = parent;</span>
+<span class="fc" id="L200">    }</span>
+
+    /**
+     * Returns the number of this Element's children
+     *
+     * @return the number of this Element's children
+     */
+    public int getNumChildren() {
+<span class="fc bfc" id="L208" title="All 2 branches covered.">        if (children == null) {</span>
+<span class="fc" id="L209">            return 0;</span>
+        }
+<span class="fc" id="L211">        return children.size();</span>
+    }
+
+    /**
+     * Returns the internal children vector
+     *
+     * @return the children vector
+     * @deprecated this uses the old vector API instead of the more modern Collection/List
+     */
+    protected Vector getChildren() {
+<span class="pc bpc" id="L221" title="1 of 2 branches missed.">        if (children == null) {</span>
+<span class="nc" id="L222">            return null;</span>
+        }
+<span class="fc" id="L224">        return new Vector(children);</span>
+    }
+
+    /**
+     * Sets the children vector of this Element
+     *
+     * @param children The vector to set as this Element's children
+     * @deprecated this uses the old vector API instead of the more modern Collection/List
+     */
+    protected void setChildren(Vector children) {
+<span class="nc bnc" id="L234" title="All 2 branches missed.">        if (children == null) {</span>
+<span class="nc" id="L235">            this.children = null;</span>
+        } else {
+<span class="nc" id="L237">            this.children = new ArrayList&lt;Element&gt;(children);</span>
+        }
+<span class="nc" id="L239">    }</span>
+
+    /**
+     * Returns the Element's child positioned at the specified index
+     *
+     * @param index The requested index
+     * @return child number index of this ELement
+     * @throws ArrayIndexOutOfBoundsException if the index is bigger than the children's count or smaller than 0
+     */
+    public Element getChildAt(int index) {
+<span class="pc bpc" id="L249" title="3 of 6 branches missed.">        if ((index &lt; 0) || (children == null) || (index &gt;= children.size())) {</span>
+<span class="nc" id="L250">            throw new ArrayIndexOutOfBoundsException();</span>
+        }
+<span class="fc" id="L252">        return children.get(index);</span>
+
+    }
+
+    /**
+     * Returns an Element's child by a tag name
+     *
+     * @param name The child's tag name
+     * @return the first child with the specified name, or null if not found
+     */
+    public Element getFirstChildByTagName(String name) {
+<span class="nc bnc" id="L263" title="All 2 branches missed.">        if (children == null) {</span>
+<span class="nc" id="L264">            return null;</span>
+        }
+<span class="nc" id="L266">        int i = 0;</span>
+<span class="nc" id="L267">        Element found = null;</span>
+<span class="nc bnc" id="L268" title="All 4 branches missed.">        while ((found == null) &amp;&amp; (i &lt; children.size())) {</span>
+<span class="nc" id="L269">            Element child = children.get(i);</span>
+<span class="nc bnc" id="L270" title="All 4 branches missed.">            if ((!child.textElement) &amp;&amp; cmpTagName(name, child)) {</span>
+<span class="nc" id="L271">                found = child;</span>
+            } else {
+<span class="nc" id="L273">                i++;</span>
+            }
+<span class="nc" id="L275">        }</span>
+<span class="nc" id="L276">        return found;</span>
+    }
+
+    /**
+     * Returns the element with the specified ID
+     *
+     * @param id The id to find
+     * @return An element with the id, or null if none found
+     */
+    public Element getElementById(String id) {
+<span class="nc" id="L286">        String thisId = getAttribute(&quot;id&quot;);</span>
+<span class="nc bnc" id="L287" title="All 4 branches missed.">        if ((thisId != null) &amp;&amp; (thisId.equals(id))) {</span>
+<span class="nc" id="L288">            return this;</span>
+        }
+<span class="nc bnc" id="L290" title="All 2 branches missed.">        if (children != null) {</span>
+<span class="nc" id="L291">            int i = 0;</span>
+<span class="nc bnc" id="L292" title="All 2 branches missed.">            while (i &lt; children.size()) {</span>
+<span class="nc" id="L293">                Element child = children.get(i);</span>
+<span class="nc" id="L294">                Element match = child.getElementById(id);</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">                if (match != null) {</span>
+<span class="nc" id="L296">                    return match;</span>
+                }
+<span class="nc" id="L298">                i++;</span>
+<span class="nc" id="L299">            }</span>
+
+        }
+<span class="nc" id="L302">        return null;</span>
+    }
+
+//    private void getElementByIdInternal() {
+//
+//    }
+
+    private void getDescendantsByTagNameInternal(Vector v, String name, int depth) {
+<span class="pc bpc" id="L310" title="1 of 2 branches missed.">        if (children != null) {</span>
+<span class="fc" id="L311">            int i = 0;</span>
+<span class="fc bfc" id="L312" title="All 2 branches covered.">            while (i &lt; children.size()) {</span>
+<span class="fc" id="L313">                Element child = children.get(i);</span>
+<span class="pc bpc" id="L314" title="1 of 2 branches missed.">                if (depth &gt; 1) {</span>
+<span class="nc" id="L315">                    child.getDescendantsByTagNameInternal(v, name, depth - 1);</span>
+                }
+<span class="pc bpc" id="L317" title="1 of 4 branches missed.">                if ((!child.textElement) &amp;&amp; cmpTagName(name, child)) {</span>
+<span class="fc" id="L318">                    v.addElement(child);</span>
+                }
+<span class="fc" id="L320">                i++;</span>
+<span class="fc" id="L321">            }</span>
+        }
+
+<span class="fc" id="L324">    }</span>
+
+    private void getDescendantsByTagNameAndAttributeInternal(Vector v, String name, String attribute, int depth) {
+<span class="nc bnc" id="L327" title="All 2 branches missed.">        if (children != null) {</span>
+<span class="nc" id="L328">            int i = 0;</span>
+<span class="nc bnc" id="L329" title="All 2 branches missed.">            while (i &lt; children.size()) {</span>
+<span class="nc" id="L330">                Element child = children.get(i);</span>
+<span class="nc bnc" id="L331" title="All 2 branches missed.">                if (depth &gt; 1) {</span>
+<span class="nc" id="L332">                    child.getDescendantsByTagNameAndAttributeInternal(v, name, attribute, depth - 1);</span>
+                }
+<span class="nc bnc" id="L334" title="All 4 branches missed.">                if ((!child.textElement) &amp;&amp; cmpTagName(name, child)) {</span>
+<span class="nc" id="L335">                    String a = child.getAttribute(attribute);</span>
+<span class="nc bnc" id="L336" title="All 4 branches missed.">                    if (a != null &amp;&amp; a.length() &gt; 0) {</span>
+<span class="nc" id="L337">                        v.addElement(child);</span>
+                    }
+                }
+<span class="nc" id="L340">                i++;</span>
+<span class="nc" id="L341">            }</span>
+        }
+
+<span class="nc" id="L344">    }</span>
+
+    /**
+     * Returns all descendants with the specified tag name and the none empty attribute
+     *
+     * @param name          The tag name to look for
+     * @param attributeName the attribute that must exist on the tag
+     * @param depth         The search depth (1 - children, 2 - grandchildren .... DEPTH_INFINITE - for all descendants)
+     * @return A vector containing descendants with the specified tag name
+     */
+    public Vector getDescendantsByTagNameAndAttribute(String name, String attributeName, int depth) {
+<span class="nc bnc" id="L355" title="All 2 branches missed.">        if (depth &lt; 1) {</span>
+<span class="nc" id="L356">            throw new IllegalArgumentException(&quot;Depth must be 1 or higher&quot;);</span>
+        }
+<span class="nc bnc" id="L358" title="All 2 branches missed.">        if (children == null) {</span>
+<span class="nc" id="L359">            return new Vector();</span>
+        }
+<span class="nc" id="L361">        Vector v = new Vector();</span>
+<span class="nc" id="L362">        getDescendantsByTagNameAndAttributeInternal(v, name, attributeName, depth);</span>
+<span class="nc" id="L363">        return v;</span>
+    }
+
+    /**
+     * Returns all descendants with the specified tag name
+     *
+     * @param name  The tag name to look for
+     * @param depth The search depth (1 - children, 2 - grandchildren .... DEPTH_INFINITE - for all descendants)
+     * @return A vector containing descendants with the specified tag name
+     */
+    public Vector getDescendantsByTagName(String name, int depth) {
+<span class="pc bpc" id="L374" title="1 of 2 branches missed.">        if (depth &lt; 1) {</span>
+<span class="nc" id="L375">            throw new IllegalArgumentException(&quot;Depth must be 1 or higher&quot;);</span>
+        }
+
+<span class="fc" id="L378">        Vector v = new Vector();</span>
+<span class="pc bpc" id="L379" title="1 of 2 branches missed.">        if (children != null) {</span>
+<span class="fc" id="L380">            getDescendantsByTagNameInternal(v, name, depth);</span>
+        }
+<span class="fc" id="L382">        return v;</span>
+    }
+
+    /**
+     * Returns all descendants with the specified tag name
+     *
+     * @param name The tag name to look for
+     * @return A vector containing descendants with the specified tag name
+     */
+    public Vector getDescendantsByTagName(String name) {
+<span class="nc" id="L392">        return getDescendantsByTagName(name, DEPTH_INFINITE);</span>
+    }
+
+
+    /**
+     * Returns all children with the specified tag name
+     *
+     * @param name The tag name to look for
+     * @return A vector containing children with the specified tag name
+     */
+    public Vector getChildrenByTagName(String name) {
+<span class="fc" id="L403">        return getDescendantsByTagName(name, 1);</span>
+    }
+
+    private void getTextDescendantsInternal(Vector v, String text, boolean caseSensitive, int depth) {
+<span class="nc bnc" id="L407" title="All 2 branches missed.">        if (children == null) {</span>
+<span class="nc" id="L408">            return;</span>
+        }
+<span class="nc" id="L410">        int i = 0;</span>
+<span class="nc bnc" id="L411" title="All 2 branches missed.">        while (i &lt; children.size()) {</span>
+<span class="nc" id="L412">            Element child = children.get(i);</span>
+<span class="nc bnc" id="L413" title="All 2 branches missed.">            if (depth &gt; 0) {</span>
+<span class="nc" id="L414">                child.getTextDescendantsInternal(v, text, caseSensitive, depth - 1);</span>
+            }
+<span class="nc bnc" id="L416" title="All 2 branches missed.">            if (child.textElement) {</span>
+<span class="nc bnc" id="L417" title="All 2 branches missed.">                if (text != null) {</span>
+<span class="nc" id="L418">                    String childText = child.getText();</span>
+<span class="nc bnc" id="L419" title="All 2 branches missed.">                    if (!caseSensitive) {</span>
+<span class="nc" id="L420">                        childText = childText.toLowerCase();</span>
+                    }
+<span class="nc" id="L422">                    int index = childText.indexOf(text);</span>
+<span class="nc bnc" id="L423" title="All 2 branches missed.">                    if (index != -1) {</span>
+<span class="nc" id="L424">                        v.addElement(child);</span>
+                    }
+<span class="nc" id="L426">                } else { // if text==null, it means we want all text children</span>
+<span class="nc" id="L427">                    v.addElement(child);</span>
+                }
+            }
+<span class="nc" id="L430">            i++;</span>
+<span class="nc" id="L431">        }</span>
+<span class="nc" id="L432">    }</span>
+
+
+    /**
+     * Returns all text descendants containing the specified text
+     *
+     * @param text          The text to look for (null to return all text children)
+     * @param caseSensitive true to perform a case sensitive match, false to ignore case
+     * @param depth         The search depth (1 - children, 2 - grandchildren .... DEPTH_INFINITE - for all descendants)
+     * @return A vector containing descendants containing the specified text
+     */
+    public Vector getTextDescendants(String text, boolean caseSensitive, int depth) {
+<span class="nc bnc" id="L444" title="All 2 branches missed.">        if (depth &lt; 1) {</span>
+<span class="nc" id="L445">            throw new IllegalArgumentException(&quot;Depth must be 1 or higher&quot;);</span>
+        }
+<span class="nc bnc" id="L447" title="All 2 branches missed.">        if (children == null) {</span>
+<span class="nc" id="L448">            return new Vector();</span>
+        }
+<span class="nc bnc" id="L450" title="All 4 branches missed.">        if ((!caseSensitive) &amp;&amp; (text != null)) {</span>
+<span class="nc" id="L451">            text = text.toLowerCase();</span>
+        }
+<span class="nc" id="L453">        Vector v = new Vector();</span>
+<span class="nc" id="L454">        getTextDescendantsInternal(v, text, caseSensitive, depth);</span>
+<span class="nc" id="L455">        return v;</span>
+    }
+
+    /**
+     * Returns all text descendants containing the specified text
+     *
+     * @param text          The text to look for (null to return all text children)
+     * @param caseSensitive true to perform a case sensitive match, false to ignore case
+     * @return A vector containing decensants containing the specified text
+     */
+    public Vector getTextDescendants(String text, boolean caseSensitive) {
+<span class="nc" id="L466">        return getTextDescendants(text, caseSensitive, DEPTH_INFINITE);</span>
+    }
+
+    /**
+     * Returns all children with the specified text
+     *
+     * @param text          The text to look for (null to return all text children)
+     * @param caseSensitive true to perform a case sensitive match, false to ignore case
+     * @return A vector containing children containing the specified text
+     */
+    public Vector getTextChildren(String text, boolean caseSensitive) {
+<span class="nc" id="L477">        return getTextDescendants(text, caseSensitive, 1);</span>
+    }
+
+    /**
+     * Returns true if the specified element is contained in this element's hierarchy (meaning it is one of its descendants)
+     *
+     * @param element The element to look for
+     * @return true if this element contains the specified element, false otherwise
+     */
+    public boolean contains(Element element) {
+<span class="nc bnc" id="L487" title="All 2 branches missed.">        if (this == element) {</span>
+<span class="nc" id="L488">            return true;</span>
+        }
+<span class="nc bnc" id="L490" title="All 2 branches missed.">        if (children != null) {</span>
+<span class="nc" id="L491">            int i = 0;</span>
+<span class="nc bnc" id="L492" title="All 2 branches missed.">            while (i &lt; children.size()) {</span>
+<span class="nc" id="L493">                Element child = children.get(i);</span>
+<span class="nc bnc" id="L494" title="All 2 branches missed.">                if (child.contains(element)) {</span>
+<span class="nc" id="L495">                    return true;</span>
+                }
+<span class="nc" id="L497">                i++;</span>
+<span class="nc" id="L498">            }</span>
+
+        }
+<span class="nc" id="L501">        return false;</span>
+    }
+
+
+    /**
+     * Adds the specified attribute and value to this Element if it is supported for the Element and has a valid value.
+     *
+     * @param attribute The attribute's name
+     * @param value     The attribute's value
+     * @return a positive error code or -1 if attribute is supported and valid
+     */
+    public int setAttribute(String attribute, String value) {
+<span class="pc bpc" id="L513" title="1 of 2 branches missed.">        if (textElement) {</span>
+<span class="nc" id="L514">            throw new IllegalStateException(&quot;Text elements cannot have attributes&quot;);</span>
+        }
+
+<span class="fc" id="L517">        setAttribute((Object) attribute, value);</span>
+        /*if (attributes==null) {
+            attributes=new Hashtable();
+        }
+        attributes.put(attribute, value);*/
+<span class="fc" id="L522">        return -1;</span>
+    }
+
+    /**
+     * Removes the specified attribute
+     *
+     * @param attribute The attribute to remove
+     */
+    public void removeAttribute(String attribute) {
+<span class="nc" id="L531">        removeAttribute((Object) attribute);</span>
+<span class="nc" id="L532">    }</span>
+
+
+    /**
+     * Removes the specified attribute if it exist in this Element
+     * This method allows creating a key that is non-string to be used by subclasses that optimize attributes retrieval
+     *
+     * @param id The attribute ID
+     */
+    protected void removeAttribute(Object id) {
+<span class="nc bnc" id="L542" title="All 2 branches missed.">        if (attributes != null) {</span>
+<span class="nc" id="L543">            attributes.remove(id);</span>
+<span class="nc bnc" id="L544" title="All 2 branches missed.">            if (attributes.isEmpty()) {</span>
+<span class="nc" id="L545">                attributes = null;</span>
+            }
+        }
+<span class="nc" id="L548">    }</span>
+
+    /**
+     * Helper method to return the attribute as an integer
+     *
+     * @param name the name of the attribute
+     * @param def  default value
+     * @return return value
+     */
+    public int getAttributeAsInt(String name, int def) {
+<span class="nc" id="L558">        String s = getAttribute(name);</span>
+<span class="nc bnc" id="L559" title="All 2 branches missed.">        if (s == null) {</span>
+<span class="nc" id="L560">            return def;</span>
+        }
+        try {
+<span class="nc" id="L563">            return Integer.parseInt(s);</span>
+<span class="nc" id="L564">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L565">            return def;</span>
+        }
+    }
+
+
+    /**
+     * Returns the attribute value by its name (or null if it wasn't defined for this element)
+     *
+     * @param name The attribute id
+     * @return the attribute value by its name (or null if it wasn't defined for this element)
+     */
+    public String getAttribute(String name) {
+<span class="fc bfc" id="L577" title="All 2 branches covered.">        if (attributes == null) {</span>
+<span class="fc" id="L578">            return null;</span>
+        }
+<span class="fc bfc" id="L580" title="All 2 branches covered.">        if (!caseSensitive) {</span>
+<span class="fc" id="L581">            String val = (String) attributes.get(name.toLowerCase());</span>
+<span class="fc bfc" id="L582" title="All 2 branches covered.">            if (val != null) {</span>
+<span class="fc" id="L583">                return val;</span>
+            }
+        }
+<span class="fc" id="L586">        return (String) attributes.get(name);</span>
+    }
+
+    private void setChildParent(Element child) {
+<span class="pc bpc" id="L590" title="1 of 2 branches missed.">        if (textElement) {</span>
+<span class="nc" id="L591">            throw new IllegalStateException(&quot;Text elements cannot have children&quot;);</span>
+        }
+
+<span class="pc bpc" id="L594" title="1 of 2 branches missed.">        if (child.getParent() != null) {</span>
+<span class="nc" id="L595">            throw new IllegalStateException(&quot;An Element can't have two parents.&quot;);</span>
+        }
+<span class="fc bfc" id="L597" title="All 2 branches covered.">        if (children == null) {</span>
+<span class="fc" id="L598">            children = new ArrayList&lt;Element&gt;();</span>
+        }
+<span class="fc" id="L600">        child.setParent(this);</span>
+<span class="fc" id="L601">    }</span>
+
+    /**
+     * Removes the child at the given index
+     *
+     * @param index The child's index
+     */
+    public void removeChildAt(int index) {
+<span class="nc bnc" id="L609" title="All 6 branches missed.">        if ((index &lt; 0) || (children == null) || (index &gt;= children.size())) {</span>
+<span class="nc" id="L610">            throw new ArrayIndexOutOfBoundsException();</span>
+        }
+<span class="nc" id="L612">        Element child = children.get(index);</span>
+<span class="nc" id="L613">        child.setParent(null);</span>
+<span class="nc" id="L614">        children.remove(index);</span>
+<span class="nc" id="L615">    }</span>
+
+    /**
+     * Returns the child index
+     *
+     * @param child The child element to look for
+     * @return The child position, or -1 if the child does not belong to this element.
+     */
+    public int getChildIndex(Element child) {
+<span class="nc" id="L624">        int result = -1;</span>
+<span class="nc bnc" id="L625" title="All 2 branches missed.">        if (children != null) {</span>
+<span class="nc bnc" id="L626" title="All 2 branches missed.">            for (int i = 0; i &lt; children.size(); i++) {</span>
+<span class="nc bnc" id="L627" title="All 2 branches missed.">                if (child == children.get(i)) {</span>
+<span class="nc" id="L628">                    result = i;</span>
+<span class="nc" id="L629">                    break;</span>
+                }
+            }
+        }
+<span class="nc" id="L633">        return result;</span>
+    }
+
+    /**
+     * Inserts the given child at the specified index
+     *
+     * @param child The child to insert
+     * @param index The index to insert it at
+     */
+    public void insertChildAt(Element child, int index) {
+<span class="nc" id="L643">        setChildParent(child);</span>
+<span class="nc" id="L644">        children.add(index, child);</span>
+<span class="nc" id="L645">    }</span>
+
+    /**
+     * Replaces one child with another
+     *
+     * @param oldChild The child to replace (Must belong to this element, otherwise a call to this method will have no effect)
+     * @param newChild The child to replace it with
+     */
+    public void replaceChild(Element oldChild, Element newChild) {
+<span class="nc bnc" id="L654" title="All 2 branches missed.">        if (children != null) {</span>
+<span class="nc" id="L655">            setChildParent(newChild);</span>
+<span class="nc" id="L656">            int index = children.indexOf(oldChild);</span>
+<span class="nc bnc" id="L657" title="All 2 branches missed.">            if (index != -1) {</span>
+<span class="nc" id="L658">                children.add(index, newChild);</span>
+<span class="nc" id="L659">                removeChildAt(index + 1);</span>
+//                children.removeElement(oldChild);
+//                oldChild.setParent(null);
+<span class="nc" id="L662">                return;</span>
+            }
+        }
+<span class="nc" id="L665">        throw new IllegalArgumentException(&quot;The oldChild element specified must be this element's child&quot;);</span>
+    }
+
+    /**
+     * Returns the text of this element (for text elements only)
+     *
+     * @return the text of this element (for text elements only)
+     * @throws IllegalStateException if this is not a text element
+     */
+    public String getText() {
+<span class="pc bpc" id="L675" title="1 of 2 branches missed.">        if (!textElement) {</span>
+<span class="nc" id="L676">            throw new IllegalStateException(&quot;Only text elements can get text&quot;);</span>
+        }
+<span class="fc" id="L678">        return name;</span>
+    }
+
+    /**
+     * Sets the text of this element to the specified string (For text elements only)
+     *
+     * @param str The text to set
+     * @throws IllegalStateException if this is not a text element
+     */
+    public void setText(String str) {
+<span class="pc bpc" id="L688" title="1 of 2 branches missed.">        if (!textElement) {</span>
+<span class="nc" id="L689">            throw new IllegalStateException(&quot;Only text elements can set text&quot;);</span>
+        }
+<span class="fc" id="L691">        name = str;</span>
+
+<span class="fc" id="L693">    }</span>
+
+    /**
+     * Returns a printable string representing this element
+     *
+     * @return a printable string representing this element
+     */
+    public String toString() {
+<span class="fc" id="L701">        return toString(&quot;&quot;);</span>
+    }
+
+    /**
+     * A recursive method for creating a printout of a full tag with its entire hierarchy.
+     * This is used by the public method toString().
+     *
+     * @param spacing Increased by one in each recursion phase to provide with indentation
+     * @return the printout of this tag
+     */
+    public String toString(String spacing) {
+
+<span class="fc" id="L713">        String str = spacing;</span>
+<span class="pc bpc" id="L714" title="1 of 2 branches missed.">        if (!textElement) {</span>
+<span class="fc" id="L715">            str += &quot;&lt;&quot; + getTagName();</span>
+<span class="pc bpc" id="L716" title="1 of 2 branches missed.">            if (attributes != null) {</span>
+<span class="fc bfc" id="L717" title="All 2 branches covered.">                for (Enumeration e = attributes.keys(); e.hasMoreElements(); ) {</span>
+<span class="fc" id="L718">                    String attrStr = (String) e.nextElement();</span>
+<span class="fc" id="L719">                    String val = (String) attributes.get(attrStr);</span>
+<span class="fc" id="L720">                    str += &quot; &quot; + attrStr + &quot;='&quot; + val + &quot;'&quot;;</span>
+<span class="fc" id="L721">                }</span>
+            }
+<span class="fc" id="L723">            str += &quot;&gt;\n&quot;;</span>
+<span class="fc bfc" id="L724" title="All 2 branches covered.">            if (children != null) {</span>
+<span class="fc bfc" id="L725" title="All 2 branches covered.">                for (int i = 0; i &lt; children.size(); i++) {</span>
+<span class="fc" id="L726">                    str += children.get(i).toString(spacing + ' ');</span>
+                }
+            }
+<span class="fc" id="L729">            str += spacing + &quot;&lt;/&quot; + getTagName() + &quot;&gt;\n&quot;;</span>
+        } else {
+<span class="nc" id="L731">            str += &quot;'&quot; + name + &quot;'\n&quot;;</span>
+        }
+<span class="fc" id="L733">        return str;</span>
+    }
+
+    /**
+     * Determines whether or not this Element has any text children.
+     *
+     * @return true if any of this Elements children are text Elements.
+     */
+    public boolean hasTextChild() {
+<span class="nc bnc" id="L742" title="All 2 branches missed.">        if (children != null) {</span>
+<span class="nc bnc" id="L743" title="All 2 branches missed.">            for (int iter = 0; iter &lt; children.size(); iter++) {</span>
+<span class="nc" id="L744">                Object child = children.get(iter);</span>
+<span class="nc bnc" id="L745" title="All 4 branches missed.">                if (child instanceof Element &amp;&amp; ((Element) child).isTextElement()) {</span>
+<span class="nc" id="L746">                    return true;</span>
+                }
+            }
+        }
+<span class="nc" id="L750">        return false;</span>
+    }
+
+    /**
+     * Determines whether or not this Element has no children.
+     *
+     * @return true if this Element has no children.
+     */
+    public boolean isEmpty() {
+<span class="nc bnc" id="L759" title="All 4 branches missed.">        return children == null || children.isEmpty();</span>
+    }
+
+    /**
+     * Iterable for children of this entry making tree walking easier, this makes for(Element child : base) {} possible
+     *
+     * @return the children iterator
+     */
+    public Iterator&lt;Element&gt; iterator() {
+<span class="nc" id="L768">        return children.iterator();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

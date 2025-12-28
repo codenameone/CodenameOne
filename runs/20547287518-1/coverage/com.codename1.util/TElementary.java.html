@@ -1,0 +1,429 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TElementary.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">TElementary.java</span></div><h1>TElementary.java</h1><pre class="source lang-java linenums">/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the &quot;License&quot;); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package com.codename1.util;
+
+/**
+ * Static library that provides the basic arithmetic mutable operations for
+ * {@link TBigInteger}. The operations provided are listed below.
+ * &lt;ul type=&quot;circle&quot;&gt;
+ * &lt;li&gt;Addition.&lt;/li&gt;
+ * &lt;li&gt;Subtraction.&lt;/li&gt;
+ * &lt;li&gt;Comparison.&lt;/li&gt;
+ * &lt;/ul&gt;
+ * In addition to this, some &lt;i&gt;&lt;b&gt;Inplace&lt;/b&gt;&lt;/i&gt; (mutable) methods are
+ * provided.
+ */
+class TElementary {
+
+    /**
+     * Just to denote that this class can't be instantiated
+     */
+    private TElementary() {
+    }
+
+    /**
+     * Compares two arrays. All elements are treated as unsigned integers. The
+     * magnitude is the bit chain of elements in big-endian order.
+     *
+     * @param a    the first array
+     * @param b    the second array
+     * @param size the size of arrays
+     * @return 1 if a &gt; b, -1 if a &lt; b, 0 if a == b
+     */
+    static int compareArrays(final int[] a, final int[] b, final int size) {
+        int i;
+<span class="pc bpc" id="L50" title="2 of 4 branches missed.">        for (i = size - 1; (i &gt;= 0) &amp;&amp; (a[i] == b[i]); i--) {</span>
+            // do nothing
+        }
+<span class="pc bpc" id="L53" title="2 of 4 branches missed.">        return ((i &lt; 0) ? TBigInteger.EQUALS : (a[i] &amp; 0xFFFFFFFFL) &lt; (b[i] &amp; 0xFFFFFFFFL) ? TBigInteger.LESS</span>
+                : TBigInteger.GREATER);
+    }
+
+    /**
+     * @see TBigInteger#add(TBigInteger)
+     */
+    static TBigInteger add(TBigInteger op1, TBigInteger op2) {
+        int[] resDigits;
+        int resSign;
+<span class="fc" id="L63">        int op1Sign = op1.sign;</span>
+<span class="fc" id="L64">        int op2Sign = op2.sign;</span>
+
+<span class="pc bpc" id="L66" title="1 of 2 branches missed.">        if (op1Sign == 0) {</span>
+<span class="nc" id="L67">            return op2;</span>
+        }
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">        if (op2Sign == 0) {</span>
+<span class="nc" id="L70">            return op1;</span>
+        }
+<span class="fc" id="L72">        int op1Len = op1.numberLength;</span>
+<span class="fc" id="L73">        int op2Len = op2.numberLength;</span>
+
+<span class="fc bfc" id="L75" title="All 2 branches covered.">        if (op1Len + op2Len == 2) {</span>
+<span class="fc" id="L76">            long a = (op1.digits[0] &amp; 0xFFFFFFFFL);</span>
+<span class="fc" id="L77">            long b = (op2.digits[0] &amp; 0xFFFFFFFFL);</span>
+            long res;
+            int valueLo;
+            int valueHi;
+
+<span class="pc bpc" id="L82" title="1 of 2 branches missed.">            if (op1Sign == op2Sign) {</span>
+<span class="fc" id="L83">                res = a + b;</span>
+<span class="fc" id="L84">                valueLo = (int) res;</span>
+<span class="fc" id="L85">                valueHi = (int) (res &gt;&gt;&gt; 32);</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                return ((valueHi == 0) ? new TBigInteger(op1Sign, valueLo) : new TBigInteger(op1Sign, 2, new int[]{</span>
+                        valueLo, valueHi}));
+            }
+<span class="nc bnc" id="L89" title="All 2 branches missed.">            return TBigInteger.valueOf((op1Sign &lt; 0) ? (b - a) : (a - b));</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">        } else if (op1Sign == op2Sign) {</span>
+<span class="fc" id="L91">            resSign = op1Sign;</span>
+            // an augend should not be shorter than addend
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">            resDigits = (op1Len &gt;= op2Len) ? add(op1.digits, op1Len, op2.digits, op2Len) : add(op2.digits, op2Len,</span>
+                    op1.digits, op1Len);
+        } else { // signs are different
+<span class="nc bnc" id="L96" title="All 4 branches missed.">            int cmp = ((op1Len != op2Len) ? ((op1Len &gt; op2Len) ? 1 : -1)</span>
+<span class="nc" id="L97">                    : compareArrays(op1.digits, op2.digits, op1Len));</span>
+
+<span class="nc bnc" id="L99" title="All 2 branches missed.">            if (cmp == TBigInteger.EQUALS) {</span>
+<span class="nc" id="L100">                return TBigInteger.ZERO;</span>
+            }
+            // a minuend should not be shorter than subtrahend
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            if (cmp == TBigInteger.GREATER) {</span>
+<span class="nc" id="L104">                resSign = op1Sign;</span>
+<span class="nc" id="L105">                resDigits = subtract(op1.digits, op1Len, op2.digits, op2Len);</span>
+            } else {
+<span class="nc" id="L107">                resSign = op2Sign;</span>
+<span class="nc" id="L108">                resDigits = subtract(op2.digits, op2Len, op1.digits, op1Len);</span>
+            }
+        }
+<span class="fc" id="L111">        TBigInteger res = new TBigInteger(resSign, resDigits.length, resDigits);</span>
+<span class="fc" id="L112">        res.cutOffLeadingZeroes();</span>
+<span class="fc" id="L113">        return res;</span>
+    }
+
+    /**
+     * Performs {@code res = a + b}.
+     */
+    private static void add(int[] res, int[] a, int aSize, int[] b, int bSize) {
+        // PRE: a.length &lt; max(aSize, bSize)
+
+        int i;
+<span class="fc" id="L123">        long carry = (a[0] &amp; 0xFFFFFFFFL) + (b[0] &amp; 0xFFFFFFFFL);</span>
+
+<span class="fc" id="L125">        res[0] = (int) carry;</span>
+<span class="fc" id="L126">        carry &gt;&gt;= 32;</span>
+
+<span class="pc bpc" id="L128" title="1 of 2 branches missed.">        if (aSize &gt;= bSize) {</span>
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">            for (i = 1; i &lt; bSize; i++) {</span>
+<span class="nc" id="L130">                carry += (a[i] &amp; 0xFFFFFFFFL) + (b[i] &amp; 0xFFFFFFFFL);</span>
+<span class="nc" id="L131">                res[i] = (int) carry;</span>
+<span class="nc" id="L132">                carry &gt;&gt;= 32;</span>
+            }
+<span class="fc bfc" id="L134" title="All 2 branches covered.">            for (; i &lt; aSize; i++) {</span>
+<span class="fc" id="L135">                carry += a[i] &amp; 0xFFFFFFFFL;</span>
+<span class="fc" id="L136">                res[i] = (int) carry;</span>
+<span class="fc" id="L137">                carry &gt;&gt;= 32;</span>
+            }
+        } else {
+<span class="nc bnc" id="L140" title="All 2 branches missed.">            for (i = 1; i &lt; aSize; i++) {</span>
+<span class="nc" id="L141">                carry += (a[i] &amp; 0xFFFFFFFFL) + (b[i] &amp; 0xFFFFFFFFL);</span>
+<span class="nc" id="L142">                res[i] = (int) carry;</span>
+<span class="nc" id="L143">                carry &gt;&gt;= 32;</span>
+            }
+<span class="nc bnc" id="L145" title="All 2 branches missed.">            for (; i &lt; bSize; i++) {</span>
+<span class="nc" id="L146">                carry += b[i] &amp; 0xFFFFFFFFL;</span>
+<span class="nc" id="L147">                res[i] = (int) carry;</span>
+<span class="nc" id="L148">                carry &gt;&gt;= 32;</span>
+            }
+        }
+<span class="pc bpc" id="L151" title="1 of 2 branches missed.">        if (carry != 0) {</span>
+<span class="nc" id="L152">            res[i] = (int) carry;</span>
+        }
+<span class="fc" id="L154">    }</span>
+
+    /**
+     * @see TBigInteger#subtract(TBigInteger)
+     */
+    static TBigInteger subtract(TBigInteger op1, TBigInteger op2) {
+        int resSign;
+        int[] resDigits;
+<span class="fc" id="L162">        int op1Sign = op1.sign;</span>
+<span class="fc" id="L163">        int op2Sign = op2.sign;</span>
+
+<span class="pc bpc" id="L165" title="1 of 2 branches missed.">        if (op2Sign == 0) {</span>
+<span class="nc" id="L166">            return op1;</span>
+        }
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (op1Sign == 0) {</span>
+<span class="nc" id="L169">            return op2.negate();</span>
+        }
+<span class="fc" id="L171">        int op1Len = op1.numberLength;</span>
+<span class="fc" id="L172">        int op2Len = op2.numberLength;</span>
+<span class="fc bfc" id="L173" title="All 2 branches covered.">        if (op1Len + op2Len == 2) {</span>
+<span class="fc" id="L174">            long a = (op1.digits[0] &amp; 0xFFFFFFFFL);</span>
+<span class="fc" id="L175">            long b = (op2.digits[0] &amp; 0xFFFFFFFFL);</span>
+<span class="pc bpc" id="L176" title="1 of 2 branches missed.">            if (op1Sign &lt; 0) {</span>
+<span class="nc" id="L177">                a = -a;</span>
+            }
+<span class="pc bpc" id="L179" title="1 of 2 branches missed.">            if (op2Sign &lt; 0) {</span>
+<span class="nc" id="L180">                b = -b;</span>
+            }
+<span class="fc" id="L182">            return TBigInteger.valueOf(a - b);</span>
+        }
+<span class="pc bpc" id="L184" title="2 of 4 branches missed.">        int cmp = ((op1Len != op2Len) ? ((op1Len &gt; op2Len) ? 1 : -1) : TElementary.compareArrays(op1.digits, op2.digits,</span>
+                op1Len));
+
+<span class="pc bpc" id="L187" title="1 of 2 branches missed.">        if (cmp == TBigInteger.LESS) {</span>
+<span class="nc" id="L188">            resSign = -op2Sign;</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            resDigits = (op1Sign == op2Sign) ? subtract(op2.digits, op2Len, op1.digits, op1Len) : add(op2.digits,</span>
+                    op2Len, op1.digits, op1Len);
+        } else {
+<span class="fc" id="L192">            resSign = op1Sign;</span>
+<span class="pc bpc" id="L193" title="1 of 2 branches missed.">            if (op1Sign == op2Sign) {</span>
+<span class="pc bpc" id="L194" title="1 of 2 branches missed.">                if (cmp == TBigInteger.EQUALS) {</span>
+<span class="nc" id="L195">                    return TBigInteger.ZERO;</span>
+                }
+<span class="fc" id="L197">                resDigits = subtract(op1.digits, op1Len, op2.digits, op2Len);</span>
+            } else {
+<span class="nc" id="L199">                resDigits = add(op1.digits, op1Len, op2.digits, op2Len);</span>
+            }
+        }
+<span class="fc" id="L202">        TBigInteger res = new TBigInteger(resSign, resDigits.length, resDigits);</span>
+<span class="fc" id="L203">        res.cutOffLeadingZeroes();</span>
+<span class="fc" id="L204">        return res;</span>
+    }
+
+    /**
+     * Performs {@code res = a - b}. It is assumed the magnitude of a is not
+     * less than the magnitude of b.
+     */
+    private static void subtract(int[] res, int[] a, int aSize, int[] b, int bSize) {
+        // PRE: a[] &gt;= b[]
+        int i;
+<span class="fc" id="L214">        long borrow = 0;</span>
+
+<span class="fc bfc" id="L216" title="All 2 branches covered.">        for (i = 0; i &lt; bSize; i++) {</span>
+<span class="fc" id="L217">            borrow += (a[i] &amp; 0xFFFFFFFFL) - (b[i] &amp; 0xFFFFFFFFL);</span>
+<span class="fc" id="L218">            res[i] = (int) borrow;</span>
+<span class="fc" id="L219">            borrow &gt;&gt;= 32; // -1 or 0</span>
+        }
+<span class="fc bfc" id="L221" title="All 2 branches covered.">        for (; i &lt; aSize; i++) {</span>
+<span class="fc" id="L222">            borrow += a[i] &amp; 0xFFFFFFFFL;</span>
+<span class="fc" id="L223">            res[i] = (int) borrow;</span>
+<span class="fc" id="L224">            borrow &gt;&gt;= 32; // -1 or 0</span>
+        }
+<span class="fc" id="L226">    }</span>
+
+    /**
+     * Addss the value represented by {@code b} to the value represented by
+     * {@code a}. It is assumed the magnitude of a is not less than the
+     * magnitude of b.
+     *
+     * @return {@code a + b}
+     */
+    private static int[] add(int[] a, int aSize, int[] b, int bSize) {
+        // PRE: a[] &gt;= b[]
+<span class="fc" id="L237">        int[] res = new int[aSize + 1];</span>
+<span class="fc" id="L238">        add(res, a, aSize, b, bSize);</span>
+<span class="fc" id="L239">        return res;</span>
+    }
+
+    /**
+     * Performs {@code op1 += op2}. {@code op1} must have enough place to store
+     * the result (i.e. {@code op1.bitLength() &gt;= op2.bitLength()}). Both should
+     * be positive (i.e. {@code op1 &gt;= op2}).
+     *
+     * @param op1 the input minuend, and the output result.
+     * @param op2 the addend
+     */
+    static void inplaceAdd(TBigInteger op1, TBigInteger op2) {
+        // PRE: op1 &gt;= op2 &gt; 0
+<span class="nc" id="L252">        add(op1.digits, op1.digits, op1.numberLength, op2.digits, op2.numberLength);</span>
+<span class="nc" id="L253">        op1.numberLength = Math.min(Math.max(op1.numberLength, op2.numberLength) + 1, op1.digits.length);</span>
+<span class="nc" id="L254">        op1.cutOffLeadingZeroes();</span>
+<span class="nc" id="L255">        op1.unCache();</span>
+<span class="nc" id="L256">    }</span>
+
+    /**
+     * Adds an integer value to the array of integers remembering carry.
+     *
+     * @return a possible generated carry (0 or 1)
+     */
+    static int inplaceAdd(int[] a, final int aSize, final int addend) {
+<span class="fc" id="L264">        long carry = addend &amp; 0xFFFFFFFFL;</span>
+
+<span class="fc bfc" id="L266" title="All 4 branches covered.">        for (int i = 0; (carry != 0) &amp;&amp; (i &lt; aSize); i++) {</span>
+<span class="fc" id="L267">            carry += a[i] &amp; 0xFFFFFFFFL;</span>
+<span class="fc" id="L268">            a[i] = (int) carry;</span>
+<span class="fc" id="L269">            carry &gt;&gt;= 32;</span>
+        }
+<span class="fc" id="L271">        return (int) carry;</span>
+    }
+
+    /**
+     * Performs: {@code op1 += addend}. The number must to have place to hold a
+     * possible carry.
+     */
+    static void inplaceAdd(TBigInteger op1, final int addend) {
+<span class="nc" id="L279">        int carry = inplaceAdd(op1.digits, op1.numberLength, addend);</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">        if (carry == 1) {</span>
+<span class="nc" id="L281">            op1.digits[op1.numberLength] = 1;</span>
+<span class="nc" id="L282">            op1.numberLength++;</span>
+        }
+<span class="nc" id="L284">        op1.unCache();</span>
+<span class="nc" id="L285">    }</span>
+
+    /**
+     * Performs {@code op1 -= op2}. {@code op1} must have enough place to store
+     * the result (i.e. {@code op1.bitLength() &gt;= op2.bitLength()}). Both should
+     * be positive (what implies that {@code op1 &gt;= op2}).
+     *
+     * @param op1 the input minuend, and the output result.
+     * @param op2 the subtrahend
+     */
+    static void inplaceSubtract(TBigInteger op1, TBigInteger op2) {
+        // PRE: op1 &gt;= op2 &gt; 0
+<span class="nc" id="L297">        subtract(op1.digits, op1.digits, op1.numberLength, op2.digits, op2.numberLength);</span>
+<span class="nc" id="L298">        op1.cutOffLeadingZeroes();</span>
+<span class="nc" id="L299">        op1.unCache();</span>
+<span class="nc" id="L300">    }</span>
+
+    /**
+     * Performs {@code res = b - a}
+     */
+    private static void inverseSubtract(int[] res, int[] a, int aSize, int[] b, int bSize) {
+        int i;
+<span class="nc" id="L307">        long borrow = 0;</span>
+<span class="nc bnc" id="L308" title="All 2 branches missed.">        if (aSize &lt; bSize) {</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">            for (i = 0; i &lt; aSize; i++) {</span>
+<span class="nc" id="L310">                borrow += (b[i] &amp; 0xFFFFFFFFL) - (a[i] &amp; 0xFFFFFFFFL);</span>
+<span class="nc" id="L311">                res[i] = (int) borrow;</span>
+<span class="nc" id="L312">                borrow &gt;&gt;= 32; // -1 or 0</span>
+            }
+<span class="nc bnc" id="L314" title="All 2 branches missed.">            for (; i &lt; bSize; i++) {</span>
+<span class="nc" id="L315">                borrow += b[i] &amp; 0xFFFFFFFFL;</span>
+<span class="nc" id="L316">                res[i] = (int) borrow;</span>
+<span class="nc" id="L317">                borrow &gt;&gt;= 32; // -1 or 0</span>
+            }
+        } else {
+<span class="nc bnc" id="L320" title="All 2 branches missed.">            for (i = 0; i &lt; bSize; i++) {</span>
+<span class="nc" id="L321">                borrow += (b[i] &amp; 0xFFFFFFFFL) - (a[i] &amp; 0xFFFFFFFFL);</span>
+<span class="nc" id="L322">                res[i] = (int) borrow;</span>
+<span class="nc" id="L323">                borrow &gt;&gt;= 32; // -1 or 0</span>
+            }
+<span class="nc bnc" id="L325" title="All 2 branches missed.">            for (; i &lt; aSize; i++) {</span>
+<span class="nc" id="L326">                borrow -= a[i] &amp; 0xFFFFFFFFL;</span>
+<span class="nc" id="L327">                res[i] = (int) borrow;</span>
+<span class="nc" id="L328">                borrow &gt;&gt;= 32; // -1 or 0</span>
+            }
+        }
+
+<span class="nc" id="L332">    }</span>
+
+    /**
+     * Subtracts the value represented by {@code b} from the value represented
+     * by {@code a}. It is assumed the magnitude of a is not less than the
+     * magnitude of b.
+     *
+     * @return {@code a - b}
+     */
+    private static int[] subtract(int[] a, int aSize, int[] b, int bSize) {
+        // PRE: a[] &gt;= b[]
+<span class="fc" id="L343">        int[] res = new int[aSize];</span>
+<span class="fc" id="L344">        subtract(res, a, aSize, b, bSize);</span>
+<span class="fc" id="L345">        return res;</span>
+    }
+
+    /**
+     * Same as
+     * {@link #inplaceSubtract(TBigInteger, TBigInteger)}, but without the
+     * restriction of non-positive values
+     *
+     * @param op1 should have enough space to save the result
+     * @param op2
+     */
+    static void completeInPlaceSubtract(TBigInteger op1, TBigInteger op2) {
+<span class="nc" id="L357">        int resultSign = op1.compareTo(op2);</span>
+<span class="nc bnc" id="L358" title="All 2 branches missed.">        if (op1.sign == 0) {</span>
+<span class="nc" id="L359">            System.arraycopy(op2.digits, 0, op1.digits, 0, op2.numberLength);</span>
+<span class="nc" id="L360">            op1.sign = -op2.sign;</span>
+<span class="nc bnc" id="L361" title="All 2 branches missed.">        } else if (op1.sign != op2.sign) {</span>
+<span class="nc" id="L362">            add(op1.digits, op1.digits, op1.numberLength, op2.digits, op2.numberLength);</span>
+<span class="nc" id="L363">            op1.sign = resultSign;</span>
+        } else {
+<span class="nc" id="L365">            int sign = unsignedArraysCompare(op1.digits, op2.digits, op1.numberLength, op2.numberLength);</span>
+<span class="nc bnc" id="L366" title="All 2 branches missed.">            if (sign &gt; 0) {</span>
+<span class="nc" id="L367">                subtract(op1.digits, op1.digits, op1.numberLength, op2.digits, op2.numberLength);</span>
+                // op1.sign remains equal
+            } else {
+<span class="nc" id="L370">                inverseSubtract(op1.digits, op1.digits, op1.numberLength, op2.digits, op2.numberLength);</span>
+<span class="nc" id="L371">                op1.sign = -op1.sign;</span>
+            }
+        }
+<span class="nc" id="L374">        op1.numberLength = Math.max(op1.numberLength, op2.numberLength) + 1;</span>
+<span class="nc" id="L375">        op1.cutOffLeadingZeroes();</span>
+<span class="nc" id="L376">        op1.unCache();</span>
+<span class="nc" id="L377">    }</span>
+
+    /**
+     * Same as @link #inplaceAdd(BigInteger, BigInteger), but without the
+     * restriction of non-positive values
+     *
+     * @param op1 any number
+     * @param op2 any number
+     */
+    static void completeInPlaceAdd(TBigInteger op1, TBigInteger op2) {
+<span class="nc bnc" id="L387" title="All 2 branches missed.">        if (op1.sign == 0)</span>
+<span class="nc" id="L388">            System.arraycopy(op2.digits, 0, op1.digits, 0, op2.numberLength);</span>
+<span class="nc bnc" id="L389" title="All 2 branches missed.">        else if (op2.sign == 0)</span>
+<span class="nc" id="L390">            return;</span>
+<span class="nc bnc" id="L391" title="All 2 branches missed.">        else if (op1.sign == op2.sign)</span>
+<span class="nc" id="L392">            add(op1.digits, op1.digits, op1.numberLength, op2.digits, op2.numberLength);</span>
+        else {
+<span class="nc" id="L394">            int sign = unsignedArraysCompare(op1.digits, op2.digits, op1.numberLength, op2.numberLength);</span>
+<span class="nc bnc" id="L395" title="All 2 branches missed.">            if (sign &gt; 0)</span>
+<span class="nc" id="L396">                subtract(op1.digits, op1.digits, op1.numberLength, op2.digits, op2.numberLength);</span>
+            else {
+<span class="nc" id="L398">                inverseSubtract(op1.digits, op1.digits, op1.numberLength, op2.digits, op2.numberLength);</span>
+<span class="nc" id="L399">                op1.sign = -op1.sign;</span>
+            }
+        }
+<span class="nc" id="L402">        op1.numberLength = Math.max(op1.numberLength, op2.numberLength) + 1;</span>
+<span class="nc" id="L403">        op1.cutOffLeadingZeroes();</span>
+<span class="nc" id="L404">        op1.unCache();</span>
+<span class="nc" id="L405">    }</span>
+
+    /**
+     * Compares two arrays, representing unsigned integer in little-endian
+     * order. Returns +1,0,-1 if a is - respective - greater, equal or lesser
+     * then b
+     */
+    private static int unsignedArraysCompare(int[] a, int[] b, int aSize, int bSize) {
+<span class="nc bnc" id="L413" title="All 2 branches missed.">        if (aSize &gt; bSize)</span>
+<span class="nc" id="L414">            return 1;</span>
+<span class="nc bnc" id="L415" title="All 2 branches missed.">        else if (aSize &lt; bSize)</span>
+<span class="nc" id="L416">            return -1;</span>
+
+        else {
+            int i;
+<span class="nc bnc" id="L420" title="All 4 branches missed.">            for (i = aSize - 1; i &gt;= 0 &amp;&amp; a[i] == b[i]; i--) {</span>
+                // do nothing
+            }
+<span class="nc bnc" id="L423" title="All 4 branches missed.">            return i &lt; 0 ? TBigInteger.EQUALS : ((a[i] &amp; 0xFFFFFFFFL) &lt; (b[i] &amp; 0xFFFFFFFFL) ? TBigInteger.LESS</span>
+                    : TBigInteger.GREATER);
+        }
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

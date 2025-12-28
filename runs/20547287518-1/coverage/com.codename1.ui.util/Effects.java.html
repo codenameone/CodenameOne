@@ -1,0 +1,290 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Effects.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.util</a> &gt; <span class="el_source">Effects.java</span></div><h1>Effects.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+package com.codename1.ui.util;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Display;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.RGBImage;
+import com.codename1.ui.animations.Motion;
+
+/**
+ * Static utility class useful for simple visual effects that don't quite fit
+ * anywhere else in the core API.
+ *
+ * @author Shai Almog
+ */
+public class Effects {
+    private Effects() {
+    }
+
+    /**
+     * Takes the given image and appends an effect of reflection below it that
+     * is similar to the way elements appear in water beneath them. This method
+     * shouldn't be used when numAlpha is very low.
+     *
+     * @param source image to add the reflection effect to
+     * @return new image with a reflection effect for the source image
+     */
+    public static Image reflectionImage(Image source) {
+<span class="fc" id="L52">        return reflectionImage(source, 0.5f, 120);</span>
+    }
+
+    /**
+     * Takes the given image and appends an effect of reflection below it that
+     * is similar to the way elements appear in water beneath them. This method
+     * shouldn't be used when numAlpha is very low.
+     *
+     * @param source      image to add the reflection effect to
+     * @param mirrorRatio generally less than 1, a mirror ration of 0.5f will create a mirror image half the
+     *                    height of the image, 0.75f will create a 3 quarter height mirror etc.
+     * @param alphaRatio  starting point for the alpha value in the mirror, this should be a number between 0 - 255
+     *                    (recommended larger than 0) indicating the opacity of the closest pixel. For a mirror thats completely
+     *                    opaque use 255. A recommended value would be between 128 to 90.
+     * @return new image with a reflection effect for the source image
+     */
+    public static Image reflectionImage(Image source, float mirrorRatio, int alphaRatio) {
+<span class="fc" id="L69">        return reflectionImage(source, mirrorRatio, alphaRatio, 0);</span>
+    }
+
+    /**
+     * Takes the given image and appends an effect of reflection below it that
+     * is similar to the way elements appear in water beneath them. This method
+     * shouldn't be used when numAlpha is very low.
+     *
+     * @param source      image to add the reflection effect to
+     * @param mirrorRatio generally less than 1, a mirror ration of 0.5f will create a mirror image half the
+     *                    height of the image, 0.75f will create a 3 quarter height mirror etc.
+     * @param alphaRatio  starting point for the alpha value in the mirror, this should be a number between 0 - 255
+     *                    (recommended larger than 0) indicating the opacity of the closest pixel. For a mirror thats completely
+     *                    opaque use 255. A recommended value would be between 128 to 90.
+     * @param spacing     the distance in pixels between the image and its reflection
+     * @return new image with a reflection effect for the source image
+     */
+    public static Image reflectionImage(Image source, float mirrorRatio, int alphaRatio, int spacing) {
+<span class="fc" id="L87">        int w = source.getWidth();</span>
+<span class="fc" id="L88">        int h = source.getHeight();</span>
+<span class="fc" id="L89">        int mirrorHeight = ((int) (h * mirrorRatio)) * w;</span>
+
+        // create an array big enough to hold the mirror data
+<span class="fc" id="L92">        RGBImage rgbImg = new RGBImage(new int[w * (h + spacing) + mirrorHeight], w, h + ((int) (h * mirrorRatio) + spacing));</span>
+<span class="fc" id="L93">        source.toRGB(rgbImg, 0, 0, 0, 0, w, h);</span>
+<span class="fc" id="L94">        int[] imageData = rgbImg.getRGB();</span>
+<span class="fc" id="L95">        int ilen = imageData.length;</span>
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        for (int iter = 0; iter &lt; mirrorHeight; iter++) {</span>
+<span class="fc" id="L97">            int sourcePos = w * h - iter - 1;</span>
+<span class="fc" id="L98">            int off = iter % w;</span>
+<span class="fc" id="L99">            off = w - off + iter - off;</span>
+<span class="fc" id="L100">            int mirrorPos = ilen - (mirrorHeight - off) + (spacing * w);</span>
+<span class="fc" id="L101">            int color = imageData[sourcePos];</span>
+
+            // if the color is not transparent
+<span class="pc bpc" id="L104" title="1 of 4 branches missed.">            if ((color &amp; 0xff000000) != 0 &amp;&amp; mirrorPos &lt; ilen) {</span>
+<span class="fc" id="L105">                int alpha = (int) (alphaRatio * ((float) mirrorHeight - iter) / ((float) mirrorHeight));</span>
+<span class="fc" id="L106">                imageData[mirrorPos] = (imageData[sourcePos] &amp; 0xffffff) | ((alpha &lt;&lt; 24) &amp; 0xff000000);</span>
+            }
+        }
+<span class="fc" id="L109">        return rgbImg;</span>
+    }
+
+    /**
+     * Grows or shrinks the given component to its new preferred size, this method
+     * essentially takes a component whose preferred size has changed and creates a &quot;growing&quot;
+     * effect that lasts for the duration. Notice that some components (such as text areas)
+     * don't report proper preferred size untill they are laid out once. Hence the first time
+     * around a text area (or container containing a text area) will not produce the expected
+     * effect. This can be solved by invoking revalidate before the call to this method only the
+     * first time around!
+     *
+     * @param c        the component to grow/shrink, its size must be different from its preferred size
+     * @param duration the duration in milliseconds for the grow/shrink animation
+     * @deprecated use Component.growShrink instead
+     */
+    public static void growShrink(final Component c, int duration) {
+<span class="fc" id="L126">        c.growShrink(duration);</span>
+<span class="fc" id="L127">    }</span>
+
+    /**
+     * Skews an image in a faux perspective transform on the vertical axis, this is effectively a fast scale
+     * algorithm that both shrinks the image vertically and reduces the width
+     *
+     * @param topScaleRatio    the amount by which the top portion should be scaled where 1.0 means none
+     * @param bottomScaleRatio the amount by which the bottom portion should be scaled where 1.0 means none
+     * @param verticalShrink   the scale ratio for the image height where 1.0 means none
+     * @return the perspective translated image
+     */
+    public static Image verticalPerspective(Image i, float topScaleRatio, float bottomScaleRatio, float verticalShrink) {
+<span class="fc" id="L139">        int[] imageData = i.getRGB();</span>
+<span class="fc" id="L140">        int sourceWidth = i.getWidth();</span>
+<span class="fc" id="L141">        int sourceHeight = i.getHeight();</span>
+<span class="fc" id="L142">        int destinationWidth = (int) (Math.max(topScaleRatio, bottomScaleRatio) * sourceWidth);</span>
+<span class="fc" id="L143">        int destinationHeight = (int) (verticalShrink * sourceHeight);</span>
+<span class="fc" id="L144">        int[] destinationArray = new int[destinationWidth * destinationHeight];</span>
+
+        // faster than math.min
+<span class="fc" id="L147">        float diff = bottomScaleRatio - topScaleRatio;</span>
+
+<span class="pc bpc" id="L149" title="1 of 2 branches missed.">        if (destinationWidth &gt; sourceWidth) {</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">            for (int y = 0; y &lt; destinationHeight; y++) {</span>
+<span class="nc" id="L151">                float positionY = ((float) y) / ((float) destinationHeight - 1);</span>
+<span class="nc" id="L152">                int sourceY = (int) ((float) (sourceHeight - 1) * positionY);</span>
+<span class="nc" id="L153">                float currentRowRatio = (topScaleRatio + (diff * positionY)) / bottomScaleRatio;</span>
+                //int minX = (int)(((float)destinationWidth - sourceWidth) / 2.0f * currentRowRatio);
+<span class="nc" id="L155">                int minX = (int) (((float) destinationWidth) * (1 - currentRowRatio));</span>
+<span class="nc" id="L156">                int maxX = destinationWidth - minX;</span>
+<span class="nc" id="L157">                float distance = maxX - minX;</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">                for (int x = minX; x &lt; maxX; x++) {</span>
+<span class="nc" id="L159">                    int sourceX = (int) (((float) sourceWidth) * (((float) x - minX) / distance));</span>
+<span class="nc" id="L160">                    destinationArray[x + y * destinationWidth] = imageData[sourceY * sourceWidth + sourceX];</span>
+                }
+            }
+        } else {
+<span class="fc bfc" id="L164" title="All 2 branches covered.">            for (int y = 0; y &lt; destinationHeight; y++) {</span>
+<span class="fc" id="L165">                float positionY = ((float) y) / ((float) destinationHeight);</span>
+<span class="fc" id="L166">                int sourceY = (int) ((float) sourceHeight * positionY);</span>
+<span class="fc" id="L167">                float currentRowRatio = topScaleRatio + (diff * positionY);</span>
+<span class="fc" id="L168">                int minX = (int) (((float) destinationWidth) * (1 - currentRowRatio));</span>
+<span class="fc" id="L169">                int maxX = destinationWidth - minX;</span>
+<span class="fc" id="L170">                float distance = maxX - minX;</span>
+<span class="fc bfc" id="L171" title="All 2 branches covered.">                for (int x = minX; x &lt; maxX; x++) {</span>
+<span class="fc" id="L172">                    int sourceX = (int) (((float) sourceWidth) * (((float) x - minX) / distance));</span>
+<span class="fc" id="L173">                    destinationArray[x + y * destinationWidth] = imageData[sourceY * sourceWidth + sourceX];</span>
+                }
+            }
+        }
+
+<span class="fc" id="L178">        return Image.createImage(destinationArray, destinationWidth, destinationHeight);</span>
+    }
+
+
+    /**
+     * Create a blur image from the given image.
+     * The algorithm is gaussian blur - https://en.wikipedia.org/wiki/Gaussian_blur
+     *
+     * @param image  the image to blur
+     * @param radius the radius to be used in the algorithm
+     */
+    public static Image gaussianBlurImage(Image image, float radius) {
+<span class="fc" id="L190">        return Display.getInstance().gaussianBlurImage(image, radius);</span>
+    }
+
+    /**
+     * Returns true if gaussian blur is supported on this platform
+     *
+     * @return true if gaussian blur is supported.
+     */
+    public static boolean isGaussianBlurSupported() {
+<span class="fc" id="L199">        return Display.getInstance().isGaussianBlurSupported();</span>
+    }
+
+    /**
+     * Generates a shadow for the source image and returns a new larger image containing the shadow
+     *
+     * @param source     the source image for whom the shadow should be generated
+     * @param blurRadius a shadow is blurred using a gaussian blur when available, a value of 10 is often satisfactory
+     * @param opacity    the opacity of the shadow between 0 - 1 where 1 is completely opaque
+     * @param xDistance  the distance on the x axis from the main image body in pixels e.g. a negative value will represent a lightsource from the right (shadow on the left)
+     * @param yDistance  the distance on the y axis from the main image body in pixels e.g. a negative value will represent a lightsource from the bottom (shadow on top)
+     * @return a new image whose size incorporates x/yDistance
+     */
+    public static Image dropshadow(Image source, int blurRadius, float opacity, int xDistance, int yDistance) {
+<span class="fc" id="L213">        Image s = dropshadow(source, blurRadius, opacity);</span>
+<span class="fc" id="L214">        Image n = Image.createImage(source.getWidth() + Math.abs(xDistance), source.getHeight() + Math.abs(yDistance), 0);</span>
+<span class="fc" id="L215">        Graphics g = n.getGraphics();</span>
+<span class="fc" id="L216">        int shadowX = 0, imageX = 0, shadowY = 0, imageY = 0;</span>
+<span class="pc bpc" id="L217" title="1 of 2 branches missed.">        if (xDistance &lt; 0) {</span>
+<span class="nc" id="L218">            imageX = xDistance * -1;</span>
+        } else {
+<span class="fc" id="L220">            shadowX = xDistance;</span>
+        }
+<span class="pc bpc" id="L222" title="1 of 2 branches missed.">        if (yDistance &lt; 0) {</span>
+<span class="nc" id="L223">            imageY = yDistance * -1;</span>
+        } else {
+<span class="fc" id="L225">            shadowY = yDistance;</span>
+        }
+<span class="fc" id="L227">        g.drawImage(s, shadowX, shadowY);</span>
+<span class="fc" id="L228">        g.drawImage(source, imageX, imageY);</span>
+<span class="fc" id="L229">        return n;</span>
+    }
+
+    /**
+     * Generates a shadow for the source image and returns either the shadow itself or the image merged with the
+     * shadow.
+     *
+     * @param source     the source image for whom the shadow should be generated
+     * @param blurRadius a shadow is blurred using a gaussian blur when available, a value of 10 is often satisfactory
+     * @param opacity    the opacity of the shadow between 0 - 1 where 1 is completely opaque
+     * @return an image containing the shadow for source
+     */
+    public static Image dropshadow(Image source, int blurRadius, float opacity) {
+<span class="fc" id="L242">        int[] rgb = source.getRGB();</span>
+<span class="fc bfc" id="L243" title="All 2 branches covered.">        for (int iter = 0; iter &lt; rgb.length; iter++) {</span>
+<span class="fc" id="L244">            float f = rgb[iter] &amp; 0xff000000;</span>
+<span class="fc" id="L245">            f *= opacity;</span>
+<span class="fc" id="L246">            rgb[iter] = (int) f;</span>
+        }
+<span class="fc" id="L248">        Image shadow = Image.createImage(rgb, source.getWidth(), source.getHeight());</span>
+<span class="fc bfc" id="L249" title="All 2 branches covered.">        if (Display.getInstance().isGaussianBlurSupported()) {</span>
+<span class="fc" id="L250">            shadow = Display.getInstance().gaussianBlurImage(shadow, blurRadius);</span>
+        }
+<span class="fc" id="L252">        return shadow;</span>
+
+    }
+
+    /**
+     * Generates a square shadow and returns it
+     *
+     * @param width      the width of the shadow image
+     * @param height     the height of the shadow image
+     * @param blurRadius a shadow is blurred using a gaussian blur when available, a value of 10 is often satisfactory
+     * @param opacity    the opacity of the shadow between 0 - 1 where 1 is completely opaque
+     * @return an image containing the shadow for source
+     */
+    public static Image squareShadow(int width, int height, int blurRadius, float opacity) {
+
+<span class="fc" id="L267">        Image img = Image.createImage(width + blurRadius * 2, height + blurRadius * 2, 0);</span>
+<span class="fc" id="L268">        Graphics g = img.getGraphics();</span>
+<span class="fc" id="L269">        int destAlpha = (int) (opacity * 255.0);</span>
+<span class="fc" id="L270">        g.setColor(0);</span>
+
+<span class="fc bfc" id="L272" title="All 2 branches covered.">        if (Display.getInstance().isGaussianBlurSupported()) {</span>
+            // Note:  This is not exactly the same as the result when we don't have gaussian blur
+            // But it looks better.
+<span class="fc" id="L275">            g.setAlpha(Math.min(destAlpha * 2, 255));</span>
+<span class="fc" id="L276">            g.fillRect(blurRadius - 1, blurRadius - 1, width + 2, height + 2);</span>
+<span class="fc" id="L277">            img = Display.getInstance().gaussianBlurImage(img, blurRadius);</span>
+        } else {
+<span class="fc" id="L279">            Motion lin = Motion.createLinearMotion(0, destAlpha, blurRadius);</span>
+            // draw a gradient of sort for the shadow
+<span class="fc bfc" id="L281" title="All 2 branches covered.">            for (int iter = blurRadius - 1; iter &gt;= 0; iter--) {</span>
+<span class="fc" id="L282">                lin.setCurrentMotionTime(iter);</span>
+<span class="fc" id="L283">                g.setAlpha(Math.max(0, (int) (lin.getValue() * iter / (blurRadius - 1f))));</span>
+<span class="fc" id="L284">                g.drawRect(iter, iter, width + (blurRadius - iter) * 2, height + (blurRadius - iter) * 2);</span>
+            }
+        }
+<span class="fc" id="L287">        return img;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

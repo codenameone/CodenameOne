@@ -1,0 +1,1206 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GridBagLayout.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts</a> &gt; <span class="el_source">GridBagLayout.java</span></div><h1>GridBagLayout.java</h1><pre class="source lang-java linenums">/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the &quot;License&quot;); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+package com.codename1.ui.layouts;
+
+import com.codename1.io.Log;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.plaf.Style;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Map;
+
+/**
+ * &lt;p&gt;Codename One port of the infamous GridBagLayout based on the Apache Harmony code. For new applications
+ * we generally recommend a &quot;native&quot; Codename One layout such as {@link com.codename1.ui.table.TableLayout}
+ * and recommend avoiding this layout. Its here for developers who are accustomed to it and need to port existing code.&lt;/p&gt;
+ *
+ * &lt;script src=&quot;https://gist.github.com/codenameone/6266580.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/gridbag-layout.png&quot; alt=&quot;Sample gridbag layout usage&quot; /&gt;
+ */
+public class GridBagLayout extends Layout {
+    protected static final int MAXGRIDSIZE = 512;
+
+    protected static final int MINSIZE = 1;
+
+    protected static final int PREFERREDSIZE = 2;
+    public double[] columnWeights;
+    public double[] rowWeights;
+    public int[] columnWidths;
+    public int[] rowHeights;
+    // Direct modification is forbidden
+    protected volatile Hashtable&lt;Component, GridBagConstraints&gt; comptable;
+    protected volatile GridBagConstraints defaultConstraints;
+    protected volatile GridBagLayoutInfo layoutInfo;
+    private ParentInfo lastParentInfo;
+
+<span class="fc" id="L56">    public GridBagLayout() {</span>
+<span class="fc" id="L57">        comptable = new Hashtable&lt;Component, GridBagConstraints&gt;();</span>
+<span class="fc" id="L58">        defaultConstraints = new GridBagConstraints();</span>
+<span class="fc" id="L59">        columnWeights = rowWeights = null;</span>
+<span class="fc" id="L60">        columnWidths = rowHeights = null;</span>
+<span class="fc" id="L61">        layoutInfo = null;</span>
+<span class="fc" id="L62">        lastParentInfo = null;</span>
+<span class="fc" id="L63">    }</span>
+
+
+    public void addLayoutComponent(Object constraints, Component comp, Container c) {
+        GridBagConstraints cons;
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (constraints != null) {</span>
+<span class="pc bpc" id="L69" title="1 of 2 branches missed.">            if (!(constraints instanceof GridBagConstraints)) {</span>
+<span class="nc" id="L70">                throw new IllegalArgumentException(&quot;AddLayoutComponent: constraint object must be GridBagConstraints&quot;); //$NON-NLS-1$</span>
+            }
+<span class="fc" id="L72">            cons = (GridBagConstraints) constraints;</span>
+        } else {
+<span class="nc bnc" id="L74" title="All 2 branches missed.">            if (comptable.containsKey(comp)) {</span>
+                //  don't replace constraints with default ones
+<span class="nc" id="L76">                return;</span>
+            }
+<span class="nc" id="L78">            cons = defaultConstraints;</span>
+        }
+        /*try {
+            //cons.verify();
+        } catch (IllegalArgumentException e) {
+            // awt.81=AddLayoutComponent: {0}
+            throw new IllegalArgumentException(&quot;AddLayoutComponent: &quot; + e.getMessage()); //$NON-NLS-1$
+        }*/
+<span class="fc" id="L86">        GridBagConstraints consClone = (GridBagConstraints) cons.clone();</span>
+<span class="fc" id="L87">        comptable.put(comp, consClone);</span>
+<span class="fc" id="L88">        Container parent = comp.getParent();</span>
+<span class="fc" id="L89">        updateParentInfo(parent, consClone);</span>
+<span class="fc" id="L90">    }</span>
+
+    public void removeLayoutComponent(Component comp) {
+<span class="fc" id="L93">        Container parent = comp.getParent();</span>
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">        if (parent != null) {</span>
+<span class="fc" id="L95">            getParentInfo(parent).consTable.remove(comptable.get(comp));</span>
+        }
+<span class="fc" id="L97">        comptable.remove(comp);</span>
+<span class="fc" id="L98">    }</span>
+
+    public Object getComponentConstraint(Component comp) {
+<span class="fc" id="L101">        GridBagConstraints cons = comptable.get(comp);</span>
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">        if (cons == null) {</span>
+<span class="nc" id="L103">            cons = defaultConstraints;</span>
+<span class="nc" id="L104">            comptable.put(comp, (GridBagConstraints) cons.clone());</span>
+        }
+<span class="fc" id="L106">        return cons.clone();</span>
+    }
+
+    public void setConstraints(Component comp, GridBagConstraints constraints) {
+<span class="nc" id="L110">        GridBagConstraints consClone = (GridBagConstraints) constraints.clone();</span>
+        /*try {
+            //                consClone.verify();
+        } catch (IllegalArgumentException e) {
+            // awt.85=SetConstraints: {0}
+            throw new IllegalArgumentException(&quot;SetConstraints: &quot; + e.getMessage()); //$NON-NLS-1$
+        }*/
+<span class="nc" id="L117">        ParentInfo info = getParentInfo(comp.getParent());</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (info != null) {</span>
+<span class="nc" id="L119">            GridBagConstraints cons = comptable.get(comp);</span>
+<span class="nc" id="L120">            info.allConstraints.remove(info.consTable.get(cons)); //?</span>
+<span class="nc" id="L121">            info.consTable.remove(cons);</span>
+        }
+        // add component if it's not there yet
+<span class="nc" id="L124">        comptable.put(comp, consClone);</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (info != null) {</span>
+<span class="nc" id="L126">            MixedConstraints mixCons = new MixedConstraints(consClone);</span>
+<span class="nc" id="L127">            info.consTable.put(consClone, mixCons);</span>
+<span class="nc" id="L128">            info.allConstraints.add(mixCons);</span>
+        }
+<span class="nc" id="L130">    }</span>
+
+    public void invalidateLayout(Container target) {
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if (target == null) {</span>
+<span class="nc" id="L134">            return;</span>
+        }
+<span class="nc" id="L136">        getParentInfo(target).valid = false;</span>
+<span class="nc" id="L137">    }</span>
+
+    public Dimension getPreferredSize(Container parent) {
+<span class="fc" id="L140">        Style s = parent.getStyle();</span>
+<span class="fc" id="L141">        ParentInfo info = lastParentInfo = getParentInfo(parent);</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        if (getComponentsNumber(parent) == 0) {</span>
+<span class="nc" id="L143">            return new Dimension(s.getHorizontalPadding(), s.getVerticalPadding());</span>
+        }
+        try {
+<span class="fc" id="L146">            validate(parent, info);</span>
+<span class="nc" id="L147">        } catch (RuntimeException e) {</span>
+            // awt.87=PreferredLayoutSize: {0}
+<span class="nc" id="L149">            Log.e(e);</span>
+<span class="nc" id="L150">            throw new IllegalArgumentException(&quot;PreferredLayoutSize: &quot; + e.getMessage()); //$NON-NLS-1$</span>
+<span class="fc" id="L151">        }</span>
+<span class="fc" id="L152">        Dimension d = info.grid.preferredSize();</span>
+<span class="fc" id="L153">        d.setWidth(d.getWidth() + s.getHorizontalPadding());</span>
+<span class="fc" id="L154">        d.setHeight(d.getHeight() + s.getVerticalPadding());</span>
+<span class="fc" id="L155">        return d;</span>
+        //return addInsets(grid.preferredSize(), parent);
+    }
+
+    public void layoutContainer(Container parent) {
+<span class="fc" id="L160">        ParentInfo info = lastParentInfo = getParentInfo(parent);</span>
+<span class="pc bpc" id="L161" title="1 of 2 branches missed.">        if (getComponentsNumber(parent) == 0) {</span>
+<span class="nc" id="L162">            return;</span>
+        }
+        try {
+<span class="fc" id="L165">            arrangeGridImpl(parent, info);</span>
+<span class="nc" id="L166">        } catch (RuntimeException e) {</span>
+            // awt.88=LayoutContainer: {0}
+<span class="nc" id="L168">            e.printStackTrace();</span>
+<span class="nc" id="L169">            throw new IllegalArgumentException(&quot;LayoutContainer: &quot; + e.getMessage()); //$NON-NLS-1$</span>
+<span class="fc" id="L170">        }</span>
+<span class="fc" id="L171">        setComponentsBounds(info);</span>
+<span class="fc" id="L172">    }</span>
+
+    public int[][] getLayoutDimensions() {
+<span class="nc bnc" id="L175" title="All 2 branches missed.">        if (lastParentInfo == null) {</span>
+<span class="nc" id="L176">            return new int[][]{new int[0], new int[0]};</span>
+        }
+<span class="nc" id="L178">        return new int[][]{lastParentInfo.grid.getWidths(),</span>
+<span class="nc" id="L179">                lastParentInfo.grid.getHeights()};</span>
+    }
+
+    public double[][] getLayoutWeights() {
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        if (lastParentInfo == null) {</span>
+<span class="nc" id="L184">            return new double[][]{new double[0], new double[0]};</span>
+        }
+<span class="nc" id="L186">        return lastParentInfo.grid.getWeights();</span>
+    }
+
+    /*public Point location(int x, int y) {
+        toolkit.lockAWT();
+        try {
+            if (lastParentInfo == null) {
+                return new Point();
+            }
+            return lastParentInfo.grid.location(x, y, lastParentInfo.orientation
+                    .isLeftToRight());
+        } finally {
+            toolkit.unlockAWT();
+        }
+    }
+
+    protected Dimension GetMinSize(Container parent, GridBagLayoutInfo info) {
+        toolkit.lockAWT();
+        try {
+            int w = 0;
+            int h = 0;
+            for (int i = 0; i &lt; MAXGRIDSIZE; i++) {
+                w += info.widths[i];
+                h += info.heights[i];
+            }
+            return new Dimension(w, h);
+        } finally {
+            toolkit.unlockAWT();
+        }
+    }
+
+    protected GridBagLayoutInfo GetLayoutInfo(Container parent, int sizeflag) {
+        toolkit.lockAWT();
+        try {
+            ParentInfo parentInfo = getParentInfo(parent);
+            if (sizeflag == PREFERREDSIZE) {
+                return new GridBagLayoutInfo(parentInfo.grid.lookupPrefWidths(),
+                        parentInfo.grid.lookupPrefHeights());
+            }
+            // MINSIZE
+            return new GridBagLayoutInfo(parentInfo.grid.lookupMinWidths(), parentInfo.grid
+                    .lookupMinHeights());
+        } finally {
+            toolkit.unlockAWT();
+        }
+    }*/
+
+    protected void ArrangeGrid(Container parent) {
+<span class="nc" id="L234">        ParentInfo info = lastParentInfo = getParentInfo(parent);</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        if (getComponentsNumber(parent) == 0) {</span>
+<span class="nc" id="L236">            return;</span>
+        }
+        try {
+<span class="nc" id="L239">            arrangeGridImpl(parent, info);</span>
+<span class="nc" id="L240">        } catch (RuntimeException e) {</span>
+            // awt.86=MinimumLayoutSize: {0}
+<span class="nc" id="L242">            e.printStackTrace();</span>
+<span class="nc" id="L243">            throw new IllegalArgumentException(&quot;MinimumLayoutSize: &quot; + e.getMessage()); //$NON-NLS-1$</span>
+<span class="nc" id="L244">        }</span>
+<span class="nc" id="L245">    }</span>
+
+    protected GridBagConstraints lookupConstraints(Component comp) {
+<span class="nc" id="L248">        GridBagConstraints cons = comptable.get(comp);</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">        if (cons == null) {</span>
+            // if comp is not in the layout, return a copy of default constraints
+<span class="nc" id="L251">            cons = (GridBagConstraints) defaultConstraints.clone();</span>
+        }
+<span class="nc" id="L253">        return cons;</span>
+    }
+
+    protected void adjustForGravity(GridBagConstraints constraints, Rectangle r) {
+<span class="nc" id="L257">        AdjustForGravity(constraints, r);</span>
+<span class="nc" id="L258">    }</span>
+
+    protected void arrangeGrid(Container parent) {
+<span class="nc" id="L261">        ArrangeGrid(parent);</span>
+<span class="nc" id="L262">    }</span>
+
+    /*protected GridBagLayoutInfo getLayoutInfo(Container parent, int sizeflag) {
+        return GetLayoutInfo(parent, sizeflag);
+    }
+
+    protected Dimension getMinSize(Container parent, GridBagLayoutInfo info) {
+        toolkit.lockAWT();
+        try {
+            return GetMinSize(parent, info);
+        } finally {
+            toolkit.unlockAWT();
+        }
+    }*/
+
+    protected void AdjustForGravity(GridBagConstraints constraints, Rectangle r) {
+        /*try {
+            //                ((GridBagConstraints) constraints).verify();
+        } catch (IllegalArgumentException e) {
+            // awt.8C={0}
+            throw new IllegalArgumentException(&quot;AdjustForGravity: &quot; + e.getMessage()); //$NON-NLS-1$
+        }*/
+        //Don't get parent as param, so have to use older info if exists
+<span class="nc bnc" id="L285" title="All 2 branches missed.">        if (layoutInfo == null) {</span>
+<span class="nc" id="L286">            r.setBounds(0, 0, 0, 0);</span>
+<span class="nc" id="L287">            return;</span>
+        }
+<span class="nc" id="L289">        GridBagConstraints consClone = (GridBagConstraints) constraints.clone();</span>
+<span class="nc" id="L290">        consClone.fill = GridBagConstraints.BOTH;</span>
+<span class="nc" id="L291">        ComponentSide horSide = new ComponentSide();</span>
+<span class="nc" id="L292">        ComponentSide vertSide = new ComponentSide();</span>
+<span class="nc" id="L293">        Dimension dummySize = new Dimension(0, 0);</span>
+<span class="nc" id="L294">        initHorCompSide(horSide, consClone, dummySize, dummySize, lastParentInfo);</span>
+<span class="nc" id="L295">        initVertCompSide(vertSide, consClone, dummySize, dummySize, lastParentInfo);</span>
+<span class="nc" id="L296">        calculateComponentBounds(horSide, vertSide, r, lastParentInfo.grid);</span>
+<span class="nc" id="L297">    }</span>
+
+    private ParentInfo getParentInfo(Container parent) {
+<span class="pc bpc" id="L300" title="1 of 2 branches missed.">        if (parent == null) {</span>
+<span class="nc" id="L301">            return null;</span>
+        }
+<span class="fc" id="L303">        ParentInfo pi = (ParentInfo) parent.getClientProperty(&quot;cn1$gridBagLayoutData&quot;);</span>
+<span class="fc bfc" id="L304" title="All 2 branches covered.">        if (pi == null) {</span>
+<span class="fc" id="L305">            pi = new ParentInfo();</span>
+<span class="fc" id="L306">            parent.putClientProperty(&quot;cn1$gridBagLayoutData&quot;, pi);</span>
+        }
+<span class="fc" id="L308">        return pi;</span>
+    }
+
+    private void arrangeGridImpl(Container parent, ParentInfo info) {
+<span class="fc" id="L312">        validate(parent, info);</span>
+        // Do not check clientRect for emptiness. Grid must be updated anyway
+<span class="fc" id="L314">        Rectangle clientRect = new Rectangle(0, 0, parent.getWidth(), parent.getHeight());</span>
+<span class="fc" id="L315">        info.grid.fit2Client(clientRect);</span>
+<span class="fc" id="L316">    }</span>
+
+    private void setComponentsBounds(ParentInfo info) {
+<span class="fc bfc" id="L319" title="All 2 branches covered.">        for (int i = 0; i &lt; info.components.length; i++) {</span>
+<span class="fc" id="L320">            Rectangle r = new Rectangle();</span>
+<span class="fc" id="L321">            calculateComponentBounds(info.horCompSides[i], info.vertCompSides[i], r, info.grid);</span>
+<span class="fc" id="L322">            info.components[i].setX(r.getX());</span>
+<span class="fc" id="L323">            info.components[i].setY(r.getY());</span>
+<span class="fc" id="L324">            info.components[i].setWidth(r.getSize().getWidth());</span>
+<span class="fc" id="L325">            info.components[i].setHeight(r.getSize().getHeight());</span>
+        }
+<span class="fc" id="L327">    }</span>
+
+    private void calculateComponentBounds(ComponentSide horSide, ComponentSide vertSide,
+                                          Rectangle r, Grid grid) {
+<span class="fc" id="L331">        Rectangle dispArea = grid.componentDisplayArea(horSide, vertSide);</span>
+<span class="fc" id="L332">        r.setWidth(fillDisplaySide(dispArea.getWidth(), horSide));</span>
+<span class="fc" id="L333">        r.setHeight(fillDisplaySide(dispArea.getHeight(), vertSide));</span>
+<span class="fc" id="L334">        r.setX(anchorComponentSide(dispArea.getX(), dispArea.getWidth(), horSide, r.getWidth()));</span>
+<span class="fc" id="L335">        r.setY(anchorComponentSide(dispArea.getY(), dispArea.getHeight(), vertSide, r.getHeight()));</span>
+<span class="fc" id="L336">    }</span>
+
+    private int fillDisplaySide(int dispLength, ComponentSide compSide) {
+<span class="fc" id="L339">        int l = Math.max(dispLength - compSide.start_inset - compSide.end_inset, 0);</span>
+<span class="pc bpc" id="L340" title="1 of 2 branches missed.">        if (l &lt; compSide.minLength) {</span>
+<span class="nc" id="L341">            l = Math.min(compSide.minLength, dispLength);</span>
+<span class="fc bfc" id="L342" title="All 2 branches covered.">        } else if (!compSide.stretch) {</span>
+<span class="fc" id="L343">            l = Math.min(l, compSide.prefLength);</span>
+        }
+<span class="fc" id="L345">        return l;</span>
+    }
+
+    private int anchorComponentSide(int dispStart, int dispLength, ComponentSide compSide,
+                                    int compLength) {
+        //        if (compLength == 0) {
+        //            return 0;
+        //        }
+<span class="fc" id="L353">        int insDispLength = dispLength - compSide.start_inset - compSide.end_inset;</span>
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">        if (compLength &lt;= insDispLength) {</span>
+<span class="fc" id="L355">            int s = dispStart + compSide.start_inset;</span>
+<span class="pc bpc" id="L356" title="2 of 4 branches missed.">            switch (compSide.position) {</span>
+                case ComponentSide.POS_START:
+<span class="nc" id="L358">                    break;</span>
+                case ComponentSide.POS_CENTER:
+<span class="fc" id="L360">                    s += (insDispLength - compLength) / 2;</span>
+<span class="fc" id="L361">                    break;</span>
+                case ComponentSide.POS_END:
+<span class="fc" id="L363">                    s += insDispLength - compLength;</span>
+<span class="fc" id="L364">                    break;</span>
+                default:
+                    break;
+            }
+<span class="fc" id="L368">            return s;</span>
+        }
+<span class="nc" id="L370">        float insetFactor = (float) (dispLength - compLength)</span>
+                / (float) (compSide.start_inset + compSide.end_inset);
+<span class="nc" id="L372">        return (dispStart + (int) (compSide.start_inset * insetFactor));</span>
+    }
+
+    private void initHorCompSide(ComponentSide side, GridBagConstraints cons,
+                                 Dimension minSize, Dimension prefSize, ParentInfo info) {
+<span class="fc" id="L377">        MixedConstraints mixCons = info.consTable.get(cons);</span>
+<span class="fc" id="L378">        side.gridStart = mixCons.mapped.getX();</span>
+<span class="fc" id="L379">        side.gridLength = mixCons.mapped.getSize().getWidth();</span>
+<span class="fc" id="L380">        side.weight = cons.weightx;</span>
+<span class="fc" id="L381">        side.start_inset = cons.insets.left;</span>
+<span class="fc" id="L382">        side.end_inset = cons.insets.right;</span>
+<span class="pc bpc" id="L383" title="1 of 2 branches missed.">        int anchor = translateRelativeAnchor(cons.anchor, !info.orientation);</span>
+<span class="pc bpc" id="L384" title="1 of 3 branches missed.">        switch (anchor) {</span>
+            case GridBagConstraints.NORTHWEST:
+            case GridBagConstraints.WEST:
+            case GridBagConstraints.SOUTHWEST:
+<span class="nc" id="L388">                side.position = ComponentSide.POS_START;</span>
+<span class="nc" id="L389">                break;</span>
+            case GridBagConstraints.NORTH:
+            case GridBagConstraints.CENTER:
+            case GridBagConstraints.SOUTH:
+<span class="fc" id="L393">                side.position = ComponentSide.POS_CENTER;</span>
+<span class="fc" id="L394">                break;</span>
+            default:
+<span class="fc" id="L396">                side.position = ComponentSide.POS_END;</span>
+        }
+<span class="pc bpc" id="L398" title="1 of 4 branches missed.">        side.stretch = (cons.fill == GridBagConstraints.BOTH)</span>
+                || (cons.fill == GridBagConstraints.HORIZONTAL);
+<span class="fc" id="L400">        side.minLength = minSize.getWidth() + cons.ipadx;</span>
+<span class="fc" id="L401">        side.prefLength = prefSize.getWidth() + cons.ipadx;</span>
+<span class="fc" id="L402">    }</span>
+
+    private void initVertCompSide(ComponentSide side, GridBagConstraints cons,
+                                  Dimension minSize, Dimension prefSize, ParentInfo info) {
+<span class="fc" id="L406">        MixedConstraints mixCons = info.consTable.get(cons);</span>
+<span class="fc" id="L407">        side.gridStart = mixCons.mapped.getY();</span>
+<span class="fc" id="L408">        side.gridLength = mixCons.mapped.getSize().getHeight();</span>
+<span class="fc" id="L409">        side.weight = cons.weighty;</span>
+<span class="fc" id="L410">        side.start_inset = cons.insets.top;</span>
+<span class="fc" id="L411">        side.end_inset = cons.insets.bottom;</span>
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">        int anchor = translateRelativeAnchor(cons.anchor, !info.orientation);</span>
+<span class="pc bpc" id="L413" title="2 of 3 branches missed.">        switch (anchor) {</span>
+            case GridBagConstraints.NORTHWEST:
+            case GridBagConstraints.NORTH:
+            case GridBagConstraints.NORTHEAST:
+<span class="nc" id="L417">                side.position = ComponentSide.POS_START;</span>
+<span class="nc" id="L418">                break;</span>
+            case GridBagConstraints.WEST:
+            case GridBagConstraints.CENTER:
+            case GridBagConstraints.EAST:
+<span class="fc" id="L422">                side.position = ComponentSide.POS_CENTER;</span>
+<span class="fc" id="L423">                break;</span>
+            default:
+<span class="nc" id="L425">                side.position = ComponentSide.POS_END;</span>
+        }
+<span class="pc bpc" id="L427" title="2 of 4 branches missed.">        side.stretch = (cons.fill == GridBagConstraints.BOTH)</span>
+                || (cons.fill == GridBagConstraints.VERTICAL);
+<span class="fc" id="L429">        side.minLength = minSize.getHeight() + cons.ipady;</span>
+<span class="fc" id="L430">        side.prefLength = prefSize.getHeight() + cons.ipady;</span>
+<span class="fc" id="L431">    }</span>
+
+    private int translateRelativeAnchor(int relAnchor, boolean l2r) {
+<span class="fc" id="L434">        int absAnchor = relAnchor;</span>
+<span class="pc bpc" id="L435" title="8 of 9 branches missed.">        switch (relAnchor) {</span>
+            case GridBagConstraints.PAGE_START:
+<span class="nc" id="L437">                absAnchor = GridBagConstraints.NORTH;</span>
+<span class="nc" id="L438">                break;</span>
+            case GridBagConstraints.PAGE_END:
+<span class="nc" id="L440">                absAnchor = GridBagConstraints.SOUTH;</span>
+<span class="nc" id="L441">                break;</span>
+            case GridBagConstraints.LINE_START:
+<span class="nc bnc" id="L443" title="All 2 branches missed.">                absAnchor = l2r ? GridBagConstraints.WEST : GridBagConstraints.EAST;</span>
+<span class="nc" id="L444">                break;</span>
+            case GridBagConstraints.LINE_END:
+<span class="nc bnc" id="L446" title="All 2 branches missed.">                absAnchor = l2r ? GridBagConstraints.EAST : GridBagConstraints.WEST;</span>
+<span class="nc" id="L447">                break;</span>
+            case GridBagConstraints.FIRST_LINE_START:
+<span class="nc bnc" id="L449" title="All 2 branches missed.">                absAnchor = l2r ? GridBagConstraints.NORTHWEST : GridBagConstraints.NORTHEAST;</span>
+<span class="nc" id="L450">                break;</span>
+            case GridBagConstraints.FIRST_LINE_END:
+<span class="nc bnc" id="L452" title="All 2 branches missed.">                absAnchor = l2r ? GridBagConstraints.NORTHEAST : GridBagConstraints.NORTHWEST;</span>
+<span class="nc" id="L453">                break;</span>
+            case GridBagConstraints.LAST_LINE_START:
+<span class="nc bnc" id="L455" title="All 2 branches missed.">                absAnchor = l2r ? GridBagConstraints.SOUTHWEST : GridBagConstraints.SOUTHEAST;</span>
+<span class="nc" id="L456">                break;</span>
+            case GridBagConstraints.LAST_LINE_END:
+<span class="nc bnc" id="L458" title="All 2 branches missed.">                absAnchor = l2r ? GridBagConstraints.SOUTHEAST : GridBagConstraints.SOUTHWEST;</span>
+<span class="nc" id="L459">                break;</span>
+            default:
+                break;
+        }
+<span class="fc" id="L463">        return absAnchor;</span>
+    }
+
+    private void validate(Container parent, ParentInfo info) {
+<span class="fc bfc" id="L467" title="All 2 branches covered.">        if (info.valid) {</span>
+<span class="fc" id="L468">            return;</span>
+        }
+<span class="fc" id="L470">        info.valid = true;</span>
+<span class="fc" id="L471">        resetCache(parent, info);</span>
+<span class="fc" id="L472">        info.orientation = parent.isRTL();</span>
+<span class="fc" id="L473">        Dimension maxSize = initCompsArray(parent, info.components);</span>
+<span class="fc" id="L474">        new RelativeTranslator(maxSize.getWidth(), maxSize.getHeight()).translate(info);</span>
+<span class="fc" id="L475">        initCompSides(info);</span>
+<span class="fc" id="L476">        info.grid.validate(info);</span>
+<span class="pc bpc" id="L477" title="1 of 2 branches missed.">        if (layoutInfo == null) {</span>
+<span class="fc" id="L478">            layoutInfo = new GridBagLayoutInfo(info.grid.lookupWidths(), info.grid</span>
+<span class="fc" id="L479">                    .lookupHeights());</span>
+        } else {
+<span class="nc" id="L481">            layoutInfo.update(info.grid.lookupWidths(), info.grid.lookupHeights());</span>
+        }
+<span class="fc" id="L483">    }</span>
+
+    private void initCompSides(ParentInfo info) {
+<span class="fc bfc" id="L486" title="All 2 branches covered.">        for (int i = 0; i &lt; info.components.length; i++) {</span>
+<span class="fc" id="L487">            Component comp = info.components[i];</span>
+<span class="fc" id="L488">            info.horCompSides[i] = new ComponentSide();</span>
+<span class="fc" id="L489">            initHorCompSide(info.horCompSides[i], comptable.get(comp), comp.getPreferredSize(), //comp.getMinimumSize(),</span>
+<span class="fc" id="L490">                    comp.getPreferredSize(), info);</span>
+<span class="fc" id="L491">            info.vertCompSides[i] = new ComponentSide();</span>
+<span class="fc" id="L492">            initVertCompSide(info.vertCompSides[i], comptable.get(comp), comp.getPreferredSize(), //comp.getMinimumSize(),</span>
+<span class="fc" id="L493">                    comp.getPreferredSize(), info);</span>
+        }
+<span class="fc" id="L495">    }</span>
+
+    private Dimension initCompsArray(Container parent, Component[] components) {
+<span class="fc" id="L498">        int maxW = 0;</span>
+<span class="fc" id="L499">        int maxH = 0;</span>
+<span class="fc" id="L500">        int i = 0;</span>
+<span class="fc bfc" id="L501" title="All 2 branches covered.">        for (Map.Entry&lt;Component, GridBagConstraints&gt; entry : comptable.entrySet()) {</span>
+<span class="fc" id="L502">            Component comp = entry.getKey();</span>
+<span class="fc" id="L503">            GridBagConstraints cons = entry.getValue();</span>
+<span class="pc bpc" id="L504" title="2 of 4 branches missed.">            if ((comp.getParent() == parent) &amp;&amp; comp.isVisible()) {</span>
+<span class="fc" id="L505">                components[i++] = comp;</span>
+            }
+<span class="pc bpc" id="L507" title="2 of 4 branches missed.">            if ((cons.gridx != GridBagConstraints.RELATIVE)</span>
+                    &amp;&amp; (cons.gridy != GridBagConstraints.RELATIVE)) {
+<span class="fc" id="L509">                maxW = Math.max(maxW, cons.gridx + cons.gridwidth);</span>
+<span class="fc" id="L510">                maxH = Math.max(maxH, cons.gridy + cons.gridheight);</span>
+            }
+<span class="fc" id="L512">        }</span>
+<span class="fc" id="L513">        return new Dimension(maxW, maxH);</span>
+    }
+
+    private int getComponentsNumber(Container parent) {
+<span class="fc" id="L517">        int componentsNumber = 0;</span>
+<span class="fc bfc" id="L518" title="All 2 branches covered.">        for (Map.Entry&lt;Component, GridBagConstraints&gt; entry : comptable.entrySet()) {</span>
+<span class="fc" id="L519">            Component comp = entry.getKey();</span>
+<span class="pc bpc" id="L520" title="2 of 4 branches missed.">            if ((comp.getParent() == parent) &amp;&amp; comp.isVisible()) {</span>
+<span class="fc" id="L521">                componentsNumber++;</span>
+            }
+<span class="fc" id="L523">        }</span>
+<span class="fc" id="L524">        return componentsNumber;</span>
+    }
+
+    private void resetCache(Container parent, ParentInfo info) {
+<span class="fc" id="L528">        int componentsNumber = getComponentsNumber(parent);</span>
+<span class="fc" id="L529">        info.components = new Component[componentsNumber];</span>
+<span class="fc" id="L530">        info.horCompSides = new ComponentSide[componentsNumber];</span>
+<span class="fc" id="L531">        info.vertCompSides = new ComponentSide[componentsNumber];</span>
+<span class="fc" id="L532">        updateParentInfo(parent);</span>
+<span class="fc" id="L533">    }</span>
+
+    private void updateParentInfo(Container parent, GridBagConstraints gbc) {
+<span class="fc bfc" id="L536" title="All 2 branches covered.">        if (parent == null) {</span>
+<span class="fc" id="L537">            return;</span>
+        }
+<span class="fc" id="L539">        ParentInfo info = getParentInfo(parent);</span>
+<span class="pc bpc" id="L540" title="1 of 2 branches missed.">        if (!info.consTable.containsKey(gbc)) {</span>
+<span class="fc" id="L541">            MixedConstraints mixCons = new MixedConstraints(gbc);</span>
+<span class="fc" id="L542">            info.consTable.put(gbc, mixCons);</span>
+<span class="fc" id="L543">            info.allConstraints.add(mixCons);</span>
+        }
+<span class="fc" id="L545">    }</span>
+
+    private void updateParentInfo(Container parent) {
+<span class="fc" id="L548">        int count = parent.getComponentCount();</span>
+<span class="fc bfc" id="L549" title="All 2 branches covered.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="fc" id="L550">            Component element = parent.getComponentAt(iter);</span>
+<span class="fc" id="L551">            GridBagConstraints gbc = comptable.get(element);</span>
+<span class="fc" id="L552">            updateParentInfo(parent, gbc);</span>
+        }
+<span class="fc" id="L554">    }</span>
+
+    private class RelativeTranslator {
+        private final int[] curX; // up-to-down
+        private int curY; //Left-to-right (or vice versa)
+        private int maxW; //Common for relative
+
+        private int maxH; // and absolute components
+
+        private boolean relWComp;
+
+        private boolean relHComp;
+
+        private int relEndY;
+
+        private int relEndX;
+
+<span class="fc" id="L571">        public RelativeTranslator(int maxW, int maxH) {</span>
+<span class="fc" id="L572">            this.maxW = maxW;</span>
+<span class="fc" id="L573">            this.maxH = maxH;</span>
+<span class="fc" id="L574">            curY = 0;</span>
+<span class="fc" id="L575">            curX = new int[MAXGRIDSIZE]; //All = 0, hope so</span>
+<span class="fc" id="L576">            relWComp = false;</span>
+<span class="fc" id="L577">            relHComp = false;</span>
+<span class="fc" id="L578">            relEndY = 0;</span>
+<span class="fc" id="L579">            relEndX = 0;</span>
+<span class="fc" id="L580">        }</span>
+
+        public void translate(ParentInfo info) {
+<span class="fc" id="L583">            spreadComponents(info.allConstraints);</span>
+<span class="fc" id="L584">            recalculateRemainders(info.allConstraints);</span>
+<span class="fc" id="L585">            applyOrientation(info);</span>
+<span class="fc" id="L586">        }</span>
+
+        private void spreadComponents(ArrayList&lt;MixedConstraints&gt; allConstraints) {
+<span class="fc bfc" id="L589" title="All 2 branches covered.">            for (int i = 0; i &lt; allConstraints.size(); i++) {</span>
+<span class="fc" id="L590">                MixedConstraints mixCons = allConstraints.get(i);</span>
+                // awt.8D=
+                //assert !((relWComp &amp;&amp; (mixCons.initial.getWidth() != GridBagConstraints.REMAINDER)) || (relHComp &amp;&amp; (mixCons.initial.getSize().getHeight() != GridBagConstraints.REMAINDER))) : &quot;REMINDER component expected after RELATIVE one&quot;; //$NON-NLS-1$
+<span class="pc bpc" id="L593" title="1 of 2 branches missed.">                if (curY == MAXGRIDSIZE) {</span>
+                    // awt.8E=
+<span class="nc" id="L595">                    throw new RuntimeException(&quot;component is out of grid's range&quot;); //$NON-NLS-1$</span>
+                }
+<span class="fc" id="L597">                translateHor(mixCons, translateVert(mixCons, i, allConstraints));</span>
+            }
+            // awt.8D=
+            //assert !(relWComp || relHComp) : &quot;REMINDER component expected after RELATIVE one&quot;; //$NON-NLS-1$
+<span class="fc" id="L601">        }</span>
+
+        private void applyOrientation(ParentInfo info) {
+<span class="pc bpc" id="L604" title="1 of 2 branches missed.">            if (info.orientation) {</span>
+<span class="nc bnc" id="L605" title="All 2 branches missed.">                for (int i = 0; i &lt; info.allConstraints.size(); i++) {</span>
+<span class="nc" id="L606">                    MixedConstraints mixCons = info.allConstraints.get(i);</span>
+<span class="nc bnc" id="L607" title="All 2 branches missed.">                    if (mixCons.relative) {</span>
+<span class="nc" id="L608">                        mixCons.mapped.setX(maxW - mixCons.mapped.getX() - mixCons.mapped.getWidth());</span>
+                    }
+                }
+            }
+<span class="fc" id="L612">        }</span>
+
+        private int translateVert(MixedConstraints mixCons, int i,
+                                  ArrayList&lt;MixedConstraints&gt; allConstraints) {
+            int endY;
+<span class="pc bpc" id="L617" title="1 of 2 branches missed.">            if (mixCons.initial.getY() != GridBagConstraints.RELATIVE) {</span>
+<span class="fc" id="L618">                curY = mixCons.initial.getY();</span>
+            }
+<span class="fc" id="L620">            mixCons.mapped.setY(curY);</span>
+<span class="fc" id="L621">            mixCons.mapped.setHeight(Math.max(mixCons.initial.getHeight(), 1));</span>
+<span class="pc bpc" id="L622" title="1 of 2 branches missed.">            if (mixCons.initial.getHeight() == GridBagConstraints.REMAINDER) {</span>
+<span class="nc bnc" id="L623" title="All 2 branches missed.">                if (relHComp) {</span>
+<span class="nc" id="L624">                    mixCons.mapped.setY(allConstraints.get(i - 1).mapped.getY() + 1);</span>
+<span class="nc" id="L625">                    relHComp = false;</span>
+                }
+<span class="nc" id="L627">                endY = MAXGRIDSIZE;</span>
+<span class="pc bpc" id="L628" title="1 of 2 branches missed.">            } else if (mixCons.initial.getHeight() == GridBagConstraints.RELATIVE) {</span>
+<span class="nc" id="L629">                relHComp = true;</span>
+<span class="nc bnc" id="L630" title="All 2 branches missed.">                if (mixCons.initial.getWidth() != GridBagConstraints.REMAINDER) {</span>
+<span class="nc" id="L631">                    relEndX = curX[curY] + mixCons.initial.getWidth();</span>
+                } else {
+<span class="nc" id="L633">                    relEndX = MAXGRIDSIZE;</span>
+                }
+<span class="nc" id="L635">                endY = mixCons.mapped.getY() + 1;</span>
+            } else {
+<span class="fc" id="L637">                endY = mixCons.mapped.getY() + mixCons.mapped.getHeight();</span>
+            }
+<span class="pc bpc" id="L639" title="1 of 2 branches missed.">            if (endY &gt; MAXGRIDSIZE) {</span>
+                // awt.8E=
+<span class="nc" id="L641">                throw new RuntimeException(&quot;component is out of grid's range&quot;); //$NON-NLS-1$</span>
+            }
+<span class="fc" id="L643">            maxH = Math.max(maxH, mixCons.mapped.getY() + mixCons.mapped.getHeight());</span>
+<span class="fc" id="L644">            return endY;</span>
+        }
+
+        private void translateHor(MixedConstraints mixCons, int endY) {
+<span class="fc" id="L648">            int trueCurY = curY;</span>
+<span class="pc bpc" id="L649" title="1 of 2 branches missed.">            if (mixCons.initial.getX() != GridBagConstraints.RELATIVE) {</span>
+<span class="nc" id="L650">                for (; ; trueCurY++) {</span>
+<span class="pc bpc" id="L651" title="1 of 2 branches missed.">                    if (trueCurY == MAXGRIDSIZE) {</span>
+                        // awt.8E=
+<span class="nc" id="L653">                        throw new RuntimeException(&quot;component is out of grid's range&quot;); //$NON-NLS-1$</span>
+                    }
+<span class="pc bpc" id="L655" title="1 of 2 branches missed.">                    if (curX[trueCurY] &lt;= mixCons.initial.getX()) {</span>
+<span class="fc" id="L656">                        break;</span>
+                    }
+                }
+<span class="fc" id="L659">                mixCons.mapped.setY(trueCurY);</span>
+<span class="fc" id="L660">                mixCons.mapped.setX(mixCons.initial.getX());</span>
+<span class="fc" id="L661">                endY += trueCurY - curY;</span>
+            } else {
+<span class="nc" id="L663">                mixCons.mapped.setX(curX[trueCurY]);</span>
+            }
+<span class="fc" id="L665">            mixCons.mapped.setWidth(Math.max(mixCons.initial.getWidth(), 1));</span>
+<span class="pc bpc" id="L666" title="1 of 2 branches missed.">            if (mixCons.initial.getWidth() == GridBagConstraints.REMAINDER) {</span>
+<span class="nc bnc" id="L667" title="All 2 branches missed.">                if (relWComp) {</span>
+<span class="nc" id="L668">                    endY = Math.max(endY, relEndY);</span>
+<span class="nc" id="L669">                    relWComp = false;</span>
+<span class="nc" id="L670">                    relEndY = 0;</span>
+                }
+<span class="nc" id="L672">                curY = endY;</span>
+<span class="pc bpc" id="L673" title="1 of 2 branches missed.">            } else if (mixCons.initial.getWidth() == GridBagConstraints.RELATIVE) {</span>
+<span class="nc" id="L674">                relWComp = true;</span>
+<span class="nc" id="L675">                relEndY = endY;</span>
+<span class="nc" id="L676">                curX[curY]++;</span>
+            } else {
+<span class="pc bpc" id="L678" title="1 of 2 branches missed.">                if (!relHComp) {</span>
+<span class="fc" id="L679">                    int endX = Math.max(curX[trueCurY] + mixCons.mapped.getWidth(), relEndX);</span>
+<span class="fc bfc" id="L680" title="All 2 branches covered.">                    for (int j = trueCurY; j &lt; endY; j++) {</span>
+<span class="fc" id="L681">                        curX[j] = endX;</span>
+                    }
+<span class="fc" id="L683">                    relEndX = 0;</span>
+                }
+            }
+<span class="pc bpc" id="L686" title="1 of 2 branches missed.">            if ((mixCons.mapped.getX() + mixCons.mapped.getWidth()) &gt; MAXGRIDSIZE) {</span>
+                // awt.8E=
+<span class="nc" id="L688">                throw new RuntimeException(&quot;component is out of grid's range&quot;); //$NON-NLS-1$</span>
+            }
+<span class="fc" id="L690">            maxW = Math.max(maxW, mixCons.mapped.getX() + mixCons.mapped.getWidth());</span>
+            //            if (curYBackup &gt;= 0) { //FIX
+            //                curY = curYBackup;
+            //                curYBackup = -1;
+            //            }
+<span class="fc" id="L695">        }</span>
+
+        private void recalculateRemainders(ArrayList&lt;MixedConstraints&gt; allConstraints) {
+<span class="fc bfc" id="L698" title="All 2 branches covered.">            for (int i = 0; i &lt; allConstraints.size(); i++) {</span>
+<span class="fc" id="L699">                MixedConstraints mixCons = allConstraints.get(i);</span>
+<span class="pc bpc" id="L700" title="1 of 2 branches missed.">                if (mixCons.initial.getWidth() == GridBagConstraints.REMAINDER) {</span>
+<span class="nc" id="L701">                    mixCons.mapped.setWidth(maxW - mixCons.mapped.getX());</span>
+<span class="pc bpc" id="L702" title="1 of 2 branches missed.">                } else if (mixCons.initial.getWidth() == GridBagConstraints.RELATIVE) {</span>
+<span class="nc" id="L703">                    int reserve = maxW - mixCons.mapped.getX() - 2;</span>
+<span class="nc bnc" id="L704" title="All 2 branches missed.">                    if (reserve &gt; 0) {</span>
+<span class="nc" id="L705">                        mixCons.mapped.setWidth(mixCons.mapped.getWidth() + reserve);</span>
+<span class="nc bnc" id="L706" title="All 2 branches missed.">                        if ((i + 1) &lt; allConstraints.size()) {</span>
+<span class="nc" id="L707">                            Rectangle r = allConstraints.get(i + 1).mapped;</span>
+<span class="nc" id="L708">                            r.setX(r.getX() + reserve);</span>
+                        }
+                    }
+                }
+<span class="pc bpc" id="L712" title="1 of 2 branches missed.">                if (mixCons.initial.getHeight() == GridBagConstraints.REMAINDER) {</span>
+<span class="nc" id="L713">                    mixCons.mapped.setHeight(maxH - mixCons.mapped.getY());</span>
+<span class="pc bpc" id="L714" title="1 of 2 branches missed.">                } else if (mixCons.initial.getHeight() == GridBagConstraints.RELATIVE) {</span>
+<span class="nc" id="L715">                    int reserve = maxH - mixCons.mapped.getX() - 2;</span>
+<span class="nc" id="L716">                    mixCons.mapped.setHeight(mixCons.mapped.getHeight() + reserve);</span>
+<span class="nc bnc" id="L717" title="All 2 branches missed.">                    if ((i + 1) &lt; allConstraints.size()) {</span>
+<span class="nc" id="L718">                        Rectangle r = allConstraints.get(i + 1).mapped;</span>
+<span class="nc" id="L719">                        r.setY(r.getY() + reserve);</span>
+                    }
+                }
+            }
+<span class="fc" id="L723">        }</span>
+    }
+
+<span class="fc" id="L726">    private class ComponentSide {</span>
+        public static final int POS_START = 1;
+
+        public static final int POS_CENTER = 2;
+
+        public static final int POS_END = 3;
+
+        public int gridStart;
+
+        public int gridLength;
+
+        public int start_inset;
+
+        public int end_inset;
+
+        public int position;
+
+        public int minLength;
+
+        public int prefLength;
+
+        public double weight;
+
+        public boolean stretch;
+    }
+
+<span class="fc" id="L752">    private class Grid {</span>
+<span class="fc" id="L753">        private final GridSide cols = new GridSide();</span>
+
+<span class="fc" id="L755">        private final GridSide rows = new GridSide();</span>
+
+        public void validate(ParentInfo info) {
+<span class="fc" id="L758">            cols.validate(info.horCompSides, columnWidths, columnWeights);</span>
+<span class="fc" id="L759">            rows.validate(info.vertCompSides, rowHeights, rowWeights);</span>
+<span class="fc" id="L760">        }</span>
+
+        public Dimension minimumSize() {
+<span class="nc" id="L763">            return new Dimension(cols.getMinLength(), rows.getMinLength());</span>
+        }
+
+        public Dimension preferredSize() {
+<span class="fc" id="L767">            return new Dimension(cols.getPrefLength(), rows.getPrefLength());</span>
+        }
+
+        public Rectangle componentDisplayArea(ComponentSide horSide, ComponentSide vertSide) {
+<span class="fc" id="L771">            Segment hor = cols.componentDisplaySide(horSide.gridStart, horSide.gridLength);</span>
+<span class="fc" id="L772">            Segment vert = rows.componentDisplaySide(vertSide.gridStart, vertSide.gridLength);</span>
+<span class="fc" id="L773">            return new Rectangle(hor.start, vert.start, hor.length, vert.length);</span>
+        }
+
+        public void fit2Client(Rectangle clientRect) {
+<span class="fc" id="L777">            Segment horSeg = new Segment(clientRect.getX(), clientRect.getWidth());</span>
+<span class="fc" id="L778">            cols.fit2Client(horSeg);</span>
+<span class="fc" id="L779">            clientRect.setX(horSeg.start);</span>
+<span class="fc" id="L780">            clientRect.setWidth(horSeg.length);</span>
+<span class="fc" id="L781">            Segment vertSeg = new Segment(clientRect.getY(), clientRect.getHeight());</span>
+<span class="fc" id="L782">            rows.fit2Client(vertSeg);</span>
+<span class="fc" id="L783">            clientRect.setY(vertSeg.start);</span>
+<span class="fc" id="L784">            clientRect.setHeight(vertSeg.length);</span>
+<span class="fc" id="L785">        }</span>
+
+        public int[] getWidths() {
+<span class="nc" id="L788">            return cols.getLengths();</span>
+        }
+
+        public int[] getHeights() {
+<span class="nc" id="L792">            return rows.getLengths();</span>
+        }
+
+        public int[] lookupWidths() {
+<span class="fc" id="L796">            return cols.lookupLengths();</span>
+        }
+
+        public int[] lookupHeights() {
+<span class="fc" id="L800">            return rows.lookupLengths();</span>
+        }
+
+        public int[] lookupMinWidths() {
+<span class="nc" id="L804">            return cols.lookupMinLengths();</span>
+        }
+
+        public int[] lookupMinHeights() {
+<span class="nc" id="L808">            return rows.lookupMinLengths();</span>
+        }
+
+        public int[] lookupPrefWidths() {
+<span class="nc" id="L812">            return cols.lookupPrefLengths();</span>
+        }
+
+        public int[] lookupPrefHeights() {
+<span class="nc" id="L816">            return rows.lookupPrefLengths();</span>
+        }
+
+        public double[][] getWeights() {
+<span class="nc" id="L820">            return new double[][]{cols.getWeights(), rows.getWeights()};</span>
+        }
+
+        /*public Point getOrigin() {
+            return new Point(cols.getOrigin(), rows.getOrigin());
+        }
+
+        public Point location(int x, int y, boolean l2r) {
+            int col = cols.location(x);
+            int row = Math.max(Math.min(rows.location(y), MAXGRIDSIZE - 1), 0);
+            if (col == MAXGRIDSIZE) {
+                col = l2r ? MAXGRIDSIZE - 1 : 0;
+            } else if (col == -1) {
+                col = l2r ? 0 : MAXGRIDSIZE - 1;
+            }
+            return new Point(col, row);
+        }*/
+
+<span class="fc" id="L838">        private class GridSide {</span>
+<span class="fc" id="L839">            private final int[] coordinates = new int[MAXGRIDSIZE];</span>
+
+<span class="fc" id="L841">            private final int[] lengths = new int[MAXGRIDSIZE];</span>
+
+            /*Cashed data. Validation controlled by parent class*/
+<span class="fc" id="L844">            private final int[] minLengths = new int[MAXGRIDSIZE];</span>
+<span class="fc" id="L845">            private final int[] prefLengths = new int[MAXGRIDSIZE];</span>
+<span class="fc" id="L846">            private final double[] weights = new double[MAXGRIDSIZE];</span>
+<span class="fc" id="L847">            private int minLength = 0;</span>
+<span class="fc" id="L848">            private int prefLength = 0;</span>
+<span class="fc" id="L849">            private double weight = 0.;</span>
+
+<span class="fc" id="L851">            private int weightlessPrefLength = 0;</span>
+
+<span class="fc" id="L853">            private int weightlessMinLength = 0;</span>
+
+<span class="fc" id="L855">            private int weightyPartsNum = 0;</span>
+
+            public void validate(ComponentSide[] compSides, int[] lengthsOverride,
+                                 double[] weightsOverride) {
+<span class="fc" id="L859">                resetCache();</span>
+<span class="fc" id="L860">                spreadComponents(compSides);</span>
+<span class="fc" id="L861">                applyOverrides(lengthsOverride, weightsOverride);</span>
+<span class="fc" id="L862">                calculateIntegrals();</span>
+<span class="fc" id="L863">            }</span>
+
+            public int getMinLength() {
+<span class="nc" id="L866">                return minLength;</span>
+            }
+
+            public int getPrefLength() {
+<span class="fc" id="L870">                return prefLength;</span>
+            }
+
+            public Segment componentDisplaySide(int startPart, int partsNum) {
+<span class="fc" id="L874">                int l = 0;</span>
+<span class="fc bfc" id="L875" title="All 2 branches covered.">                for (int part = startPart; part &lt; (startPart + partsNum); part++) {</span>
+<span class="fc" id="L876">                    l += lengths[part];</span>
+                }
+<span class="fc" id="L878">                return new Segment(coordinates[startPart], l);</span>
+            }
+
+            public void fit2Client(Segment clientSide) {
+<span class="fc" id="L882">                int start = clientSide.start;</span>
+<span class="pc bpc" id="L883" title="1 of 2 branches missed.">                if (clientSide.length &gt; weightlessPrefLength) {</span>
+<span class="fc bfc" id="L884" title="All 2 branches covered.">                    if (weight &gt; 0.) {</span>
+<span class="pc bpc" id="L885" title="1 of 2 branches missed.">                        if (clientSide.length &gt;= prefLength) {</span>
+<span class="fc" id="L886">                            divideExtraWeightyLength(clientSide);</span>
+                        } else {
+                            //divideExtraLength(clientSide);
+<span class="nc" id="L889">                            divideInsufWeightyLength(clientSide);</span>
+                        }
+                    } else {
+<span class="fc" id="L892">                        start = centerSide(clientSide);</span>
+                    }
+<span class="nc bnc" id="L894" title="All 2 branches missed.">                } else if (weightlessMinLength &gt; clientSide.length) {</span>
+<span class="nc" id="L895">                    divideInsufficientLength(clientSide);</span>
+                } else {
+                    //                    divideSufficientLength(clientSide);
+<span class="nc" id="L898">                    divideInsufWeightyLength(clientSide);</span>
+                }
+<span class="fc" id="L900">                calculateCoordinates(start);</span>
+<span class="fc" id="L901">            }</span>
+
+            public int[] getLengths() {
+<span class="nc" id="L904">                int[] res = new int[MAXGRIDSIZE];</span>
+<span class="nc" id="L905">                System.arraycopy(lengths, 0, res, 0, MAXGRIDSIZE);</span>
+<span class="nc" id="L906">                return res;</span>
+            }
+
+            public int[] lookupLengths() {
+<span class="fc" id="L910">                return lengths;</span>
+            }
+
+            public int[] lookupMinLengths() {
+<span class="nc" id="L914">                return minLengths;</span>
+            }
+
+            public int[] lookupPrefLengths() {
+<span class="nc" id="L918">                return prefLengths;</span>
+            }
+
+            public double[] getWeights() {
+<span class="nc" id="L922">                double[] res = new double[MAXGRIDSIZE];</span>
+<span class="nc" id="L923">                System.arraycopy(weights, 0, res, 0, MAXGRIDSIZE);</span>
+<span class="nc" id="L924">                return res;</span>
+            }
+
+            public int getOrigin() {
+<span class="nc" id="L928">                return coordinates[0];</span>
+            }
+
+            public int location(int p) {
+<span class="nc bnc" id="L932" title="All 2 branches missed.">                if (p &lt; coordinates[0]) {</span>
+<span class="nc" id="L933">                    return -1;</span>
+<span class="nc bnc" id="L934" title="All 2 branches missed.">                } else if (p &gt;= (coordinates[MAXGRIDSIZE - 1] + lengths[MAXGRIDSIZE - 1])) {</span>
+<span class="nc" id="L935">                    return MAXGRIDSIZE;</span>
+                }
+<span class="nc" id="L937">                int i = 0;</span>
+<span class="nc bnc" id="L938" title="All 4 branches missed.">                while (!((coordinates[i] &lt;= p) &amp;&amp; ((coordinates[i] + lengths[i]) &gt; p))) {</span>
+<span class="nc" id="L939">                    i++;</span>
+                }
+<span class="nc" id="L941">                return i;</span>
+            }
+
+            private void calculateIntegrals() {
+<span class="fc bfc" id="L945" title="All 2 branches covered.">                for (int i = 0; i &lt; MAXGRIDSIZE; i++) {</span>
+<span class="fc" id="L946">                    prefLength += prefLengths[i];</span>
+<span class="fc" id="L947">                    minLength += minLengths[i];</span>
+<span class="fc" id="L948">                    weight += weights[i];</span>
+<span class="fc bfc" id="L949" title="All 2 branches covered.">                    if (weights[i] == 0.) {</span>
+<span class="fc" id="L950">                        weightlessPrefLength += prefLengths[i];</span>
+<span class="fc" id="L951">                        weightlessMinLength += minLengths[i];</span>
+<span class="fc" id="L952">                        weightyPartsNum++;</span>
+                    }
+                }
+<span class="fc" id="L955">            }</span>
+
+            private void applyOverrides(int[] lengthsOverride, double[] weightsOverride) {
+<span class="pc bpc" id="L958" title="1 of 2 branches missed.">                if (weightsOverride != null) {</span>
+<span class="nc bnc" id="L959" title="All 2 branches missed.">                    if (weightsOverride.length &gt; MAXGRIDSIZE) {</span>
+                        // awt.8F=Weights' overrides array is too long
+<span class="nc" id="L961">                        throw new RuntimeException(&quot;Weights' overrides array is too long&quot;); //$NON-NLS-1$</span>
+                    }
+<span class="nc bnc" id="L963" title="All 2 branches missed.">                    for (int i = 0; i &lt; weightsOverride.length; i++) {</span>
+<span class="nc" id="L964">                        weights[i] = Math.max(weights[i], weightsOverride[i]);</span>
+                    }
+                }
+<span class="pc bpc" id="L967" title="1 of 2 branches missed.">                if (lengthsOverride != null) {</span>
+<span class="nc bnc" id="L968" title="All 2 branches missed.">                    if (lengthsOverride.length &gt; MAXGRIDSIZE) {</span>
+                        // awt.90=
+<span class="nc" id="L970">                        throw new RuntimeException(&quot;Lengths' overrides array is too long&quot;); //$NON-NLS-1$</span>
+                    }
+<span class="nc bnc" id="L972" title="All 2 branches missed.">                    for (int i = 0; i &lt; lengthsOverride.length; i++) {</span>
+<span class="nc" id="L973">                        minLengths[i] = lengthsOverride[i];</span>
+<span class="nc" id="L974">                        prefLengths[i] = Math.max(prefLengths[i], lengthsOverride[i]);</span>
+                    }
+                }
+<span class="fc" id="L977">            }</span>
+
+            private void spreadComponents(ComponentSide[] compSides) {
+<span class="fc bfc" id="L980" title="All 2 branches covered.">                for (ComponentSide element : compSides) {</span>
+<span class="pc bpc" id="L981" title="1 of 2 branches missed.">                    if (element.gridLength == 1) {</span>
+<span class="fc" id="L982">                        int insets = element.start_inset + element.end_inset;</span>
+<span class="fc" id="L983">                        spreadUnicellularComponent(element.gridStart, element.minLength</span>
+                                + insets, element.prefLength + insets, element.weight);
+                    }
+                }
+<span class="fc bfc" id="L987" title="All 2 branches covered.">                for (ComponentSide element : compSides) {</span>
+<span class="pc bpc" id="L988" title="1 of 2 branches missed.">                    if (element.gridLength &gt; 1) {</span>
+<span class="nc" id="L989">                        int insets = element.start_inset + element.end_inset;</span>
+<span class="nc" id="L990">                        spreadMulticellularComponent(element.gridStart, element.gridLength,</span>
+                                element.minLength + insets, element.prefLength + insets,
+                                element.weight);
+                    }
+                }
+<span class="fc" id="L995">            }</span>
+
+            private void spreadUnicellularComponent(int part, int minCompLength,
+                                                    int prefCompLength, double compWeight) {
+<span class="fc" id="L999">                minLengths[part] = Math.max(minLengths[part], minCompLength);</span>
+<span class="fc" id="L1000">                prefLengths[part] = Math.max(prefLengths[part], prefCompLength);</span>
+<span class="fc" id="L1001">                weights[part] = Math.max(weights[part], compWeight);</span>
+<span class="fc" id="L1002">            }</span>
+
+            private void spreadMulticellularComponent(int startPart, int partsNum,
+                                                      int minCompLength, int prefCompLength, double compWeight) {
+<span class="nc" id="L1006">                double sumWeight = spreadComponentWeight(weights, startPart, partsNum,</span>
+                        compWeight);
+<span class="nc" id="L1008">                spreadComponentLength(minLengths, startPart, partsNum, minCompLength, sumWeight);</span>
+<span class="nc" id="L1009">                spreadComponentLength(prefLengths, startPart, partsNum, prefCompLength,</span>
+                        sumWeight);
+<span class="nc" id="L1011">            }</span>
+
+            private void resetCache() {
+<span class="fc" id="L1014">                Arrays.fill(minLengths, 0);</span>
+<span class="fc" id="L1015">                minLength = 0;</span>
+<span class="fc" id="L1016">                Arrays.fill(prefLengths, 0);</span>
+<span class="fc" id="L1017">                prefLength = 0;</span>
+<span class="fc" id="L1018">                Arrays.fill(weights, 0.);</span>
+<span class="fc" id="L1019">                weight = 0.;</span>
+<span class="fc" id="L1020">                weightlessPrefLength = 0;</span>
+<span class="fc" id="L1021">                weightlessMinLength = 0;</span>
+<span class="fc" id="L1022">                weightyPartsNum = 0;</span>
+<span class="fc" id="L1023">            }</span>
+
+            private void spreadComponentLength(int[] arr, int startPart, int partsNum,
+                                               int compLength, double sumWeight) {
+<span class="nc" id="L1027">                int rest = compLength;</span>
+<span class="nc" id="L1028">                int lastPart = startPart + partsNum - 1;</span>
+<span class="nc bnc" id="L1029" title="All 2 branches missed.">                for (int part = startPart; part &lt; lastPart; part++) {</span>
+<span class="nc" id="L1030">                    rest -= arr[part];</span>
+                }
+<span class="nc bnc" id="L1032" title="All 2 branches missed.">                if (sumWeight != 0.0) {</span>
+<span class="nc" id="L1033">                    rest -= arr[lastPart];</span>
+                    // divide extra length using weights
+<span class="nc" id="L1035">                    int sharedExtraL = 0;</span>
+<span class="nc" id="L1036">                    double accumWeight = 0.0;</span>
+<span class="nc bnc" id="L1037" title="All 2 branches missed.">                    for (int part = startPart; part &lt;= lastPart; part++) {</span>
+<span class="nc" id="L1038">                        accumWeight += weights[part];</span>
+<span class="nc" id="L1039">                        int curExtraL = (int) (rest * (accumWeight / sumWeight)) - sharedExtraL;</span>
+<span class="nc" id="L1040">                        arr[part] = Math.max(arr[part], arr[part] + curExtraL);</span>
+<span class="nc" id="L1041">                        sharedExtraL += curExtraL;</span>
+                    }
+<span class="nc" id="L1043">                } else {</span>
+                    // just put all extra
+                    // length into the last part
+<span class="nc" id="L1046">                    arr[lastPart] = Math.max(arr[lastPart], rest);</span>
+                }
+<span class="nc" id="L1048">            }</span>
+
+            private double spreadComponentWeight(double[] arr, int startPart, int partsNum,
+                                                 double compWeight) {
+<span class="nc" id="L1052">                int lastPart = startPart + partsNum - 1;</span>
+<span class="nc" id="L1053">                double sumWeight = .0;</span>
+<span class="nc bnc" id="L1054" title="All 2 branches missed.">                for (int part = startPart; part &lt;= lastPart; part++) {</span>
+<span class="nc" id="L1055">                    sumWeight += arr[part];</span>
+                }
+<span class="nc bnc" id="L1057" title="All 4 branches missed.">                if ((compWeight &gt; sumWeight) &amp;&amp; (sumWeight &gt; 0)) {</span>
+<span class="nc bnc" id="L1058" title="All 2 branches missed.">                    for (int part = startPart; part &lt; (startPart + partsNum); part++) {</span>
+<span class="nc" id="L1059">                        arr[part] = compWeight * arr[part] / sumWeight;</span>
+                    }
+<span class="nc bnc" id="L1061" title="All 2 branches missed.">                } else if (sumWeight == 0) {</span>
+<span class="nc" id="L1062">                    arr[lastPart] = compWeight;</span>
+                }
+<span class="nc" id="L1064">                return sumWeight;</span>
+            }
+
+            private void divideExtraWeightyLength(Segment clientSide) {
+<span class="fc" id="L1068">                int extraL = clientSide.length - prefLength;</span>
+<span class="fc" id="L1069">                int sharedExtraL = 0;</span>
+<span class="fc" id="L1070">                double accumWeight = 0.;</span>
+<span class="fc bfc" id="L1071" title="All 2 branches covered.">                for (int i = 0; i &lt; MAXGRIDSIZE; i++) {</span>
+<span class="fc bfc" id="L1072" title="All 2 branches covered.">                    if (weights[i] &gt; 0.) {</span>
+<span class="fc" id="L1073">                        accumWeight += weights[i];</span>
+<span class="fc" id="L1074">                        int curExtraL = (int) (extraL * (accumWeight / weight)) - sharedExtraL;</span>
+<span class="fc" id="L1075">                        lengths[i] = prefLengths[i] + curExtraL;</span>
+<span class="fc" id="L1076">                        sharedExtraL += curExtraL;</span>
+<span class="fc" id="L1077">                    } else {</span>
+<span class="fc" id="L1078">                        lengths[i] = prefLengths[i];</span>
+                    }
+                }
+<span class="fc" id="L1081">            }</span>
+
+            private void divideInsufWeightyLength(Segment clientSide) {
+<span class="nc" id="L1084">                int extraL = clientSide.length - minLength;</span>
+<span class="nc" id="L1085">                int sharedExtraL = 0;</span>
+<span class="nc" id="L1086">                double accumWeight = 0.;</span>
+<span class="nc bnc" id="L1087" title="All 2 branches missed.">                for (int i = 0; i &lt; MAXGRIDSIZE; i++) {</span>
+<span class="nc bnc" id="L1088" title="All 2 branches missed.">                    if (weights[i] &gt; 0.) {</span>
+<span class="nc" id="L1089">                        accumWeight += weights[i];</span>
+<span class="nc" id="L1090">                        int curExtraL = (int) (extraL * (accumWeight / weight)) - sharedExtraL;</span>
+<span class="nc" id="L1091">                        lengths[i] = minLengths[i] + curExtraL;</span>
+<span class="nc" id="L1092">                        sharedExtraL += curExtraL;</span>
+<span class="nc" id="L1093">                    } else {</span>
+<span class="nc" id="L1094">                        lengths[i] = minLengths[i];</span>
+                    }
+                }
+<span class="nc" id="L1097">            }</span>
+
+            private int centerSide(Segment clientSide) {
+<span class="fc" id="L1100">                System.arraycopy(prefLengths, 0, lengths, 0, MAXGRIDSIZE);</span>
+<span class="fc" id="L1101">                return (clientSide.start + (clientSide.length - prefLength) / 2);</span>
+            }
+
+            private void divideInsufficientLength(Segment clientSide) {
+<span class="nc" id="L1105">                int sharedL = (weightlessMinLength - clientSide.length) / 2;</span>
+<span class="nc bnc" id="L1106" title="All 2 branches missed.">                if (sharedL &lt; 0) {</span>
+<span class="nc" id="L1107">                    sharedL = 0;</span>
+                }
+<span class="nc bnc" id="L1109" title="All 2 branches missed.">                for (int i = 0; i &lt; MAXGRIDSIZE; i++) {</span>
+<span class="nc bnc" id="L1110" title="All 2 branches missed.">                    if (weights[i] &gt; 0.) {</span>
+<span class="nc" id="L1111">                        lengths[i] = 0;</span>
+                    } else {
+<span class="nc" id="L1113">                        int minL = minLengths[i];</span>
+<span class="nc bnc" id="L1114" title="All 2 branches missed.">                        if (sharedL &gt;= minL) {</span>
+<span class="nc" id="L1115">                            sharedL -= minL;</span>
+<span class="nc" id="L1116">                            lengths[i] = 0;</span>
+                        } else {
+<span class="nc" id="L1118">                            lengths[i] = minL - sharedL;</span>
+<span class="nc" id="L1119">                            sharedL = 0;</span>
+                        }
+                    }
+                }
+<span class="nc" id="L1123">            }</span>
+
+            private void calculateCoordinates(int start) {
+<span class="fc" id="L1126">                coordinates[0] = start;</span>
+<span class="fc bfc" id="L1127" title="All 2 branches covered.">                for (int i = 1; i &lt; MAXGRIDSIZE; i++) {</span>
+<span class="fc" id="L1128">                    coordinates[i] = coordinates[i - 1] + lengths[i - 1];</span>
+                }
+<span class="fc" id="L1130">            }</span>
+        }
+    }
+
+    private class Segment {
+        public int start;
+
+        public int length;
+
+<span class="fc" id="L1139">        Segment(int start, int length) {</span>
+<span class="fc" id="L1140">            this.start = start;</span>
+<span class="fc" id="L1141">            this.length = length;</span>
+<span class="fc" id="L1142">        }</span>
+    }
+
+    private class MixedConstraints {
+        public Rectangle initial; //Relative/Absolute
+
+        public Rectangle mapped; //Absolute
+
+        public boolean relative;
+
+<span class="fc" id="L1152">        MixedConstraints(GridBagConstraints cons) {</span>
+<span class="fc" id="L1153">            initial = new Rectangle(cons.gridx, cons.gridy, cons.gridwidth, cons.gridheight);</span>
+<span class="fc" id="L1154">            mapped = new Rectangle();</span>
+<span class="pc bpc" id="L1155" title="2 of 4 branches missed.">            relative = (cons.gridx == GridBagConstraints.RELATIVE)</span>
+                    || (cons.gridy == GridBagConstraints.RELATIVE);
+<span class="fc" id="L1157">        }</span>
+    }
+
+    private class ParentInfo {
+        final HashMap&lt;GridBagConstraints, MixedConstraints&gt; consTable; // Components' constraints to relative constraints
+
+        final ArrayList&lt;MixedConstraints&gt; allConstraints; // Only mapped rectangle is a part of cache
+
+        final Grid grid;
+
+        boolean valid;
+
+        ComponentSide[] horCompSides;
+
+        ComponentSide[] vertCompSides;
+
+        Component[] components; // Hashtable is too slow
+
+
+        // true for RTL
+        boolean orientation;
+
+<span class="fc" id="L1179">        ParentInfo() {</span>
+<span class="fc" id="L1180">            valid = false;</span>
+<span class="fc" id="L1181">            consTable = new HashMap&lt;GridBagConstraints, MixedConstraints&gt;();</span>
+<span class="fc" id="L1182">            allConstraints = new ArrayList&lt;MixedConstraints&gt;();</span>
+<span class="fc" id="L1183">            grid = new Grid();</span>
+<span class="fc" id="L1184">            horCompSides = vertCompSides = null;</span>
+<span class="fc" id="L1185">            components = null;</span>
+<span class="fc" id="L1186">        }</span>
+    }
+}
+
+class GridBagLayoutInfo {
+
+    int[] widths;
+    int[] heights;
+
+<span class="fc" id="L1195">    GridBagLayoutInfo(int[] widths, int[] heights) {</span>
+<span class="fc" id="L1196">        this.widths = widths;</span>
+<span class="fc" id="L1197">        this.heights = heights;</span>
+<span class="fc" id="L1198">    }</span>
+
+    void update(int[] widths, int[] heights) {
+<span class="nc" id="L1201">        this.widths = widths;</span>
+<span class="nc" id="L1202">        this.heights = heights;</span>
+<span class="nc" id="L1203">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

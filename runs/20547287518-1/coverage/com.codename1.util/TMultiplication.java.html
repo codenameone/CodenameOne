@@ -1,0 +1,513 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TMultiplication.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">TMultiplication.java</span></div><h1>TMultiplication.java</h1><pre class="source lang-java linenums">/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the &quot;License&quot;); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package com.codename1.util;
+
+/**
+ * Static library that provides all multiplication of {@link TBigInteger} methods.
+ */
+class TMultiplication {
+
+    /**
+     * Break point in digits (number of {@code int} elements)
+     * between Karatsuba and Pencil and Paper multiply.
+     */
+    static final int whenUseKaratsuba = 63; // an heuristic value
+    /**
+     * An array with powers of ten that fit in the type {@code int}.
+     * ({@code 10^0,10^1,...,10^9})
+     */
+<span class="fc" id="L34">    static final int[] tenPows = {</span>
+            1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000
+    };
+    /**
+     * An array with powers of five that fit in the type {@code int}.
+     * ({@code 5^0,5^1,...,5^13})
+     */
+<span class="fc" id="L41">    static final int[] fivePows = {</span>
+            1, 5, 25, 125, 625, 3125, 15625, 78125, 390625,
+            1953125, 9765625, 48828125, 244140625, 1220703125
+    };
+    /**
+     * An array with the first powers of ten in {@code BigInteger} version.
+     * ({@code 10^0,10^1,...,10^31})
+     */
+<span class="fc" id="L49">    static final TBigInteger[] bigTenPows = new TBigInteger[32];</span>
+    /**
+     * An array with the first powers of five in {@code BigInteger} version.
+     * ({@code 5^0,5^1,...,5^31})
+     */
+<span class="fc" id="L54">    static final TBigInteger[] bigFivePows = new TBigInteger[32];</span>
+
+    static {
+        int i;
+<span class="fc" id="L58">        long fivePow = 1L;</span>
+
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        for (i = 0; i &lt;= 18; i++) {</span>
+<span class="fc" id="L61">            bigFivePows[i] = TBigInteger.valueOf(fivePow);</span>
+<span class="fc" id="L62">            bigTenPows[i] = TBigInteger.valueOf(fivePow &lt;&lt; i);</span>
+<span class="fc" id="L63">            fivePow *= 5;</span>
+        }
+<span class="fc bfc" id="L65" title="All 2 branches covered.">        for (; i &lt; bigTenPows.length; i++) {</span>
+<span class="fc" id="L66">            bigFivePows[i] = bigFivePows[i - 1].multiply(bigFivePows[1]);</span>
+<span class="fc" id="L67">            bigTenPows[i] = bigTenPows[i - 1].multiply(TBigInteger.TEN);</span>
+        }
+<span class="fc" id="L69">    }</span>
+
+
+    /**
+     * Just to denote that this class can't be instantiated.
+     */
+    private TMultiplication() {
+    }
+
+    /**
+     * Performs a multiplication of two BigInteger and hides the algorithm used.
+     *
+     * @see TBigInteger#multiply(TBigInteger)
+     */
+    static TBigInteger multiply(TBigInteger x, TBigInteger y) {
+<span class="fc" id="L84">        return karatsuba(x, y);</span>
+    }
+
+    /**
+     * Performs the multiplication with the Karatsuba's algorithm.
+     * &lt;b&gt;Karatsuba's algorithm:&lt;/b&gt;
+     * &lt;tt&gt;
+     * u = u&lt;sub&gt;1&lt;/sub&gt; * B + u&lt;sub&gt;0&lt;/sub&gt;&lt;br&gt;
+     * v = v&lt;sub&gt;1&lt;/sub&gt; * B + v&lt;sub&gt;0&lt;/sub&gt;&lt;br&gt;
+     * &lt;p&gt;
+     * &lt;p&gt;
+     * u*v = (u&lt;sub&gt;1&lt;/sub&gt; * v&lt;sub&gt;1&lt;/sub&gt;) * B&lt;sub&gt;2&lt;/sub&gt; + ((u&lt;sub&gt;1&lt;/sub&gt; - u&lt;sub&gt;0&lt;/sub&gt;) * (v&lt;sub&gt;0&lt;/sub&gt; - v&lt;sub&gt;1&lt;/sub&gt;) + u&lt;sub&gt;1&lt;/sub&gt; * v&lt;sub&gt;1&lt;/sub&gt; +
+     * u&lt;sub&gt;0&lt;/sub&gt; * v&lt;sub&gt;0&lt;/sub&gt; ) * B + u&lt;sub&gt;0&lt;/sub&gt; * v&lt;sub&gt;0&lt;/sub&gt;&lt;br&gt;
+     * &lt;/tt&gt;
+     *
+     * @param op1 first factor of the product
+     * @param op2 second factor of the product
+     * @return {@code op1 * op2}
+     * @see #multiply(TBigInteger, TBigInteger)
+     */
+    static TBigInteger karatsuba(TBigInteger op1, TBigInteger op2) {
+        TBigInteger temp;
+<span class="pc bpc" id="L106" title="1 of 2 branches missed.">        if (op2.numberLength &gt; op1.numberLength) {</span>
+<span class="nc" id="L107">            temp = op1;</span>
+<span class="nc" id="L108">            op1 = op2;</span>
+<span class="nc" id="L109">            op2 = temp;</span>
+        }
+<span class="pc bpc" id="L111" title="1 of 2 branches missed.">        if (op2.numberLength &lt; whenUseKaratsuba) {</span>
+<span class="fc" id="L112">            return multiplyPAP(op1, op2);</span>
+        }
+        /*  Karatsuba:  u = u1*B + u0
+         *              v = v1*B + v0
+         *  u*v = (u1*v1)*B^2 + ((u1-u0)*(v0-v1) + u1*v1 + u0*v0)*B + u0*v0
+         */
+        // ndiv2 = (op1.numberLength / 2) * 32
+<span class="nc" id="L119">        int ndiv2 = (op1.numberLength &amp; 0xFFFFFFFE) &lt;&lt; 4;</span>
+<span class="nc" id="L120">        TBigInteger upperOp1 = op1.shiftRight(ndiv2);</span>
+<span class="nc" id="L121">        TBigInteger upperOp2 = op2.shiftRight(ndiv2);</span>
+<span class="nc" id="L122">        TBigInteger lowerOp1 = op1.subtract(upperOp1.shiftLeft(ndiv2));</span>
+<span class="nc" id="L123">        TBigInteger lowerOp2 = op2.subtract(upperOp2.shiftLeft(ndiv2));</span>
+
+<span class="nc" id="L125">        TBigInteger upper = karatsuba(upperOp1, upperOp2);</span>
+<span class="nc" id="L126">        TBigInteger lower = karatsuba(lowerOp1, lowerOp2);</span>
+<span class="nc" id="L127">        TBigInteger middle = karatsuba(upperOp1.subtract(lowerOp1),</span>
+<span class="nc" id="L128">                lowerOp2.subtract(upperOp2));</span>
+<span class="nc" id="L129">        middle = middle.add(upper).add(lower);</span>
+<span class="nc" id="L130">        middle = middle.shiftLeft(ndiv2);</span>
+<span class="nc" id="L131">        upper = upper.shiftLeft(ndiv2 &lt;&lt; 1);</span>
+
+<span class="nc" id="L133">        return upper.add(middle).add(lower);</span>
+    }
+
+    /**
+     * Multiplies two BigIntegers.
+     * Implements traditional scholar algorithm described by Knuth.
+     *
+     * &lt;br&gt;&lt;tt&gt;
+     *         &lt;table border=&quot;0&quot;&gt;
+     * &lt;tbody&gt;
+     *
+     *
+     * &lt;tr&gt;
+     * &lt;td align=&quot;center&quot;&gt;A=&lt;/td&gt;
+     * &lt;td&gt;a&lt;sub&gt;3&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td&gt;a&lt;sub&gt;2&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td&gt;a&lt;sub&gt;1&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td&gt;a&lt;sub&gt;0&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td&gt;&lt;/td&gt;
+     * &lt;td&gt;&lt;/td&gt;
+     * &lt;/tr&gt;
+     *
+     * &lt;tr&gt;
+     * &lt;td align=&quot;center&quot;&gt;B=&lt;/td&gt;
+     * &lt;td&gt;&lt;/td&gt;
+     * &lt;td&gt;b&lt;sub&gt;2&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td&gt;b&lt;sub&gt;1&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td&gt;b&lt;sub&gt;1&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td&gt;&lt;/td&gt;
+     * &lt;td&gt;&lt;/td&gt;
+     * &lt;/tr&gt;
+     *
+     * &lt;tr&gt;
+     * &lt;td&gt;&lt;/td&gt;
+     * &lt;td&gt;&lt;/td&gt;
+     * &lt;td&gt;&lt;/td&gt;
+     * &lt;td&gt;b&lt;sub&gt;0&lt;/sub&gt;*a&lt;sub&gt;3&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td&gt;b&lt;sub&gt;0&lt;/sub&gt;*a&lt;sub&gt;2&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td&gt;b&lt;sub&gt;0&lt;/sub&gt;*a&lt;sub&gt;1&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td&gt;b&lt;sub&gt;0&lt;/sub&gt;*a&lt;sub&gt;0&lt;/sub&gt;&lt;/td&gt;
+     * &lt;/tr&gt;
+     *
+     * &lt;tr&gt;
+     * &lt;td&gt;&lt;/td&gt;
+     * &lt;td&gt;&lt;/td&gt;
+     * &lt;td&gt;b&lt;sub&gt;1&lt;/sub&gt;*a&lt;sub&gt;3&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td&gt;b&lt;sub&gt;1&lt;/sub&gt;*a&lt;sub&gt;2&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td&gt;b&lt;sub&gt;1&lt;/sub&gt;*a1&lt;/td&gt;
+     * &lt;td&gt;b&lt;sub&gt;1&lt;/sub&gt;*a0&lt;/td&gt;
+     * &lt;/tr&gt;
+     *
+     * &lt;tr&gt;
+     * &lt;td&gt;+&lt;/td&gt;
+     * &lt;td&gt;b&lt;sub&gt;2&lt;/sub&gt;*a&lt;sub&gt;3&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td&gt;b&lt;sub&gt;2&lt;/sub&gt;*a&lt;sub&gt;2&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td&gt;b&lt;sub&gt;2&lt;/sub&gt;*a&lt;sub&gt;1&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td&gt;b&lt;sub&gt;2&lt;/sub&gt;*a&lt;sub&gt;0&lt;/sub&gt;&lt;/td&gt;
+     * &lt;/tr&gt;
+     *
+     * &lt;tr&gt;
+     * &lt;td&gt;&lt;/td&gt;
+     * &lt;td&gt;______&lt;/td&gt;
+     * &lt;td&gt;______&lt;/td&gt;
+     * &lt;td&gt;______&lt;/td&gt;
+     * &lt;td&gt;______&lt;/td&gt;
+     * &lt;td&gt;______&lt;/td&gt;
+     * &lt;td&gt;______&lt;/td&gt;
+     * &lt;/tr&gt;
+     *
+     * &lt;tr&gt;
+     *
+     * &lt;td align=&quot;center&quot;&gt;A*B=R=&lt;/td&gt;
+     * &lt;td align=&quot;center&quot;&gt;r&lt;sub&gt;5&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td align=&quot;center&quot;&gt;r&lt;sub&gt;4&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td align=&quot;center&quot;&gt;r&lt;sub&gt;3&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td align=&quot;center&quot;&gt;r&lt;sub&gt;2&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td align=&quot;center&quot;&gt;r&lt;sub&gt;1&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td align=&quot;center&quot;&gt;r&lt;sub&gt;0&lt;/sub&gt;&lt;/td&gt;
+     * &lt;td&gt;&lt;/td&gt;
+     * &lt;/tr&gt;
+     *
+     * &lt;/tbody&gt;
+     * &lt;/table&gt;
+     *
+     * &lt;/tt&gt;
+     *
+     * @param op1 first factor of the multiplication {@code  op1 &gt;= 0}
+     * @param op2 second factor of the multiplication {@code  op2 &gt;= 0}
+     * @return a {@code BigInteger} of value {@code  op1 * op2}
+     */
+    static TBigInteger multiplyPAP(TBigInteger a, TBigInteger b) {
+        // PRE: a &gt;= b
+<span class="fc" id="L225">        int aLen = a.numberLength;</span>
+<span class="fc" id="L226">        int bLen = b.numberLength;</span>
+<span class="fc" id="L227">        int resLength = aLen + bLen;</span>
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">        int resSign = (a.sign != b.sign) ? -1 : 1;</span>
+        // A special case when both numbers don't exceed int
+<span class="fc bfc" id="L230" title="All 2 branches covered.">        if (resLength == 2) {</span>
+<span class="fc" id="L231">            long val = unsignedMultAddAdd(a.digits[0], b.digits[0], 0, 0);</span>
+<span class="fc" id="L232">            int valueLo = (int) val;</span>
+<span class="fc" id="L233">            int valueHi = (int) (val &gt;&gt;&gt; 32);</span>
+<span class="fc bfc" id="L234" title="All 2 branches covered.">            return ((valueHi == 0)</span>
+                    ? new TBigInteger(resSign, valueLo)
+                    : new TBigInteger(resSign, 2, new int[]{valueLo, valueHi}));
+        }
+<span class="fc" id="L238">        int[] aDigits = a.digits;</span>
+<span class="fc" id="L239">        int[] bDigits = b.digits;</span>
+<span class="fc" id="L240">        int[] resDigits = new int[resLength];</span>
+        // Common case
+<span class="fc" id="L242">        multArraysPAP(aDigits, aLen, bDigits, bLen, resDigits);</span>
+<span class="fc" id="L243">        TBigInteger result = new TBigInteger(resSign, resLength, resDigits);</span>
+<span class="fc" id="L244">        result.cutOffLeadingZeroes();</span>
+<span class="fc" id="L245">        return result;</span>
+    }
+
+    static void multArraysPAP(int[] aDigits, int aLen, int[] bDigits, int bLen, int[] resDigits) {
+<span class="pc bpc" id="L249" title="2 of 4 branches missed.">        if (aLen == 0 || bLen == 0) return;</span>
+
+<span class="fc bfc" id="L251" title="All 2 branches covered.">        if (aLen == 1) {</span>
+<span class="fc" id="L252">            resDigits[bLen] = multiplyByInt(resDigits, bDigits, bLen, aDigits[0]);</span>
+<span class="pc bpc" id="L253" title="1 of 2 branches missed.">        } else if (bLen == 1) {</span>
+<span class="fc" id="L254">            resDigits[aLen] = multiplyByInt(resDigits, aDigits, aLen, bDigits[0]);</span>
+        } else {
+<span class="nc" id="L256">            multPAP(aDigits, bDigits, resDigits, aLen, bLen);</span>
+        }
+<span class="fc" id="L258">    }</span>
+
+    static void multPAP(int[] a, int[] b, int[] t, int aLen, int bLen) {
+<span class="nc bnc" id="L261" title="All 4 branches missed.">        if (a == b &amp;&amp; aLen == bLen) {</span>
+<span class="nc" id="L262">            square(a, aLen, t);</span>
+<span class="nc" id="L263">            return;</span>
+        }
+
+<span class="nc bnc" id="L266" title="All 2 branches missed.">        for (int i = 0; i &lt; aLen; i++) {</span>
+<span class="nc" id="L267">            long carry = 0;</span>
+<span class="nc" id="L268">            int aI = a[i];</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">            for (int j = 0; j &lt; bLen; j++) {</span>
+<span class="nc" id="L270">                carry = unsignedMultAddAdd(aI, b[j], t[i + j], (int) carry);</span>
+<span class="nc" id="L271">                t[i + j] = (int) carry;</span>
+<span class="nc" id="L272">                carry &gt;&gt;&gt;= 32;</span>
+            }
+<span class="nc" id="L274">            t[i + bLen] = (int) carry;</span>
+        }
+<span class="nc" id="L276">    }</span>
+
+    /**
+     * Multiplies an array of integers by an integer value
+     * and saves the result in {@code res}.
+     *
+     * @param a      the array of integers
+     * @param aSize  the number of elements of intArray to be multiplied
+     * @param factor the multiplier
+     * @return the top digit of production
+     */
+    private static int multiplyByInt(int[] res, int[] a, final int aSize, final int factor) {
+<span class="fc" id="L288">        long carry = 0;</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        for (int i = 0; i &lt; aSize; i++) {</span>
+<span class="fc" id="L290">            carry = unsignedMultAddAdd(a[i], factor, (int) carry, 0);</span>
+<span class="fc" id="L291">            res[i] = (int) carry;</span>
+<span class="fc" id="L292">            carry &gt;&gt;&gt;= 32;</span>
+        }
+<span class="fc" id="L294">        return (int) carry;</span>
+    }
+
+
+    /**
+     * Multiplies an array of integers by an integer value.
+     *
+     * @param a      the array of integers
+     * @param aSize  the number of elements of intArray to be multiplied
+     * @param factor the multiplier
+     * @return the top digit of production
+     */
+    static int multiplyByInt(int[] a, final int aSize, final int factor) {
+<span class="fc" id="L307">        return multiplyByInt(a, a, aSize, factor);</span>
+    }
+
+    /**
+     * Multiplies a number by a positive integer.
+     *
+     * @param val    an arbitrary {@code BigInteger}
+     * @param factor a positive {@code int} number
+     * @return {@code val * factor}
+     */
+    static TBigInteger multiplyByPositiveInt(TBigInteger val, int factor) {
+<span class="nc" id="L318">        int resSign = val.sign;</span>
+<span class="nc bnc" id="L319" title="All 2 branches missed.">        if (resSign == 0) {</span>
+<span class="nc" id="L320">            return TBigInteger.ZERO;</span>
+        }
+<span class="nc" id="L322">        int aNumberLength = val.numberLength;</span>
+<span class="nc" id="L323">        int[] aDigits = val.digits;</span>
+
+<span class="nc bnc" id="L325" title="All 2 branches missed.">        if (aNumberLength == 1) {</span>
+<span class="nc" id="L326">            long res = unsignedMultAddAdd(aDigits[0], factor, 0, 0);</span>
+<span class="nc" id="L327">            int resLo = (int) res;</span>
+<span class="nc" id="L328">            int resHi = (int) (res &gt;&gt;&gt; 32);</span>
+<span class="nc bnc" id="L329" title="All 2 branches missed.">            return ((resHi == 0)</span>
+                    ? new TBigInteger(resSign, resLo)
+                    : new TBigInteger(resSign, 2, new int[]{resLo, resHi}));
+        }
+        // Common case
+<span class="nc" id="L334">        int resLength = aNumberLength + 1;</span>
+<span class="nc" id="L335">        int[] resDigits = new int[resLength];</span>
+
+<span class="nc" id="L337">        resDigits[aNumberLength] = multiplyByInt(resDigits, aDigits, aNumberLength, factor);</span>
+<span class="nc" id="L338">        TBigInteger result = new TBigInteger(resSign, resLength, resDigits);</span>
+<span class="nc" id="L339">        result.cutOffLeadingZeroes();</span>
+<span class="nc" id="L340">        return result;</span>
+    }
+
+    static TBigInteger pow(TBigInteger base, int exponent) {
+        // PRE: exp &gt; 0
+<span class="fc" id="L345">        TBigInteger res = TBigInteger.ONE;</span>
+<span class="fc" id="L346">        TBigInteger acc = base;</span>
+
+<span class="fc bfc" id="L348" title="All 2 branches covered.">        for (; exponent &gt; 1; exponent &gt;&gt;= 1) {</span>
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">            if ((exponent &amp; 1) != 0) {</span>
+                // if odd, multiply one more time by acc
+<span class="fc" id="L351">                res = res.multiply(acc);</span>
+            }
+            // acc = base^(2^i)
+            //a limit where karatsuba performs a faster square than the square algorithm
+<span class="pc bpc" id="L355" title="1 of 2 branches missed.">            if (acc.numberLength == 1) {</span>
+<span class="fc" id="L356">                acc = acc.multiply(acc); // square</span>
+            } else {
+<span class="nc" id="L358">                acc = new TBigInteger(1, square(acc.digits, acc.numberLength, new int[acc.numberLength &lt;&lt; 1]));</span>
+            }
+        }
+        // exponent == 1, multiply one more time
+<span class="fc" id="L362">        res = res.multiply(acc);</span>
+<span class="fc" id="L363">        return res;</span>
+    }
+
+    /**
+     * Performs a&lt;sup&gt;2&lt;/sup&gt;
+     *
+     * @param a    The number to square.
+     * @param aLen The length of the number to square.
+     */
+    static int[] square(int[] a, int aLen, int[] res) {
+        long carry;
+
+<span class="nc bnc" id="L375" title="All 2 branches missed.">        for (int i = 0; i &lt; aLen; i++) {</span>
+<span class="nc" id="L376">            carry = 0;</span>
+<span class="nc bnc" id="L377" title="All 2 branches missed.">            for (int j = i + 1; j &lt; aLen; j++) {</span>
+<span class="nc" id="L378">                carry = unsignedMultAddAdd(a[i], a[j], res[i + j], (int) carry);</span>
+<span class="nc" id="L379">                res[i + j] = (int) carry;</span>
+<span class="nc" id="L380">                carry &gt;&gt;&gt;= 32;</span>
+            }
+<span class="nc" id="L382">            res[i + aLen] = (int) carry;</span>
+        }
+
+<span class="nc" id="L385">        TBitLevel.shiftLeftOneBit(res, res, aLen &lt;&lt; 1);</span>
+
+<span class="nc" id="L387">        carry = 0;</span>
+<span class="nc bnc" id="L388" title="All 2 branches missed.">        for (int i = 0, index = 0; i &lt; aLen; i++, index++) {</span>
+<span class="nc" id="L389">            carry = unsignedMultAddAdd(a[i], a[i], res[index], (int) carry);</span>
+<span class="nc" id="L390">            res[index] = (int) carry;</span>
+<span class="nc" id="L391">            carry &gt;&gt;&gt;= 32;</span>
+<span class="nc" id="L392">            index++;</span>
+<span class="nc" id="L393">            carry += res[index] &amp; 0xFFFFFFFFL;</span>
+<span class="nc" id="L394">            res[index] = (int) carry;</span>
+<span class="nc" id="L395">            carry &gt;&gt;&gt;= 32;</span>
+        }
+<span class="nc" id="L397">        return res;</span>
+    }
+
+    /**
+     * Multiplies a number by a power of ten.
+     * This method is used in {@code BigDecimal} class.
+     *
+     * @param val the number to be multiplied
+     * @param exp a positive {@code long} exponent
+     * @return {@code val * 10&lt;sup&gt;exp&lt;/sup&gt;}
+     */
+    static TBigInteger multiplyByTenPow(TBigInteger val, long exp) {
+        // PRE: exp &gt;= 0
+<span class="nc bnc" id="L410" title="All 2 branches missed.">        return ((exp &lt; tenPows.length)</span>
+<span class="nc" id="L411">                ? multiplyByPositiveInt(val, tenPows[(int) exp])</span>
+<span class="nc" id="L412">                : val.multiply(powerOf10(exp)));</span>
+    }
+
+    /**
+     * It calculates a power of ten, which exponent could be out of 32-bit range.
+     * Note that internally this method will be used in the worst case with
+     * an exponent equals to: {@code Integer.MAX_VALUE - Integer.MIN_VALUE}.
+     *
+     * @param exp the exponent of power of ten, it must be positive.
+     * @return a {@code BigInteger} with value {@code 10&lt;sup&gt;exp&lt;/sup&gt;}.
+     */
+    static TBigInteger powerOf10(long exp) {
+        // PRE: exp &gt;= 0
+<span class="fc" id="L425">        int intExp = (int) exp;</span>
+        // &quot;SMALL POWERS&quot;
+<span class="pc bpc" id="L427" title="1 of 2 branches missed.">        if (exp &lt; bigTenPows.length) {</span>
+            // The largest power that fit in 'long' type
+<span class="fc" id="L429">            return bigTenPows[intExp];</span>
+<span class="nc bnc" id="L430" title="All 2 branches missed.">        } else if (exp &lt;= 50) {</span>
+            // To calculate:    10^exp
+<span class="nc" id="L432">            return TBigInteger.TEN.pow(intExp);</span>
+<span class="nc bnc" id="L433" title="All 2 branches missed.">        } else if (exp &lt;= 1000) {</span>
+            // To calculate:    5^exp * 2^exp
+<span class="nc" id="L435">            return bigFivePows[1].pow(intExp).shiftLeft(intExp);</span>
+        }
+        // &quot;LARGE POWERS&quot;
+        /*
+         * To check if there is free memory to allocate a BigInteger of the
+         * estimated size, measured in bytes: 1 + [exp / log10(2)]
+         */
+<span class="nc" id="L442">        long byteArraySize = 1 + (long) (exp / 2.4082399653118496);</span>
+
+<span class="nc bnc" id="L444" title="All 2 branches missed.">        if (byteArraySize &gt; 1000000) {</span>
+<span class="nc" id="L445">            throw new ArithmeticException(&quot;power of ten too big&quot;);</span>
+        }
+<span class="nc bnc" id="L447" title="All 2 branches missed.">        if (exp &lt;= Integer.MAX_VALUE) {</span>
+            // To calculate:    5^exp * 2^exp
+<span class="nc" id="L449">            return bigFivePows[1].pow(intExp).shiftLeft(intExp);</span>
+        }
+        /*
+         * &quot;HUGE POWERS&quot;
+         *
+         * This branch probably won't be executed since the power of ten is too
+         * big.
+         */
+        // To calculate:    5^exp
+<span class="nc" id="L458">        TBigInteger powerOfFive = bigFivePows[1].pow(Integer.MAX_VALUE);</span>
+<span class="nc" id="L459">        TBigInteger res = powerOfFive;</span>
+<span class="nc" id="L460">        long longExp = exp - Integer.MAX_VALUE;</span>
+
+<span class="nc" id="L462">        intExp = (int) (exp % Integer.MAX_VALUE);</span>
+<span class="nc bnc" id="L463" title="All 2 branches missed.">        while (longExp &gt; Integer.MAX_VALUE) {</span>
+<span class="nc" id="L464">            res = res.multiply(powerOfFive);</span>
+<span class="nc" id="L465">            longExp -= Integer.MAX_VALUE;</span>
+        }
+<span class="nc" id="L467">        res = res.multiply(bigFivePows[1].pow(intExp));</span>
+        // To calculate:    5^exp &lt;&lt; exp
+<span class="nc" id="L469">        res = res.shiftLeft(Integer.MAX_VALUE);</span>
+<span class="nc" id="L470">        longExp = exp - Integer.MAX_VALUE;</span>
+<span class="nc bnc" id="L471" title="All 2 branches missed.">        while (longExp &gt; Integer.MAX_VALUE) {</span>
+<span class="nc" id="L472">            res = res.shiftLeft(Integer.MAX_VALUE);</span>
+<span class="nc" id="L473">            longExp -= Integer.MAX_VALUE;</span>
+        }
+<span class="nc" id="L475">        res = res.shiftLeft(intExp);</span>
+<span class="nc" id="L476">        return res;</span>
+    }
+
+    /**
+     * Multiplies a number by a power of five.
+     * This method is used in {@code BigDecimal} class.
+     *
+     * @param val the number to be multiplied
+     * @param exp a positive {@code int} exponent
+     * @return {@code val * 5&lt;sup&gt;exp&lt;/sup&gt;}
+     */
+    static TBigInteger multiplyByFivePow(TBigInteger val, int exp) {
+        // PRE: exp &gt;= 0
+<span class="nc bnc" id="L489" title="All 2 branches missed.">        if (exp &lt; fivePows.length) {</span>
+<span class="nc" id="L490">            return multiplyByPositiveInt(val, fivePows[exp]);</span>
+<span class="nc bnc" id="L491" title="All 2 branches missed.">        } else if (exp &lt; bigFivePows.length) {</span>
+<span class="nc" id="L492">            return val.multiply(bigFivePows[exp]);</span>
+        } else {// Large powers of five
+<span class="nc" id="L494">            return val.multiply(bigFivePows[1].pow(exp));</span>
+        }
+    }
+
+    /**
+     * Computes the value unsigned ((uint)a*(uint)b + (uint)c + (uint)d). This
+     * method could improve the readability and performance of the code.
+     *
+     * @param a parameter 1
+     * @param b parameter 2
+     * @param c parameter 3
+     * @param d parameter 4
+     * @return value of expression
+     */
+    static long unsignedMultAddAdd(int a, int b, int c, int d) {
+<span class="fc" id="L509">        return (a &amp; 0xFFFFFFFFL) * (b &amp; 0xFFFFFFFFL) + (c &amp; 0xFFFFFFFFL) + (d &amp; 0xFFFFFFFFL);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

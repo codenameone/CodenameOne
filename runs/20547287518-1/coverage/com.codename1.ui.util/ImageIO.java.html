@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ImageIO.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.util</a> &gt; <span class="el_source">ImageIO.java</span></div><h1>ImageIO.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.util;
+
+import com.codename1.io.FileSystemStorage;
+import com.codename1.io.Util;
+import com.codename1.ui.Display;
+import com.codename1.ui.EncodedImage;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.geom.Dimension;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+/**
+ * Enable simple operations on image file &amp;amp; image objects such as dynamic scaling
+ * and storage to binary formats such as JPEG. Use Display.getImageIO() to get an instance
+ * of this class.
+ *
+ * @author Shai Almog
+ */
+<span class="fc" id="L45">public abstract class ImageIO {</span>
+    /**
+     * Indicates the JPEG output format
+     */
+    public static final String FORMAT_JPEG = &quot;jpeg&quot;;
+
+    /**
+     * Indicates the PNG output format
+     */
+    public static final String FORMAT_PNG = &quot;png&quot;;
+
+    /**
+     * Gets the ImageIO instance
+     *
+     * @return the image IO instance or null if image IO isn't supported for the
+     * given platform
+     */
+    public static ImageIO getImageIO() {
+<span class="fc" id="L63">        return Display.getInstance().getImageIO();</span>
+    }
+
+    /**
+     * Saves an image file at the given resolution, scaling if necessary
+     *
+     * @param image    source image stream
+     * @param response resulting image output will be written to this stream
+     * @param format   the format for the image either FORMAT_PNG or FORMAT_JPEG
+     * @param width    the width for the resulting image, use -1 to not scale
+     * @param height   the height of the resulting image, use -1 to not scale
+     * @param quality  the quality for the resulting image output (applicable mostly for JPEG), a value between 0 and 1 notice that
+     *                 this isn't implemented in all platforms.
+     */
+    public abstract void save(InputStream image, OutputStream response, String format, int width, int height, float quality) throws IOException;
+
+    /**
+     * Saves an image object to the given format
+     *
+     * @param img      the image object
+     * @param response resulting image output will be written to this stream
+     * @param format   the format for the image either FORMAT_PNG or FORMAT_JPEG
+     * @param quality  the quality for the resulting image output (applicable mostly for JPEG), a value between 0 and 1 notice that
+     *                 this isn't implemented in all platforms.
+     */
+    public void save(Image img, OutputStream response, String format, float quality) throws IOException {
+<span class="fc bfc" id="L89" title="All 2 branches covered.">        if (img instanceof EncodedImage) {</span>
+<span class="fc" id="L90">            EncodedImage i = (EncodedImage) img;</span>
+<span class="fc" id="L91">            save(new ByteArrayInputStream(i.getImageData()), response, format, i.getWidth(), i.getHeight(), quality);</span>
+<span class="fc" id="L92">        } else {</span>
+<span class="pc bpc" id="L93" title="1 of 2 branches missed.">            if (img.getImage() == null) {</span>
+<span class="nc" id="L94">                Image img2 = Image.createImage(img.getWidth(), img.getHeight(), 0);</span>
+<span class="nc" id="L95">                Graphics g = img2.getGraphics();</span>
+<span class="nc" id="L96">                g.drawImage(img, 0, 0);</span>
+<span class="nc" id="L97">                saveImage(img2, response, format, quality);</span>
+<span class="nc" id="L98">            } else {</span>
+<span class="fc" id="L99">                saveImage(img, response, format, quality);</span>
+            }
+        }
+<span class="fc" id="L102">    }</span>
+
+    /**
+     * Saves an image file at the given resolution, scaling if necessary
+     *
+     * @param imageFilePath the image file path
+     * @param response      resulting image output will be written to this stream
+     * @param format        the format for the image either FORMAT_PNG or FORMAT_JPEG
+     * @param width         the width for the resulting image, use -1 to not scale
+     * @param height        the height of the resulting image, use -1 to not scale
+     * @param quality       the quality for the resulting image output (applicable mostly for JPEG), a value between 0 and 1 notice that
+     *                      this isn't implemented in all platforms.
+     */
+    public void save(String imageFilePath, OutputStream response, String format, int width, int height, float quality) throws IOException {
+<span class="fc" id="L116">        InputStream in = FileSystemStorage.getInstance().openInputStream(imageFilePath);</span>
+<span class="fc" id="L117">        save(in, response, format, width, height, quality);</span>
+<span class="fc" id="L118">        Util.cleanup(in);</span>
+<span class="fc" id="L119">    }</span>
+
+    /**
+     * Returns the image size in pixels
+     *
+     * @param imageFilePath the path to the image
+     * @return the size in pixels
+     */
+    public Dimension getImageSize(String imageFilePath) throws IOException {
+<span class="fc" id="L128">        Image img = Image.createImage(imageFilePath);</span>
+<span class="fc" id="L129">        Dimension d = new Dimension(img.getWidth(), img.getHeight());</span>
+<span class="fc" id="L130">        img.dispose();</span>
+<span class="fc" id="L131">        return d;</span>
+    }
+
+    /**
+     * Scales an image on disk while maintaining an aspect ratio, the appropriate aspect size will be
+     * picked based on the status of scaleToFill
+     *
+     * @param imageFilePath       the path to the image
+     * @param preferredOutputPath the url where the image will be saved
+     * @param format              the format for the image either FORMAT_JPEG or FORMAT_PNG
+     * @param width               the desired width, either width or height will be respected based on aspect dimensions
+     * @param height              the desired height, either width or height will be respected based on aspect dimensions
+     * @param quality             the quality for the resulting image output (applicable mostly for JPEG), a value between 0 and 1 notice that
+     *                            this isn't implemented in all platforms.
+     * @param onlyDownscale       will not scale if the resolution to scale will be higher in this case will return the imageFilePath
+     * @param scaleToFill         when set to true will pick the larger value so the resulting image will be at least as big as width x height, when set to false
+     *                            will create an image that is no bigger than width x height
+     * @return the url for the scaled image or the url of the unscaled image
+     * @throws IOException if the operation fails
+     */
+    public String saveAndKeepAspect(String imageFilePath, String preferredOutputPath, String format, int width, int height, float quality, boolean onlyDownscale, boolean scaleToFill) throws IOException {
+<span class="fc" id="L152">        Dimension d = getImageSize(imageFilePath);</span>
+<span class="fc bfc" id="L153" title="All 2 branches covered.">        if (onlyDownscale) {</span>
+<span class="pc bpc" id="L154" title="1 of 2 branches missed.">            if (scaleToFill) {</span>
+<span class="pc bpc" id="L155" title="3 of 4 branches missed.">                if (d.getHeight() &lt;= height || d.getWidth() &lt;= width) {</span>
+<span class="fc" id="L156">                    return imageFilePath;</span>
+                }
+            } else {
+<span class="nc bnc" id="L159" title="All 4 branches missed.">                if (d.getHeight() &lt;= height &amp;&amp; d.getWidth() &lt;= width) {</span>
+<span class="nc" id="L160">                    return imageFilePath;</span>
+                }
+            }
+        }
+
+<span class="fc" id="L165">        float ratio = ((float) d.getWidth()) / ((float) d.getHeight());</span>
+<span class="fc" id="L166">        int heightBasedOnWidth = (int) (((float) width) / ratio);</span>
+<span class="fc" id="L167">        int widthBasedOnHeight = (int) (((float) height) * ratio);</span>
+<span class="pc bpc" id="L168" title="1 of 2 branches missed.">        if (scaleToFill) {</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">            if (heightBasedOnWidth &gt;= width) {</span>
+<span class="nc" id="L170">                height = heightBasedOnWidth;</span>
+            } else {
+<span class="nc" id="L172">                width = widthBasedOnHeight;</span>
+            }
+        } else {
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">            if (heightBasedOnWidth &gt; width) {</span>
+<span class="nc" id="L176">                width = widthBasedOnHeight;</span>
+            } else {
+<span class="fc" id="L178">                height = heightBasedOnWidth;</span>
+            }
+        }
+<span class="fc" id="L181">        OutputStream im = FileSystemStorage.getInstance().openOutputStream(preferredOutputPath);</span>
+<span class="fc" id="L182">        save(imageFilePath, im, format, width, height, quality);</span>
+<span class="fc" id="L183">        return preferredOutputPath;</span>
+    }
+
+    /**
+     * Saves an image object to the given format
+     *
+     * @param img      the image object
+     * @param response resulting image output will be written to this stream
+     * @param format   the format for the image either FORMAT_PNG or FORMAT_JPEG
+     * @param quality  the quality for the resulting image output (applicable mostly for JPEG), a value between 0 and 1 notice that
+     *                 this isn't implemented in all platforms.
+     */
+    protected abstract void saveImage(Image img, OutputStream response, String format, float quality) throws IOException;
+
+    /**
+     * Indicates if the given format for output is supported by this implementation
+     *
+     * @param format the format for the image either FORMAT_PNG or FORMAT_JPEG
+     * @return true if supported
+     */
+    public abstract boolean isFormatSupported(String format);
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

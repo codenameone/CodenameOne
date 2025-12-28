@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>GoogleConnect.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.social</a> &gt; <span class="el_source">GoogleConnect.java</span></div><h1>GoogleConnect.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.social;
+
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkManager;
+import com.codename1.io.Oauth2;
+
+import java.util.Hashtable;
+
+/**
+ * The GoogleConnect Login class allows the sign in with google functionality.
+ * The GoogleConnect requires to create a corresponding google cloud project.
+ * To enable the GoogleConnect to sign-in on the Simulator create a corresponding
+ * web login - https://developers.google.com/+/web/signin/
+ * &lt;p&gt;
+ * To enable the GoogleConnect to sign-in on Android
+ * Follow step 1 from here - https://developers.google.com/+/mobile/android/getting-started
+ * &lt;p&gt;
+ * To enable the GoogleConnect to sign-in on iOS
+ * follow step 1 from here - https://developers.google.com/+/mobile/ios/getting-started
+ *
+ * @author Chen
+ */
+public class GoogleConnect extends Login {
+
+    static Class implClass;
+    private static final String tokenURL = &quot;https://www.googleapis.com/oauth2/v3/token&quot;;
+    private static GoogleConnect instance;
+
+    static {
+<span class="fc" id="L52">        implClass = null;</span>
+<span class="fc" id="L53">    }</span>
+
+<span class="fc" id="L55">    GoogleConnect() {</span>
+<span class="fc" id="L56">        setOauth2URL(&quot;https://accounts.google.com/o/oauth2/auth&quot;);</span>
+<span class="fc" id="L57">        setScope(&quot;profile email&quot;);</span>
+<span class="fc" id="L58">    }</span>
+
+    /**
+     * Gets the GoogleConnect singleton instance
+     * .
+     *
+     * @return the GoogleConnect instance
+     */
+    public static GoogleConnect getInstance() {
+<span class="fc bfc" id="L67" title="All 2 branches covered.">        if (instance == null) {</span>
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">            if (implClass != null) {</span>
+                try {
+<span class="nc" id="L70">                    instance = (GoogleConnect) implClass.newInstance();</span>
+<span class="nc" id="L71">                } catch (Throwable t) {</span>
+<span class="nc" id="L72">                    instance = new GoogleConnect();</span>
+<span class="nc" id="L73">                }</span>
+            } else {
+<span class="fc" id="L75">                instance = new GoogleConnect();</span>
+            }
+        }
+<span class="fc" id="L78">        return instance;</span>
+    }
+
+    @Override
+    public boolean isNativeLoginSupported() {
+<span class="fc" id="L83">        return false;</span>
+    }
+
+    @Override
+    protected Oauth2 createOauth2() {
+<span class="fc" id="L88">        Hashtable params = new Hashtable();</span>
+<span class="fc" id="L89">        params.put(&quot;approval_prompt&quot;, &quot;force&quot;);</span>
+<span class="fc" id="L90">        params.put(&quot;access_type&quot;, &quot;offline&quot;);</span>
+
+<span class="fc" id="L92">        Oauth2 auth = new Oauth2(oauth2URL, clientId, redirectURI, scope, tokenURL, clientSecret, params);</span>
+<span class="fc" id="L93">        return auth;</span>
+    }
+
+    @Override
+    protected boolean validateToken(String token) {
+        //make a call to the API if the return value is 40X the token is not 
+        //valid anymore
+<span class="fc" id="L100">        final boolean[] retval = new boolean[1];</span>
+<span class="fc" id="L101">        retval[0] = true;</span>
+<span class="fc" id="L102">        ConnectionRequest req = new ConnectionRequest() {</span>
+            @Override
+            protected void handleErrorResponseCode(int code, String message) {
+                //access token not valid anymore
+<span class="pc bpc" id="L106" title="2 of 4 branches missed.">                if (code &gt;= 400 &amp;&amp; code &lt;= 410) {</span>
+<span class="fc" id="L107">                    retval[0] = false;</span>
+<span class="fc" id="L108">                    return;</span>
+                }
+<span class="nc" id="L110">                super.handleErrorResponseCode(code, message);</span>
+<span class="nc" id="L111">            }</span>
+
+        };
+<span class="fc" id="L114">        req.setPost(false);</span>
+<span class="fc" id="L115">        req.setUrl(&quot;https://www.googleapis.com/plus/v1/people/me&quot;);</span>
+<span class="fc" id="L116">        req.addRequestHeader(&quot;Authorization&quot;, &quot;Bearer &quot; + token);</span>
+<span class="fc" id="L117">        NetworkManager.getInstance().addToQueueAndWait(req);</span>
+<span class="fc" id="L118">        return retval[0];</span>
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

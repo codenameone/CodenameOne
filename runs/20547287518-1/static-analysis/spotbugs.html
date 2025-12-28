@@ -1,0 +1,3018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SpotBugs Findings</title>
+  <style>body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;padding:1.5rem;max-width:960px;margin:auto;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #d0d7de;padding:0.5rem;text-align:left;}th{background:#f6f8fa;}code{background:#f3f4f6;padding:0.1rem 0.3rem;border-radius:4px;}caption{font-weight:600;margin-bottom:0.75rem;text-align:left;}</style>
+</head>
+<body>
+  <h1>SpotBugs Findings</h1>
+  <table>
+    <caption>Reported findings</caption>
+    <thead>
+      <tr>
+        <th scope="col">Severity</th>
+        <th scope="col">Location</th>
+        <th scope="col">Message</th>
+        <th scope="col">Rule</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ads/InnerActive.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ads/InnerActive.java:149</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/capture/Capture.java:262</code></td>
+        <td>Naked notify</td>
+        <td><code>NN_NAKED_NOTIFY</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/capture/VideoCaptureConstraints.java:193</code></td>
+        <td>equals method fails for subtypes</td>
+        <td><code>EQ_GETCLASS_AND_CLASS_CONSTANT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/capture/VideoCaptureConstraints.java:110</code></td>
+        <td>equals() method does not check for null argument</td>
+        <td><code>NP_EQUALS_SHOULD_HANDLE_NULL_ARGUMENT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/charts/ChartComponent.java:489</code></td>
+        <td>Integral division result cast to double or float</td>
+        <td><code>ICAST_IDIV_CAST_TO_DOUBLE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/charts/ChartComponent.java:682</code></td>
+        <td>Return value of method without side effect is ignored</td>
+        <td><code>RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/charts/ChartComponent.java:770</code></td>
+        <td>Return value of method without side effect is ignored</td>
+        <td><code>RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/charts/compat/Paint.java:38</code></td>
+        <td>Unused field</td>
+        <td><code>UUF_UNUSED_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/charts/compat/PathMeasure.java:35</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/charts/compat/PathMeasure.java:38</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/charts/views/BarChart.java:128</code></td>
+        <td>Useless object created</td>
+        <td><code>UC_USELESS_OBJECT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/charts/views/BarChart.java:393</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/charts/views/BarChart.java:131</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/charts/views/BarChart.java:132</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/charts/views/DoughnutChart.java:106</code></td>
+        <td>Useless object created</td>
+        <td><code>UC_USELESS_OBJECT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/charts/views/PieSegment.java:55</code></td>
+        <td>Do not use floating-point variables as loop counters</td>
+        <td><code>FL_FLOATS_AS_LOOP_COUNTERS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/charts/views/RadarChart.java:115</code></td>
+        <td>Do not use floating-point variables as loop counters</td>
+        <td><code>FL_FLOATS_AS_LOOP_COUNTERS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/charts/views/RadarChart.java:110</code></td>
+        <td>Integral division result cast to double or float</td>
+        <td><code>ICAST_IDIV_CAST_TO_DOUBLE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/charts/views/XYChart.java:145</code></td>
+        <td>Integral division result cast to double or float</td>
+        <td><code>ICAST_IDIV_CAST_TO_DOUBLE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/cloud/CloudImageProperty.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/cloud/CloudListModel.java:47</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/cloud/CloudStorage.java:104</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/components/RSSReader.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/components/RSSReader.java:472</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/components/RSSReader.java:460</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/components/SignatureComponent.java:446</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/components/SplitPane.java:1175</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/components/SplitPane.java:789</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/components/SplitPane.java:822</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/components/SplitPane.java:811</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/components/SplitPane.java:844</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/components/SplitPane.java:800</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/components/SplitPane.java:833</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/components/Switch.java:434</code></td>
+        <td>Load of known null value</td>
+        <td><code>NP_LOAD_OF_KNOWN_NULL_VALUE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/components/ToastBar.java:274</code></td>
+        <td>Unused field</td>
+        <td><code>UUF_UNUSED_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/components/WebBrowser.java:159</code></td>
+        <td>Naked notify</td>
+        <td><code>NN_NAKED_NOTIFY</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/components/WebBrowser.java:453</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/db/ThreadSafeDatabase.java:279</code></td>
+        <td>Empty finalizer should be deleted</td>
+        <td><code>FI_EMPTY</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/facebook/Album.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/facebook/FaceBookAccess.java:223</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/facebook/FaceBookAccess.java:1227</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/facebook/FaceBookAccess.java:1334</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/facebook/FacebookRESTService.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/facebook/FacebookRESTService.java:261</code></td>
+        <td>Method call passes null for non-null parameter</td>
+        <td><code>NP_NULL_PARAM_DEREF</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/facebook/Page.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/facebook/Photo.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/facebook/Post.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/facebook/User.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/impl/CodenameOneImplementation.java:2882</code></td>
+        <td>Integral division result cast to double or float</td>
+        <td><code>ICAST_IDIV_CAST_TO_DOUBLE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/impl/CodenameOneImplementation.java:7305</code></td>
+        <td>Naked notify</td>
+        <td><code>NN_NAKED_NOTIFY</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/impl/CodenameOneImplementation.java:3977</code></td>
+        <td>Return value of method without side effect is ignored</td>
+        <td><code>RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/impl/CodenameOneImplementation.java:8823</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/impl/CodenameOneThread.java:152</code></td>
+        <td>Method may fail to close stream</td>
+        <td><code>OS_OPEN_STREAM</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/BufferedInputStream.java:642</code></td>
+        <td>Self comparison of field with itself</td>
+        <td><code>SA_FIELD_SELF_COMPARISON</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/BufferedInputStream.java:385</code></td>
+        <td>Method calls Thread.sleep() with a lock held</td>
+        <td><code>SWL_SLEEP_WITH_LOCK_HELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/CacheMap.java:53</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/ConnectionRequest.java:2316</code></td>
+        <td>Comparison of String objects using == or !=</td>
+        <td><code>ES_COMPARING_STRINGS_WITH_EQ</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/ConnectionRequest.java:76</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/ConnectionRequest.java:2941</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/JSONParser.java:434</code></td>
+        <td>Exception is caught when Exception is not thrown</td>
+        <td><code>REC_CATCH_EXCEPTION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/Log.java:339</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/MultipartRequest.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/NetworkManager.java:335</code></td>
+        <td>Naked notify</td>
+        <td><code>NN_NAKED_NOTIFY</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/NetworkManager.java:977</code></td>
+        <td>Naked notify</td>
+        <td><code>NN_NAKED_NOTIFY</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/Oauth2.java:404</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/Oauth2.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/Oauth2.java:665</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/Util.java:706</code></td>
+        <td>Method invokes inefficient Number constructor; use static valueOf instead</td>
+        <td><code>DM_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/Util.java:703</code></td>
+        <td>Method invokes inefficient Number constructor; use static valueOf instead</td>
+        <td><code>DM_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/Util.java:712</code></td>
+        <td>Method invokes inefficient Number constructor; use static valueOf instead</td>
+        <td><code>DM_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/Util.java:709</code></td>
+        <td>Method invokes inefficient Number constructor; use static valueOf instead</td>
+        <td><code>DM_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/Util.java:2016</code></td>
+        <td>Method ignores results of InputStream.read()</td>
+        <td><code>RR_NOT_CHECKED</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/Util.java:2496</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/Util.java:2543</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/WebServiceProxyCall.java:311</code></td>
+        <td>Method invokes inefficient Number constructor; use static valueOf instead</td>
+        <td><code>DM_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/WebServiceProxyCall.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/WebServiceProxyCall.java:513</code></td>
+        <td>Nullcheck of value previously dereferenced</td>
+        <td><code>RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/Deflate.java:723</code></td>
+        <td>Unsigned right shift cast to short/byte</td>
+        <td><code>ICAST_QUESTIONABLE_UNSIGNED_RIGHT_SHIFT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/Deflate.java:566</code></td>
+        <td>Unsigned right shift cast to short/byte</td>
+        <td><code>ICAST_QUESTIONABLE_UNSIGNED_RIGHT_SHIFT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/Deflate.java:1374</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/Deflater.java:121</code></td>
+        <td>Useless control flow</td>
+        <td><code>UCF_USELESS_CONTROL_FLOW</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/GZConnectionRequest.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/GZIPHeader.java:122</code></td>
+        <td>Invocation of toString on an array</td>
+        <td><code>DMI_INVOKING_TOSTRING_ON_ARRAY</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/GZIPHeader.java:69</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/Inflate.java:560</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/Inflate.java:463</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/Inflate.java:475</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/InfBlocks.java:109</code></td>
+        <td>Useless control flow</td>
+        <td><code>UCF_USELESS_CONTROL_FLOW</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/Inflate.java:770</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/Inflater.java:109</code></td>
+        <td>Useless control flow</td>
+        <td><code>UCF_USELESS_CONTROL_FLOW</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/Inflater.java:60</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/ZStream.java:184</code></td>
+        <td>Useless control flow</td>
+        <td><code>UCF_USELESS_CONTROL_FLOW</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/ZStream.java:118</code></td>
+        <td>Useless control flow</td>
+        <td><code>UCF_USELESS_CONTROL_FLOW</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/rest/RequestBuilder.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/services/CachedDataService.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/services/RSSService.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/services/RSSService.java:100</code></td>
+        <td>Unused field</td>
+        <td><code>UUF_UNUSED_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/services/TwitterRESTService.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/io/services/TwitterRESTService.java:100</code></td>
+        <td>Useless control flow</td>
+        <td><code>UCF_USELESS_CONTROL_FLOW</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/javascript/JavascriptContext.java:149</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/javascript/JavascriptContext.java:147</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/javascript/JavascriptContext.java:114</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/l10n/SimpleDateFormat.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/location/Geofence.java:192</code></td>
+        <td>Load of known null value</td>
+        <td><code>NP_LOAD_OF_KNOWN_NULL_VALUE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/location/Geofence.java:182</code></td>
+        <td>Load of known null value</td>
+        <td><code>NP_LOAD_OF_KNOWN_NULL_VALUE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/location/GeofenceManager.java:140</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/location/LocationManager.java:250</code></td>
+        <td>Instance level lock was used on a shared static data</td>
+        <td><code>SSD_DO_NOT_USE_INSTANCE_LOCK_ON_SHARED_STATIC_DATA</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/location/LocationManager.java:207</code></td>
+        <td>Instance level lock was used on a shared static data</td>
+        <td><code>SSD_DO_NOT_USE_INSTANCE_LOCK_ON_SHARED_STATIC_DATA</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/location/LocationManager.java:204</code></td>
+        <td>Instance level lock was used on a shared static data</td>
+        <td><code>SSD_DO_NOT_USE_INSTANCE_LOCK_ON_SHARED_STATIC_DATA</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/maps/CacheProviderProxy.java:97</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/maps/MapComponent.java:494</code></td>
+        <td>Return value of method without side effect is ignored</td>
+        <td><code>RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/maps/MapComponent.java:86</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/maps/MapComponent.java:85</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/maps/MapComponent.java:332</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/maps/MapComponent.java:333</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/maps/layers/ArrowLinesLayer.java:38</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/maps/layers/ArrowLinesLayer.java:198</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/maps/layers/PointLayer.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/payment/Purchase.java:415</code></td>
+        <td>Synchronization on interned String</td>
+        <td><code>DL_SYNCHRONIZATION_ON_SHARED_CONSTANT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/payment/Purchase.java:398</code></td>
+        <td>Synchronization on interned String</td>
+        <td><code>DL_SYNCHRONIZATION_ON_SHARED_CONSTANT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/payment/Purchase.java:430</code></td>
+        <td>Synchronization on interned String</td>
+        <td><code>DL_SYNCHRONIZATION_ON_SHARED_CONSTANT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/payment/Purchase.java:493</code></td>
+        <td>Synchronization on interned String</td>
+        <td><code>DL_SYNCHRONIZATION_ON_SHARED_CONSTANT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/payment/Purchase.java:616</code></td>
+        <td>Useless object created</td>
+        <td><code>UC_USELESS_OBJECT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/processing/HashtableContent.java:57</code></td>
+        <td>Unusual equals method</td>
+        <td><code>EQ_UNUSUAL</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/processing/HashtableContent.java:57</code></td>
+        <td>equals() method does not check for null argument</td>
+        <td><code>NP_EQUALS_SHOULD_HANDLE_NULL_ARGUMENT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/processing/PrettyPrinter.java:235</code></td>
+        <td>Call to equals(null)</td>
+        <td><code>EC_NULL_ARG</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/processing/PrettyPrinter.java:123</code></td>
+        <td>Call to equals(null)</td>
+        <td><code>EC_NULL_ARG</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/properties/InstantUI.java:84</code></td>
+        <td>Suspicious reference comparison of Boolean values</td>
+        <td><code>RC_REF_COMPARISON_BAD_PRACTICE_BOOLEAN</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/properties/PropertyIndex.java:190</code></td>
+        <td>Iterator next() method cannot throw NoSuchElementException</td>
+        <td><code>IT_NO_SUCH_ELEMENT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/properties/PropertyXMLElement.java:382</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/properties/SQLMap.java:159</code></td>
+        <td>Load of known null value</td>
+        <td><code>NP_LOAD_OF_KNOWN_NULL_VALUE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/properties/SQLMap.java:159</code></td>
+        <td>Redundant comparison of non-null value to null</td>
+        <td><code>RCN_REDUNDANT_COMPARISON_OF_NULL_AND_NONNULL_VALUE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/properties/SQLMap.java:796</code></td>
+        <td>Useless object created</td>
+        <td><code>UC_USELESS_OBJECT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/push/Push.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/share/FacebookShare.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/share/FacebookShare.java:101</code></td>
+        <td>Dead store to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/share/FacebookShare.java:134</code></td>
+        <td>Dead store to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/testing/DeviceRunner.java:63</code></td>
+        <td>Method may fail to close stream</td>
+        <td><code>OS_OPEN_STREAM</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/testing/TestUtils.java:267</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/testing/TestUtils.java:52</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/testing/TestUtils.java:52</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/BrowserComponent.java:1671</code></td>
+        <td>Suspicious reference comparison of Boolean values</td>
+        <td><code>RC_REF_COMPARISON_BAD_PRACTICE_BOOLEAN</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/BrowserComponent.java:2232</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/BrowserComponent.java:2158</code></td>
+        <td>Useless object created</td>
+        <td><code>UC_USELESS_OBJECT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/BrowserComponent.java:2187</code></td>
+        <td>Useless object created</td>
+        <td><code>UC_USELESS_OBJECT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Command.java:40</code></td>
+        <td>Unused field</td>
+        <td><code>UUF_UNUSED_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/CommonProgressAnimations.java:159</code></td>
+        <td>Integral division result cast to double or float</td>
+        <td><code>ICAST_IDIV_CAST_TO_DOUBLE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Component.java:6534</code></td>
+        <td>Using pointer equality to compare different types</td>
+        <td><code>EC_UNRELATED_TYPES_USING_POINTER_EQUALITY</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Component.java:6284</code></td>
+        <td>Double assignment of field</td>
+        <td><code>SA_FIELD_DOUBLE_ASSIGNMENT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Component.java:324</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/ComponentSelector.java:2234</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/ComponentSelector.java:2270</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/ComponentSelector.java:1284</code></td>
+        <td>Useless object created</td>
+        <td><code>UC_USELESS_OBJECT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Container.java:3103</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Container.java:3333</code></td>
+        <td>Useless non-empty void method</td>
+        <td><code>UC_USELESS_VOID_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Container.java:219</code></td>
+        <td>Uninitialized read of field method called from constructor of superclass</td>
+        <td><code>UR_UNINIT_READ_CALLED_FROM_SUPER_CONSTRUCTOR</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Container.java:4279</code></td>
+        <td>Unused field</td>
+        <td><code>UUF_UNUSED_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Container.java:4279</code></td>
+        <td>Unused field</td>
+        <td><code>UUF_UNUSED_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Container.java:4279</code></td>
+        <td>Unused field</td>
+        <td><code>UUF_UNUSED_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Container.java:4279</code></td>
+        <td>Unused field</td>
+        <td><code>UUF_UNUSED_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Container.java:4198</code></td>
+        <td>Unused field</td>
+        <td><code>UUF_UNUSED_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Container.java:4198</code></td>
+        <td>Unused field</td>
+        <td><code>UUF_UNUSED_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Display.java:515</code></td>
+        <td>Naked notify</td>
+        <td><code>NN_NAKED_NOTIFY</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Display.java:1336</code></td>
+        <td>Naked notify</td>
+        <td><code>NN_NAKED_NOTIFY</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Display.java:1317</code></td>
+        <td>Naked notify</td>
+        <td><code>NN_NAKED_NOTIFY</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Display.java:1625</code></td>
+        <td>Naked notify</td>
+        <td><code>NN_NAKED_NOTIFY</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Display.java:391</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Display.java:392</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Display.java:5237</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/EncodedImage.java:160</code></td>
+        <td>Comparison of String objects using == or !=</td>
+        <td><code>ES_COMPARING_STRINGS_WITH_EQ</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Form.java:4594</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Image.java:566</code></td>
+        <td>Method ignores results of InputStream.skip()</td>
+        <td><code>SR_NOT_CHECKED</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/InputComponent.java:74</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/InterFormContainer.java:74</code></td>
+        <td>Method ignores return value, is this OK?</td>
+        <td><code>RV_RETURN_VALUE_IGNORED_INFERRED</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Label.java:539</code></td>
+        <td>Uninitialized read of field method called from constructor of superclass</td>
+        <td><code>UR_UNINIT_READ_CALLED_FROM_SUPER_CONSTRUCTOR</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Label.java:537</code></td>
+        <td>Uninitialized read of field method called from constructor of superclass</td>
+        <td><code>UR_UNINIT_READ_CALLED_FROM_SUPER_CONSTRUCTOR</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/List.java:1102</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/NavigationCommand.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/RunnableWrapper.java:109</code></td>
+        <td>Naked notify</td>
+        <td><code>NN_NAKED_NOTIFY</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/SideMenuBar.java:1234</code></td>
+        <td>Comparison of String objects using == or !=</td>
+        <td><code>ES_COMPARING_STRINGS_WITH_EQ</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/SideMenuBar.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/TextArea.java:1151</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/TextField.java:300</code></td>
+        <td>Incorrect lazy initialization and update of static field</td>
+        <td><code>LI_LAZY_INIT_UPDATE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/TextSelection.java:642</code></td>
+        <td>Dead store to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/TextSelection.java:97</code></td>
+        <td>compareTo()/compare() incorrectly handles float or double value</td>
+        <td><code>CO_COMPARETO_INCORRECT_FLOATING</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/TextSelection.java:156</code></td>
+        <td>compareTo()/compare() incorrectly handles float or double value</td>
+        <td><code>CO_COMPARETO_INCORRECT_FLOATING</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/TextSelection.java:344</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/TextSelection.java:345</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Transform.java:86</code></td>
+        <td>Incorrect lazy initialization and update of static field</td>
+        <td><code>LI_LAZY_INIT_UPDATE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/URLImage.java:731</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/animations/CommonTransitions.java:921</code></td>
+        <td>Dead store to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/animations/CommonTransitions.java:920</code></td>
+        <td>Dead store to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/animations/CommonTransitions.java:881</code></td>
+        <td>Nullcheck of value previously dereferenced</td>
+        <td><code>RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/animations/CommonTransitions.java:504</code></td>
+        <td>Nullcheck of value previously dereferenced</td>
+        <td><code>RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/animations/CommonTransitions.java:398</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/animations/FlipTransition.java:252</code></td>
+        <td>Integral division result cast to double or float</td>
+        <td><code>ICAST_IDIV_CAST_TO_DOUBLE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/animations/FlipTransition.java:65</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/animations/FlipTransition.java:66</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/animations/MorphTransition.java:170</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/animations/MorphTransition.java:171</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:207</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:357</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:358</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:200</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:214</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:183</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:193</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:3219</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/Geometry.java:230</code></td>
+        <td>Integral division result cast to double or float</td>
+        <td><code>ICAST_IDIV_CAST_TO_DOUBLE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/Geometry.java:256</code></td>
+        <td>Integral division result cast to double or float</td>
+        <td><code>ICAST_IDIV_CAST_TO_DOUBLE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/Rectangle.java:428</code></td>
+        <td>Vacuous comparison of integer value</td>
+        <td><code>INT_VACUOUS_COMPARISON</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/Rectangle.java:194</code></td>
+        <td>Vacuous comparison of integer value</td>
+        <td><code>INT_VACUOUS_COMPARISON</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/Rectangle.java:468</code></td>
+        <td>Vacuous comparison of integer value</td>
+        <td><code>INT_VACUOUS_COMPARISON</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/AsyncDocumentRequestHandlerImpl.java:147</code></td>
+        <td>Naked notify</td>
+        <td><code>NN_NAKED_NOTIFY</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/CSSElement.java:1211</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/CSSEngine.java:637</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/CSSParser.java:740</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLComponent.java:470</code></td>
+        <td>Method call passes null for non-null parameter</td>
+        <td><code>NP_NULL_PARAM_DEREF</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLComponent.java:1863</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLComponent.java:256</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLComponent.java:4105</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLComponent.java:4268</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLComponent.java:4334</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLComponent.java:4159</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLComponent.java:4065</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLElement.java:976</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLElement.java:1164</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLElement.java:1440</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLFont.java:47</code></td>
+        <td>Unused field</td>
+        <td><code>UUF_UNUSED_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLForm.java:279</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLForm.java:1</code></td>
+        <td>Class doesn&#x27;t override equals in superclass</td>
+        <td><code>EQ_DOESNT_OVERRIDE_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLForm.java:433</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLInputFormat.java:357</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLInputFormat.java:430</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/MultiComboBox.java:312</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/MultiComboBox.java:235</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/ResourceThreadQueue.java:330</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/ResourceThreadQueue.java:356</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/GridBagLayout.java:56</code></td>
+        <td>Method names should start with a lower case letter</td>
+        <td><code>NM_METHOD_NAMING_CONVENTION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/GridBagLayout.java:56</code></td>
+        <td>Method names should start with a lower case letter</td>
+        <td><code>NM_METHOD_NAMING_CONVENTION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/GridBagLayout.java:726</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/GridBagLayout.java:1152</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/GridBagLayout.java:571</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/GridBagLayout.java:1139</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/GridBagLayout.java:1197</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/GridBagLayout.java:1196</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/CC.java:632</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/CC.java:388</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/CC.java:684</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/CC.java:286</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/CC.java:239</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/CC.java:354</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/CC.java:320</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/CC.java:422</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/CodenameOneMiGComponentWrapper.java:80</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/CodenameOneMiGContainerWrapper.java:84</code></td>
+        <td>Useless non-empty void method</td>
+        <td><code>UC_USELESS_VOID_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/ConstraintParser.java:973</code></td>
+        <td>Check for oddness that won&#x27;t work for negative numbers</td>
+        <td><code>IM_BAD_CHECK_FOR_ODD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/MigLayout.java:86</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/list/FilterProxyListModel.java:201</code></td>
+        <td>Computation of average could overflow</td>
+        <td><code>IM_AVERAGE_COMPUTATION_COULD_OVERFLOW</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/list/FilterProxyListModel.java:169</code></td>
+        <td>Negating the result of compareTo()/compare()</td>
+        <td><code>RV_NEGATING_RESULT_OF_COMPARETO</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/Border.java:1725</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/Border.java:1319</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/CSSBorder.java:321</code></td>
+        <td>Incorrect lazy initialization and update of static field</td>
+        <td><code>LI_LAZY_INIT_UPDATE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/CSSBorder.java:518</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/CSSBorder.java:2109</code></td>
+        <td>Unused field</td>
+        <td><code>UUF_UNUSED_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/CSSBorder.java:1974</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/CSSBorder.java:1990</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/CSSBorder.java:2018</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/CSSBorder.java:2022</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/CSSBorder.java:2018</code></td>
+        <td>Unused field</td>
+        <td><code>UUF_UNUSED_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/CSSBorder.java:2018</code></td>
+        <td>Unused field</td>
+        <td><code>UUF_UNUSED_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/CSSBorder.java:2018</code></td>
+        <td>Unused field</td>
+        <td><code>UUF_UNUSED_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/CSSBorder.java:2018</code></td>
+        <td>Unused field</td>
+        <td><code>UUF_UNUSED_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/DefaultLookAndFeel.java:2595</code></td>
+        <td>Dead store to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/DefaultLookAndFeel.java:898</code></td>
+        <td>Dead store to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/DefaultLookAndFeel.java:1582</code></td>
+        <td>Integral division result cast to double or float</td>
+        <td><code>ICAST_IDIV_CAST_TO_DOUBLE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/DefaultLookAndFeel.java:873</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/DefaultLookAndFeel.java:964</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/DefaultLookAndFeel.java:1290</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/DefaultLookAndFeel.java:1889</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/LookAndFeel.java:134</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/LookAndFeel.java:133</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/RoundRectBorder.java:884</code></td>
+        <td>Integral division result cast to double or float</td>
+        <td><code>ICAST_IDIV_CAST_TO_DOUBLE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/RoundRectBorder.java:887</code></td>
+        <td>Check for oddness that won&#x27;t work for negative numbers</td>
+        <td><code>IM_BAD_CHECK_FOR_ODD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/RoundRectBorder.java:861</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/Style.java:2804</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/Style.java:605</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/StyleParser.java:371</code></td>
+        <td>Integral division result cast to double or float</td>
+        <td><code>ICAST_IDIV_CAST_TO_DOUBLE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/StyleParser.java:826</code></td>
+        <td>Incorrect lazy initialization and update of static field</td>
+        <td><code>LI_LAZY_INIT_UPDATE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/scene/Node.java:612</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/scene/PerspectiveCamera.java:81</code></td>
+        <td>Integral division result cast to double or float</td>
+        <td><code>ICAST_IDIV_CAST_TO_DOUBLE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/spinner/DateSpinner3D.java:71</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/spinner/Picker.java:1211</code></td>
+        <td>Comparison of String objects using == or !=</td>
+        <td><code>ES_COMPARING_STRINGS_WITH_EQ</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/spinner/Picker.java:78</code></td>
+        <td>Unused field</td>
+        <td><code>UUF_UNUSED_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/spinner/Spinner3D.java:43</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/spinner/SpinnerNode.java:194</code></td>
+        <td>Integral division result cast to double or float</td>
+        <td><code>ICAST_IDIV_CAST_TO_DOUBLE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/spinner/SpinnerNode.java:48</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/spinner/SpinnerRenderer.java:122</code></td>
+        <td>Method invokes inefficient Number constructor; use static valueOf instead</td>
+        <td><code>DM_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/table/Table.java:458</code></td>
+        <td>compareTo()/compare() incorrectly handles float or double value</td>
+        <td><code>CO_COMPARETO_INCORRECT_FLOATING</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/tree/Tree.java:84</code></td>
+        <td>Unread field: should this field be static?</td>
+        <td><code>SS_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/tree/Tree.java:813</code></td>
+        <td>Comparison of String objects using == or !=</td>
+        <td><code>ES_COMPARING_STRINGS_WITH_EQ</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/util/Resources.java:1202</code></td>
+        <td>Dead store to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/util/UIBuilder.java:934</code></td>
+        <td>Method invokes inefficient Number constructor; use static valueOf instead</td>
+        <td><code>DM_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/util/UIBuilder.java:930</code></td>
+        <td>int value converted to long and used as absolute time</td>
+        <td><code>ICAST_INT_2_LONG_AS_INSTANT</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/ui/validation/Validator.java:541</code></td>
+        <td>Nullcheck of value previously dereferenced</td>
+        <td><code>RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/util/CaseInsensitiveOrder.java:33</code></td>
+        <td>Comparator doesn&#x27;t implement Serializable</td>
+        <td><code>SE_COMPARATOR_SHOULD_BE_SERIALIZABLE</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/util/DateUtil.java:450</code></td>
+        <td>int value cast to float and then passed to Math.round</td>
+        <td><code>ICAST_INT_CAST_TO_FLOAT_PASSED_TO_ROUND</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/util/EasyThread.java:102</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/util/EasyThread.java:116</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/util/TBigInteger.java:927</code></td>
+        <td>Vacuous bit mask operation on integer value</td>
+        <td><code>INT_VACUOUS_BIT_OPERATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/util/TMathContext.java:157</code></td>
+        <td>Uninitialized read of field in constructor</td>
+        <td><code>UR_UNINIT_READ</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/util/regex/RECompiler.java:50</code></td>
+        <td>Method invokes inefficient Number constructor; use static valueOf instead</td>
+        <td><code>DM_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/util/regex/RECompiler.java:503</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/util/regex/RECompiler.java:851</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/util/regex/RECompiler.java:1172</code></td>
+        <td>Should be a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/xml/Element.java:720</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Normal</td>
+        <td><code>CodenameOne/src/com/codename1/xml/XMLParser.java:284</code></td>
+        <td>Method concatenates strings using + in a loop</td>
+        <td><code>SBSC_USE_STRINGBUFFER_CONCATENATION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/analytics/AnalyticsService.java:129</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/analytics/AnalyticsService.java:44</code></td>
+        <td>Method names should start with a lower case letter</td>
+        <td><code>NM_METHOD_NAMING_CONVENTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/charts/transitions/SeriesTransition.java:103</code></td>
+        <td>Method uses the same code for two switch clauses</td>
+        <td><code>DB_DUPLICATE_SWITCH_CLAUSES</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/charts/util/ColorUtil.java:100</code></td>
+        <td>Method names should start with a lower case letter</td>
+        <td><code>NM_METHOD_NAMING_CONVENTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/cloud/CloudImageProperty.java:65</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/components/InfiniteScrollAdapter.java:231</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/components/StorageImageAsync.java:40</code></td>
+        <td>A volatile reference to an array doesn&#x27;t treat the array elements as volatile</td>
+        <td><code>VO_VOLATILE_REFERENCE_TO_ARRAY</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/components/StorageImageAsync.java:120</code></td>
+        <td>Load of known null value</td>
+        <td><code>NP_LOAD_OF_KNOWN_NULL_VALUE</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/components/ToastBar.java:151</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/components/ToastBar.java:772</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/facebook/FacebookRESTService.java:101</code></td>
+        <td>Method checks to see if result of String.indexOf is positive</td>
+        <td><code>RV_CHECK_FOR_POSITIVE_INDEXOF</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/facebook/FacebookRESTService.java:173</code></td>
+        <td>Method checks to see if result of String.indexOf is positive</td>
+        <td><code>RV_CHECK_FOR_POSITIVE_INDEXOF</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/impl/FullScreenAdService.java:338</code></td>
+        <td>Exception is caught when Exception is not thrown</td>
+        <td><code>REC_CATCH_EXCEPTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/CacheMap.java:45</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/JSONParser.java:841</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/Log.java:519</code></td>
+        <td>Exception is caught when Exception is not thrown</td>
+        <td><code>REC_CATCH_EXCEPTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/MultipartRequest.java:290</code></td>
+        <td>Method invokes toString() method on a String</td>
+        <td><code>DM_STRING_TOSTRING</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/Oauth2.java:657</code></td>
+        <td>Method checks to see if result of String.indexOf is positive</td>
+        <td><code>RV_CHECK_FOR_POSITIVE_INDEXOF</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/Oauth2.java:622</code></td>
+        <td>Method checks to see if result of String.indexOf is positive</td>
+        <td><code>RV_CHECK_FOR_POSITIVE_INDEXOF</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/Preferences.java:176</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/Preferences.java:186</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/Socket.java:176</code></td>
+        <td>Exception is caught when Exception is not thrown</td>
+        <td><code>REC_CATCH_EXCEPTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/Storage.java:67</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/Util.java:718</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/Util.java:715</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/WebServiceProxyCall.java:327</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/WebServiceProxyCall.java:331</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/DeflaterOutputStream.java:87</code></td>
+        <td>Questionable use of non-short-circuit logic</td>
+        <td><code>NS_NON_SHORT_CIRCUIT</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/InfBlocks.java:560</code></td>
+        <td>Dead store to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/InfBlocks.java:355</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/InfBlocks.java:436</code></td>
+        <td>Useless control flow</td>
+        <td><code>UCF_USELESS_CONTROL_FLOW</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/InfCodes.java:161</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/Inflate.java:302</code></td>
+        <td>Dead store to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/Inflate.java:273</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/gzip/ZStream.java:234</code></td>
+        <td>Useless control flow</td>
+        <td><code>UCF_USELESS_CONTROL_FLOW</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/rest/RequestBuilder.java:253</code></td>
+        <td>Method invokes toString() method on a String</td>
+        <td><code>DM_STRING_TOSTRING</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/rest/RequestBuilder.java:762</code></td>
+        <td>Exception is caught when Exception is not thrown</td>
+        <td><code>REC_CATCH_EXCEPTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/rest/RequestBuilder.java:855</code></td>
+        <td>Exception is caught when Exception is not thrown</td>
+        <td><code>REC_CATCH_EXCEPTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/rest/RequestBuilder.java:646</code></td>
+        <td>Exception is caught when Exception is not thrown</td>
+        <td><code>REC_CATCH_EXCEPTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/rest/RequestBuilder.java:804</code></td>
+        <td>Exception is caught when Exception is not thrown</td>
+        <td><code>REC_CATCH_EXCEPTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/io/services/ImageDownloadService.java:360</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/javascript/JSObject.java:640</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/javascript/JSObject.java:556</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/javascript/JSObject.java:619</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/javascript/JSObject.java:535</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/maps/MapComponent.java:1113</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/media/MediaManager.java:160</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/payment/Purchase.java:52</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/properties/InstantUI.java:241</code></td>
+        <td>Exception is caught when Exception is not thrown</td>
+        <td><code>REC_CATCH_EXCEPTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/properties/PropertyXMLElement.java:39</code></td>
+        <td>Class defines hashCode() and uses Object.equals()</td>
+        <td><code>HE_HASHCODE_USE_OBJECT_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/properties/PropertyXMLElement.java:323</code></td>
+        <td>Iterator next() method cannot throw NoSuchElementException</td>
+        <td><code>IT_NO_SUCH_ELEMENT</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/properties/UiBinding.java:483</code></td>
+        <td>Method checks to see if result of String.indexOf is positive</td>
+        <td><code>RV_CHECK_FOR_POSITIVE_INDEXOF</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/social/FacebookConnect.java:65</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/social/FacebookConnect.java:66</code></td>
+        <td>Field only ever set to null</td>
+        <td><code>UWF_NULL_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/social/GoogleConnect.java:67</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/social/GoogleConnect.java:68</code></td>
+        <td>Field only ever set to null</td>
+        <td><code>UWF_NULL_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/system/NativeLookup.java:104</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/testing/TestReporting.java:48</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/BrowserComponent.java:628</code></td>
+        <td>Useless control flow</td>
+        <td><code>UCF_USELESS_CONTROL_FLOW</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/BrowserComponent.java:86</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/BrowserComponent.java:86</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/BrowserComponent.java:1759</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/BrowserWindow.java:216</code></td>
+        <td>Could be refactored into a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC_NEEDS_THIS</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/ComboBox.java:90</code></td>
+        <td>Class implements same interface as superclass</td>
+        <td><code>RI_REDUNDANT_INTERFACES</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Container.java:4123</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Container.java:4268</code></td>
+        <td>Unwritten field</td>
+        <td><code>UWF_UNWRITTEN_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Display.java:1186</code></td>
+        <td>Exception is caught when Exception is not thrown</td>
+        <td><code>REC_CATCH_EXCEPTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Display.java:98</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Display.java:426</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Display.java:1170</code></td>
+        <td>Wait not in loop</td>
+        <td><code>WA_NOT_IN_LOOP</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Display.java:1419</code></td>
+        <td>Wait not in loop</td>
+        <td><code>WA_NOT_IN_LOOP</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Display.java:1021</code></td>
+        <td>Wait not in loop</td>
+        <td><code>WA_NOT_IN_LOOP</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/FontImage.java:11204</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Graphics.java:66</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/IndexedImage.java:297</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/InputComponent.java:90</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Label.java:911</code></td>
+        <td>Dead store to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Label.java:908</code></td>
+        <td>Dead store to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Label.java:1471</code></td>
+        <td>Useless control flow</td>
+        <td><code>UCF_USELESS_CONTROL_FLOW</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/LeadUtil.java:73</code></td>
+        <td>Useless control flow</td>
+        <td><code>UCF_USELESS_CONTROL_FLOW</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/LinearGradientPaint.java:43</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/LinearGradientPaint.java:43</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/LinearGradientPaint.java:43</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Slider.java:807</code></td>
+        <td>Could be refactored into a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC_NEEDS_THIS</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/TextField.java:1452</code></td>
+        <td>Useless control flow</td>
+        <td><code>UCF_USELESS_CONTROL_FLOW</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/TextSelection.java:63</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/Toolbar.java:1321</code></td>
+        <td>Useless control flow</td>
+        <td><code>UCF_USELESS_CONTROL_FLOW</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/UIFragment.java:462</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/URLImage.java:73</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/animations/MorphTransition.java:269</code></td>
+        <td>Could be refactored into a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC_NEEDS_THIS</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:3219</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:3102</code></td>
+        <td>Field names should start with a lower case letter</td>
+        <td><code>NM_FIELD_NAMING_CONVENTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:3102</code></td>
+        <td>Field names should start with a lower case letter</td>
+        <td><code>NM_FIELD_NAMING_CONVENTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:3102</code></td>
+        <td>Field names should start with a lower case letter</td>
+        <td><code>NM_FIELD_NAMING_CONVENTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:3102</code></td>
+        <td>Field names should start with a lower case letter</td>
+        <td><code>NM_FIELD_NAMING_CONVENTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:3102</code></td>
+        <td>Field names should start with a lower case letter</td>
+        <td><code>NM_FIELD_NAMING_CONVENTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:3102</code></td>
+        <td>Field names should start with a lower case letter</td>
+        <td><code>NM_FIELD_NAMING_CONVENTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:3102</code></td>
+        <td>Field names should start with a lower case letter</td>
+        <td><code>NM_FIELD_NAMING_CONVENTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:3102</code></td>
+        <td>Field names should start with a lower case letter</td>
+        <td><code>NM_FIELD_NAMING_CONVENTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:3003</code></td>
+        <td>Field names should start with a lower case letter</td>
+        <td><code>NM_FIELD_NAMING_CONVENTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:3003</code></td>
+        <td>Field names should start with a lower case letter</td>
+        <td><code>NM_FIELD_NAMING_CONVENTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:3003</code></td>
+        <td>Field names should start with a lower case letter</td>
+        <td><code>NM_FIELD_NAMING_CONVENTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/geom/GeneralPath.java:3003</code></td>
+        <td>Field names should start with a lower case letter</td>
+        <td><code>NM_FIELD_NAMING_CONVENTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/CSSEngine.java:166</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/CSSEngine.java:150</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/CSSParser.java:61</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLComponent.java:392</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLComponent.java:2490</code></td>
+        <td>Exception is caught when Exception is not thrown</td>
+        <td><code>REC_CATCH_EXCEPTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLComponent.java:2973</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLComponent.java:3782</code></td>
+        <td>Useless control flow</td>
+        <td><code>UCF_USELESS_CONTROL_FLOW</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLComponent.java:69</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/html/HTMLUtils.java:190</code></td>
+        <td>Condition has no effect due to the variable type</td>
+        <td><code>UC_USELESS_CONDITION_TYPE</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/GridBagLayout.java:1179</code></td>
+        <td>Could be refactored into a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC_NEEDS_THIS</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/GroupLayout.java:405</code></td>
+        <td>Dead store to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/LayeredLayout.java:183</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/LayeredLayout.java:183</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/LayoutStyle.java:44</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/AC.java:453</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/AC.java:530</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/CC.java:336</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/CC.java:563</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/CodenameOneMiGComponentWrapper.java:139</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/CodenameOneMiGComponentWrapper.java:70</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/CodenameOneMiGComponentWrapper.java:79</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/CodenameOneMiGContainerWrapper.java:73</code></td>
+        <td>Useless control flow</td>
+        <td><code>UCF_USELESS_CONTROL_FLOW</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/ConstraintParser.java:1529</code></td>
+        <td>Dead store to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/ConstraintParser.java:901</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/ConstraintParser.java:1070</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/ConstraintParser.java:936</code></td>
+        <td>Exception is caught when Exception is not thrown</td>
+        <td><code>REC_CATCH_EXCEPTION</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/MigLayout.java:65</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/MigLayout.java:65</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/MigLayout.java:65</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/PlatformDefaults.java:430</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/PlatformDefaults.java:431</code></td>
+        <td>Unread field</td>
+        <td><code>URF_UNREAD_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/ResizeConstraint.java:42</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/layouts/mig/UnitValue.java:174</code></td>
+        <td>Class defines hashCode() and uses Object.equals()</td>
+        <td><code>HE_HASHCODE_USE_OBJECT_EQUALS</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/list/DefaultListCellRenderer.java:99</code></td>
+        <td>Uninitialized read of field method called from constructor of superclass</td>
+        <td><code>UR_UNINIT_READ_CALLED_FROM_SUPER_CONSTRUCTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/Border.java:116</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/Border.java:72</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/CSSBorder.java:2380</code></td>
+        <td>Could be refactored into a static inner class</td>
+        <td><code>SIC_INNER_SHOULD_BE_STATIC_NEEDS_THIS</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/CSSBorder.java:2370</code></td>
+        <td>Useless control flow</td>
+        <td><code>UCF_USELESS_CONTROL_FLOW</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/CSSBorder.java:1761</code></td>
+        <td>Method checks to see if result of String.indexOf is positive</td>
+        <td><code>RV_CHECK_FOR_POSITIVE_INDEXOF</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/CSSBorder.java:1497</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/CSSBorder.java:1995</code></td>
+        <td>Unwritten field</td>
+        <td><code>UWF_UNWRITTEN_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/DefaultLookAndFeel.java:1653</code></td>
+        <td>Method uses the same code for two switch clauses</td>
+        <td><code>DB_DUPLICATE_SWITCH_CLAUSES</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/DefaultLookAndFeel.java:584</code></td>
+        <td>Dead store to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/DefaultLookAndFeel.java:621</code></td>
+        <td>Dead store to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/DefaultLookAndFeel.java:980</code></td>
+        <td>Dead store to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/Style.java:2469</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/Style.java:2590</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/Style.java:2543</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/Style.java:2566</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/Style.java:411</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/StyleParser.java:152</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/UIManager.java:1823</code></td>
+        <td>Dead store of null to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE_OF_NULL</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/UIManager.java:1939</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/UIManager.java:122</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/UIManager.java:67</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/UIManager.java:67</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/plaf/UIManager.java:67</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/spinner/DateTimeSpinner3D.java:236</code></td>
+        <td>Useless control flow</td>
+        <td><code>UCF_USELESS_CONTROL_FLOW</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/spinner/DateTimeSpinner3D.java:218</code></td>
+        <td>Useless control flow</td>
+        <td><code>UCF_USELESS_CONTROL_FLOW</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/spinner/NumericSpinner.java:180</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/spinner/NumericSpinner.java:129</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/spinner/Spinner.java:209</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/spinner/Spinner.java:534</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/spinner/SpinnerNode.java:34</code></td>
+        <td>Private method is never called</td>
+        <td><code>UPM_UNCALLED_PRIVATE_METHOD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/spinner/SpinnerNumberModel.java:118</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/spinner/SpinnerNumberModel.java:96</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/spinner/TimeSpinner3D.java:208</code></td>
+        <td>Unwritten field</td>
+        <td><code>UWF_UNWRITTEN_FIELD</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/table/Table.java:240</code></td>
+        <td>Dead store to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/tree/Tree.java:108</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/util/Resources.java:492</code></td>
+        <td>Method uses the same code for two switch clauses</td>
+        <td><code>DB_DUPLICATE_SWITCH_CLAUSES</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/util/Resources.java:1073</code></td>
+        <td>Dead store to local variable</td>
+        <td><code>DLS_DEAD_LOCAL_STORE</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/util/Resources.java:1590</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/util/UIBuilder.java:866</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/util/UIBuilder.java:870</code></td>
+        <td>Method invokes inefficient floating-point Number constructor; use static valueOf instead</td>
+        <td><code>DM_FP_NUMBER_CTOR</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/ui/validation/Validator.java:129</code></td>
+        <td>Incorrect lazy initialization and update of static field</td>
+        <td><code>LI_LAZY_INIT_UPDATE_STATIC</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/util/TBigInteger.java:1243</code></td>
+        <td>Questionable use of non-short-circuit logic</td>
+        <td><code>NS_NON_SHORT_CIRCUIT</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/util/regex/RECompiler.java:765</code></td>
+        <td>Switch statement found where one case falls through to the next case</td>
+        <td><code>SF_SWITCH_FALLTHROUGH</code></td>
+      </tr>
+      <tr>
+        <td>Low</td>
+        <td><code>CodenameOne/src/com/codename1/xml/XMLParser.java:101</code></td>
+        <td>Incorrect lazy initialization of static field</td>
+        <td><code>LI_LAZY_INIT_STATIC</code></td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+</html>

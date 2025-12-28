@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>PickerComponent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">PickerComponent.java</span></div><h1>PickerComponent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.ui;
+
+import com.codename1.ui.spinner.Picker;
+
+import java.util.Date;
+
+/**
+ * &lt;p&gt;A picker component similar to {@link com.codename1.ui.TextComponent} that adapts to native UI
+ * conventions and leverages the {@link com.codename1.ui.spinner.Picker} API. See the docs for
+ * {@link com.codename1.ui.InputComponent} for more options and coverage.&lt;/p&gt;
+ * &lt;p&gt;
+ * The following code demonstrates a simple set of inputs and validation as it appears in iOS, Android and with
+ * validation errors
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/5a28c7944aeab7d8ae6b26dc81690238.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/blog/pixel-perfect-text-field-picker-ios.png&quot; alt=&quot;Running on iOS&quot; /&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/blog/pixel-perfect-text-field-picker-android.png&quot; alt=&quot;Running on Android&quot; /&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/blog/pixel-perfect-text-field-error-handling-blank.png&quot; alt=&quot;Android validation errors&quot; /&gt;
+ *
+ * @author Shai Almog
+ */
+public class PickerComponent extends InputComponent {
+<span class="fc" id="L46">    private final Picker picker = createPickerInstance();</span>
+
+    /**
+     * Allows subclassing the picker component for customization
+     */
+<span class="fc" id="L51">    protected PickerComponent() {</span>
+<span class="fc" id="L52">        initInput();</span>
+<span class="fc" id="L53">        picker.setTickerEnabled(false);</span>
+<span class="fc" id="L54">    }</span>
+
+    /**
+     * Creates a strings picker component
+     *
+     * @param values the values for the picker
+     * @return a strings version of the picker component
+     */
+    public static PickerComponent createStrings(String... values) {
+<span class="fc" id="L63">        PickerComponent p = new PickerComponent();</span>
+<span class="fc" id="L64">        p.picker.setType(Display.PICKER_TYPE_STRINGS);</span>
+<span class="fc" id="L65">        p.picker.setStrings(values);</span>
+<span class="fc" id="L66">        p.picker.setSelectedString(values[0]);</span>
+<span class="fc" id="L67">        return p;</span>
+    }
+
+    /**
+     * Creates a date picker component
+     *
+     * @param date the initial date in the picker
+     * @return a date version of the picker component
+     */
+    public static PickerComponent createDate(Date date) {
+<span class="fc" id="L77">        PickerComponent p = new PickerComponent();</span>
+<span class="fc" id="L78">        p.picker.setType(Display.PICKER_TYPE_DATE);</span>
+<span class="fc" id="L79">        p.picker.setDate(date);</span>
+<span class="fc" id="L80">        return p;</span>
+    }
+
+    /**
+     * Creates a date + time picker component
+     *
+     * @param date the initial date in the picker
+     * @return a date + time version of the picker component
+     */
+    public static PickerComponent createDateTime(Date date) {
+<span class="nc" id="L90">        PickerComponent p = new PickerComponent();</span>
+<span class="nc" id="L91">        p.picker.setType(Display.PICKER_TYPE_DATE_AND_TIME);</span>
+<span class="nc" id="L92">        p.picker.setDate(date);</span>
+<span class="nc" id="L93">        return p;</span>
+    }
+
+    /**
+     * Creates a time picker component
+     *
+     * @param minutes minutes since midnight as a time of day
+     * @return a time version of the picker component
+     */
+    public static PickerComponent createTime(int minutes) {
+<span class="fc" id="L103">        PickerComponent p = new PickerComponent();</span>
+<span class="fc" id="L104">        p.picker.setType(Display.PICKER_TYPE_TIME);</span>
+<span class="fc" id="L105">        p.picker.setTime(minutes);</span>
+<span class="fc" id="L106">        return p;</span>
+    }
+
+    /**
+     * Creates a duration minutes picker component
+     *
+     * @param ms the duration value in milliseconds
+     * @return a duration version of the picker component
+     */
+    public static PickerComponent createDurationMinutes(int ms) {
+<span class="fc" id="L116">        PickerComponent p = new PickerComponent();</span>
+<span class="fc" id="L117">        p.picker.setType(Display.PICKER_TYPE_DURATION_MINUTES);</span>
+<span class="fc" id="L118">        p.picker.setDuration(ms);</span>
+<span class="fc" id="L119">        return p;</span>
+    }
+
+    /**
+     * Creates a duration hours + minutes picker component
+     *
+     * @param hours   the number of hours
+     * @param minutes the number of minutes
+     * @return a duration version of the picker component
+     */
+    public static PickerComponent createDurationHoursMinutes(int hours, int minutes) {
+<span class="fc" id="L130">        PickerComponent p = new PickerComponent();</span>
+<span class="fc" id="L131">        p.picker.setType(Display.PICKER_TYPE_DURATION_HOURS);</span>
+<span class="fc" id="L132">        p.picker.setDuration(hours, minutes);</span>
+<span class="fc" id="L133">        return p;</span>
+    }
+
+    /**
+     * Allows developers to subclass the Picker component instance to customize
+     * behaviors of the subclass
+     *
+     * @return the picker instance
+     */
+    protected Picker createPickerInstance() {
+<span class="fc" id="L143">        return new Picker();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Component getEditor() {
+<span class="fc" id="L151">        return picker;</span>
+    }
+
+    /**
+     * Returns the picker instance
+     *
+     * @return the picker
+     */
+    public Picker getPicker() {
+<span class="fc" id="L160">        return picker;</span>
+    }
+
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    public PickerComponent onTopMode(boolean onTopMode) {
+<span class="fc" id="L168">        super.onTopMode(onTopMode);</span>
+<span class="fc" id="L169">        return this;</span>
+    }
+
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     */
+    public PickerComponent errorMessage(String errorMessage) {
+<span class="fc" id="L177">        super.errorMessage(errorMessage);</span>
+<span class="fc" id="L178">        return this;</span>
+    }
+
+    /**
+     * Overridden for covariant return type
+     * {@inheritDoc}
+     * }
+     */
+    public PickerComponent label(String text) {
+<span class="fc" id="L187">        super.label(text);</span>
+<span class="fc" id="L188">        return this;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

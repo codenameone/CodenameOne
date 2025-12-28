@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SpinnerRenderer.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.spinner</a> &gt; <span class="el_source">SpinnerRenderer.java</span></div><h1>SpinnerRenderer.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui.spinner;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Font;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Image;
+import com.codename1.ui.ImageFactory;
+import com.codename1.ui.List;
+import com.codename1.ui.list.DefaultListCellRenderer;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+import com.codename1.ui.util.Effects;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Spinner renderer that can automatically simulate the iOS perspective transform behavior
+ *
+ * @author Shai Almog
+ */
+class SpinnerRenderer&lt;T&gt; extends DefaultListCellRenderer&lt;T&gt; {
+    private static final int PERSPECTIVES = 9;
+    private static final int FRONT_ANGLE = 4;
+<span class="fc" id="L47">    private static final float[] TOP_SCALE = {0.5f, 0.5f, 0.8f, 0.95f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f};</span>
+<span class="fc" id="L48">    private static final float[] BOTTOM_SCALE = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.95f, 0.8f, 0.5f, 0.5f};</span>
+<span class="fc" id="L49">    private static final float[] VERTICAL_SHRINK = {0.5f, 0.5f, 0.80f, 0.90f, 1.0f, 0.90f, 0.80f, 0.5f, 0.5f};</span>
+    static boolean iOS7Mode;
+    int perspective;
+    private Map&lt;Character, Image&gt;[] imageCache;
+
+    public SpinnerRenderer() {
+<span class="fc" id="L55">        super(false);</span>
+<span class="fc" id="L56">    }</span>
+
+    @Override
+    public Component getCellRendererComponent(Component list, Object model, T value, int index, boolean isSelected) {
+<span class="fc bfc" id="L60" title="All 2 branches covered.">        if (iOS7Mode) {</span>
+<span class="fc" id="L61">            perspective = -1;</span>
+            // calculate perspective
+<span class="fc" id="L63">            int idx = ((List) list).getCurrentSelected();</span>
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">            if (idx == index) {</span>
+<span class="nc" id="L65">                perspective = FRONT_ANGLE;</span>
+            } else {
+<span class="fc" id="L67">                int count = ((List) list).getModel().getSize();</span>
+<span class="fc" id="L68">                int directDistance = Math.abs(idx - index);</span>
+                int indirect;
+<span class="fc bfc" id="L70" title="All 2 branches covered.">                if (index &gt; idx) {</span>
+<span class="fc" id="L71">                    indirect = count - index + idx;</span>
+                } else {
+<span class="fc" id="L73">                    indirect = count - idx + index;</span>
+                }
+<span class="pc bpc" id="L75" title="1 of 2 branches missed.">                if (indirect &lt; directDistance) {</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                    if (indirect &lt; FRONT_ANGLE) {</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                        if (index &lt; idx) {</span>
+<span class="nc" id="L78">                            perspective = indirect;</span>
+                        } else {
+<span class="nc" id="L80">                            perspective = FRONT_ANGLE + 1 + indirect;</span>
+                        }
+                    }
+                } else {
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">                    if (directDistance &lt; FRONT_ANGLE) {</span>
+<span class="fc bfc" id="L85" title="All 2 branches covered.">                        if (index &lt; idx) {</span>
+<span class="fc" id="L86">                            perspective = directDistance;</span>
+                        } else {
+<span class="fc" id="L88">                            perspective = FRONT_ANGLE + 1 + directDistance;</span>
+                        }
+                    }
+                }
+            }
+        }
+<span class="fc" id="L94">        return super.getCellRendererComponent(list, model, value, index, isSelected);</span>
+    }
+
+    @Override
+    public void paint(Graphics g) {
+<span class="pc bpc" id="L99" title="3 of 4 branches missed.">        if (!iOS7Mode || perspective == FRONT_ANGLE) {</span>
+<span class="fc" id="L100">            super.paint(g);</span>
+        } else {
+<span class="nc bnc" id="L102" title="All 2 branches missed.">            if (!isInClippingRegion(g)) {</span>
+<span class="nc" id="L103">                return;</span>
+            }
+<span class="nc" id="L105">            Style s = getStyle();</span>
+<span class="nc" id="L106">            drawStringPerspectivePosition(g, getText(), getX() + s.getPaddingLeftNoRTL(), getY() + s.getPaddingTop());</span>
+        }
+<span class="fc" id="L108">    }</span>
+
+    /**
+     * Draws the character with the given perspective effect
+     */
+    private int drawCharPerspectivePosition(Graphics g, char c, int x, int y) {
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        if (imageCache == null) {</span>
+<span class="nc" id="L115">            imageCache = new HashMap[PERSPECTIVES];</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">            for (int iter = 0; iter &lt; PERSPECTIVES; iter++) {</span>
+<span class="nc bnc" id="L117" title="All 2 branches missed.">                if (iter != FRONT_ANGLE) {</span>
+<span class="nc" id="L118">                    imageCache[iter] = new HashMap&lt;Character, Image&gt;();</span>
+                }
+            }
+        }
+<span class="nc" id="L122">        Character chr = new Character(c);</span>
+<span class="nc" id="L123">        Image i = imageCache[perspective].get(chr);</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (i == null) {</span>
+            //UIManager.getInstance().getLookAndFeel().setFG(g, this);
+<span class="nc" id="L126">            Font f = getStyle().getFont();</span>
+<span class="nc" id="L127">            int w = f.charWidth(c);</span>
+<span class="nc" id="L128">            int h = f.getHeight();</span>
+<span class="nc" id="L129">            i = ImageFactory.createImage(this, w, h, 0);</span>
+<span class="nc" id="L130">            g = i.getGraphics();</span>
+<span class="nc" id="L131">            UIManager.getInstance().getLookAndFeel().setFG(g, this);</span>
+<span class="nc" id="L132">            int alpha = g.concatenateAlpha(getStyle().getFgAlpha());</span>
+<span class="nc" id="L133">            g.drawChar(c, 0, 0);</span>
+<span class="nc" id="L134">            g.setAlpha(alpha);</span>
+<span class="nc" id="L135">            i = Effects.verticalPerspective(i, TOP_SCALE[perspective], BOTTOM_SCALE[perspective], VERTICAL_SHRINK[perspective]);</span>
+<span class="nc" id="L136">            imageCache[perspective].put(chr, i);</span>
+        }
+<span class="nc" id="L138">        g.drawImage(i, x, y);</span>
+<span class="nc" id="L139">        return i.getWidth();</span>
+    }
+
+    private void drawStringPerspectivePosition(Graphics g, String s, int x, int y) {
+<span class="nc bnc" id="L143" title="All 4 branches missed.">        if (perspective &lt; 0 || perspective &gt;= PERSPECTIVES) {</span>
+<span class="nc" id="L144">            return;</span>
+        }
+<span class="nc" id="L146">        int l = s.length();</span>
+<span class="nc" id="L147">        int position = 0;</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">        for (int iter = 0; iter &lt; l; iter++) {</span>
+<span class="nc" id="L149">            char c = s.charAt(iter);</span>
+<span class="nc" id="L150">            position += drawCharPerspectivePosition(g, c, x + position, y);</span>
+<span class="nc" id="L151">            position -= 4;</span>
+        }
+<span class="nc" id="L153">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
