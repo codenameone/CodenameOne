@@ -733,7 +733,7 @@ class StampedLockIntegrationTest {
             return;
         }
 
-        String content = Files.readString(nativeMethods);
+        String content = new String(Files.readAllBytes(nativeMethods), StandardCharsets.UTF_8);
 
         content = content.replaceFirst("#include \\\"java_lang_System.h\\\"\\n\\n",
                 "#include \"java_lang_System.h\"\n\nJAVA_OBJECT java_lang_Class_getName___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls);\nJAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT t);\n\n");
