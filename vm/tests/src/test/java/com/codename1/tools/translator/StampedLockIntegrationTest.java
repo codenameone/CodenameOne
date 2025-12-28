@@ -89,20 +89,22 @@ class StampedLockIntegrationTest {
 
         Path srcRoot = distDir.resolve("StampedLockTestApp-src");
         CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
+        CleanTargetIntegrationTest.patchFileHeader(srcRoot);
         writeRuntimeStubs(srcRoot);
+        patchHashMapNativeSupport(srcRoot);
 
-        replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
+        CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
 
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
 
-        CleanTargetIntegrationTest.runCommand(Arrays.asList(
+        List<String> cmakeCommand = new ArrayList<>(Arrays.asList(
                 "cmake",
                 "-S", distDir.toString(),
-                "-B", buildDir.toString(),
-                "-DCMAKE_C_COMPILER=clang",
-                "-DCMAKE_OBJC_COMPILER=clang"
-        ), distDir);
+                "-B", buildDir.toString()
+        ));
+        cmakeCommand.addAll(CleanTargetIntegrationTest.cmakeCompilerArgs());
+        CleanTargetIntegrationTest.runCommand(cmakeCommand, distDir);
 
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
@@ -122,6 +124,20 @@ class StampedLockIntegrationTest {
         Files.createDirectories(concurrent);
         Files.createDirectories(io);
 
+        // java.util.HashMap (needed for generated native stubs)
+        Files.write(util.resolve("HashMap.java"), ("package java.util;\n" +
+                "public class HashMap<K,V> {\n" +
+                "    public HashMap() {}\n" +
+                "    public V put(K key, V value) { return value; }\n" +
+                "    public V get(Object key) { return null; }\n" +
+                "    public int size() { return 0; }\n" +
+                "    public static class Entry<K,V> {\n" +
+                "        public K key;\n" +
+                "        public V value;\n" +
+                "        public Entry(K key, V value) { this.key = key; this.value = value; }\n" +
+                "    }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
         // java.lang.Object
         Files.write(lang.resolve("Object.java"), ("package java.lang;\n" +
                 "public class Object {\n" +
@@ -136,6 +152,9 @@ class StampedLockIntegrationTest {
                 "    public final native Class<?> getClass();\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
+        // java.lang.AutoCloseable
+        Files.write(lang.resolve("AutoCloseable.java"), "package java.lang; public interface AutoCloseable { void close() throws java.io.IOException; }".getBytes(StandardCharsets.UTF_8));
+
         // java.lang.String
         Files.write(lang.resolve("String.java"), ("package java.lang;\n" +
                 "public class String {\n" +
@@ -143,19 +162,88 @@ class StampedLockIntegrationTest {
                 "    private int offset;\n" +
                 "    private int count;\n" +
                 "    public String(char[] v) { value = v; count=v.length; }\n" +
+                "    public String(char[] v, int off, int len) { value = v; offset = off; count = len; }\n" +
                 "    public static String valueOf(Object obj) { return obj == null ? \"null\" : obj.toString(); }\n" +
+                "    public static String valueOf(int i) { return new String(new char[0]); }\n" +
+                "    public static String valueOf(long i) { return new String(new char[0]); }\n" +
+                "    public static String valueOf(boolean b) { return new String(new char[0]); }\n" +
+                "    public static String valueOf(char c) { return new String(new char[]{c}); }\n" +
+                "    public static String valueOf(float f) { return new String(new char[0]); }\n" +
+                "    public static String valueOf(double d) { return new String(new char[0]); }\n" +
+                "    public byte[] getBytes() { return new byte[0]; }\n" +
+                "    public byte[] getBytes(String charset) { return new byte[0]; }\n" +
+                "    public void getChars(int srcBegin, int srcEnd, char[] dst, int dstBegin) {\n" +
+                "        for (int i = srcBegin; i < srcEnd; i++) { dst[dstBegin + i - srcBegin] = value[offset + i]; }\n" +
+                "    }\n" +
+                "    public int length() { return count; }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
         // java.lang.StringBuilder
         Files.write(lang.resolve("StringBuilder.java"), ("package java.lang;\n" +
                 "public class StringBuilder {\n" +
-                "    public StringBuilder() {}\n" +
-                "    public StringBuilder(String str) {}\n" +
-                "    public StringBuilder(int cap) {}\n" +
-                "    public StringBuilder append(String s) { return this; }\n" +
-                "    public StringBuilder append(Object o) { return this; }\n" +
-                "    public StringBuilder append(int i) { return this; }\n" +
-                "    public String toString() { return \"\"; }\n" +
+                "    char[] value;\n" +
+                "    int count;\n" +
+                "    public StringBuilder() { this(16); }\n" +
+                "    public StringBuilder(String str) { this(16); append(str); }\n" +
+                "    public StringBuilder(int cap) { value = new char[cap]; }\n" +
+                "    private void ensureCapacity(int cap) { if (cap > value.length) { char[] n = new char[cap]; System.arraycopy(value, 0, n, 0, count); value = n; } }\n" +
+                "    public StringBuilder append(String s) { if (s == null) return append(\"null\"); int len = s.length(); ensureCapacity(count + len); s.getChars(0, len, value, count); count += len; return this; }\n" +
+                "    public StringBuilder append(Object o) { return append(String.valueOf(o)); }\n" +
+                "    public StringBuilder append(int i) { return append(String.valueOf(i)); }\n" +
+                "    public StringBuilder append(char c) { ensureCapacity(count + 1); value[count++] = c; return this; }\n" +
+                "    public void getChars(int srcBegin, int srcEnd, char[] dst, int dstBegin) { System.arraycopy(value, srcBegin, dst, dstBegin, srcEnd - srcBegin); }\n" +
+                "    public int length() { return count; }\n" +
+                "    public String toString() { return new String(value, 0, count); }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
+        // Primitive wrappers
+        Files.write(lang.resolve("Boolean.java"), ("package java.lang;\n" +
+                "public final class Boolean {\n" +
+                "    private boolean value;\n" +
+                "    public Boolean(boolean value) { this.value = value; }\n" +
+                "    public boolean booleanValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Byte.java"), ("package java.lang;\n" +
+                "public final class Byte {\n" +
+                "    private byte value;\n" +
+                "    public Byte(byte value) { this.value = value; }\n" +
+                "    public byte byteValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Short.java"), ("package java.lang;\n" +
+                "public final class Short {\n" +
+                "    private short value;\n" +
+                "    public Short(short value) { this.value = value; }\n" +
+                "    public short shortValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Character.java"), ("package java.lang;\n" +
+                "public final class Character {\n" +
+                "    private char value;\n" +
+                "    public Character(char value) { this.value = value; }\n" +
+                "    public char charValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Integer.java"), ("package java.lang;\n" +
+                "public final class Integer {\n" +
+                "    private int value;\n" +
+                "    public Integer(int value) { this.value = value; }\n" +
+                "    public int intValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Long.java"), ("package java.lang;\n" +
+                "public final class Long {\n" +
+                "    private long value;\n" +
+                "    public Long(long value) { this.value = value; }\n" +
+                "    public long longValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Float.java"), ("package java.lang;\n" +
+                "public final class Float {\n" +
+                "    private float value;\n" +
+                "    public Float(float value) { this.value = value; }\n" +
+                "    public float floatValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Double.java"), ("package java.lang;\n" +
+                "public final class Double {\n" +
+                "    private double value;\n" +
+                "    public Double(double value) { this.value = value; }\n" +
+                "    public double doubleValue() { return value; }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
         // java.lang.Class
@@ -186,13 +274,18 @@ class StampedLockIntegrationTest {
         // java.lang.System
         Files.write(lang.resolve("System.java"), ("package java.lang;\n" +
                 "public final class System {\n" +
-                "    public static native long currentTimeMillis();\n" +
+                "    public static long currentTimeMillis() { return 0L; }\n" +
+                "    public static void arraycopy(Object src, int srcPos, Object dest, int destPos, int length) {}\n" +
+                "    public static void gc() {}\n" +
+                "    public static void startGCThread() {}\n" +
+                "    public static Thread gcThreadInstance;\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
         // Exceptions
         Files.write(lang.resolve("Throwable.java"), "package java.lang; public class Throwable { public Throwable() {} public Throwable(String s) {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("Exception.java"), "package java.lang; public class Exception extends Throwable { public Exception() {} public Exception(String s) {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("RuntimeException.java"), "package java.lang; public class RuntimeException extends Exception { public RuntimeException() {} public RuntimeException(String s) {} }".getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("ArrayIndexOutOfBoundsException.java"), "package java.lang; public class ArrayIndexOutOfBoundsException extends RuntimeException { public ArrayIndexOutOfBoundsException() {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("InterruptedException.java"), "package java.lang; public class InterruptedException extends Exception { public InterruptedException() {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("NullPointerException.java"), "package java.lang; public class NullPointerException extends RuntimeException { public NullPointerException() {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("IllegalMonitorStateException.java"), "package java.lang; public class IllegalMonitorStateException extends RuntimeException { public IllegalMonitorStateException() {} }".getBytes(StandardCharsets.UTF_8));
@@ -201,6 +294,147 @@ class StampedLockIntegrationTest {
 
         // java.io.Serializable
         Files.write(io.resolve("Serializable.java"), "package java.io; public interface Serializable {}".getBytes(StandardCharsets.UTF_8));
+
+        // java.io.IOException
+        Files.write(io.resolve("IOException.java"), "package java.io; public class IOException extends Exception { public IOException() {} public IOException(String s) { super(s); } }".getBytes(StandardCharsets.UTF_8));
+
+        // java.io.InputStream
+        Files.write(io.resolve("InputStream.java"), ("package java.io;\n" +
+                "public class InputStream implements java.lang.AutoCloseable {\n" +
+                "    public InputStream() {}\n" +
+                "    public int available() throws IOException { return 0; }\n" +
+                "    public int read() throws IOException { return -1; }\n" +
+                "    public int read(byte[] b, int off, int len) throws IOException { return read(); }\n" +
+                "    public long skip(long n) throws IOException { return 0; }\n" +
+                "    public void close() throws IOException {}\n" +
+                "    public synchronized void mark(int readlimit) {}\n" +
+                "    public void reset() throws IOException { throw new IOException(); }\n" +
+                "    public boolean markSupported() { return false; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
+        // java.io.OutputStream
+        Files.write(io.resolve("OutputStream.java"), ("package java.io;\n" +
+                "public class OutputStream implements java.lang.AutoCloseable {\n" +
+                "    public OutputStream() {}\n" +
+                "    public void write(int b) throws IOException {}\n" +
+                "    public void write(byte[] b, int off, int len) throws IOException {\n" +
+                "        for (int i = 0; i < len; i++) { write(b[off + i]); }\n" +
+                "    }\n" +
+                "    public void flush() throws IOException {}\n" +
+                "    public void close() throws IOException {}\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
+        // Minimal java.io.File to satisfy translator native headers
+        Files.write(io.resolve("File.java"), ("package java.io;\n" +
+                "public class File {\n" +
+                "    public static final String separator = \"/\";\n" +
+                "    public static final char separatorChar = '/';\n" +
+                "    public static final String pathSeparator = \":\";\n" +
+                "    public static final char pathSeparatorChar = ':';\n" +
+                "    private String path;\n" +
+                "    public File(String pathname) { this.path = pathname == null ? \"\" : pathname; }\n" +
+                "    public File(File parent, String child) { this(parent == null ? child : parent.getPath() + separator + child); }\n" +
+                "    public File(String parent, String child) { this(parent == null ? child : parent + separator + child); }\n" +
+                "    public String getPath() { return path; }\n" +
+                "    public boolean exists() { return existsImpl(path); }\n" +
+                "    public boolean isDirectory() { return isDirectoryImpl(path); }\n" +
+                "    public boolean isFile() { return isFileImpl(path); }\n" +
+                "    public boolean isHidden() { return isHiddenImpl(path); }\n" +
+                "    public long lastModified() { return lastModifiedImpl(path); }\n" +
+                "    public long length() { return lengthImpl(path); }\n" +
+                "    public boolean createNewFile() { return createNewFileImpl(path); }\n" +
+                "    public boolean delete() { return deleteImpl(path); }\n" +
+                "    public String[] list() { return listImpl(path); }\n" +
+                "    public boolean mkdir() { return mkdirImpl(path); }\n" +
+                "    public boolean renameTo(File dest) { return renameToImpl(path, dest == null ? null : dest.getPath()); }\n" +
+                "    public boolean setReadOnly() { return setReadOnlyImpl(path); }\n" +
+                "    public boolean setWritable(boolean writable) { return setWritableImpl(path, writable); }\n" +
+                "    public boolean setReadable(boolean readable) { return setReadableImpl(path, readable); }\n" +
+                "    public boolean setExecutable(boolean executable) { return setExecutableImpl(path, executable); }\n" +
+                "    public long getTotalSpace() { return getTotalSpaceImpl(path); }\n" +
+                "    public long getFreeSpace() { return getFreeSpaceImpl(path); }\n" +
+                "    public long getUsableSpace() { return getUsableSpaceImpl(path); }\n" +
+                "    public String getAbsolutePath() { return getAbsolutePathImpl(path); }\n" +
+                "    public String getCanonicalPath() { return getCanonicalPathImpl(path); }\n" +
+                "    private native String getAbsolutePathImpl(String path);\n" +
+                "    private native String getCanonicalPathImpl(String path);\n" +
+                "    private native boolean existsImpl(String path);\n" +
+                "    private native boolean isDirectoryImpl(String path);\n" +
+                "    private native boolean isFileImpl(String path);\n" +
+                "    private native boolean isHiddenImpl(String path);\n" +
+                "    private native long lastModifiedImpl(String path);\n" +
+                "    private native long lengthImpl(String path);\n" +
+                "    private native boolean createNewFileImpl(String path);\n" +
+                "    private native boolean deleteImpl(String path);\n" +
+                "    private native String[] listImpl(String path);\n" +
+                "    private native boolean mkdirImpl(String path);\n" +
+                "    private native boolean renameToImpl(String path, String dest);\n" +
+                "    private native boolean setReadOnlyImpl(String path);\n" +
+                "    private native boolean setWritableImpl(String path, boolean writable);\n" +
+                "    private native boolean setReadableImpl(String path, boolean readable);\n" +
+                "    private native boolean setExecutableImpl(String path, boolean executable);\n" +
+                "    private native long getTotalSpaceImpl(String path);\n" +
+                "    private native long getFreeSpaceImpl(String path);\n" +
+                "    private native long getUsableSpaceImpl(String path);\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
+        Files.write(io.resolve("FileInputStream.java"), ("package java.io;\n" +
+                "public class FileInputStream extends InputStream {\n" +
+                "    private long handle;\n" +
+                "    private boolean closed;\n" +
+                "    public FileInputStream(String name) throws IOException { this(name == null ? null : new File(name)); }\n" +
+                "    public FileInputStream(File file) throws IOException {\n" +
+                "        if (file == null) throw new NullPointerException();\n" +
+                "        this.handle = openImpl(file.getPath());\n" +
+                "        if (this.handle == 0) throw new IOException();\n" +
+                "    }\n" +
+                "    public int read() throws IOException { byte[] b = new byte[1]; int c = read(b,0,1); return c <= 0 ? -1 : b[0] & 0xff; }\n" +
+                "    public int read(byte[] b, int off, int len) throws IOException { if (closed) throw new IOException(); return readImpl(handle, b, off, len); }\n" +
+                "    public long skip(long n) throws IOException { if (closed) throw new IOException(); return skipImpl(handle, n); }\n" +
+                "    public int available() throws IOException { if (closed) throw new IOException(); return availableImpl(handle); }\n" +
+                "    public void close() throws IOException { if (!closed) { closed = true; closeImpl(handle); handle = 0; } }\n" +
+                "    private static native long openImpl(String path) throws IOException;\n" +
+                "    private static native int readImpl(long handle, byte[] b, int off, int len) throws IOException;\n" +
+                "    private static native long skipImpl(long handle, long n) throws IOException;\n" +
+                "    private static native int availableImpl(long handle) throws IOException;\n" +
+                "    private static native void closeImpl(long handle) throws IOException;\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
+        Files.write(io.resolve("FileOutputStream.java"), ("package java.io;\n" +
+                "public class FileOutputStream extends OutputStream {\n" +
+                "    private long handle;\n" +
+                "    private boolean closed;\n" +
+                "    public FileOutputStream(String name) throws IOException { this(name, false); }\n" +
+                "    public FileOutputStream(String name, boolean append) throws IOException { this(name == null ? null : new File(name), append); }\n" +
+                "    public FileOutputStream(File file) throws IOException { this(file, false); }\n" +
+                "    public FileOutputStream(File file, boolean append) throws IOException {\n" +
+                "        if (file == null) throw new NullPointerException();\n" +
+                "        this.handle = openImpl(file.getPath(), append);\n" +
+                "        if (this.handle == 0) throw new IOException();\n" +
+                "    }\n" +
+                "    public void write(int b) throws IOException { byte[] tmp = new byte[]{(byte)b}; write(tmp,0,1); }\n" +
+                "    public void write(byte[] b, int off, int len) throws IOException { if (closed) throw new IOException(); writeImpl(handle, b, off, len); }\n" +
+                "    public void flush() throws IOException { if (closed) throw new IOException(); flushImpl(handle); }\n" +
+                "    public void close() throws IOException { if (!closed) { closed = true; flushImpl(handle); closeImpl(handle); handle = 0; } }\n" +
+                "    private static native long openImpl(String path, boolean append) throws IOException;\n" +
+                "    private static native void writeImpl(long handle, byte[] b, int off, int len) throws IOException;\n" +
+                "    private static native void flushImpl(long handle) throws IOException;\n" +
+                "    private static native void closeImpl(long handle) throws IOException;\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
+        Files.write(io.resolve("FileWriter.java"), ("package java.io;\n" +
+                "public class FileWriter {\n" +
+                "    private final FileOutputStream out;\n" +
+                "    public FileWriter(String name) { this.out = new FileOutputStream(name); }\n" +
+                "    public FileWriter(File file) { this.out = new FileOutputStream(file); }\n" +
+                "    public void write(String s) throws java.io.IOException {\n" +
+                "        if (s == null) return;\n" +
+                "        byte[] data = s.getBytes();\n" +
+                "        out.write(data, 0, data.length);\n" +
+                "    }\n" +
+                "    public void flush() { out.flush(); }\n" +
+                "    public void close() { out.close(); }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
 
         // java.util.concurrent.TimeUnit
         Files.write(concurrent.resolve("TimeUnit.java"), ("package java.util.concurrent;\n" +
@@ -213,13 +447,27 @@ class StampedLockIntegrationTest {
     private String stampedLockTestAppSource() {
         return "import java.util.concurrent.locks.*;\n" +
                "import java.util.concurrent.TimeUnit;\n" +
+               "import java.io.*;\n" +
                "public class StampedLockTestApp {\n" +
                "    private static native void report(String msg);\n" +
                "    \n" +
                "    public static void main(String[] args) {\n" +
+               "        touchFileStreams();\n" +
+               "        java.util.HashMap<Object,Object> map = new java.util.HashMap<Object,Object>();\n" +
+               "        map.put(\"k\", \"v\");\n" +
+               "        map.get(\"k\");\n" +
                "        testBasic();\n" +
                "        testOptimisticRead();\n" +
                "        testWriteLockExclusion();\n" +
+               "    }\n" +
+               "    private static void touchFileStreams() {\n" +
+               "        try {\n" +
+               "            File f = new File(\"fs-touch.tmp\");\n" +
+               "            new FileInputStream(f).close();\n" +
+               "            new FileOutputStream(f).close();\n" +
+               "            new FileWriter(f).close();\n" +
+               "        } catch (Exception ignore) {\n" +
+               "        }\n" +
                "    }\n" +
                "    \n" +
                "    private static void testBasic() {\n" +
@@ -318,18 +566,6 @@ class StampedLockIntegrationTest {
                 "        fflush(stdout);\n" +
                 "    }\n" +
                 "}\n";
-    }
-
-    static void replaceLibraryWithExecutableTarget(Path cmakeLists, String sourceDirName) throws java.io.IOException {
-        String content = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
-        String globWithObjc = String.format("file(GLOB TRANSLATOR_SOURCES \"%s/*.c\" \"%s/*.m\")", sourceDirName, sourceDirName);
-        String globCOnly = String.format("file(GLOB TRANSLATOR_SOURCES \"%s/*.c\")", sourceDirName);
-        content = content.replace(globWithObjc, globCOnly);
-        String replacement = content.replace(
-                "add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})",
-                "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m pthread)"
-        );
-        Files.write(cmakeLists, replacement.getBytes(StandardCharsets.UTF_8));
     }
 
     private void writeRuntimeStubs(Path srcRoot) throws java.io.IOException {
@@ -541,5 +777,120 @@ class StampedLockIntegrationTest {
                 "JAVA_OBJECT java_lang_Object_getClass___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { return NULL; }\n";
 
         Files.write(stubs, content.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private void patchHashMapNativeSupport(Path srcRoot) throws java.io.IOException {
+        Path hashMapHeader = srcRoot.resolve("java_util_HashMap.h");
+        if (Files.exists(hashMapHeader)) {
+            String content = new String(Files.readAllBytes(hashMapHeader), StandardCharsets.UTF_8);
+            if (!content.contains("java_util_HashMap_elementData")) {
+                String structDef = "struct obj__java_util_HashMap {\n" +
+                        "    DEBUG_GC_VARIABLES\n" +
+                        "    struct clazz *__codenameOneParentClsReference;\n" +
+                        "    int __codenameOneReferenceCount;\n" +
+                        "    void* __codenameOneThreadData;\n" +
+                        "    int __codenameOneGcMark;\n" +
+                        "    void* __ownerThread;\n" +
+                        "    int __heapPosition;\n" +
+                        "    JAVA_OBJECT java_util_HashMap_elementData;\n" +
+                        "};";
+                content = content.replace("struct obj__java_util_HashMap {\n" +
+                        "    DEBUG_GC_VARIABLES\n" +
+                        "    struct clazz *__codenameOneParentClsReference;\n" +
+                        "    int __codenameOneReferenceCount;\n" +
+                        "    void* __codenameOneThreadData;\n" +
+                        "    int __codenameOneGcMark;\n" +
+                        "    void* __ownerThread;\n" +
+                        "    int __heapPosition;\n" +
+                        "};", structDef);
+                Files.write(hashMapHeader, content.getBytes(StandardCharsets.UTF_8));
+            }
+        }
+
+        Path entryHeader = srcRoot.resolve("java_util_HashMap_Entry.h");
+        if (!Files.exists(entryHeader)) {
+            String entryContent = "#ifndef __JAVA_UTIL_HASHMAP_ENTRY__\n" +
+                    "#define __JAVA_UTIL_HASHMAP_ENTRY__\n\n" +
+                    "#include \"cn1_globals.h\"\n" +
+                    "#include \"java_lang_Object.h\"\n\n" +
+                    "extern struct clazz class__java_util_HashMap_Entry;\n\n" +
+                    "struct obj__java_util_HashMap_Entry {\n" +
+                    "    DEBUG_GC_VARIABLES\n" +
+                    "    struct clazz *__codenameOneParentClsReference;\n" +
+                    "    int __codenameOneReferenceCount;\n" +
+                    "    void* __codenameOneThreadData;\n" +
+                    "    int __codenameOneGcMark;\n" +
+                    "    void* __ownerThread;\n" +
+                    "    int __heapPosition;\n" +
+                    "    JAVA_OBJECT java_util_MapEntry_key;\n" +
+                    "    JAVA_OBJECT java_util_MapEntry_value;\n" +
+                    "    JAVA_INT java_util_HashMap_Entry_origKeyHash;\n" +
+                    "    JAVA_OBJECT java_util_HashMap_Entry_next;\n" +
+                    "};\n\n" +
+                    "#endif\n";
+            Files.write(entryHeader, entryContent.getBytes(StandardCharsets.UTF_8));
+        }
+
+        Path dateHeader = srcRoot.resolve("java_util_Date.h");
+        if (!Files.exists(dateHeader)) {
+            String dateContent = "#ifndef __JAVA_UTIL_DATE__\n" +
+                    "#define __JAVA_UTIL_DATE__\n\n" +
+                    "#include \"cn1_globals.h\"\n" +
+                    "#include \"java_lang_Object.h\"\n\n" +
+                    "extern struct clazz class__java_util_Date;\n\n" +
+                    "struct obj__java_util_Date {\n" +
+                    "    DEBUG_GC_VARIABLES\n" +
+                    "    struct clazz *__codenameOneParentClsReference;\n" +
+                    "    int __codenameOneReferenceCount;\n" +
+                    "    void* __codenameOneThreadData;\n" +
+                    "    int __codenameOneGcMark;\n" +
+                    "    void* __ownerThread;\n" +
+                    "    int __heapPosition;\n" +
+                    "    JAVA_LONG java_util_Date_date;\n" +
+                    "};\n\n" +
+                    "#endif\n";
+            Files.write(dateHeader, dateContent.getBytes(StandardCharsets.UTF_8));
+        }
+
+        Path dateFormatHeader = srcRoot.resolve("java_text_DateFormat.h");
+        if (!Files.exists(dateFormatHeader)) {
+            String dateFormatContent = "#ifndef __JAVA_TEXT_DATEFORMAT__\n" +
+                    "#define __JAVA_TEXT_DATEFORMAT__\n\n" +
+                    "#include \"cn1_globals.h\"\n" +
+                    "#include \"java_lang_Object.h\"\n\n" +
+                    "extern struct clazz class__java_text_DateFormat;\n\n" +
+                    "struct obj__java_text_DateFormat {\n" +
+                    "    DEBUG_GC_VARIABLES\n" +
+                    "    struct clazz *__codenameOneParentClsReference;\n" +
+                    "    int __codenameOneReferenceCount;\n" +
+                    "    void* __codenameOneThreadData;\n" +
+                    "    int __codenameOneGcMark;\n" +
+                    "    void* __ownerThread;\n" +
+                    "    int __heapPosition;\n" +
+                    "    JAVA_INT java_text_DateFormat_dateStyle;\n" +
+                    "};\n\n" +
+                    "#endif\n";
+            Files.write(dateFormatHeader, dateFormatContent.getBytes(StandardCharsets.UTF_8));
+        }
+
+        Path stringToRealHeader = srcRoot.resolve("java_lang_StringToReal.h");
+        if (!Files.exists(stringToRealHeader)) {
+            String strContent = "#ifndef __JAVA_LANG_STRINGTOREAL__\n" +
+                    "#define __JAVA_LANG_STRINGTOREAL__\n\n" +
+                    "#include \"cn1_globals.h\"\n" +
+                    "#include \"java_lang_Object.h\"\n\n" +
+                    "extern struct clazz class__java_lang_StringToReal;\n\n" +
+                    "struct obj__java_lang_StringToReal {\n" +
+                    "    DEBUG_GC_VARIABLES\n" +
+                    "    struct clazz *__codenameOneParentClsReference;\n" +
+                    "    int __codenameOneReferenceCount;\n" +
+                    "    void* __codenameOneThreadData;\n" +
+                    "    int __codenameOneGcMark;\n" +
+                    "    void* __ownerThread;\n" +
+                    "    int __heapPosition;\n" +
+                    "};\n\n" +
+                    "#endif\n";
+            Files.write(stringToRealHeader, strContent.getBytes(StandardCharsets.UTF_8));
+        }
     }
 }
