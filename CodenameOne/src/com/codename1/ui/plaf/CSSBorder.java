@@ -360,7 +360,7 @@ public class CSSBorder extends Border {
 
     }
 
-    private void setAlpha(Graphics g, Color c) {
+    private static void setAlpha(Graphics g, Color c) {
         g.setAlpha(c == null ? 0 : c.alpha);
     }
 
@@ -445,11 +445,11 @@ public class CSSBorder extends Border {
         return sb.toString();
     }
 
-    private float floatPx(ScalarUnit u) {
+    private static float floatPx(ScalarUnit u) {
         return u == null ? 0 : u.floatPx();
     }
 
-    private float floatPx(ScalarUnit u, Component c, Rectangle2D contentRect, boolean horizontal) {
+    private static float floatPx(ScalarUnit u, Component c, Rectangle2D contentRect, boolean horizontal) {
         return u == null ? 0 : u.floatPx(c, contentRect, horizontal);
     }
 
@@ -665,7 +665,7 @@ public class CSSBorder extends Border {
             );
 
             if (boxShadow != null) {
-                boxShadow.paint(g, c, contentRect);
+                boxShadow.paint(g, c, contentRect, this);
             }
             if (s.getBgTransparency() != 0) {
                 g.setColor(s.getBgColor());
@@ -826,7 +826,7 @@ public class CSSBorder extends Border {
      * @since 7.0
      */
     public CSSBorder borderImage(Image borderImage, double... slicePoints) {
-        this.borderImage = new BorderImage(borderImage, slicePoints);
+        this.borderImage = new BorderImage(res, borderImage, slicePoints);
         return this;
     }
 
@@ -850,7 +850,7 @@ public class CSSBorder extends Border {
      * @since 7.0
      */
     public CSSBorder borderImageWithName(String borderImageName, double... slicePoints) {
-        this.borderImage = new BorderImage(borderImageName, slicePoints);
+        this.borderImage = new BorderImage(res, borderImageName, slicePoints);
         return this;
     }
 
@@ -1693,7 +1693,7 @@ public class CSSBorder extends Border {
 
     }
 
-    private class BoxShadow {
+    private static class BoxShadow {
         ScalarUnit hOffset, vOffset, blurRadius, spread;
         boolean inset;
         Color color;
@@ -1715,20 +1715,20 @@ public class CSSBorder extends Border {
         }
 
 
-        void paint(Graphics g, Component c, Rectangle2D contentRect) {
+        void paint(Graphics g, Component c, Rectangle2D contentRect, CSSBorder border) {
             int alpha = g.getAlpha();
             int color = g.getColor();
             boolean antialiased = g.isAntiAliased();
-            setColor(g, this.color);
+            border.setColor(g, this.color);
             GeneralPath p = GeneralPath.createFromPool();
             try {
-                createShape(
+                border.createShape(
                         p,
                         contentRect.getX(),
                         contentRect.getY(),
                         contentRect.getWidth(),
                         contentRect.getHeight(),
-                        createArrow(c)
+                        border.createArrow(c)
                 );
                 p.transform(Transform.makeTranslation(hOffset.floatPx(c, contentRect, true), vOffset.floatPx(c, contentRect, false)));
                 g.fillShape(p);
@@ -1747,7 +1747,7 @@ public class CSSBorder extends Border {
 
     }
 
-    private class BorderRadius {
+    private static class BorderRadius {
         private final ScalarUnit topLeftX;
         private final ScalarUnit topRightX;
         private final ScalarUnit bottomLeftX;
@@ -1971,7 +1971,7 @@ public class CSSBorder extends Border {
 
     }
 
-    private class ColorStop {
+    private static class ColorStop {
         Color color = new Color("#000000");
         int position = 0;
 
@@ -1987,7 +1987,7 @@ public class CSSBorder extends Border {
 
     }
 
-    private class LinearGradient {
+    private static class LinearGradient {
         float angle;
         ColorStop[] colors = new ColorStop[0];
 
@@ -2015,7 +2015,7 @@ public class CSSBorder extends Border {
         }
     }
 
-    private class RadialGradient {
+    private static class RadialGradient {
         byte shape;
         byte size;
         float xPos, yPos;
@@ -2026,13 +2026,15 @@ public class CSSBorder extends Border {
         }
     }
 
-    private class BorderImage {
+    private static class BorderImage {
         Image image;
         double[] slices;
         Border internal;
         String imageName;
+        final Resources res;
 
-        BorderImage(String imageName, double... slces) {
+        BorderImage(Resources res, String imageName, double... slces) {
+            this.res = res;
             this.imageName = imageName;
             slices = new double[4];
             if (slces.length == 4) {
@@ -2051,7 +2053,8 @@ public class CSSBorder extends Border {
             }
         }
 
-        BorderImage(Image img, double... slces) {
+        BorderImage(Resources res, Image img, double... slces) {
+            this.res = res;
             image = img;
             slices = new double[4];
             if (slces.length == 4) {
@@ -2106,7 +2109,7 @@ public class CSSBorder extends Border {
         }
     }
 
-    private class BackgroundImage {
+    private static class BackgroundImage {
         LinearGradient linearGradient;
         RadialGradient radialGradient;
         byte verticalPositionType, horizontalPositionType, verticalSizeType, horizontalSizeType;

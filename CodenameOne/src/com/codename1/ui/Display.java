@@ -5274,7 +5274,7 @@ public final class Display extends CN1Constants {
      * if an exception occurs, it is easier to track it back to the original
      * source.
      */
-    private class DebugRunnable implements Runnable {
+    private static class DebugRunnable implements Runnable {
         private final Runnable internal;
         private final EdtException exceptionWrapper;
         private DebugRunnable parentContext;
