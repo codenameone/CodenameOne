@@ -199,9 +199,19 @@ class ReadWriteLockIntegrationTest {
         // java.lang.StringBuilder
         Files.write(lang.resolve("StringBuilder.java"), ("package java.lang;\n" +
                 "public class StringBuilder {\n" +
+                "    char[] value = new char[16];\n" +
+                "    int count = 0;\n" +
                 "    public StringBuilder() {}\n" +
                 "    public StringBuilder(String str) {}\n" +
                 "    public StringBuilder(int cap) {}\n" +
+                "    void appendNull() {\n" +
+                "        append(\"null\");\n" +
+                "    }\n" +
+                "    void enlargeBuffer(int newCap) {\n" +
+                "        if (newCap > value.length) {\n" +
+                "            value = new char[newCap];\n" +
+                "        }\n" +
+                "    }\n" +
                 "    public StringBuilder append(String s) { return this; }\n" +
                 "    public StringBuilder append(Object o) { return this; }\n" +
                 "    public StringBuilder append(int i) { return this; }\n" +
@@ -632,6 +642,8 @@ class ReadWriteLockIntegrationTest {
         String globWithObjc = String.format("file(GLOB TRANSLATOR_SOURCES \"%s/*.c\" \"%s/*.m\")", sourceDirName, sourceDirName);
         String globCOnly = String.format("file(GLOB TRANSLATOR_SOURCES \"%s/*.c\")", sourceDirName);
         content = content.replace(globWithObjc, globCOnly);
+        content = content.replaceAll("LANGUAGES\\s+C\\s+OBJC", "LANGUAGES C");
+        content = content.replaceAll("(?m)^enable_language\\(OBJC OPTIONAL\\)\\s*$\\n?", "");
         String replacement = content.replace(
                 "add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})",
                 "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m pthread)"
@@ -884,13 +896,35 @@ class ReadWriteLockIntegrationTest {
         }
 
         Path entryHeader = srcRoot.resolve("java_util_HashMap_Entry.h");
-        if (!Files.exists(entryHeader)) {
-            String entryContent = "#ifndef __JAVA_UTIL_HASHMAP_ENTRY__\n" +
-                    "#define __JAVA_UTIL_HASHMAP_ENTRY__\n\n" +
+        String entryContent = "#ifndef __JAVA_UTIL_HASHMAP_ENTRY__\n" +
+                "#define __JAVA_UTIL_HASHMAP_ENTRY__\n\n" +
+                "#include \"cn1_globals.h\"\n" +
+                "#include \"java_lang_Object.h\"\n\n" +
+                "extern struct clazz class__java_util_HashMap_Entry;\n\n" +
+                "struct obj__java_util_HashMap_Entry {\n" +
+                "    DEBUG_GC_VARIABLES\n" +
+                "    struct clazz *__codenameOneParentClsReference;\n" +
+                "    int __codenameOneReferenceCount;\n" +
+                "    void* __codenameOneThreadData;\n" +
+                "    int __codenameOneGcMark;\n" +
+                "    void* __ownerThread;\n" +
+                "    int __heapPosition;\n" +
+                "    JAVA_OBJECT java_util_MapEntry_key;\n" +
+                "    JAVA_OBJECT java_util_MapEntry_value;\n" +
+                "    JAVA_INT java_util_HashMap_Entry_origKeyHash;\n" +
+                "    JAVA_OBJECT java_util_HashMap_Entry_next;\n" +
+                "};\n\n" +
+                "#endif\n";
+        Files.write(entryHeader, entryContent.getBytes(StandardCharsets.UTF_8));
+
+        Path dateHeader = srcRoot.resolve("java_util_Date.h");
+        if (!Files.exists(dateHeader)) {
+            String dateContent = "#ifndef __JAVA_UTIL_DATE__\n" +
+                    "#define __JAVA_UTIL_DATE__\n\n" +
                     "#include \"cn1_globals.h\"\n" +
                     "#include \"java_lang_Object.h\"\n\n" +
-                    "extern struct clazz class__java_util_HashMap_Entry;\n\n" +
-                    "struct obj__java_util_HashMap_Entry {\n" +
+                    "extern struct clazz class__java_util_Date;\n\n" +
+                    "struct obj__java_util_Date {\n" +
                     "    DEBUG_GC_VARIABLES\n" +
                     "    struct clazz *__codenameOneParentClsReference;\n" +
                     "    int __codenameOneReferenceCount;\n" +
@@ -898,13 +932,51 @@ class ReadWriteLockIntegrationTest {
                     "    int __codenameOneGcMark;\n" +
                     "    void* __ownerThread;\n" +
                     "    int __heapPosition;\n" +
-                    "    JAVA_OBJECT java_util_MapEntry_key;\n" +
-                    "    JAVA_OBJECT java_util_MapEntry_value;\n" +
-                    "    JAVA_INT java_util_HashMap_Entry_origKeyHash;\n" +
-                    "    JAVA_OBJECT java_util_HashMap_Entry_next;\n" +
+                    "    JAVA_LONG java_util_Date_date;\n" +
                     "};\n\n" +
                     "#endif\n";
-            Files.write(entryHeader, entryContent.getBytes(StandardCharsets.UTF_8));
+            Files.write(dateHeader, dateContent.getBytes(StandardCharsets.UTF_8));
+        }
+
+        Path dateFormatHeader = srcRoot.resolve("java_text_DateFormat.h");
+        if (!Files.exists(dateFormatHeader)) {
+            String dateFormatContent = "#ifndef __JAVA_TEXT_DATEFORMAT__\n" +
+                    "#define __JAVA_TEXT_DATEFORMAT__\n\n" +
+                    "#include \"cn1_globals.h\"\n" +
+                    "#include \"java_lang_Object.h\"\n\n" +
+                    "extern struct clazz class__java_text_DateFormat;\n\n" +
+                    "struct obj__java_text_DateFormat {\n" +
+                    "    DEBUG_GC_VARIABLES\n" +
+                    "    struct clazz *__codenameOneParentClsReference;\n" +
+                    "    int __codenameOneReferenceCount;\n" +
+                    "    void* __codenameOneThreadData;\n" +
+                    "    int __codenameOneGcMark;\n" +
+                    "    void* __ownerThread;\n" +
+                    "    int __heapPosition;\n" +
+                    "    JAVA_INT java_text_DateFormat_dateStyle;\n" +
+                    "};\n\n" +
+                    "#endif\n";
+            Files.write(dateFormatHeader, dateFormatContent.getBytes(StandardCharsets.UTF_8));
+        }
+
+        Path stringToRealHeader = srcRoot.resolve("java_lang_StringToReal.h");
+        if (!Files.exists(stringToRealHeader)) {
+            String strContent = "#ifndef __JAVA_LANG_STRINGTOREAL__\n" +
+                    "#define __JAVA_LANG_STRINGTOREAL__\n\n" +
+                    "#include \"cn1_globals.h\"\n" +
+                    "#include \"java_lang_Object.h\"\n\n" +
+                    "extern struct clazz class__java_lang_StringToReal;\n\n" +
+                    "struct obj__java_lang_StringToReal {\n" +
+                    "    DEBUG_GC_VARIABLES\n" +
+                    "    struct clazz *__codenameOneParentClsReference;\n" +
+                    "    int __codenameOneReferenceCount;\n" +
+                    "    void* __codenameOneThreadData;\n" +
+                    "    int __codenameOneGcMark;\n" +
+                    "    void* __ownerThread;\n" +
+                    "    int __heapPosition;\n" +
+                    "};\n\n" +
+                    "#endif\n";
+            Files.write(stringToRealHeader, strContent.getBytes(StandardCharsets.UTF_8));
         }
     }
 }

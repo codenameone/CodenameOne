@@ -140,6 +140,8 @@ public class FileStreamsIntegrationTest {
 
     private void replaceLibraryWithExecutableTarget(Path cmakeLists) throws IOException {
         String content = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
+        content = content.replaceAll("LANGUAGES\\s+C\\s+OBJC", "LANGUAGES C");
+        content = content.replaceAll("(?m)^enable_language\\(OBJC OPTIONAL\\)\\s*$\\n?", "");
         String replacement = content.replace(
                 "add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})",
                 "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m)"
