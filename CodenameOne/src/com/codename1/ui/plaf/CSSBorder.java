@@ -2384,7 +2384,7 @@ public class CSSBorder extends Border {
         float trackComponentHorizontalPosition = -1;
         float trackComponentVerticalPosition = -1;
 
-        Arrow(Component c, Component trackComponent) {
+        Arrow(Component c, com.codename1.ui.geom.Rectangle trackComponent) {
             if (trackComponent != null) {
                 int cabsY = c.getAbsoluteY();
                 int trackY = trackComponent.getY();
