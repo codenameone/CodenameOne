@@ -124,42 +124,64 @@ class StampedLockIntegrationTest {
         Files.createDirectories(concurrent);
         Files.createDirectories(io);
 
+        // java.util.Map
+        Files.write(util.resolve("Map.java"), ("package java.util;\n" +
+                "public interface Map<K,V> {\n" +
+                "    V get(Object key);\n" +
+                "    V put(K key, V value);\n" +
+                "    V remove(Object key);\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
         // java.util.HashMap (needed for generated native stubs)
-        Files.write(util.resolve(\"HashMap.java\"), (\"package java.util;\\n\" +
-                \"public class HashMap<K,V> {\\n\" +
-                \"    public static class Entry<K,V> {\\n\" +
-                \"        public K key;\\n\" +
-                \"        public V value;\\n\" +
-                \"        public int hash;\\n\" +
-                \"        public int origKeyHash;\\n\" +
-                \"        public Entry<K,V> next;\\n\" +
-                \"        public Entry(K key, V value, int hash, Entry<K,V> next) {\\n\" +
-                \"            this.key = key;\\n\" +
-                \"            this.value = value;\\n\" +
-                \"            this.hash = hash;\\n\" +
-                \"            this.origKeyHash = hash;\\n\" +
-                \"            this.next = next;\\n\" +
-                \"        }\\n\" +
-                \"    }\\n\" +
-                \"    private Entry head;\\n\" +
-                \"    private int size = 0;\\n\" +
-                \"    public HashMap() {}\\n\" +
-                \"    public V put(K key, V value) {\\n\" +
-                \"        for (Entry e = head; e != null; e = e.next) {\\n\" +
-                \"            if (e.key == key) { V old = (V)e.value; e.value = value; return old; }\\n\" +
-                \"        }\\n\" +
-                \"        head = new Entry(key, value, key == null ? 0 : key.hashCode(), head);\\n\" +
-                \"        size++;\\n\" +
-                \"        return null;\\n\" +
-                \"    }\\n\" +
-                \"    public V get(Object key) {\\n\" +
-                \"        for (Entry e = head; e != null; e = e.next) {\\n\" +
-                \"            if (e.key == key) return (V)e.value;\\n\" +
-                \"        }\\n\" +
-                \"        return null;\\n\" +
-                \"    }\\n\" +
-                \"    public int size() { return size; }\\n\" +
-                \"}\\n\").getBytes(StandardCharsets.UTF_8));
+        Files.write(util.resolve("HashMap.java"), ("package java.util;\n" +
+                "public class HashMap<K,V> implements Map<K,V> {\n" +
+                "    public static class Entry<K,V> {\n" +
+                "        public K key;\n" +
+                "        public V value;\n" +
+                "        public int hash;\n" +
+                "        public int origKeyHash;\n" +
+                "        public Entry<K,V> next;\n" +
+                "        public Entry(K key, V value, int hash, Entry<K,V> next) {\n" +
+                "            this.key = key;\n" +
+                "            this.value = value;\n" +
+                "            this.hash = hash;\n" +
+                "            this.origKeyHash = hash;\n" +
+                "            this.next = next;\n" +
+                "        }\n" +
+                "    }\n" +
+                "    private Entry head;\n" +
+                "    private int size = 0;\n" +
+                "    public HashMap() {}\n" +
+                "    public V get(Object key) {\n" +
+                "        for (Entry e = head; e != null; e = e.next) {\n" +
+                "            if (e.key == key) return (V)e.value;\n" +
+                "        }\n" +
+                "        return null;\n" +
+                "    }\n" +
+                "    public V put(K key, V value) {\n" +
+                "        for (Entry e = head; e != null; e = e.next) {\n" +
+                "            if (e.key == key) { V old = (V)e.value; e.value = value; return old; }\n" +
+                "        }\n" +
+                "        head = new Entry(key, value, key == null ? 0 : key.hashCode(), head);\n" +
+                "        size++;\n" +
+                "        return null;\n" +
+                "    }\n" +
+                "    public V remove(Object key) {\n" +
+                "        Entry prev = null;\n" +
+                "        Entry e = head;\n" +
+                "        while (e != null) {\n" +
+                "            if (e.key == key) {\n" +
+                "                if (prev == null) head = e.next; else prev.next = e.next;\n" +
+                "                size--;\n" +
+                "                return (V)e.value;\n" +
+                "            }\n" +
+                "            prev = e;\n" +
+                "            e = e.next;\n" +
+                "        }\n" +
+                "        return null;\n" +
+                "    }\n" +
+                "    public int size() { return size; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
         // java.lang.Object
         Files.write(lang.resolve("Object.java"), ("package java.lang;\n" +
                 "public class Object {\n" +
