@@ -491,36 +491,28 @@ class ReadWriteLockIntegrationTest {
                 "            this.next = next;\n" +
                 "        }\n" +
                 "    }\n" +
-                "    private Entry[] elementData = new Entry[16];\n" +
+                "    private Entry head;\n" +
                 "    private int size = 0;\n" +
                 "    public V get(Object key) {\n" +
-                "        int h = key == null ? 0 : key.hashCode();\n" +
-                "        int idx = (h & 0x7fffffff) % elementData.length;\n" +
-                "        for (Entry e = elementData[idx]; e != null; e = e.next) {\n" +
+                "        for (Entry e = head; e != null; e = e.next) {\n" +
                 "            if (e.key == key) return (V)e.value;\n" +
                 "        }\n" +
                 "        return null;\n" +
                 "    }\n" +
                 "    public V put(K key, V value) {\n" +
-                "        int h = key == null ? 0 : key.hashCode();\n" +
-                "        int idx = (h & 0x7fffffff) % elementData.length;\n" +
-                "        Entry e = elementData[idx];\n" +
-                "        while (e != null) {\n" +
+                "        for (Entry e = head; e != null; e = e.next) {\n" +
                 "            if (e.key == key) { V old = (V)e.value; e.value = value; return old; }\n" +
-                "            e = e.next;\n" +
                 "        }\n" +
-                "        elementData[idx] = new Entry(key, value, h, elementData[idx]);\n" +
+                "        head = new Entry(key, value, key == null ? 0 : key.hashCode(), head);\n" +
                 "        size++;\n" +
                 "        return null;\n" +
                 "    }\n" +
                 "    public V remove(Object key) {\n" +
-                "        int h = key == null ? 0 : key.hashCode();\n" +
-                "        int idx = (h & 0x7fffffff) % elementData.length;\n" +
                 "        Entry prev = null;\n" +
-                "        Entry e = elementData[idx];\n" +
+                "        Entry e = head;\n" +
                 "        while (e != null) {\n" +
                 "            if (e.key == key) {\n" +
-                "                if (prev == null) elementData[idx] = e.next; else prev.next = e.next;\n" +
+                "                if (prev == null) head = e.next; else prev.next = e.next;\n" +
                 "                size--;\n" +
                 "                return (V)e.value;\n" +
                 "            }\n" +
@@ -529,9 +521,8 @@ class ReadWriteLockIntegrationTest {
                 "        }\n" +
                 "        return null;\n" +
                 "    }\n" +
+                "    public int size() { return size; }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
-
-
         // java.util.concurrent.TimeUnit
         Files.write(concurrent.resolve("TimeUnit.java"), ("package java.util.concurrent;\n" +
                 "public class TimeUnit {\n" +
@@ -868,54 +859,29 @@ class ReadWriteLockIntegrationTest {
     }
 
     private void patchHashMapNativeSupport(Path srcRoot) throws java.io.IOException {
-        Path hashMapHeader = srcRoot.resolve("java_util_HashMap.h");
-        if (Files.exists(hashMapHeader)) {
-            String content = new String(Files.readAllBytes(hashMapHeader), StandardCharsets.UTF_8);
-            if (!content.contains("java_util_HashMap_elementData")) {
-                String structDef = "struct obj__java_util_HashMap {\n" +
-                        "    DEBUG_GC_VARIABLES\n" +
-                        "    struct clazz *__codenameOneParentClsReference;\n" +
-                        "    int __codenameOneReferenceCount;\n" +
-                        "    void* __codenameOneThreadData;\n" +
-                        "    int __codenameOneGcMark;\n" +
-                        "    void* __ownerThread;\n" +
-                        "    int __heapPosition;\n" +
-                        "    JAVA_OBJECT java_util_HashMap_elementData;\n" +
-                        "};";
-                content = content.replace("struct obj__java_util_HashMap {\n" +
-                        "    DEBUG_GC_VARIABLES\n" +
-                        "    struct clazz *__codenameOneParentClsReference;\n" +
-                        "    int __codenameOneReferenceCount;\n" +
-                        "    void* __codenameOneThreadData;\n" +
-                        "    int __codenameOneGcMark;\n" +
-                        "    void* __ownerThread;\n" +
-                        "    int __heapPosition;\n" +
-                        "};", structDef);
-                Files.write(hashMapHeader, content.getBytes(StandardCharsets.UTF_8));
-            }
-        }
-
         Path entryHeader = srcRoot.resolve("java_util_HashMap_Entry.h");
-        String entryContent = "#ifndef __JAVA_UTIL_HASHMAP_ENTRY__\n" +
-                "#define __JAVA_UTIL_HASHMAP_ENTRY__\n\n" +
-                "#include \"cn1_globals.h\"\n" +
-                "#include \"java_lang_Object.h\"\n\n" +
-                "extern struct clazz class__java_util_HashMap_Entry;\n\n" +
-                "struct obj__java_util_HashMap_Entry {\n" +
-                "    DEBUG_GC_VARIABLES\n" +
-                "    struct clazz *__codenameOneParentClsReference;\n" +
-                "    int __codenameOneReferenceCount;\n" +
-                "    void* __codenameOneThreadData;\n" +
-                "    int __codenameOneGcMark;\n" +
-                "    void* __ownerThread;\n" +
-                "    int __heapPosition;\n" +
-                "    JAVA_OBJECT java_util_MapEntry_key;\n" +
-                "    JAVA_OBJECT java_util_MapEntry_value;\n" +
-                "    JAVA_INT java_util_HashMap_Entry_origKeyHash;\n" +
-                "    JAVA_OBJECT java_util_HashMap_Entry_next;\n" +
-                "};\n\n" +
-                "#endif\n";
-        Files.write(entryHeader, entryContent.getBytes(StandardCharsets.UTF_8));
+        if (!Files.exists(entryHeader)) {
+            String entryContent = "#ifndef __JAVA_UTIL_HASHMAP_ENTRY__\n" +
+                    "#define __JAVA_UTIL_HASHMAP_ENTRY__\n\n" +
+                    "#include \"cn1_globals.h\"\n" +
+                    "#include \"java_lang_Object.h\"\n\n" +
+                    "extern struct clazz class__java_util_HashMap_Entry;\n\n" +
+                    "struct obj__java_util_HashMap_Entry {\n" +
+                    "    DEBUG_GC_VARIABLES\n" +
+                    "    struct clazz *__codenameOneParentClsReference;\n" +
+                    "    int __codenameOneReferenceCount;\n" +
+                    "    void* __codenameOneThreadData;\n" +
+                    "    int __codenameOneGcMark;\n" +
+                    "    void* __ownerThread;\n" +
+                    "    int __heapPosition;\n" +
+                    "    JAVA_OBJECT java_util_MapEntry_key;\n" +
+                    "    JAVA_OBJECT java_util_MapEntry_value;\n" +
+                    "    JAVA_INT java_util_HashMap_Entry_origKeyHash;\n" +
+                    "    JAVA_OBJECT java_util_HashMap_Entry_next;\n" +
+                    "};\n\n" +
+                    "#endif\n";
+            Files.write(entryHeader, entryContent.getBytes(StandardCharsets.UTF_8));
+        }
 
         Path dateHeader = srcRoot.resolve("java_util_Date.h");
         if (!Files.exists(dateHeader)) {

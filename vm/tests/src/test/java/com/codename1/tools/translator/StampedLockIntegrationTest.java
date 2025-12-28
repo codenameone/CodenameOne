@@ -125,48 +125,41 @@ class StampedLockIntegrationTest {
         Files.createDirectories(io);
 
         // java.util.HashMap (needed for generated native stubs)
-        Files.write(util.resolve("HashMap.java"), ("package java.util;\n" +
-                "public class HashMap<K,V> {\n" +
-                "    public static class Entry<K,V> {\n" +
-                "        public K key;\n" +
-                "        public V value;\n" +
-                "        public int hash;\n" +
-                "        public int origKeyHash;\n" +
-                "        public Entry<K,V> next;\n" +
-                "        public Entry(K key, V value, int hash, Entry<K,V> next) {\n" +
-                "            this.key = key;\n" +
-                "            this.value = value;\n" +
-                "            this.hash = hash;\n" +
-                "            this.origKeyHash = hash;\n" +
-                "            this.next = next;\n" +
-                "        }\n" +
-                "    }\n" +
-                "    private Entry[] elementData = new Entry[16];\n" +
-                "    private int size = 0;\n" +
-                "    public HashMap() {}\n" +
-                "    public V put(K key, V value) {\n" +
-                "        int h = key == null ? 0 : key.hashCode();\n" +
-                "        int idx = (h & 0x7fffffff) % elementData.length;\n" +
-                "        Entry e = elementData[idx];\n" +
-                "        while (e != null) {\n" +
-                "            if (e.key == key) { V old = (V)e.value; e.value = value; return old; }\n" +
-                "            e = e.next;\n" +
-                "        }\n" +
-                "        elementData[idx] = new Entry(key, value, h, elementData[idx]);\n" +
-                "        size++;\n" +
-                "        return null;\n" +
-                "    }\n" +
-                "    public V get(Object key) {\n" +
-                "        int h = key == null ? 0 : key.hashCode();\n" +
-                "        int idx = (h & 0x7fffffff) % elementData.length;\n" +
-                "        for (Entry e = elementData[idx]; e != null; e = e.next) {\n" +
-                "            if (e.key == key) return (V)e.value;\n" +
-                "        }\n" +
-                "        return null;\n" +
-                "    }\n" +
-                "    public int size() { return size; }\n" +
-                "}\n").getBytes(StandardCharsets.UTF_8));
-
+        Files.write(util.resolve(\"HashMap.java\"), (\"package java.util;\\n\" +
+                \"public class HashMap<K,V> {\\n\" +
+                \"    public static class Entry<K,V> {\\n\" +
+                \"        public K key;\\n\" +
+                \"        public V value;\\n\" +
+                \"        public int hash;\\n\" +
+                \"        public int origKeyHash;\\n\" +
+                \"        public Entry<K,V> next;\\n\" +
+                \"        public Entry(K key, V value, int hash, Entry<K,V> next) {\\n\" +
+                \"            this.key = key;\\n\" +
+                \"            this.value = value;\\n\" +
+                \"            this.hash = hash;\\n\" +
+                \"            this.origKeyHash = hash;\\n\" +
+                \"            this.next = next;\\n\" +
+                \"        }\\n\" +
+                \"    }\\n\" +
+                \"    private Entry head;\\n\" +
+                \"    private int size = 0;\\n\" +
+                \"    public HashMap() {}\\n\" +
+                \"    public V put(K key, V value) {\\n\" +
+                \"        for (Entry e = head; e != null; e = e.next) {\\n\" +
+                \"            if (e.key == key) { V old = (V)e.value; e.value = value; return old; }\\n\" +
+                \"        }\\n\" +
+                \"        head = new Entry(key, value, key == null ? 0 : key.hashCode(), head);\\n\" +
+                \"        size++;\\n\" +
+                \"        return null;\\n\" +
+                \"    }\\n\" +
+                \"    public V get(Object key) {\\n\" +
+                \"        for (Entry e = head; e != null; e = e.next) {\\n\" +
+                \"            if (e.key == key) return (V)e.value;\\n\" +
+                \"        }\\n\" +
+                \"        return null;\\n\" +
+                \"    }\\n\" +
+                \"    public int size() { return size; }\\n\" +
+                \"}\\n\").getBytes(StandardCharsets.UTF_8));
         // java.lang.Object
         Files.write(lang.resolve("Object.java"), ("package java.lang;\n" +
                 "public class Object {\n" +
@@ -809,33 +802,6 @@ class StampedLockIntegrationTest {
     }
 
     private void patchHashMapNativeSupport(Path srcRoot) throws java.io.IOException {
-        Path hashMapHeader = srcRoot.resolve("java_util_HashMap.h");
-        if (Files.exists(hashMapHeader)) {
-            String content = new String(Files.readAllBytes(hashMapHeader), StandardCharsets.UTF_8);
-            if (!content.contains("java_util_HashMap_elementData")) {
-                String structDef = "struct obj__java_util_HashMap {\n" +
-                        "    DEBUG_GC_VARIABLES\n" +
-                        "    struct clazz *__codenameOneParentClsReference;\n" +
-                        "    int __codenameOneReferenceCount;\n" +
-                        "    void* __codenameOneThreadData;\n" +
-                        "    int __codenameOneGcMark;\n" +
-                        "    void* __ownerThread;\n" +
-                        "    int __heapPosition;\n" +
-                        "    JAVA_OBJECT java_util_HashMap_elementData;\n" +
-                        "};";
-                content = content.replace("struct obj__java_util_HashMap {\n" +
-                        "    DEBUG_GC_VARIABLES\n" +
-                        "    struct clazz *__codenameOneParentClsReference;\n" +
-                        "    int __codenameOneReferenceCount;\n" +
-                        "    void* __codenameOneThreadData;\n" +
-                        "    int __codenameOneGcMark;\n" +
-                        "    void* __ownerThread;\n" +
-                        "    int __heapPosition;\n" +
-                        "};", structDef);
-                Files.write(hashMapHeader, content.getBytes(StandardCharsets.UTF_8));
-            }
-        }
-
         Path entryHeader = srcRoot.resolve("java_util_HashMap_Entry.h");
         if (!Files.exists(entryHeader)) {
             String entryContent = "#ifndef __JAVA_UTIL_HASHMAP_ENTRY__\n" +
