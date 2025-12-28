@@ -93,6 +93,7 @@ class ReadWriteLockIntegrationTest {
         Path srcRoot = distDir.resolve("ReadWriteLockTestApp-src");
         CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
         CleanTargetIntegrationTest.patchFileHeader(srcRoot);
+        patchHashMapNativeSupport(srcRoot);
         writeRuntimeStubs(srcRoot);
 
         replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
@@ -835,5 +836,58 @@ class ReadWriteLockIntegrationTest {
                 "JAVA_OBJECT java_lang_Object_getClass___R_java_lang_Class(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { return NULL; }\n";
 
         Files.write(stubs, content.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private void patchHashMapNativeSupport(Path srcRoot) throws java.io.IOException {
+        Path hashMapHeader = srcRoot.resolve("java_util_HashMap.h");
+        if (Files.exists(hashMapHeader)) {
+            String content = new String(Files.readAllBytes(hashMapHeader), StandardCharsets.UTF_8);
+            if (!content.contains("java_util_HashMap_elementData")) {
+                String structDef = "struct obj__java_util_HashMap {\n" +
+                        "    DEBUG_GC_VARIABLES\n" +
+                        "    struct clazz *__codenameOneParentClsReference;\n" +
+                        "    int __codenameOneReferenceCount;\n" +
+                        "    void* __codenameOneThreadData;\n" +
+                        "    int __codenameOneGcMark;\n" +
+                        "    void* __ownerThread;\n" +
+                        "    int __heapPosition;\n" +
+                        "    JAVA_OBJECT java_util_HashMap_elementData;\n" +
+                        "};";
+                content = content.replace("struct obj__java_util_HashMap {\n" +
+                        "    DEBUG_GC_VARIABLES\n" +
+                        "    struct clazz *__codenameOneParentClsReference;\n" +
+                        "    int __codenameOneReferenceCount;\n" +
+                        "    void* __codenameOneThreadData;\n" +
+                        "    int __codenameOneGcMark;\n" +
+                        "    void* __ownerThread;\n" +
+                        "    int __heapPosition;\n" +
+                        "};", structDef);
+                Files.write(hashMapHeader, content.getBytes(StandardCharsets.UTF_8));
+            }
+        }
+
+        Path entryHeader = srcRoot.resolve("java_util_HashMap_Entry.h");
+        if (!Files.exists(entryHeader)) {
+            String entryContent = "#ifndef __JAVA_UTIL_HASHMAP_ENTRY__\n" +
+                    "#define __JAVA_UTIL_HASHMAP_ENTRY__\n\n" +
+                    "#include \"cn1_globals.h\"\n" +
+                    "#include \"java_lang_Object.h\"\n\n" +
+                    "extern struct clazz class__java_util_HashMap_Entry;\n\n" +
+                    "struct obj__java_util_HashMap_Entry {\n" +
+                    "    DEBUG_GC_VARIABLES\n" +
+                    "    struct clazz *__codenameOneParentClsReference;\n" +
+                    "    int __codenameOneReferenceCount;\n" +
+                    "    void* __codenameOneThreadData;\n" +
+                    "    int __codenameOneGcMark;\n" +
+                    "    void* __ownerThread;\n" +
+                    "    int __heapPosition;\n" +
+                    "    JAVA_OBJECT java_util_MapEntry_key;\n" +
+                    "    JAVA_OBJECT java_util_MapEntry_value;\n" +
+                    "    JAVA_INT java_util_HashMap_Entry_origKeyHash;\n" +
+                    "    JAVA_OBJECT java_util_HashMap_Entry_next;\n" +
+                    "};\n\n" +
+                    "#endif\n";
+            Files.write(entryHeader, entryContent.getBytes(StandardCharsets.UTF_8));
+        }
     }
 }
