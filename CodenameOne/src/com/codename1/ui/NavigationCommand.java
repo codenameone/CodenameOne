@@ -97,6 +97,38 @@ public class NavigationCommand extends Command {
         this.nextForm = nextForm;
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        if (!super.equals(o)) {
+            return false;
+        }
+
+        NavigationCommand that = (NavigationCommand) o;
+
+        if (nextForm != null ? !nextForm.equals(that.nextForm) : that.nextForm != null) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+        int result = super.hashCode();
+        result = 31 * result + (nextForm != null ? nextForm.hashCode() : 0);
+        return result;
+    }
+
     @Override
     public void actionPerformed(ActionEvent evt) {
         super.actionPerformed(evt);

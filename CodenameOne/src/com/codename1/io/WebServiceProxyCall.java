@@ -272,6 +272,59 @@ public class WebServiceProxyCall {
             setPost(true);
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            if (!super.equals(o)) {
+                return false;
+            }
+
+            WSConnection that = (WSConnection) o;
+
+            if (def != null ? !def.equals(that.def) : that.def != null) {
+                return false;
+            }
+            if (arguments == null) {
+                return that.arguments == null;
+            }
+            if (that.arguments == null) {
+                return false;
+            }
+            if (arguments.length != that.arguments.length) {
+                return false;
+            }
+            for (int i = 0; i < arguments.length; i++) {
+                Object a1 = arguments[i];
+                Object a2 = that.arguments[i];
+                if (a1 == null) {
+                    if (a2 != null) {
+                        return false;
+                    }
+                } else {
+                    if (!a1.equals(a2)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        public int hashCode() {
+            int result = super.hashCode();
+            result = 31 * result + (def != null ? def.hashCode() : 0);
+            return result;
+        }
+
         @Override
         protected void postResponse() {
             if (scall != null) {

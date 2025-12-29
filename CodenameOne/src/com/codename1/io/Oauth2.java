@@ -568,6 +568,29 @@ public class Oauth2 {
                         }
                     }
 
+                    /**
+                     * {@inheritDoc}
+                     */
+                    public boolean equals(Object o) {
+                        if (this == o) {
+                            return true;
+                        }
+                        if (o == null || getClass() != o.getClass()) {
+                            return false;
+                        }
+                        if (!super.equals(o)) {
+                            return false;
+                        }
+                        return true;
+                    }
+
+                    /**
+                     * {@inheritDoc}
+                     */
+                    public int hashCode() {
+                        return super.hashCode();
+                    }
+
                     protected void postResponse() {
 
                         if (backToParent && backToForm != null && !callbackCalled) {

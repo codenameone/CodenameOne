@@ -93,6 +93,50 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
     /**
      * {@inheritDoc}
      */
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        if (!super.equals(o)) {
+            return false;
+        }
+
+        RSSService that = (RSSService) o;
+
+        if (limit != that.limit) {
+            return false;
+        }
+        if (startOffset != that.startOffset) {
+            return false;
+        }
+        if (createPlainTextDetails != that.createPlainTextDetails) {
+            return false;
+        }
+        if (iconPlaceholder != null ? !iconPlaceholder.equals(that.iconPlaceholder) : that.iconPlaceholder != null) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+        int result = super.hashCode();
+        result = 31 * result + limit;
+        result = 31 * result + startOffset;
+        result = 31 * result + (createPlainTextDetails ? 1 : 0);
+        result = 31 * result + (iconPlaceholder != null ? iconPlaceholder.hashCode() : 0);
+        return result;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     protected void readResponse(InputStream input) throws IOException {
         results = new Vector();
         class FinishParsing extends RuntimeException {

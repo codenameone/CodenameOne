@@ -1190,7 +1190,7 @@ public class SideMenuBar extends MenuBar {
                 int width = w - (formStyle.getHorizontalMargins());
 
                 parent.sizeChangedInternal(w, h);
-                //if the size changed event came from a keyboard open/close don't 
+                //if the size changed event came from a keyboard open/close don't
                 //close the menu
                 if (getWidth() != width) {
                     closeMenu();
@@ -1765,6 +1765,38 @@ public class SideMenuBar extends MenuBar {
         @Override
         public void setMaterialIcon(char materialIcon) {
             cmd.setMaterialIcon(materialIcon);
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            if (!super.equals(o)) {
+                return false;
+            }
+
+            CommandWrapper that = (CommandWrapper) o;
+
+            if (cmd != null ? !cmd.equals(that.cmd) : that.cmd != null) {
+                return false;
+            }
+
+            return true;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        public int hashCode() {
+            int result = super.hashCode();
+            result = 31 * result + (cmd != null ? cmd.hashCode() : 0);
+            return result;
         }
 
         public void actionPerformed(final ActionEvent evt) {

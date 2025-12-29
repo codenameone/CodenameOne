@@ -48,6 +48,38 @@ public class GZConnectionRequest extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        if (!super.equals(o)) {
+            return false;
+        }
+
+        GZConnectionRequest that = (GZConnectionRequest) o;
+
+        if (isGzipped != that.isGzipped) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+        int result = super.hashCode();
+        result = 31 * result + (isGzipped ? 1 : 0);
+        return result;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     protected void readHeaders(Object connection) throws IOException {
         super.readHeaders(connection);
 

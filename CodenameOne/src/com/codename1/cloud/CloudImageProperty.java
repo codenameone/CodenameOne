@@ -71,6 +71,38 @@ public class CloudImageProperty implements CustomProperty { // PMD Fix: Unnecess
     /**
      * {@inheritDoc}
      */
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        CloudImageProperty that = (CloudImageProperty) o;
+
+        if (idProperty != null ? !idProperty.equals(that.idProperty) : that.idProperty != null) {
+            return false;
+        }
+        if (placeholderImage != null ? !placeholderImage.equals(that.placeholderImage) : that.placeholderImage != null) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+        int result = idProperty != null ? idProperty.hashCode() : 0;
+        result = 31 * result + (placeholderImage != null ? placeholderImage.hashCode() : 0);
+        return result;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public Object propertyValue(CloudObject obj, String propertyName) {
         final String key = (String) obj.getObject(idProperty);
         if (key == null) {

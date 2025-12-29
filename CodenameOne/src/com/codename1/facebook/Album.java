@@ -178,4 +178,24 @@ public class Album extends FBObject {
         created_time = (String) toCopy.get("created_time");
         updated_time = (String) toCopy.get("updated_time");
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        return super.equals(o);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+        return super.hashCode();
+    }
 }
