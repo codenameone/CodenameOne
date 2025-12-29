@@ -776,7 +776,8 @@ def main() -> None:
             "EQ_ALWAYS_FALSE",
             "SBSC_USE_STRINGBUFFER_CONCATENATION",
             "SIC_INNER_SHOULD_BE_STATIC",
-            "EQ_DOESNT_OVERRIDE_EQUALS"
+            "EQ_DOESNT_OVERRIDE_EQUALS",
+            "UPM_UNCALLED_PRIVATE_METHOD",
         }
         violations = [
             f for f in spotbugs.findings

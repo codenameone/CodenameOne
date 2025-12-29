@@ -527,16 +527,6 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
-    /**
-     * A convenience method to convert a string to an int.
-     * This is mainly intended to save the try-catch for NumericFormatExceptions
-     *
-     * @param intStr The string describing the integer
-     * @return the integer value of the string, or 0 if the string is not numeric
-     */
-    static int getInt(String intStr) {
-        return getInt(intStr, 0);
-    }
 
     /**
      * Calculates width or height of an element according to its original size, requested size and default size
