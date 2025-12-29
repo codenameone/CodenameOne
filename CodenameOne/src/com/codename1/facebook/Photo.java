@@ -220,4 +220,24 @@ public class Photo extends FBObject {
         }
 
     }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        return super.equals(o);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+        return super.hashCode();
+    }
 }

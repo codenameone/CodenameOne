@@ -67,6 +67,38 @@ public class FacebookShare extends ShareService {
     /**
      * {@inheritDoc}
      */
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        if (!super.equals(o)) {
+            return false;
+        }
+
+        FacebookShare that = (FacebookShare) o;
+
+        if (token != null ? !token.equals(that.token) : that.token != null) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+        int result = super.hashCode();
+        result = 31 * result + (token != null ? token.hashCode() : 0);
+        return result;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public void actionPerformed(ActionEvent evt) {
         if (!FaceBookAccess.getInstance().isAuthenticated()) {
             FaceBookAccess.getInstance().showAuthentication(this);

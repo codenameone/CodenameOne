@@ -775,7 +775,8 @@ def main() -> None:
             "EC_UNRELATED_TYPES",
             "EQ_ALWAYS_FALSE",
             "SBSC_USE_STRINGBUFFER_CONCATENATION",
-            "SIC_INNER_SHOULD_BE_STATIC"
+            "SIC_INNER_SHOULD_BE_STATIC",
+            "EQ_DOESNT_OVERRIDE_EQUALS"
         }
         violations = [
             f for f in spotbugs.findings

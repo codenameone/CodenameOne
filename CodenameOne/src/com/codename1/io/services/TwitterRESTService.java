@@ -125,6 +125,29 @@ public class TwitterRESTService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        if (!super.equals(o)) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+        return super.hashCode();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     protected void readResponse(InputStream input) throws IOException {
         InputStreamReader i = new InputStreamReader(input, "UTF-8");
         parseTree = new JSONParser().parse(i);

@@ -71,6 +71,38 @@ public class CloudImageProperty implements CustomProperty { // PMD Fix: Unnecess
     /**
      * {@inheritDoc}
      */
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        CloudImageProperty that = (CloudImageProperty) o;
+
+        if (idProperty != null ? !idProperty.equals(that.idProperty) : that.idProperty != null) {
+            return false;
+        }
+        if (placeholderImage != null ? !placeholderImage.equals(that.placeholderImage) : that.placeholderImage != null) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+        int result = idProperty != null ? idProperty.hashCode() : 0;
+        result = 31 * result + (placeholderImage != null ? placeholderImage.hashCode() : 0);
+        return result;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public Object propertyValue(CloudObject obj, String propertyName) {
         final String key = (String) obj.getObject(idProperty);
         if (key == null) {
@@ -84,33 +116,56 @@ public class CloudImageProperty implements CustomProperty { // PMD Fix: Unnecess
             }
             final ReplaceableImage rp = ReplaceableImage.create(placeholderImage);
             inProgress.put(key, rp);
-            ConnectionRequest cr = new ConnectionRequest() {
-                private EncodedImage e;
-
-                protected void readResponse(InputStream input) throws IOException {
-                    e = EncodedImage.create(input);
-                    if (e.getWidth() != placeholderImage.getWidth() || e.getHeight() != placeholderImage.getHeight()) {
-                        ImageIO io = ImageIO.getImageIO();
-                        if (io != null) {
-                            ByteArrayOutputStream bo = new ByteArrayOutputStream();
-                            io.save(new ByteArrayInputStream(e.getImageData()), bo, ImageIO.FORMAT_JPEG, placeholderImage.getWidth(), placeholderImage.getHeight(), 0.9f);
-                            e = EncodedImage.create(bo.toByteArray());
-                        }
-                    }
-                }
-
-                protected void postResponse() {
-                    rp.replace(e);
-                    getCache().put(key, e);
-                    inProgress.remove(key);
-                }
-            };
+            ConnectionRequest cr = new CloudImageRequest(rp, key);
             cr.setPost(false);
             cr.setUrl(CloudStorage.getInstance().getUrlForCloudFileId(key));
             NetworkManager.getInstance().addToQueue(cr);
             return rp;
         }
         return image;
+    }
+
+    private class CloudImageRequest extends ConnectionRequest {
+        private EncodedImage e;
+        private final ReplaceableImage rp;
+        private final String key;
+
+        public CloudImageRequest(ReplaceableImage rp, String key) {
+            this.rp = rp;
+            this.key = key;
+        }
+
+        protected void readResponse(InputStream input) throws IOException {
+            e = EncodedImage.create(input);
+            if (e.getWidth() != placeholderImage.getWidth() || e.getHeight() != placeholderImage.getHeight()) {
+                ImageIO io = ImageIO.getImageIO();
+                if (io != null) {
+                    ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                    io.save(new ByteArrayInputStream(e.getImageData()), bo, ImageIO.FORMAT_JPEG, placeholderImage.getWidth(), placeholderImage.getHeight(), 0.9f);
+                    e = EncodedImage.create(bo.toByteArray());
+                }
+            }
+        }
+
+        protected void postResponse() {
+            rp.replace(e);
+            getCache().put(key, e);
+            inProgress.remove(key);
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        public boolean equals(Object o) {
+            return super.equals(o);
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        public int hashCode() {
+            return super.hashCode();
+        }
     }
 
 }

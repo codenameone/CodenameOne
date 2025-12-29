@@ -318,4 +318,48 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     public void booleanToken(boolean tok) {
     }
 
+    /**
+     * {@inheritDoc}
+     */
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        if (!super.equals(o)) {
+            return false;
+        }
+
+        FacebookRESTService that = (FacebookRESTService) o;
+
+        if (responseOffset != that.responseOffset) {
+            return false;
+        }
+        if (connectionType != null ? !connectionType.equals(that.connectionType) : that.connectionType != null) {
+            return false;
+        }
+        if (imageKey != null ? !imageKey.equals(that.imageKey) : that.imageKey != null) {
+            return false;
+        }
+        if (root != null ? !root.equals(that.root) : that.root != null) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int hashCode() {
+        int result = super.hashCode();
+        result = 31 * result + (connectionType != null ? connectionType.hashCode() : 0);
+        result = 31 * result + responseOffset;
+        result = 31 * result + (imageKey != null ? imageKey.hashCode() : 0);
+        result = 31 * result + (root != null ? root.hashCode() : 0);
+        return result;
+    }
+
 }

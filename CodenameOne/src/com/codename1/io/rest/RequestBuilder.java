@@ -953,6 +953,38 @@ public class RequestBuilder {
             this.parseJSON = parseJSON;
         }
 
+        /**
+         * {@inheritDoc}
+         */
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            if (!super.equals(o)) {
+                return false;
+            }
+
+            Connection that = (Connection) o;
+
+            if (parseJSON != that.parseJSON) {
+                return false;
+            }
+
+            return true;
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        public int hashCode() {
+            int result = super.hashCode();
+            result = 31 * result + (parseJSON ? 1 : 0);
+            return result;
+        }
+
         @Override
         protected void handleErrorResponseCode(int code, String message) {
             if (byteArrayErrorCallback != null || stringErrorCallback != null ||
