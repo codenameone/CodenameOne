@@ -22,7 +22,7 @@ public class RSSReaderCoverageTest extends UITestBase {
         Assertions.assertEquals("Current", Display.getInstance().getCurrent().getTitle());
 
         RSSReader reader = new RSSReader();
-        RSSReader.BackCommand backCmd = reader.new BackCommand(previousForm);
+        RSSReader.BackCommand backCmd = new RSSReader.BackCommand(previousForm);
 
         backCmd.actionPerformed(new ActionEvent(backCmd));
 
@@ -35,7 +35,7 @@ public class RSSReaderCoverageTest extends UITestBase {
     public void testListener() {
         RSSReader reader = new RSSReader();
         String testUrl = "https://www.example.com";
-        RSSReader.Listener listener = reader.new Listener(testUrl);
+        RSSReader.Listener listener = new RSSReader.Listener(testUrl);
 
         listener.actionPerformed(new ActionEvent(reader));
 

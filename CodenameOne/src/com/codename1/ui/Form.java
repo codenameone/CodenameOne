@@ -4591,7 +4591,7 @@ public class Form extends Container {
      *
      * @see #getTabIterator(com.codename1.ui.Component)
      */
-    public class TabIterator implements ListIterator<Component> {
+    public static class TabIterator implements ListIterator<Component> {
         private final java.util.List<Component> components;
         private int currPos;
         private Component current;

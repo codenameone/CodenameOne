@@ -230,7 +230,7 @@ class MultiComboBox extends List {
      *
      * @author Ofir Leitner
      */
-    class MultiListModel extends DefaultListModel {
+    static class MultiListModel extends DefaultListModel {
 
         Vector selected = new Vector();
         int direction;
@@ -305,7 +305,7 @@ class MultiComboBox extends List {
      *
      * @author Ofir Leitner
      */
-    class MultiCellRenderer extends DefaultListCellRenderer {
+    static class MultiCellRenderer extends DefaultListCellRenderer {
 
         private final MultiListModel model;
         private boolean optgroup;

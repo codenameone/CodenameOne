@@ -1329,7 +1329,7 @@ public class FaceBookAccess {
         }
     }
 
-    class Listener implements ActionListener {
+    static class Listener implements ActionListener {
         private final FacebookRESTService con;
         private final ActionListener callback;
 

@@ -1197,7 +1197,7 @@ class CSSElement extends HTMLElement {
      *
      * @author Ofir Leitner
      */
-    class AttString {
+    static class AttString {
 
         static final int EQUALS = 0;
         static final int BEGINS_WITH = 1;

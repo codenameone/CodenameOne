@@ -381,7 +381,7 @@ class HTMLInputFormat {
      *
      * @author Ofir Leitner
      */
-    class FormatConstraint {
+    static class FormatConstraint {
 
         /**
          * All lowercase english letters are allowed

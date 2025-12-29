@@ -764,7 +764,7 @@ final class Inflate {
         }
     }
 
-    class Return extends Exception {
+    static class Return extends Exception {
         int r;
 
         Return(int r) {

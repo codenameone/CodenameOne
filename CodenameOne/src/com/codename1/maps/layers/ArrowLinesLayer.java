@@ -189,7 +189,7 @@ public class ArrowLinesLayer extends LinesLayer {
         this.arrowWidth = arrowWidth;
     }
 
-    private class ArrowHead {
+    private static class ArrowHead {
 
         private final int _height;
         private final int _width;

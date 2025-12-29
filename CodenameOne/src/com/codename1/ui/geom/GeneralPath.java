@@ -3216,7 +3216,7 @@ public final class GeneralPath implements Shape {
     /*
      * GeneralPath path iterator
      */
-    private class Iterator implements PathIterator {
+    private static class Iterator implements PathIterator {
 
         /**
          * The current cursor position in types buffer

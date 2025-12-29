@@ -607,7 +607,7 @@ public class Node {
         }
     }
 
-    private class RenderableContainer extends Container {
+    private static class RenderableContainer extends Container {
 
         public RenderableContainer() {
             super(new BorderLayout(), "NodeWrapper");

@@ -1169,7 +1169,7 @@ public class RECompiler {
     /**
      * Local, nested class for maintaining character ranges for character classes.
      */
-    class RERange {
+    static class RERange {
         int size = 16;                      // Capacity of current range arrays
         int[] minRange = new int[size];     // Range minima
         int[] maxRange = new int[size];     // Range maxima

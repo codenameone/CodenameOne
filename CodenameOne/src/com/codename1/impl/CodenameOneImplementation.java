@@ -8820,7 +8820,7 @@ public abstract class CodenameOneImplementation {
         return "";
     }
 
-    class RPush implements Runnable {
+    static class RPush implements Runnable {
         public void run() {
             final long pushId = Preferences.get("push_id", (long) -1);
             if (pushId > -1 && callback != null) {

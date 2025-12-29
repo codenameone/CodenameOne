@@ -735,7 +735,7 @@ class CSSParser {
      *
      * @author Ofir Leitner
      */
-    class ExtInputStreamReader {
+    static class ExtInputStreamReader {
 
         char lastCharRead = (char) -1;
         Reader internalReader;

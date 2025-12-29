@@ -9,7 +9,7 @@ public class Oauth2RefreshTokenRequestTest extends UITestBase {
     @FormTest
     public void testRefreshTokenRequest() {
         // Just instantiate to cover the class definition
-        Oauth2.RefreshTokenRequest req = new Oauth2("url", "id", "uri").new RefreshTokenRequest();
+        Oauth2.RefreshTokenRequest req = new Oauth2.RefreshTokenRequest();
         Assertions.assertNotNull(req);
     }
 }

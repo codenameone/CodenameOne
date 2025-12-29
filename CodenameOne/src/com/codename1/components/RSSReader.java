@@ -454,7 +454,7 @@ public class RSSReader extends List {
         this.addBackToTaget = addBackToTaget;
     }
 
-    class Listener implements ActionListener {
+    static class Listener implements ActionListener {
         private final String url;
 
         public Listener(String url) {
@@ -466,7 +466,7 @@ public class RSSReader extends List {
         }
     }
 
-    class BackCommand extends Command {
+    static class BackCommand extends Command {
         private final Form sourceForm;
 
         public BackCommand(Form sourceForm) {

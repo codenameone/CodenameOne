@@ -473,7 +473,7 @@ public class GridBagLayout extends Layout {
         Dimension maxSize = initCompsArray(parent, info.components);
         new RelativeTranslator(maxSize.getWidth(), maxSize.getHeight()).translate(info);
         initCompSides(info);
-        info.grid.validate(info);
+        info.grid.validate(info, columnWidths, columnWeights, rowHeights, rowWeights);
         if (layoutInfo == null) {
             layoutInfo = new GridBagLayoutInfo(info.grid.lookupWidths(), info.grid
                     .lookupHeights());
@@ -553,7 +553,7 @@ public class GridBagLayout extends Layout {
         }
     }
 
-    private class RelativeTranslator {
+    private static class RelativeTranslator {
         private final int[] curX; // up-to-down
         private int curY; //Left-to-right (or vice versa)
         private int maxW; //Common for relative
@@ -723,7 +723,7 @@ public class GridBagLayout extends Layout {
         }
     }
 
-    private class ComponentSide {
+    private static class ComponentSide {
         public static final int POS_START = 1;
 
         public static final int POS_CENTER = 2;
@@ -749,12 +749,12 @@ public class GridBagLayout extends Layout {
         public boolean stretch;
     }
 
-    private class Grid {
+    private static class Grid {
         private final GridSide cols = new GridSide();
 
         private final GridSide rows = new GridSide();
 
-        public void validate(ParentInfo info) {
+        public void validate(ParentInfo info, int[] columnWidths, double[] columnWeights, int[] rowHeights, double[] rowWeights) {
             cols.validate(info.horCompSides, columnWidths, columnWeights);
             rows.validate(info.vertCompSides, rowHeights, rowWeights);
         }
@@ -835,7 +835,7 @@ public class GridBagLayout extends Layout {
             return new Point(col, row);
         }*/
 
-        private class GridSide {
+        private static class GridSide {
             private final int[] coordinates = new int[MAXGRIDSIZE];
 
             private final int[] lengths = new int[MAXGRIDSIZE];
@@ -1131,7 +1131,7 @@ public class GridBagLayout extends Layout {
         }
     }
 
-    private class Segment {
+    private static class Segment {
         public int start;
 
         public int length;
@@ -1142,7 +1142,7 @@ public class GridBagLayout extends Layout {
         }
     }
 
-    private class MixedConstraints {
+    private static class MixedConstraints {
         public Rectangle initial; //Relative/Absolute
 
         public Rectangle mapped; //Absolute
@@ -1157,7 +1157,7 @@ public class GridBagLayout extends Layout {
         }
     }
 
-    private class ParentInfo {
+    private static class ParentInfo {
         final HashMap<GridBagConstraints, MixedConstraints> consTable; // Components' constraints to relative constraints
 
         final ArrayList<MixedConstraints> allConstraints; // Only mapped rectangle is a part of cache

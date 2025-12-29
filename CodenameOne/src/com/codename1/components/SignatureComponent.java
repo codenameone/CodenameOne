@@ -441,7 +441,7 @@ public class SignatureComponent extends Container implements ActionSource {
      * The actual panel for drawing a signature.  This doesn't include any buttons (like done, reset, or cancel),
      * it merely provides the functionality to record the drawing of a signature.
      */
-    private class SignaturePanel extends Component {
+    private static class SignaturePanel extends Component {
 
         private final GeneralPath path = new GeneralPath();
         private final Stroke stroke = new Stroke();

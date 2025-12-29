@@ -446,7 +446,7 @@ public class WebBrowser extends Container {
         return super.setPropertyValue(name, value);
     }
 
-    class Loading implements Painter, Animation {
+    static class Loading implements Painter, Animation {
 
         private final Form f;
 

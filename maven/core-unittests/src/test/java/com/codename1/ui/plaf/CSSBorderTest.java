@@ -75,9 +75,9 @@ public class CSSBorderTest extends UITestBase {
 
         // Reflection to create LinearGradient
         Class<?> linearGradientClass = Class.forName("com.codename1.ui.plaf.CSSBorder$LinearGradient");
-        java.lang.reflect.Constructor<?> lgCtor = linearGradientClass.getDeclaredConstructor(CSSBorder.class);
+        java.lang.reflect.Constructor<?> lgCtor = linearGradientClass.getDeclaredConstructor();
         lgCtor.setAccessible(true);
-        Object linearGradient = lgCtor.newInstance(border);
+        Object linearGradient = lgCtor.newInstance();
 
         // Set angle
         java.lang.reflect.Field angleField = linearGradientClass.getDeclaredField("angle");
@@ -86,10 +86,10 @@ public class CSSBorderTest extends UITestBase {
 
         // Create ColorStops
         Class<?> colorStopClass = Class.forName("com.codename1.ui.plaf.CSSBorder$ColorStop");
-        java.lang.reflect.Constructor<?> csCtor = colorStopClass.getDeclaredConstructor(CSSBorder.class);
+        java.lang.reflect.Constructor<?> csCtor = colorStopClass.getDeclaredConstructor();
         csCtor.setAccessible(true);
 
-        Object stop1 = csCtor.newInstance(border);
+        Object stop1 = csCtor.newInstance();
 
         // Create Colors
         Class<?> colorClass = Class.forName("com.codename1.ui.plaf.CSSBorder$Color");
@@ -102,7 +102,7 @@ public class CSSBorderTest extends UITestBase {
         colorField.setAccessible(true);
         colorField.set(stop1, red);
 
-        Object stop2 = csCtor.newInstance(border);
+        Object stop2 = csCtor.newInstance();
         colorField.set(stop2, blue);
         java.lang.reflect.Field positionField = colorStopClass.getDeclaredField("position");
         positionField.setAccessible(true);
@@ -118,9 +118,9 @@ public class CSSBorderTest extends UITestBase {
 
         // Create BackgroundImage and attach LinearGradient
         Class<?> bgImageClass = Class.forName("com.codename1.ui.plaf.CSSBorder$BackgroundImage");
-        java.lang.reflect.Constructor<?> bgCtor = bgImageClass.getDeclaredConstructor(CSSBorder.class);
+        java.lang.reflect.Constructor<?> bgCtor = bgImageClass.getDeclaredConstructor();
         bgCtor.setAccessible(true);
-        Object bgImage = bgCtor.newInstance(border);
+        Object bgImage = bgCtor.newInstance();
 
         java.lang.reflect.Field lgField = bgImageClass.getDeclaredField("linearGradient");
         lgField.setAccessible(true);
@@ -183,15 +183,15 @@ public class CSSBorderTest extends UITestBase {
 
         // Reflection to create RadialGradient
         Class<?> radialGradientClass = Class.forName("com.codename1.ui.plaf.CSSBorder$RadialGradient");
-        java.lang.reflect.Constructor<?> rgCtor = radialGradientClass.getDeclaredConstructor(CSSBorder.class);
+        java.lang.reflect.Constructor<?> rgCtor = radialGradientClass.getDeclaredConstructor();
         rgCtor.setAccessible(true);
-        Object radialGradient = rgCtor.newInstance(border);
+        Object radialGradient = rgCtor.newInstance();
 
         // Create BackgroundImage and attach RadialGradient
         Class<?> bgImageClass = Class.forName("com.codename1.ui.plaf.CSSBorder$BackgroundImage");
-        java.lang.reflect.Constructor<?> bgCtor = bgImageClass.getDeclaredConstructor(CSSBorder.class);
+        java.lang.reflect.Constructor<?> bgCtor = bgImageClass.getDeclaredConstructor();
         bgCtor.setAccessible(true);
-        Object bgImage = bgCtor.newInstance(border);
+        Object bgImage = bgCtor.newInstance();
 
         java.lang.reflect.Field rgField = bgImageClass.getDeclaredField("radialGradient");
         rgField.setAccessible(true);
