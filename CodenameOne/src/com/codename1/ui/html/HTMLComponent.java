@@ -527,6 +527,9 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
+    static int getInt(String intStr) {
+        return getInt(intStr, 0);
+    }
 
     /**
      * Calculates width or height of an element according to its original size, requested size and default size
@@ -2061,55 +2064,6 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     }
 
     /**
-     * Shows the given text. This method breaks lines as necessary and adds the text either as regular labels or links.
-     *
-     * @param text  The text to display
-     * @param align The current horizontal alignment
-     */
-    private Vector showTextFixedWidth(String text, int align) {
-        Vector comps = new Vector();
-        if ((text == null) || (text.equals(""))) {
-            return comps; //no text to show
-        }
-        int spaceW = width - x;
-
-        Vector words = getWords(text, align, false);
-
-        if (words.size() > 0) {
-            int w = 0;
-            StringBuilder wordStr = new StringBuilder();
-            if ((CSSParser.isWhiteSpace(text.charAt(0))) && (curLine.getComponentCount() != 0)) { //leading space is trimmed if it is in the first component of the line
-                wordStr.append(" "); //leading space
-            }
-
-            while (w < words.size()) {
-                String nextWord = (String) words.elementAt(w);
-                String space = "";
-                if ((wordStr.length() > 0) && (!wordStr.toString().equals(" "))) {
-                    space = " ";
-                }
-                if (font.stringWidth(wordStr.toString() + space + nextWord) > spaceW - 2) {
-                    comps.addElement(addString(wordStr.toString(), align));
-                    newLineIfNotEmpty(align);
-                    spaceW = width - x;
-                    wordStr.setLength(0);
-                    wordStr.append(nextWord);
-                } else {
-                    wordStr.append(space).append(nextWord);
-                }
-                w++;
-            }
-            if (CSSParser.isWhiteSpace(text.charAt(text.length() - 1))) {
-                wordStr.append(" "); //trailing space
-            }
-
-            comps.addElement(addString(wordStr.toString(), align));
-        }
-
-        return comps;
-    }
-
-    /**
      * Adds the given text to the container as a label or a link.
      * The string given here does not need line breaking as this was calculated before in the calling method.
      *
@@ -2917,12 +2871,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                         if (preTagCount != 0) {
                             comps = showPreTagText(text, curAlign);
                         } else {
-
-                            if (FIXED_WIDTH) {
-                                comps = showTextFixedWidth(text, curAlign);
-                            } else {
-                                comps = showText(text, curAlign);
-                            }
+                            comps = showText(text, curAlign);
                         }
                         if (loadCSS) {
                             child.setAssociatedComponents(comps);
