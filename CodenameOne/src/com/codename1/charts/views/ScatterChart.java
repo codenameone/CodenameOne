@@ -203,7 +203,8 @@ public class ScatterChart extends XYChart {
      */
     public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
                                 int seriesIndex, Paint paint) {
-        if (((XYSeriesRenderer) renderer).isFillPoints()) {
+        if (renderer instanceof  XYSeriesRenderer &&
+                ((XYSeriesRenderer) renderer).isFillPoints()) {
             paint.setStyle(Style.FILL);
         } else {
             paint.setStyle(Style.STROKE);

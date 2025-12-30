@@ -513,13 +513,19 @@ public class FaceBookAccess {
         getFaceBookObject(postId, new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
-                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();
-                Hashtable t = (Hashtable) v.elementAt(0);
-                if (post != null) {
-                    post.copy(t);
-                }
-                if (callback != null) {
-                    callback.actionPerformed(evt);
+                final Object val = ((NetworkEvent) evt).getMetaData();;
+                if(val instanceof Vector) {
+                    final Vector v = (Vector) val;
+                    final Object o = v.elementAt(0);
+                    if(o instanceof Hashtable) {
+                        final Hashtable t = (Hashtable) o;
+                        if (post != null) {
+                            post.copy(t);
+                        }
+                        if (callback != null) {
+                            callback.actionPerformed(evt);
+                        }
+                    }
                 }
             }
         });
@@ -548,10 +554,15 @@ public class FaceBookAccess {
         getFaceBookObject(postId, new ActionListener() {
 
             public void actionPerformed(ActionEvent evt) {
-                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();
-                Hashtable t = (Hashtable) v.elementAt(0);
-                post.copy(t);
-
+                final Object val = ((NetworkEvent) evt).getMetaData();
+                if(val instanceof Vector) {
+                    final Vector v = (Vector) val;
+                    final Object o = v.elementAt(0);
+                    if(o instanceof Hashtable) {
+                        Hashtable t = (Hashtable) o;
+                        post.copy(t);
+                    }
+                }
             }
         }, needAuth, false);
         if (err.size() > 0) {

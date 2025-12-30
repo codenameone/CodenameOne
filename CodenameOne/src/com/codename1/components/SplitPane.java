@@ -967,10 +967,12 @@ public class SplitPane extends Container {
                     .each(new ComponentClosure() {
                         @Override
                         public void call(Component c) {
-                            if (collapseIcon != null) {
-                                ((Label) c).setIcon(collapseIcon);
-                            } else {
-                                ((Label) c).setMaterialIcon(getCollapseMaterialIcon());
+                            if(c instanceof Label) {
+                                if (collapseIcon != null) {
+                                    ((Label) c).setIcon(collapseIcon);
+                                } else {
+                                    ((Label) c).setMaterialIcon(getCollapseMaterialIcon());
+                                }
                             }
                         }
 
@@ -990,13 +992,14 @@ public class SplitPane extends Container {
                     .each(new ComponentClosure() {
                         @Override
                         public void call(Component c) {
-                            if (expandIcon != null) {
-                                ((Label) c).setIcon(expandIcon);
-                            } else {
-                                ((Label) c).setMaterialIcon(getExpandMaterialIcon());
+                            if(c instanceof Label) {
+                                if (expandIcon != null) {
+                                    ((Label) c).setIcon(expandIcon);
+                                } else {
+                                    ((Label) c).setMaterialIcon(getExpandMaterialIcon());
+                                }
                             }
                         }
-
                     })
                     .addActionListener(new ActionListener() {
                         public void actionPerformed(ActionEvent evt) {

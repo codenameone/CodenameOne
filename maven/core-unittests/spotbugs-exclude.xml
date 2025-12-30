@@ -96,6 +96,23 @@
     <Match>
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
+    <Match>
+        <Bug pattern="MS_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
+    </Match>
+
+
+    <!--
+    This rule prevents Class.newInstance() which we generally avoid anyway.
+    However, the solution is to use java.beans or reflection to create a class
+    via its constructor. That's a problem since that API isn't available in
+    Codename One.
+    -->
+    <Match>
+        <Bug pattern="REFLC_REFLECTION_MAY_INCREASE_ACCESSIBILITY_OF_CLASS"/>
+    </Match>
 
     <!-- Match>
         <Bug pattern="UI_INHERITANCE_UNSAFE_GETRESOURCE"/>
@@ -125,10 +142,15 @@
         <Bug pattern="ES_COMPARING_STRINGS_WITH_EQ" />
     </Match>
 
-    <!-- The API should return null when the value isn't found -->
+    <!-- The class has too many casts like this to go over -->
     <Match>
-        <Class name="~com\.codename1\.plaf\.UIManager" />
-        <Method name="isThemeConstant" />
+        <Class name="~com\.codename1\.facebook\.FaceBookAccess.*" />
+        <Bug pattern="BC_UNCONFIRMED_CAST" />
+    </Match>
+
+    <!-- The API isThemeConstant should return null when the value isn't found -->
+    <Match>
+        <Class name="~com\.codename1\.plaf\.UIManager.*" />
         <Bug pattern="NP_BOOLEAN_RETURN_NULL" />
     </Match>
 
