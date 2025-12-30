@@ -627,6 +627,10 @@ public class CSSBorder extends Border {
         return true;
     }
 
+    private static void setContext(Context ctx) {
+        context = ctx;
+    }
+
     /**
      * {@inheritDoc }
      */
@@ -647,7 +651,7 @@ public class CSSBorder extends Border {
             calculateContentRect(c.getWidth(), c.getHeight(), contentRect);
             contentRect.setX(contentRect.getX() + c.getX());
             contentRect.setY(contentRect.getY() + c.getY());
-            context = new Context(c, contentRect);
+            setContext(new Context(c, contentRect));
             String borderPathKey = "$$CSSBorderPath";
             GeneralPath p = (GeneralPath) c.getClientProperty(borderPathKey);
             if (p == null) {
