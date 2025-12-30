@@ -267,7 +267,10 @@ public class Capture {
             while (!completed) {
                 synchronized (this) {
                     try {
-                        this.wait();
+                        // we need to recheck the condition within the synchronized block (double locking)
+                        if(!completed) {
+                            this.wait();
+                        }
                     } catch (InterruptedException ex) {
                     }
                 }

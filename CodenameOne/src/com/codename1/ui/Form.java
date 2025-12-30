@@ -260,6 +260,10 @@ public class Form extends Container {
         return rippleMotion;
     }
 
+    static void setRippleMotion(Motion m) {
+        rippleMotion = m;
+    }
+
     /**
      * Sets the title after invoking the constructor
      *
@@ -3107,8 +3111,9 @@ public class Form extends Container {
 
     private void initRippleEffect(int x, int y, Component cmp) {
         if (cmp.isRippleEffect()) {
-            rippleMotion = Motion.createEaseInMotion(0, 1000, 800);
-            rippleMotion.start();
+            Motion motion = Motion.createEaseInMotion(0, 1000, 800);
+            motion.start();
+            setRippleMotion(motion);
             setRippleComponent(cmp);
             rippleX = x;
             rippleY = y;
@@ -3391,7 +3396,7 @@ public class Form extends Container {
             }
         }
 
-        rippleMotion = null;
+        setRippleMotion(null);
 
         if (dragged != null) {
             LeadUtil.pointerDragged(dragged, x, y);
@@ -3463,7 +3468,7 @@ public class Form extends Container {
             }
         }
 
-        rippleMotion = null;
+        setRippleMotion(null);
 
         if (dragged != null) {
             LeadUtil.pointerDragged(dragged, x, y);
@@ -3668,7 +3673,7 @@ public class Form extends Container {
     public void pointerReleased(int x, int y) {
         try {
             Component origPressedCmp = pressedCmp;
-            rippleMotion = null;
+            setRippleMotion(null);
             setPressedCmp(null);
             boolean isScrollWheeling = Display.impl.isScrollWheeling();
             Container actual = getActualPane(formLayeredPane, x, y);

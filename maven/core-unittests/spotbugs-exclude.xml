@@ -75,6 +75,27 @@
         <Bug pattern="CN_IDIOM_NO_SUPER_CALL"/>
     </Match>
 
+    <!--
+    This fails on writing to a static field from a non-static method.
+    This is a bad practice in general because it could indicate a state
+    that changes across threads. However, in our case, we have many such
+    fields and threads are typically mostly the EDT. The risk is much lower
+    as a result.
+    -->
+    <Match>
+        <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
+    </Match>
+
+    <!--
+    Since the code runs on the clientside performance is more important than
+    abstraction. We don't always copy values or wrap them in immutable data.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+    </Match>
 
     <!-- Match>
         <Bug pattern="UI_INHERITANCE_UNSAFE_GETRESOURCE"/>
@@ -102,6 +123,13 @@
     <Match>
         <Class name="~com\.codename1\.io\.ConnectionRequest.*" />
         <Bug pattern="ES_COMPARING_STRINGS_WITH_EQ" />
+    </Match>
+
+    <!-- The API should return null when the value isn't found -->
+    <Match>
+        <Class name="~com\.codename1\.plaf\.UIManager" />
+        <Method name="isThemeConstant" />
+        <Bug pattern="NP_BOOLEAN_RETURN_NULL" />
     </Match>
 
     <!-- Deprecated classes that should be excluded from checks -->

@@ -123,7 +123,7 @@ public final class PlatformDefaults {
     private static int DEF_H_UNIT = UnitValue.LPX;
     private static int DEF_V_UNIT = UnitValue.LPY;
     private static InCellGapProvider GAP_PROVIDER = null;
-    private static volatile int MOD_COUNT = 0;
+    private static int MOD_COUNT = 0;
     private static int CUR_PLAF = WINDOWS_XP;
     private static String BUTTON_FORMAT = null;
     private static BoundSize DEF_VGAP = null, DEF_HGAP = null;
@@ -342,7 +342,7 @@ public final class PlatformDefaults {
     public static void setHorizontalScaleFactor(Float f) {
         if (!LayoutUtil.equals(horScale, f)) {
             horScale = f;
-            MOD_COUNT++;
+            incModeCount();
         }
     }
 
@@ -371,7 +371,7 @@ public final class PlatformDefaults {
     public static void setVerticalScaleFactor(Float f) {
         if (!LayoutUtil.equals(verScale, f)) {
             verScale = f;
-            MOD_COUNT++;
+            incModeCount();
         }
     }
 
@@ -401,7 +401,7 @@ public final class PlatformDefaults {
                 throw new IllegalArgumentException("Unrecognized base: " + base);
 
             LP_BASE = base;
-            MOD_COUNT++;
+            incModeCount();
         }
     }
 
@@ -465,7 +465,7 @@ public final class PlatformDefaults {
         if (y != null)
             DEF_VGAP = new BoundSize(y, y, null, null);
 
-        MOD_COUNT++;
+        incModeCount();
     }
 
     /**
@@ -484,7 +484,7 @@ public final class PlatformDefaults {
      */
     public static void setMinimumButtonWidth(UnitValue width) {
         BUTT_WIDTH = width;
-        MOD_COUNT++;
+        incModeCount();
     }
 
     /**
@@ -525,7 +525,7 @@ public final class PlatformDefaults {
             if (y != null)
                 VER_DEFS.put(s, y);
         }
-        MOD_COUNT++;
+        incModeCount();
     }
 
     /**
@@ -587,7 +587,7 @@ public final class PlatformDefaults {
      */
     public static void setButtonOrder(String order) {
         BUTTON_FORMAT = order;
-        MOD_COUNT++;
+        incModeCount();
     }
 
     /**
@@ -678,7 +678,7 @@ public final class PlatformDefaults {
         if (right != null)
             DIALOG_INS[3] = right;
 
-        MOD_COUNT++;
+        incModeCount();
     }
 
     /**
@@ -712,7 +712,7 @@ public final class PlatformDefaults {
         if (right != null)
             PANEL_INS[3] = right;
 
-        MOD_COUNT++;
+        incModeCount();
     }
 
     /**
@@ -775,6 +775,10 @@ public final class PlatformDefaults {
      */
     public static int getModCount() {
         return MOD_COUNT;
+    }
+
+    private static void incModeCount() {
+        MOD_COUNT++;
     }
 
     /**
