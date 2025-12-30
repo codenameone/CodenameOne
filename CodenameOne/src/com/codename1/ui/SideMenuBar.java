@@ -1231,7 +1231,7 @@ public class SideMenuBar extends MenuBar {
                 }
                 super.pointerReleased(x, y);
                 boolean isRTLValue = isRTL();
-                if (placement == COMMAND_PLACEMENT_VALUE_RIGHT) {
+                if (placement.equals(COMMAND_PLACEMENT_VALUE_RIGHT)) {
                     isRTLValue = !isRTLValue;
                 }
                 int displayWidth = Display.getInstance().getDisplayWidth();

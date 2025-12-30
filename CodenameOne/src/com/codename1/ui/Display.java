@@ -86,12 +86,12 @@ import java.util.TimerTask;
  * specific event delivery and painting semantics and enables threading features such as
  * animations etc...
  * <p>The EDT should not be blocked since paint operations and events would also be blocked
- * in much the same way as they would be in other platforms. In order to serialize calls back
- * into the EDT use the methods {@link Display#callSerially} &amp; {@link Display#callSeriallyAndWait}.
- * <p>Notice that all Codename One calls occur on the EDT (events, painting, animations etc...), Codename One
+ * in much the same way as they would be in other platforms. To serialize calls back
+ * into the EDT, use the methods {@link Display#callSerially} &amp; {@link Display#callSeriallyAndWait}.
+ * <p>Notice that all Codename One calls occur on the EDT (events, painting, animations, etc...), Codename One
  * should normally be manipulated on the EDT as well (hence the {@link Display#callSerially} &amp;
- * {@link Display#callSeriallyAndWait} methods). Theoretically it should be possible to manipulate
- * some Codename One features from other threads but this can't be guaranteed to work for all use cases.
+ * {@link Display#callSeriallyAndWait} methods). Theoretically, it should be possible to manipulate
+ * some Codename One features from other threads, but this can't be guaranteed to work for all use cases.
  *
  * @author Chen Fishbein, Shai Almog
  */
@@ -134,11 +134,11 @@ public final class Display extends CN1Constants {
      */
     public static final int KEYBOARD_TYPE_QWERTY = 2;
     /**
-     * Touch device without a physical keyboard that should popup a keyboad
+     * A touch based device that doesn't have a physical keyboard. Such a device pops up a virtual keyboad.
      */
     public static final int KEYBOARD_TYPE_VIRTUAL = 3;
     /**
-     * Half QWERTY which needs software assistance for completion
+     * Half-QWERTY which needs software assistance for completion
      */
     public static final int KEYBOARD_TYPE_HALF_QWERTY = 4;
     /**
@@ -146,7 +146,7 @@ public final class Display extends CN1Constants {
      */
     public static final int GAME_FIRE = 8;
     /**
-     * Game action for left key
+     * Game action for the left key
      */
     public static final int GAME_LEFT = 2;
     /**
@@ -338,7 +338,7 @@ public final class Display extends CN1Constants {
      * Indicates the maximum drawing speed of no more than 10 frames per second
      * by default (this can be increased or decreased) the advantage of limiting
      * framerate is to allow the CPU to perform other tasks besides drawing.
-     * Notice that when no change is occurring on the screen no frame is drawn and
+     * Notice that when no change is occurring on the screen, no frame is drawn and
      * so a high/low FPS will have no effect then.
      */
     private int framerateLock = 15;
@@ -388,8 +388,6 @@ public final class Display extends CN1Constants {
     private int longPressInterval = 500;
     private long nextKeyRepeatEvent;
     private int keyRepeatValue;
-    private final int keyRepeatInitialIntervalTime = 800;
-    private final int keyRepeatNextIntervalTime = 10;
     private boolean lastInteractionWasKeypad;
     private boolean dragOccured;
     private boolean processingSerialCalls;
@@ -1240,6 +1238,7 @@ public final class Display extends CN1Constants {
             long t = System.currentTimeMillis();
             if (keyRepeatCharged && nextKeyRepeatEvent <= t) {
                 current.keyRepeated(keyRepeatValue);
+                int keyRepeatNextIntervalTime = 10;
                 nextKeyRepeatEvent = t + keyRepeatNextIntervalTime;
             }
             if (longPressCharged && longPressInterval <= t - longKeyPressTime) {
@@ -1926,6 +1925,7 @@ public final class Display extends CN1Constants {
         longPressCharged = keyRepeatCharged;
         longKeyPressTime = System.currentTimeMillis();
         keyRepeatValue = keyCode;
+        int keyRepeatInitialIntervalTime = 800;
         nextKeyRepeatEvent = System.currentTimeMillis() + keyRepeatInitialIntervalTime;
         previousKeyPressed = lastKeyPressed;
         lastKeyPressed = keyCode;

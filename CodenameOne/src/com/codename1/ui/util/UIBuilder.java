@@ -907,9 +907,8 @@ public class UIBuilder { //implements Externalizable {
             // resource might have been removed we need to fail gracefully
             String[] uiNames = res.getUIResourceNames();
             String currentName = in.readUTF();
-            int ulen = uiNames.length;
-            for (int iter = 0; iter < ulen; iter++) {
-                if (uiNames[iter].equals(currentName)) {
+            for (String uiName : uiNames) {
+                if (uiName.equals(currentName)) {
                     return createContainer(res, currentName);
                 }
             }
@@ -931,7 +930,7 @@ public class UIBuilder { //implements Externalizable {
             }
         }
 
-        return new Character(in.readChar());
+        return in.readChar();
     }
 
     private Component createComponent(DataInputStream in, Container parent, Container root, Resources res, Hashtable componentListeners, EmbeddedContainer embedded) throws Exception {

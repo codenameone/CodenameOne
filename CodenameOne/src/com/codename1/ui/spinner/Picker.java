@@ -1208,7 +1208,7 @@ public class Picker extends Button {
     public int getSelectedStringIndex() {
         int offset = 0;
         for (String s : (String[]) metaData) {
-            if (s == value) {
+            if (s == value || (s != null && s.equals(value))) {
                 return offset;
             }
             offset++;

@@ -776,7 +776,18 @@ def main() -> None:
             "EQ_ALWAYS_FALSE",
             "SBSC_USE_STRINGBUFFER_CONCATENATION",
             "SIC_INNER_SHOULD_BE_STATIC",
-            "EQ_DOESNT_OVERRIDE_EQUALS"
+            "EQ_DOESNT_OVERRIDE_EQUALS",
+            "CO_COMPARETO_INCORRECT_FLOATING",
+            "DL_SYNCHRONIZATION_ON_SHARED_CONSTANT",
+            "DLS_DEAD_LOCAL_STORE",
+            "DM_NUMBER_CTOR",
+            "DMI_INVOKING_TOSTRING_ON_ARRAY",
+            "EC_NULL_ARG",
+            "EC_UNRELATED_TYPES_USING_POINTER_EQUALITY",
+            "EQ_GETCLASS_AND_CLASS_CONSTANT",
+            "EQ_UNUSUAL",
+            "ES_COMPARING_STRINGS_WITH_EQ",
+            "FI_EMPTY"
         }
         violations = [
             f for f in spotbugs.findings

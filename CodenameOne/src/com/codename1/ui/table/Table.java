@@ -426,15 +426,15 @@ public class Table extends Container {
 
     /**
      * Returns a generic comparator that tries to work in a way that will sort columns with similar object types.
-     * This method can be overriden to create custom sort orders or return null and thus disable sorting for a
+     * This method can be overridden to create custom sort orders or return null and thus disable sorting for a
      * specific column
      *
      * @param column the column that's sorted
      * @return the comparator instance
      */
-    protected Comparator createColumnSortComparator(int column) {
+    protected Comparator<Object> createColumnSortComparator(int column) {
         final CaseInsensitiveOrder ccmp = new CaseInsensitiveOrder();
-        return new Comparator() {
+        return new Comparator<Object>() {
             public int compare(Object o1, Object o2) {
                 if (o1 == null) {
                     if (o2 == null) {
@@ -452,25 +452,11 @@ public class Table extends Container {
                 try {
                     double d1 = Util.toDoubleValue(o1);
                     double d2 = Util.toDoubleValue(o2);
-                    if (d1 < d2) {
-                        return -1;
-                    }
-                    if (d1 > d2) {
-                        return 1;
-                    }
-                    long bits1 = Double.doubleToLongBits(d1);
-                    long bits2 = Double.doubleToLongBits(d2);
-                    if (bits1 < bits2) {
-                        return -1;
-                    }
-                    if (bits1 > bits2) {
-                        return 1;
-                    }
+                    return Double.compare(d1, d2);
                 } catch (IllegalArgumentException err) {
                     long dd = Util.toDateValue(o1).getTime() - Util.toDateValue(o2).getTime();
                     return (int) dd;
                 }
-                return 0;
             }
         };
     }
@@ -483,7 +469,7 @@ public class Table extends Container {
      */
     public void sort(int column, boolean ascending) {
         sortedColumn = column;
-        Comparator cmp = createColumnSortComparator(column);
+        Comparator<Object> cmp = createColumnSortComparator(column);
         if (model instanceof SortableTableModel) {
             model = ((SortableTableModel) model).getUnderlying();
         }
@@ -505,9 +491,9 @@ public class Table extends Container {
             header.getAllStyles().setAlignment(titleAlignment);
             header.setTextPosition(LEFT);
             if (isSortSupported()) {
-                header.addActionListener(new ActionListener() {
+                header.addActionListener(new ActionListener<ActionEvent>() {
                     public void actionPerformed(ActionEvent evt) {
-                        Comparator cmp = createColumnSortComparator(column);
+                        Comparator<Object> cmp = createColumnSortComparator(column);
                         if (column == sortedColumn) {
                             ascending = !ascending;
                         } else {

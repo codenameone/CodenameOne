@@ -1198,19 +1198,8 @@ public class Resources {
         // read a system font fallback
         int fallback = input.readByte() & 0xff;
 
-        // do we have an emedded truetype font? Do we support embedded fonts?
-        boolean trueTypeIncluded = input.readBoolean();
+        // do we have an embedded truetype font? Do we support embedded fonts?
         Font font = null;
-        /*if(trueTypeIncluded) {
-            int size = input.readInt();
-            if(Font.isTrueTypeFileSupported()) {
-                font = Font.createTrueTypeFont(input);
-            } else {
-                while(size > 0) {
-                    size -= input.skip(size);
-                }
-            }
-        }*/
         boolean lookupIncluded = input.readBoolean();
         if (lookupIncluded) {
             String lookup = input.readUTF();

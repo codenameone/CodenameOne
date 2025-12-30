@@ -917,8 +917,6 @@ public final class CommonTransitions extends Transition {
         if(src == null) {
             return;
         }
-        int w = src.getWidth();
-        int h = src.getHeight();
         int position = this.position;
         if (position > 255) {
             position = 255;

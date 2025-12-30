@@ -1,5 +1,5 @@
 <FindBugsFilter>
-    <Match>
+    <!-- Match>
         <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
     </Match>
     <Match>
@@ -58,11 +58,14 @@
     </Match>
     <Match>
         <Bug pattern="REFLC_REFLECTION_MAY_INCREASE_ACCESSIBILITY_OF_CLASS"/>
-    </Match>
+    </Match !-->
+
+    <!-- We don't support serialization -->
     <Match>
         <Bug pattern="SE_NO_SERIALVERSIONID"/>
     </Match>
-    <Match>
+
+    <!-- Match>
         <Bug pattern="UI_INHERITANCE_UNSAFE_GETRESOURCE"/>
     </Match>
     <Match>
@@ -73,7 +76,8 @@
     </Match>
     <Match>
         <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON" />
-    </Match>
+    </Match -->
+
     <Match>
         <Class name="~com\.codename1\.io\.Socket.*" />
         <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE" />
@@ -81,5 +85,16 @@
     <Match>
         <Class name="~com\.codename1\.io\.gzip\.InfBlocks.*" />
         <Bug pattern="SA_FIELD_SELF_ASSIGNMENT" />
+    </Match>
+
+    <!-- Excluding since the class explicitly compares interned strings -->
+    <Match>
+        <Class name="~com\.codename1\.io\.ConnectionRequest.*" />
+        <Bug pattern="ES_COMPARING_STRINGS_WITH_EQ" />
+    </Match>
+
+    <!-- Deprecated classes that should be excluded from checks -->
+    <Match>
+        <Class name="~com\.codename1\.db\.ThreadSafeDatabase.*" />
     </Match>
 </FindBugsFilter>

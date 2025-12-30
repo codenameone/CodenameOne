@@ -357,82 +357,82 @@ public class WebServiceProxyCall {
                     return;
 
                 case TYPE_BYTE:
-                    returnValue = Byte.valueOf(dis.readByte());
+                    returnValue = dis.readByte();
                     break;
 
                 case TYPE_CHAR:
-                    returnValue = new Character(dis.readChar());
+                    returnValue = dis.readChar();
                     break;
 
                 case TYPE_SHORT:
-                    returnValue = Short.valueOf(dis.readShort());
+                    returnValue = dis.readShort();
                     break;
 
                 case TYPE_INT:
-                    returnValue = Integer.valueOf(dis.readInt());
+                    returnValue = dis.readInt();
                     break;
 
                 case TYPE_LONG:
-                    returnValue = Long.valueOf(dis.readLong());
+                    returnValue = dis.readLong();
                     break;
 
                 case TYPE_DOUBLE:
-                    returnValue = new Double(dis.readDouble());
+                    returnValue = dis.readDouble();
                     break;
 
                 case TYPE_FLOAT:
-                    returnValue = new Float(dis.readFloat());
+                    returnValue = dis.readFloat();
                     break;
 
                 case TYPE_BOOLEAN:
-                    returnValue = Boolean.valueOf(dis.readBoolean());
+                    returnValue = dis.readBoolean();
                     break;
 
                 case TYPE_BYTE_OBJECT:
                     if (dis.readBoolean()) {
-                        returnValue = Byte.valueOf(dis.readByte());
+                        returnValue = dis.readByte();
                     }
                     break;
 
                 case TYPE_CHARACTER_OBJECT:
                     if (dis.readBoolean()) {
-                        returnValue = new Character(dis.readChar());
+                        returnValue = dis.readChar();
                     }
                     break;
 
                 case TYPE_SHORT_OBJECT:
                     if (dis.readBoolean()) {
-                        returnValue = Short.valueOf(dis.readShort());
+                        returnValue = dis.readShort();
                     }
                     break;
 
                 case TYPE_INTEGER_OBJECT:
                     if (dis.readBoolean()) {
-                        returnValue = Integer.valueOf(dis.readInt());
+                        returnValue = dis.readInt();
                     }
                     break;
 
                 case TYPE_LONG_OBJECT:
                     if (dis.readBoolean()) {
-                        returnValue = Long.valueOf(dis.readLong());
+                        returnValue = dis.readLong();
                     }
                     break;
 
                 case TYPE_DOUBLE_OBJECT:
                     if (dis.readBoolean()) {
-                        returnValue = new Double(dis.readDouble());
+                        returnValue = dis.readDouble();
                     }
                     break;
 
                 case TYPE_FLOAT_OBJECT:
                     if (dis.readBoolean()) {
-                        returnValue = new Float(dis.readFloat());
+                        returnValue = dis.readFloat();
                     }
                     break;
 
                 case TYPE_BOOLEAN_OBJECT:
                     if (dis.readBoolean()) {
-                        returnValue = Boolean.valueOf(dis.readBoolean());
+                        returnValue = dis.readBoolean();
                     }
                     break;
 
