@@ -119,7 +119,7 @@ public class GZIPHeader {
         try {
             this.comment = comment.getBytes("ISO-8859-1");
         } catch (UnsupportedEncodingException e) {
-            throw new IllegalArgumentException("comment must be in ISO-8859-1 " + name);
+            throw new IllegalArgumentException("comment must be in ISO-8859-1 " + comment);
         }
     }
 

@@ -700,25 +700,25 @@ public class Util {
             }
             String type = input.readUTF();
             if ("int".equals(type)) {
-                return new Integer(input.readInt());
+                return input.readInt();
             }
             if ("byte".equals(type)) {
-                return new Byte(input.readByte());
+                return input.readByte();
             }
             if ("short".equals(type)) {
-                return new Short(input.readShort());
+                return input.readShort();
             }
             if ("long".equals(type)) {
-                return new Long(input.readLong());
+                return input.readLong();
             }
             if ("float".equals(type)) {
-                return new Float(input.readFloat());
+                return input.readFloat();
             }
             if ("double".equals(type)) {
-                return new Double(input.readDouble());
+                return input.readDouble();
             }
             if ("bool".equals(type)) {
-                return new Boolean(input.readBoolean());
+                return input.readBoolean();
             }
             if ("String".equals(type)) {
                 return input.readUTF();

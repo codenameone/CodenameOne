@@ -47,20 +47,20 @@ public class RECompiler {
     static final HashMap hashPOSIX = new HashMap();
 
     static {
-        hashPOSIX.put("alnum", new Character(RE.POSIX_CLASS_ALNUM));
-        hashPOSIX.put("alpha", new Character(RE.POSIX_CLASS_ALPHA));
-        hashPOSIX.put("blank", new Character(RE.POSIX_CLASS_BLANK));
-        hashPOSIX.put("cntrl", new Character(RE.POSIX_CLASS_CNTRL));
-        hashPOSIX.put("digit", new Character(RE.POSIX_CLASS_DIGIT));
-        hashPOSIX.put("graph", new Character(RE.POSIX_CLASS_GRAPH));
-        hashPOSIX.put("lower", new Character(RE.POSIX_CLASS_LOWER));
-        hashPOSIX.put("print", new Character(RE.POSIX_CLASS_PRINT));
-        hashPOSIX.put("punct", new Character(RE.POSIX_CLASS_PUNCT));
-        hashPOSIX.put("space", new Character(RE.POSIX_CLASS_SPACE));
-        hashPOSIX.put("upper", new Character(RE.POSIX_CLASS_UPPER));
-        hashPOSIX.put("xdigit", new Character(RE.POSIX_CLASS_XDIGIT));
-        hashPOSIX.put("javastart", new Character(RE.POSIX_CLASS_JSTART));
-        hashPOSIX.put("javapart", new Character(RE.POSIX_CLASS_JPART));
+        hashPOSIX.put("alnum", RE.POSIX_CLASS_ALNUM);
+        hashPOSIX.put("alpha", RE.POSIX_CLASS_ALPHA);
+        hashPOSIX.put("blank", RE.POSIX_CLASS_BLANK);
+        hashPOSIX.put("cntrl", RE.POSIX_CLASS_CNTRL);
+        hashPOSIX.put("digit", RE.POSIX_CLASS_DIGIT);
+        hashPOSIX.put("graph", RE.POSIX_CLASS_GRAPH);
+        hashPOSIX.put("lower", RE.POSIX_CLASS_LOWER);
+        hashPOSIX.put("print", RE.POSIX_CLASS_PRINT);
+        hashPOSIX.put("punct", RE.POSIX_CLASS_PUNCT);
+        hashPOSIX.put("space", RE.POSIX_CLASS_SPACE);
+        hashPOSIX.put("upper", RE.POSIX_CLASS_UPPER);
+        hashPOSIX.put("xdigit", RE.POSIX_CLASS_XDIGIT);
+        hashPOSIX.put("javastart", RE.POSIX_CLASS_JSTART);
+        hashPOSIX.put("javapart", RE.POSIX_CLASS_JPART);
     }
 
     // The compiled program

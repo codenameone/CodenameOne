@@ -6531,7 +6531,10 @@ public class Component implements Animation, StyleListener, Editable {
 
 
         Painter bgp = getStyle().getBgPainter();
-        boolean animateBackgroundB = bgp != null && bgp.getClass() != BGPainter.class && bgp instanceof Animation && (bgp != this) && ((Animation) bgp).animate();
+        boolean animateBackgroundB = bgp != null &&
+                bgp.getClass() != BGPainter.class &&
+                bgp instanceof Animation &&
+                ((Animation) bgp).animate();
         animateBackground = animateBackgroundB || animateBackground;
 
         if (getUIManager().getLookAndFeel().isFadeScrollBar()) {

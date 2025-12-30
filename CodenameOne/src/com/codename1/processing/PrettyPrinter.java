@@ -53,26 +53,26 @@ import java.util.Map;
  * @author Eric Coolman (2012-03 - derivative work from original Sun source).
  */
 class PrettyPrinter {
-    Map myHashMap;
+    Map<?, ?> myHashMap;
 
-    private PrettyPrinter(Map h) {
+    private PrettyPrinter(Map<?, ?> h) {
         this.myHashMap = h;
     }
 
-    public static String print(Map h) {
+    public static String print(Map<?, ?> h) {
         return print(h, 2, 0);
     }
 
-    public static String print(List v) {
+    public static String print(List<?> v) {
         return print(v, 2, 0);
     }
 
-    static String print(Map h, int indentFactor, int indent) {
+    static String print(Map<?, ?> h, int indentFactor, int indent) {
         PrettyPrinter printer = new PrettyPrinter(h);
         return printer.toString(indentFactor, indent);
     }
 
-    static String print(List v, int indentFactor, int indent) {
+    static String print(List<?> v, int indentFactor, int indent) {
         int len = v.size();
         if (len == 0) {
             return "[]";
@@ -120,7 +120,7 @@ class PrettyPrinter {
      * with <code>}</code>&nbsp;<small>(right brace)</small>.
      */
     static String valueToString(Object value, int indentFactor, int indent) {
-        if (value == null || value.equals(null)) {
+        if (value == null) {
             return "null";
         }
         try {
@@ -215,41 +215,6 @@ class PrettyPrinter {
         return sb.toString();
     }
 
-    /**
-     * Make a JSON text of an Object value. If the object has an
-     * value.toJSONString() method, then that method will be used to produce
-     * the JSON text. The method is required to produce a strictly
-     * conforming text. If the object does not contain a toJSONString
-     * method (which is the most common case), then a text will be
-     * produced by the rules.
-     * <p>
-     * Warning: This method assumes that the data structure is acyclical.
-     *
-     * @param value The value to be serialized.
-     * @return a printable, displayable, transmittable
-     * representation of the object, beginning
-     * with <code>{</code>&nbsp;<small>(left brace)</small> and ending
-     * with <code>}</code>&nbsp;<small>(right brace)</small>.
-     */
-    static String valueToString(Object value) {
-        if (value == null || value.equals(null)) {
-            return "null";
-        }
-        if (value instanceof String) {
-            return (String) value;
-        }
-        if (value instanceof Float || value instanceof Double ||
-                value instanceof Byte || value instanceof Short ||
-                value instanceof Integer || value instanceof Long) {
-            return numberToString(value);
-        }
-        if (value instanceof Boolean || value instanceof Map ||
-                value instanceof List) {
-            return value.toString();
-        }
-        return quote(value.toString());
-    }
-
     static public String trimNumber(String s) {
         if (s.indexOf('.') > 0 && s.indexOf('e') < 0 && s.indexOf('E') < 0) {
             while (s.endsWith("0")) {
@@ -267,7 +232,6 @@ class PrettyPrinter {
      *
      * @param n A Number
      * @return A String.
-     * @throws JSONException If n is a non-finite number.
      */
     static public String numberToString(Object n) {
         if (n == null) {
@@ -290,7 +254,7 @@ class PrettyPrinter {
      *
      * @return An iterator of the keys.
      */
-    public Enumeration keys() {
+    public Enumeration<?> keys() {
         return Collections.enumeration(this.myHashMap.keySet());
     }
 

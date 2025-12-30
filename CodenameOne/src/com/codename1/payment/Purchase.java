@@ -53,6 +53,7 @@ public abstract class Purchase {
     private static final String RECEIPTS_KEY = "CN1SubscriptionsData.dat";
     private static final String RECEIPTS_REFRESH_TIME_KEY = "CN1SubscriptionsDataRefreshTime.dat";
     private static final String PENDING_PURCHASE_KEY = "PendingPurchases.dat";
+    private static final Object PENDING_PURCHASE_LOCK = new Object();
     private static final Object synchronizationLock = new Object();
     private static final Object receiptsLock = new Object();
     private static ReceiptStore receiptStore;
@@ -394,8 +395,9 @@ public abstract class Purchase {
      *
      * @return List of receipts that haven't been sent to the server.
      */
+    @SuppressWarnings("unchecked")
     public List<Receipt> getPendingPurchases() {
-        synchronized (PENDING_PURCHASE_KEY) {
+        synchronized (PENDING_PURCHASE_LOCK) {
             Storage s = Storage.getInstance();
             Util.register(new Receipt());
             if (s.exists(PENDING_PURCHASE_KEY)) {
@@ -409,10 +411,10 @@ public abstract class Purchase {
     /**
      * Adds a receipt to be pushed to the server.
      *
-     * @param receipt
+     * @param receipt the receipt
      */
     private void addPendingPurchase(Receipt receipt) {
-        synchronized (PENDING_PURCHASE_KEY) {
+        synchronized (PENDING_PURCHASE_LOCK) {
             Storage s = Storage.getInstance();
             List<Receipt> pendingPurchases = getPendingPurchases();
             pendingPurchases.add(receipt);
@@ -423,11 +425,11 @@ public abstract class Purchase {
     /**
      * Removes a receipt from pending purchases.
      *
-     * @param transactionId
-     * @return
+     * @param transactionId the transaction id
+     * @return the removed receipt
      */
     private Receipt removePendingPurchase(String transactionId) {
-        synchronized (PENDING_PURCHASE_KEY) {
+        synchronized (PENDING_PURCHASE_LOCK) {
             Storage s = Storage.getInstance();
             List<Receipt> pendingPurchases = getPendingPurchases();
             Receipt found = null;
@@ -490,7 +492,7 @@ public abstract class Purchase {
             syncInProgress = true;
         }
 
-        synchronized (PENDING_PURCHASE_KEY) {
+        synchronized (PENDING_PURCHASE_LOCK) {
 
             List<Receipt> pending = getPendingPurchases();
             if (!pending.isEmpty() && receiptStore != null) {
@@ -539,7 +541,6 @@ public abstract class Purchase {
                 synchronizeReceipts();
             }
         });
-
     }
 
     /**

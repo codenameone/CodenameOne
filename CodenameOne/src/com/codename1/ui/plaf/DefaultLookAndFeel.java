@@ -825,13 +825,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     @Override
     public Spans calculateTextAreaSpan(TextSelection sel, TextArea ta) {
         Spans out = sel.newSpans();
-        //setFG(g, ta);
-        //Span out = sel.newSpan(ta);
         int line = ta.getLines();
-        //int oX = g.getClipX();
-        //int oY = g.getClipY();
-        //int oWidth = g.getClipWidth();
-        //int oHeight = g.getClipHeight();
         Font f = ta.getStyle().getFont();
         int fontHeight = f.getHeight();
 
@@ -850,7 +844,6 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             default:
                 break;
         }
-        //boolean shouldBreak = false;
         int posOffset = 0;
         int lastRowBottom = 0;
         for (int i = 0; i < line; i++) {
@@ -862,10 +855,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             int yDiff = adjustedY - y;
             y = adjustedY;
 
-            //if(Rectangle.intersects(x, y, ta.getWidth(), fontHeight, oX, oY, oWidth, oHeight)) {
-
             String rowText = ta.getTextAt(i);
-            //display ******** if it is a password field
             String displayText = "";
             if ((ta.getConstraint() & TextArea.PASSWORD) != 0) {
                 int rlen = rowText.length();
@@ -888,33 +878,21 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 default:
                     break;
             }
-            //int nextY = ta.getY() +  topPadding + (ta.getRowsGap() + fontHeight) * (i + 2);
-            //if this is the last line to display and there is more content and isEndsWith3Points() is true
-            //add "..." at the last row
             if (ta.isEndsWith3Points() && ta.getGrowLimit() == (i + 1) && ta.getGrowLimit() != line) {
                 if (displayText.length() > 3) {
                     displayText = displayText.substring(0, displayText.length() - 3);
                 }
-                //g.drawString(displayText + "...", x, y ,ta.getStyle().getTextDecoration());
                 append(sel, ta, rowSpan, displayText + "...", f, posOffset, x, y, getSelectionHeight(f) - yDiff);
-                lastRowBottom = rowSpan.getBounds().getY() + rowSpan.getBounds().getHeight();
                 rowSpan = rowSpan.translate(ta.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - ta.getX(), ta.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - ta.getY());
                 out.add(rowSpan);
                 return out;
             } else {
-                //g.drawString(displayText, x, y ,ta.getStyle().getTextDecoration());
                 append(sel, ta, rowSpan, displayText, f, posOffset, x, y, getSelectionHeight(f) - yDiff);
                 lastRowBottom = rowSpan.getBounds().getY() + rowSpan.getBounds().getHeight();
                 rowSpan = rowSpan.translate(ta.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - ta.getX(), ta.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - ta.getY());
                 out.add(rowSpan);
             }
             posOffset += displayText.length();
-            //shouldBreak = true;
-            //}else{
-            //    if(shouldBreak){
-            //        break;
-            //    }
-            //}
         }
         return out;
     }
@@ -2567,22 +2545,19 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         int txtW = l.getStringWidth(f);
         int curPos = text.length();
         if ((!isTickerRunning) || rtl) {
-            //if there is no space to draw the text add ... at the end
+            // if there is no space to draw the text, add ... at the end
             if (txtW > textSpaceW && textSpaceW > 0) {
-                // Handling of adding 3 points and in fact all text positioning when the text is bigger than
+                // Handling of adding 3 points and in fact, all text positioning when the text is bigger than
                 // the allowed space is handled differently in RTL, this is due to the reverse algorithm
                 // effects - i.e. when the text includes both Hebrew/Arabic and English/numbers then simply
                 // trimming characters from the end of the text (as done with LTR) won't do.
-                // Instead we simple reposition the text, and draw the 3 points, this is quite simple, but
+                // Instead, we simply reposition the text, and draw the 3 points, this is quite simple, but
                 // the downside is that a part of a letter may be shown here as well.
 
                 if (rtl) {
                     if ((!isTickerRunning) && (l.isEndsWith3Points())) {
                         String points = "...";
                         int pointsW = f.stringWidth(points);
-                        //xPos = f.stringWidth(displayText.substring(0, cursorCharPosition));
-                        //g.drawString(points, l.getShiftText() + x, y,l.getStyle().getTextDecoration());
-                        //g.clipRect(pointsW+l.getShiftText() + x, y, textSpaceW - pointsW, f.getHeight());
                         Char nextChar = sel.newChar(curPos, pointsW + l.getShiftText() + x, y, textSpaceW - pointsW, h);
                         span.add(nextChar);
                     }
@@ -2598,7 +2573,6 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                             index++;
                         }
                         text = text.substring(0, Math.min(text.length(), Math.max(1, index - 1))) + points;
-                        txtW = f.stringWidth(text);
                     }
                 }
             }

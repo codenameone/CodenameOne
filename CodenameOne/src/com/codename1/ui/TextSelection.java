@@ -55,7 +55,7 @@ import static com.codename1.ui.ComponentSelector.$;
  * <p>If text selection is enabled on a form, then non-editable text fields and text areas will allow text
  * selection by default.  Labels and SpanLabels have text selection disabled by default, but can be enabled using
  * {@link Label#setTextSelectionEnabled(boolean) }, and {@link SpanLabel#setTextSelectionEnabled(boolean)} respectively.
- * Similarly text selection can be disabled on TextFields and TextAreas using {@link TextArea#setTextSelectionEnabled(boolean) }.</p>
+ * Similarly, text selection can be disabled on TextFields and TextAreas using {@link TextArea#setTextSelectionEnabled(boolean) }.</p>
  *
  * @author shannah
  * @since 7.0
@@ -70,8 +70,8 @@ public class TextSelection {
         /**
          * We can't just use component's AbsoluteY coordinates for ordering because of scrolling,
          * so we create a scaled coorindate that will order components properly.
-         * @param cmp
-         * @return
+         * @param cmp the component
+         * @return the Y scale
          */
         private double getScaledY(Component cmp) {
             double y = 0;
@@ -91,14 +91,7 @@ public class TextSelection {
             double y1 = getScaledY(o1);
             double y2 = getScaledY(o2);
 
-            int compareY;
-            if (y1 < y2) {
-                compareY = -1;
-            } else if (y1 > y2) {
-                compareY = 1;
-            } else {
-                compareY = 0;
-            }
+            int compareY = Double.compare(y1, y2);
             if (compareY != 0) {
                 return compareY;
             }
@@ -150,14 +143,7 @@ public class TextSelection {
             double y1 = getScaledY(o1);
             double y2 = getScaledY(o2);
 
-            int compareY;
-            if (y1 < y2) {
-                compareY = -1;
-            } else if (y1 > y2) {
-                compareY = 1;
-            } else {
-                compareY = 0;
-            }
+            int compareY = Double.compare(y1, y2);
             if (compareY != 0) {
                 return compareY;
             }
@@ -639,7 +625,6 @@ public class TextSelection {
     }
 
     private boolean isVerticallyCoveredByBounds(Component cmp, Rectangle bounds) {
-        int cmpX = getX(cmp, selectionRoot) + cmp.getScrollX();
         int cmpY = getY(cmp, selectionRoot) + cmp.getScrollY();
         boolean isVerticallyCovered = cmpY >= bounds.getY() && cmpY + cmp.getHeight() <= bounds.getY() + bounds.getHeight();
         if (isVerticallyCovered) {
