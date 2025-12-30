@@ -33,8 +33,8 @@ public class DisplayTest extends UITestBase {
 
     @AfterEach
     void resetStatics() {
-        Container.blockOverdraw = false;
-        Component.revalidateOnStyleChange = true;
+        Container.setBlockOverdraw(false);
+        Component.setRevalidateOnStyleChange(true);
     }
 
     @Test
@@ -62,16 +62,16 @@ public class DisplayTest extends UITestBase {
         assertEquals("launch", display.getProperty("AppArg", ""));
 
         display.setProperty("blockOverdraw", "ignored");
-        assertTrue(Container.blockOverdraw);
+        assertTrue(Container.isBlockOverdraw());
 
         display.setProperty("blockCopyPaste", "true");
         assertTrue(implementation.isBlockCopyAndPaste());
 
         display.setProperty("Component.revalidateOnStyleChange", "false");
-        assertFalse(Component.revalidateOnStyleChange);
+        assertFalse(Component.isRevalidateOnStyleChange());
 
         display.setProperty("Component.revalidateOnStyleChange", "TRUE");
-        assertTrue(Component.revalidateOnStyleChange);
+        assertTrue(Component.isRevalidateOnStyleChange());
     }
 
     @Test
