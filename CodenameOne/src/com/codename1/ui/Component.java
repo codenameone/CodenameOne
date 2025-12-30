@@ -237,7 +237,7 @@ public class Component implements Animation, StyleListener, Editable {
      * <p>
      * Users can disable this with {@code CN.setProperty("Component.revalidateOnStyleChange", "false")}.
      */
-    static boolean revalidateOnStyleChange = true;
+    private static boolean revalidateOnStyleChange = true;
     static int restoreDragPercentage = -1;
     private static byte defaultDragTransparency = 55;
     private static boolean disableSmoothScrolling = false;
@@ -532,6 +532,14 @@ public class Component implements Animation, StyleListener, Editable {
      */
     public static boolean isSetCursorSupported() {
         return Display.getInstance().getImplementation().isSetCursorSupported();
+    }
+
+    static void setRevalidateOnStyleChange(boolean val) {
+        revalidateOnStyleChange = val;
+    }
+
+    static boolean isRevalidateOnStyleChange() {
+        return revalidateOnStyleChange;
     }
 
     /**
@@ -3197,8 +3205,8 @@ public class Component implements Animation, StyleListener, Editable {
     }
 
     private void paintRippleEffect(Graphics g) {
-        if (isRippleEffect() && Form.rippleComponent == this && Form.rippleMotion != null) {
-            paintRippleOverlay(g, Form.rippleX, Form.rippleY, Form.rippleMotion.getValue());
+        if (isRippleEffect() && Form.getRippleComponent() == this && Form.getRippleMotion() != null) {
+            paintRippleOverlay(g, Form.rippleX, Form.rippleY, Form.getRippleMotion().getValue());
         }
     }
 
@@ -4497,7 +4505,7 @@ public class Component implements Animation, StyleListener, Editable {
                         sourceStyle.setMargin(RIGHT, marginRight.getValue());
                         requiresRevalidate = true;
                     }
-                    if (!Component.revalidateOnStyleChange) {
+                    if (!Component.isRevalidateOnStyleChange()) {
                         // If revalidation on stylechange is not enabled, then the style animation
                         // won't work. We need to explicitly revalidate or repaint here.
                         if (requiresRevalidate) {
@@ -7063,7 +7071,7 @@ public class Component implements Animation, StyleListener, Editable {
             setShouldCalcPreferredSize(true);
             Container parent = getParent();
             if (parent != null && parent.getComponentForm() != null) {
-                if (revalidateOnStyleChange) {
+                if (isRevalidateOnStyleChange()) {
                     parent.revalidateLater();
                 }
             }

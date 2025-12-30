@@ -304,7 +304,7 @@ public class Tabs extends Container {
                     component.paintLockRelease();
                 }
                 slideToDestMotion = null;
-                enableLayoutOnPaint = true;
+                setEnableLayoutOnPaint(true);
                 deregisterAnimatedInternal();
                 setSelectedIndex(active);
             }
@@ -1653,7 +1653,7 @@ public class Tabs extends Container {
                                 component.setX(component.getX() + diffX);
                                 component.paintLock(false);
                             }
-                            enableLayoutOnPaint = false;
+                            setEnableLayoutOnPaint(false);
                             repaint();
                         }
                     }
@@ -1667,7 +1667,7 @@ public class Tabs extends Container {
                                 component.setY(component.getY() + diffY);
                                 component.paintLock(false);
                             }
-                            enableLayoutOnPaint = false;
+                            setEnableLayoutOnPaint(false);
                             repaint();
                         }
                     }

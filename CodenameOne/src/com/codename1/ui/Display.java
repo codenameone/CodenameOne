@@ -288,9 +288,9 @@ public final class Display extends CN1Constants {
     private static final int MAX_ASYNC_EXCEPTION_DEPTH = 10;
     private static final int[] xArray1 = new int[1];
     private static final int[] yArray1 = new int[1];
-    static int transitionDelay = -1;
+    private int transitionDelay = -1;
     static CodenameOneImplementation impl;
-    private static String selectedVirtualKeyboard = null;
+    private String selectedVirtualKeyboard = null;
     private static final Map<String, VirtualKeyboardInterface> virtualKeyboards = new HashMap<String, VirtualKeyboardInterface>();
     private final LinkedList<Runnable> runningSerialCallsQueue = new LinkedList<Runnable>();
     boolean codenameOneExited;
@@ -3491,7 +3491,7 @@ public final class Display extends CN1Constants {
             return out == null ? defaultValue : out;
         }
         if ("Component.revalidateOnStyleChange".equals(key)) {
-            return Component.revalidateOnStyleChange ? "true" : "false";
+            return Component.isRevalidateOnStyleChange() ? "true" : "false";
         }
         if (localProperties != null) {
             String v = localProperties.get(key);
@@ -3516,14 +3516,14 @@ public final class Display extends CN1Constants {
             return;
         }
         if ("blockOverdraw".equals(key)) {
-            Container.blockOverdraw = true;
+            Container.blockOverdraw();
             return;
         }
         if ("blockCopyPaste".equals(key)) {
             impl.blockCopyPaste("true".equals(value));
         }
         if ("Component.revalidateOnStyleChange".equals(key)) {
-            Component.revalidateOnStyleChange = "true".equalsIgnoreCase(value);
+            Component.setRevalidateOnStyleChange("true".equalsIgnoreCase(value));
         }
         if (key.startsWith("platformHint.")) {
             impl.setPlatformHint(key, value);

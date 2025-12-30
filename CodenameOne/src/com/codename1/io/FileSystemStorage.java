@@ -161,7 +161,6 @@ public class FileSystemStorage {
      * @param retryCount the number of times to retry
      */
     public void deleteRetry(final String file, final int retryCount) {
-        System.gc();
         try {
             Util.getImplementation().deleteFile(file);
         } catch (Throwable t) {

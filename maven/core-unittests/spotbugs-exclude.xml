@@ -65,6 +65,17 @@
         <Bug pattern="SE_NO_SERIALVERSIONID"/>
     </Match>
 
+    <!-- We don't support clone() -->
+    <Match>
+        <Bug pattern="CN_IMPLEMENTS_CLONE_BUT_NOT_CLONEABLE"/>
+    </Match>
+
+    <!-- We don't support clone() -->
+    <Match>
+        <Bug pattern="CN_IDIOM_NO_SUPER_CALL"/>
+    </Match>
+
+
     <!-- Match>
         <Bug pattern="UI_INHERITANCE_UNSAFE_GETRESOURCE"/>
     </Match>

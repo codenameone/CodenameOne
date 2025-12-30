@@ -123,8 +123,8 @@ public abstract class CodenameOneImplementation {
      */
     private static final int RTL_RANGE_BEGIN = 0x590;
     private static final int RTL_RANGE_END = 0x7BF;
-    private static Object displayLock;
-    private static boolean bidi;
+    private Object displayLock;
+    private boolean bidi;
     private static boolean pollingThreadRunning;
     private static PushCallback callback;
     private static PurchaseCallback purchaseCallback;
@@ -925,16 +925,6 @@ public abstract class CodenameOneImplementation {
      */
     public boolean paintNativePeersBehind() {
         return false;
-    }
-
-    /**
-     * Returns a lock object which can be synchronized against, this lock is used
-     * by the EDT.
-     *
-     * @return a lock object
-     */
-    public Object getDisplayLock() {
-        return displayLock;
     }
 
     /**
@@ -8786,7 +8776,7 @@ public abstract class CodenameOneImplementation {
      * @return true in case of dark mode
      */
     public Boolean isDarkMode() {
-        return null;
+        return Boolean.FALSE;
     }
 
     /**
