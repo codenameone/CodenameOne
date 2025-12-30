@@ -290,13 +290,6 @@ public class BrowserComponent extends Container {
         return Display.impl.isNativeBrowserComponentSupported();
     }
 
-    private static boolean isNumber(Object o) {
-        if (o == null) {
-            return false;
-        }
-        Class c = o.getClass();
-        return c == Integer.class || c == Double.class || c == Float.class || c == Long.class || c == Short.class;
-    }
 
     /**
      * Injects parameters into a Javascript string expression.  This will quote strings properly.  The
@@ -546,13 +539,6 @@ public class BrowserComponent extends Container {
             return returnValueCallbacks.remove(id);
         }
         return null;
-    }
-
-    private JSONParser returnValueParser() {
-        if (returnValueParser == null) {
-            returnValueParser = new JSONParser();
-        }
-        return returnValueParser;
     }
 
     @Override
@@ -1698,6 +1684,11 @@ public class BrowserComponent extends Container {
         UNDEFINED("undefined"),
         BOOLEAN("boolean");
 
+        // values() doesn't work great on iOS builds
+        private static final JSType[] values = {
+                OBJECT, FUNCTION, NUMBER, STRING, UNDEFINED, BOOLEAN
+        };
+
         private final String typeOfValue;
 
         JSType(String val) {
@@ -1708,26 +1699,13 @@ public class BrowserComponent extends Container {
          * Gets the corresponding JSType for the given string type.
          *
          * @param type The string type as returned by the typeof operator.  Possible input values are 'object', 'function', 'number', 'boolean', and 'undefined'
-         * @return
+         * @return the enum corresponding to the type
          */
         public static JSType get(String type) {
-            if ("object".equals(type)) {
-                return OBJECT;
-            }
-            if ("string".equals(type)) {
-                return JSType.STRING;
-            }
-            if ("number".equals(type)) {
-                return JSType.NUMBER;
-            }
-            if ("function".equals(type)) {
-                return JSType.FUNCTION;
-            }
-            if ("undefined".equals(type)) {
-                return JSType.UNDEFINED;
-            }
-            if ("boolean".equals(type)) {
-                return BOOLEAN;
+            for(JSType t : values) {
+                if(t.typeOfValue.equals(type)) {
+                    return t;
+                }
             }
             return UNDEFINED;
         }
@@ -1769,15 +1747,6 @@ public class BrowserComponent extends Container {
          */
         public String getValue() {
             return value;
-        }
-
-        /**
-         * Returns the type of the value
-         *
-         * @return
-         */
-        private String getType() {
-            return type;
         }
 
         /**
