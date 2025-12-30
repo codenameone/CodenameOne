@@ -747,51 +747,6 @@ public abstract class Purchase {
     }
 
     /**
-     * Fetch receipts from IAP service synchronously.
-     *
-     * @param ifOlderThanMs If the current data is not older than this number of milliseconds
-     *                      then it will not attempt to fetch the receipts.
-     * @return true if data was successfully retrieved.  false otherwise.
-     */
-    private boolean loadReceiptsSync(long ifOlderThanMs) {
-        final boolean[] complete = new boolean[1];
-        final boolean[] success = new boolean[1];
-        loadReceipts(ifOlderThanMs, new SuccessCallback<Boolean>() {
-
-            public void onSucess(Boolean value) {
-                complete[0] = true;
-                success[0] = value;
-
-                synchronized (complete) {
-                    complete.notifyAll();
-                }
-
-            }
-
-        });
-
-        if (!complete[0]) {
-            Display.getInstance().invokeAndBlock(new Runnable() {
-
-                public void run() {
-                    while (!complete[0]) {
-                        synchronized (complete) {
-                            try {
-                                complete.wait();
-                            } catch (InterruptedException ex) {
-                                Thread.currentThread().interrupt();
-                                return;
-                            }
-                        }
-                    }
-                }
-
-            });
-        }
-        return success[0];
-    }
-
-    /**
      * Indicates whether refunding is possible when the SKU is purchased
      *
      * @param sku the sku

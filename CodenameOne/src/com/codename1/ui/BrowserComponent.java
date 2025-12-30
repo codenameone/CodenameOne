@@ -290,14 +290,6 @@ public class BrowserComponent extends Container {
         return Display.impl.isNativeBrowserComponentSupported();
     }
 
-    private static boolean isNumber(Object o) {
-        if (o == null) {
-            return false;
-        }
-        Class c = o.getClass();
-        return c == Integer.class || c == Double.class || c == Float.class || c == Long.class || c == Short.class;
-    }
-
     /**
      * Injects parameters into a Javascript string expression.  This will quote strings properly.  The
      * expression should include placeholders for each parameter of the form ${0}, ${1}, etc..
@@ -546,13 +538,6 @@ public class BrowserComponent extends Container {
             return returnValueCallbacks.remove(id);
         }
         return null;
-    }
-
-    private JSONParser returnValueParser() {
-        if (returnValueParser == null) {
-            returnValueParser = new JSONParser();
-        }
-        return returnValueParser;
     }
 
     @Override

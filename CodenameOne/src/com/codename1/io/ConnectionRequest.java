@@ -2732,10 +2732,6 @@ public class ConnectionRequest implements IOProgressListener {
         downloadImageToFileSystem(file, onSuccess, onFail, true);
     }
 
-    private void downloadImage(final SuccessCallback<Image> onSuccess, FailureCallback<Image> onFail) {
-        downloadImage(onSuccess, onFail, true);
-    }
-
     private void downloadImage(final SuccessCallback<Image> onSuccess, final FailureCallback<Image> onFail, boolean useCache) {
         setReadResponseForErrors(false);
         if (useCache) {

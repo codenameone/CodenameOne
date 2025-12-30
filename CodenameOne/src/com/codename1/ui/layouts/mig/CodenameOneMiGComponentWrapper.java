@@ -206,10 +206,6 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
         return Display.getInstance().getDisplayWidth();
     }
 
-    private boolean isMaxSet(Component c) {
-        return false;
-    }
-
     public final ContainerWrapper getParent() {
         Container p = c.getParent();
         return p != null ? new CodenameOneMiGContainerWrapper(p) : null;

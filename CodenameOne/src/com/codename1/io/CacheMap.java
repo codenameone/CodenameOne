@@ -289,12 +289,6 @@ public class CacheMap {
         return r;
     }
 
-    private Vector fetchFromStorageCache(int offset) {
-        Vector v = getStorageCacheContent();
-        Object[] arr = (Object[]) v.elementAt(offset);
-        return (Vector) Storage.getInstance().readObject("$CACHE$" + cachePrefix + arr[1].toString());
-    }
-
     /**
      * Clears the storage cache
      */

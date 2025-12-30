@@ -477,10 +477,6 @@ public class UIFragment {
             return BorderLayout.CENTER_BEHAVIOR_SCALE;
         }
 
-        private static boolean grow(String grow) {
-            return "true".equalsIgnoreCase(grow);
-        }
-
         private static int align(String align) {
             if ("left".equals(align)) {
                 return Component.LEFT;

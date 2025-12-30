@@ -623,9 +623,6 @@ public class StyleParser {
         return im;
     }
 
-    static Integer parseTextDecoration(String decoration) {
-        return null;
-    }
 
     private static FontInfo parseFontSize(FontInfo out, String arg) {
         arg = arg.trim();

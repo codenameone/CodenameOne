@@ -93,10 +93,6 @@ public abstract class InputComponent extends Container {
     }
 
     // varags calls are significantly slower in java
-    private static int max(int a, int b, int c) {
-        return Math.max(Math.max(a, b), c);
-    }
-
     private static int max(int a, int b, int c, int d) {
         return Math.max(Math.max(Math.max(a, b), c), d);
     }

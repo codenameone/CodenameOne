@@ -52,6 +52,7 @@ import java.util.ArrayList;
 public class TestUtils {
     private static boolean verbose;
 
+    @SuppressWarnings("unused")
     private TestUtils() {
     }
 
