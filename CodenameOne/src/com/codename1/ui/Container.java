@@ -152,8 +152,12 @@ public class Container extends Component implements Iterable<Component> {
         setFocusable(false);
     }
 
-    static void blockOverdraw() {
-        blockOverdraw = true;
+    static void setBlockOverdraw(boolean b) {
+        blockOverdraw = b;
+    }
+
+    static boolean isBlockOverdraw() {
+        return blockOverdraw;
     }
 
     /**

@@ -3516,7 +3516,7 @@ public final class Display extends CN1Constants {
             return;
         }
         if ("blockOverdraw".equals(key)) {
-            Container.blockOverdraw();
+            Container.setBlockOverdraw(true);
             return;
         }
         if ("blockCopyPaste".equals(key)) {
