@@ -56,9 +56,9 @@ public abstract class Purchase {
     private static final Object PENDING_PURCHASE_LOCK = new Object();
     private static final Object synchronizationLock = new Object();
     private static final Object receiptsLock = new Object();
-    private static ReceiptStore receiptStore;
-    private static List<Receipt> receipts;
-    private static Date receiptsRefreshTime;
+    private ReceiptStore receiptStore;
+    private List<Receipt> receipts;
+    private Date receiptsRefreshTime;
     /**
      * Boolean flag to prevent {@link #synchronizeReceipts(long, com.codename1.util.SuccessCallback) }
      * re-entry.
@@ -281,7 +281,7 @@ public abstract class Purchase {
     /**
      * Returns the product list for the given SKU array
      *
-     * @param sku the ids for the specific products
+     * @param skus the ids for the specific products
      * @return the product instances
      * @throws RuntimeException This method is a part of the managed payments API and will fail if
      *                          isManagedPaymentSupported() returns false

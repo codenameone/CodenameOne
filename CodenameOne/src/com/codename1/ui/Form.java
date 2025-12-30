@@ -70,8 +70,8 @@ import java.util.Set;
 public class Form extends Container {
     private static final String Z_INDEX_PROP = "cn1$_zIndex";
     static int activePeerCount;
-    static Motion rippleMotion;
-    static Component rippleComponent;
+    private static Motion rippleMotion;
+    private static Component rippleComponent;
     static int rippleX;
     static int rippleY;
     /**
@@ -254,6 +254,10 @@ public class Form extends Container {
         formStyle.setBgTransparency(0xFF);
 
         initGlobalToolbar();
+    }
+
+    static Motion getRippleMotion() {
+        return rippleMotion;
     }
 
     /**
@@ -2031,6 +2035,14 @@ public class Form extends Container {
         return super.animate();
     }
 
+    static Component getRippleComponent() {
+        return rippleComponent;
+    }
+
+    private static void resetRippleComponent() {
+        rippleComponent = null;
+    }
+
     /**
      * Makes sure all animations are repainted so they would be rendered in every
      * frame
@@ -2039,7 +2051,7 @@ public class Form extends Container {
         if (rippleComponent != null) {
             rippleComponent.repaint();
             if (rippleMotion == null) {
-                rippleComponent = null;
+                resetRippleComponent();
             }
         }
         if (animatableComponents != null) {
@@ -3089,11 +3101,15 @@ public class Form extends Container {
         }
     }
 
+    static void setRippleComponent(Component cmp) {
+        rippleComponent = cmp;
+    }
+
     private void initRippleEffect(int x, int y, Component cmp) {
         if (cmp.isRippleEffect()) {
             rippleMotion = Motion.createEaseInMotion(0, 1000, 800);
             rippleMotion.start();
-            rippleComponent = cmp;
+            setRippleComponent(cmp);
             rippleX = x;
             rippleY = y;
         }

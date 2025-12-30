@@ -78,13 +78,13 @@ import java.util.Vector;
  * @see Component
  */
 public class Container extends Component implements Iterable<Component> {
-    static boolean enableLayoutOnPaint = true;
+    private static boolean enableLayoutOnPaint = true;
     /**
      * Workaround for the behavior of the sidemenu bar on iOS etc. which translates aggressively,
      * this is visible with the table component where the lines slide out of place
      */
     static int sidemenuBarTranslation;
-    static boolean blockOverdraw = false;
+    private static boolean blockOverdraw;
     boolean scrollableX;
     boolean scrollableY;
     /**
@@ -150,6 +150,10 @@ public class Container extends Component implements Iterable<Component> {
         setUIID(uiid);
         this.layout = layout;
         setFocusable(false);
+    }
+
+    static void blockOverdraw() {
+        blockOverdraw = true;
     }
 
     /**
@@ -1002,6 +1006,10 @@ public class Container extends Component implements Iterable<Component> {
         replaceComponents(current, next, t, true, false, null, 0, 0, true);
     }
 
+    static void setEnableLayoutOnPaint(boolean val) {
+        enableLayoutOnPaint = val;
+    }
+
     /**
      * This method replaces the current Component with the next Component.
      * Current Component must be contained in this Container.
@@ -1014,13 +1022,13 @@ public class Container extends Component implements Iterable<Component> {
      * @param layoutAnimationSpeed the speed of the layout animation after replace  is completed
      */
     public void replaceAndWait(final Component current, final Component next, final Transition t, int layoutAnimationSpeed) {
-        enableLayoutOnPaint = false;
+        setEnableLayoutOnPaint(false);
         replaceComponents(current, next, t, true, false, null, 0, layoutAnimationSpeed, true);
         if (layoutAnimationSpeed > 0) {
             animateLayoutAndWait(layoutAnimationSpeed);
         }
         dontRecurseContainer = false;
-        enableLayoutOnPaint = true;
+        setEnableLayoutOnPaint(true);
     }
 
     /**
@@ -3700,7 +3708,7 @@ public class Container extends Component implements Iterable<Component> {
 
     private void morph(Component source, Component destination, int duration, boolean wait, Runnable onCompletion) {
         setShouldCalcPreferredSize(true);
-        enableLayoutOnPaint = false;
+        setEnableLayoutOnPaint(false);
         dontRecurseContainer = true;
         int deltaX = getAbsoluteX();
         int deltaY = getAbsoluteY();
@@ -3755,7 +3763,7 @@ public class Container extends Component implements Iterable<Component> {
      */
     private ComponentAnimation animateHierarchy(final int duration, boolean wait, int opacity, boolean add) {
         setShouldCalcPreferredSize(true);
-        enableLayoutOnPaint = false;
+        setEnableLayoutOnPaint(false);
         dontRecurseContainer = true;
         Vector comps = new Vector();
         findComponentsInHierachy(comps);
@@ -3853,7 +3861,7 @@ public class Container extends Component implements Iterable<Component> {
      */
     private ComponentAnimation animateUnlayout(final int duration, boolean wait, int opacity, Runnable callback, boolean add) {
         setShouldCalcPreferredSize(true);
-        enableLayoutOnPaint = false;
+        setEnableLayoutOnPaint(false);
         final int componentCount = getComponentCount();
         int[] beforeX = new int[componentCount];
         int[] beforeY = new int[componentCount];
@@ -3913,7 +3921,7 @@ public class Container extends Component implements Iterable<Component> {
             return null;
         }
         setShouldCalcPreferredSize(true);
-        enableLayoutOnPaint = false;
+        setEnableLayoutOnPaint(false);
         final int componentCount = getComponentCount();
         int[] beforeX = new int[componentCount];
         int[] beforeY = new int[componentCount];
@@ -4362,7 +4370,7 @@ public class Container extends Component implements Iterable<Component> {
             }
             thisContainer.repaint();
             if (System.currentTimeMillis() - startTime >= duration) {
-                enableLayoutOnPaint = true;
+                setEnableLayoutOnPaint(true);
                 thisContainer.dontRecurseContainer = false;
                 Form f = thisContainer.getComponentForm();
                 finished = true;
