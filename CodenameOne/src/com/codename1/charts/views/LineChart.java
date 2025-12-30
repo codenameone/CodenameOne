@@ -349,7 +349,8 @@ public class LineChart extends XYChart {
      * @param renderer the series renderer
      */
     public boolean isRenderPoints(SimpleSeriesRenderer renderer) {
-        return ((XYSeriesRenderer) renderer).getPointStyle() != PointStyle.POINT;
+        return renderer instanceof XYSeriesRenderer &&
+                ((XYSeriesRenderer) renderer).getPointStyle() != PointStyle.POINT;
     }
 
     /**

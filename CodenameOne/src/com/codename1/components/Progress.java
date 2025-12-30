@@ -137,15 +137,17 @@ public class Progress extends Dialog implements ActionListener {
      * {@inheritDoc}
      */
     public void actionPerformed(ActionEvent evt) {
-        NetworkEvent ev = (NetworkEvent) evt;
-        if (ev.getConnectionRequest() == request) {
-            if (disposeOnCompletion && ev.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {
-                dispose();
-                return;
-            }
-            if (autoShow && !showing) {
-                showing = true;
-                showModeless();
+        if(evt instanceof NetworkEvent) {
+            NetworkEvent ev = (NetworkEvent) evt;
+            if (ev.getConnectionRequest() == request) {
+                if (disposeOnCompletion && ev.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {
+                    dispose();
+                    return;
+                }
+                if (autoShow && !showing) {
+                    showing = true;
+                    showModeless();
+                }
             }
         }
     }
