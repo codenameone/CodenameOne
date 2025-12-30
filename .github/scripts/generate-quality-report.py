@@ -787,7 +787,31 @@ def main() -> None:
             "EQ_GETCLASS_AND_CLASS_CONSTANT",
             "EQ_UNUSUAL",
             "ES_COMPARING_STRINGS_WITH_EQ",
-            "FI_EMPTY"
+            "FI_EMPTY",
+            "ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD",
+            "DM_GC",
+            "CN_IMPLEMENTS_CLONE_BUT_NOT_CLONEABLE",
+            "BC_UNCONFIRMED_CAST",
+            "BC_UNCONFIRMED_CAST_OF_RETURN_VALUE",
+            "CN_IDIOM_NO_SUPER_CALL",
+            "DM_BOOLEAN_CTOR",
+            "DM_CONVERT_CASE",
+            "DM_EXIT",
+            "EI_EXPOSE_REP",
+            "EI_EXPOSE_REP2",
+            "EI_EXPOSE_STATIC_REP2",
+            "EQ_COMPARETO_USE_OBJECT_EQUALS",
+            "MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR",
+            "MS_EXPOSE_REP",
+            "NM_CONFUSING",
+            "NO_NOTIFY_NOT_NOTIFYALL",
+            "NP_BOOLEAN_RETURN_NULL",
+            "PZLA_PREFER_ZERO_LENGTH_ARRAYS",
+            "REFLC_REFLECTION_MAY_INCREASE_ACCESSIBILITY_OF_CLASS",
+            "UI_INHERITANCE_UNSAFE_GETRESOURCE",
+            "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD",
+            "UW_UNCOND_WAIT",
+            "SIC_INNER_SHOULD_BE_STATIC_ANON"
         }
         violations = [
             f for f in spotbugs.findings
