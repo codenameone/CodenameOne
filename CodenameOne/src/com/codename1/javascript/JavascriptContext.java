@@ -180,7 +180,7 @@ public class JavascriptContext {
     }
 
     /**
-     * Increments the reference count for a the javascript object wrapped by
+     * Increments the reference count for the javascript object wrapped by
      * the given JSObject.  This may also trigger a cleanup of the object map if
      * the map grows too big, or it randomly decided to perform cleanup.
      *

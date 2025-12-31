@@ -3783,7 +3783,7 @@ public abstract class CodenameOneImplementation {
         if (cls != null) {
             return cls.getResourceAsStream(resource);
         }
-        return getClass().getResourceAsStream(resource);
+        return CodenameOneImplementation.class.getResourceAsStream(resource);
     }
 
     /**
@@ -5898,58 +5898,7 @@ public abstract class CodenameOneImplementation {
             model.addExtensionFilter("mov");
         }
 
-        FileTree t = new FileTree(model) {
-
-            protected Button createNodeComponent(final Object node, int depth) {
-                if (node == null || !getModel().isLeaf(node)) {
-                    return super.createNodeComponent(node, depth);
-                }
-                Hashtable t = (Hashtable) Storage.getInstance().readObject("thumbnails");
-                if (t == null) {
-                    t = new Hashtable();
-                }
-                final Hashtable thumbs = t;
-                final Button b = super.createNodeComponent(node, depth);
-                b.addActionListener(new ActionListener() {
-
-                    public void actionPerformed(ActionEvent evt) {
-                        response.actionPerformed(new ActionEvent(node, ActionEvent.Type.Other));
-                        d.dispose();
-                    }
-                });
-                final ImageIO imageio = ImageIO.getImageIO();
-                if (imageio != null) {
-
-                    Display.getInstance().scheduleBackgroundTask(new Runnable() {
-
-                        public void run() {
-                            byte[] data = (byte[]) thumbs.get(node);
-                            if (data == null) {
-                                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                                try {
-                                    imageio.save(FileSystemStorage.getInstance().openInputStream((String) node),
-                                            out,
-                                            ImageIO.FORMAT_JPEG,
-                                            b.getIcon().getWidth(), b.getIcon().getHeight(), 1);
-                                    data = out.toByteArray();
-                                    thumbs.put(node, data);
-                                    Storage.getInstance().writeObject("thumbnails", thumbs);
-                                } catch (IOException ex) {
-                                    Log.e(ex);
-                                }
-                            }
-                            if (data != null) {
-                                Image im = Image.createImage(data, 0, data.length);
-                                b.setIcon(im);
-                            }
-                        }
-                    });
-
-                }
-                return b;
-            }
-
-        };
+        FileTree t = new OpenGalleryFileTree(model, response, d);
 
         d.addComponent(BorderLayout.CENTER, t);
 

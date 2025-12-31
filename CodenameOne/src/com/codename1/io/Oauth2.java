@@ -329,7 +329,7 @@ public class Oauth2 {
      * @param al a listener that will receive at its source either a token for
      *           the service or an exception in case of a failure
      */
-    public void showAuthentication(final ActionListener al) {
+    public void showAuthentication(final ActionListener<ActionEvent> al) {
 
 
         if ("HTML5".equals(CN.getPlatformName()) && useRedirectForWeb) {
@@ -343,15 +343,7 @@ public class Oauth2 {
         if (useBrowserWindow) {
             final BrowserWindow win = new BrowserWindow(buildURL());
             win.setTitle("Login");
-            win.addLoadListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    String url = (String) evt.getSource();
-                    if (url.startsWith(redirectURI)) {
-                        win.close();
-                        handleURL((String) evt.getSource(), null, al, null, null, null);
-                    }
-                }
-            });
+            win.addLoadListener(new ShowAuthenticationActionListener(win, al));
 
             win.show();
             return;
@@ -407,7 +399,7 @@ public class Oauth2 {
         return URL.toString();
     }
 
-    private Component createLoginComponent(final ActionListener al, final Form frm, final Form backToForm, final Dialog progress) {
+    private Component createLoginComponent(final ActionListener<ActionEvent> al, final Form frm, final Form backToForm, final Dialog progress) {
 
         String URL = buildURL();
 
@@ -499,26 +491,15 @@ public class Oauth2 {
 
     public RefreshTokenRequest refreshToken(String refreshToken) {
         final RefreshTokenRequest out = new RefreshTokenRequest();
-        refreshToken(refreshToken, new ActionListener() {
-            public void actionPerformed(ActionEvent evt) {
-                if (out.isDone()) {
-                    return;
-                }
-                if (evt.getSource() instanceof Throwable) {
-                    out.error(new AsyncResource.AsyncExecutionException((Throwable) evt.getSource()));
-                } else {
-                    out.complete((AccessToken) evt.getSource());
-                }
-            }
-        });
+        refreshToken(refreshToken, new RefreshTokenActionListener(out));
         return out;
     }
 
-    private void refreshToken(String refreshToken, ActionListener al) {
+    private void refreshToken(String refreshToken, ActionListener<ActionEvent> al) {
         handleURL(redirectURI + "?code=" + Util.encodeUrl(refreshToken) + "&cn1_refresh_token=1", null, al, null, null, null);
     }
 
-    private void handleURL(String url, WebBrowser web, final ActionListener al, final Form frm, final Form backToForm, final Dialog progress) {
+    private void handleURL(String url, WebBrowser web, final ActionListener<ActionEvent> al, final Form frm, final Form backToForm, final Dialog progress) {
         if ((url.startsWith(redirectURI))) {
             if (progress != null && Display.getInstance().getCurrent() == progress) {
                 progress.dispose();
@@ -687,5 +668,42 @@ public class Oauth2 {
 
     public static class RefreshTokenRequest extends AsyncResource<AccessToken> {
 
+    }
+
+    private static class RefreshTokenActionListener implements ActionListener<ActionEvent> {
+        private final RefreshTokenRequest out;
+
+        public RefreshTokenActionListener(RefreshTokenRequest out) {
+            this.out = out;
+        }
+
+        public void actionPerformed(ActionEvent evt) {
+            if (out.isDone()) {
+                return;
+            }
+            if (evt.getSource() instanceof Throwable) {
+                out.error(new AsyncResource.AsyncExecutionException((Throwable) evt.getSource()));
+            } else {
+                out.complete((AccessToken) evt.getSource());
+            }
+        }
+    }
+
+    private class ShowAuthenticationActionListener implements ActionListener<NetworkEvent> {
+        private final BrowserWindow win;
+        private final ActionListener<ActionEvent> al;
+
+        public ShowAuthenticationActionListener(BrowserWindow win, ActionListener<ActionEvent> al) {
+            this.win = win;
+            this.al = al;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            String url = (String) evt.getSource();
+            if (url.startsWith(redirectURI)) {
+                win.close();
+                handleURL((String) evt.getSource(), null, al, null, null, null);
+            }
+        }
     }
 }

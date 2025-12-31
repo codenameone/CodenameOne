@@ -769,14 +769,7 @@ public class JSObject {
      * @param callback Callback to be called when the method call is completed.
      */
     public void callAsync(String key, Object[] params, final SuccessCallback callback) {
-        this.callAsync(key, params, new CallbackAdapter() {
-
-            @Override
-            public void onSucess(Object value) {
-                callback.onSucess(value);
-            }
-
-        });
+        this.callAsync(key, params, new CallAsyncCallbackAdapter(callback));
     }
 
     /**
@@ -806,14 +799,7 @@ public class JSObject {
      * @param callback Callback to be called with the return value.
      */
     public void callAsync(String key, final SuccessCallback callback) {
-        callAsync(key, new CallbackAdapter() {
-
-            @Override
-            public void onSucess(Object value) {
-                callback.onSucess(value);
-            }
-
-        });
+        callAsync(key, new CallAsyncCallbackAdapter(callback));
     }
 
     /**
@@ -835,17 +821,7 @@ public class JSObject {
      * @param callback Callback to handle the return value.
      */
     public void callIntAsync(String key, final Callback<Integer> callback) {
-        callDoubleAsync(key, new Callback<Double>() {
-
-            public void onSucess(Double value) {
-                callback.onSucess(value.intValue());
-            }
-
-            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
-                callback.onError(sender, err, errorCode, errorMessage);
-            }
-
-        });
+        callDoubleAsync(key, new CallIntAsyncCallback(callback));
     }
 
     /**
@@ -856,14 +832,7 @@ public class JSObject {
      * @param callback Callback to handle the return value.
      */
     public void callIntAsync(String key, final SuccessCallback<Integer> callback) {
-        callIntAsync(key, new CallbackAdapter<Integer>() {
-
-            @Override
-            public void onSucess(Integer value) {
-                callback.onSucess(value);
-            }
-
-        });
+        callIntAsync(key, new CallIntAsyncCallbackAdapter(callback));
     }
 
     /**
@@ -896,14 +865,7 @@ public class JSObject {
      * @param callback Callback to handle the return value.
      */
     public void callDoubleAsync(String key, final SuccessCallback<Double> callback) {
-        callDoubleAsync(key, new CallbackAdapter<Double>() {
-
-            @Override
-            public void onSucess(Double value) {
-                callback.onSucess(value);
-            }
-
-        });
+        callDoubleAsync(key, new CallDoubleAsyncCallbackAdapter(callback));
     }
 
     /**
@@ -935,13 +897,7 @@ public class JSObject {
      * @param callback Callback to handle the return value.
      */
     public void callStringAsync(String key, final SuccessCallback<String> callback) {
-        callStringAsync(key, new CallbackAdapter<String>() {
-
-            @Override
-            public void onSucess(String value) {
-                callback.onSucess(value);
-            }
-        });
+        callStringAsync(key, new CallStringAsyncCallbackAdapter(callback));
     }
 
     /**
@@ -973,13 +929,7 @@ public class JSObject {
      * @param callback Callback to handle the return value.
      */
     public void callObjectAsync(String key, final SuccessCallback<JSObject> callback) {
-        callObjectAsync(key, new CallbackAdapter<JSObject>() {
-
-            @Override
-            public void onSucess(JSObject value) {
-                callback.onSucess(value);
-            }
-        });
+        callObjectAsync(key, new CallObjectAsyncCallbackAdapter(callback));
     }
 
     /**
@@ -1058,14 +1008,7 @@ public class JSObject {
      *                 Java type and passed to the callback.
      */
     public void callAsync(Object[] params, final SuccessCallback callback) {
-        callAsync(params, new CallbackAdapter() {
-
-            @Override
-            public void onSucess(Object value) {
-                callback.onSucess(value);
-            }
-
-        });
+        callAsync(params, new CallAsyncCallbackAdapter(callback));
     }
 
     /**
@@ -1079,4 +1022,92 @@ public class JSObject {
     }
 
 
+    private static class CallAsyncCallbackAdapter extends CallbackAdapter {
+        private final SuccessCallback callback;
+
+        public CallAsyncCallbackAdapter(SuccessCallback callback) {
+            this.callback = callback;
+        }
+
+        @Override
+        public void onSucess(Object value) {
+            callback.onSucess(value);
+        }
+    }
+
+    private static class CallObjectAsyncCallbackAdapter extends CallbackAdapter<JSObject> {
+
+        private final SuccessCallback<JSObject> callback;
+
+        public CallObjectAsyncCallbackAdapter(SuccessCallback<JSObject> callback) {
+            this.callback = callback;
+        }
+
+        @Override
+        public void onSucess(JSObject value) {
+            callback.onSucess(value);
+        }
+    }
+
+    private static class CallStringAsyncCallbackAdapter extends CallbackAdapter<String> {
+
+        private final SuccessCallback<String> callback;
+
+        public CallStringAsyncCallbackAdapter(SuccessCallback<String> callback) {
+            this.callback = callback;
+        }
+
+        @Override
+        public void onSucess(String value) {
+            callback.onSucess(value);
+        }
+    }
+
+    private static class CallDoubleAsyncCallbackAdapter extends CallbackAdapter<Double> {
+
+        private final SuccessCallback<Double> callback;
+
+        public CallDoubleAsyncCallbackAdapter(SuccessCallback<Double> callback) {
+            this.callback = callback;
+        }
+
+        @Override
+        public void onSucess(Double value) {
+            callback.onSucess(value);
+        }
+
+    }
+
+    private static class CallIntAsyncCallbackAdapter extends CallbackAdapter<Integer> {
+
+        private final SuccessCallback<Integer> callback;
+
+        public CallIntAsyncCallbackAdapter(SuccessCallback<Integer> callback) {
+            this.callback = callback;
+        }
+
+        @Override
+        public void onSucess(Integer value) {
+            callback.onSucess(value);
+        }
+
+    }
+
+    private static class CallIntAsyncCallback implements Callback<Double> {
+
+        private final Callback<Integer> callback;
+
+        public CallIntAsyncCallback(Callback<Integer> callback) {
+            this.callback = callback;
+        }
+
+        public void onSucess(Double value) {
+            callback.onSucess(value.intValue());
+        }
+
+        public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+            callback.onError(sender, err, errorCode, errorMessage);
+        }
+
+    }
 }

@@ -82,7 +82,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
     public SpanLabel(String txt) {
         setUIIDFinal("Container");
         super.setLayout(new BorderLayout());
-        text = new TextArea(getUIManager().localize(txt, txt));
+        text = new TextArea(super.getUIManager().localize(txt, txt));
         text.setActAsLabel(true);
         text.setColumns(text.getText().length() + 1);
         text.setGrowByContent(true);
