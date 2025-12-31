@@ -13,6 +13,16 @@
     </Match>
 
     <!--
+    We have a lot of those in the code, they might produce
+    a class cast exception, but those are easy to debug/fix
+    with fail-fast semantics. If we wrap them with an if
+    statement, we might get a bug that's harder to spot.
+    -->
+    <Match>
+        <Bug pattern="BC_UNCONFIRMED_CAST"/>
+    </Match>
+
+    <!--
     This fails on writing to a static field from a non-static method.
     This is a bad practice in general because it could indicate a state
     that changes across threads. However, in our case, we have many such
@@ -88,8 +98,28 @@
         <Bug pattern="NP_BOOLEAN_RETURN_NULL" />
     </Match>
 
+    <!-- The testing framework invokes System.exit() legitimately -->
+    <Match>
+        <Class name="com.codename1.testing.DeviceRunner" />
+        <Method name="runTests" />
+        <Bug pattern="DM_EXIT" />
+    </Match>
+
+    <!--
+    This is pretty niche behavior of a class we mostly added for porting/compatibility.
+    -->
+    <Match>
+        <Class name="com.codename1.ui.layouts.GroupLayout" />
+        <Bug pattern="EQ_COMPARETO_USE_OBJECT_EQUALS" />
+    </Match>
+
     <!-- Deprecated classes that should be excluded from checks -->
     <Match>
-        <Class name="~com\.codename1\.db\.ThreadSafeDatabase.*" />
+        <Class name="com.codename1.db.ThreadSafeDatabase" />
+    </Match>
+
+    <!-- Badly written 3rd party classes -->
+    <Match>
+        <Class name="com.codename1.io.tar.TarEntry" />
     </Match>
 </FindBugsFilter>

@@ -574,7 +574,10 @@ public abstract class Purchase {
                         while (!complete[0]) {
                             synchronized (complete) {
                                 try {
-                                    complete.wait();
+                                    // need to recheck condition within the synchronized block
+                                    if(!complete[0]) {
+                                        complete.wait();
+                                    }
                                 } catch (InterruptedException ex) {
                                     Thread.currentThread().interrupt();
                                     return;
@@ -778,7 +781,10 @@ public abstract class Purchase {
                     while (!complete[0]) {
                         synchronized (complete) {
                             try {
-                                complete.wait();
+                                // need to recheck condition within the synchronized block
+                                if(!complete[0]) {
+                                    complete.wait();
+                                }
                             } catch (InterruptedException ex) {
                                 Thread.currentThread().interrupt();
                                 return;

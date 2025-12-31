@@ -119,7 +119,7 @@ public class JavascriptContext {
      * is packaged by the JavascriptContext class in response to a
      * BrowserNavigationCallback.
      */
-    private final ActionListener scriptMessageListener;
+    private final ActionListener<JavascriptEvent> scriptMessageListener;
     /**
      * A handler for navigation attempts.  This intercepts URLs of the
      * form cn1command:... .  This is how Javascript communicates/calls
@@ -1000,9 +1000,9 @@ public class JavascriptContext {
      * @see addCallback()
      * @see JSObject.addCallback()
      */
-    private class ScriptMessageListener implements ActionListener {
+    private class ScriptMessageListener implements ActionListener<JavascriptEvent> {
 
-        public void actionPerformed(ActionEvent evt) {
+        public void actionPerformed(JavascriptEvent evt) {
             JavascriptEvent jevt = (JavascriptEvent) evt;
             JSObject source = jevt.getSelf();
             String method = jevt.getMethod();
