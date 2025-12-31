@@ -90,7 +90,7 @@ public class RSSReader extends List {
      * Creates an rss reader instance
      */
     public RSSReader() {
-        setUIID("RSSReader");
+        setUIIDFinal("RSSReader");
         setRenderer(new GenericListCellRenderer(createRendererContainer(), createRendererContainer()));
         addActionListener(new EventHandler());
     }

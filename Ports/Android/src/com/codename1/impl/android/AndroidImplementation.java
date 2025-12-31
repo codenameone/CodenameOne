@@ -4612,9 +4612,8 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
 
         @Override
-        public void setFocusable(final boolean focusable) {
+        public void onSetFocusable(final boolean focusable) {
             // EDT
-            super.setFocusable(focusable);
             if (getActivity() == null) {
                 return;
             }

@@ -149,7 +149,7 @@ public class Tabs extends Container {
         press = new SwipeListener(SwipeListener.PRESS);
         drag = new SwipeListener(SwipeListener.DRAG);
         release = new SwipeListener(SwipeListener.RELEASE);
-        setUIID("Tabs");
+        setUIIDFinal("Tabs");
         BorderLayout bd = (BorderLayout) super.getLayout();
         if (bd != null) {
             if (UIManager.getInstance().isThemeConstant("tabsOnTopBool", false)) {

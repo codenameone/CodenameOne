@@ -747,7 +747,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
-    public void setLayout(Layout layout) {
+    public final void setLayout(Layout layout) {
         dialogContentPane.setLayout(layout);
     }
 
@@ -768,7 +768,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
-    public void addComponent(Component cmp) {
+    public final void addComponent(Component cmp) {
         dialogContentPane.addComponent(cmp);
     }
 
@@ -1736,7 +1736,7 @@ public class Dialog extends Form {
      *
      * @param autoDispose true if this dialog disposes on any command
      */
-    public void setAutoDispose(boolean autoDispose) {
+    public final void setAutoDispose(boolean autoDispose) {
         this.autoDispose = autoDispose;
     }
 
@@ -1778,7 +1778,7 @@ public class Dialog extends Form {
      *
      * @param disposeWhenPointerOutOfBounds
      */
-    public void setDisposeWhenPointerOutOfBounds(boolean disposeWhenPointerOutOfBounds) {
+    public final void setDisposeWhenPointerOutOfBounds(boolean disposeWhenPointerOutOfBounds) {
         this.disposeWhenPointerOutOfBounds = disposeWhenPointerOutOfBounds;
     }
 

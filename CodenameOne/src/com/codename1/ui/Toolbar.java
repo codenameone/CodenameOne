@@ -146,7 +146,7 @@ public class Toolbar extends Container {
         if (UIManager.getInstance().isThemeConstant("landscapeTitleUiidBool", false)) {
             setUIID("Toolbar", "ToolbarLandscape");
         } else {
-            setUIID("Toolbar");
+            setUIIDFinal("Toolbar");
         }
         sideMenu = new ToolbarSideMenu();
         if (centeredDefault

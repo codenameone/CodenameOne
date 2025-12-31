@@ -114,7 +114,7 @@ public class Picker extends Button {
      * Default constructor
      */
     public Picker() {
-        setUIID("Picker");
+        setUIIDFinal("Picker");
         setPreferredTabIndex(0);
 
         // Fixes iOS picker issue https://github.com/codenameone/CodenameOne/issues/3283

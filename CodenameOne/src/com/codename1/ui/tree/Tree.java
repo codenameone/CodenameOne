@@ -112,7 +112,7 @@ public class Tree extends Container {
         }
         buildBranch(null, 0, this);
         setScrollableY(true);
-        setUIID("Tree");
+        setUIIDFinal("Tree");
     }
 
     /**

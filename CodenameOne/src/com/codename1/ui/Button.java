@@ -186,7 +186,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
      */
     public Button(String text, Image icon, String id) {
         super(text);
-        setUIID(id);
+        setUIIDFinal(id);
         setFocusable(true);
         setIcon(icon);
         this.pressedIcon = icon;

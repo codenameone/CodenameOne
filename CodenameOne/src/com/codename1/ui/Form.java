@@ -220,7 +220,7 @@ public class Form extends Container {
         super(new BorderLayout());
         setSafeAreaRoot(true);
         contentPane = new Container(contentPaneLayout);
-        setUIID("Form");
+        setUIIDFinal("Form");
         // forms/dialogs are not visible by default
         setVisible(false);
         Style formStyle = getStyle();
@@ -3924,7 +3924,7 @@ public class Form extends Container {
      * @param cmd the Form command to be added
      * @deprecated Please use {@link Toolbar#addCommandToLeftBar(com.codename1.ui.Command)} or similar methods
      */
-    public void addCommand(Command cmd) {
+    public final void addCommand(Command cmd) {
         //menuBar.addCommand(cmd);
         addCommand(cmd, 0);
     }

@@ -43,7 +43,7 @@ public abstract class BaseSpinner extends Container {
      */
     public BaseSpinner() {
         super(new BoxLayout(BoxLayout.X_AXIS));
-        setUIID("SpinnerWrapper");
+        setUIIDFinal("SpinnerWrapper");
         overlayStyle = getUIManager().getComponentStyle("SpinnerOverlay");
         installDefaultPainter(overlayStyle);
     }

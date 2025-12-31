@@ -145,7 +145,7 @@ public class Calendar extends Container implements ActionSource {
     public Calendar(long time, TimeZone tmz, Image leftArrowImage, Image rightArrowImage) {
         super(new BorderLayout());
         this.tmz = tmz;
-        setUIID("Calendar");
+        setUIIDFinal("Calendar");
         mv = new MonthView(time);
 
         Image leftArrow = leftArrowImage != null ? leftArrowImage : UIManager.getInstance().getThemeImageConstant("calendarLeftImage");
@@ -967,7 +967,7 @@ public class Calendar extends Container implements ActionSource {
 
         public MonthView(long time) {
             super(new BoxLayout(BoxLayout.Y_AXIS));
-            setUIID("MonthView");
+            setUIIDFinal("MonthView");
             titles = new Container(new GridLayout(1, 7));
             days = new Container(new GridLayout(6, 7));
             addComponent(titles);

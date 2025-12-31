@@ -57,7 +57,7 @@ public class DefaultListCellRenderer<T> extends Label implements ListCellRendere
         setEndsWith3Points(false);
         focusComponent.setUIID("ListRendererFocus");
         focusComponent.setFocus(true);
-        setUIID("ListRenderer");
+        setUIIDFinal("ListRenderer");
     }
 
     /**

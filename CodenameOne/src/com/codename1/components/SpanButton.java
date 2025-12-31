@@ -82,7 +82,7 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
      * Constructor accepting default text
      */
     public SpanButton(String txt) {
-        setUIID("Button");
+        setUIIDFinal("Button");
         setLayout(new BorderLayout());
         text = new TextArea(getUIManager().localize(txt, txt));
         text.setColumns(100);

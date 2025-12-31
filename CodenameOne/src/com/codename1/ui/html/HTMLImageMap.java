@@ -42,7 +42,7 @@ class HTMLImageMap extends Button implements ActionListener {
 
     HTMLImageMap(HTMLComponent htmlC) {
         this.htmlC = htmlC;
-        setUIID("HTMLLink");
+        setUIIDFinal("HTMLLink");
         addActionListener(this);
     }
 

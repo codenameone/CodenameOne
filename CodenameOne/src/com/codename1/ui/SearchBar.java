@@ -67,7 +67,7 @@ class SearchBar extends Toolbar {
                 onSearch(search.getText());
             }
         });
-        setUIID("ToolbarSearch");
+        setUIIDFinal("ToolbarSearch");
         if (parent.getComponentForm() == Display.INSTANCE.getCurrent()) {
             search.startEditingAsync();
         } else {

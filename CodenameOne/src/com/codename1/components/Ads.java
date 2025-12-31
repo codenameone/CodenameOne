@@ -24,6 +24,7 @@ package com.codename1.components;
 
 import com.codename1.ads.AdsService;
 import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkEvent;
 import com.codename1.ui.Component;
 import com.codename1.ui.Container;
 import com.codename1.ui.Display;
@@ -76,7 +77,7 @@ public class Ads extends Container implements HTMLCallback {
      * Default constructor for GUI builder
      */
     public Ads() {
-        setUIID("Ads");
+        setUIIDFinal("Ads");
         setLayout(new BorderLayout());
 
         // special case for iOS. It seems the ad component can inadvertedly steal focus from 
@@ -218,20 +219,7 @@ public class Ads extends Container implements HTMLCallback {
      */
     public void setAd(String ad) {
         this.ad = ad;
-        HTMLComponent html = new HTMLComponent(new AsyncDocumentRequestHandlerImpl() {
-
-            protected ConnectionRequest createConnectionRequest(DocumentInfo docInfo, IOCallback callback, Object[] response) {
-                ConnectionRequest req = super.createConnectionRequest(docInfo, callback, response);
-                req.setFailSilently(true);
-                req.addResponseCodeListener(new ActionListener() {
-
-                    public void actionPerformed(ActionEvent evt) {
-                        //do nothing, just make sure the html won't throw an error
-                    }
-                });
-                return req;
-            }
-        });
+        HTMLComponent html = new HTMLComponent(new MyAsyncDocumentRequestHandlerImpl());
         html.setSupressExceptions(true);
         html.setHTMLCallback(this);
         html.setBodyText("<html><body><div align='center'>" + ad + "</div></body></html>");
@@ -584,5 +572,22 @@ public class Ads extends Container implements HTMLCallback {
             return null;
         }
         return super.setPropertyValue(name, value);
+    }
+
+    private static class MyAsyncDocumentRequestHandlerImpl extends AsyncDocumentRequestHandlerImpl {
+
+        protected ConnectionRequest createConnectionRequest(DocumentInfo docInfo, IOCallback callback, Object[] response) {
+            ConnectionRequest req = super.createConnectionRequest(docInfo, callback, response);
+            req.setFailSilently(true);
+            req.addResponseCodeListener(new NetworkEventActionListener());
+            return req;
+        }
+
+        private static class NetworkEventActionListener implements ActionListener<NetworkEvent> {
+
+            public void actionPerformed(NetworkEvent evt) {
+                //do nothing, just make sure the html won't throw an error
+            }
+        }
     }
 }

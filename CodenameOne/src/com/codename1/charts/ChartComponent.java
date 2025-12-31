@@ -208,7 +208,7 @@ public class ChartComponent extends Component {
      * @param chart The chart to be displayed in this component.
      */
     public ChartComponent(AbstractChart chart) {
-        setUIID("ChartComponent");
+        setUIIDFinal("ChartComponent");
         this.chart = chart;
         if (chart != null && chart instanceof XYChart) {
             XYChart xyChart = (XYChart) chart;

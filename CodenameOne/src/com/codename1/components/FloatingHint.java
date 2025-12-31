@@ -65,12 +65,7 @@ public class FloatingHint extends Container {
         this.tf = tf;
         Container content = new Container(new BorderLayout());
         add(content);
-        hintButton = new Button(tf.getHint()) {
-            @Override
-            protected boolean shouldRenderComponentSelection() {
-                return true;
-            }
-        };
+        hintButton = new HintButtonImpl(tf);
         hintLabel = new Label(tf.getHint());
         tf.setHint("");
         hintButton.setFocusable(false);
@@ -87,11 +82,7 @@ public class FloatingHint extends Container {
         add(BorderLayout.north(hintButton).
                 add(BorderLayout.CENTER, hintLabel));
 
-        hintButton.addActionListener(new ActionListener() {
-            public void actionPerformed(ActionEvent evt) {
-                tf.startEditingAsync();
-            }
-        });
+        hintButton.addActionListener(new HintButtonActionListener(tf));
         if (tf.getText() == null || tf.getText().length() == 0) {
             hintButton.setVisible(false);
         } else {
@@ -170,4 +161,26 @@ public class FloatingHint extends Container {
     }
 
 
+    private static class HintButtonImpl extends Button {
+        public HintButtonImpl(TextArea tf) {
+            super(tf.getHint());
+        }
+
+        @Override
+        protected boolean shouldRenderComponentSelection() {
+            return true;
+        }
+    }
+
+    private static class HintButtonActionListener implements ActionListener<ActionEvent> {
+        private final TextArea tf;
+
+        public HintButtonActionListener(TextArea tf) {
+            this.tf = tf;
+        }
+
+        public void actionPerformed(ActionEvent evt) {
+            tf.startEditingAsync();
+        }
+    }
 }

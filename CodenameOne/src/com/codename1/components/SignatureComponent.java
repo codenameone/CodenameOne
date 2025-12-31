@@ -451,7 +451,7 @@ public class SignatureComponent extends Container implements ActionSource {
         private final Style signatureStyle;
 
         SignaturePanel() {
-            setUIID("SignaturePanel");
+            setUIIDFinal("SignaturePanel");
             signatureBoxStyle = getUIManager().getComponentStyle("SignaturePanelBox");
             signatureStyle = getUIManager().getComponentStyle("SignaturePanelSignature");
             stroke.setLineWidth(Math.max(1, Display.getInstance().convertToPixels(1, true) / 2));

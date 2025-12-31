@@ -332,7 +332,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      * @throws IllegalArgumentException if rows <= 0 or columns <= 1
      */
     private TextArea(String text, int maxSize, int rows, int columns, int constraint) {
-        setUIID("TextArea");
+        setUIIDFinal("TextArea");
         setPreferredTabIndex(0);
         this.maxSize = maxSize;
         setText(text);

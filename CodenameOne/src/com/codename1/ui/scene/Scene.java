@@ -40,7 +40,7 @@ public class Scene extends Container {
     private Node root;
 
     public Scene() {
-        setUIID("Scene");
+        setUIIDFinal("Scene");
         camera = new Property<Camera, Scene>("camera", (Camera) null);
     }
 

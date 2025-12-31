@@ -84,7 +84,7 @@ public class CheckBox extends Button {
      */
     public CheckBox(String text, Image icon) {
         super(text, icon);
-        setUIID("CheckBox");
+        setUIIDFinal("CheckBox");
         updateSide();
     }
 
