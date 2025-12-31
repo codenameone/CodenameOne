@@ -1,65 +1,4 @@
 <FindBugsFilter>
-    <!-- Match>
-        <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
-    </Match>
-    <Match>
-        <Bug pattern="DM_GC"/>
-    </Match>
-    <Match>
-        <Bug pattern="CN_IMPLEMENTS_CLONE_BUT_NOT_CLONEABLE"/>
-    </Match>
-    <Match>
-        <Bug pattern="BC_UNCONFIRMED_CAST"/>
-    </Match>
-    <Match>
-        <Bug pattern="BC_UNCONFIRMED_CAST_OF_RETURN_VALUE"/>
-    </Match>
-    <Match>
-        <Bug pattern="CN_IDIOM_NO_SUPER_CALL"/>
-    </Match>
-    <Match>
-        <Bug pattern="DM_BOOLEAN_CTOR"/>
-    </Match>
-    <Match>
-        <Bug pattern="DM_CONVERT_CASE"/>
-    </Match>
-    <Match>
-        <Bug pattern="DM_EXIT"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_REP2"/>
-    </Match>
-    <Match>
-        <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
-    </Match>
-    <Match>
-        <Bug pattern="EQ_COMPARETO_USE_OBJECT_EQUALS"/>
-    </Match>
-    <Match>
-        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
-    </Match>
-    <Match>
-        <Bug pattern="MS_EXPOSE_REP"/>
-    </Match>
-    <Match>
-        <Bug pattern="NM_CONFUSING"/>
-    </Match>
-    <Match>
-        <Bug pattern="NO_NOTIFY_NOT_NOTIFYALL"/>
-    </Match>
-    <Match>
-        <Bug pattern="NP_BOOLEAN_RETURN_NULL"/>
-    </Match>
-    <Match>
-        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
-    </Match>
-    <Match>
-        <Bug pattern="REFLC_REFLECTION_MAY_INCREASE_ACCESSIBILITY_OF_CLASS"/>
-    </Match !-->
-
     <!-- We don't support serialization -->
     <Match>
         <Bug pattern="SE_NO_SERIALVERSIONID"/>
@@ -69,8 +8,6 @@
     <Match>
         <Bug pattern="CN_IMPLEMENTS_CLONE_BUT_NOT_CLONEABLE"/>
     </Match>
-
-    <!-- We don't support clone() -->
     <Match>
         <Bug pattern="CN_IDIOM_NO_SUPER_CALL"/>
     </Match>
@@ -103,7 +40,6 @@
         <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
     </Match>
 
-
     <!--
     This rule prevents Class.newInstance() which we generally avoid anyway.
     However, the solution is to use java.beans or reflection to create a class
@@ -114,23 +50,13 @@
         <Bug pattern="REFLC_REFLECTION_MAY_INCREASE_ACCESSIBILITY_OF_CLASS"/>
     </Match>
 
-    <!-- Match>
-        <Bug pattern="UI_INHERITANCE_UNSAFE_GETRESOURCE"/>
-    </Match>
-    <Match>
-        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
-    </Match>
-    <Match>
-        <Bug pattern="UW_UNCOND_WAIT"/>
-    </Match>
-    <Match>
-        <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON" />
-    </Match -->
-
+    <!-- This seems to be a problem with the check -->
     <Match>
         <Class name="~com\.codename1\.io\.Socket.*" />
         <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE" />
     </Match>
+
+    <!-- This is a 3rd party file that's really hard to fix properly  -->
     <Match>
         <Class name="~com\.codename1\.io\.gzip\.InfBlocks.*" />
         <Bug pattern="SA_FIELD_SELF_ASSIGNMENT" />
@@ -150,7 +76,13 @@
 
     <!-- The API isThemeConstant should return null when the value isn't found -->
     <Match>
-        <Class name="~com\.codename1\.plaf\.UIManager.*" />
+        <Class name="com.codename1.plaf.UIManager" />
+        <Bug pattern="NP_BOOLEAN_RETURN_NULL" />
+    </Match>
+
+    <!-- The API canExecute should return null when we don't know the answer -->
+    <Match>
+        <Class name="com.codename1.impl.CodenameOneImplementation" />
         <Bug pattern="NP_BOOLEAN_RETURN_NULL" />
     </Match>
 
