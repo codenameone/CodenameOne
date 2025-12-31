@@ -39,6 +39,7 @@ jobs:
 
       - name: Build core dependencies
         run: |
+          xvfb-run -a ant -noinput -buildfile Ports/CLDC11/build.xml jar
           xvfb-run -a ant -noinput -buildfile Ports/JavaSE/build.xml jar
           xvfb-run -a ant -noinput -buildfile Ports/JavaSEWithSVGSupport/build.xml jar
           xvfb-run -a ant -noinput -buildfile CodenameOne/build.xml jar

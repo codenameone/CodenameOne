@@ -62,7 +62,7 @@ public class LikeButton extends Button implements ActionListener {
     public LikeButton() {
         setUIIDFinal("LikeButton");
         setText("Like");
-        addActionListener(this);
+        super.addActionListener(this);
     }
 
     /**

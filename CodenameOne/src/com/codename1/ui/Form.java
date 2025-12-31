@@ -1964,18 +1964,28 @@ public class Form extends Container {
     /**
      * The given component is interested in animating its appearance and will start
      * receiving callbacks when it is visible in the form allowing it to animate
-     * its appearance. This method would not register a compnent instance more than once
+     * its appearance. This method would not register a component instance more than once
      *
      * @param cmp component that would be animated
      */
-    public void registerAnimated(Animation cmp) {
+    public final void registerAnimated(Animation cmp) {
         if (animatableComponents == null) {
             animatableComponents = new ArrayList<Animation>();
         }
         if (!animatableComponents.contains(cmp)) {
             animatableComponents.add(cmp);
         }
+        onRegisterAnimated(cmp);
         Display.getInstance().notifyDisplay();
+    }
+
+    /**
+     * Callback that's invoked by registerAnimated to let subclasses keep
+     * track of animation registration.
+     *
+     * @param cmp component that would be animated
+     */
+    protected void onRegisterAnimated(Animation cmp) {
     }
 
     /**

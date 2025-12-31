@@ -1020,7 +1020,7 @@ public class FaceBookAccess {
      * @param callback      the callback that should be updated when the data arrives
      */
     public void getUserNotifications(String userId, String startTime, boolean includeRead,
-                                     DefaultListModel notifications, final ActionListener callback) throws IOException {
+                                     DefaultListModel notifications, final ActionListener<NetworkEvent> callback) throws IOException {
         checkAuthentication();
 
         final FacebookRESTService con = new FacebookRESTService(token, "https://api.facebook.com/method/notifications.getList", false);
@@ -1030,17 +1030,7 @@ public class FaceBookAccess {
         con.addArgument("format", "json");
 
         con.setResponseDestination(notifications);
-        con.addResponseListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                if (!con.isAlive()) {
-                    return;
-                }
-                if (callback != null) {
-                    callback.actionPerformed(evt);
-                }
-            }
-        });
+        con.addResponseListener(new GetUserNotificationsActionListener(con, callback));
 
         if (slider != null) {
             SliderBridge.bindProgress(con, slider);
@@ -1064,7 +1054,7 @@ public class FaceBookAccess {
      *                 Vector users = (Vector) data.elementAt(0);
      *                 }
      */
-    public void getUsersDetails(String[] usersIds, String[] fields, final ActionListener callback) throws IOException {
+    public void getUsersDetails(String[] usersIds, String[] fields, final ActionListener<NetworkEvent> callback) throws IOException {
         checkAuthentication();
 
         final FacebookRESTService con = new FacebookRESTService(token, "https://api.facebook.com/method/users.getInfo", false);
@@ -1085,17 +1075,7 @@ public class FaceBookAccess {
         con.addArgumentNoEncoding("fields", fieldsStr.toString());
         con.addArgument("format", "json");
 
-        con.addResponseListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                if (!con.isAlive()) {
-                    return;
-                }
-                if (callback != null) {
-                    callback.actionPerformed(evt);
-                }
-            }
-        });
+        con.addResponseListener(new GetUsersDetailsActionListener(con, callback));
         if (slider != null) {
             SliderBridge.bindProgress(con, slider);
         }
@@ -1434,6 +1414,44 @@ public class FaceBookAccess {
             Vector v = (Vector) evt.getMetaData();
             Hashtable t = (Hashtable) v.elementAt(0);
             album.copy(t);
+        }
+    }
+
+    private static class GetUserNotificationsActionListener implements ActionListener<NetworkEvent> {
+        private final FacebookRESTService con;
+        private final ActionListener<NetworkEvent> callback;
+
+        public GetUserNotificationsActionListener(FacebookRESTService con, ActionListener<NetworkEvent> callback) {
+            this.con = con;
+            this.callback = callback;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            if (!con.isAlive()) {
+                return;
+            }
+            if (callback != null) {
+                callback.actionPerformed(evt);
+            }
+        }
+    }
+
+    private static class GetUsersDetailsActionListener implements ActionListener<NetworkEvent> {
+        private final FacebookRESTService con;
+        private final ActionListener<NetworkEvent> callback;
+
+        public GetUsersDetailsActionListener(FacebookRESTService con, ActionListener<NetworkEvent> callback) {
+            this.con = con;
+            this.callback = callback;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            if (!con.isAlive()) {
+                return;
+            }
+            if (callback != null) {
+                callback.actionPerformed(evt);
+            }
         }
     }
 

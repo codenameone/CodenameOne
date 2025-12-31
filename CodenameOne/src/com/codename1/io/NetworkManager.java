@@ -663,7 +663,7 @@ public class NetworkManager {
      *
      * @param al action listener
      */
-    public void addProgressListener(ActionListener<NetworkEvent> al) {
+    public final void addProgressListener(ActionListener<NetworkEvent> al) {
         if (progressListeners == null) {
             progressListeners = new EventDispatcher();
             progressListeners.setBlocking(false);
