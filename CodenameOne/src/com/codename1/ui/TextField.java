@@ -152,7 +152,7 @@ public class TextField extends TextArea {
      */
     public TextField() {
         super(1, 20);
-        setUIID("TextField");
+        setUIIDFinal("TextField");
         setSingleLineTextArea(true);
     }
 
@@ -163,7 +163,7 @@ public class TextField extends TextArea {
      */
     public TextField(int columns) {
         super(1, columns);
-        setUIID("TextField");
+        setUIIDFinal("TextField");
         setSingleLineTextArea(true);
     }
 
@@ -174,7 +174,7 @@ public class TextField extends TextArea {
      */
     public TextField(String text) {
         super(text, 1, 20);
-        setUIID("TextField");
+        setUIIDFinal("TextField");
         setSingleLineTextArea(true);
     }
     /**
@@ -211,7 +211,7 @@ public class TextField extends TextArea {
      */
     public TextField(String text, int columns) {
         super(text, 1, columns);
-        setUIID("TextField");
+        setUIIDFinal("TextField");
         setSingleLineTextArea(true);
     }
 

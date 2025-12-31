@@ -154,7 +154,7 @@ public class BrowserComponent extends Container {
      * This constructor will work as expected when a browser component is supported, see isNativeBrowserSupported()
      */
     public BrowserComponent() {
-        setUIID("BrowserComponent");
+        setUIIDFinal("BrowserComponent");
         putClientProperty("BrowserComponent.useWKWebView", "true".equals(Display.getInstance().getProperty("BrowserComponent.useWKWebView", "true")));
         setLayout(new BorderLayout());
         addComponent(BorderLayout.CENTER, placeholder);

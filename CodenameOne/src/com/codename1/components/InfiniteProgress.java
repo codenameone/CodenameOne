@@ -101,7 +101,7 @@ public class InfiniteProgress extends Component {
      * Default constructor to define the UIID
      */
     public InfiniteProgress() {
-        setUIID("InfiniteProgress");
+        setUIIDFinal("InfiniteProgress");
     }
 
     /**

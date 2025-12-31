@@ -24,6 +24,7 @@
 package com.codename1.ui;
 
 import com.codename1.cloud.BindTarget;
+import com.codename1.components.SpanLabel;
 import com.codename1.io.Log;
 import com.codename1.ui.TextSelection.Char;
 import com.codename1.ui.TextSelection.Span;
@@ -123,7 +124,11 @@ public class Label extends Component implements IconHolder, TextHolder {
     public Label(String text) {
         endsWith3Points = UIManager.getInstance().getLookAndFeel().isDefaultEndsWith3Points();
         noBind = true;
-        setUIID("Label");
+
+        // This solves overridable method calls in constructor which are
+        // a source of some core problems in Java/CodenameOne
+        setUIIDFinal("Label");
+        setLabelUIID("Label");
         this.text = text;
         localize();
         setFocusable(false);
@@ -141,7 +146,7 @@ public class Label extends Component implements IconHolder, TextHolder {
         this.text = text;
         localize();
         setFocusable(false);
-        setUIID(uiid);
+        setUIIDFinal(uiid);
     }
 
 
@@ -343,7 +348,7 @@ public class Label extends Component implements IconHolder, TextHolder {
     }
 
     /**
-     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, com.codename1.ui.Font, char)}
+     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(Label, Font, char, float)}
      *
      * @param c one of the constants from the font
      */
@@ -489,6 +494,10 @@ public class Label extends Component implements IconHolder, TextHolder {
     @Override
     public void setUIID(String id) {
         super.setUIID(id);
+        setLabelUIID(id);
+    }
+
+    private void setLabelUIID(String id) {
         if (id != null && id.length() > 0) {
             String iconUIID = getUIManager().getIconUIIDFor(id);
             if (iconUIID != null) {
@@ -1350,7 +1359,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      *
      * @param showEvenIfBlank the showEvenIfBlank to set
      */
-    public void setShowEvenIfBlank(boolean showEvenIfBlank) {
+    public final void setShowEvenIfBlank(boolean showEvenIfBlank) {
         this.showEvenIfBlank = showEvenIfBlank;
     }
 

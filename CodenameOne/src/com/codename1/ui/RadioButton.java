@@ -92,7 +92,7 @@ public class RadioButton extends Button {
      */
     public RadioButton(String text, Image icon) {
         super(text, icon);
-        setUIID("RadioButton");
+        setUIIDFinal("RadioButton");
     }
 
     /**

@@ -45,6 +45,14 @@
     </Match>
 
     <!--
+    Null is superior to zero length arrays. It fails fast and doesn't take up
+    ram or CPU. We often use null and it is good.
+    -->
+    <Match>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+
+    <!--
     Since the code runs on the clientside performance is more important than
     abstraction. We don't always copy values or wrap them in immutable data.
     -->

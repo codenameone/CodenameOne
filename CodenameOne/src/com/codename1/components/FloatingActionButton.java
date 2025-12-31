@@ -112,7 +112,7 @@ public class FloatingActionButton extends Button {
         setIcon(image);
         setText("");
         this.text = text;
-        setUIID(uiid);
+        setUIIDFinal(uiid);
         Style all = getAllStyles();
         all.setAlignment(CENTER);
         updateBorder();
@@ -125,7 +125,7 @@ public class FloatingActionButton extends Button {
         super.setText(text);
         rectangle = true;
         shadowOpacity = 0;
-        setUIID("Badge");
+        setUIIDFinal("Badge");
         updateBorder();
         isBadge = true;
     }
@@ -370,15 +370,7 @@ public class FloatingActionButton extends Button {
             int oldTint = f.getTintColor();
             f.setTintColor(0);
             d.setBlurBackgroundRadius(-1);
-            d.addShowListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    for (Component c : con) {
-                        c.setY(con.getHeight());
-                        c.setVisible(true);
-                    }
-                    con.animateLayout(200);
-                }
-            });
+            d.addShowListener(new ReleaseActionListener(con));
             showPopupDialog(d);
             f.setTintColor(oldTint);
             for (FloatingActionButton next : subMenu) {
@@ -404,12 +396,7 @@ public class FloatingActionButton extends Button {
             c.add(BorderLayout.CENTER, FlowLayout.encloseRight(txt));
             c.add(BorderLayout.EAST, next);
             con.add(c);
-            txt.addActionListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    next.pressed();
-                    next.released();
-                }
-            });
+            txt.addActionListener(new CreatePopupContentActionListener(next));
         }
         return con;
     }
@@ -438,4 +425,32 @@ public class FloatingActionButton extends Button {
         this.floatingActionTextUIID = floatingActionTextUIID;
     }
 
+    private static class ReleaseActionListener implements ActionListener<ActionEvent> {
+        private final Container con;
+
+        public ReleaseActionListener(Container con) {
+            this.con = con;
+        }
+
+        public void actionPerformed(ActionEvent evt) {
+            for (Component c : con) {
+                c.setY(con.getHeight());
+                c.setVisible(true);
+            }
+            con.animateLayout(200);
+        }
+    }
+
+    private static class CreatePopupContentActionListener implements ActionListener<ActionEvent> {
+        private final FloatingActionButton next;
+
+        public CreatePopupContentActionListener(FloatingActionButton next) {
+            this.next = next;
+        }
+
+        public void actionPerformed(ActionEvent evt) {
+            next.pressed();
+            next.released();
+        }
+    }
 }

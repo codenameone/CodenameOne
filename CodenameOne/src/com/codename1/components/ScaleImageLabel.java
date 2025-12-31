@@ -50,7 +50,7 @@ public class ScaleImageLabel extends Label {
      * Default constructor
      */
     public ScaleImageLabel() {
-        setUIID("Label");
+        setUIIDFinal("Label");
         setShowEvenIfBlank(true);
         getAllStyles().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FIT);
     }
@@ -61,7 +61,7 @@ public class ScaleImageLabel extends Label {
      * @param i image
      */
     public ScaleImageLabel(Image i) {
-        setUIID("Label");
+        setUIIDFinal("Label");
         setShowEvenIfBlank(true);
         getAllStyles().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FIT);
         setIcon(i);

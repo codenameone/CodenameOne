@@ -420,7 +420,7 @@ public class Accordion extends Container {
         private String topUiid = uiidHeader;
 
         public AccordionContent(Component header, final Component body) {
-            setUIID(uiidBackGroundItem);
+            setUIIDFinal(uiidBackGroundItem);
             setLayout(new BorderLayout());
             this.body = body;
             this.header = header;

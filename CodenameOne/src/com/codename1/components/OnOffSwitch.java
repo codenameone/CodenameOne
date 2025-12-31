@@ -74,7 +74,7 @@ public class OnOffSwitch extends Container implements ActionSource {
      * Default constructor
      */
     public OnOffSwitch() {
-        setUIID("OnOffSwitch");
+        setUIIDFinal("OnOffSwitch");
         initialize();
     }
 

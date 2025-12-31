@@ -91,7 +91,7 @@ public class ContainerList extends Container {
 
     private void init(ListModel m) {
         setModel(m);
-        setUIID("ContainerList");
+        setUIIDFinal("ContainerList");
         setScrollableY(true);
     }
 
@@ -370,7 +370,7 @@ public class ContainerList extends Container {
         private int offset;
 
         Entry(int off) {
-            setUIID("Container");
+            setUIIDFinal("Container");
             setFocusable(true);
             offset = off;
         }

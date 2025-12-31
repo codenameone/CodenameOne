@@ -114,7 +114,7 @@ public class MultiButton extends Container implements ActionSource, SelectableIc
         emblem.setUIID("Emblem");
         icon.setUIID("Label");
         setLeadComponent(emblem);
-        setUIID("MultiButton");
+        setUIIDFinal("MultiButton");
         Image i = UIManager.getInstance().getThemeImageConstant("defaultEmblemImage");
         if (i != null) {
             emblem.setIcon(i);

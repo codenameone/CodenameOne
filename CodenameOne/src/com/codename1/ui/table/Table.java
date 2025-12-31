@@ -140,7 +140,7 @@ public class Table extends Container {
      * @param model the model underlying this table
      */
     public Table(TableModel model) {
-        setUIID("Table");
+        setUIIDFinal("Table");
         this.model = model;
         updateModel();
     }
@@ -152,7 +152,7 @@ public class Table extends Container {
      * @param includeHeader Indicates whether the table should render a table header as the first row
      */
     public Table(TableModel model, boolean includeHeader) {
-        setUIID("Table");
+        setUIIDFinal("Table");
         this.includeHeader = includeHeader;
         this.model = model;
         updateModel();

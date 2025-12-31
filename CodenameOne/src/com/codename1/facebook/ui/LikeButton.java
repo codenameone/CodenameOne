@@ -60,7 +60,7 @@ public class LikeButton extends Button implements ActionListener {
      * Default constructor
      */
     public LikeButton() {
-        setUIID("LikeButton");
+        setUIIDFinal("LikeButton");
         setText("Like");
         addActionListener(this);
     }

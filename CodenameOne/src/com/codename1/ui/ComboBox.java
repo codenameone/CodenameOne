@@ -128,7 +128,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
      */
     public ComboBox(ListModel<T> model) {
         super(model);
-        super.setUIID("ComboBox");
+        setUIIDFinal("ComboBox");
         ((DefaultListCellRenderer) super.getRenderer()).setShowNumbers(false);
 
         setInputOnFocus(false);

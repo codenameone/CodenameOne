@@ -80,7 +80,7 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
      * Constructor accepting default text
      */
     public SpanLabel(String txt) {
-        setUIID("Container");
+        setUIIDFinal("Container");
         setLayout(new BorderLayout());
         text = new TextArea(getUIManager().localize(txt, txt));
         text.setActAsLabel(true);

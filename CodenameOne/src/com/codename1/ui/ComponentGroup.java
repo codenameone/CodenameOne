@@ -57,7 +57,7 @@ public class ComponentGroup extends Container {
      */
     public ComponentGroup() {
         super(new BoxLayout(BoxLayout.Y_AXIS));
-        setUIID("ComponentGroup");
+        setUIIDFinal("ComponentGroup");
     }
 
     /**

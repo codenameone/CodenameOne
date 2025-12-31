@@ -959,7 +959,7 @@ public class SplitPane extends Container {
         Divider() {
             super(new LayeredLayout());
             if (dividerUIID != null) {
-                setUIID(dividerUIID);
+                setUIIDFinal(dividerUIID);
             }
             btnCollapse = $(new Button())
                     .setUIID(collapseButtonUIID)

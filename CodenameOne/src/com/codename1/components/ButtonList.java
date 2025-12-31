@@ -110,7 +110,6 @@ public abstract class ButtonList extends Container implements DataChangedListene
             ((DefaultListModel) model).setMultiSelectionMode(true);
         }
         setModel(model);
-
     }
 
     /**
@@ -130,7 +129,7 @@ public abstract class ButtonList extends Container implements DataChangedListene
      * This should be called by the concrete implementation once it is ready to generate the
      * buttons.
      */
-    protected void fireReady() {
+    protected final void fireReady() {
         ready = true;
         for (Runnable r : onReady) {
             r.run();
@@ -160,7 +159,7 @@ public abstract class ButtonList extends Container implements DataChangedListene
         return model;
     }
 
-    public void setModel(ListModel model) {
+    public final void setModel(ListModel model) {
         if (model != this.model) {
             if (this.model != null) {
                 this.model.removeDataChangedListener(this);

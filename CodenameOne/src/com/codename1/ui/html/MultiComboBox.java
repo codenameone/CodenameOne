@@ -55,7 +55,7 @@ class MultiComboBox extends List {
 
     MultiComboBox(ListModel underlyingModel, boolean multiple) {
         super();
-        setUIID("ComboBox");
+        setUIIDFinal("ComboBox");
         this.multiple = multiple;
         setScrollToSelected(!multiple); // In multiple comboboxes we don't scroll to selected, as there can be several
         model = new MultiListModel(underlyingModel, multiple);
@@ -324,20 +324,20 @@ class MultiComboBox extends List {
         public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
             Component cmp = super.getListCellRendererComponent(list, value, index, isSelected);
             if (model.isSelected(value)) {
-                setUIID("HTMLMultiComboBoxItem");
+                setUIIDFinal("HTMLMultiComboBoxItem");
                 fgColor = getUnselectedStyle().getFgColor();
                 bgColor = getUnselectedStyle().getBgColor();
             } else {
-                setUIID("ComboBoxItem");
+                setUIIDFinal("ComboBoxItem");
                 bgColor = -1;
                 fgColor = -1;
             }
 
             if (optgroup) {
                 if (value instanceof String) {
-                    setUIID("HTMLOptgroup");
+                    setUIIDFinal("HTMLOptgroup");
                 } else {
-                    setUIID("HTMLOptgroupItem");
+                    setUIIDFinal("HTMLOptgroupItem");
                 }
             }
 

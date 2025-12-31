@@ -216,7 +216,7 @@ public class Sheet extends Container {
         }
         $(this).addTags("Sheet");
         setGrabsPointerEvents(true);
-        this.setUIID(uiid);
+        setUIIDFinal(uiid);
         this.title.setUIID(uiid + "Title");
         titleBar.setUIID(uiid + "TitleBar");
         backButton.setUIID(uiid + "BackButton");

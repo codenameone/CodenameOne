@@ -147,7 +147,7 @@ public class Container extends Component implements Iterable<Component> {
      */
     public Container(Layout layout, String uiid) {
         super();
-        setUIID(uiid);
+        setUIIDFinal(uiid);
         this.layout = layout;
         setFocusable(false);
     }
@@ -498,7 +498,7 @@ public class Container extends Component implements Iterable<Component> {
      *
      * @param lead component that takes over the hierarchy
      */
-    public void setLeadComponent(Component lead) {
+    public final void setLeadComponent(Component lead) {
         if (lead == leadComponent) {
             return;
         }

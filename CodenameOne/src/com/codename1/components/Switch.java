@@ -273,7 +273,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
      *             necessary for theme constants
      */
     public Switch(String uiid) {
-        setUIID(uiid);
+        setUIIDFinal(uiid);
         setOpaque(false);
         initialize();
     }
