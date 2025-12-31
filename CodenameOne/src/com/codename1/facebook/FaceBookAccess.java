@@ -245,16 +245,8 @@ public class FaceBookAccess {
      * @param al a listener that will receive at its source either a token for the service or an exception in case of a failure
      * @return a component that should be displayed to the user in order to perform the authentication
      */
-    public Component createAuthComponent(final ActionListener al) {
-        return createOAuth().createAuthComponent(new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                if (evt.getSource() instanceof String) {
-                    token = (String) evt.getSource();
-                }
-                al.actionPerformed(evt);
-            }
-        });
+    public Component createAuthComponent(final ActionListener<ActionEvent> al) {
+        return createOAuth().createAuthComponent(new CreateAuthComponentActionListener(al));
     }
 
     /**
@@ -263,21 +255,8 @@ public class FaceBookAccess {
      * @param al a listener that will receive at its source either a token for
      *           the service or an exception in case of a failure
      */
-    public void showAuthentication(final ActionListener al) {
-        createOAuth().showAuthentication(new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                if (evt.getSource() instanceof String) {
-                    token = (String) evt.getSource();
-                }
-                if (evt.getSource() instanceof AccessToken) {
-                    AccessToken t = (AccessToken) evt.getSource();
-                    token = t.getToken();
-
-                }
-                al.actionPerformed(evt);
-            }
-        });
+    public void showAuthentication(final ActionListener<ActionEvent> al) {
+        createOAuth().showAuthentication(new ShowAuthenticationActionListener(al));
     }
 
     /**
@@ -311,20 +290,10 @@ public class FaceBookAccess {
      * @param faceBookId the object id that we would like to query
      * @param callback   the callback that should be updated when the data arrives
      */
-    public void getFaceBookObject(String faceBookId, final ActionListener callback) throws IOException {
+    public void getFaceBookObject(String faceBookId, final ActionListener<NetworkEvent> callback) throws IOException {
         checkAuthentication();
         final FacebookRESTService con = new FacebookRESTService(token, faceBookId, "", false);
-        con.addResponseListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                if (!con.isAlive()) {
-                    return;
-                }
-                if (callback != null) {
-                    callback.actionPerformed(evt);
-                }
-            }
-        });
+        con.addResponseListener(new GetFaceBookObjectActionListener(con, callback));
         if (slider != null) {
             SliderBridge.bindProgress(con, slider);
         }
@@ -343,22 +312,12 @@ public class FaceBookAccess {
      * @param callback   the callback that should be updated when the data arrives
      * @param needToken  if true authentication is being checked
      */
-    public void getFaceBookObject(String faceBookId, final ActionListener callback, boolean needToken, boolean async) throws IOException {
+    public void getFaceBookObject(String faceBookId, final ActionListener<NetworkEvent> callback, boolean needToken, boolean async) throws IOException {
         if (needToken) {
             checkAuthentication();
         }
         final FacebookRESTService con = new FacebookRESTService(token, faceBookId, "", false);
-        con.addResponseListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                if (!con.isAlive()) {
-                    return;
-                }
-                if (callback != null) {
-                    callback.actionPerformed(evt);
-                }
-            }
-        });
+        con.addResponseListener(new GetFaceBookObjectWithTokenActionListener(con, callback));
         if (slider != null) {
             SliderBridge.bindProgress(con, slider);
         }
@@ -413,24 +372,12 @@ public class FaceBookAccess {
      * @param user     an object to fill with the user details
      * @param callback the callback that should be updated when the data arrives
      */
-    public void getUser(String userId, final User user, final ActionListener callback) throws IOException {
+    public void getUser(String userId, final User user, final ActionListener<NetworkEvent> callback) throws IOException {
         String id = userId;
         if (id == null) {
             id = "me";
         }
-        getFaceBookObject(id, new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();
-                Hashtable t = (Hashtable) v.elementAt(0);
-                if (user != null) {
-                    user.copy(t);
-                }
-                if (callback != null) {
-                    callback.actionPerformed(evt);
-                }
-            }
-        });
+        getFaceBookObject(id, new GetUserActionListener(user, callback));
     }
 
     /**
@@ -447,22 +394,8 @@ public class FaceBookAccess {
         }
         final User user = new User();
         final Vector err = new Vector();
-        addResponseCodeListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                NetworkEvent ne = (NetworkEvent) evt;
-                err.addElement(ne);
-                removeResponseCodeListener(this);
-            }
-        });
-        getFaceBookObject(id, new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();
-                Hashtable t = (Hashtable) v.elementAt(0);
-                user.copy(t);
-            }
-        }, true, false);
+        addResponseCodeListener(new GetUserResponseCodeActionListener(err));
+        getFaceBookObject(id, new GetUserFacebookObjectActionListener(user), true, false);
         if (err.size() > 0) {
             throw new IOException(((NetworkEvent) err.elementAt(0)).getResponseCode() + ": " + ((NetworkEvent) err.elementAt(0)).getMessage());
         }
@@ -480,22 +413,8 @@ public class FaceBookAccess {
     public Page getPage(String pageId) throws IOException {
         final Page page = new Page();
         final Vector err = new Vector();
-        addResponseCodeListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                NetworkEvent ne = (NetworkEvent) evt;
-                err.addElement(ne);
-                removeResponseCodeListener(this);
-            }
-        });
-        getFaceBookObject(pageId, new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();
-                Hashtable t = (Hashtable) v.elementAt(0);
-                page.copy(t);
-            }
-        }, false, false);
+        addResponseCodeListener(new GetPageResponseCodeActionListener(err));
+        getFaceBookObject(pageId, new GetPageActionListener(page), false, false);
         if (err.size() > 0) {
             throw new IOException(((NetworkEvent) err.elementAt(0)).getResponseCode() + ": " + ((NetworkEvent) err.elementAt(0)).getMessage());
         }
@@ -509,26 +428,8 @@ public class FaceBookAccess {
      * @param post     an Object to fill with the data
      * @param callback the callback that should be updated when the data arrives
      */
-    public void getPost(String postId, final Post post, final ActionListener callback) throws IOException {
-        getFaceBookObject(postId, new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                final Object val = ((NetworkEvent) evt).getMetaData();;
-                if(val instanceof Vector) {
-                    final Vector v = (Vector) val;
-                    final Object o = v.elementAt(0);
-                    if(o instanceof Hashtable) {
-                        final Hashtable t = (Hashtable) o;
-                        if (post != null) {
-                            post.copy(t);
-                        }
-                        if (callback != null) {
-                            callback.actionPerformed(evt);
-                        }
-                    }
-                }
-            }
-        });
+    public void getPost(String postId, final Post post, final ActionListener<NetworkEvent> callback) throws IOException {
+        getFaceBookObject(postId, new GetPostActionListener(post, callback));
     }
 
     /**
@@ -543,28 +444,8 @@ public class FaceBookAccess {
     public Post getPost(String postId, boolean needAuth) throws IOException {
         final Post post = new Post();
         final Vector err = new Vector();
-        addResponseCodeListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                NetworkEvent ne = (NetworkEvent) evt;
-                err.addElement(ne);
-                removeResponseCodeListener(this);
-            }
-        });
-        getFaceBookObject(postId, new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                final Object val = ((NetworkEvent) evt).getMetaData();
-                if(val instanceof Vector) {
-                    final Vector v = (Vector) val;
-                    final Object o = v.elementAt(0);
-                    if(o instanceof Hashtable) {
-                        Hashtable t = (Hashtable) o;
-                        post.copy(t);
-                    }
-                }
-            }
-        }, needAuth, false);
+        addResponseCodeListener(new GetPostAuthResponseCodeActionListener(err));
+        getFaceBookObject(postId, new GetPostAuthActionListener(post), needAuth, false);
         if (err.size() > 0) {
             throw new IOException(((NetworkEvent) err.elementAt(0)).getResponseCode() + ": " + ((NetworkEvent) err.elementAt(0)).getMessage());
         }
@@ -578,27 +459,15 @@ public class FaceBookAccess {
      * @param photo    an Object to fill with the data
      * @param callback the callback that should be updated when the data arrives
      */
-    public void getPhoto(String photoId, final Photo photo, final ActionListener callback) throws IOException {
-        getFaceBookObject(photoId, new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();
-                Hashtable t = (Hashtable) v.elementAt(0);
-                if (photo != null) {
-                    photo.copy(t);
-                }
-                if (callback != null) {
-                    callback.actionPerformed(evt);
-                }
-            }
-        });
+    public void getPhoto(String photoId, final Photo photo, final ActionListener<NetworkEvent> callback) throws IOException {
+        getFaceBookObject(photoId, new GetPhotoActionListener(photo, callback));
     }
 
     /**
      * Gets a Photo from a photoId
      * This is a sync method it will block until a response it returned
      *
-     * @param the      photoId
+     * @param photoId the photoId
      * @param needAuth if this object is public needAuth can be false and no
      *                 authentication will be performed
      * @return the Photo requested
@@ -607,22 +476,8 @@ public class FaceBookAccess {
         final Photo photo = new Photo();
         final Vector err = new Vector();
 
-        addResponseCodeListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                NetworkEvent ne = (NetworkEvent) evt;
-                err.addElement(ne);
-                removeResponseCodeListener(this);
-            }
-        });
-        getFaceBookObject(photoId, new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();
-                Hashtable t = (Hashtable) v.elementAt(0);
-                photo.copy(t);
-            }
-        }, needAuth, false);
+        addResponseCodeListener(new GetPhotoAuthResponseCodeActionListener(err));
+        getFaceBookObject(photoId, new GetPhotoAuthActionListener(photo), needAuth, false);
         if (err.size() > 0) {
             throw new IOException(((NetworkEvent) err.elementAt(0)).getResponseCode() + ": " + ((NetworkEvent) err.elementAt(0)).getMessage());
         }
@@ -636,27 +491,15 @@ public class FaceBookAccess {
      * @param album    an Object to fill with the data
      * @param callback the callback that should be updated when the data arrives
      */
-    public void getAlbum(String albumId, final Album album, final ActionListener callback) throws IOException {
-        getFaceBookObject(albumId, new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();
-                Hashtable t = (Hashtable) v.elementAt(0);
-                if (album != null) {
-                    album.copy(t);
-                }
-                if (callback != null) {
-                    callback.actionPerformed(evt);
-                }
-            }
-        });
+    public void getAlbum(String albumId, final Album album, final ActionListener<NetworkEvent> callback) throws IOException {
+        getFaceBookObject(albumId, new GetAlbumActionListener(album, callback));
     }
 
     /**
      * Gets a Album from a albumId
      * This is a sync method it will block until a response it returned
      *
-     * @param the      albumId
+     * @param albumId the albumId
      * @param needAuth if this object is public needAuth can be false and no
      *                 authentication will be performed
      * @return the Album requested
@@ -664,22 +507,13 @@ public class FaceBookAccess {
     public Album getAlbum(String albumId, boolean needAuth) throws IOException {
         final Album album = new Album();
         final Vector err = new Vector();
-        addResponseCodeListener(new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                NetworkEvent ne = (NetworkEvent) evt;
-                err.addElement(ne);
+        addResponseCodeListener(new ActionListener<NetworkEvent>() {
+            public void actionPerformed(NetworkEvent evt) {
+                err.addElement(evt);
                 removeResponseCodeListener(this);
             }
         });
-        getFaceBookObject(albumId, new ActionListener() {
-
-            public void actionPerformed(ActionEvent evt) {
-                Vector v = (Vector) ((NetworkEvent) evt).getMetaData();
-                Hashtable t = (Hashtable) v.elementAt(0);
-                album.copy(t);
-            }
-        }, needAuth, false);
+        getFaceBookObject(albumId, new GetAlbumAuthActionListener(album), needAuth, false);
         if (err.size() > 0) {
             throw new IOException(((NetworkEvent) err.elementAt(0)).getResponseCode() + ": " + ((NetworkEvent) err.elementAt(0)).getMessage());
         }
@@ -1360,4 +1194,299 @@ public class FaceBookAccess {
     }
 
 
+    private static class CreateAuthComponentActionListener implements ActionListener<ActionEvent> {
+
+        private final ActionListener<ActionEvent> al;
+
+        public CreateAuthComponentActionListener(ActionListener<ActionEvent> al) {
+            this.al = al;
+        }
+
+        public void actionPerformed(ActionEvent evt) {
+            if (evt.getSource() instanceof String) {
+                token = (String) evt.getSource();
+            }
+            al.actionPerformed(evt);
+        }
+    }
+
+    private static class ShowAuthenticationActionListener implements ActionListener<ActionEvent> {
+        private final ActionListener<ActionEvent> al;
+
+        public ShowAuthenticationActionListener(ActionListener<ActionEvent> al) {
+            this.al = al;
+        }
+
+        public void actionPerformed(ActionEvent evt) {
+            if (evt.getSource() instanceof String) {
+                token = (String) evt.getSource();
+            }
+            if (evt.getSource() instanceof AccessToken) {
+                AccessToken t = (AccessToken) evt.getSource();
+                token = t.getToken();
+
+            }
+            al.actionPerformed(evt);
+        }
+    }
+
+    private static class GetFaceBookObjectActionListener implements ActionListener<NetworkEvent> {
+        private final FacebookRESTService con;
+        private final ActionListener<NetworkEvent> callback;
+
+        public GetFaceBookObjectActionListener(FacebookRESTService con, ActionListener<NetworkEvent> callback) {
+            this.con = con;
+            this.callback = callback;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            if (!con.isAlive()) {
+                return;
+            }
+            if (callback != null) {
+                callback.actionPerformed(evt);
+            }
+        }
+    }
+
+    private static class GetFaceBookObjectWithTokenActionListener implements ActionListener<NetworkEvent> {
+        private final FacebookRESTService con;
+        private final ActionListener<NetworkEvent> callback;
+
+        public GetFaceBookObjectWithTokenActionListener(FacebookRESTService con, ActionListener<NetworkEvent> callback) {
+            this.con = con;
+            this.callback = callback;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            if (!con.isAlive()) {
+                return;
+            }
+            if (callback != null) {
+                callback.actionPerformed(evt);
+            }
+        }
+    }
+
+    private static class GetUserActionListener implements ActionListener<NetworkEvent> {
+
+        private final User user;
+        private final ActionListener<NetworkEvent> callback;
+
+        public GetUserActionListener(User user, ActionListener<NetworkEvent> callback) {
+            this.user = user;
+            this.callback = callback;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            Vector v = (Vector) ((NetworkEvent) evt).getMetaData();
+            Hashtable t = (Hashtable) v.elementAt(0);
+            if (user != null) {
+                user.copy(t);
+            }
+            if (callback != null) {
+                callback.actionPerformed(evt);
+            }
+        }
+    }
+
+    private static class GetUserFacebookObjectActionListener implements ActionListener<NetworkEvent> {
+
+        private final User user;
+
+        public GetUserFacebookObjectActionListener(User user) {
+            this.user = user;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            Vector v = (Vector) evt.getMetaData();
+            Hashtable t = (Hashtable) v.elementAt(0);
+            user.copy(t);
+        }
+    }
+
+    private static class GetPageActionListener implements ActionListener<NetworkEvent> {
+        private final Page page;
+
+        public GetPageActionListener(Page page) {
+            this.page = page;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            Vector v = (Vector) evt.getMetaData();
+            Hashtable t = (Hashtable) v.elementAt(0);
+            page.copy(t);
+        }
+    }
+
+    private static class GetPostActionListener implements ActionListener<NetworkEvent> {
+        private final Post post;
+        private final ActionListener<NetworkEvent> callback;
+
+        public GetPostActionListener(Post post, ActionListener<NetworkEvent> callback) {
+            this.post = post;
+            this.callback = callback;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            final Object val = evt.getMetaData();;
+            if(val instanceof Vector) {
+                final Vector v = (Vector) val;
+                final Object o = v.elementAt(0);
+                if(o instanceof Hashtable) {
+                    final Hashtable t = (Hashtable) o;
+                    if (post != null) {
+                        post.copy(t);
+                    }
+                    if (callback != null) {
+                        callback.actionPerformed(evt);
+                    }
+                }
+            }
+        }
+    }
+
+    private static class GetPostAuthActionListener implements ActionListener<NetworkEvent> {
+        private final Post post;
+
+        public GetPostAuthActionListener(Post post) {
+            this.post = post;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            final Object val = evt.getMetaData();
+            if(val instanceof Vector) {
+                final Vector v = (Vector) val;
+                final Object o = v.elementAt(0);
+                if(o instanceof Hashtable) {
+                    Hashtable t = (Hashtable) o;
+                    post.copy(t);
+                }
+            }
+        }
+    }
+
+    private static class GetPhotoActionListener implements ActionListener<NetworkEvent> {
+        private final Photo photo;
+        private final ActionListener<NetworkEvent> callback;
+
+        public GetPhotoActionListener(Photo photo, ActionListener<NetworkEvent> callback) {
+            this.photo = photo;
+            this.callback = callback;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            Vector v = (Vector) evt.getMetaData();
+            Hashtable t = (Hashtable) v.elementAt(0);
+            if (photo != null) {
+                photo.copy(t);
+            }
+            if (callback != null) {
+                callback.actionPerformed(evt);
+            }
+        }
+    }
+
+    private static class GetPhotoAuthActionListener implements ActionListener<NetworkEvent> {
+
+        private final Photo photo;
+
+        public GetPhotoAuthActionListener(Photo photo) {
+            this.photo = photo;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            Vector v = (Vector) evt.getMetaData();
+            Hashtable t = (Hashtable) v.elementAt(0);
+            photo.copy(t);
+        }
+    }
+
+    private static class GetAlbumActionListener implements ActionListener<NetworkEvent> {
+        private final Album album;
+        private final ActionListener<NetworkEvent> callback;
+
+        public GetAlbumActionListener(Album album, ActionListener<NetworkEvent> callback) {
+            this.album = album;
+            this.callback = callback;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            Vector v = (Vector) evt.getMetaData();
+            Hashtable t = (Hashtable) v.elementAt(0);
+            if (album != null) {
+                album.copy(t);
+            }
+            if (callback != null) {
+                callback.actionPerformed(evt);
+            }
+        }
+    }
+
+    private static class GetAlbumAuthActionListener implements ActionListener<NetworkEvent> {
+        private final Album album;
+
+        public GetAlbumAuthActionListener(Album album) {
+            this.album = album;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            Vector v = (Vector) evt.getMetaData();
+            Hashtable t = (Hashtable) v.elementAt(0);
+            album.copy(t);
+        }
+    }
+
+    private class GetUserResponseCodeActionListener implements ActionListener<NetworkEvent> {
+
+        private final Vector err;
+
+        public GetUserResponseCodeActionListener(Vector err) {
+            this.err = err;
+        }
+
+        public void actionPerformed(NetworkEvent ne) {
+            err.addElement(ne);
+            removeResponseCodeListener(this);
+        }
+    }
+
+    private class GetPageResponseCodeActionListener implements ActionListener<NetworkEvent> {
+        private final Vector err;
+
+        public GetPageResponseCodeActionListener(Vector err) {
+            this.err = err;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            err.addElement(evt);
+            removeResponseCodeListener(this);
+        }
+    }
+
+    private class GetPostAuthResponseCodeActionListener implements ActionListener<NetworkEvent> {
+        private final Vector err;
+
+        public GetPostAuthResponseCodeActionListener(Vector err) {
+            this.err = err;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            err.addElement(evt);
+            removeResponseCodeListener(this);
+        }
+    }
+
+    private class GetPhotoAuthResponseCodeActionListener implements ActionListener<NetworkEvent> {
+        private final Vector err;
+
+        public GetPhotoAuthResponseCodeActionListener(Vector err) {
+            this.err = err;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            err.addElement(evt);
+            removeResponseCodeListener(this);
+        }
+    }
 }

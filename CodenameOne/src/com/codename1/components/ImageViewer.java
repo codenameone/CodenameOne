@@ -779,7 +779,7 @@ public class ImageViewer extends Component {
      *
      * @param image the image to set
      */
-    public void setImage(Image image) {
+    public final void setImage(Image image) {
         if (this.image != image) {
             panPositionX = 0.5f;
             panPositionY = 0.5f;
