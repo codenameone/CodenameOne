@@ -7252,7 +7252,7 @@ public class Component implements Animation, StyleListener, Editable {
      *
      * @return true if the component is working in a right to left mode
      */
-    public boolean isRTL() {
+    public final boolean isRTL() {
         return rtl;
     }
 
