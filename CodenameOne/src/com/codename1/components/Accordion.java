@@ -81,7 +81,7 @@ public class Accordion extends Container {
                 FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon));
         this.openIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_DOWN, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon));
 
-        setScrollableY(true);
+        super.setScrollableY(true);
     }
 
     /**

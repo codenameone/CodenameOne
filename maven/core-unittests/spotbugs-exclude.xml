@@ -26,6 +26,14 @@
     </Match>
 
     <!--
+    This inspection seems buggy. It highlighted the wrong line in
+    a file that didn't have any visible related problem.
+    -->
+    <Match>
+        <Bug pattern="NM_CONFUSING"/>
+    </Match>
+
+    <!--
     This fails on writing to a static field from a non-static method.
     This is a bad practice in general because it could indicate a state
     that changes across threads. However, in our case, we have many such
@@ -118,13 +126,13 @@
 
     <!-- Excluded classes... -->
 
+    <!-- Badly written 3rd party class -->
+    <Match>
+        <Class name="com.codename1.io.tar.TarEntry" />
+    </Match>
+
     <!-- Deprecated classes that should be excluded from checks -->
     <Match>
         <Class name="~com\.codename1\.db\.ThreadSafeDatabase(\$.*)?" />
-    </Match>
-
-    <!-- Badly written 3rd party classes -->
-    <Match>
-        <Class name="com.codename1.io.tar.TarEntry" />
     </Match>
 </FindBugsFilter>
