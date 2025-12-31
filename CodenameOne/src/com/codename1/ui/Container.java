@@ -387,7 +387,7 @@ public class Container extends Component implements Iterable<Component> {
      * @param cmp the component to add
      * @return this for call chaining
      */
-    public Container add(Component cmp) {
+    public final Container add(Component cmp) {
         addComponent(cmp);
         return this;
     }

@@ -118,7 +118,7 @@ public class ImageViewer extends Component {
     public ImageViewer() {
         setFocusable(true);
         setUIIDFinal("ImageViewer");
-        $(this).selectAllStyles().setBgTransparency(0x0);
+        getAllStyles().setBgTransparency(0x0);
     }
 
     /**

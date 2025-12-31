@@ -36,7 +36,7 @@ import java.util.HashMap;
  *
  * @author Nir Shabi
  */
-public class Command implements ActionListener {
+public class Command implements ActionListener<ActionEvent> {
     private boolean disposesDialog = true;
     private Image icon;
     private char materialIcon;

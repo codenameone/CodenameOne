@@ -43,7 +43,7 @@ import com.codename1.ui.plaf.UIManager;
  *
  * @author Shai Almog
  */
-public class Progress extends Dialog implements ActionListener {
+public class Progress extends Dialog implements ActionListener<NetworkEvent> {
     private final ConnectionRequest request;
     private boolean disposeOnCompletion;
     private boolean autoShow;
@@ -136,18 +136,15 @@ public class Progress extends Dialog implements ActionListener {
     /**
      * {@inheritDoc}
      */
-    public void actionPerformed(ActionEvent evt) {
-        if(evt instanceof NetworkEvent) {
-            NetworkEvent ev = (NetworkEvent) evt;
-            if (ev.getConnectionRequest() == request) {
-                if (disposeOnCompletion && ev.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {
-                    dispose();
-                    return;
-                }
-                if (autoShow && !showing) {
-                    showing = true;
-                    showModeless();
-                }
+    public void actionPerformed(NetworkEvent ev) {
+        if (ev.getConnectionRequest() == request) {
+            if (disposeOnCompletion && ev.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {
+                dispose();
+                return;
+            }
+            if (autoShow && !showing) {
+                showing = true;
+                showModeless();
             }
         }
     }
