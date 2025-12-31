@@ -366,7 +366,7 @@ public class UIManager {
      * @param id the component id whose style we want
      * @return the appropriate style (this method never returns null)
      */
-    public Style getComponentStyle(String id) {
+    public final Style getComponentStyle(String id) {
         return getComponentStyleImpl(id, false, "");
     }
 
@@ -1458,7 +1458,7 @@ public class UIManager {
      * @param def          default value
      * @return the value of the constant or the default if the constant isn't in the theme
      */
-    public String getThemeConstant(String constantName, String def) {
+    public final String getThemeConstant(String constantName, String def) {
         String v = (String) themeConstants.get(constantName);
         if (v != null) {
             return v;
@@ -2146,7 +2146,8 @@ public class UIManager {
      * @param defaultValue the value returned if no such key exists
      * @return either default value or the appropriate value
      */
-    public String localize(String key, String defaultValue) {
+    public final String localize(String key, String defaultValue) {
+        onLocalize(key, defaultValue);
         if (bundle != null && key != null) {
             Object o = bundle.get(key);
             if (o != null) {
@@ -2154,6 +2155,15 @@ public class UIManager {
             }
         }
         return defaultValue;
+    }
+
+    /**
+     * Callback for subclasses that wish to track localization invocations.
+     *
+     * @param key          The key used to lookup in the resource bundle
+     * @param defaultValue the value returned if no such key exists
+     */
+    protected void onLocalize(String key, String defaultValue) {
     }
 
     /**

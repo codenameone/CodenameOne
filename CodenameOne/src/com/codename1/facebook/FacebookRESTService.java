@@ -50,9 +50,6 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     public static final String GRAPH_URL = "https://graph.facebook.com/";
     public static String PICTURE = "picture";
     public static String FRIENDS = "friends";
-    public static String TAGGED = "tagged";
-    public static String ACTIVITIES = "activities";
-    public static String INTERESTS = "interests";
     public static String LIKES = "likes";
     public static String ALBUMS = "albums";
     public static String PHOTOS = "photos";
@@ -61,7 +58,6 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     public static String FEED = "feed";
     public static String POSTS = "posts";
     public static String INBOX = "inbox";
-    public static String MESSAGES = "messages";
     public static String EVENTS = "events";
     public static String NOTES = "notes";
     private final Hashtable entry = new Hashtable();
@@ -72,10 +68,6 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     private int responseOffset = -1;
     private String imageKey;
     private String root;
-
-    public FacebookRESTService(boolean post, String token) {
-        setPost(post);
-    }
 
     public FacebookRESTService(String token, String id, String connectionType, boolean post) {
         setPost(post);
@@ -133,14 +125,6 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
         if (stack.size() > 0) {
             fireResponseListener(new NetworkEvent(this, stack.elementAt(0)));
         }
-    }
-
-    protected String getConnectionType() {
-        return connectionType;
-    }
-
-    protected void setConnectionType(String connectionType) {
-        this.connectionType = connectionType;
     }
 
     public void startBlock(String block) {
@@ -279,34 +263,6 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
 
     protected int getYield() {
         return -1;
-    }
-
-    /**
-     * @return the responseOffset
-     */
-    public int getResponseOffset() {
-        return responseOffset;
-    }
-
-    /**
-     * @param responseOffset the responseOffset to set
-     */
-    public void setResponseOffset(int responseOffset) {
-        this.responseOffset = responseOffset;
-    }
-
-    /**
-     * @return the imageKey
-     */
-    public String getImageKey() {
-        return imageKey;
-    }
-
-    /**
-     * @param imageKey the imageKey to set
-     */
-    public void setImageKey(String imageKey) {
-        this.imageKey = imageKey;
     }
 
     /**

@@ -989,7 +989,7 @@ public abstract class CodenameOneImplementation {
 
             paintQueue[paintQueueFill] = cmp;
             paintQueueFill++;
-            displayLock.notify();
+            displayLock.notifyAll();
         }
     }
 
@@ -5759,7 +5759,7 @@ public abstract class CodenameOneImplementation {
         return null;
     }
 
-    public void captureAudio(final com.codename1.ui.events.ActionListener response) {
+    public void captureAudio(final ActionListener<ActionEvent> response) {
         captureAudio(new MediaRecorderBuilder()
                 .path(new com.codename1.io.File("tmpaudio.wav").getAbsolutePath())
                 .mimeType("audio/wav"), response);
@@ -5805,7 +5805,7 @@ public abstract class CodenameOneImplementation {
      * @param response callback for the resulting data
      */
 
-    public void captureAudio(final MediaRecorderBuilder recordingOptions, final com.codename1.ui.events.ActionListener response) {
+    public void captureAudio(final MediaRecorderBuilder recordingOptions, final ActionListener<ActionEvent> response) {
         final MediaRecorderBuilder builder = recordingOptions == null ? new MediaRecorderBuilder() : recordingOptions;
         if (!builder.isRedirectToAudioBuffer() && builder.getPath() == null) {
             builder.path(new com.codename1.io.File("tmpaudio.wav").getAbsolutePath());
@@ -5813,76 +5813,12 @@ public abstract class CodenameOneImplementation {
         if (!builder.isRedirectToAudioBuffer() && builder.getMimeType() == null) {
             builder.mimeType("audio/wav");
         }
-        System.out.println("in captureAudio " + builder.isRedirectToAudioBuffer());
         final AudioRecorderComponent cmp = new AudioRecorderComponent(builder);
         final Sheet sheet = new Sheet(null, "Record Audio");
         sheet.getContentPane().setLayout(new com.codename1.ui.layouts.BorderLayout());
         sheet.getContentPane().add(com.codename1.ui.layouts.BorderLayout.CENTER, cmp);
-        cmp.addActionListener(new com.codename1.ui.events.ActionListener() {
-            @Override
-            public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
-                switch (cmp.getState()) {
-                    case Accepted:
-                        CN.getCurrentForm().getAnimationManager().flushAnimation(new Runnable() {
-                            public void run() {
-                                sheet.back();
-                                sheet.addCloseListener(new ActionListener() {
-                                    @Override
-                                    public void actionPerformed(ActionEvent evt) {
-                                        sheet.removeCloseListener(this);
-                                        response.actionPerformed(new com.codename1.ui.events.ActionEvent(builder.getPath()));
-                                    }
-
-                                });
-                            }
-                        });
-
-
-                        break;
-                    case Canceled:
-                        FileSystemStorage fs = FileSystemStorage.getInstance();
-                        if (fs.exists(builder.getPath())) {
-                            FileSystemStorage.getInstance().delete(builder.getPath());
-                        }
-                        CN.getCurrentForm().getAnimationManager().flushAnimation(new Runnable() {
-                            public void run() {
-                                sheet.back();
-                                sheet.addCloseListener(new ActionListener() {
-                                    @Override
-                                    public void actionPerformed(ActionEvent evt) {
-                                        sheet.removeCloseListener(this);
-                                        response.actionPerformed(new com.codename1.ui.events.ActionEvent(null));
-                                    }
-
-                                });
-                            }
-                        });
-
-
-                        break;
-                    default:
-                        break;
-                }
-            }
-
-        });
-        sheet.addCloseListener(new com.codename1.ui.events.ActionListener() {
-            @Override
-            public void actionPerformed(com.codename1.ui.events.ActionEvent e) {
-                if (cmp.getState() != AudioRecorderComponent.RecorderState.Accepted && cmp.getState() != AudioRecorderComponent.RecorderState.Canceled) {
-                    FileSystemStorage fs = FileSystemStorage.getInstance();
-                    if (fs.exists(builder.getPath())) {
-                        FileSystemStorage.getInstance().delete(builder.getPath());
-                    }
-                    CN.getCurrentForm().getAnimationManager().flushAnimation(new Runnable() {
-                        public void run() {
-                            response.actionPerformed(new com.codename1.ui.events.ActionEvent(null));
-                        }
-                    });
-                }
-            }
-
-        });
+        cmp.addActionListener(new CaptureAudioActionListener(cmp, sheet, response, builder));
+        sheet.addCloseListener(new CaptureAudioCloseActionListener(cmp, builder, response));
         sheet.show();
         //capture(response, new String[] {"wav", "mp3", "aac"}, "*.wav;*.mp3;*.aac");
     }
@@ -7289,10 +7225,9 @@ public abstract class CodenameOneImplementation {
      * @param freq the frequency in milliseconds
      */
     public void setPollingFrequency(int freq) {
-        // PMD Fix (UnusedPrivateField): Removed obsolete pollingMillis state; method now only triggers listener wake-up.
         if (callback != null && pollingThreadRunning) {
             synchronized (callback) {
-                callback.notify();
+                callback.notifyAll();
             }
         }
     }

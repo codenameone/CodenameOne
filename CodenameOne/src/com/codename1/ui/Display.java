@@ -3989,7 +3989,7 @@ public final class Display extends CN1Constants {
      * @param response a callback Object to retrieve the file path
      * @throws RuntimeException if this feature failed or unsupported on the platform
      */
-    public void captureAudio(ActionListener response) {
+    public void captureAudio(ActionListener<ActionEvent> response) {
         impl.captureAudio(response);
     }
 
