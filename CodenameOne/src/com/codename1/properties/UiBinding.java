@@ -678,7 +678,9 @@ public class UiBinding {
             if (cmp instanceof CheckBox) {
                 ((CheckBox) cmp).setSelected((Boolean) toComponentType.convert(value));
             } else {
-                ((RadioButton) cmp).setSelected((Boolean) toComponentType.convert(value));
+                if(cmp instanceof RadioButton) {
+                    ((RadioButton) cmp).setSelected((Boolean) toComponentType.convert(value));
+                }
             }
         }
 

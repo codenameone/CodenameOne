@@ -30,15 +30,11 @@ class CacheProviderProxy extends MapProvider {
 
     private final MapProvider provider;
     private final WeakHashMap _cache;
-    private int _time;
-    private int _maxSize;
 
     CacheProviderProxy(MapProvider provider) {
         super(provider.projection(), provider.tileSize());
         this.provider = provider;
         _cache = new WeakHashMap();
-        _time = 0;
-        _maxSize = 100;
     }
 
     public int maxZoomLevel() {
@@ -70,34 +66,28 @@ class CacheProviderProxy extends MapProvider {
     }
 
     protected Tile get(BoundingBox bbox) {
-        _time += 1;
         Object o = _cache.get(bbox);
         if (o == null) {
             return null;
         }
-        AgeableTile tile = (AgeableTile) o;
-        tile.age = _time;
-        return tile;
+        return (Tile) o;
     }
 
     protected void put(BoundingBox bbox, Tile tile) {
-        _cache.put(bbox, new AgeableTile(tile, _time));
+        _cache.put(bbox, new AgeableTile(tile));
     }
 
     public void clearCache() {
-        _maxSize = 6;
         _cache.clear();
     }
 
     static class AgeableTile extends Tile {
 
-        public int age;
         private final Tile tile;
 
-        public AgeableTile(Tile tile, int time) {
+        public AgeableTile(Tile tile) {
             super(tile.dimension(), tile.getBoundingBox(), null);
             this.tile = tile;
-            this.age = time;
         }
 
         public boolean paint(Graphics g) {
