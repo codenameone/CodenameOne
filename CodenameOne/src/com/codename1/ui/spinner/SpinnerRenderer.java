@@ -119,7 +119,7 @@ class SpinnerRenderer<T> extends DefaultListCellRenderer<T> {
                 }
             }
         }
-        Character chr = new Character(c);
+        Character chr = c;
         Image i = imageCache[perspective].get(chr);
         if (i == null) {
             //UIManager.getInstance().getLookAndFeel().setFG(g, this);

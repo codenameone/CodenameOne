@@ -21,6 +21,9 @@
     <Match>
         <Bug pattern="BC_UNCONFIRMED_CAST"/>
     </Match>
+    <Match>
+        <Bug pattern="BC_UNCONFIRMED_CAST_OF_RETURN_VALUE"/>
+    </Match>
 
     <!--
     This fails on writing to a static field from a non-static method.
@@ -106,10 +109,10 @@
     </Match>
 
     <!--
-    This is pretty niche behavior of a class we mostly added for porting/compatibility.
+    GroupLayout is pretty niche behavior of a class we mostly added for porting/compatibility.
     -->
     <Match>
-        <Class name="com.codename1.ui.layouts.GroupLayout" />
+        <Class name="~com\.codename1\.ui\.layouts\.GroupLayout(\$.*)?" />
         <Bug pattern="EQ_COMPARETO_USE_OBJECT_EQUALS" />
     </Match>
 
