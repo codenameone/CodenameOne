@@ -40,7 +40,7 @@ public class RadioButtonList extends ButtonList {
     /**
      * Change listener added to individual radio buttons to keep them in sync with the model.
      */
-    private final ActionListener changeListener = new ActionListener() {
+    private final ActionListener<ActionEvent> changeListener = new ActionListener<ActionEvent>() {
         @Override
         public void actionPerformed(ActionEvent evt) {
             if (evt.getSource() instanceof RadioButton && contains((Component) evt.getSource())) {
@@ -61,20 +61,9 @@ public class RadioButtonList extends ButtonList {
      * @param model The model that defines the options that the user can choose between.
      */
     public RadioButtonList(ListModel model) {
-        super(model);
+        super(model, false);
         fireReady();
     }
-
-    /**
-     * Returns false for RadioButtonList since only one radio button can be selected at a time.
-     *
-     * @return
-     */
-    @Override
-    public boolean isAllowMultipleSelection() {
-        return false;
-    }
-
 
     @Override
     protected Component createButton(Object model) {

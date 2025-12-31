@@ -1204,7 +1204,7 @@ public class Form extends Container {
      *
      * @return the number of softbuttons
      */
-    public int getSoftButtonCount() {
+    public final int getSoftButtonCount() {
         return menuBar.getSoftButtons().length;
     }
 

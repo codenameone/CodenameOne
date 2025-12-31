@@ -17,12 +17,6 @@ class CheckBoxListTest extends UITestBase {
         assertEquals(3, list.getComponentCount());
     }
 
-    @FormTest
-    void testIsAllowMultipleSelectionReturnsTrue() {
-        DefaultListModel<String> model = new DefaultListModel<>("One");
-        CheckBoxList list = new CheckBoxList(model);
-        assertTrue(list.isAllowMultipleSelection());
-    }
 
     @FormTest
     void testCreateButtonCreatesCheckBox() {

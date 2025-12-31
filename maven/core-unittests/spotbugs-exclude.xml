@@ -26,6 +26,13 @@
     </Match>
 
     <!--
+    We don't support the locale sensitive version of case conversion.
+    -->
+    <Match>
+        <Bug pattern="DM_CONVERT_CASE"/>
+    </Match>
+
+    <!--
     This inspection seems buggy. It highlighted the wrong line in
     a file that didn't have any visible related problem.
     -->

@@ -795,7 +795,6 @@ def main() -> None:
             "BC_UNCONFIRMED_CAST_OF_RETURN_VALUE",
             "CN_IDIOM_NO_SUPER_CALL",
             "DM_BOOLEAN_CTOR",
-            "DM_CONVERT_CASE",
             "DM_EXIT",
             "EI_EXPOSE_REP",
             "EI_EXPOSE_REP2",

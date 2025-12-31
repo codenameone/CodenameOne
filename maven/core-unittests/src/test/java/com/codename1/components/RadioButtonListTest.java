@@ -18,13 +18,6 @@ class RadioButtonListTest extends UITestBase {
     }
 
     @FormTest
-    void testIsAllowMultipleSelectionReturnsFalse() {
-        DefaultListModel<String> model = new DefaultListModel<>("One");
-        RadioButtonList list = new RadioButtonList(model);
-        assertFalse(list.isAllowMultipleSelection());
-    }
-
-    @FormTest
     void testCreateButtonCreatesRadioButton() {
         DefaultListModel<String> model = new DefaultListModel<>("Test");
         RadioButtonList list = new RadioButtonList(model);

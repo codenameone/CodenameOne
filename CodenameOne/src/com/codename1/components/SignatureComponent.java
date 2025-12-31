@@ -85,7 +85,7 @@ import com.codename1.ui.util.EventDispatcher;
  * @author shannah
  * @since 3.4
  */
-public class SignatureComponent extends Container implements ActionSource {
+public class SignatureComponent extends Container implements ActionSource<ActionEvent> {
 
     private final SignaturePanel signaturePanel = new SignaturePanel();
     private final Button lead;
@@ -152,7 +152,7 @@ public class SignatureComponent extends Container implements ActionSource {
         };
         lead.setText(localize("SignatureComponent.LeadText", "Press to sign"));
         lead.setUIID("SignatureButton");
-        lead.addActionListener(new ActionListener() {
+        lead.addActionListener(new ActionListener<ActionEvent>() {
             public void actionPerformed(ActionEvent evt) {
                 final Dialog dialog = new Dialog(localize("SignatureComponent.DialogTitle", "Sign Here"));
                 final SignatureDialogBody sigBody = new SignatureDialogBody() {
@@ -164,7 +164,7 @@ public class SignatureComponent extends Container implements ActionSource {
                 };
                 signaturePanel.clear();
 
-                sigBody.addActionListener(new ActionListener() {
+                sigBody.addActionListener(new ActionListener<ActionEvent>() {
                     public void actionPerformed(ActionEvent sigDoneEvent) {
                         dialog.dispose();
                         setSignatureImage(sigBody.getValue());
@@ -179,7 +179,7 @@ public class SignatureComponent extends Container implements ActionSource {
                 dialog.show();
             }
         });
-        addComponent(BorderLayout.CENTER, lead);
+        super.addComponent(BorderLayout.CENTER, lead);
     }
 
     /**
@@ -208,7 +208,7 @@ public class SignatureComponent extends Container implements ActionSource {
      *
      * @param l
      */
-    public void addActionListener(ActionListener l) {
+    public void addActionListener(ActionListener<ActionEvent> l) {
         eventDispatcher.addListener(l);
     }
 
@@ -217,7 +217,7 @@ public class SignatureComponent extends Container implements ActionSource {
      *
      * @param l
      */
-    public void removeActionListener(ActionListener l) {
+    public void removeActionListener(ActionListener<ActionEvent> l) {
         eventDispatcher.removeListener(l);
     }
 
@@ -331,25 +331,22 @@ public class SignatureComponent extends Container implements ActionSource {
      */
     private class SignatureDialogBody extends Container {
         private final EventDispatcher eventDispatcher = new EventDispatcher();
-        private final Button doneButton;
-        private final Button resetButton;
-        private final Button cancelButton;
         private Image value;
 
         public SignatureDialogBody() {
             setLayout(new BorderLayout());
-            addComponent(BorderLayout.CENTER, signaturePanel);
-            doneButton = new Button(
+            super.addComponent(BorderLayout.CENTER, signaturePanel);
+            Button doneButton = new Button(
                     localize("SignatureComponent.SaveButtonLabel", "Save"),
                     getUIManager().getThemeConstant("sigButtonOKUIID", "Button"));
-            resetButton = new Button(
+            Button resetButton = new Button(
                     localize("SignatureComponent.ResetButtonLabel", "Reset"),
                     getUIManager().getThemeConstant("sigButtonResetUIID", "Button"));
-            cancelButton = new Button(
+            Button cancelButton = new Button(
                     localize("SignatureComponent.CancelButtonLabel", "Cancel"),
                     getUIManager().getThemeConstant("sigButtonCancelUIID", "Button"));
 
-            doneButton.addActionListener(new ActionListener() {
+            doneButton.addActionListener(new ActionListener<ActionEvent>() {
                 public void actionPerformed(ActionEvent evt) {
                     value = signaturePanel.getImage();
                     if (value == null) {
@@ -366,7 +363,7 @@ public class SignatureComponent extends Container implements ActionSource {
                 }
             });
 
-            resetButton.addActionListener(new ActionListener() {
+            resetButton.addActionListener(new ActionListener<ActionEvent>() {
                 public void actionPerformed(ActionEvent evt) {
                     signaturePanel.clear();
                     onSignatureReset();
@@ -374,14 +371,14 @@ public class SignatureComponent extends Container implements ActionSource {
                 }
             });
 
-            cancelButton.addActionListener(new ActionListener() {
+            cancelButton.addActionListener(new ActionListener<ActionEvent>() {
                 public void actionPerformed(ActionEvent evt) {
                     removeComponent(signaturePanel);
                     onCancel();
                 }
             });
 
-            addComponent(BorderLayout.SOUTH, GridLayout.encloseIn(3, cancelButton, resetButton, doneButton));
+            super.addComponent(BorderLayout.SOUTH, GridLayout.encloseIn(3, cancelButton, resetButton, doneButton));
         }
 
         /**

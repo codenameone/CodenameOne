@@ -99,14 +99,17 @@ public abstract class ButtonList extends Container implements DataChangedListene
     private final java.util.List<Runnable> onReady = new ArrayList<Runnable>();
     private String cellUIID;
     private java.util.List<Decorator> decorators;
+    private final boolean allowMultipleSelection;
 
     /**
      * Creates a new ButtonList.
      *
      * @param model The options.  Each will be represented by a button.
+     * @param allowMultipleSelection indicates that multiple selection is allowed or not
      */
-    public ButtonList(ListModel model) {
-        if (model instanceof DefaultListModel && isAllowMultipleSelection()) {
+    protected ButtonList(ListModel model, boolean allowMultipleSelection) {
+        this.allowMultipleSelection = allowMultipleSelection;
+        if (model instanceof DefaultListModel && allowMultipleSelection) {
             ((DefaultListModel) model).setMultiSelectionMode(true);
         }
         setModel(model);
@@ -183,14 +186,6 @@ public abstract class ButtonList extends Container implements DataChangedListene
     }
 
     /**
-     * Returns true for lists that allow multiple selection.  {@link CheckBoxList}, and {@link SwitchList} support multiple selection.
-     * {@link RadioButtonList} does not.
-     *
-     * @return
-     */
-    public abstract boolean isAllowMultipleSelection();
-
-    /**
      * Creates a new button for this list. Should be implemented by subclasses to create the correct kind of button.
      *
      * @param model
@@ -237,7 +232,7 @@ public abstract class ButtonList extends Container implements DataChangedListene
         int len = model.getSize();
         for (int i = 0; i < len; i++) {
             Component b = createComponent(model.getItemAt(i));
-            if (isAllowMultipleSelection()) {
+            if (allowMultipleSelection) {
                 if (Arrays.binarySearch(selectedIndices, i) >= 0) {
                     setSelected(b, true);
                 }
@@ -328,7 +323,7 @@ public abstract class ButtonList extends Container implements DataChangedListene
     // Called when the selection is changed in the model
     @Override
     public void selectionChanged(int oldSelected, int newSelected) {
-        if (isAllowMultipleSelection()) {
+        if (allowMultipleSelection) {
             if (oldSelected < 0 && newSelected >= 0) {
                 Component cmp = newSelected < getComponentCount() ? getComponentAt(newSelected) : null;
                 if (cmp != null) {

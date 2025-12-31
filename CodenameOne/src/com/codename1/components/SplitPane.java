@@ -208,7 +208,7 @@ public class SplitPane extends Container {
         divider = new Divider();
         add(this.topOrLeft).add(this.bottomOrRight).add(divider);
 
-        LayeredLayout l = (LayeredLayout) getLayout();
+        LayeredLayout l = (LayeredLayout) super.getLayout();
         this.preferredInset = initDividerInset(l.createConstraint(), preferredInset);
         this.minInset = initDividerInset(l.createConstraint(), minInset);
         this.maxInset = initDividerInset(l.createConstraint(), maxInset);
@@ -217,22 +217,13 @@ public class SplitPane extends Container {
                 .setInsets(this.topOrLeft, "0 0 0 0");
         this.preferredInset.copyTo(l.getOrCreateConstraint(divider));
 
-        switch (orientation) {
-            case HORIZONTAL_SPLIT: {
-                l.setReferenceComponentRight(this.topOrLeft, divider, 1f);
-                l.setReferenceComponentLeft(this.bottomOrRight, divider, 1f);
-                break;
-            }
-
-            default: {
-                l.setReferenceComponentBottom(this.topOrLeft, divider, 1f);
-                l.setReferenceComponentTop(this.bottomOrRight, divider, 1f);
-                break;
-            }
-
+        if (orientation == HORIZONTAL_SPLIT) {
+            l.setReferenceComponentRight(this.topOrLeft, divider, 1f);
+            l.setReferenceComponentLeft(this.bottomOrRight, divider, 1f);
+        } else {
+            l.setReferenceComponentBottom(this.topOrLeft, divider, 1f);
+            l.setReferenceComponentTop(this.bottomOrRight, divider, 1f);
         }
-
-
     }
 
     /**

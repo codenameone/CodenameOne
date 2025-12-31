@@ -20,11 +20,6 @@ class SwitchListTest extends UITestBase {
         implementation.setBuiltinSoundsEnabled(false);
     }
 
-    @Test
-    void testAllowMultipleSelection() {
-        SwitchList list = new SwitchList(new DefaultListModel<>("One", "Two"));
-        assertTrue(list.isAllowMultipleSelection());
-    }
 
     @FormTest
     void testCreateButtonContainsSwitchAndLabel() {

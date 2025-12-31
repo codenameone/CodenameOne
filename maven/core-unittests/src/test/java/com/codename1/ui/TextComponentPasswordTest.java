@@ -18,8 +18,8 @@ class TextComponentPasswordTest extends UITestBase {
 
     private void triggerAction(Button action) {
         @SuppressWarnings("unchecked")
-        Vector<ActionListener> listeners = action.getActionListeners();
-        for (ActionListener listener : listeners) {
+        Vector<ActionListener<ActionEvent>> listeners = action.getActionListeners();
+        for (ActionListener<ActionEvent> listener : listeners) {
             listener.actionPerformed(new ActionEvent(action));
         }
     }
