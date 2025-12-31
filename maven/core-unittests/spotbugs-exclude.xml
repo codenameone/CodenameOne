@@ -113,13 +113,15 @@
         <Bug pattern="EQ_COMPARETO_USE_OBJECT_EQUALS" />
     </Match>
 
+    <!-- Excluded classes... -->
+
     <!-- Deprecated classes that should be excluded from checks -->
     <Match>
-        <Class name="com.codename1.db.ThreadSafeDatabase" />
+        <Class name="~com\.codename1\.db\.ThreadSafeDatabase(\$.*)?" />
     </Match>
 
     <!-- Badly written 3rd party classes -->
     <Match>
-        <Class name="com.codename1.io.tar.TarEntry" />
+        <Class name="~com\.codename1\.io\.tar\.TarEntry(\$.*)?" />
     </Match>
 </FindBugsFilter>
