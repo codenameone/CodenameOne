@@ -23,7 +23,6 @@
  */
 package com.codename1.ui.list;
 
-import com.codename1.cloud.CloudObject;
 import com.codename1.ui.Button;
 import com.codename1.ui.CheckBox;
 import com.codename1.ui.Command;
@@ -328,34 +327,8 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                     entries[iter].setFocus(lead || entries[iter].isFocusable());
                 }
             } else {
-                if (value instanceof CloudObject) {
-                    CloudObject h = (CloudObject) value;
-                    Boolean enabled = h.getBoolean(ENABLED);
-                    if (enabled != null) {
-                        cmp.setEnabled(enabled.booleanValue());
-                    }
-                    int elen = entries.length;
-                    for (int iter = 0; iter < elen; iter++) {
-                        String currentName = entries[iter].getName();
-
-                        Object val;
-                        if (currentName.equals("$number")) {
-                            val = "" + (index + 1);
-                        } else {
-                            // a selected entry might differ in its value to allow for
-                            // behavior such as rollover images
-                            val = h.getObject("#" + currentName);
-                            if (val == null) {
-                                val = h.getObject(currentName);
-                            }
-                        }
-                        setComponentValueWithTickering(entries[iter], val, list, cmp);
-                        entries[iter].setFocus(entries[iter].isFocusable());
-                    }
-                } else {
-                    setComponentValueWithTickering(entries[0], value, list, cmp);
-                    entries[0].setFocus(entries[0].isFocusable());
-                }
+                setComponentValueWithTickering(entries[0], value, list, cmp);
+                entries[0].setFocus(entries[0].isFocusable());
             }
             return cmp;
         } else {
@@ -389,25 +362,8 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                     setComponentValue(entries[iter], val, list, cmp);
                 }
             } else {
-                if (value instanceof CloudObject) {
-                    CloudObject h = (CloudObject) value;
-                    Boolean enabled = h.getBoolean(ENABLED);
-                    if (enabled != null) {
-                        cmp.setEnabled(enabled.booleanValue());
-                    }
-                    int elen = entries.length;
-                    for (int iter = 0; iter < elen; iter++) {
-                        String currentName = entries[iter].getName();
-                        if (currentName.equals("$number")) {
-                            setComponentValue(entries[iter], "" + (index + 1), list, cmp);
-                            continue;
-                        }
-                        setComponentValue(entries[iter], h.getObject(currentName), list, cmp);
-                    }
-                } else {
-                    if (entries.length > 0) {
-                        setComponentValue(entries[0], value, list, cmp);
-                    }
+                if (entries.length > 0) {
+                    setComponentValue(entries[0], value, list, cmp);
                 }
             }
             return cmp;

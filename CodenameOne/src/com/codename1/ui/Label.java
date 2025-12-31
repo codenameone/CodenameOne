@@ -1221,6 +1221,7 @@ public class Label extends Component implements IconHolder, TextHolder {
 
     /**
      * {@inheritDoc}
+     * @deprecated uses the deprecated BindTarget interface
      */
     public void bindProperty(String prop, BindTarget target) {
         if (prop.equals("text")) {
@@ -1235,6 +1236,7 @@ public class Label extends Component implements IconHolder, TextHolder {
 
     /**
      * {@inheritDoc}
+     * @deprecated uses the deprecated BindTarget interface
      */
     public void unbindProperty(String prop, BindTarget target) {
         if (prop.equals("text")) {
