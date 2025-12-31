@@ -222,6 +222,15 @@ for test in "${TEST_NAMES[@]}"; do
   fi
 done
 
+# Harvest test results for quality report
+TEST_RESULTS_DIR="$GRADLE_PROJECT_DIR/app/build/test-results/connectedDebugAndroidTest"
+DEST_TEST_DIR="$ARTIFACTS_DIR/android-coverage-report/surefire-reports"
+if [ -d "$TEST_RESULTS_DIR" ]; then
+  ensure_dir "$DEST_TEST_DIR"
+  cp "$TEST_RESULTS_DIR"/*.xml "$DEST_TEST_DIR/" 2>/dev/null || true
+  ra_log "Copied test results to $DEST_TEST_DIR"
+fi
+
 # ---- Compare against stored references ------------------------------------
 
 COMPARE_ENTRIES=()

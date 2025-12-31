@@ -239,6 +239,14 @@ json.dump(data, summary_path.open("w", encoding="utf-8"), indent=2)
 PY
 
 cov_log "Copied Jacoco coverage report to $REPORT_DEST_DIR"
+
+# Prepare layout for generate-quality-report.py
+# It expects site/jacoco/jacoco.xml
+mkdir -p "$REPORT_DEST_DIR/site/jacoco"
+if [ -f "$REPORT_XML_PATH" ]; then
+  cp "$REPORT_XML_PATH" "$REPORT_DEST_DIR/site/jacoco/jacoco.xml"
+fi
+
 if [ -f "$SUMMARY_OUT" ]; then
   cov_log "Wrote coverage summary to $SUMMARY_OUT"
 fi

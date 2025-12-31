@@ -162,15 +162,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
           compression-level: 6
-      - name: Prepare coverage for quality report
-        if: ${{ always() && matrix.id == 'default' }}
-        run: |
-          mkdir -p artifacts/android-coverage-report/site/jacoco
-          if [ -f artifacts/android-coverage-report/jacocoAndroidReport.xml ]; then
-            cp artifacts/android-coverage-report/jacocoAndroidReport.xml artifacts/android-coverage-report/site/jacoco/jacoco.xml
-          else
-            echo "No coverage XML found at expected path."
-          fi
       - name: Generate quality report summary
         if: ${{ always() && matrix.id == 'default' }}
         env:

@@ -701,9 +701,8 @@ def build_report(
     )
     lines.extend([
         "",
-        "### Static Analysis",
     ])
-    for block in (
+    static_analysis_blocks = [
         format_spotbugs(
             spotbugs,
             html_urls.get("spotbugs"),
@@ -724,8 +723,19 @@ def build_report(
             archive_urls.get("checkstyle"),
             blob_base,
         ),
-    ):
-        lines.extend(block)
+    ]
+
+    has_findings = False
+    for block in static_analysis_blocks:
+        if block:
+            has_findings = True
+            break
+
+    if has_findings:
+        lines.append("### Static Analysis")
+        for block in static_analysis_blocks:
+            lines.extend(block)
+
     lines.extend(
         [
             "",
