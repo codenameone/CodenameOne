@@ -134,4 +134,26 @@ fi
 run_maven -q -f maven/pom.xml -pl android -am -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -Djava.awt.headless=true clean install "$@"
 
 log "Running Spotless verification..."
-JAVA_HOME="$JAVA17_HOME" run_maven -q -f maven/pom.xml -pl android -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries -Djava.awt.headless=true com.diffplug.spotless:spotless-maven-plugin:check
+ARTIFACTS_DIR="${ARTIFACTS_DIR:-../artifacts}"
+mkdir -p "$ARTIFACTS_DIR" || true
+SPOTLESS_REPORT="$ARTIFACTS_DIR/spotless-report.md"
+SPOTLESS_LOG="$ARTIFACTS_DIR/spotless.log"
+
+if JAVA_HOME="$JAVA17_HOME" run_maven -e -f maven/pom.xml -pl android -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries -Djava.awt.headless=true com.diffplug.spotless:spotless-maven-plugin:check > "$SPOTLESS_LOG" 2>&1; then
+  echo "✅ **Spotless:** Passed" > "$SPOTLESS_REPORT"
+else
+  log "Spotless check failed. See artifacts/spotless.log"
+  {
+    echo "❌ **Spotless:** Failed"
+    echo ""
+    echo "<details><summary>Spotless Failure Log</summary>"
+    echo ""
+    echo "\`\`\`"
+    tail -n 20 "$SPOTLESS_LOG"
+    echo "\`\`\`"
+    echo ""
+    echo "</details>"
+  } > "$SPOTLESS_REPORT"
+  # Signal failure but continue to ensure reporting happens
+  touch "$ARTIFACTS_DIR/build_failed.txt"
+fi

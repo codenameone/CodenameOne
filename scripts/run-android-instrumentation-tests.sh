@@ -252,6 +252,7 @@ export CN1SS_COVERAGE_SUMMARY="$COVERAGE_SUMMARY"
 if [ -n "${ANDROID_COVERAGE_HTML_URL:-}" ]; then
     export CN1SS_COVERAGE_HTML_URL="${ANDROID_COVERAGE_HTML_URL}"
 fi
+export CN1SS_EXTRA_MARKDOWN_FILE="$ARTIFACTS_DIR/spotless-report.md"
 
 cn1ss_process_and_report \
   "Android screenshot updates" \
@@ -267,5 +268,10 @@ comment_rc=$?
 # Copy useful artifacts for GH Actions
 cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner-logcat.txt" 2>/dev/null || true
 [ -n "${TEST_EXEC_LOG:-}" ] && cp -f "$TEST_EXEC_LOG" "$ARTIFACTS_DIR/test-results.log" 2>/dev/null || true
+
+if [ -f "$ARTIFACTS_DIR/build_failed.txt" ]; then
+  ra_log "FATAL: Build failed in a previous step (see artifacts)"
+  exit 1
+fi
 
 exit $comment_rc

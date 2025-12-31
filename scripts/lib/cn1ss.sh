@@ -410,6 +410,14 @@ cn1ss_process_and_report() {
     cp -f "$comment_out" "$artifacts_dir/screenshot-comment.md" 2>/dev/null || true
   fi
 
+  if [ -n "${CN1SS_EXTRA_MARKDOWN_FILE:-}" ] && [ -f "$CN1SS_EXTRA_MARKDOWN_FILE" ]; then
+    cn1ss_log "Appending extra markdown from $CN1SS_EXTRA_MARKDOWN_FILE to comment"
+    {
+      echo ""
+      cat "$CN1SS_EXTRA_MARKDOWN_FILE"
+    } >> "$comment_out"
+  fi
+
   cn1ss_log "STAGE:COMMENT_POST -> Submitting PR feedback"
   local comment_rc=0
   if [ "${CN1SS_SKIP_COMMENT:-0}" = "1" ]; then

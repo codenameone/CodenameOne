@@ -93,6 +93,7 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
+      QUALITY_REPORT_SUPPRESS_MISSING: "1"
     steps:
       - uses: actions/checkout@v4
       - name: Free Disk Space
@@ -154,7 +155,6 @@ jobs:
           compression-level: 6
       - name: Upload Android Jacoco coverage report
         if: always() && matrix.id == 'default'
-        id: upload-quality-artifacts
         uses: actions/upload-artifact@v4
         with:
           name: android-jacoco-coverage
