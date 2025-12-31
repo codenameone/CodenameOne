@@ -1020,34 +1020,30 @@ public class SplitPane extends Container {
 
             boolean isDesktop = CN.isDesktop();
 
-            LayeredLayout l = (LayeredLayout) getLayout();
-            switch (orientation) {
-                case HORIZONTAL_SPLIT: {
-                    l.setInsets(btnCollapse, "0 0 auto 0")
-                            .setInsets(btnExpand, "0 0 auto 0")
-                            .setInsets(dragHandle, "auto auto auto auto")
-                            .setReferenceComponentTop(btnExpand, btnCollapse, 1f);
-                    if (!isDesktop) {
-                        // On tablets and phones it is difficult to use the collapse
-                        // expand buttons when they are adjacent.
-                        // On these devices we'll place them at opposite ends of the divider
-                        l.setInsets(btnExpand, "auto 0 0 0")
-                                .setReferenceComponentTop(btnExpand, null, 1f);
-                    }
-                    break;
+            LayeredLayout l = (LayeredLayout) super.getLayout();
+            if (orientation == HORIZONTAL_SPLIT) {
+                l.setInsets(btnCollapse, "0 0 auto 0")
+                        .setInsets(btnExpand, "0 0 auto 0")
+                        .setInsets(dragHandle, "auto auto auto auto")
+                        .setReferenceComponentTop(btnExpand, btnCollapse, 1f);
+                if (!isDesktop) {
+                    // On tablets and phones it is difficult to use the collapse
+                    // expand buttons when they are adjacent.
+                    // On these devices we'll place them at opposite ends of the divider
+                    l.setInsets(btnExpand, "auto 0 0 0")
+                            .setReferenceComponentTop(btnExpand, null, 1f);
                 }
-                default: {
-                    l.setInsets(btnCollapse, "0 auto 0 0")
-                            .setInsets(btnExpand, "0 auto 0 0")
-                            .setInsets(dragHandle, "auto auto auto auto")
-                            .setReferenceComponentLeft(btnExpand, btnCollapse, 1f);
-                    if (!isDesktop) {
-                        // On tablets and phones it is difficult to use the collapse
-                        // expand buttons when they are adjacent.
-                        // On these devices we'll place them at opposite ends of the divider
-                        l.setInsets(btnExpand, "0 0 0 auto")
-                                .setReferenceComponentLeft(btnExpand, null, 1f);
-                    }
+            } else {
+                l.setInsets(btnCollapse, "0 auto 0 0")
+                        .setInsets(btnExpand, "0 auto 0 0")
+                        .setInsets(dragHandle, "auto auto auto auto")
+                        .setReferenceComponentLeft(btnExpand, btnCollapse, 1f);
+                if (!isDesktop) {
+                    // On tablets and phones it is difficult to use the collapse
+                    // expand buttons when they are adjacent.
+                    // On these devices we'll place them at opposite ends of the divider
+                    l.setInsets(btnExpand, "0 0 0 auto")
+                            .setReferenceComponentLeft(btnExpand, null, 1f);
                 }
             }
 
@@ -1055,18 +1051,12 @@ public class SplitPane extends Container {
                 $(this)
                         .setBorder(createBorder())
                         .setCursor(getDragCursor())
-                        .setDraggable(true)
-
-                ;
+                        .setDraggable(true);
             } else {
                 $(this)
                         .setCursor(getDragCursor())
-                        .setDraggable(true)
-
-                ;
+                        .setDraggable(true);
             }
-
-
         }
 
         private char getCollapseMaterialIcon() {

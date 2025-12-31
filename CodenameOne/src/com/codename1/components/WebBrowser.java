@@ -156,7 +156,7 @@ public class WebBrowser extends Container {
                         } else {
                             response[0] = input;
                             synchronized (LOCK) {
-                                LOCK.notify();
+                                LOCK.notifyAll();
                             }
                         }
                     }

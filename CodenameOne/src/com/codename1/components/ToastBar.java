@@ -608,15 +608,7 @@ public class ToastBar {
             return;
         }
         if (parent.getComponentIndex(layered) != parent.getComponentCount() - 1) {
-            f.getAnimationManager().flushAnimation(new Runnable() {
-                public void run() {
-                    parent.removeComponent(layered);
-                    parent.addComponent(layered);
-                    parent.revalidate();
-                }
-            });
-
-
+            f.getAnimationManager().flushAnimation(new FlushAnimationCallback(parent, layered));
         }
     }
 
@@ -707,6 +699,22 @@ public class ToastBar {
             }
             c.hidden = true;
             c.setVisible(false);
+        }
+    }
+
+    private static class FlushAnimationCallback implements Runnable {
+        private final Container parent;
+        private final Container layered;
+
+        public FlushAnimationCallback(Container parent, Container layered) {
+            this.parent = parent;
+            this.layered = layered;
+        }
+
+        public void run() {
+            parent.removeComponent(layered);
+            parent.addComponent(layered);
+            parent.revalidate();
         }
     }
 

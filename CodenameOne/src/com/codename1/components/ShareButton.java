@@ -73,7 +73,7 @@ public class ShareButton extends Button implements ActionListener {
         //Image shareIcon =  Resources.getSystemResource().getImage("share.png");
         //setIcon(shareIcon);
         FontImage.setMaterialIcon(this, FontImage.MATERIAL_SHARE);
-        addActionListener(this);
+        super.addActionListener(this);
         shareServices.addElement(new SMSShare());
         shareServices.addElement(new EmailShare());
         shareServices.addElement(new FacebookShare());

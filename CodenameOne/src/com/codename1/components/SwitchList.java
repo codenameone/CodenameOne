@@ -73,16 +73,7 @@ public class SwitchList extends ButtonList {
 
     @Override
     protected void setSelected(Component button, final boolean selected) {
-        $(".switch", button).each(new ComponentSelector.ComponentClosure() {
-            @Override
-            public void call(Component c) {
-                if (selected) {
-                    ((Switch) c).setOn();
-                } else {
-                    ((Switch) c).setOff();
-                }
-            }
-        });
+        $(".switch", button).each(new SetSelectedComponentClosure(selected));
     }
 
 
@@ -104,4 +95,20 @@ public class SwitchList extends ButtonList {
     }
 
 
+    private static class SetSelectedComponentClosure implements ComponentSelector.ComponentClosure {
+        private final boolean selected;
+
+        public SetSelectedComponentClosure(boolean selected) {
+            this.selected = selected;
+        }
+
+        @Override
+        public void call(Component c) {
+            if (selected) {
+                ((Switch) c).setOn();
+            } else {
+                ((Switch) c).setOff();
+            }
+        }
+    }
 }

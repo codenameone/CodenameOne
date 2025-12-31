@@ -126,9 +126,9 @@ public class SignatureComponent extends Container implements ActionSource<Action
      * Creates a new signature component.
      */
     public SignatureComponent() {
-        setLayout(new BorderLayout());
+        super.setLayout(new BorderLayout());
         xFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_LARGE);
-        final Style signatureButtonBoxStyle = getUIManager().getComponentStyle("SignatureButtonBox");
+        final Style signatureButtonBoxStyle = super.getUIManager().getComponentStyle("SignatureButtonBox");
         lead = new Button() {
 
             @Override

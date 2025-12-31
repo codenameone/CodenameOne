@@ -761,7 +761,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
-    public void setTitle(String title) {
+    public final void setTitle(String title) {
         dialogTitle.setText(title);
     }
 
