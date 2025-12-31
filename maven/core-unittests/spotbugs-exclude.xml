@@ -125,6 +125,6 @@
 
     <!-- Badly written 3rd party classes -->
     <Match>
-        <Class name="~com\.codename1\.io\.tar\.TarEntry(\$.*)?" />
+        <Class name="com.codename1.io.tar.TarEntry" />
     </Match>
 </FindBugsFilter>
