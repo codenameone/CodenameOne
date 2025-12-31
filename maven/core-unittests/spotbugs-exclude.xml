@@ -128,7 +128,7 @@
 
     <!-- Badly written 3rd party class -->
     <Match>
-        <Class name="com.codename1.io.tar.TarEntry" />
+        <Source name="TarEntry.java" />
     </Match>
 
     <!-- Deprecated classes that should be excluded from checks -->
