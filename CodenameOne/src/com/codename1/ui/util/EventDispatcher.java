@@ -167,6 +167,7 @@ public class EventDispatcher {
      * @param propertyName the name of the property
      * @param oldValue     the old value of the property
      * @param newValue     the new value for the property
+     * @deprecated uses the deprecated BindTarget interface
      */
     public void fireBindTargetChange(Component source, String propertyName, Object oldValue, Object newValue) {
         if (listeners == null || listeners.size() == 0) {
@@ -201,6 +202,7 @@ public class EventDispatcher {
      * @param propertyName the name of the property
      * @param oldValue     the old value of the property
      * @param newValue     the new value for the property
+     * @deprecated uses the deprecated BindTarget interface
      */
     private void fireBindTargetChangeSync(BindTarget[] arr, Component source, String propertyName, Object oldValue, Object newValue) {
         int alen = arr.length;

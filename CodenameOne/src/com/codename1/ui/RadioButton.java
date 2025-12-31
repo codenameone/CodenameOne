@@ -380,6 +380,7 @@ public class RadioButton extends Button {
 
     /**
      * {@inheritDoc}
+     * @deprecated uses the deprecated BindTarget interface
      */
     public void bindProperty(String prop, BindTarget target) {
         if (prop.equals("selected")) {
@@ -394,6 +395,7 @@ public class RadioButton extends Button {
 
     /**
      * {@inheritDoc}
+     * @deprecated uses the deprecated BindTarget interface
      */
     public void unbindProperty(String prop, BindTarget target) {
         if (prop.equals("selected")) {

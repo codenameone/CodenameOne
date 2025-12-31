@@ -1825,6 +1825,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
 
     /**
      * {@inheritDoc}
+     * @deprecated uses the deprecated BindTarget interface
      */
     public void bindProperty(String prop, BindTarget target) {
         if (prop.equals("text")) {
@@ -1839,6 +1840,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
 
     /**
      * {@inheritDoc}
+     * @deprecated uses the deprecated BindTarget interface
      */
     public void unbindProperty(String prop, BindTarget target) {
         if (prop.equals("text")) {
