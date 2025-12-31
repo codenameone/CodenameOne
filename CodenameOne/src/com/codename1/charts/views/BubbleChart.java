@@ -66,8 +66,8 @@ public class BubbleChart extends XYChart {
      * @param canvas the canvas to paint to
      * @param paint the paint to be used for drawing
      * @param points the array of points to be used for drawing the series
-     * @param seriesRenderer the series renderer
-     * @param yAxisValue the minimum value of the y axis
+     * @param renderer the series renderer
+     * @param yAxisValue the minimum value of the y-axis
      * @param seriesIndex the index of the series currently being drawn
      * @param startIndex the start index of the rendering points
      */
