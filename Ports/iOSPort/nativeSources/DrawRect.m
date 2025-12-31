@@ -103,7 +103,92 @@ static GLuint getOGLProgram(){
     height = h;
     return self;
 }
-#ifdef USE_ES2
+
+#ifdef CN1_USE_METAL
+-(void)execute {
+    // Metal rendering path - draws rectangle outline
+    id<MTLRenderCommandEncoder> encoder = [self makeRenderCommandEncoder];
+    if (!encoder) {
+        NSLog(@"DrawRect: No encoder available!");
+        return;
+    }
+
+    // Get or create pipeline state (same as FillRect - uses solid color shader)
+    static id<MTLRenderPipelineState> pipelineState = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        id<MTLDevice> device = [self device];
+        id<MTLLibrary> library = [device newDefaultLibrary];
+
+        MTLRenderPipelineDescriptor *pipelineDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
+        pipelineDescriptor.vertexFunction = [library newFunctionWithName:@"solidColor_vertex"];
+        pipelineDescriptor.fragmentFunction = [library newFunctionWithName:@"solidColor_fragment"];
+        pipelineDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+
+        // Configure vertex descriptor
+        MTLVertexDescriptor *vertexDescriptor = [[MTLVertexDescriptor alloc] init];
+        vertexDescriptor.attributes[0].format = MTLVertexFormatFloat2;
+        vertexDescriptor.attributes[0].offset = 0;
+        vertexDescriptor.attributes[0].bufferIndex = 0;
+        vertexDescriptor.layouts[0].stride = sizeof(float) * 2;
+        vertexDescriptor.layouts[0].stepRate = 1;
+        vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
+        pipelineDescriptor.vertexDescriptor = vertexDescriptor;
+
+        // Enable blending for alpha
+        pipelineDescriptor.colorAttachments[0].blendingEnabled = YES;
+        pipelineDescriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
+        pipelineDescriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
+        pipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOne;
+        pipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
+        pipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+        pipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+
+        NSError *error = nil;
+        pipelineState = [device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:&error];
+        if (error) {
+            NSLog(@"Error creating DrawRect pipeline state: %@", error);
+        }
+#ifndef CN1_USE_ARC
+        [pipelineDescriptor release];
+#endif
+    });
+
+    [encoder setRenderPipelineState:pipelineState];
+
+    // Create vertex data - 4 corners with 0.5 pixel offset for proper line alignment
+    float vertices[] = {
+        (float)x + 0.5f,         (float)y + 0.5f,          // Top-left
+        (float)(x + width) + 0.5f, (float)y + 0.5f,        // Top-right
+        (float)(x + width) + 0.5f, (float)(y + height) + 0.5f, // Bottom-right
+        (float)x + 0.5f,         (float)(y + height) + 0.5f  // Bottom-left
+    };
+
+    [encoder setVertexBytes:vertices length:sizeof(vertices) atIndex:0];
+
+    // Set uniforms (MVP matrix + color)
+    typedef struct {
+        simd_float4x4 mvpMatrix;
+        simd_float4 color;
+    } Uniforms;
+
+    Uniforms uniforms;
+    uniforms.mvpMatrix = [self getMVPMatrix];
+    uniforms.color = [self colorToFloat4:color alpha:alpha];
+
+    [encoder setVertexBytes:&uniforms length:sizeof(uniforms) atIndex:1];
+
+    // Draw rectangle outline as line strip (4 lines forming a closed loop)
+    // Metal doesn't have LINE_LOOP, so we need to draw lines manually
+    // Draw 4 line segments: 0->1, 1->2, 2->3, 3->0
+    uint16_t indices[] = {0, 1, 1, 2, 2, 3, 3, 0};
+    [encoder drawIndexedPrimitives:MTLPrimitiveTypeLine
+                        indexCount:8
+                         indexType:MTLIndexTypeUInt16
+                       indexBuffer:[encoder.device newBufferWithBytes:indices length:sizeof(indices) options:MTLResourceStorageModeShared]
+                 indexBufferOffset:0];
+}
+#elif USE_ES2
 -(void)execute {
     glUseProgram(getOGLProgram());
     

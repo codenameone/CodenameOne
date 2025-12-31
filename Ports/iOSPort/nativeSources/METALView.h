@@ -40,15 +40,22 @@
     GLuint defaultFramebuffer, colorRenderbuffer;
     
 }
-@property (nonatomic, retain) MTLCommandQueue* commandQueue;
-@property (nonatomic, retain) MTLCommandBuffer* commandBuffer;
-@property (nonatomic, retain) MTLRenderPassDescriptor* renderPassDescriptor;
-@property (nonatomic, retain) MTLRenderCommandEncoder* renderCommandEncoder;
-@property (nonatomic, retain) MTLDrawable* drawable;
-@property (nonatomic, retain) UIView* peerComponentsLayer;
+@property (nonatomic, strong) id<MTLDevice> device;
+@property (nonatomic, strong) id<MTLCommandQueue> commandQueue;
+@property (nonatomic, strong) id<MTLCommandBuffer> commandBuffer;
+@property (nonatomic, strong) MTLRenderPassDescriptor* renderPassDescriptor;
+@property (nonatomic, strong) id<CAMetalDrawable> drawable;
+@property (nonatomic, strong) UIView* peerComponentsLayer;
+@property (nonatomic, strong) id<MTLRenderCommandEncoder> currentEncoder;
+@property (nonatomic, readonly) CGSize drawableSize;
+@property (nonatomic, assign) MTLScissorRect scissorRect;
+@property (nonatomic, assign) BOOL scissorEnabled;
+@property (nonatomic, strong) id<MTLTexture> persistentTexture;
+@property (nonatomic, assign) BOOL persistentTextureNeedsClear;
 
 -(void)textViewDidChange:(UITextView *)textView;
 -(void)deleteFramebuffer;
+-(void)beginFrame;
 - (void)setFramebuffer;
 - (BOOL)presentFramebuffer;
 -(void)updateFrameBufferSize:(int)w h:(int)h;
@@ -57,5 +64,6 @@
 -(void) keyboardNextClicked;
 -(void) addPeerComponent:(UIView*) view;
 -(void) removePeerComponent:(UIView*) view;
+-(id<MTLRenderCommandEncoder>)makeRenderCommandEncoder;
 @end
 #endif

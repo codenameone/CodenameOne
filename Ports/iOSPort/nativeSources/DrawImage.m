@@ -2,6 +2,12 @@
 #import "CodenameOne_GLViewController.h"
 #include "xmlvm.h"
 
+#ifdef CN1_USE_METAL
+#import <Metal/Metal.h>
+#import <simd/simd.h>
+#import "CN1METALTransform.h"
+#endif
+
 #ifdef USE_ES2
 extern GLKMatrix4 CN1modelViewMatrix;
 extern GLKMatrix4 CN1projectionMatrix;
@@ -102,7 +108,143 @@ static GLuint getOGLProgram(){
 #endif
     return self;
 }
-#ifdef USE_ES2
+
+#ifdef CN1_USE_METAL
+-(void)execute {
+    // Metal rendering path
+    id<MTLRenderCommandEncoder> encoder = [self makeRenderCommandEncoder];
+    if (!encoder) {
+        return;
+    }
+
+    // Get the Metal device and create pipeline state if needed
+    static id<MTLRenderPipelineState> pipelineState = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        id<MTLDevice> device = [self device];
+        id<MTLLibrary> library = [device newDefaultLibrary];
+
+        MTLRenderPipelineDescriptor *pipelineDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
+        pipelineDescriptor.vertexFunction = [library newFunctionWithName:@"textured_vertex"];
+        pipelineDescriptor.fragmentFunction = [library newFunctionWithName:@"textured_fragment"];
+        pipelineDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+
+        // Configure vertex descriptor for textured shader
+        MTLVertexDescriptor *vertexDescriptor = [[MTLVertexDescriptor alloc] init];
+        // Position attribute (float2) at attribute 0
+        vertexDescriptor.attributes[0].format = MTLVertexFormatFloat2;
+        vertexDescriptor.attributes[0].offset = 0;
+        vertexDescriptor.attributes[0].bufferIndex = 0;
+        // TexCoord attribute (float2) at attribute 1
+        vertexDescriptor.attributes[1].format = MTLVertexFormatFloat2;
+        vertexDescriptor.attributes[1].offset = sizeof(float) * 2;
+        vertexDescriptor.attributes[1].bufferIndex = 0;
+        // Layout for buffer 0 (interleaved position + texCoord)
+        vertexDescriptor.layouts[0].stride = sizeof(float) * 4;
+        vertexDescriptor.layouts[0].stepRate = 1;
+        vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
+        pipelineDescriptor.vertexDescriptor = vertexDescriptor;
+
+        // Enable blending for alpha
+        pipelineDescriptor.colorAttachments[0].blendingEnabled = YES;
+        pipelineDescriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
+        pipelineDescriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
+        pipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOne;
+        pipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
+        pipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+        pipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+
+        NSError *error = nil;
+        pipelineState = [device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:&error];
+        if (error) {
+            NSLog(@"Error creating DrawImage pipeline state: %@", error);
+        }
+#ifndef CN1_USE_ARC
+        [pipelineDescriptor release];
+#endif
+    });
+
+    [encoder setRenderPipelineState:pipelineState];
+
+    // Get Metal texture from GLUIImage
+    id<MTLTexture> texture = [img getMetalTexture];
+    if (!texture) {
+        return;
+    }
+
+    // Calculate texture coordinates
+    GLfloat actualImageWidth = [img getImage].size.width;
+    GLfloat actualImageHeight = [img getImage].size.height;
+    GLfloat actualImageWidthP2 = nextPowerOf2((int)actualImageWidth);
+    GLfloat actualImageHeightP2 = nextPowerOf2((int)actualImageHeight);
+
+    // Get actual texture dimensions
+    int textW = [img getTextureWidth];
+    int textH = [img getTextureHeight];
+
+    // Textures are flipped during creation to match OpenGL convention (V=0 at bottom, V=1 at top)
+    // Texture coordinates must match ES2 exactly
+    GLfloat nY = 1.0; // Top (V=1 in OpenGL)
+    GLfloat wX = 0;
+    GLfloat sY = 1.0 - actualImageHeight / actualImageHeightP2; // Bottom
+    GLfloat eX = actualImageWidth / actualImageWidthP2;
+
+    // Create vertex data (position + texCoord interleaved)
+    typedef struct {
+        float position[2];
+        float texCoord[2];
+    } Vertex;
+
+    Vertex vertices[] = {
+        {{(float)x,         (float)y},          {wX, nY}}, // Top-left
+        {{(float)(x+width), (float)y},          {eX, nY}}, // Top-right
+        {{(float)x,         (float)(y+height)}, {wX, sY}}, // Bottom-left
+        {{(float)(x+width), (float)(y+height)}, {eX, sY}}  // Bottom-right
+    };
+
+    // Set vertex buffer
+    [encoder setVertexBytes:vertices length:sizeof(vertices) atIndex:0];
+
+    // Set uniforms (MVP matrix + color)
+    typedef struct {
+        simd_float4x4 mvpMatrix;
+        simd_float4 color;
+    } Uniforms;
+
+    Uniforms uniforms;
+    uniforms.mvpMatrix = [self getMVPMatrix];
+
+    // Preserve texture color, only apply alpha transparency
+    float alphaFloat = ((float)alpha) / 255.0f;
+    uniforms.color = simd_make_float4(1.0f, 1.0f, 1.0f, alphaFloat);
+
+    [encoder setVertexBytes:&uniforms length:sizeof(uniforms) atIndex:1];
+
+    // Set texture
+    [encoder setFragmentTexture:texture atIndex:0];
+
+    // Create sampler state
+    static id<MTLSamplerState> samplerState = nil;
+    static dispatch_once_t samplerOnce;
+    dispatch_once(&samplerOnce, ^{
+        MTLSamplerDescriptor *samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
+        samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
+        samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
+        samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToEdge;
+        samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToEdge;
+        samplerState = [[self device] newSamplerStateWithDescriptor:samplerDescriptor];
+#ifndef CN1_USE_ARC
+        [samplerDescriptor release];
+#endif
+    });
+
+    [encoder setFragmentSamplerState:samplerState atIndex:0];
+
+    // Draw rectangle as triangle strip
+    [encoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
+}
+
+#elif USE_ES2
 -(void)execute {
     glUseProgram(getOGLProgram());
     GLKVector4 color = GLKVector4Make(((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f, ((float)alpha) / 255.0f);
