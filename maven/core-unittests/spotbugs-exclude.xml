@@ -76,13 +76,15 @@
 
     <!-- The API isThemeConstant should return null when the value isn't found -->
     <Match>
-        <Class name="com.codename1.plaf.UIManager" />
+        <Class name="com.codename1.ui.plaf.UIManager" />
+        <Method name="isThemeConstant" />
         <Bug pattern="NP_BOOLEAN_RETURN_NULL" />
     </Match>
 
     <!-- The API canExecute should return null when we don't know the answer -->
     <Match>
         <Class name="com.codename1.impl.CodenameOneImplementation" />
+        <Method name="canExecute" />
         <Bug pattern="NP_BOOLEAN_RETURN_NULL" />
     </Match>
 
