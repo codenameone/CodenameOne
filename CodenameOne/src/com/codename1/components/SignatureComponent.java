@@ -338,13 +338,13 @@ public class SignatureComponent extends Container implements ActionSource<Action
             super.addComponent(BorderLayout.CENTER, signaturePanel);
             Button doneButton = new Button(
                     localize("SignatureComponent.SaveButtonLabel", "Save"),
-                    getUIManager().getThemeConstant("sigButtonOKUIID", "Button"));
+                    super.getUIManager().getThemeConstant("sigButtonOKUIID", "Button"));
             Button resetButton = new Button(
                     localize("SignatureComponent.ResetButtonLabel", "Reset"),
-                    getUIManager().getThemeConstant("sigButtonResetUIID", "Button"));
+                    super.getUIManager().getThemeConstant("sigButtonResetUIID", "Button"));
             Button cancelButton = new Button(
                     localize("SignatureComponent.CancelButtonLabel", "Cancel"),
-                    getUIManager().getThemeConstant("sigButtonCancelUIID", "Button"));
+                    super.getUIManager().getThemeConstant("sigButtonCancelUIID", "Button"));
 
             doneButton.addActionListener(new ActionListener<ActionEvent>() {
                 public void actionPerformed(ActionEvent evt) {
@@ -449,8 +449,8 @@ public class SignatureComponent extends Container implements ActionSource<Action
 
         SignaturePanel() {
             setUIIDFinal("SignaturePanel");
-            signatureBoxStyle = getUIManager().getComponentStyle("SignaturePanelBox");
-            signatureStyle = getUIManager().getComponentStyle("SignaturePanelSignature");
+            signatureBoxStyle = super.getUIManager().getComponentStyle("SignaturePanelBox");
+            signatureStyle = super.getUIManager().getComponentStyle("SignaturePanelSignature");
             stroke.setLineWidth(Math.max(1, Display.getInstance().convertToPixels(1, true) / 2));
         }
 

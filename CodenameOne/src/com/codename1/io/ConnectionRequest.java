@@ -2580,21 +2580,8 @@ public class ConnectionRequest implements IOProgressListener {
      */
     public AsyncResource<Image> downloadImageToStorage(String storageFile, boolean useCache) {
         final AsyncResource<Image> out = new AsyncResource<Image>();
-        downloadImageToStorage(storageFile, new SuccessCallback<Image>() {
-            @Override
-            public void onSucess(Image value) {
-                if (!out.isDone()) {
-                    out.complete(value);
-                }
-            }
-        }, new FailureCallback<Image>() {
-            @Override
-            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
-                if (!out.isDone()) {
-                    out.error(err);
-                }
-            }
-        }, useCache);
+        downloadImageToStorage(storageFile, new ImageStorageSuccessCallback(out),
+                new ImageStorageFailureCallback(out), useCache);
         return out;
     }
 
@@ -2646,28 +2633,13 @@ public class ConnectionRequest implements IOProgressListener {
      */
     public AsyncResource<Image> downloadImageToFileSystem(String file, boolean useCache) {
         final AsyncResource<Image> out = new AsyncResource<Image>();
-        downloadImageToFileSystem(file, new SuccessCallback<Image>() {
-            @Override
-            public void onSucess(Image value) {
-                if (out.isDone()) {
-                    return;
-                }
-                out.complete(value);
-            }
-        }, new FailureCallback<Image>() {
-            @Override
-            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
-                if (out.isDone()) {
-                    return;
-                }
-                out.error(err);
-            }
-        }, useCache);
+        downloadImageToFileSystem(file, new ImageFileSystemSuccessCallback(out),
+                new ImageFileSystemFailureCallback(out), useCache);
         return out;
     }
 
     /**
-     * Downloads an image to a the file system asynchronously returning an AsyncResource object that resolves to the loaded image..
+     * Downloads an image to the file system asynchronously returning an AsyncResource object that resolves to the loaded image..
      * If useCache is true, then this will first try to load the image from Storage if it exists.  This is a wrapper around {@link #downloadImageToFileSystem(java.lang.String, boolean) }
      * with {@literal true} as the 2nd parameter.
      *
@@ -2960,6 +2932,68 @@ public class ConnectionRequest implements IOProgressListener {
          */
         public String getCertificteAlgorithm() {
             return certificateAlgorithm;
+        }
+    }
+
+    private static class ImageStorageSuccessCallback implements SuccessCallback<Image> {
+        private final AsyncResource<Image> out;
+
+        public ImageStorageSuccessCallback(AsyncResource<Image> out) {
+            this.out = out;
+        }
+
+        @Override
+        public void onSucess(Image value) {
+            if (!out.isDone()) {
+                out.complete(value);
+            }
+        }
+    }
+
+    private static class ImageStorageFailureCallback implements FailureCallback<Image> {
+        private final AsyncResource<Image> out;
+
+        public ImageStorageFailureCallback(AsyncResource<Image> out) {
+            this.out = out;
+        }
+
+        @Override
+        public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+            if (!out.isDone()) {
+                out.error(err);
+            }
+        }
+    }
+
+    private static class ImageFileSystemSuccessCallback implements SuccessCallback<Image> {
+        private final AsyncResource<Image> out;
+
+        public ImageFileSystemSuccessCallback(AsyncResource<Image> out) {
+            this.out = out;
+        }
+
+        @Override
+        public void onSucess(Image value) {
+            if (out.isDone()) {
+                return;
+            }
+            out.complete(value);
+        }
+    }
+
+    private static class ImageFileSystemFailureCallback implements FailureCallback<Image> {
+        private final AsyncResource<Image> out;
+
+        public ImageFileSystemFailureCallback(AsyncResource<Image> out) {
+            this.out = out;
+        }
+
+        @Override
+        public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+            if (out.isDone()) {
+                return;
+            }
+            out.error(err);
         }
     }
 }

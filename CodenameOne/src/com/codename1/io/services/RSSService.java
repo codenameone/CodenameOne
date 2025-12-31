@@ -134,13 +134,77 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
         return result;
     }
 
+    static class FinishParsing extends RuntimeException {
+    }
+
     /**
      * {@inheritDoc}
      */
     protected void readResponse(InputStream input) throws IOException {
         results = new Vector();
-        class FinishParsing extends RuntimeException {
+        XMLParser p = getXmlParser();
+        input.mark(10);
+
+        // Skip the bom marking UTF-8 in some streams
+        while (input.read() != '<') {
+            //input.mark(4);
         }
+        int question = input.read();
+        String cType = "UTF-8";
+        if (question == '?') {
+            // we are in an XML header, check if the encoding section exists 
+            StringBuilder cs = new StringBuilder();
+            question = input.read();
+            while (question != '>') {
+                cs.append((char) question);
+                question = input.read();
+            }
+            String str = cs.toString();
+            int index = str.indexOf("encoding=\"") + 10;
+            if (index > -1) {
+                cType = str.substring(index, Math.max(str.indexOf("\"", index), str.indexOf("'", index)));
+            }
+        } else {
+            // oops, continue as usual
+            input.reset();
+        }
+
+        String resultType = getResponseContentType();
+        if (resultType != null && resultType.indexOf("charset=") > -1) {
+            cType = resultType.substring(resultType.indexOf("charset=") + 8);
+        }
+        try {
+            int pos2 = cType.indexOf(';');
+            if (pos2 > 0) {
+                cType = cType.substring(0, pos2);
+            }
+            p.eventParser(new InputStreamReader(input, cType));
+        } catch (FinishParsing ignor) {
+            hasMore = true;
+        }
+
+        if (isCreatePlainTextDetails()) {
+            int elementCount = results.size();
+            for (int iter = 0; iter < elementCount; iter++) {
+                Hashtable h = (Hashtable) results.elementAt(iter);
+                String s = (String) h.get("description");
+                if (s != null && !h.containsKey("details")) {
+                    XMLParser x = new XMLParser();
+                    Element e = x.parse(new CharArrayReader(("<xml>" + s + "</xml>").toCharArray()));
+                    Vector results = e.getTextDescendants(null, false);
+                    StringBuilder endResult = new StringBuilder();
+                    for (int i = 0; i < results.size(); i++) {
+                        endResult.append(((Element) results.elementAt(i)).getText());
+                    }
+                    h.put("details", endResult.toString());
+                }
+            }
+        }
+
+        fireResponseListener(new NetworkEvent(this, results));
+    }
+
+    private XMLParser getXmlParser() {
         XMLParser p = new XMLParser() {
             private String lastTag;
             private Hashtable current;
@@ -205,65 +269,7 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
             }
         };
         p.setParserCallback(this);
-        input.mark(10);
-
-        // Skip the bom marking UTF-8 in some streams
-        while (input.read() != '<') {
-            //input.mark(4);
-        }
-        int question = input.read();
-        String cType = "UTF-8";
-        if (question == '?') {
-            // we are in an XML header, check if the encoding section exists 
-            StringBuilder cs = new StringBuilder();
-            question = input.read();
-            while (question != '>') {
-                cs.append((char) question);
-                question = input.read();
-            }
-            String str = cs.toString();
-            int index = str.indexOf("encoding=\"") + 10;
-            if (index > -1) {
-                cType = str.substring(index, Math.max(str.indexOf("\"", index), str.indexOf("'", index)));
-            }
-        } else {
-            // oops, continue as usual
-            input.reset();
-        }
-
-        String resultType = getResponseContentType();
-        if (resultType != null && resultType.indexOf("charset=") > -1) {
-            cType = resultType.substring(resultType.indexOf("charset=") + 8);
-        }
-        try {
-            int pos2 = cType.indexOf(';');
-            if (pos2 > 0) {
-                cType = cType.substring(0, pos2);
-            }
-            p.eventParser(new InputStreamReader(input, cType));
-        } catch (FinishParsing ignor) {
-            hasMore = true;
-        }
-
-        if (isCreatePlainTextDetails()) {
-            int elementCount = results.size();
-            for (int iter = 0; iter < elementCount; iter++) {
-                Hashtable h = (Hashtable) results.elementAt(iter);
-                String s = (String) h.get("description");
-                if (s != null && !h.containsKey("details")) {
-                    XMLParser x = new XMLParser();
-                    Element e = x.parse(new CharArrayReader(("<xml>" + s + "</xml>").toCharArray()));
-                    Vector results = e.getTextDescendants(null, false);
-                    StringBuilder endResult = new StringBuilder();
-                    for (int i = 0; i < results.size(); i++) {
-                        endResult.append(((Element) results.elementAt(i)).getText());
-                    }
-                    h.put("details", endResult.toString());
-                }
-            }
-        }
-
-        fireResponseListener(new NetworkEvent(this, results));
+        return p;
     }
 
 

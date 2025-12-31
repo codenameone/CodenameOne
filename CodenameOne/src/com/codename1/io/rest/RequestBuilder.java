@@ -257,22 +257,12 @@ public class RequestBuilder {
     /**
      * Sets the request body
      *
-     * @param body request bodyContent
+     * @param bodyContent request body content
      * @return RequestBuilder instance
      */
     public RequestBuilder body(final String bodyContent) {
         checkFetched();
-        this.body = new Data() {
-            @Override
-            public void appendTo(OutputStream output) throws IOException {
-                output.write(bodyContent.getBytes("UTF-8"));
-            }
-
-            @Override
-            public long getSize() throws IOException {
-                return bodyContent.getBytes("UTF-8").length;
-            }
-        };
+        this.body = new BodyData(bodyContent);
         return this;
     }
 
@@ -476,25 +466,7 @@ public class RequestBuilder {
 
     private ConnectionRequest getAsStringAsyncImpl(final Object callback) {
         final Connection request = createRequest(false);
-        request.addResponseListener(new ActionListener<NetworkEvent>() {
-            @Override
-            public void actionPerformed(NetworkEvent evt) {
-                if (request.errorCode) {
-                    return;
-                }
-                Response res = null;
-                try {
-                    res = new Response(evt.getResponseCode(), new String(evt.getConnectionRequest().getResponseData(), "UTF-8"), evt.getMessage());
-                    if (callback instanceof Callback) {
-                        ((Callback) callback).onSucess(res);
-                    } else {
-                        ((OnComplete<Response<String>>) callback).completed(res);
-                    }
-                } catch (UnsupportedEncodingException ex) {
-                    ex.printStackTrace();
-                }
-            }
-        });
+        request.addResponseListener(new GetAsStringAsyncImplActionListener(request, callback));
         fetched = true;
         CN.addToQueue(request);
         return request;
@@ -549,21 +521,7 @@ public class RequestBuilder {
 
     private ConnectionRequest getAsBytesAsyncImpl(final Object callback) {
         final Connection request = createRequest(false);
-        request.addResponseListener(new ActionListener<NetworkEvent>() {
-            @Override
-            public void actionPerformed(NetworkEvent evt) {
-                if (request.errorCode) {
-                    return;
-                }
-                Response res = null;
-                res = new Response(evt.getResponseCode(), evt.getConnectionRequest().getResponseData(), evt.getMessage());
-                if (callback instanceof Callback) {
-                    ((Callback) callback).onSucess(res);
-                } else {
-                    ((OnComplete) callback).completed(res);
-                }
-            }
-        });
+        request.addResponseListener(new GetAsBytesAsyncImplActionListener(request, callback));
         fetched = true;
         CN.addToQueue(request);
         return request;
@@ -602,18 +560,7 @@ public class RequestBuilder {
      */
     public ConnectionRequest fetchAsJsonMap(final OnComplete<Response<Map>> callback) {
         final Connection request = createRequest(true);
-        request.addResponseListener(new ActionListener<NetworkEvent>() {
-            @Override
-            public void actionPerformed(NetworkEvent evt) {
-                if (request.errorCode) {
-                    return;
-                }
-                Response res = null;
-                Map response = (Map) evt.getMetaData();
-                res = new Response(evt.getResponseCode(), response, evt.getMessage());
-                callback.completed(res);
-            }
-        });
+        request.addResponseListener(new FetchAsJsonMapActionListener(request, callback));
         fetched = true;
         CN.addToQueue(request);
         return request;
@@ -630,25 +577,7 @@ public class RequestBuilder {
     public ConnectionRequest fetchAsProperties(final OnComplete<Response<PropertyBusinessObject>> callback, final Class type) {
         useBoolean(true);
         final Connection request = createRequest(true);
-        request.addResponseListener(new ActionListener<NetworkEvent>() {
-            @Override
-            public void actionPerformed(NetworkEvent evt) {
-                if (request.errorCode) {
-                    return;
-                }
-                Response res = null;
-                Map response = (Map) evt.getMetaData();
-                try {
-                    PropertyBusinessObject pb = (PropertyBusinessObject) type.newInstance();
-                    pb.getPropertyIndex().populateFromMap(response);
-                    res = new Response(evt.getResponseCode(), pb, evt.getMessage());
-                    callback.completed(res);
-                } catch (Exception err) {
-                    Log.e(err);
-                    throw new RuntimeException(err.toString());
-                }
-            }
-        });
+        request.addResponseListener(new FetchAsPropertiesActionListener(request, type, callback));
         fetched = true;
         CN.addToQueue(request);
         return request;
@@ -677,24 +606,7 @@ public class RequestBuilder {
      */
     public ConnectionRequest getAsJsonMap(final SuccessCallback<Response<Map>> callback, final FailureCallback<? extends Object> onError) {
         final Connection request = createRequest(true);
-        request.addResponseListener(new ActionListener<NetworkEvent>() {
-            @Override
-            public void actionPerformed(NetworkEvent evt) {
-                if (request.errorCode) {
-                    return;
-                }
-                if (onError != null) {
-                    // this is an error response code and should be handled as an error
-                    if (evt.getResponseCode() > 310) {
-                        return;
-                    }
-                }
-                Response res = null;
-                Map response = (Map) evt.getMetaData();
-                res = new Response(evt.getResponseCode(), response, evt.getMessage());
-                callback.onSucess(res);
-            }
-        });
+        request.addResponseListener(new GetAsJsonMapActionListener(request, onError, callback));
         bindOnError(request, onError);
         fetched = true;
         CN.addToQueue(request);
@@ -705,18 +617,8 @@ public class RequestBuilder {
         if (f == null) {
             return;
         }
-        req.addResponseCodeListener(new ActionListener<NetworkEvent>() {
-            public void actionPerformed(NetworkEvent evt) {
-                evt.consume();
-                f.onError(null, evt.getError(), evt.getResponseCode(), evt.getMessage());
-            }
-        });
-        req.addExceptionListener(new ActionListener<NetworkEvent>() {
-            public void actionPerformed(NetworkEvent evt) {
-                evt.consume();
-                f.onError(null, evt.getError(), evt.getResponseCode(), evt.getMessage());
-            }
-        });
+        req.addResponseCodeListener(new BindOnErrorResponseCodeActionListener(f));
+        req.addExceptionListener(new BindOnErrorExceptionActionListener(f));
     }
 
     /**
@@ -777,36 +679,7 @@ public class RequestBuilder {
     public ConnectionRequest fetchAsPropertyList(final OnComplete<Response<List<PropertyBusinessObject>>> callback, final Class type, final String root) {
         useBoolean(true);
         final Connection request = createRequest(true);
-        request.addResponseListener(new ActionListener<NetworkEvent>() {
-            @Override
-            public void actionPerformed(NetworkEvent evt) {
-                if (request.errorCode) {
-                    return;
-                }
-                Response res = null;
-                Map response = (Map) evt.getMetaData();
-                if (response == null) {
-                    return;
-                }
-                List<Map> lst = (List<Map>) response.get(root);
-                if (lst == null) {
-                    return;
-                }
-                try {
-                    List<PropertyBusinessObject> result = new ArrayList<PropertyBusinessObject>();
-                    for (Map m : lst) {
-                        PropertyBusinessObject pb = (PropertyBusinessObject) type.newInstance();
-                        pb.getPropertyIndex().populateFromMap(m);
-                        result.add(pb);
-                    }
-                    res = new Response(evt.getResponseCode(), result, evt.getMessage());
-                    callback.completed(res);
-                } catch (Exception err) {
-                    Log.e(err);
-                    throw new RuntimeException(err.toString());
-                }
-            }
-        });
+        request.addResponseListener(new FetchAsPropertyListActionListener(request, root, type, callback));
         fetched = true;
         CN.addToQueue(request);
         return request;
@@ -940,6 +813,225 @@ public class RequestBuilder {
         }
 
         return req;
+    }
+
+    private static class FetchAsPropertyListActionListener implements ActionListener<NetworkEvent> {
+        private final Connection request;
+        private final String root;
+        private final Class type;
+        private final OnComplete<Response<List<PropertyBusinessObject>>> callback;
+
+        public FetchAsPropertyListActionListener(Connection request, String root, Class type, OnComplete<Response<List<PropertyBusinessObject>>> callback) {
+            this.request = request;
+            this.root = root;
+            this.type = type;
+            this.callback = callback;
+        }
+
+        @Override
+        public void actionPerformed(NetworkEvent evt) {
+            if (request.errorCode) {
+                return;
+            }
+            Response res = null;
+            Map response = (Map) evt.getMetaData();
+            if (response == null) {
+                return;
+            }
+            List<Map> lst = (List<Map>) response.get(root);
+            if (lst == null) {
+                return;
+            }
+            try {
+                List<PropertyBusinessObject> result = new ArrayList<PropertyBusinessObject>();
+                for (Map m : lst) {
+                    PropertyBusinessObject pb = (PropertyBusinessObject) type.newInstance();
+                    pb.getPropertyIndex().populateFromMap(m);
+                    result.add(pb);
+                }
+                res = new Response(evt.getResponseCode(), result, evt.getMessage());
+                callback.completed(res);
+            } catch (Exception err) {
+                Log.e(err);
+                throw new RuntimeException(err.toString());
+            }
+        }
+    }
+
+    private static class BindOnErrorExceptionActionListener implements ActionListener<NetworkEvent> {
+        private final FailureCallback<?> f;
+
+        public BindOnErrorExceptionActionListener(FailureCallback<? extends Object> f) {
+            this.f = f;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            evt.consume();
+            f.onError(null, evt.getError(), evt.getResponseCode(), evt.getMessage());
+        }
+    }
+
+    private static class BindOnErrorResponseCodeActionListener implements ActionListener<NetworkEvent> {
+        private final FailureCallback<?> f;
+
+        public BindOnErrorResponseCodeActionListener(FailureCallback<? extends Object> f) {
+            this.f = f;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            evt.consume();
+            f.onError(null, evt.getError(), evt.getResponseCode(), evt.getMessage());
+        }
+    }
+
+    private static class GetAsJsonMapActionListener implements ActionListener<NetworkEvent> {
+        private final Connection request;
+        private final FailureCallback<?> onError;
+        private final SuccessCallback<Response<Map>> callback;
+
+        public GetAsJsonMapActionListener(Connection request, FailureCallback<? extends Object> onError, SuccessCallback<Response<Map>> callback) {
+            this.request = request;
+            this.onError = onError;
+            this.callback = callback;
+        }
+
+        @Override
+        public void actionPerformed(NetworkEvent evt) {
+            if (request.errorCode) {
+                return;
+            }
+            if (onError != null) {
+                // this is an error response code and should be handled as an error
+                if (evt.getResponseCode() > 310) {
+                    return;
+                }
+            }
+            Response res = null;
+            Map response = (Map) evt.getMetaData();
+            res = new Response(evt.getResponseCode(), response, evt.getMessage());
+            callback.onSucess(res);
+        }
+    }
+
+    private static class FetchAsPropertiesActionListener implements ActionListener<NetworkEvent> {
+        private final Connection request;
+        private final Class type;
+        private final OnComplete<Response<PropertyBusinessObject>> callback;
+
+        public FetchAsPropertiesActionListener(Connection request, Class type, OnComplete<Response<PropertyBusinessObject>> callback) {
+            this.request = request;
+            this.type = type;
+            this.callback = callback;
+        }
+
+        @Override
+        public void actionPerformed(NetworkEvent evt) {
+            if (request.errorCode) {
+                return;
+            }
+            Response res = null;
+            Map response = (Map) evt.getMetaData();
+            try {
+                PropertyBusinessObject pb = (PropertyBusinessObject) type.newInstance();
+                pb.getPropertyIndex().populateFromMap(response);
+                res = new Response(evt.getResponseCode(), pb, evt.getMessage());
+                callback.completed(res);
+            } catch (Exception err) {
+                Log.e(err);
+                throw new RuntimeException(err.toString());
+            }
+        }
+    }
+
+    private static class FetchAsJsonMapActionListener implements ActionListener<NetworkEvent> {
+        private final Connection request;
+        private final OnComplete<Response<Map>> callback;
+
+        public FetchAsJsonMapActionListener(Connection request, OnComplete<Response<Map>> callback) {
+            this.request = request;
+            this.callback = callback;
+        }
+
+        @Override
+        public void actionPerformed(NetworkEvent evt) {
+            if (request.errorCode) {
+                return;
+            }
+            Response res = null;
+            Map response = (Map) evt.getMetaData();
+            res = new Response(evt.getResponseCode(), response, evt.getMessage());
+            callback.completed(res);
+        }
+    }
+
+    private static class GetAsBytesAsyncImplActionListener implements ActionListener<NetworkEvent> {
+        private final Connection request;
+        private final Object callback;
+
+        public GetAsBytesAsyncImplActionListener(Connection request, Object callback) {
+            this.request = request;
+            this.callback = callback;
+        }
+
+        @Override
+        public void actionPerformed(NetworkEvent evt) {
+            if (request.errorCode) {
+                return;
+            }
+            Response res = null;
+            res = new Response(evt.getResponseCode(), evt.getConnectionRequest().getResponseData(), evt.getMessage());
+            if (callback instanceof Callback) {
+                ((Callback) callback).onSucess(res);
+            } else {
+                ((OnComplete) callback).completed(res);
+            }
+        }
+    }
+
+    private static class GetAsStringAsyncImplActionListener implements ActionListener<NetworkEvent> {
+        private final Connection request;
+        private final Object callback;
+
+        public GetAsStringAsyncImplActionListener(Connection request, Object callback) {
+            this.request = request;
+            this.callback = callback;
+        }
+
+        @Override
+        public void actionPerformed(NetworkEvent evt) {
+            if (request.errorCode) {
+                return;
+            }
+            Response res = null;
+            try {
+                res = new Response(evt.getResponseCode(), new String(evt.getConnectionRequest().getResponseData(), "UTF-8"), evt.getMessage());
+                if (callback instanceof Callback) {
+                    ((Callback) callback).onSucess(res);
+                } else {
+                    ((OnComplete<Response<String>>) callback).completed(res);
+                }
+            } catch (UnsupportedEncodingException ex) {
+                ex.printStackTrace();
+            }
+        }
+    }
+
+    private static class BodyData implements Data {
+        private final String bodyContent;
+
+        public BodyData(String bodyContent) {
+            this.bodyContent = bodyContent;
+        }
+
+        @Override
+        public void appendTo(OutputStream output) throws IOException {
+            output.write(bodyContent.getBytes("UTF-8"));
+        }
+
+        @Override
+        public long getSize() throws IOException {
+            return bodyContent.getBytes("UTF-8").length;
+        }
     }
 
     class Connection extends GZConnectionRequest {

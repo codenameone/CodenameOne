@@ -433,10 +433,6 @@ final class InfBlocks {
                             k += 8;
                         }
 
-                        if (tb[0] == -1) {
-                            //System.err.println("null...");
-                        }
-
                         t = hufts[(tb[0] + (b & inflate_mask[t])) * 3 + 1];
                         c = hufts[(tb[0] + (b & inflate_mask[t])) * 3 + 2];
 
@@ -504,7 +500,6 @@ final class InfBlocks {
                 {
                     bl[0] = 9;         // must be <= 9 for lookahead assumptions
                     bd[0] = 6;         // must be <= 9 for lookahead assumptions
-                    t = table;
                     t = inftree.inflate_trees_dynamic(257 + (t & 0x1f),
                             1 + ((t >> 5) & 0x1f),
                             blens, bl, bd, tli, tdi, hufts, z);
@@ -557,14 +552,12 @@ final class InfBlocks {
                     write = q;
                     r = inflate_flush(r);
                     q = write;
-                    m = q < read ? read - q - 1 : end - q;
                     if (read != write) {
                         bitb = b;
                         bitk = k;
                         z.avail_in = n;
                         z.total_in += p - z.next_in_index;
                         z.next_in_index = p;
-                        write = q;
                         return inflate_flush(r);
                     }
                     mode = DONE;
