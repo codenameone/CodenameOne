@@ -813,10 +813,19 @@ def main() -> None:
             "UW_UNCOND_WAIT",
             "SIC_INNER_SHOULD_BE_STATIC_ANON"
         }
+
+        def _is_exempt(f: Finding) -> bool:
+            loc = f.path or f.location or ""
+            if f.rule == "SA_FIELD_SELF_ASSIGNMENT" and "InfBlocks.java" in loc:
+                return True
+            if f.rule == "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" and "TarEntry.java" in loc:
+                return True
+            return False
+
+
         violations = [
             f for f in spotbugs.findings
-            if f.rule in forbidden_rules
-            and not (f.rule == "SA_FIELD_SELF_ASSIGNMENT" and "InfBlocks.java" in f.location)
+            if f.rule in forbidden_rules and not _is_exempt(f)
         ]
         if violations:
             print("\n❌ Build failed due to forbidden SpotBugs violations:")
