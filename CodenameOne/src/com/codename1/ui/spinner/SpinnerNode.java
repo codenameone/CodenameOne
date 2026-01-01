@@ -69,20 +69,7 @@ class SpinnerNode extends Node {
         selectedRowStyle = rowTemplate.getSelectedStyle();
         overlayStyle = overlayTemplate.getUnselectedStyle();
         selectedRowOverlay.setStyle(overlayStyle);
-        selectedRowOverlay.setRenderer(new NodePainter() {
-            public void paint(Graphics g, Rectangle bounds, Node node) {
-                Style style = node.getStyle();
-                g.setColor(style.getBgColor());
-                g.fillRect(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
-                g.setColor(style.getFgColor());
-                int alpha = g.concatenateAlpha(style.getFgAlpha());
-                g.drawLine(bounds.getX(), bounds.getY(), bounds.getWidth() + bounds.getX(), bounds.getY());
-                g.drawLine(bounds.getX(), bounds.getY() + bounds.getHeight(),
-                        bounds.getX() + bounds.getWidth(), bounds.getY() + bounds.getHeight()
-                );
-                g.setAlpha(alpha);
-            }
-        });
+        selectedRowOverlay.setRenderer(new SpinnerNodePainter());
     }
 
     private static boolean usePerspective() {
@@ -290,16 +277,7 @@ class SpinnerNode extends Node {
             if (rowFormatter != null) {
                 lbl = rowFormatter.format(lbl);
             }
-            Label renderer = new Label(lbl, "Spinner3DRow") {
-                @Override
-                public Style getStyle() {
-                    if (n.hasTag("selected")) {
-                        return this.getSelectedStyle();
-                    } else {
-                        return this.getUnselectedStyle();
-                    }
-                }
-            };
+            Label renderer = new SpinnerRenderer(lbl, n);
 
             renderer.setSelectedStyle(getSelectedRowStyle());
             renderer.setUnselectedStyle(getRowStyle());
@@ -448,4 +426,36 @@ class SpinnerNode extends Node {
         String format(String input);
     }
 
+    private static class SpinnerRenderer extends Label {
+        private final Node n;
+
+        public SpinnerRenderer(String lbl, Node n) {
+            super(lbl, "Spinner3DRow");
+            this.n = n;
+        }
+
+        @Override
+        public Style getStyle() {
+            if (n.hasTag("selected")) {
+                return this.getSelectedStyle();
+            } else {
+                return this.getUnselectedStyle();
+            }
+        }
+    }
+
+    private static class SpinnerNodePainter implements NodePainter {
+        public void paint(Graphics g, Rectangle bounds, Node node) {
+            Style style = node.getStyle();
+            g.setColor(style.getBgColor());
+            g.fillRect(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());
+            g.setColor(style.getFgColor());
+            int alpha = g.concatenateAlpha(style.getFgAlpha());
+            g.drawLine(bounds.getX(), bounds.getY(), bounds.getWidth() + bounds.getX(), bounds.getY());
+            g.drawLine(bounds.getX(), bounds.getY() + bounds.getHeight(),
+                    bounds.getX() + bounds.getWidth(), bounds.getY() + bounds.getHeight()
+            );
+            g.setAlpha(alpha);
+        }
+    }
 }

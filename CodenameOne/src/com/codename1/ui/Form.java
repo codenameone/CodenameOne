@@ -736,14 +736,7 @@ public class Form extends Container {
      * @see Component#isEditing()
      */
     public Component findCurrentlyEditingComponent() {
-        return ComponentSelector.select("*", this).filter(new Filter() {
-
-
-            public boolean filter(Component c) {
-                return c.isEditing();
-            }
-
-        }).asComponent();
+        return ComponentSelector.select("*", this).filter(new CurrentlyEditingFilter()).asComponent();
     }
 
     /**
@@ -2954,25 +2947,8 @@ public class Form extends Container {
     public TabIterator getTabIterator(Component start) {
         updateTabIndices(0);
         java.util.List<Component> out = new ArrayList<Component>();
-        out.addAll(ComponentSelector.select("*", this).filter(new Filter() {
-
-
-            public boolean filter(Component c) {
-                return c.getTabIndex() >= 0 && c.isVisible() && c.isFocusable() && c.isEnabled() && !c.isHidden(true);
-            }
-
-        }));
-        Collections.sort(out, new Comparator<Component>() {
-
-
-            public int compare(Component o1, Component o2) {
-                return o1.getTabIndex() < o2.getTabIndex() ? -1 :
-                        o2.getTabIndex() < o1.getTabIndex() ? 1 :
-                                0;
-            }
-
-        });
-
+        out.addAll(ComponentSelector.select("*", this).filter(new TabIteratorFilter()));
+        Collections.sort(out, new TabIteratorComparator());
         return new TabIterator(out, start);
     }
 
@@ -4831,4 +4807,23 @@ public class Form extends Container {
     }
 
 
+    private static class CurrentlyEditingFilter implements Filter {
+        public boolean filter(Component c) {
+            return c.isEditing();
+        }
+    }
+
+    private static class TabIteratorComparator implements Comparator<Component> {
+        public int compare(Component o1, Component o2) {
+            return o1.getTabIndex() < o2.getTabIndex() ? -1 :
+                    o2.getTabIndex() < o1.getTabIndex() ? 1 :
+                            0;
+        }
+    }
+
+    private static class TabIteratorFilter implements Filter {
+        public boolean filter(Component c) {
+            return c.getTabIndex() >= 0 && c.isVisible() && c.isFocusable() && c.isEnabled() && !c.isHidden(true);
+        }
+    }
 }

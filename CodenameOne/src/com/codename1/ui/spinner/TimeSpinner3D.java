@@ -84,66 +84,24 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     void initSpinner() {
         if (hour == null) {
             hour = Spinner3D.create(startHour, endHour, currentHour, 1);
-            hour.setRowFormatter(new RowFormatter() {
-
-                @Override
-                public String format(String input) {
-                    if (input != null) {
-                        return Integer.toString((int) Double.parseDouble(input));
-                    }
-                    return null;
-                }
-
-            });
+            hour.setRowFormatter(new HourRowFormatter());
             Style hourStyle = Style.createProxyStyle(hour.getRowStyle(), hour.getSelectedRowStyle());
             hourStyle.setAlignment(Component.RIGHT);
             hourStyle.setPaddingRight(3f);
-            //hour.refreshStyles();
             minute = Spinner3D.create(0, 59, currentMinute, minuteStep);
-            minute.setRowFormatter(new SpinnerNode.RowFormatter() {
-
-                @Override
-                public String format(String input) {
-                    if (input != null) {
-                        try {
-                            int i = (int) Double.parseDouble(input);
-                            if (i < 10) {
-                                return "0" + i;
-                            } else {
-                                return Integer.toString(i);
-                            }
-                        } catch (Throwable t) {
-                            // ignore and return null below
-                        }
-                    }
-                    return null;
-                }
-            });
+            minute.setRowFormatter(new MinuteRowFormatter());
 
             Style minuteStyle = Style.createProxyStyle(minute.getRowStyle(), minute.getSelectedRowStyle());
             minuteStyle.setAlignment(Component.RIGHT);
             minuteStyle.setPaddingRight(3f);
 
-            //minute.refreshStyles();
             if (currentMeridiem) {
                 amPM = Spinner3D.create(0, 2, 1, 1);
             } else {
                 amPM = Spinner3D.create(0, 2, 0, 1);
             }
 
-            amPM.setRowFormatter(new RowFormatter() {
-
-                @Override
-                public String format(String input) {
-                    if (Double.parseDouble(input) < 1) {
-                        return "AM";
-                    }
-                    return "PM";
-                }
-
-            });
-            //getAllStyles().setBgColor(hour.getUnselectedStyle().getBgColor());
-            //getAllStyles().setBgTransparency(255);
+            amPM.setRowFormatter(new AmPmRowFormatter());
             addComponents();
         }
     }
@@ -533,4 +491,45 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     }
 
 
+    private static class AmPmRowFormatter implements RowFormatter {
+        @Override
+        public String format(String input) {
+            if (Double.parseDouble(input) < 1) {
+                return "AM";
+            }
+            return "PM";
+        }
+    }
+
+    private static class MinuteRowFormatter implements RowFormatter {
+
+        @Override
+        public String format(String input) {
+            if (input != null) {
+                try {
+                    int i = (int) Double.parseDouble(input);
+                    if (i < 10) {
+                        return "0" + i;
+                    } else {
+                        return Integer.toString(i);
+                    }
+                } catch (Throwable t) {
+                    // ignore and return null below
+                }
+            }
+            return null;
+        }
+    }
+
+    private static class HourRowFormatter implements RowFormatter {
+
+        @Override
+        public String format(String input) {
+            if (input != null) {
+                return Integer.toString((int) Double.parseDouble(input));
+            }
+            return null;
+        }
+
+    }
 }

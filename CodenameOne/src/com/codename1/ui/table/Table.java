@@ -236,16 +236,13 @@ public class Table extends Container {
                     Component cell = createCellImpl(value, r, c, e);
                     TableLayout.Constraint con = createCellConstraint(value, r, c);
 
-                    // returns the current row we iterate about
-                        int currentRow = ((TableLayout) getLayout()).getNextRow();
-
-                        if (r > model.getRowCount()) {
-                            return;
-                        }
-                        addComponent(con, cell);
-                        if (r == selectionRow && c == selectionColumn) {
-                            cell.requestFocus();
-                        }
+                    if (r > model.getRowCount()) {
+                        return;
+                    }
+                    addComponent(con, cell);
+                    if (r == selectionRow && c == selectionColumn) {
+                        cell.requestFocus();
+                    }
                 }
             }
         }
@@ -433,32 +430,7 @@ public class Table extends Container {
      * @return the comparator instance
      */
     protected Comparator<Object> createColumnSortComparator(int column) {
-        final CaseInsensitiveOrder ccmp = new CaseInsensitiveOrder();
-        return new Comparator<Object>() {
-            public int compare(Object o1, Object o2) {
-                if (o1 == null) {
-                    if (o2 == null) {
-                        return 0;
-                    }
-                    return -1;
-                } else {
-                    if (o2 == null) {
-                        return 1;
-                    }
-                }
-                if (o1 instanceof String && o2 instanceof String) {
-                    return ccmp.compare((String) o1, (String) o2);
-                }
-                try {
-                    double d1 = Util.toDoubleValue(o1);
-                    double d2 = Util.toDoubleValue(o2);
-                    return Double.compare(d1, d2);
-                } catch (IllegalArgumentException err) {
-                    long dd = Util.toDateValue(o1).getTime() - Util.toDateValue(o2).getTime();
-                    return (int) dd;
-                }
-            }
-        };
+        return new ColumnSortComparator(new CaseInsensitiveOrder());
     }
 
     /**
@@ -975,6 +947,38 @@ public class Table extends Container {
             return ((SortableTableModel) model).getUnderlying() instanceof AbstractTableModel;
         }
         return model instanceof AbstractTableModel;
+    }
+
+    private static class ColumnSortComparator implements Comparator<Object> {
+        private final CaseInsensitiveOrder ccmp;
+
+        public ColumnSortComparator(CaseInsensitiveOrder ccmp) {
+            this.ccmp = ccmp;
+        }
+
+        public int compare(Object o1, Object o2) {
+            if (o1 == null) {
+                if (o2 == null) {
+                    return 0;
+                }
+                return -1;
+            } else {
+                if (o2 == null) {
+                    return 1;
+                }
+            }
+            if (o1 instanceof String && o2 instanceof String) {
+                return ccmp.compare((String) o1, (String) o2);
+            }
+            try {
+                double d1 = Util.toDoubleValue(o1);
+                double d2 = Util.toDoubleValue(o2);
+                return Double.compare(d1, d2);
+            } catch (IllegalArgumentException err) {
+                long dd = Util.toDateValue(o1).getTime() - Util.toDateValue(o2).getTime();
+                return (int) dd;
+            }
+        }
     }
 
     class Listener implements DataChangedListener, ActionListener {

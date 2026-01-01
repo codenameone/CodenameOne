@@ -83,11 +83,7 @@ public class GlassTutorial implements Painter {
     public void showOn(Form f) {
         Painter oldPane = f.getGlassPane();
         f.setGlassPane(this);
-        Dialog dummy = new Dialog() {
-            public void keyReleased(int i) {
-                dispose();
-            }
-        };
+        Dialog dummy = new DisposableDialog();
         int oldTint = f.getTintColor();
         f.setTintColor(0);
 
@@ -157,4 +153,9 @@ public class GlassTutorial implements Painter {
         }
     }
 
+    private static class DisposableDialog extends Dialog {
+        public void keyReleased(int i) {
+            dispose();
+        }
+    }
 }

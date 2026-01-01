@@ -423,12 +423,9 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
     public Span calculateLabelSpan(TextSelection sel, Label l) {
         Image icon = l.getMaskedIcon();
-        Image stateIcon = null;
         int preserveSpaceForState = 0;
-        //setFG(g, l);
 
         int gap = l.getGap();
-        int stateIconSize = 0;
         String text = l.getText();
         Style style = l.getStyle();
         int cmpX = l.getX();
@@ -580,49 +577,30 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     if (iconHeight > fontHeight) {
                         iconStringHGap = (iconHeight - fontHeight) / 2;
                         return calculateSpanForLabelStringValign(sel, l, text, x, y, iconStringHGap, iconHeight, textSpaceW, fontHeight);
-                    } else {
-                        iconStringHGap = (fontHeight - iconHeight) / 2;
-                        //strWidth = drawLabelString(l, text, x, y, textSpaceW);
-                        return calculateSpanForLabelString(sel, l, text, x, y, textSpaceW);
-                        //g.drawImage(icon, x + strWidth + gap, y + iconStringHGap);
                     }
+                    return calculateSpanForLabelString(sel, l, text, x, y, textSpaceW);
 
                 case Label.RIGHT:
                     if (iconHeight > fontHeight) {
                         iconStringHGap = (iconHeight - fontHeight) / 2;
-                        //g.drawImage(icon, x, y);
                         return calculateSpanForLabelStringValign(sel, l, text, x + iconWidth + gap, y, iconStringHGap, iconHeight, textSpaceW, fontHeight);
-                    } else {
-                        iconStringHGap = (fontHeight - iconHeight) / 2;
-                        //g.drawImage(icon, x, y + iconStringHGap);
-                        return calculateSpanForLabelString(sel, l, text, x + iconWidth + gap, y, textSpaceW);
                     }
+                    return calculateSpanForLabelString(sel, l, text, x + iconWidth + gap, y, textSpaceW);
 
                 case Label.BOTTOM:
                     if (iconWidth > strWidth) { //center align the smaller
-
                         iconStringWGap = (iconWidth - strWidth) / 2;
-                        //g.drawImage(icon, x, y);
                         return calculateSpanForLabelString(sel, l, text, x + iconStringWGap, y + iconHeight + gap, textSpaceW);
-                    } else {
-                        iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;
-                        //g.drawImage(icon, x + iconStringWGap, y);
-
-                        return calculateSpanForLabelString(sel, l, text, x, y + iconHeight + gap, textSpaceW);
                     }
+                    return calculateSpanForLabelString(sel, l, text, x, y + iconHeight + gap, textSpaceW);
 
                 case Label.TOP:
                     if (iconWidth > strWidth) { //center align the smaller
 
                         iconStringWGap = (iconWidth - strWidth) / 2;
                         return calculateSpanForLabelString(sel, l, text, x + iconStringWGap, y, textSpaceW);
-                        //g.drawImage(icon, x, y + fontHeight + gap);
-                    } else {
-                        iconStringWGap = (Math.min(strWidth, textSpaceW) - iconWidth) / 2;
-                        return calculateSpanForLabelString(sel, l, text, x, y, textSpaceW);
-                        //g.drawImage(icon, x + iconStringWGap, y + fontHeight + gap);
                     }
-                    // break; // unreachable because of return
+                    return calculateSpanForLabelString(sel, l, text, x, y, textSpaceW);
                 default:
                     break;
 
@@ -959,7 +937,6 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                     default:
                         break;
                 }
-                int nextY = ta.getY() + topPadding + (ta.getRowsGap() + fontHeight) * (i + 2);
                 //if this is the last line to display and there is more content and isEndsWith3Points() is true
                 //add "..." at the last row
                 if (ta.isEndsWith3Points() && ta.getGrowLimit() == (i + 1) && ta.getGrowLimit() != line) {
@@ -2323,20 +2300,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
 
         // We need to make the InfiniteProgress to animate, otherwise the progress
         // just stays static.
-        ComponentSelector.select("*", pull).each(new ComponentClosure() {
-
-
-            @Override
-            public void call(Component c) {
-                if (c instanceof InfiniteProgress) {
-                    ((InfiniteProgress) c).animate(true);
-                } else {
-                    c.animate();
-                }
-            }
-        });
+        ComponentSelector.select("*", pull).each(new PullToRefreshComponentClosure());
         pull.paintComponent(g);
-
     }
 
     /**
@@ -2590,5 +2555,16 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
         }
         //System.out.println("Span: "+span);
         return span.translate(l.getAbsoluteX() - sel.getSelectionRoot().getAbsoluteX() - l.getX(), l.getAbsoluteY() - sel.getSelectionRoot().getAbsoluteY() - l.getY());
+    }
+
+    private static class PullToRefreshComponentClosure implements ComponentClosure {
+        @Override
+        public void call(Component c) {
+            if (c instanceof InfiniteProgress) {
+                ((InfiniteProgress) c).animate(true);
+            } else {
+                c.animate();
+            }
+        }
     }
 }

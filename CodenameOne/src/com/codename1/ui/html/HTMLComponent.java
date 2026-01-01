@@ -2719,11 +2719,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     if (Display.getInstance().getCurrent() != inputField.getComponentForm()) { // ((inputField.getComponentForm()==null) ||
                         inputField.getParent().replace(inputField, newInputField, null); // Applying the constraints may return a new instance that has to be replaced in the form
                     } else {
-                        Display.getInstance().callSerially(new Runnable() {
-                            public void run() {
-                                inputField.getParent().replace(inputField, newInputField, null); // Applying the constraints may return a new instance that has to be replaced in the form
-                            }
-                        });
+                        Display.getInstance().callSerially(new InputFormatRunnable(inputField, newInputField));
                     }
                     if (firstFocusable == inputField) {
                         firstFocusable = newInputField;
@@ -4351,4 +4347,17 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
     }
 
+    private static class InputFormatRunnable implements Runnable {
+        private final TextArea inputField;
+        private final TextArea newInputField;
+
+        public InputFormatRunnable(TextArea inputField, TextArea newInputField) {
+            this.inputField = inputField;
+            this.newInputField = newInputField;
+        }
+
+        public void run() {
+            inputField.getParent().replace(inputField, newInputField, null); // Applying the constraints may return a new instance that has to be replaced in the form
+        }
+    }
 }

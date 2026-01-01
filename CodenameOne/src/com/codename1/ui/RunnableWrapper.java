@@ -122,7 +122,9 @@ class RunnableWrapper implements Runnable {
                     while (!done) {
                         synchronized (Display.lock) {
                             try {
-                                Display.lock.wait(10);
+                                if(!done) {
+                                    Display.lock.wait(10);
+                                }
                             } catch (InterruptedException ex) {
                                 ex.printStackTrace();
                             }
