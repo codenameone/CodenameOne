@@ -116,6 +116,22 @@ class ShareForm extends Form {
             this.contacts = contacts;
         }
 
+        @Override
+        public final boolean equals(Object o) {
+            if (!(o instanceof BackCommand)) return false;
+            if (!super.equals(o)) return false;
+
+            BackCommand that = (BackCommand) o;
+            return (contacts == null ? that.contacts == null : contacts.equals(that.contacts));
+        }
+
+        @Override
+        public int hashCode() {
+            int result = super.hashCode();
+            result = 31 * result + (contacts != null ? contacts.hashCode() : 0);
+            return result;
+        }
+
         public void actionPerformed(ActionEvent evt) {
             contacts.showBack();
         }

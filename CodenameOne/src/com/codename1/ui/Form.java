@@ -1730,7 +1730,6 @@ public class Form extends Container {
     @Override
     public void stopEditing(Runnable onFinish) {
         Display.getInstance().stopEditing(this, onFinish);
-
     }
 
     @Override

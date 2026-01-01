@@ -65,7 +65,7 @@ class RunnableWrapper implements Runnable {
         }
         synchronized (THREADPOOL_LOCK) {
             threadPool.add(r);
-            THREADPOOL_LOCK.notify();
+            THREADPOOL_LOCK.notifyAll();
         }
     }
 
@@ -94,7 +94,9 @@ class RunnableWrapper implements Runnable {
             while (!dlg.isDisposed()) {
                 try {
                     synchronized (Display.lock) {
-                        Display.lock.wait(40);
+                        if(!dlg.isDisposed()) {
+                            Display.lock.wait(40);
+                        }
                     }
                 } catch (InterruptedException ex) {
                 }
@@ -106,7 +108,7 @@ class RunnableWrapper implements Runnable {
                     internal.run();
                     done = true;
                     synchronized (Display.lock) {
-                        Display.lock.notify();
+                        Display.lock.notifyAll();
                     }
                     break;
                 case 1:

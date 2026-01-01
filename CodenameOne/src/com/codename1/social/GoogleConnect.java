@@ -26,6 +26,7 @@ import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Oauth2;
 
+import java.util.Arrays;
 import java.util.Hashtable;
 
 /**
@@ -113,6 +114,22 @@ public class GoogleConnect extends Login {
 
         public ValidateTokenConnectionRequest(boolean[] retval) {
             this.retval = retval;
+        }
+
+        @Override
+        public final boolean equals(Object o) {
+            if (!(o instanceof ValidateTokenConnectionRequest)) return false;
+            if (!super.equals(o)) return false;
+
+            ValidateTokenConnectionRequest that = (ValidateTokenConnectionRequest) o;
+            return Arrays.equals(retval, that.retval);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = super.hashCode();
+            result = 31 * result + Arrays.hashCode(retval);
+            return result;
         }
 
         @Override

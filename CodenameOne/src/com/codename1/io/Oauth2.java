@@ -23,6 +23,7 @@
  */
 package com.codename1.io;
 
+import com.codename1.compat.java.util.Objects;
 import com.codename1.components.InfiniteProgress;
 import com.codename1.components.WebBrowser;
 import com.codename1.ui.BrowserWindow;
@@ -542,27 +543,20 @@ public class Oauth2 {
                         }
                     }
 
-                    /**
-                     * {@inheritDoc}
-                     */
-                    public boolean equals(Object o) {
-                        if (this == o) {
-                            return true;
-                        }
-                        if (o == null || getClass() != o.getClass()) {
-                            return false;
-                        }
-                        if (!super.equals(o)) {
-                            return false;
-                        }
-                        return true;
+                    @Override
+                    public final boolean equals(Object o) {
+                        if (!(o instanceof TokenRequest)) return false;
+                        if (!super.equals(o)) return false;
+
+                        TokenRequest that = (TokenRequest) o;
+                        return callbackCalled == that.callbackCalled;
                     }
 
-                    /**
-                     * {@inheritDoc}
-                     */
+                    @Override
                     public int hashCode() {
-                        return super.hashCode();
+                        int result = super.hashCode();
+                        result = 31 * result + (callbackCalled ? 1 : 0);
+                        return result;
                     }
 
                     protected void postResponse() {
@@ -660,7 +654,6 @@ public class Oauth2 {
     }
 
     public static class RefreshTokenRequest extends AsyncResource<AccessToken> {
-
     }
 
     private static class RefreshTokenActionListener implements ActionListener<ActionEvent> {
@@ -690,6 +683,25 @@ public class Oauth2 {
             super("Cancel");
             this.progress = progress;
             this.old = old;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if(obj instanceof ShowAuthenticationCommand) {
+                ShowAuthenticationCommand c = (ShowAuthenticationCommand) obj;
+                return super.equals(c) &&
+                        Objects.equals(progress, c.progress) &&
+                        Objects.equals(old, c.old);
+            }
+            return false;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = super.hashCode();
+            result = 31 * result + (progress != null ? progress.hashCode() : 0);
+            result = 31 * result + (old != null ? old.hashCode() : 0);
+            return result;
         }
 
         public void actionPerformed(ActionEvent ev) {

@@ -510,7 +510,7 @@ public class Component implements Animation, StyleListener, Editable {
      * Creates a new instance of Component
      */
     protected Component() {
-        initLaf(getUIManager());
+        initLaf(getUIManagerImpl());
         setCursor(DEFAULT_CURSOR);
     }
 
@@ -727,7 +727,7 @@ public class Component implements Animation, StyleListener, Editable {
      *
      * <script src="https://gist.github.com/codenameone/31a32bdcf014a9e55a95.js"></script>
      *
-     * @return a unified style object for the purpose of setting on object object instances
+     * @return a unified style object to set values on all styles
      */
     public final Style getAllStyles() {
         if (allStyles == null) {
@@ -1047,6 +1047,10 @@ public class Component implements Animation, StyleListener, Editable {
      * @return a UIManager instance
      */
     public UIManager getUIManager() {
+        return getUIManagerImpl();
+    }
+
+    private UIManager getUIManagerImpl() {
         Container parent = getParent();
         //if no parent return the default UIManager
         if (parent == null) {
@@ -1695,7 +1699,7 @@ public class Component implements Animation, StyleListener, Editable {
      *
      * @return unique string identifying this component for the style sheet
      */
-    public String getUIID() {
+    public final String getUIID() {
         if (landscapeUiid != null) {
             if (Display.impl.isPortrait()) {
                 return portraitUiid;
@@ -6043,7 +6047,7 @@ public class Component implements Animation, StyleListener, Editable {
      *
      * @return the component Style object
      */
-    public Style getUnselectedStyle() {
+    public final Style getUnselectedStyle() {
         if (unSelectedStyle == null) {
             initStyle();
         }

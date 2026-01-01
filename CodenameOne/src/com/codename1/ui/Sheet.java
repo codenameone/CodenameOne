@@ -460,17 +460,7 @@ public class Sheet extends Container {
         if (!(cnt.getLayout() instanceof BorderLayout)) {
             cnt.setLayout(new BorderLayout(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE));
 
-            cnt.getStyle().setBgPainter(new Painter() {
-                @Override
-                public void paint(Graphics g, Rectangle rect) {
-                    int alph = g.getAlpha();
-                    g.setAlpha((int) (alph * 30 / 100.0));
-                    g.setColor(0x0);
-                    g.fillRect(rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
-                    g.setAlpha(alph);
-                }
-
-            });
+            cnt.getStyle().setBgPainter(new ShowPainter());
 
             cnt.revalidate();
 
@@ -907,4 +897,15 @@ public class Sheet extends Container {
     }
 
 
+    private static class ShowPainter implements Painter {
+        @Override
+        public void paint(Graphics g, Rectangle rect) {
+            int alph = g.getAlpha();
+            g.setAlpha((int) (alph * 30 / 100.0));
+            g.setColor(0x0);
+            g.fillRect(rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
+            g.setAlpha(alph);
+        }
+
+    }
 }

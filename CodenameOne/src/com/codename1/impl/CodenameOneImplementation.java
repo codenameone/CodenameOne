@@ -575,7 +575,9 @@ public abstract class CodenameOneImplementation {
      */
     public void stopTextEditing(Runnable onFinish) {
         stopTextEditing();
-        onFinish.run();
+        if(onFinish != null) {
+            onFinish.run();
+        }
     }
 
     /**

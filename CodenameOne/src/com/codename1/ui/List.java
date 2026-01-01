@@ -777,7 +777,7 @@ public class List<T> extends Component implements ActionSource {
      *
      * @return the renderer which is used to draw list elements
      */
-    public ListCellRenderer getRenderer() {
+    public final ListCellRenderer getRenderer() {
         return renderer;
     }
 
