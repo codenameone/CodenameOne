@@ -40,7 +40,6 @@ import com.codename1.ui.plaf.UIManager;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Vector;
@@ -304,24 +303,12 @@ public class Container extends Component implements Iterable<Component> {
         };
         AnimationManager a = getAnimationManager();
         if (a != null && a.isAnimating()) {
-
-            a.addAnimation(new ComponentAnimation() {
-                @Override
-                public boolean isInProgress() {
-                    return false;
-                }
-
-                @Override
-                protected void updateState() {
-                    r.run();
-                }
-            });
+            a.addAnimation(new RefreshThemeCallback(r));
             return newParent;
         } else {
             r.run();
             return newParent;
         }
-
     }
 
     /**
@@ -961,11 +948,7 @@ public class Container extends Component implements Iterable<Component> {
         boolean refreshLaf = manager != cmp.getUIManager();
         cmp.setParent(this);
         if (refreshLaf) {
-            Display.getInstance().callSerially(new Runnable() {
-                public void run() {
-                    cmp.refreshTheme(false);
-                }
-            });
+            Display.getInstance().callSerially(new RefreshThemeRunnable(cmp));
         }
         components.add(index, cmp);
         if (layout instanceof BorderLayout && !BorderLayout.OVERLAY.equals(layout.getComponentConstraint(cmp))) {
@@ -1904,18 +1887,7 @@ public class Container extends Component implements Iterable<Component> {
                 _tmpRenderingElevatedComponents.clear();
                 _tmpRenderingElevatedComponents.addAll(elevatedComponents);
             }
-            Collections.sort(_tmpRenderingElevatedComponents, new Comparator<Component>() {
-
-                public int compare(Component o1, Component o2) {
-                    int e1 = o1.getStyle().getElevation();
-                    int e2 = o2.getStyle().getElevation();
-                    if (e1 < e2) return -1;
-                    else if (e1 > e2) return 1;
-                    else {
-                        return o1.renderedElevationComponentIndex - o2.renderedElevationComponentIndex;
-                    }
-                }
-            });
+            Collections.sort(_tmpRenderingElevatedComponents, new ElevationComparator());
             for (Component child : _tmpRenderingElevatedComponents) {
                 int relativeX = child.getRelativeX(this) + child.getScrollX();
                 int relativeY = child.getRelativeY(this) + child.getScrollY();
