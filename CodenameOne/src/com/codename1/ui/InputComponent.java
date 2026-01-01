@@ -151,7 +151,7 @@ public abstract class InputComponent extends Container {
     /**
      * This method must be invoked by the constructor of the subclasses to initialize the UI
      */
-    protected void initInput() {
+    protected final void initInput() {
         // this can happen for base class constructors
         if (getEditor() != null) {
             setUIID("TextComponent");

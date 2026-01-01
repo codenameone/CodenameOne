@@ -269,7 +269,6 @@ public class JSObject {
                     R1 + "." + PROP_REFCOUNT + "++;" +
                     "} id";
 
-
             String id = exec(js);
             this.objectId = Integer.parseInt(id);
             context.retain(this);

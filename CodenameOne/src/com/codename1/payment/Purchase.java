@@ -552,41 +552,10 @@ public abstract class Purchase {
     public final boolean synchronizeReceiptsSync(long ifOlderThanMs) {
         final boolean[] complete = new boolean[1];
         final boolean[] success = new boolean[1];
-        synchronizeReceipts(ifOlderThanMs, new SuccessCallback<Boolean>() {
-
-            public void onSucess(Boolean value) {
-                complete[0] = true;
-                success[0] = value;
-
-                synchronized (complete) {
-                    complete.notifyAll();
-                }
-
-            }
-
-        });
+        synchronizeReceipts(ifOlderThanMs, new SynchronizeReceiptsSyncSuccessCallback(complete, success));
 
         if (!complete[0]) {
-            Display.getInstance().invokeAndBlock(new Runnable() {
-
-                public void run() {
-
-                        while (!complete[0]) {
-                            synchronized (complete) {
-                                try {
-                                    // need to recheck condition within the synchronized block
-                                    if(!complete[0]) {
-                                        complete.wait();
-                                    }
-                                } catch (InterruptedException ex) {
-                                    Thread.currentThread().interrupt();
-                                    return;
-                                }
-                            }
-                        }
-                }
-
-            });
+            Display.getInstance().invokeAndBlock(new SynchronizeReceiptsSyncRunnable(complete));
         }
         return success[0];
     }
@@ -751,54 +720,6 @@ public abstract class Purchase {
     }
 
     /**
-     * Fetch receipts from IAP service synchronously.
-     *
-     * @param ifOlderThanMs If the current data is not older than this number of milliseconds
-     *                      then it will not attempt to fetch the receipts.
-     * @return true if data was successfully retrieved.  false otherwise.
-     */
-    private boolean loadReceiptsSync(long ifOlderThanMs) {
-        final boolean[] complete = new boolean[1];
-        final boolean[] success = new boolean[1];
-        loadReceipts(ifOlderThanMs, new SuccessCallback<Boolean>() {
-
-            public void onSucess(Boolean value) {
-                complete[0] = true;
-                success[0] = value;
-
-                synchronized (complete) {
-                    complete.notifyAll();
-                }
-
-            }
-
-        });
-
-        if (!complete[0]) {
-            Display.getInstance().invokeAndBlock(new Runnable() {
-
-                public void run() {
-                    while (!complete[0]) {
-                        synchronized (complete) {
-                            try {
-                                // need to recheck condition within the synchronized block
-                                if(!complete[0]) {
-                                    complete.wait();
-                                }
-                            } catch (InterruptedException ex) {
-                                Thread.currentThread().interrupt();
-                                return;
-                            }
-                        }
-                    }
-                }
-
-            });
-        }
-        return success[0];
-    }
-
-    /**
      * Indicates whether refunding is possible when the SKU is purchased
      *
      * @param sku the sku
@@ -887,4 +808,52 @@ public abstract class Purchase {
         return null;
     }
 
+    private static class SynchronizeReceiptsSyncRunnable implements Runnable {
+
+        private final boolean[] complete;
+
+        public SynchronizeReceiptsSyncRunnable(boolean[] complete) {
+            this.complete = complete;
+        }
+
+        public void run() {
+
+                while (!complete[0]) {
+                    synchronized (complete) {
+                        try {
+                            // need to recheck condition within the synchronized block
+                            if(!complete[0]) {
+                                complete.wait();
+                            }
+                        } catch (InterruptedException ex) {
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
+                    }
+                }
+        }
+
+    }
+
+    private static class SynchronizeReceiptsSyncSuccessCallback implements SuccessCallback<Boolean> {
+
+        private final boolean[] complete;
+        private final boolean[] success;
+
+        public SynchronizeReceiptsSyncSuccessCallback(boolean[] complete, boolean[] success) {
+            this.complete = complete;
+            this.success = success;
+        }
+
+        public void onSucess(Boolean value) {
+            complete[0] = true;
+            success[0] = value;
+
+            synchronized (complete) {
+                complete.notifyAll();
+            }
+
+        }
+
+    }
 }

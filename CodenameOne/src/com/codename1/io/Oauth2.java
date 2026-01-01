@@ -356,14 +356,7 @@ public class Oauth2 {
         Form authenticationForm = new Form("Login");
         authenticationForm.setScrollable(false);
         if (old != null) {
-            Command cancel = new Command("Cancel") {
-                public void actionPerformed(ActionEvent ev) {
-                    if (Display.getInstance().getCurrent() == progress) {
-                        progress.dispose();
-                    }
-                    old.showBack();
-                }
-            };
+            Command cancel = new ShowAuthenticationCommand(progress, old);
             if (authenticationForm.getToolbar() != null) {
                 authenticationForm.getToolbar().addCommandToLeftBar(cancel);
             } else {
@@ -686,6 +679,24 @@ public class Oauth2 {
             } else {
                 out.complete((AccessToken) evt.getSource());
             }
+        }
+    }
+
+    private static class ShowAuthenticationCommand extends Command {
+        private final Dialog progress;
+        private final Form old;
+
+        public ShowAuthenticationCommand(Dialog progress, Form old) {
+            super("Cancel");
+            this.progress = progress;
+            this.old = old;
+        }
+
+        public void actionPerformed(ActionEvent ev) {
+            if (Display.getInstance().getCurrent() == progress) {
+                progress.dispose();
+            }
+            old.showBack();
         }
     }
 

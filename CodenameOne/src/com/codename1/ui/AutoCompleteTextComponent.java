@@ -174,7 +174,7 @@ public class AutoCompleteTextComponent extends TextComponent {
      * @return the editor component
      */
     @Override
-    public Component getEditor() {
+    public final Component getEditor() {
         return field;
     }
 

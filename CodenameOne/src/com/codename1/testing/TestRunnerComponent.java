@@ -99,42 +99,14 @@ public class TestRunnerComponent extends Container {
 
     private void runTest(final AbstractTest test, final Button statusLabel) {
         try {
-
             if (test.runTest()) {
-                CN.callSerially(new Runnable() {
-                    public void run() {
-                        statusLabel.setText(test + ": Passed");
-                        $(statusLabel).selectAllStyles().setBgColor(0x00ff00).revalidate();
-                    }
-                });
-
+                CN.callSerially(new OnPassedRunnable(statusLabel, test));
             } else {
-                CN.callSerially(new Runnable() {
-                    public void run() {
-                        statusLabel.setText(test + ": Failed");
-                        $(statusLabel).selectAllStyles().setBgColor(0xff0000).revalidate();
-                    }
-                });
-
+                CN.callSerially(new OnFailedRunnable(statusLabel, test));
             }
-
         } catch (final Throwable t) {
             Log.e(t);
-            CN.callSerially(new Runnable() {
-                public void run() {
-                    statusLabel.setText(test + ": Failed");
-                    $(statusLabel).selectAllStyles().setBgColor(0xff0000).revalidate();
-
-                    statusLabel.addActionListener(new ActionListener() {
-                        public void actionPerformed(ActionEvent ev) {
-                            ToastBar.showInfoMessage(t.getMessage());
-                            Log.e(t);
-                        }
-                    });
-                }
-            });
-
-
+            CN.callSerially(new ExceptionHandlerRunnable(statusLabel, test, t));
         }
     }
 
@@ -168,6 +140,60 @@ public class TestRunnerComponent extends Container {
         }
         if (f != CN.getCurrentForm()) {
             f.showBack();
+        }
+    }
+
+    private static class ExceptionHandlerRunnable implements Runnable {
+        private final Button statusLabel;
+        private final AbstractTest test;
+        private final Throwable t;
+
+        public ExceptionHandlerRunnable(Button statusLabel, AbstractTest test, Throwable t) {
+            this.statusLabel = statusLabel;
+            this.test = test;
+            this.t = t;
+        }
+
+        public void run() {
+            statusLabel.setText(test + ": Failed");
+            $(statusLabel).selectAllStyles().setBgColor(0xff0000).revalidate();
+
+            statusLabel.addActionListener(new ActionListener() {
+                public void actionPerformed(ActionEvent ev) {
+                    ToastBar.showInfoMessage(t.getMessage());
+                    Log.e(t);
+                }
+            });
+        }
+    }
+
+    private static class OnFailedRunnable implements Runnable {
+        private final Button statusLabel;
+        private final AbstractTest test;
+
+        public OnFailedRunnable(Button statusLabel, AbstractTest test) {
+            this.statusLabel = statusLabel;
+            this.test = test;
+        }
+
+        public void run() {
+            statusLabel.setText(test + ": Failed");
+            $(statusLabel).selectAllStyles().setBgColor(0xff0000).revalidate();
+        }
+    }
+
+    private static class OnPassedRunnable implements Runnable {
+        private final Button statusLabel;
+        private final AbstractTest test;
+
+        public OnPassedRunnable(Button statusLabel, AbstractTest test) {
+            this.statusLabel = statusLabel;
+            this.test = test;
+        }
+
+        public void run() {
+            statusLabel.setText(test + ": Passed");
+            $(statusLabel).selectAllStyles().setBgColor(0x00ff00).revalidate();
         }
     }
 }

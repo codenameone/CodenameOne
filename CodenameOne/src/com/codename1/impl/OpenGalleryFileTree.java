@@ -47,34 +47,46 @@ class OpenGalleryFileTree extends FileTree {
         });
         final ImageIO imageio = ImageIO.getImageIO();
         if (imageio != null) {
-
-            Display.getInstance().scheduleBackgroundTask(new Runnable() {
-
-                public void run() {
-                    byte[] data = (byte[]) thumbs.get(node);
-                    if (data == null) {
-                        ByteArrayOutputStream out = new ByteArrayOutputStream();
-                        try {
-                            imageio.save(FileSystemStorage.getInstance().openInputStream((String) node),
-                                    out,
-                                    ImageIO.FORMAT_JPEG,
-                                    b.getIcon().getWidth(), b.getIcon().getHeight(), 1);
-                            data = out.toByteArray();
-                            thumbs.put(node, data);
-                            Storage.getInstance().writeObject("thumbnails", thumbs);
-                        } catch (IOException ex) {
-                            Log.e(ex);
-                        }
-                    }
-                    if (data != null) {
-                        Image im = Image.createImage(data, 0, data.length);
-                        b.setIcon(im);
-                    }
-                }
-            });
-
+            Display.getInstance().scheduleBackgroundTask(
+                    new CreateNodeComponentRunnable(thumbs, node, imageio, b));
         }
         return b;
     }
 
+    private static class CreateNodeComponentRunnable implements Runnable {
+
+        private final Hashtable thumbs;
+        private final Object node;
+        private final ImageIO imageio;
+        private final Button b;
+
+        public CreateNodeComponentRunnable(Hashtable thumbs, Object node, ImageIO imageio, Button b) {
+            this.thumbs = thumbs;
+            this.node = node;
+            this.imageio = imageio;
+            this.b = b;
+        }
+
+        public void run() {
+            byte[] data = (byte[]) thumbs.get(node);
+            if (data == null) {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                try {
+                    imageio.save(FileSystemStorage.getInstance().openInputStream((String) node),
+                            out,
+                            ImageIO.FORMAT_JPEG,
+                            b.getIcon().getWidth(), b.getIcon().getHeight(), 1);
+                    data = out.toByteArray();
+                    thumbs.put(node, data);
+                    Storage.getInstance().writeObject("thumbnails", thumbs);
+                } catch (IOException ex) {
+                    Log.e(ex);
+                }
+            }
+            if (data != null) {
+                Image im = Image.createImage(data, 0, data.length);
+                b.setIcon(im);
+            }
+        }
+    }
 }

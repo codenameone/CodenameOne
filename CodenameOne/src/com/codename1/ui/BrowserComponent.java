@@ -131,11 +131,7 @@ public class BrowserComponent extends Container {
     private boolean nativeScrolling = true;
     private boolean ready = false;
     private boolean fireCallbacksOnEdt = true;
-    private BrowserNavigationCallback browserNavigationCallback = new BrowserNavigationCallback() {
-        public boolean shouldNavigate(String url) {
-            return true;
-        }
-    };
+    private BrowserNavigationCallback browserNavigationCallback = new AlwaysTrueShouldNavigateCallback();
     /**
      * List of registered browser navigation callbacks.
      */
@@ -653,16 +649,7 @@ public class BrowserComponent extends Container {
             if (callback != null) {
                 if (errorMessage != null) {
                     if (fireCallbacksOnEdt) {
-                        Display.getInstance().callSerially(new Runnable() {
-
-                            public void run() {
-                                if (callback instanceof Callback) {
-                                    ((Callback) callback).onError(this, new RuntimeException(errorMessage), 0, errorMessage);
-
-                                }
-                            }
-
-                        });
+                        Display.getInstance().callSerially(new FireNavigationCallbackRunnable(callback, errorMessage));
                     } else {
                         if (callback instanceof Callback) {
                             ((Callback) callback).onError(this, new RuntimeException(errorMessage), 0, errorMessage);
@@ -672,13 +659,7 @@ public class BrowserComponent extends Container {
 
                 } else {
                     if (fireCallbacksOnEdt) {
-                        Display.getInstance().callSerially(new Runnable() {
-
-                            public void run() {
-                                callback.onSucess(new JSRef(value, type));
-                            }
-
-                        });
+                        Display.getInstance().callSerially(new NavigationCallbackRunnable(callback, value, type));
                     } else {
                         callback.onSucess(new JSRef(value, type));
                     }
@@ -784,13 +765,8 @@ public class BrowserComponent extends Container {
         if (ready) {
             out.complete(this);
         } else {
-            class LoadWrapper {
-                Timer timer;
-                ActionListener l;
-            }
             final LoadWrapper w = new LoadWrapper();
             if (timeout > 0) {
-
                 w.timer = CN.setTimeout(timeout, new Runnable() {
                     public void run() {
                         w.timer = null;
@@ -805,7 +781,7 @@ public class BrowserComponent extends Container {
 
                 });
             }
-            w.l = new ActionListener() {
+            w.l = new ActionListener<ActionEvent>() {
                 public void actionPerformed(ActionEvent evt) {
                     w.l = null;
                     if (w.timer != null) {
@@ -824,6 +800,11 @@ public class BrowserComponent extends Container {
             addWebEventListener(onLoad, w.l);
         }
         return out;
+    }
+
+    static class LoadWrapper {
+        Timer timer;
+        ActionListener<ActionEvent> l;
     }
 
     /**
@@ -1250,11 +1231,7 @@ public class BrowserComponent extends Container {
      */
     public String executeAndReturnString(String javaScript) {
         while (internal == null) {
-            CN.invokeAndBlock(new Runnable() {
-                public void run() {
-                    Util.sleep(50);
-                }
-            });
+            CN.invokeAndBlock(new ShortSleepRunnable());
         }
         if (Display.impl.supportsBrowserExecuteAndReturnString(internal)) {
             return Display.impl.browserExecuteAndReturnString(internal, javaScript);
@@ -1569,33 +1546,10 @@ public class BrowserComponent extends Container {
      */
     public JSRef executeAndWait(int timeout, String js) {
         final ExecuteResult res = new ExecuteResult();
-        execute(timeout, js, new Callback<JSRef>() {
-
-            public void onSucess(JSRef value) {
-                synchronized (res) {
-                    res.complete = true;
-                    res.value = value;
-                    res.notifyAll();
-                }
-            }
-
-            public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
-                synchronized (res) {
-                    res.complete = true;
-                    res.error = err;
-                    res.notifyAll();
-                }
-            }
-        });
+        execute(timeout, js, new WaitCallback(res));
 
         while (!res.complete) {
-            Display.getInstance().invokeAndBlock(new Runnable() {
-
-                public void run() {
-                    Util.wait(res, 1000);
-                }
-
-            });
+            Display.getInstance().invokeAndBlock(new WaitRunnable(res));
         }
         if (res.error != null) {
             throw new RuntimeException(res.error.getMessage());
@@ -1826,6 +1780,92 @@ public class BrowserComponent extends Container {
          */
         public String toString() {
             return expression;
+        }
+    }
+
+    private static class FireNavigationCallbackRunnable implements Runnable {
+        private final SuccessCallback<JSRef> callback;
+        private final String errorMessage;
+
+        public FireNavigationCallbackRunnable(SuccessCallback<JSRef> callback, String errorMessage) {
+            this.callback = callback;
+            this.errorMessage = errorMessage;
+        }
+
+        public void run() {
+            if (callback instanceof Callback) {
+                ((Callback) callback).onError(this, new RuntimeException(errorMessage), 0, errorMessage);
+
+            }
+        }
+    }
+
+    private static class WaitRunnable implements Runnable {
+
+        private final ExecuteResult res;
+
+        public WaitRunnable(ExecuteResult res) {
+            this.res = res;
+        }
+
+        public void run() {
+            Util.wait(res, 1000);
+        }
+
+    }
+
+    private static class WaitCallback implements Callback<JSRef> {
+
+        private final ExecuteResult res;
+
+        public WaitCallback(ExecuteResult res) {
+            this.res = res;
+        }
+
+        public void onSucess(JSRef value) {
+            synchronized (res) {
+                res.complete = true;
+                res.value = value;
+                res.notifyAll();
+            }
+        }
+
+        public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
+            synchronized (res) {
+                res.complete = true;
+                res.error = err;
+                res.notifyAll();
+            }
+        }
+    }
+
+    private static class ShortSleepRunnable implements Runnable {
+        public void run() {
+            Util.sleep(50);
+        }
+    }
+
+    private static class NavigationCallbackRunnable implements Runnable {
+
+        private final SuccessCallback<JSRef> callback;
+        private final String value;
+        private final String type;
+
+        public NavigationCallbackRunnable(SuccessCallback<JSRef> callback, String value, String type) {
+            this.callback = callback;
+            this.value = value;
+            this.type = type;
+        }
+
+        public void run() {
+            callback.onSucess(new JSRef(value, type));
+        }
+
+    }
+
+    private static class AlwaysTrueShouldNavigateCallback implements BrowserNavigationCallback {
+        public boolean shouldNavigate(String url) {
+            return true;
         }
     }
 
