@@ -140,21 +140,8 @@ SPOTLESS_REPORT="$ARTIFACTS_DIR/spotless-report.md"
 SPOTLESS_LOG="$ARTIFACTS_DIR/spotless.log"
 
 log "Running Spotless verification with JAVA_HOME=$JAVA17_HOME"
-if JAVA_HOME="$JAVA17_HOME" run_maven -X -f maven/pom.xml -pl android -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries -Djava.awt.headless=true com.diffplug.spotless:spotless-maven-plugin:check > "$SPOTLESS_LOG" 2>&1; then
-  {
-    echo "✅ **Spotless:** Passed"
-    echo ""
-    echo "Files checked:"
-    grep "Spotless checks" "$SPOTLESS_LOG" || echo "Count not found in log"
-    echo ""
-    echo "<details><summary>Full Spotless Log (Success)</summary>"
-    echo ""
-    echo "\`\`\`"
-    cat "$SPOTLESS_LOG"
-    echo "\`\`\`"
-    echo ""
-    echo "</details>"
-  } > "$SPOTLESS_REPORT"
+if JAVA_HOME="$JAVA17_HOME" run_maven -e -f maven/pom.xml -pl android -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries -Djava.awt.headless=true com.diffplug.spotless:spotless-maven-plugin:check > "$SPOTLESS_LOG" 2>&1; then
+  echo "✅ **Spotless:** Passed" > "$SPOTLESS_REPORT"
 else
   log "Spotless check failed. See artifacts/spotless.log"
   {

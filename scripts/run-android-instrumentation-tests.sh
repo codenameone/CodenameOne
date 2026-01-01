@@ -270,7 +270,12 @@ cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner-logcat.txt" 2>/dev/null || true
 [ -n "${TEST_EXEC_LOG:-}" ] && cp -f "$TEST_EXEC_LOG" "$ARTIFACTS_DIR/test-results.log" 2>/dev/null || true
 
 if [ -f "$ARTIFACTS_DIR/build_failed.txt" ]; then
-  ra_log "FATAL: Build failed in a previous step (see artifacts)"
+  if [ -f "$CN1SS_EXTRA_MARKDOWN_FILE" ]; then
+    ra_log "---- Failure Report ----"
+    cat "$CN1SS_EXTRA_MARKDOWN_FILE"
+    ra_log "------------------------"
+  fi
+  ra_log "FATAL: Build failed in a previous step (see artifacts or report above)"
   exit 1
 fi
 
