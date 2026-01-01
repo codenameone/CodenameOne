@@ -134,7 +134,7 @@ fi
 run_maven -q -f maven/pom.xml -pl android -am -Dcn1.binaries="$CN1_BINARIES" -P !download-cn1-binaries -T 1C -Dmaven.javadoc.skip=true -Dmaven.source.skip=true -Djava.awt.headless=true clean install "$@"
 
 log "Running Spotless verification..."
-ARTIFACTS_DIR="${ARTIFACTS_DIR:-../artifacts}"
+ARTIFACTS_DIR="${ARTIFACTS_DIR:-artifacts}"
 mkdir -p "$ARTIFACTS_DIR" || true
 SPOTLESS_REPORT="$ARTIFACTS_DIR/spotless-report.md"
 SPOTLESS_LOG="$ARTIFACTS_DIR/spotless.log"
