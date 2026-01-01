@@ -86,18 +86,7 @@ public class SortableTableModel extends AbstractTableModel {
         }
         // sort(int[]) doesn't accept a comparator how stupid is that...
         Arrays.sort(sortedTemp,
-                new Comparator<Object>() {
-                    public int compare(Object o1, Object o2) {
-                        int i1 = (Integer) o1;
-                        int i2 = (Integer) o2;
-                        if (asc) {
-                            return cmp.compare(model1.getValueAt(i1, column),
-                                    model1.getValueAt(i2, column)) * -1;
-                        }
-                        return cmp.compare(model1.getValueAt(i1, column),
-                                model1.getValueAt(i2, column));
-                    }
-                });
+                new TemporarySorterComparator(asc, cmp, model1, column));
         for (int iter = 0; iter < sorted.length; iter++) {
             sorted[iter] = sortedTemp[iter];
         }
@@ -218,5 +207,30 @@ public class SortableTableModel extends AbstractTableModel {
             return;
         }
         super.setValidator(validator);
+    }
+
+    private static class TemporarySorterComparator implements Comparator<Object> {
+        private final boolean asc;
+        private final Comparator cmp;
+        private final TableModel model1;
+        private final int column;
+
+        public TemporarySorterComparator(boolean asc, Comparator cmp, TableModel model1, int column) {
+            this.asc = asc;
+            this.cmp = cmp;
+            this.model1 = model1;
+            this.column = column;
+        }
+
+        public int compare(Object o1, Object o2) {
+            int i1 = (Integer) o1;
+            int i2 = (Integer) o2;
+            if (asc) {
+                return cmp.compare(model1.getValueAt(i1, column),
+                        model1.getValueAt(i2, column)) * -1;
+            }
+            return cmp.compare(model1.getValueAt(i1, column),
+                    model1.getValueAt(i2, column));
+        }
     }
 }

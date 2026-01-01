@@ -1070,7 +1070,8 @@ public class Resources {
                         while (svgSize > 0) {
                             svgSize -= input.skip(svgSize);
                         }
-                        String baseURL = input.readUTF();
+                        // reading baseURL
+                        input.readUTF();
 
                         // read the animated property to skip it as well...
                         input.readBoolean();
@@ -1299,6 +1300,13 @@ public class Resources {
         return Font.createTrueTypeFont(fontName, fileName).derive(fontSize, f.getStyle());
     }
 
+    static class MediaRule {
+        int matchCount;
+        int bestMatchScore;
+        String rawKey;
+        String translatedKey;
+    }
+
     Hashtable loadTheme(String id, boolean newerVersion) throws IOException {
         Hashtable theme = new Hashtable();
         String densityStr = Display.getInstance().getDensityStr();
@@ -1317,14 +1325,6 @@ public class Resources {
         int size = input.readShort();
         List<String> fontKeys = new ArrayList<String>();
         Map<String, Float> fontScaleRules = null;
-        class MediaRule {
-            int matchCount;
-            int bestMatchScore;
-            String rawKey;
-            String translatedKey;
-
-
-        }
         Map<String, MediaRule> mediaRules = new HashMap<String, MediaRule>();
         int defaultFontSizeSetPriority = 0;
         for (int iter = 0; iter < size; iter++) {

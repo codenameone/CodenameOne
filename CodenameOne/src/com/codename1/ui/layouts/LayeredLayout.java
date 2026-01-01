@@ -1195,28 +1195,28 @@ public class LayeredLayout extends Layout {
             cmps.add(cmp);
         }
 
-        Collections.sort(cmps, new Comparator<Component>() {
+        Collections.sort(cmps, new ChildrenInTraversalOrderComparator());
+        return cmps.toArray(new Component[cmps.size()]);
+    }
 
-            @Override
-            public int compare(Component o1, Component o2) {
-                if (o1.getY() < o2.getY()) {
+    private static class ChildrenInTraversalOrderComparator implements Comparator<Component> {
+        @Override
+        public int compare(Component o1, Component o2) {
+            if (o1.getY() < o2.getY()) {
+                return -1;
+            } else if (o1.getY() > o2.getY()) {
+                return 1;
+            } else {
+                if (o1.getX() < o2.getX()) {
                     return -1;
-                } else if (o1.getY() > o2.getY()) {
+                } else if (o1.getX() > o2.getX()) {
                     return 1;
                 } else {
-                    if (o1.getX() < o2.getX()) {
-                        return -1;
-                    } else if (o1.getX() > o2.getX()) {
-                        return 1;
-                    } else {
-                        return 0;
-                    }
+                    return 0;
                 }
             }
+        }
 
-        });
-        Component[] cmpArr = cmps.toArray(new Component[cmps.size()]);
-        return cmpArr;
     }
 
     /**

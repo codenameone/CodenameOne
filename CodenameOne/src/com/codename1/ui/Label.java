@@ -914,10 +914,8 @@ public class Label extends Component implements IconHolder, TextHolder {
                 while (currentWidth > w) {
                     fontSize--;
                     if (fontSize <= minSizePixel) {
-                        fontSize = minSizePixel;
                         currentFont = currentFont.derive(minSizePixel, currentFont.getStyle());
                         getAllStyles().setFont(currentFont);
-                        currentWidth = calcPreferredSize().getWidth();
                         break;
                     }
                     currentFont = currentFont.derive(fontSize, currentFont.getStyle());
@@ -1569,8 +1567,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      */
     public void setIconUIID(String uiid) {
         if (iconStyleComponent == null || !uiid.equals(iconStyleComponent.getUIID())) {
-            iconStyleComponent = new Component() {
-            };
+            iconStyleComponent = new Component();
             iconStyleComponent.setUIID(uiid);
         }
     }

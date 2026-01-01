@@ -704,11 +704,7 @@ public class MenuBar extends Container implements ActionListener {
         final Dialog d = new Dialog("Menu", "");
         d.setDisposeWhenPointerOutOfBounds(true);
         d.setMenu(true);
-        d.addOrientationListener(new ActionListener() {
-            public void actionPerformed(ActionEvent evt) {
-                d.dispose();
-            }
-        });
+        d.addOrientationListener(new MenuDisposerActionListener(d));
         d.setTransitionInAnimator(transitionIn);
         d.setTransitionOutAnimator(transitionOut);
         d.setLayout(new BorderLayout());
@@ -1760,5 +1756,17 @@ public class MenuBar extends Container implements ActionListener {
         int t = getCommandBehavior();
         return t == Display.COMMAND_BEHAVIOR_TOUCH_MENU ||
                 (t == Display.COMMAND_BEHAVIOR_DEFAULT && Display.getInstance().isTouchScreenDevice());
+    }
+
+    private static class MenuDisposerActionListener implements ActionListener {
+        private final Dialog d;
+
+        public MenuDisposerActionListener(Dialog d) {
+            this.d = d;
+        }
+
+        public void actionPerformed(ActionEvent evt) {
+            d.dispose();
+        }
     }
 }

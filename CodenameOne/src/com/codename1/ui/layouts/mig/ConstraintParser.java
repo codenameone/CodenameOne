@@ -1526,7 +1526,7 @@ public final class ConstraintParser {
             }
         }
 
-        retArr[pNr++] = s.substring(st, sSize).trim();
+        retArr[pNr] = s.substring(st, sSize).trim();
         return retArr;
     }
 
