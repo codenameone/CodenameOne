@@ -168,7 +168,7 @@ public class MapComponent extends Container {
         _layers = new Vector();
         setFocusable(false);
         if (Display.getInstance().isTouchScreenDevice() && getUIManager().isThemeConstant("mapZoomButtonsBool", true)) {
-            setLayout(new BorderLayout());
+            super.setLayout(new BorderLayout());
             Container buttonsbar = new Container(new FlowLayout(Component.RIGHT));
             Button out = new Button("-");
             out.setUIID("MapZoomOut");

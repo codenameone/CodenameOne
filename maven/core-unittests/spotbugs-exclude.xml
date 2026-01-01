@@ -92,6 +92,26 @@
         <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE" />
     </Match>
 
+    <!--
+    There's a single call to an external class from a constructor
+    that's too hard to fix and might break compatibility if modified.
+    Since the class is deprecated anyway it shouldn't be a problem.
+    -->
+    <Match>
+        <Class name="~com\.codename1\.javascript\.JavascriptContext.*" />
+        <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON" />
+    </Match>
+
+    <!--
+    Map adapters register themselves in the constructor for simplicity.
+    Changing this would force developers to use a more obtuse API for no
+    valid reason.
+    -->
+    <Match>
+        <Class name="~com\.codename1\.properties\.MapAdapter.*" />
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR" />
+    </Match>
+
     <!-- This is a 3rd party file that's really hard to fix properly  -->
     <Match>
         <Class name="~com\.codename1\.io\.gzip\.InfBlocks.*" />

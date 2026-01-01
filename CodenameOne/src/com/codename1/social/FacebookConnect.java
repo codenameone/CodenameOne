@@ -252,22 +252,29 @@ public class FacebookConnect extends Login {
         //valid anymore
         final boolean[] retval = new boolean[1];
         retval[0] = true;
-        ConnectionRequest req = new ConnectionRequest() {
-            @Override
-            protected void handleErrorResponseCode(int code, String message) {
-                //access token not valid anymore
-                if (code >= 400 && code <= 410) {
-                    retval[0] = false;
-                    return;
-                }
-                super.handleErrorResponseCode(code, message);
-            }
-
-        };
+        ConnectionRequest req = new ValidateTokenConnectionRequest(retval);
         req.setPost(false);
         req.setUrl("https://graph.facebook.com/v2.4/me");
         req.addArgumentNoEncoding("access_token", token);
         NetworkManager.getInstance().addToQueueAndWait(req);
         return retval[0];
+    }
+
+    private static class ValidateTokenConnectionRequest extends ConnectionRequest {
+        private final boolean[] retval;
+
+        public ValidateTokenConnectionRequest(boolean[] retval) {
+            this.retval = retval;
+        }
+
+        @Override
+        protected void handleErrorResponseCode(int code, String message) {
+            //access token not valid anymore
+            if (code >= 400 && code <= 410) {
+                retval[0] = false;
+                return;
+            }
+            super.handleErrorResponseCode(code, message);
+        }
     }
 }

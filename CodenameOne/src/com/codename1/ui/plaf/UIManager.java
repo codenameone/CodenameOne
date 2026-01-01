@@ -1473,7 +1473,7 @@ public class UIManager {
      * @param def          default value
      * @return the value of the constant or the default if the constant isn't in the theme
      */
-    public boolean isThemeConstant(String constantName, boolean def) {
+    public final boolean isThemeConstant(String constantName, boolean def) {
         String c = getThemeConstant(constantName, null);
         if (c == null) {
             return def;

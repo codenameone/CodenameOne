@@ -420,13 +420,7 @@ public class JavascriptContext {
      * @param callback   Callback to be called with the result of the expression.
      */
     public void getAsync(String javascript, final SuccessCallback callback) {
-        getAsync(javascript, new CallbackAdapter() {
-
-            @Override
-            public void onSucess(Object value) {
-                callback.onSucess(value);
-            }
-        });
+        getAsync(javascript, new GetAsyncCallbackAdapter(callback));
     }
 
     /**
@@ -841,14 +835,7 @@ public class JavascriptContext {
      *                 object type.
      */
     public void callAsync(String jsFunc, JSObject self, Object[] params, final SuccessCallback callback) {
-        callAsync(jsFunc, self, params, new CallbackAdapter() {
-
-            @Override
-            public void onSucess(Object value) {
-                callback.onSucess(value);
-            }
-
-        });
+        callAsync(jsFunc, self, params, new CallAsyncCallbackAdapter(callback));
     }
 
     /**
@@ -958,6 +945,35 @@ public class JavascriptContext {
             }
 
         });
+    }
+
+    private static class GetAsyncCallbackAdapter extends CallbackAdapter {
+
+        private final SuccessCallback callback;
+
+        public GetAsyncCallbackAdapter(SuccessCallback callback) {
+            this.callback = callback;
+        }
+
+        @Override
+        public void onSucess(Object value) {
+            callback.onSucess(value);
+        }
+    }
+
+    private static class CallAsyncCallbackAdapter extends CallbackAdapter {
+
+        private final SuccessCallback callback;
+
+        public CallAsyncCallbackAdapter(SuccessCallback callback) {
+            this.callback = callback;
+        }
+
+        @Override
+        public void onSucess(Object value) {
+            callback.onSucess(value);
+        }
+
     }
 
     /**

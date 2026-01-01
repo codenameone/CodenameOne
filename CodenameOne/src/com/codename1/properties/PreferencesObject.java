@@ -105,33 +105,7 @@ public class PreferencesObject {
     }
 
     private void bindChangeListener(final Property pb, final String n, final Class type) {
-        pb.addChangeListener(new PropertyChangeListener() {
-            public void propertyChanged(PropertyBase p) {
-                if (type == String.class || type == null) {
-                    Preferences.set(n, (String) pb.get());
-                    return;
-                }
-                if (type == Boolean.class) {
-                    Preferences.set(n, (Boolean) pb.get());
-                    return;
-                }
-                if (type == Double.class) {
-                    Preferences.set(n, (Double) pb.get());
-                    return;
-                }
-                if (type == Float.class) {
-                    Preferences.set(n, (Float) pb.get());
-                    return;
-                }
-                if (type == Integer.class) {
-                    Preferences.set(n, (Integer) pb.get());
-                    return;
-                }
-                if (type == Long.class) {
-                    Preferences.set(n, (Long) pb.get());
-                }
-            }
-        });
+        pb.addChangeListener(new BindPropertyChangeListener(type, n, pb));
     }
 
     private void checkBind() {
@@ -167,5 +141,43 @@ public class PreferencesObject {
         // intern is used to trigger a null pointer exception if null is used
         pb.putClientProperty("cn1-po-name", name);
         return this;
+    }
+
+    private static class BindPropertyChangeListener implements PropertyChangeListener {
+        private final Class type;
+        private final String n;
+        private final Property pb;
+
+        public BindPropertyChangeListener(Class type, String n, Property pb) {
+            this.type = type;
+            this.n = n;
+            this.pb = pb;
+        }
+
+        public void propertyChanged(PropertyBase p) {
+            if (type == String.class || type == null) {
+                Preferences.set(n, (String) pb.get());
+                return;
+            }
+            if (type == Boolean.class) {
+                Preferences.set(n, (Boolean) pb.get());
+                return;
+            }
+            if (type == Double.class) {
+                Preferences.set(n, (Double) pb.get());
+                return;
+            }
+            if (type == Float.class) {
+                Preferences.set(n, (Float) pb.get());
+                return;
+            }
+            if (type == Integer.class) {
+                Preferences.set(n, (Integer) pb.get());
+                return;
+            }
+            if (type == Long.class) {
+                Preferences.set(n, (Long) pb.get());
+            }
+        }
     }
 }
