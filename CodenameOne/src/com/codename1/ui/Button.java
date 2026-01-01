@@ -1087,7 +1087,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
             if (capsTextDefault) {
                 String uiid = getUIID();
                 return uiid.equals("Button") || uiid.equals("RaisedButton") ||
-                        getUIManager().getThemeConstant("capsButtonUiids", "").indexOf(uiid) > -1;
+                        super.getUIManager().getThemeConstant("capsButtonUiids", "").indexOf(uiid) > -1;
             }
             return false;
         }

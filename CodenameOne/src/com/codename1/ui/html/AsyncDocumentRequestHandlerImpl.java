@@ -144,7 +144,7 @@ public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandl
                 } else {
                     response[0] = input;
                     synchronized (LOCK) {
-                        LOCK.notify();
+                        LOCK.notifyAll();
                     }
                 }
             }

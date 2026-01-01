@@ -140,7 +140,7 @@ public class EasyThread {
         synchronized (LOCK) {
             queue.add(r);
             queue.add(t);
-            LOCK.notify();
+            LOCK.notifyAll();
         }
     }
 
@@ -152,7 +152,7 @@ public class EasyThread {
     public void run(Runnable r) {
         synchronized (LOCK) {
             queue.add(r);
-            LOCK.notify();
+            LOCK.notifyAll();
         }
     }
 
@@ -172,7 +172,7 @@ public class EasyThread {
                 synchronized (flag) {
                     result[0] = value;
                     flag[0] = true;
-                    flag.notify();
+                    flag.notifyAll();
                 }
             }
         };
@@ -184,7 +184,7 @@ public class EasyThread {
         synchronized (LOCK) {
             queue.add(rr);
             queue.add(sc);
-            LOCK.notify();
+            LOCK.notifyAll();
         }
         Display.getInstance().invokeAndBlock(new Runnable() {
             public void run() {
@@ -213,12 +213,12 @@ public class EasyThread {
                     } finally {
                         synchronized (flag) {
                             flag[0] = true;
-                            flag.notify();
+                            flag.notifyAll();
                         }
                     }
                 }
             });
-            LOCK.notify();
+            LOCK.notifyAll();
         }
         Display.getInstance().invokeAndBlock(new Runnable() {
             public void run() {
@@ -237,7 +237,7 @@ public class EasyThread {
     public void kill() {
         synchronized (LOCK) {
             running = false;
-            LOCK.notify();
+            LOCK.notifyAll();
         }
     }
 

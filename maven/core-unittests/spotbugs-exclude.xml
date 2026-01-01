@@ -112,6 +112,14 @@
         <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR" />
     </Match>
 
+    <!--
+    Unfortunately, Codename One does this all over the place.
+    It's bad, but we can't fix it without breaking everything...
+    -->
+    <Match>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR" />
+    </Match>
+
     <!-- This is a 3rd party file that's really hard to fix properly  -->
     <Match>
         <Class name="~com\.codename1\.io\.gzip\.InfBlocks.*" />

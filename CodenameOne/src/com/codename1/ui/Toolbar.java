@@ -1508,10 +1508,7 @@ public class Toolbar extends Container {
                 // changes in code path - since it already worked correctly on
                 // every platform except for iOS.
                 // Ref https://github.com/codenameone/CodenameOne/issues/2444
-                f.stopEditing(new Runnable() {
-                    public void run() {
-                    }
-                });
+                f.stopEditing(null);
             }
         }
         AnimationManager a = getAnimationManager();

@@ -30,6 +30,8 @@ import com.codename1.io.NetworkManager;
 import com.codename1.io.Oauth2;
 import com.codename1.util.Callback;
 
+import java.util.Arrays;
+
 /**
  * Invokes the native bundled facebook SDK to login/logout of facebook, notice
  * that in order for this to work server build arguments must indicate that you
@@ -42,7 +44,7 @@ import com.codename1.util.Callback;
  */
 public class FacebookConnect extends Login {
 
-    static Class implClass;
+    static Class<?> implClass;
     private static FacebookConnect instance;
     private final String[] permissions = new String[]{"public_profile", "email", "user_friends"};
 
@@ -265,6 +267,22 @@ public class FacebookConnect extends Login {
 
         public ValidateTokenConnectionRequest(boolean[] retval) {
             this.retval = retval;
+        }
+
+        @Override
+        public final boolean equals(Object o) {
+            if (!(o instanceof ValidateTokenConnectionRequest)) return false;
+            if (!super.equals(o)) return false;
+
+            ValidateTokenConnectionRequest that = (ValidateTokenConnectionRequest) o;
+            return Arrays.equals(retval, that.retval);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = super.hashCode();
+            result = 31 * result + Arrays.hashCode(retval);
+            return result;
         }
 
         @Override

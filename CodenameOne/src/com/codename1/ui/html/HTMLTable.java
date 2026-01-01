@@ -49,10 +49,7 @@ class HTMLTable extends Table {
     HTMLTable(HTMLTableModel model) {
         super(model, false);
         setCollapseBorder(false); //default for HTML tables
-    }
-
-    public String getUIID() {
-        return "HTMLTable";
+        setUIIDFinal("HTMLTable");
     }
 
     /**

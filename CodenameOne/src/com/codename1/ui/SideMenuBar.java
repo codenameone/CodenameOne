@@ -1871,7 +1871,7 @@ public class SideMenuBar extends MenuBar {
 
             public void actionPerformed(ActionEvent evt) {
                 synchronized (LOCK) {
-                    LOCK.notify();
+                    LOCK.notifyAll();
                 }
             }
 

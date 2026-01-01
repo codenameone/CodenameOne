@@ -1313,7 +1313,7 @@ public final class Display extends CN1Constants {
             // after finishing an event cycle there might be serial calls waiting
             // to return.
             synchronized (lock) {
-                lock.notify();
+                lock.notifyAll();
             }
         }
         processingSerialCalls = false;
@@ -1332,7 +1332,7 @@ public final class Display extends CN1Constants {
 
     void notifyDisplay() {
         synchronized (lock) {
-            lock.notify();
+            lock.notifyAll();
         }
     }
 
@@ -1621,7 +1621,7 @@ public final class Display extends CN1Constants {
             }
         }
         synchronized (lock) {
-            lock.notify();
+            lock.notifyAll();
         }
 
         if (!transitionExists) {
@@ -1847,7 +1847,7 @@ public final class Display extends CN1Constants {
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = code;
             inputEventStackPointer++;
-            lock.notify();
+            lock.notifyAll();
         }
     }
 
@@ -1977,7 +1977,7 @@ public final class Display extends CN1Constants {
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = y;
             inputEventStackPointer++;
-            lock.notify();
+            lock.notifyAll();
         }
     }
 
@@ -2000,7 +2000,7 @@ public final class Display extends CN1Constants {
                 inputEventStack[inputEventStackPointer] = y[iter];
                 inputEventStackPointer++;
             }
-            lock.notify();
+            lock.notifyAll();
         }
     }
 
@@ -2029,7 +2029,7 @@ public final class Display extends CN1Constants {
                 Log.p("EDT performance is very slow triggering this exception!");
                 Log.e(err);
             }
-            lock.notify();
+            lock.notifyAll();
         }
     }
 
@@ -2051,7 +2051,7 @@ public final class Display extends CN1Constants {
                 Log.p("EDT performance is very slow triggering this exception!");
                 Log.e(err);
             }
-            lock.notify();
+            lock.notifyAll();
         }
     }
 
@@ -2165,7 +2165,7 @@ public final class Display extends CN1Constants {
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = h;
             inputEventStackPointer++;
-            lock.notify();
+            lock.notifyAll();
         }
     }
 
@@ -2196,7 +2196,7 @@ public final class Display extends CN1Constants {
         synchronized (lock) {
             inputEventStack[inputEventStackPointer] = type;
             inputEventStackPointer++;
-            lock.notify();
+            lock.notifyAll();
         }
     }
 

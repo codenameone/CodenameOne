@@ -997,7 +997,7 @@ public class Style {
      *
      * @param fgColor foreground color
      */
-    public void setFgColor(int fgColor) {
+    public final void setFgColor(int fgColor) {
         setFgColor(fgColor, false);
     }
 
@@ -1470,7 +1470,7 @@ public class Style {
      *
      * @param opacity the opacity value
      */
-    public void setOpacity(int opacity) {
+    public final void setOpacity(int opacity) {
         setOpacity(opacity, false);
     }
 
@@ -1482,7 +1482,7 @@ public class Style {
      * @param override If set to true allows the look and feel/theme to override
      *                 the value in this attribute when changing a theme/look and feel
      */
-    public void setOpacity(int opacity, boolean override) {
+    public final void setOpacity(int opacity, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
                 s.setOpacity(opacity, override);
@@ -2602,7 +2602,7 @@ public class Style {
      * @param override If set to true allows the look and feel/theme to override
      *                 the value in this attribute when changing a theme/look and feel
      */
-    public void setFgColor(int fgColor, boolean override) {
+    public final void setFgColor(int fgColor, boolean override) {
         if (proxyTo != null) {
             for (Style s : proxyTo) {
                 s.setFgColor(fgColor, override);
@@ -2799,7 +2799,6 @@ public class Style {
     }
 
     private void firePropertyChanged(String propertName) {
-
         roundRectCache = null;
         nativeOSCache = null;
         if (listeners == null || suppressChangeEvents) {

@@ -259,9 +259,11 @@ public class CommonProgressAnimations {
 
 
         public LoadingTextAnimation() {
-            getStyle().setFgColor(0x666666);
-            getStyle().setOpacity(0x66);
-            $(this).setPaddingMillimeters(2f);
+            Style s = getUnselectedStyle();
+            s.setFgColor(0x666666);
+            s.setOpacity(0x66);
+            s.setPadding(2, 2, 2, 2);
+            s.setPaddingUnit(Style.UNIT_TYPE_DIPS);
         }
 
         /**

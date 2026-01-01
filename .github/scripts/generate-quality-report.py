@@ -800,7 +800,6 @@ def main() -> None:
             "EI_EXPOSE_REP2",
             "EI_EXPOSE_STATIC_REP2",
             "EQ_COMPARETO_USE_OBJECT_EQUALS",
-            "MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR",
             "MS_EXPOSE_REP",
             "NM_CONFUSING",
             "NO_NOTIFY_NOT_NOTIFYALL",
