@@ -41,9 +41,10 @@
                 <artifactId>spotless-maven-plugin</artifactId>
                 <version>2.43.0</version>
                 <configuration>
+                    <baseDir>${project.basedir}/../../Ports/Android/src</baseDir>
                     <java>
                         <includes>
-                            <include>${project.basedir}/../../Ports/Android/src/**/*.java</include>
+                            <include>**/*.java</include>
                         </includes>
                         <googleJavaFormat>
                             <version>1.17.0</version>
