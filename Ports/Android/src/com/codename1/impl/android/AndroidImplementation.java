@@ -1127,9 +1127,9 @@ public class AndroidImplementation extends CodenameOneImplementation
     // an instance of the base PlayServices class.  The Build Server will automatically
     // swap this for the appropriate subclass depending on the playServicesVersion of
     // the build.
-    PlayServices.setInstance(
-        new PlayServices()); // <---- DO NOT CHANGE - Build server will replace with appropriate
-    // subclass instance
+    // spotless:off
+    PlayServices.setInstance(new PlayServices()); // <---- DO NOT CHANGE - Build server will replace with appropriate subclass instance
+    // spotless:on
     if (m instanceof CodenameOneActivity) {
       setContext(null);
       setActivity((CodenameOneActivity) m);
