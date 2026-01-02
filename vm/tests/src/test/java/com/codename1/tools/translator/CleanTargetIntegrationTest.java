@@ -275,6 +275,17 @@ class CleanTargetIntegrationTest {
             content = content.replace("#include <stdlib.h>\n", "#include <stdlib.h>\n#include <string.h>\n#include <math.h>\n#include <limits.h>\n");
             Files.write(cn1Globals, content.getBytes(StandardCharsets.UTF_8));
         }
+
+        Path cn1GlobalsC = srcRoot.resolve("cn1_globals.c");
+        if (Files.exists(cn1GlobalsC)) {
+            String cContent = new String(Files.readAllBytes(cn1GlobalsC), StandardCharsets.UTF_8);
+            String cUpdated = cContent.replace(
+                    "get_static_java_lang_System_gcThreadInstance()",
+                    "get_static_java_lang_System_gcThreadInstance(threadStateData)");
+            if (!cUpdated.equals(cContent)) {
+                Files.write(cn1GlobalsC, cUpdated.getBytes(StandardCharsets.UTF_8));
+            }
+        }
     }
 
     static void patchFileHeader(Path srcRoot) throws IOException {
@@ -290,6 +301,50 @@ class CleanTargetIntegrationTest {
                 .replace("get_static_java_io_File_pathSeparatorChar();", "get_static_java_io_File_pathSeparatorChar(CODENAME_ONE_THREAD_STATE);");
         if (!updated.equals(content)) {
             Files.write(fileHeader, updated.getBytes(StandardCharsets.UTF_8));
+        }
+
+        Path systemHeader = srcRoot.resolve("java_lang_System.h");
+        if (Files.exists(systemHeader)) {
+            String systemContent = new String(Files.readAllBytes(systemHeader), StandardCharsets.UTF_8);
+            String systemUpdated = systemContent.replace(
+                    "get_static_java_lang_System_gcThreadInstance();",
+                    "get_static_java_lang_System_gcThreadInstance(CODENAME_ONE_THREAD_STATE);");
+            if (!systemUpdated.equals(systemContent)) {
+                Files.write(systemHeader, systemUpdated.getBytes(StandardCharsets.UTF_8));
+            }
+        }
+
+        Path rwLockHeader = srcRoot.resolve("java_util_concurrent_locks_ReentrantReadWriteLock.h");
+        if (Files.exists(rwLockHeader)) {
+            String rwContent = new String(Files.readAllBytes(rwLockHeader), StandardCharsets.UTF_8);
+            String rwUpdated = rwContent.replace(
+                    "get_static_java_util_concurrent_locks_ReentrantReadWriteLock_serialVersionUID();",
+                    "get_static_java_util_concurrent_locks_ReentrantReadWriteLock_serialVersionUID(CODENAME_ONE_THREAD_STATE);");
+            if (!rwUpdated.equals(rwContent)) {
+                Files.write(rwLockHeader, rwUpdated.getBytes(StandardCharsets.UTF_8));
+            }
+        }
+
+        Path rwReadLockHeader = srcRoot.resolve("java_util_concurrent_locks_ReentrantReadWriteLock_ReadLock.h");
+        if (Files.exists(rwReadLockHeader)) {
+            String rwReadContent = new String(Files.readAllBytes(rwReadLockHeader), StandardCharsets.UTF_8);
+            String rwReadUpdated = rwReadContent.replace(
+                    "get_static_java_util_concurrent_locks_ReentrantReadWriteLock_ReadLock_serialVersionUID();",
+                    "get_static_java_util_concurrent_locks_ReentrantReadWriteLock_ReadLock_serialVersionUID(CODENAME_ONE_THREAD_STATE);");
+            if (!rwReadUpdated.equals(rwReadContent)) {
+                Files.write(rwReadLockHeader, rwReadUpdated.getBytes(StandardCharsets.UTF_8));
+            }
+        }
+
+        Path rwWriteLockHeader = srcRoot.resolve("java_util_concurrent_locks_ReentrantReadWriteLock_WriteLock.h");
+        if (Files.exists(rwWriteLockHeader)) {
+            String rwWriteContent = new String(Files.readAllBytes(rwWriteLockHeader), StandardCharsets.UTF_8);
+            String rwWriteUpdated = rwWriteContent.replace(
+                    "get_static_java_util_concurrent_locks_ReentrantReadWriteLock_WriteLock_serialVersionUID();",
+                    "get_static_java_util_concurrent_locks_ReentrantReadWriteLock_WriteLock_serialVersionUID(CODENAME_ONE_THREAD_STATE);");
+            if (!rwWriteUpdated.equals(rwWriteContent)) {
+                Files.write(rwWriteLockHeader, rwWriteUpdated.getBytes(StandardCharsets.UTF_8));
+            }
         }
     }
 
