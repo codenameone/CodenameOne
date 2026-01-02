@@ -156,17 +156,30 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
             setLayout(new LayeredLayout());
             addComponent(hour);
 
-            addComponent(minute);
             LayeredLayout ll = (LayeredLayout) getLayout();
-            if (showMeridiem) {
-                //content.addComponent(createSeparator());
-                addComponent(amPM);
-                ll.setInsets(hour, "0 67% 0 0")
-                        .setInsets(minute, "0 33% 0 33%")
-                        .setInsets(amPM, "0 0 0 67%");
+            if (durationMode) {
+                Label hoursLabel = new Label(getUIManager().localize("hours", "hours"), "TimeSpinnerHoursLabel");
+                Label minutesLabel = new Label(getUIManager().localize("minutes", "minutes"), "TimeSpinnerMinutesLabel");
+                addComponent(hoursLabel);
+                addComponent(minute);
+                addComponent(minutesLabel);
+
+                ll.setInsets(hour, "0 75% 0 0");
+                ll.setInsets(hoursLabel, "0 50% 0 25%");
+                ll.setInsets(minute, "0 25% 0 50%");
+                ll.setInsets(minutesLabel, "0 0 0 75%");
             } else {
-                ll.setInsets(hour, "0 50% 0 0")
-                        .setInsets(minute, "0 0 0 50%");
+                addComponent(minute);
+                if (showMeridiem) {
+                    //content.addComponent(createSeparator());
+                    addComponent(amPM);
+                    ll.setInsets(hour, "0 67% 0 0")
+                            .setInsets(minute, "0 33% 0 33%")
+                            .setInsets(amPM, "0 0 0 67%");
+                } else {
+                    ll.setInsets(hour, "0 50% 0 0")
+                            .setInsets(minute, "0 0 0 50%");
+                }
             }
 
 
@@ -352,7 +365,10 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
     }
 
     private void rebuildHours() {
-        if (showMeridiem) {
+        if (durationMode) {
+            startHour = 0;
+            endHour = 24;
+        } else if (showMeridiem) {
             startHour = 1;
             endHour = 12;
         } else {
@@ -449,6 +465,27 @@ class TimeSpinner3D extends Container implements InternalPickerWidget {
         }
     }
 
+    /**
+     * Duration mode uses the time spinner to indicate a duration in hours and minutes
+     *
+     * @return the durationMode
+     */
+    public boolean isDurationMode() {
+        return durationMode;
+    }
+
+    /**
+     * Duration mode uses the time spinner to indicate a duration in hours and minutes
+     *
+     * @param durationMode the durationMode to set
+     */
+    public void setDurationMode(boolean durationMode) {
+        this.durationMode = durationMode;
+        if (durationMode) {
+            showMeridiem = false;
+        }
+        rebuildHours();
+    }
 
     /**
      * Show or hide the hours spinner.
