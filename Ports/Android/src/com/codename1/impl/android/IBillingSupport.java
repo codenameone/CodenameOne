@@ -25,18 +25,26 @@ package com.codename1.impl.android;
 import com.codename1.payment.Product;
 
 /**
- * A stub interface for billing support.  The main application activity (subclass of CodenameOneActivity)
- * can return the {@link BillingSupport} from {@link CodenameOneActivity#createBillingSupport()}} to provide
- * a concrete implementation that supports the Play billing API version 4.0.
+ * A stub interface for billing support. The main application activity (subclass of
+ * CodenameOneActivity) can return the {@link BillingSupport} from {@link
+ * CodenameOneActivity#createBillingSupport()}} to provide a concrete implementation that supports
+ * the Play billing API version 4.0.
  */
 public interface IBillingSupport {
 
-    public boolean wasPurchased(String item);
-    public void purchase(String item);
-    public void subscribe(String item);
-    public void consumeAndAcknowlegePurchases();
-    public void initBilling();
-    public void onDestroy();
-    public Product[] getProducts(String[] skus, boolean fromCacheOnly);
-    public boolean isConsumable(String item);
+  public boolean wasPurchased(String item);
+
+  public void purchase(String item);
+
+  public void subscribe(String item);
+
+  public void consumeAndAcknowlegePurchases();
+
+  public void initBilling();
+
+  public void onDestroy();
+
+  public Product[] getProducts(String[] skus, boolean fromCacheOnly);
+
+  public boolean isConsumable(String item);
 }

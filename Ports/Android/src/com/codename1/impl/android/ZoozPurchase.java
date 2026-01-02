@@ -6,153 +6,149 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.impl.android;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.util.Log;
 import com.codename1.payment.Product;
 import com.codename1.payment.Purchase;
-import com.codename1.payment.PurchaseCallback;
 import com.codename1.payment.Receipt;
 import com.codename1.ui.CN;
-import com.codename1.ui.Display;
-/* ZOOZMARKER_START 
+
+/* ZOOZMARKER_START
 import com.zooz.android.lib.CheckoutActivity;
  ZOOZMARKER_END */
 
 /**
- *
  * @author Chen
  */
 public class ZoozPurchase extends Purchase implements IntentResultListener, Runnable {
 
-    private Activity activity;
-    
-    private String purchaseId = null;
-    
-    private boolean completed = false;
-    private boolean hasMarket;
-    private String currency;
-    private double amount;
-    private String failMessage;
-    
-    public ZoozPurchase() {
-        activity = AndroidImplementation.getActivity();
-        hasMarket= AndroidImplementation.hasAndroidMarket(activity);
-    }
+  private Activity activity;
 
-    @Override
-    public String getStoreCode() {
-        return Receipt.STORE_CODE_PLAY;
-    }
+  private String purchaseId = null;
 
-    @Override
-    public boolean isManagedPaymentSupported() {
-        return hasMarket;
-    }
+  private boolean completed = false;
+  private boolean hasMarket;
+  private String currency;
+  private double amount;
+  private String failMessage;
 
-    @Override
-    public boolean wasPurchased(String sku) {
-        return ((CodenameOneActivity)activity).wasPurchased(sku);
-    }
+  public ZoozPurchase() {
+    activity = AndroidImplementation.getActivity();
+    hasMarket = AndroidImplementation.hasAndroidMarket(activity);
+  }
 
-    @Override
-    public void purchase(String sku) {
-        ((CodenameOneActivity)activity).purchase(sku);
-    }
+  @Override
+  public String getStoreCode() {
+    return Receipt.STORE_CODE_PLAY;
+  }
 
-    @Override
-    public void subscribe(String sku) {
-        // Note that for Subscription products in Android, you can't just use
-        // purchase(sku) like iOS does.  We need to run through the subscribe 
-        // workflow.
-        ((CodenameOneActivity)activity).subscribe(sku);
-    }
+  @Override
+  public boolean isManagedPaymentSupported() {
+    return hasMarket;
+  }
 
-    @Override
-    public boolean isSubscriptionSupported() {
-        //return ((CodenameOneActivity)activity).isSubscriptionSupported();
-        return true;
-    }
+  @Override
+  public boolean wasPurchased(String sku) {
+    return ((CodenameOneActivity) activity).wasPurchased(sku);
+  }
 
-    @Override
-    public boolean isUnsubscribeSupported() {
-        return false;
-    }
-                
-    @Override
-    public boolean isManualPaymentSupported() {
-        return true;
-    }
-    
-    public boolean isItemListingSupported() {
-        return true;
-    }
-    
-    public Product[] getProducts(String[] skus) {
-        return ((CodenameOneActivity)activity).getProducts(skus);
-    }
-    
-    
-    /* ZOOZMARKER_START    
-    @Override
-    public String pay(double amount, String currency) {
-        Intent intent = new Intent(activity, CheckoutActivity.class);
+  @Override
+  public void purchase(String sku) {
+    ((CodenameOneActivity) activity).purchase(sku);
+  }
 
-        String zoozAppKey = Display.getInstance().getProperty("ZoozAppKey", "");
-        boolean isSandBox = Display.getInstance().getProperty("ZoozSandBox", "true").equals("true");
-        // send merchant credential, app_key as given in the registration
-        intent.putExtra(CheckoutActivity.ZOOZ_APP_KEY, zoozAppKey);
-        intent.putExtra(CheckoutActivity.ZOOZ_AMOUNT, amount);
-        intent.putExtra(CheckoutActivity.ZOOZ_CURRENCY_CODE, currency);
-        intent.putExtra(CheckoutActivity.ZOOZ_IS_SANDBOX, isSandBox);
-        String zoozInvoice = Display.getInstance().getProperty("ZoozInvoice", null);
-        if(zoozInvoice != null) {
-            intent.putExtra(CheckoutActivity.ZOOZ_INVOICE, zoozInvoice);
-        }
-        // start ZooZCheckoutActivity and wait to the activity result.
-        activity.startActivityForResult(intent, ZOOZ_PAYMENT);
-        
-        Display.getInstance().invokeAndBlock(this);
-        
-        // use call serially so the purchase callback happens on the 
-        // next EDT loop AFTER the value was returned 
-        Display.getInstance().callSerially(new Runnable() {
-            @Override
-            public void run() {
-                CodenameOneActivity cn = (CodenameOneActivity)activity;
-                PurchaseCallback pc = cn.getPurchaseCallback();
-                if(pc != null) {
-                    if(failMessage != null) {
-                        pc.paymentFailed(purchaseId, failMessage);
-                    } else {
-                        pc.paymentSucceeded(purchaseId, ZoozPurchase.this.amount, ZoozPurchase.this.currency);
-                    }
-                }
-            }
-        });
-        return purchaseId;
-    }
-    ZOOZMARKER_END */
+  @Override
+  public void subscribe(String sku) {
+    // Note that for Subscription products in Android, you can't just use
+    // purchase(sku) like iOS does.  We need to run through the subscribe
+    // workflow.
+    ((CodenameOneActivity) activity).subscribe(sku);
+  }
 
-    @Override
-    public void onActivityResult(int requestCode, int resultCode, Intent data) {
-    /* ZOOZMARKER_START    
+  @Override
+  public boolean isSubscriptionSupported() {
+    // return ((CodenameOneActivity)activity).isSubscriptionSupported();
+    return true;
+  }
+
+  @Override
+  public boolean isUnsubscribeSupported() {
+    return false;
+  }
+
+  @Override
+  public boolean isManualPaymentSupported() {
+    return true;
+  }
+
+  public boolean isItemListingSupported() {
+    return true;
+  }
+
+  public Product[] getProducts(String[] skus) {
+    return ((CodenameOneActivity) activity).getProducts(skus);
+  }
+
+  /* ZOOZMARKER_START
+  @Override
+  public String pay(double amount, String currency) {
+      Intent intent = new Intent(activity, CheckoutActivity.class);
+
+      String zoozAppKey = Display.getInstance().getProperty("ZoozAppKey", "");
+      boolean isSandBox = Display.getInstance().getProperty("ZoozSandBox", "true").equals("true");
+      // send merchant credential, app_key as given in the registration
+      intent.putExtra(CheckoutActivity.ZOOZ_APP_KEY, zoozAppKey);
+      intent.putExtra(CheckoutActivity.ZOOZ_AMOUNT, amount);
+      intent.putExtra(CheckoutActivity.ZOOZ_CURRENCY_CODE, currency);
+      intent.putExtra(CheckoutActivity.ZOOZ_IS_SANDBOX, isSandBox);
+      String zoozInvoice = Display.getInstance().getProperty("ZoozInvoice", null);
+      if(zoozInvoice != null) {
+          intent.putExtra(CheckoutActivity.ZOOZ_INVOICE, zoozInvoice);
+      }
+      // start ZooZCheckoutActivity and wait to the activity result.
+      activity.startActivityForResult(intent, ZOOZ_PAYMENT);
+
+      Display.getInstance().invokeAndBlock(this);
+
+      // use call serially so the purchase callback happens on the
+      // next EDT loop AFTER the value was returned
+      Display.getInstance().callSerially(new Runnable() {
+          @Override
+          public void run() {
+              CodenameOneActivity cn = (CodenameOneActivity)activity;
+              PurchaseCallback pc = cn.getPurchaseCallback();
+              if(pc != null) {
+                  if(failMessage != null) {
+                      pc.paymentFailed(purchaseId, failMessage);
+                  } else {
+                      pc.paymentSucceeded(purchaseId, ZoozPurchase.this.amount, ZoozPurchase.this.currency);
+                  }
+              }
+          }
+      });
+      return purchaseId;
+  }
+  ZOOZMARKER_END */
+
+  @Override
+  public void onActivityResult(int requestCode, int resultCode, Intent data) {
+    /* ZOOZMARKER_START
         if(resultCode == Activity.RESULT_OK){
             failMessage = null;
             purchaseId = data.getStringExtra(CheckoutActivity.ZOOZ_TRANSACTION_ID);
@@ -175,36 +171,34 @@ public class ZoozPurchase extends Purchase implements IntentResultListener, Runn
             notify();
         }
     ZOOZMARKER_END */
-    }
-    
-    @Override
-    public synchronized void run() {
-            while(!completed) {
-                try {
-                    wait();
-                } catch (InterruptedException ex) {
-                }
-            }
-    }
+  }
 
-    @Override
-    public boolean isManageSubscriptionsSupported() {
-        return true;
+  @Override
+  public synchronized void run() {
+    while (!completed) {
+      try {
+        wait();
+      } catch (InterruptedException ex) {
+      }
     }
+  }
 
-    @Override
-    public void manageSubscriptions(String sku) {
-        if (sku == null) {
-            CN.execute("https://play.google.com/store/account/subscriptions");
-        } else {
-            String packageName = activity.getApplicationContext().getPackageName();
-            CN.execute("https://play.google.com/store/account/subscriptions?sku="+sku+"&package="+packageName);
-        }
-        
+  @Override
+  public boolean isManageSubscriptionsSupported() {
+    return true;
+  }
+
+  @Override
+  public void manageSubscriptions(String sku) {
+    if (sku == null) {
+      CN.execute("https://play.google.com/store/account/subscriptions");
+    } else {
+      String packageName = activity.getApplicationContext().getPackageName();
+      CN.execute(
+          "https://play.google.com/store/account/subscriptions?sku="
+              + sku
+              + "&package="
+              + packageName);
     }
-    
-    
-    
-    
-    
+  }
 }

@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.impl.android;
@@ -36,182 +36,179 @@ import com.codename1.push.PushCallback;
 import com.codename1.ui.Display;
 
 /**
- * This class implements a push notification fallback service for applications that require
- * push notification support but don't have Android Market installed
+ * This class implements a push notification fallback service for applications that require push
+ * notification support but don't have Android Market installed
  *
  * @author Shai Almog
  */
 public abstract class PushNotificationService extends Service implements PushCallback {
 
-    private java.util.Map<String,String> properties = new java.util.HashMap<String,String>();
-    
-    @Override
-    public IBinder onBind(Intent intent) {
-        return null;
-    }
-    
-    @Override
-    public void onCreate() {
-    }
-    
-    private String getProperty(String propertyName, String defaultValue) {
-        String val = properties.get(propertyName);
-        if (val == null) {
-            return defaultValue;
-        }
-        return val;
-    }
-    
-    public void setProperty(String propertyName, String val) {
-        properties.put(propertyName, val);
-        
-    }
-    
-    public static void startServiceIfRequired(Class service, Context ctx) {
-        if(!AndroidImplementation.hasAndroidMarket(ctx)) {
-            SharedPreferences sh = ctx.getSharedPreferences("C2DMNeeded", Context.MODE_PRIVATE);
-            if(sh.getBoolean("C2DMNeeded", false)) {
-                Intent i = new Intent();
-                i.setAction(service.getClass().getName());
-                ctx.startService(i);
-            }
-        }
-    }
-    
-    public static void forceStartService(String service, Context ctx) {
-        if(!AndroidImplementation.hasAndroidMarket(ctx)) {
-            SharedPreferences sh = ctx.getSharedPreferences("C2DMNeeded", Context.MODE_PRIVATE);
-            Editor editor = sh.edit();
-            editor.putBoolean("C2DMNeeded", true);
-            editor.commit();
-            Intent i = new Intent();
-            i.setAction(service);
-            ctx.startService(i);
-        }
-    }
+  private java.util.Map<String, String> properties = new java.util.HashMap<String, String>();
 
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        AndroidImplementation.registerPolling();
-        return START_STICKY;
+  @Override
+  public IBinder onBind(Intent intent) {
+    return null;
+  }
+
+  @Override
+  public void onCreate() {}
+
+  private String getProperty(String propertyName, String defaultValue) {
+    String val = properties.get(propertyName);
+    if (val == null) {
+      return defaultValue;
     }
+    return val;
+  }
 
-    @Override
-    public void onDestroy() {
-        AndroidImplementation.stopPollingLoop();
+  public void setProperty(String propertyName, String val) {
+    properties.put(propertyName, val);
+  }
+
+  public static void startServiceIfRequired(Class service, Context ctx) {
+    if (!AndroidImplementation.hasAndroidMarket(ctx)) {
+      SharedPreferences sh = ctx.getSharedPreferences("C2DMNeeded", Context.MODE_PRIVATE);
+      if (sh.getBoolean("C2DMNeeded", false)) {
+        Intent i = new Intent();
+        i.setAction(service.getClass().getName());
+        ctx.startService(i);
+      }
     }
-    
-    public abstract PushCallback getPushCallbackInstance();
-    public abstract Class getStubClass();
+  }
 
+  public static void forceStartService(String service, Context ctx) {
+    if (!AndroidImplementation.hasAndroidMarket(ctx)) {
+      SharedPreferences sh = ctx.getSharedPreferences("C2DMNeeded", Context.MODE_PRIVATE);
+      Editor editor = sh.edit();
+      editor.putBoolean("C2DMNeeded", true);
+      editor.commit();
+      Intent i = new Intent();
+      i.setAction(service);
+      ctx.startService(i);
+    }
+  }
 
-    @Override
-    public void push(final String value) {
-        final PushCallback callback = getPushCallbackInstance();
-        if(callback != null) {
-            final boolean delayPushCompletion = "true".equals(Display.getInstance().getProperty("delayPushCompletion", "false")) ||
-                    "true".equals(Display.getInstance().getProperty("android.delayPushCompletion", "false"));
-            if (delayPushCompletion) {
-                AndroidImplementation.acquirePushWakeLock(30000);
-            }
-            Display.getInstance().callSerially(new Runnable() {
+  @Override
+  public int onStartCommand(Intent intent, int flags, int startId) {
+    AndroidImplementation.registerPolling();
+    return START_STICKY;
+  }
+
+  @Override
+  public void onDestroy() {
+    AndroidImplementation.stopPollingLoop();
+  }
+
+  public abstract PushCallback getPushCallbackInstance();
+
+  public abstract Class getStubClass();
+
+  @Override
+  public void push(final String value) {
+    final PushCallback callback = getPushCallbackInstance();
+    if (callback != null) {
+      final boolean delayPushCompletion =
+          "true".equals(Display.getInstance().getProperty("delayPushCompletion", "false"))
+              || "true"
+                  .equals(
+                      Display.getInstance().getProperty("android.delayPushCompletion", "false"));
+      if (delayPushCompletion) {
+        AndroidImplementation.acquirePushWakeLock(30000);
+      }
+      Display.getInstance()
+          .callSerially(
+              new Runnable() {
                 public void run() {
-                    try {
-                        callback.push(value);
-                    } finally {
-                        if (!delayPushCompletion) {
-                            Display.getInstance().notifyPushCompletion();
-                        }
+                  try {
+                    callback.push(value);
+                  } finally {
+                    if (!delayPushCompletion) {
+                      Display.getInstance().notifyPushCompletion();
                     }
+                  }
                 }
-            });
-        } else {
-            NotificationManager nm = (NotificationManager)getSystemService(NOTIFICATION_SERVICE);
-            Intent newIntent = new Intent(this, getStubClass());
-            PendingIntent contentIntent = AndroidImplementation.createPendingIntent(this, 0, newIntent);
+              });
+    } else {
+      NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+      Intent newIntent = new Intent(this, getStubClass());
+      PendingIntent contentIntent = AndroidImplementation.createPendingIntent(this, 0, newIntent);
+
+      Notification.Builder builder =
+          new Notification.Builder(this)
+              .setContentIntent(contentIntent)
+              .setSmallIcon(android.R.drawable.stat_notify_sync)
+              .setTicker(value)
+              .setAutoCancel(true)
+              .setWhen(System.currentTimeMillis())
+              .setContentTitle(value)
+              .setDefaults(Notification.DEFAULT_ALL);
+
+      // The following section is commented out so that builds against SDKs below 26
+      // won't fail.
+      /*<SDK26>
+      if(android.os.Build.VERSION.SDK_INT >= 21){
+          builder.setCategory("Notification");
+      }
+      if (android.os.Build.VERSION.SDK_INT >= 26) {
+          NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+          String id = getProperty("android.NotificationChannel.id", "cn1-channel");
+
+          CharSequence name = getProperty("android.NotificationChannel.name", "Notifications");
+
+          String description = getProperty("android.NotificationChannel.description", "Remote notifications");
+
+          int importance = Integer.parseInt(getProperty("android.NotificationChannel.importance", ""+NotificationManager.IMPORTANCE_HIGH));
+
+          android.app.NotificationChannel mChannel = new android.app.NotificationChannel(id, name,importance);
+
+          mChannel.setDescription(description);
+
+          mChannel.enableLights(Boolean.parseBoolean(getProperty("android.NotificationChannel.enableLights", "true")));
+
+          mChannel.setLightColor(Integer.parseInt(getProperty("android.NotificationChannel.lightColor", ""+android.graphics.Color.RED)));
+
+          mChannel.enableVibration(Boolean.parseBoolean(getProperty("android.NotificationChannel.enableVibration", "false")));
+          String vibrationPatternStr = getProperty("android.NotificationChannel.vibrationPattern", null);
+          if (vibrationPatternStr != null) {
+              String[] parts = vibrationPatternStr.split(",");
+              int len = parts.length;
+              long[] pattern = new long[len];
+              for (int i=0; i<len; i++) {
+                  pattern[i] = Long.parseLong(parts[i].trim());
+              }
+              mChannel.setVibrationPattern(pattern);
+          }
 
 
 
-            Notification.Builder builder = new Notification.Builder(this)
-                    .setContentIntent(contentIntent)
-                    .setSmallIcon(android.R.drawable.stat_notify_sync)
-                    .setTicker(value)
-                    .setAutoCancel(true)
-                    .setWhen(System.currentTimeMillis())
-                    .setContentTitle(value)
+          mNotificationManager.createNotificationChannel(mChannel);
+          System.out.println("Setting push channel to "+id);
+          builder.setChannelId(id);
+      }
+      </SDK26>*/
 
-                    .setDefaults(Notification.DEFAULT_ALL);
+      Notification notif = builder.build();
+      int notifId = getNotifyId(); // (int)System.currentTimeMillis();
 
-
-
-
-            // The following section is commented out so that builds against SDKs below 26
-            // won't fail.
-            /*<SDK26>
-            if(android.os.Build.VERSION.SDK_INT >= 21){
-                builder.setCategory("Notification");
-            }
-            if (android.os.Build.VERSION.SDK_INT >= 26) {
-                NotificationManager mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-
-                String id = getProperty("android.NotificationChannel.id", "cn1-channel");
-
-                CharSequence name = getProperty("android.NotificationChannel.name", "Notifications");
-
-                String description = getProperty("android.NotificationChannel.description", "Remote notifications");
-
-                int importance = Integer.parseInt(getProperty("android.NotificationChannel.importance", ""+NotificationManager.IMPORTANCE_HIGH));
-
-                android.app.NotificationChannel mChannel = new android.app.NotificationChannel(id, name,importance);
-
-                mChannel.setDescription(description);
-
-                mChannel.enableLights(Boolean.parseBoolean(getProperty("android.NotificationChannel.enableLights", "true")));
-
-                mChannel.setLightColor(Integer.parseInt(getProperty("android.NotificationChannel.lightColor", ""+android.graphics.Color.RED)));
-
-                mChannel.enableVibration(Boolean.parseBoolean(getProperty("android.NotificationChannel.enableVibration", "false")));
-                String vibrationPatternStr = getProperty("android.NotificationChannel.vibrationPattern", null);
-                if (vibrationPatternStr != null) {
-                    String[] parts = vibrationPatternStr.split(",");
-                    int len = parts.length;
-                    long[] pattern = new long[len];
-                    for (int i=0; i<len; i++) {
-                        pattern[i] = Long.parseLong(parts[i].trim());
-                    }
-                    mChannel.setVibrationPattern(pattern);
-                }
-
-
-
-                mNotificationManager.createNotificationChannel(mChannel);
-                System.out.println("Setting push channel to "+id);
-                builder.setChannelId(id);
-            }
-            </SDK26>*/
-
-            Notification notif = builder.build();
-            int notifId = getNotifyId();//(int)System.currentTimeMillis();
-
-            //notif.extras.putInt("notificationId", notifId);
-            nm.notify(notifId, notif);
-        }
+      // notif.extras.putInt("notificationId", notifId);
+      nm.notify(notifId, notif);
     }
+  }
 
-    static int getNotifyId() {
-        return 1;
-    }
+  static int getNotifyId() {
+    return 1;
+  }
 
-    static void cancelNotification(Context context) {
-        NotificationManager nm = (NotificationManager) context.getSystemService(Activity.NOTIFICATION_SERVICE);
-        nm.cancel(getNotifyId());
-    }
+  static void cancelNotification(Context context) {
+    NotificationManager nm =
+        (NotificationManager) context.getSystemService(Activity.NOTIFICATION_SERVICE);
+    nm.cancel(getNotifyId());
+  }
 
-    @Override
-    public void registeredForPush(String deviceId) {
-    }
+  @Override
+  public void registeredForPush(String deviceId) {}
 
-    @Override
-    public void pushRegistrationError(String error, int errorCode) {
-    }
+  @Override
+  public void pushRegistrationError(String error, int errorCode) {}
 }

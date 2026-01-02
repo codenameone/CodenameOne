@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.impl.android;
@@ -28,124 +28,124 @@ import com.codename1.db.RowExt;
 import java.io.IOException;
 
 /**
- *
  * @author Chen
  */
 public class AndroidCursor implements Cursor, RowExt {
-    
-    private android.database.Cursor c;
-    private int last_read_column_index = -1;
-    
-    public AndroidCursor(android.database.Cursor c) {
-        this.c = c;
-        this.last_read_column_index = -1;
-    }
-    
-    @Override
-    public boolean first() throws IOException {
-        return c.moveToFirst();
-    }
 
-    @Override
-    public boolean last() throws IOException {
-        return c.moveToLast();
-    }
+  private android.database.Cursor c;
+  private int last_read_column_index = -1;
 
-    @Override
-    public boolean next() throws IOException {
-        return c.moveToNext();
-    }
+  public AndroidCursor(android.database.Cursor c) {
+    this.c = c;
+    this.last_read_column_index = -1;
+  }
 
-    @Override
-    public boolean prev() throws IOException {
-        return c.moveToPrevious();
-    }
+  @Override
+  public boolean first() throws IOException {
+    return c.moveToFirst();
+  }
 
-    @Override
-    public int getColumnIndex(String columnName) throws IOException {
-        return c.getColumnIndex(columnName);
-    }
+  @Override
+  public boolean last() throws IOException {
+    return c.moveToLast();
+  }
 
-    @Override
-    public String getColumnName(int columnIndex) throws IOException {
-        return c.getColumnName(columnIndex);
-    }
+  @Override
+  public boolean next() throws IOException {
+    return c.moveToNext();
+  }
 
-    @Override
-    public int getPosition() throws IOException {
-        return c.getPosition();
-    }
+  @Override
+  public boolean prev() throws IOException {
+    return c.moveToPrevious();
+  }
 
-    @Override
-    public Row getRow() throws IOException {
-        return this;
-    }
+  @Override
+  public int getColumnIndex(String columnName) throws IOException {
+    return c.getColumnIndex(columnName);
+  }
 
-    @Override
-    public boolean position(int row) throws IOException {
-        return c.moveToPosition(row);
-    }
+  @Override
+  public String getColumnName(int columnIndex) throws IOException {
+    return c.getColumnName(columnIndex);
+  }
 
-    @Override
-    public void close() throws IOException {
-        c.close();
-    }
+  @Override
+  public int getPosition() throws IOException {
+    return c.getPosition();
+  }
 
-    @Override
-    public byte[] getBlob(int index) throws IOException {
-        last_read_column_index = index;
-        return c.getBlob(index);
-    }
+  @Override
+  public Row getRow() throws IOException {
+    return this;
+  }
 
-    @Override
-    public double getDouble(int index) throws IOException {
-        last_read_column_index = index;
-        return c.getDouble(index);
-    }
+  @Override
+  public boolean position(int row) throws IOException {
+    return c.moveToPosition(row);
+  }
 
-    @Override
-    public float getFloat(int index) throws IOException {
-        last_read_column_index = index;
-        return c.getFloat(index);
-    }
+  @Override
+  public void close() throws IOException {
+    c.close();
+  }
 
-    @Override
-    public int getInteger(int index) throws IOException {
-        last_read_column_index = index;
-        return c.getInt(index);
-    }
+  @Override
+  public byte[] getBlob(int index) throws IOException {
+    last_read_column_index = index;
+    return c.getBlob(index);
+  }
 
-    @Override
-    public long getLong(int index) throws IOException {
-        last_read_column_index = index;
-        return c.getLong(index);
-    }
+  @Override
+  public double getDouble(int index) throws IOException {
+    last_read_column_index = index;
+    return c.getDouble(index);
+  }
 
-    @Override
-    public short getShort(int index) throws IOException {
-        last_read_column_index = index;
-        return c.getShort(index);
-    }
+  @Override
+  public float getFloat(int index) throws IOException {
+    last_read_column_index = index;
+    return c.getFloat(index);
+  }
 
-    @Override
-    public String getString(int index) throws IOException {
-        last_read_column_index = index;
-        return c.getString(index);
-    }
-    
-    public boolean isNull(int index) throws IOException {
-         return c.isNull(index);
-    }
-    
-    @Override
-    public boolean wasNull() throws IOException {
-        if (last_read_column_index<0){return true;}
-        return c.isNull(last_read_column_index);
-    }
+  @Override
+  public int getInteger(int index) throws IOException {
+    last_read_column_index = index;
+    return c.getInt(index);
+  }
 
-    @Override
-    public int getColumnCount() throws IOException {
-        return c.getColumnCount();
+  @Override
+  public long getLong(int index) throws IOException {
+    last_read_column_index = index;
+    return c.getLong(index);
+  }
+
+  @Override
+  public short getShort(int index) throws IOException {
+    last_read_column_index = index;
+    return c.getShort(index);
+  }
+
+  @Override
+  public String getString(int index) throws IOException {
+    last_read_column_index = index;
+    return c.getString(index);
+  }
+
+  public boolean isNull(int index) throws IOException {
+    return c.isNull(index);
+  }
+
+  @Override
+  public boolean wasNull() throws IOException {
+    if (last_read_column_index < 0) {
+      return true;
     }
-    
+    return c.isNull(last_read_column_index);
+  }
+
+  @Override
+  public int getColumnCount() throws IOException {
+    return c.getColumnCount();
+  }
 }

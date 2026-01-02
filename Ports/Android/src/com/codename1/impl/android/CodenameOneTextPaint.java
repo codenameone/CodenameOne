@@ -6,18 +6,18 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.impl.android;
@@ -32,42 +32,39 @@ import android.text.TextPaint;
  * @author Shai Almog
  */
 public class CodenameOneTextPaint extends TextPaint {
-    int fontHeight = -1;
-    private int ascent = -1;
-    private int top = -9999;
+  int fontHeight = -1;
+  private int ascent = -1;
+  private int top = -9999;
 
+  public CodenameOneTextPaint(CodenameOneTextPaint paint) {
+    super(paint);
+    this.fontHeight = paint.fontHeight;
+    this.ascent = paint.ascent;
+    this.top = paint.top;
+  }
 
-    public CodenameOneTextPaint(CodenameOneTextPaint paint) {
-        super(paint);
-        this.fontHeight = paint.fontHeight;
-        this.ascent = paint.ascent;
-        this.top = paint.top;
+  public CodenameOneTextPaint(Typeface tf) {
+
+    super.setTypeface(tf);
+  }
+
+  public int getFontAscent() {
+    if (ascent == -1) {
+      ascent = getFontMetricsInt().ascent;
     }
+    return ascent;
+  }
 
-    public CodenameOneTextPaint(Typeface tf) {
-
-        super.setTypeface(tf);
+  public int top() {
+    if (top == -9999) {
+      top = getFontMetricsInt().top;
     }
+    return top;
+  }
 
-    public int getFontAscent() {
-        if(ascent == -1) {
-            ascent = getFontMetricsInt().ascent;
-        }
-        return ascent;
-    }
+  public CodenameOneTextPaint() {}
 
-    public int top() {
-        if (top == -9999) {
-            top = getFontMetricsInt().top;
-        }
-        return top;
-    }
-    
-    public CodenameOneTextPaint() {
-    }
-
-
-    public CodenameOneTextPaint(Paint p) {
-        super(p);
-    }
+  public CodenameOneTextPaint(Paint p) {
+    super(p);
+  }
 }

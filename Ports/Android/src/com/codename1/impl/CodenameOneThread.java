@@ -6,24 +6,23 @@
  * published by the Free Software Foundation.  Codename One designates this
  * particular file as subject to the "Classpath" exception as provided
  * by Oracle in the LICENSE file that accompanied this code.
- *  
+ *
  * This code is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * version 2 for more details (a copy is included in the LICENSE file that
  * accompanied this code).
- * 
+ *
  * You should have received a copy of the GNU General Public License version
  * 2 along with this work; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
- * 
- * Please contact Codename One through http://www.codenameone.com/ if you 
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
 package com.codename1.impl;
 
 import com.codename1.io.Log;
-import com.codename1.io.Preferences;
 import com.codename1.io.Util;
 import com.codename1.system.CrashReport;
 import com.codename1.ui.Display;
@@ -40,166 +39,161 @@ import java.util.Hashtable;
  * @author Shai Almog
  */
 public class CodenameOneThread extends Thread {
-    private int[] stack =  new int[500];
-    private int stackPointer;
-    private Runnable r;
-    private static Class CODE = CodenameOneThread.class;
-    private Hashtable exceptionStack = new Hashtable();
-    public static int STACK_FRAME_SIZE = 65536;
-    
-    /**
-     * Constructor accepting the runnable
-     */
-    public CodenameOneThread(final Runnable r, String threadName) {
-        super(Thread.currentThread().getThreadGroup(), new Runnable() {
-            /**
-             * Catches exception
-             */
-            public void run() {
-                try {
-                    r.run();
-                } catch(Throwable err) {
-                    err.printStackTrace();
-                    handleException(err);
-                }
-            }
+  private int[] stack = new int[500];
+  private int stackPointer;
+  private Runnable r;
+  private static Class CODE = CodenameOneThread.class;
+  private Hashtable exceptionStack = new Hashtable();
+  public static int STACK_FRAME_SIZE = 65536;
 
-        }, threadName, STACK_FRAME_SIZE);
-        this.r = r;
-    }
-        
-    public boolean hasStackFrame() {
-        return stackPointer > 0;
-    }
-    
-    /**
-     * Pushes a method id into the stack
-     * @param method the method id
-     */
-    public void pushStack(int method) {
-        stack[stackPointer] = method;
-        stackPointer++;
-    }
-    
-    /**
-     * Pops the method stack pointer
-     */
-    public void popStack() {
-        stackPointer--;
-    }
-    
-    /**
-     * Pushes the method to the current thread stack
-     * 
-     * @param method the method id
-     */
-    public static void push(int method) {
-        Thread t = Thread.currentThread();
-        if(t.getClass() == CODE) {
-            CodenameOneThread c = (CodenameOneThread)t;
-            c.pushStack(method);
-        }
-    }
+  /** Constructor accepting the runnable */
+  public CodenameOneThread(final Runnable r, String threadName) {
+    super(
+        Thread.currentThread().getThreadGroup(),
+        new Runnable() {
+          /** Catches exception */
+          public void run() {
+            try {
+              r.run();
+            } catch (Throwable err) {
+              err.printStackTrace();
+              handleException(err);
+            }
+          }
+        },
+        threadName,
+        STACK_FRAME_SIZE);
+    this.r = r;
+  }
 
-    /**
-     * Pops the current method from the stack
-     */
-    public static void pop() {
-        Thread t = Thread.currentThread();
-        if(t.getClass() == CODE) {
-            CodenameOneThread c = (CodenameOneThread)t;
-            c.popStack();
-        }
+  public boolean hasStackFrame() {
+    return stackPointer > 0;
+  }
+
+  /**
+   * Pushes a method id into the stack
+   *
+   * @param method the method id
+   */
+  public void pushStack(int method) {
+    stack[stackPointer] = method;
+    stackPointer++;
+  }
+
+  /** Pops the method stack pointer */
+  public void popStack() {
+    stackPointer--;
+  }
+
+  /**
+   * Pushes the method to the current thread stack
+   *
+   * @param method the method id
+   */
+  public static void push(int method) {
+    Thread t = Thread.currentThread();
+    if (t.getClass() == CODE) {
+      CodenameOneThread c = (CodenameOneThread) t;
+      c.pushStack(method);
     }
-    
-    
-    /**
-     * Stores the stack for the given exception
-     * @param t the exception mapping to the given stack
-     */
-    public void storeStackForException(Throwable t, int currentStackFrame) {
-        if(!exceptionStack.containsKey(t)) {
-            int[] s = new int[stackPointer + 1];
-            System.arraycopy(stack, 0, s, 0, stackPointer);
-            s[stackPointer] = currentStackFrame;
-            exceptionStack.put(t, s);
-        }
+  }
+
+  /** Pops the current method from the stack */
+  public static void pop() {
+    Thread t = Thread.currentThread();
+    if (t.getClass() == CODE) {
+      CodenameOneThread c = (CodenameOneThread) t;
+      c.popStack();
     }
-    
-    /**
-     * Stores the stack for the given exception
-     * @param th the exception mapping to the given stack
-     */
-    public static void storeStack(Throwable th, int currentStackFrame) {
-        Thread t = Thread.currentThread();
-        if(t.getClass() == CODE) {
-            CodenameOneThread c = (CodenameOneThread)t;
-            c.storeStackForException(th, currentStackFrame);
-        }
+  }
+
+  /**
+   * Stores the stack for the given exception
+   *
+   * @param t the exception mapping to the given stack
+   */
+  public void storeStackForException(Throwable t, int currentStackFrame) {
+    if (!exceptionStack.containsKey(t)) {
+      int[] s = new int[stackPointer + 1];
+      System.arraycopy(stack, 0, s, 0, stackPointer);
+      s[stackPointer] = currentStackFrame;
+      exceptionStack.put(t, s);
     }
-    
-    /**
-     * Prints the stack trace matching the given stack
-     */
-    public String getStack(Throwable t) {
-        try {
-            StringBuffer b = new StringBuffer();
-            int size;
-            int[] s = (int[])exceptionStack.get(t);
-            if(s == null) {
-                s = stack;
-                size = stackPointer;
-            } else {
-                size = s.length;
-            }
-            String[] stk = new String[size];
-            
-            InputStream inp = Display.getInstance().getResourceAsStream(getClass(), "/methodData.dat");
-            if(inp == null) {
-                StringWriter sw = new StringWriter();
-                PrintWriter pw = new PrintWriter(sw);
-                t.printStackTrace(pw);
-                String str = sw.toString();
-                Util.cleanup(sw);
-                return str;
-            }
-            DataInputStream di = new DataInputStream(inp);
-            int totalAmount = di.readInt();
-            String lastClass = "";
-            for(int x = 0 ; x < totalAmount ; x++) {
-                String current = di.readUTF();
-                if(current.indexOf('.') > -1) {
-                    lastClass = current;
-                } else {
-                    for(int iter = 0 ; iter < size ; iter++) {
-                        if(s[iter] == x + 1) {
-                            stk[iter] = lastClass + "." + current;
-                        }
-                    }
-                }
-            }
-            for(int iter = size - 1 ; iter >= 0 ; iter--) {
-                b.append("at ");
-                b.append(stk[iter]);
-                b.append("\n");
-            }
-            return b.toString();
-        } catch (IOException ex) {
-            ex.printStackTrace();
-        }
-        return "Failed in stack generation for " + t;
+  }
+
+  /**
+   * Stores the stack for the given exception
+   *
+   * @param th the exception mapping to the given stack
+   */
+  public static void storeStack(Throwable th, int currentStackFrame) {
+    Thread t = Thread.currentThread();
+    if (t.getClass() == CODE) {
+      CodenameOneThread c = (CodenameOneThread) t;
+      c.storeStackForException(th, currentStackFrame);
     }
-    
-    public static void handleException(Throwable err) {
-        Thread t = Thread.currentThread();
-        if(t instanceof CodenameOneThread) {
-            Log.p(err.toString());
-            Log.p(((CodenameOneThread)t).getStack(err));
-            //Preferences.set("$CN1Uncaught", true);
-            CrashReport r = Display.getInstance().getCrashReporter();
-            if(r != null) {
-                r.exception(err);
+  }
+
+  /** Prints the stack trace matching the given stack */
+  public String getStack(Throwable t) {
+    try {
+      StringBuffer b = new StringBuffer();
+      int size;
+      int[] s = (int[]) exceptionStack.get(t);
+      if (s == null) {
+        s = stack;
+        size = stackPointer;
+      } else {
+        size = s.length;
+      }
+      String[] stk = new String[size];
+
+      InputStream inp = Display.getInstance().getResourceAsStream(getClass(), "/methodData.dat");
+      if (inp == null) {
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        t.printStackTrace(pw);
+        String str = sw.toString();
+        Util.cleanup(sw);
+        return str;
+      }
+      DataInputStream di = new DataInputStream(inp);
+      int totalAmount = di.readInt();
+      String lastClass = "";
+      for (int x = 0; x < totalAmount; x++) {
+        String current = di.readUTF();
+        if (current.indexOf('.') > -1) {
+          lastClass = current;
+        } else {
+          for (int iter = 0; iter < size; iter++) {
+            if (s[iter] == x + 1) {
+              stk[iter] = lastClass + "." + current;
             }
+          }
         }
+      }
+      for (int iter = size - 1; iter >= 0; iter--) {
+        b.append("at ");
+        b.append(stk[iter]);
+        b.append("\n");
+      }
+      return b.toString();
+    } catch (IOException ex) {
+      ex.printStackTrace();
     }
+    return "Failed in stack generation for " + t;
+  }
+
+  public static void handleException(Throwable err) {
+    Thread t = Thread.currentThread();
+    if (t instanceof CodenameOneThread) {
+      Log.p(err.toString());
+      Log.p(((CodenameOneThread) t).getStack(err));
+      // Preferences.set("$CN1Uncaught", true);
+      CrashReport r = Display.getInstance().getCrashReporter();
+      if (r != null) {
+        r.exception(err);
+      }
+    }
+  }
 }

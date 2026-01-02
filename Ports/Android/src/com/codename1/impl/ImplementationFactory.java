@@ -26,49 +26,46 @@ package com.codename1.impl;
 import com.codename1.impl.android.AndroidImplementation;
 
 /**
- * Generic class allowing 3rd parties to replace the underlying implementation in
- * Codename One seamlessly. The factory can be replaced by 3rd parties to install a new
- * underlying implementation using elaborate logic. 
+ * Generic class allowing 3rd parties to replace the underlying implementation in Codename One
+ * seamlessly. The factory can be replaced by 3rd parties to install a new underlying implementation
+ * using elaborate logic.
  *
  * @author Shai Almog
  */
 public class ImplementationFactory {
-    private static ImplementationFactory instance = new ImplementationFactory();
-    
-    /**
-     * Allows third parties to replace the implementation factory
-     */
-    protected ImplementationFactory() {
+  private static ImplementationFactory instance = new ImplementationFactory();
+
+  /** Allows third parties to replace the implementation factory */
+  protected ImplementationFactory() {}
+
+  /**
+   * Returns the singleton instance of this class
+   *
+   * @return instanceof Implementation factory
+   */
+  public static ImplementationFactory getInstance() {
+    return instance;
+  }
+
+  /**
+   * Install a new implementation factory this method is invoked by implementors to replace a
+   * factory.
+   *
+   * @param i implementation factory instance
+   */
+  public static void setInstance(ImplementationFactory i) {
+    instance = i;
+  }
+
+  /**
+   * Factory method to create the implementation instance
+   *
+   * @return a newly created implementation instance
+   */
+  public Object createImplementation() {
+    if (AndroidImplementation.getInstance() != null) {
+      return AndroidImplementation.getInstance();
     }
-    
-    /**
-     * Returns the singleton instance of this class
-     * 
-     * @return instanceof Implementation factory
-     */
-    public static ImplementationFactory getInstance() {
-        return instance;
-    }
-    
-    /**
-     * Install a new implementation factory this method is invoked by implementors
-     * to replace a factory.
-     * 
-     * @param i implementation factory instance
-     */
-    public static void setInstance(ImplementationFactory i) {
-        instance = i;
-    }
-    
-    /**
-     * Factory method to create the implementation instance
-     * 
-     * @return a newly created implementation instance
-     */
-    public Object createImplementation() {
-        if (AndroidImplementation.getInstance() != null) {
-            return AndroidImplementation.getInstance();
-        }
-        return new AndroidImplementation();
-    }
+    return new AndroidImplementation();
+  }
 }
