@@ -561,7 +561,7 @@ public class SimpleDateFormat extends DateFormat {
             switch (patternChar) {
                 case LITERAL_LETTER:
                     s = readLiteral(source, startIndex, token);
-                    if (!s.equalsIgnoreCase(token)) {
+                    if (s == null || !s.equalsIgnoreCase(token)) {
                         throw new ParseException("Unparseable string " + source, startIndex);
                     }
                     break;
