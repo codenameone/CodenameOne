@@ -150,7 +150,7 @@ else
     echo "<details><summary>Spotless Failure Log</summary>"
     echo ""
     echo "\`\`\`"
-    tail -n 20 "$SPOTLESS_LOG"
+    grep "\[ERROR\]" "$SPOTLESS_LOG" | head -n 100
     echo "\`\`\`"
     echo ""
     echo "</details>"
