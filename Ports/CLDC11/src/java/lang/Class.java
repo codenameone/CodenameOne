@@ -67,9 +67,9 @@ public final class Class<T> implements java.lang.reflect.Type {
      * In the absolute format, the programmer provides a fully qualified name that includes both the full path and the name of the resource inside the JAR file. In the path names, the character "/" is used as the separator.
      * In the relative format, the programmer provides only the name of the actual resource. Relative names are converted to absolute names by the system by prepending the resource name with the fully qualified package name of class upon which the getResourceAsStream method was called.
      */
-    /*public java.io.InputStream getResourceAsStream(java.lang.String name){
+    public java.io.InputStream getResourceAsStream(java.lang.String name){
         return null; //TODO codavaj!!
-    }*/
+    }
 
     /**
      * Determines if this Class object represents an array class.
