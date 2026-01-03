@@ -4174,9 +4174,6 @@ public class Container extends Component implements Iterable<Component> {
     static class TransitionAnimation extends ComponentAnimation {
         int growSpeed;
         int layoutAnimationSpeed;
-        Vector animatedComponents;
-        Motion[] opacity;
-        boolean dontRevalidate;
         private final Transition t;
         private final Container thisContainer;
         private boolean started = false;
@@ -4249,10 +4246,8 @@ public class Container extends Component implements Iterable<Component> {
                 if (growSpeed > 0) {
                     current.growShrink(growSpeed);
                 } else {
-                    if (layoutAnimationSpeed <= 0 && !dontRevalidate) {
-                        if (parent != null) {
-                            parent.revalidate();
-                        }
+                    if (layoutAnimationSpeed <= 0 && parent != null) {
+                        parent.revalidate();
                     }
                 }
             }
@@ -4261,9 +4256,6 @@ public class Container extends Component implements Iterable<Component> {
     }
 
     static class MorphAnimation extends ComponentAnimation {
-        Runnable onFinish;
-        int growSpeed;
-        int layoutAnimationSpeed;
         Vector animatedComponents;
         Motion[] opacity;
         boolean dontRevalidate;

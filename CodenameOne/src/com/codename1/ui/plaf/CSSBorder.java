@@ -1992,17 +1992,19 @@ public class CSSBorder extends Border {
     }
 
     private static class LinearGradient {
-        float angle;
+        //float angle;
         ColorStop[] colors = new ColorStop[0];
 
         double directionRadian() {
-            return angle * Math.PI / 180.0;
+            //return angle * Math.PI / 180.0;
+            return 0;
         }
 
         private String toCSSString() {
             StringBuilder sb = new StringBuilder();
             sb.append("linear-gradient(");
-            sb.append(angle).append("deg");
+            //sb.append(angle);
+            sb.append("deg");
             sb.append(",");
             boolean first = true;
 
@@ -2020,11 +2022,6 @@ public class CSSBorder extends Border {
     }
 
     private static class RadialGradient {
-        byte shape;
-        byte size;
-        float xPos, yPos;
-        ColorStop[] colors = new ColorStop[0];
-
         private String toCSSString() {
             throw new RuntimeException("RadialGradlient toCSSString() not implemented yet");
         }

@@ -77,6 +77,14 @@
     </Match>
 
     <!--
+    We don't have many public fields. In fact, we have one.
+    But since we're an API we can't remove it.
+    -->
+    <Match>
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
+    </Match>
+
+    <!--
     This rule prevents Class.newInstance() which we generally avoid anyway.
     However, the solution is to use java.beans or reflection to create a class
     via its constructor. That's a problem since that API isn't available in
