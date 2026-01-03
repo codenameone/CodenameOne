@@ -38,7 +38,7 @@ public class FileTree extends Tree {
      */
     public FileTree() {
         super(new FileTreeModel(true));
-        setUIID("FileTree");
+        setUIIDFinal("FileTree");
     }
 
     /**
@@ -46,7 +46,7 @@ public class FileTree extends Tree {
      */
     public FileTree(FileTreeModel model) {
         super(model);
-        setUIID("FileTree");
+        setUIIDFinal("FileTree");
     }
 
     protected String childToDisplayLabel(Object child) {

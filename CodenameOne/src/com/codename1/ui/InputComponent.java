@@ -71,12 +71,7 @@ import java.util.ArrayList;
 public abstract class InputComponent extends Container {
     static Boolean guiBuilderMode;
     private static boolean multiLineErrorMessage;
-    private final Button lbl = new Button("", "Label") {
-        @Override
-        protected boolean shouldRenderComponentSelection() {
-            return true;
-        }
-    };
+    private final Button lbl = new LabelButton();
     private final Label descriptionMessage = new Label("", "DescriptionLabel");
     Button action;
     private Boolean onTopMode;
@@ -151,7 +146,7 @@ public abstract class InputComponent extends Container {
     /**
      * This method must be invoked by the constructor of the subclasses to initialize the UI
      */
-    protected void initInput() {
+    protected final void initInput() {
         // this can happen for base class constructors
         if (getEditor() != null) {
             setUIID("TextComponent");
@@ -182,16 +177,7 @@ public abstract class InputComponent extends Container {
      */
     protected TextHolder createErrorLabel() {
         if (multiLineErrorMessage && isOnTopMode()) {
-            TextArea errorLabel = new TextArea() {
-                @Override
-                protected Dimension calcPreferredSize() {
-                    if (getText() == null || getText().length() == 0) {
-                        return new Dimension();
-                    }
-                    return super.calcPreferredSize();
-                }
-
-            };
+            TextArea errorLabel = new ErrorLabelTextArea();
             errorLabel.setRows(1);
             errorLabel.setActAsLabel(true);
             errorLabel.setGrowByContent(true);
@@ -537,5 +523,27 @@ public abstract class InputComponent extends Container {
             return null;
         }
         return super.setPropertyValue(name, value);
+    }
+
+    private static class ErrorLabelTextArea extends TextArea {
+        @Override
+        protected Dimension calcPreferredSize() {
+            if (getText() == null || getText().length() == 0) {
+                return new Dimension();
+            }
+            return super.calcPreferredSize();
+        }
+
+    }
+
+    private static class LabelButton extends Button {
+        public LabelButton() {
+            super("", "Label");
+        }
+
+        @Override
+        protected boolean shouldRenderComponentSelection() {
+            return true;
+        }
     }
 }

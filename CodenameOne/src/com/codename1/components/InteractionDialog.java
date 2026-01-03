@@ -117,7 +117,7 @@ public class InteractionDialog extends Container {
     }
 
     private void init() {
-        setUIID("Dialog");
+        setUIIDFinal("Dialog");
         title.setUIID("DialogTitle");
         contentPane.setUIID("DialogContentPane");
         super.addComponent(BorderLayout.NORTH, titleArea);

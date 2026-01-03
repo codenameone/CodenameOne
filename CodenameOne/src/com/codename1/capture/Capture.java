@@ -74,7 +74,7 @@ public class Capture {
      * @param response a callback Object to retrieve the file path
      * @throws RuntimeException if this feature failed or unsupported on the platform
      */
-    public static void capturePhoto(ActionListener response) {
+    public static void capturePhoto(ActionListener<ActionEvent> response) {
         Display.getInstance().capturePhoto(response);
     }
 
@@ -193,7 +193,7 @@ public class Capture {
      * @param response a callback Object to retrieve the file path
      * @throws RuntimeException if this feature failed or unsupported on the platform
      */
-    public static void captureAudio(ActionListener response) {
+    public static void captureAudio(ActionListener<ActionEvent> response) {
         Display.getInstance().captureAudio(response);
     }
 
@@ -210,7 +210,7 @@ public class Capture {
      * @throws RuntimeException if this feature failed or unsupported on the platform
      * @since 7.0
      */
-    public static void captureAudio(MediaRecorderBuilder recorderOptions, ActionListener response) {
+    public static void captureAudio(MediaRecorderBuilder recorderOptions, ActionListener<ActionEvent> response) {
         Display.getInstance().captureAudio(recorderOptions, response);
     }
 
@@ -224,7 +224,7 @@ public class Capture {
      * @param response    a callback Object to retrieve the file path
      * @since 7.0
      */
-    public static void captureVideo(VideoCaptureConstraints constraints, ActionListener response) {
+    public static void captureVideo(VideoCaptureConstraints constraints, ActionListener<ActionEvent> response) {
         Display.getInstance().captureVideo(constraints, response);
     }
 
@@ -241,11 +241,11 @@ public class Capture {
      * @throws RuntimeException if this feature failed or unsupported on the platform
      * @see #captureVideo(com.codename1.capture.VideoCaptureConstraints, com.codename1.ui.events.ActionListener)
      */
-    public static void captureVideo(ActionListener response) {
+    public static void captureVideo(ActionListener<ActionEvent> response) {
         Display.getInstance().captureVideo(response);
     }
 
-    static class CallBack implements ActionListener, Runnable {
+    static class CallBack implements ActionListener<ActionEvent>, Runnable {
         String url;
         private boolean completed;
         private int targetWidth = -1;
@@ -259,7 +259,7 @@ public class Capture {
             }
             completed = true;
             synchronized (this) {
-                this.notify();
+                this.notifyAll();
             }
         }
 
@@ -267,7 +267,10 @@ public class Capture {
             while (!completed) {
                 synchronized (this) {
                     try {
-                        this.wait();
+                        // we need to recheck the condition within the synchronized block (double locking)
+                        if(!completed) {
+                            this.wait();
+                        }
                     } catch (InterruptedException ex) {
                     }
                 }

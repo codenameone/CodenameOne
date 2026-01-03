@@ -146,7 +146,7 @@ public class Toolbar extends Container {
         if (UIManager.getInstance().isThemeConstant("landscapeTitleUiidBool", false)) {
             setUIID("Toolbar", "ToolbarLandscape");
         } else {
-            setUIID("Toolbar");
+            setUIIDFinal("Toolbar");
         }
         sideMenu = new ToolbarSideMenu();
         if (centeredDefault
@@ -592,15 +592,8 @@ public class Toolbar extends Container {
      *
      * @param callback gets the search string callbacks
      */
-    public void showSearchBar(final ActionListener callback) {
-        SearchBar s = new SearchBar(Toolbar.this, searchIconSize) {
-
-            @Override
-            public void onSearch(String text) {
-                callback.actionPerformed(new ActionEvent(text));
-            }
-
-        };
+    public void showSearchBar(final ActionListener<ActionEvent> callback) {
+        SearchBar s = new CallbackSearchBar(callback);
         Form f = Toolbar.this.getComponentForm();
         setHidden(true);
         f.removeComponentFromForm(Toolbar.this);
@@ -1508,10 +1501,7 @@ public class Toolbar extends Container {
                 // changes in code path - since it already worked correctly on
                 // every platform except for iOS.
                 // Ref https://github.com/codenameone/CodenameOne/issues/2444
-                f.stopEditing(new Runnable() {
-                    public void run() {
-                    }
-                });
+                f.stopEditing(null);
             }
         }
         AnimationManager a = getAnimationManager();
@@ -1645,10 +1635,7 @@ public class Toolbar extends Container {
                 // changes in code path - since it already worked correctly on
                 // every platform except for iOS.
                 // Ref https://github.com/codenameone/CodenameOne/issues/2444
-                f.stopEditing(new Runnable() {
-                    public void run() {
-                    }
-                });
+                f.stopEditing(null);
             }
         }
         AnimationManager a = getAnimationManager();
@@ -2787,4 +2774,17 @@ public class Toolbar extends Container {
     }
 
 
+    private class CallbackSearchBar extends SearchBar {
+        private final ActionListener<ActionEvent> callback;
+
+        public CallbackSearchBar(ActionListener<ActionEvent> callback) {
+            super(Toolbar.this, Toolbar.this.searchIconSize);
+            this.callback = callback;
+        }
+
+        @Override
+        public void onSearch(String text) {
+            callback.actionPerformed(new ActionEvent(text));
+        }
+    }
 }

@@ -97,32 +97,10 @@ public class TimeSpinner extends BaseSpinner {
                 amPM = Spinner.create(0, 2, 0, 1);
             }
             ((DefaultListCellRenderer) hour.getRenderer()).setRightAlignNumbers(true);
-            SpinnerRenderer<Object> twoDigitRender = new SpinnerRenderer<Object>() {
-                public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
-                    if (value != null && value instanceof Integer) {
-                        int i = ((Integer) value).intValue();
-                        if (i < 10) {
-                            value = "0" + i;
-                        }
-                    }
-                    return super.getListCellRendererComponent(list, value, index, isSelected);
-                }
-            };
+            SpinnerRenderer<Object> twoDigitRender = new TwoDigitSpinnerRenderer();
             minute.setRenderer(twoDigitRender);
 
-            SpinnerRenderer<Object> render = new SpinnerRenderer<Object>() {
-                public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
-                    if (value != null && value instanceof Integer) {
-                        int d = ((Integer) value).intValue();
-                        if (d == 0) {
-                            value = "AM";
-                        } else {
-                            value = "PM";
-                        }
-                    }
-                    return super.getListCellRendererComponent(list, value, index, isSelected);
-                }
-            };
+            SpinnerRenderer<Object> render = new TimeSpinnerRenderer();
             amPM.setRenderer(render);
             render.setRTL(false);
             render.setShowNumbers(false);
@@ -445,6 +423,32 @@ public class TimeSpinner extends BaseSpinner {
         for (Component c : minuteComponents) {
             c.setVisible(visible);
             c.setHidden(!visible);
+        }
+    }
+
+    private static class TimeSpinnerRenderer extends SpinnerRenderer<Object> {
+        public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
+            if (value != null && value instanceof Integer) {
+                int d = ((Integer) value).intValue();
+                if (d == 0) {
+                    value = "AM";
+                } else {
+                    value = "PM";
+                }
+            }
+            return super.getListCellRendererComponent(list, value, index, isSelected);
+        }
+    }
+
+    private static class TwoDigitSpinnerRenderer extends SpinnerRenderer<Object> {
+        public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
+            if (value != null && value instanceof Integer) {
+                int i = ((Integer) value).intValue();
+                if (i < 10) {
+                    value = "0" + i;
+                }
+            }
+            return super.getListCellRendererComponent(list, value, index, isSelected);
         }
     }
 }

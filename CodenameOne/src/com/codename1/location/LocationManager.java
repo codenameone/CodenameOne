@@ -52,7 +52,7 @@ public abstract class LocationManager {
     public static final int OUT_OF_SERVICE = 1;
     public static final int TEMPORARILY_UNAVAILABLE = 2;
     private static LocationListener listener;
-    private static LocationRequest request;
+    private LocationRequest request;
     private static Class backgroundlistener;
     private int status = TEMPORARILY_UNAVAILABLE;
 

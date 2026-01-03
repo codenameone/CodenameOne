@@ -1042,11 +1042,10 @@ private void syncWithUIActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FI
     final Map<String, String> allKeys = new HashMap<String, String>();
     com.codename1.ui.plaf.UIManager original = com.codename1.ui.plaf.UIManager.getInstance();
     Accessor.setUIManager(new com.codename1.ui.plaf.ProtectedUIManager() {
-        public String localize(String key, String defaultValue) {
+        public void onLocalize(String key, String defaultValue) {
             if(key != null && key.length() > 0 && defaultValue != null && defaultValue.length() > 0) {
                 allKeys.put(key, defaultValue);
             }
-            return super.localize(key, defaultValue);
         }
     });
     UIBuilderOverride o = new UIBuilderOverride();

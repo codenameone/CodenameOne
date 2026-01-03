@@ -147,7 +147,7 @@ public class PickerComponent extends InputComponent {
      * {@inheritDoc}
      */
     @Override
-    public Component getEditor() {
+    public final Component getEditor() {
         return picker;
     }
 

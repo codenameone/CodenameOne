@@ -112,7 +112,7 @@ public class Slider extends Label implements ActionSource {
     /**
      * {@inheritDoc}
      */
-    public void setUIID(String id) {
+    public final void setUIID(String id) {
         super.setUIID(id);
         initStyles(id);
     }

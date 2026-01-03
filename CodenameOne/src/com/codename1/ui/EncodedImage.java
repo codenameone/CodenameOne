@@ -37,9 +37,9 @@ import java.io.InputStream;
  * <p>{@code EncodedImage} is the workhorse of Codename One. Images returned from resource files are
  * {@code EncodedImage} and many API's expect it.</p>
  *
- * <p>{@code EncodedImage} is effectively a an image that is "hidden" and extracted as needed to remove the
+ * <p>{@code EncodedImage} is effectively an image that is "hidden" and extracted as needed to remove the
  * memory overhead associated with loaded image. When creating an {@code EncodedImage} only the PNG
- * (or JPEG etc.) is loaded to an array in RAM. Normally such images are very small (relatively) so they can be
+ * (or JPEG etc.) is loaded to an array in RAM. Normally, such images are very small (relatively) so they can be
  * kept in memory without much overhead.</p>
  *
  * <p>When image information is needed (pixels) the image is decoded into RAM and kept in a weak/sort
@@ -157,7 +157,7 @@ public class EncodedImage extends Image {
                 Util.cleanup(bo);
                 enc.width = i.getWidth();
                 enc.height = i.getHeight();
-                if (format == ImageIO.FORMAT_JPEG) {
+                if (format.equals(ImageIO.FORMAT_JPEG)) {
                     enc.opaque = true;
                     enc.opaqueChecked = true;
                 }

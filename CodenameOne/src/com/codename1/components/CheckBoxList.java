@@ -57,15 +57,10 @@ public class CheckBoxList extends ButtonList {
     };
 
     public CheckBoxList(MultipleSelectionListModel model) {
-        super(model);
+        super(model, true);
         fireReady();
     }
-
-    @Override
-    public boolean isAllowMultipleSelection() {
-        return true;
-    }
-
+    
     @Override
     protected Component createButton(Object model) {
         return new CheckBox(String.valueOf(model));

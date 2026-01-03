@@ -43,7 +43,7 @@ public abstract class BaseSpinner extends Container {
      */
     public BaseSpinner() {
         super(new BoxLayout(BoxLayout.X_AXIS));
-        setUIID("SpinnerWrapper");
+        setUIIDFinal("SpinnerWrapper");
         overlayStyle = getUIManager().getComponentStyle("SpinnerOverlay");
         installDefaultPainter(overlayStyle);
     }
@@ -92,12 +92,7 @@ public abstract class BaseSpinner extends Container {
     }
 
     Component createSeparator() {
-        Label l = new Label(" ") {
-
-            public void repaint() {
-                getParent().repaint();
-            }
-        };
+        Label l = new ParentRepaintingLabel();
         l.setUIID("SpinnerSeparator");
         return l;
     }
@@ -125,5 +120,15 @@ public abstract class BaseSpinner extends Container {
             overlayStyle.getBgPainter().paint(g, getBounds());
         }
         g.translate(-x, -y);
+    }
+
+    private static class ParentRepaintingLabel extends Label {
+        public ParentRepaintingLabel() {
+            super(" ");
+        }
+
+        public void repaint() {
+            getParent().repaint();
+        }
     }
 }

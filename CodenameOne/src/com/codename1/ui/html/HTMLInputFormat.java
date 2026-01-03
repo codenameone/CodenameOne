@@ -167,10 +167,7 @@ class HTMLInputFormat {
         if (ta instanceof TextField) {
             TextField tf = (TextField) ta;
             if (((widestConstraint & FormatConstraint.TYPE_SYMBOL) == 0) && ((widestConstraint & FormatConstraint.TYPE_ANY) == 0)) { // No symbols allowed
-                tf = new TextField(ta.getText()) {
-                    protected void showSymbolDialog() { // Block symbols dialog
-                    }
-                };
+                tf = new ConstraintsTextField(ta);
                 tf.setConstraint(ta.getConstraint());
                 ta = tf;
             }
@@ -492,5 +489,13 @@ class HTMLInputFormat {
     }
 
 
+    private static class ConstraintsTextField extends TextField {
+        public ConstraintsTextField(TextArea ta) {
+            super(ta.getText());
+        }
+
+        protected void showSymbolDialog() { // Block symbols dialog
+        }
+    }
 }
 

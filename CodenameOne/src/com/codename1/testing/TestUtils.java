@@ -1144,26 +1144,6 @@ public class TestUtils {
         }
     }
 
-    private static void assertRelativeErrorNotExceeded(float expected, float actual, double maxRelativeError) {
-        if (verbose) {
-            log("assertRelativeErrorNotExceeded(" + expected + ", " + actual + ", " + maxRelativeError + ")");
-        }
-        double relative_error = Math.abs((expected - actual) / actual) * 100;
-        if (relative_error > maxRelativeError) {
-            assertBool(false);
-        }
-    }
-
-    private static void assertRelativeErrorNotExceeded(double expected, double actual, double maxRelativeError) {
-        if (verbose) {
-            log("assertRelativeErrorNotExceeded(" + expected + ", " + actual + ", " + maxRelativeError + ")");
-        }
-        double relative_error = Math.abs((expected - actual) / actual) * 100;
-        if (relative_error > maxRelativeError) {
-            assertBool(false);
-        }
-    }
-
     private static void assertRelativeErrorNotExceeded(float expected, float actual, double maxRelativeError, String errorMessage) {
         if (verbose) {
             log("assertRelativeErrorNotExceeded(" + expected + ", " + actual + ", " + maxRelativeError + ", " + errorMessage + ")");

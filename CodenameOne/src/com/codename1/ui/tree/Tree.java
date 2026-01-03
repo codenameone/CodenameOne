@@ -112,7 +112,7 @@ public class Tree extends Container {
         }
         buildBranch(null, 0, this);
         setScrollableY(true);
-        setUIID("Tree");
+        setUIIDFinal("Tree");
     }
 
     /**
@@ -810,7 +810,7 @@ public class Tree extends Container {
             int aolen = arr[0].length;
             Vector v = new Vector();
             for (int iter = 0; iter < aolen; iter++) {
-                if (parent == arr[0][iter]) {
+                if (parent.equals(arr[0][iter])) {
                     if (alen > iter + 1 && arr[iter + 1] != null) {
                         int ailen = arr[iter + 1].length;
                         for (int i = 0; i < ailen; i++) {

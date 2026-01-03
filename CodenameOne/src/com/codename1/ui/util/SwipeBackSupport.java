@@ -172,11 +172,7 @@ public class SwipeBackSupport {
         if (t instanceof CommonTransitions) {
             Transition originalTransition = currentForm.getTransitionOutAnimator();
             currentForm.setTransitionOutAnimator(CommonTransitions.createEmpty());
-            Form blank = new Form() {
-                protected boolean shouldSendPointerReleaseToOtherForm() {
-                    return true;
-                }
-            };
+            Form blank = new SendPointerReleaseToOtherForm();
             blank.addPointerDraggedListener(pointerDragged);
             blank.addPointerReleasedListener(pointerReleased);
             blank.addPointerPressedListener(pointerPressed);
@@ -191,12 +187,26 @@ public class SwipeBackSupport {
             });
             t.init(currentForm, destination);
             t.initTransition();
-            blank.setGlassPane(new Painter() {
-                public void paint(Graphics g, Rectangle rect) {
-                    t.animate();
-                    t.paint(g);
-                }
-            });
+            blank.setGlassPane(new BackGlassPanePainter(t));
+        }
+    }
+
+    private static class BackGlassPanePainter implements Painter {
+        private final Transition t;
+
+        public BackGlassPanePainter(Transition t) {
+            this.t = t;
+        }
+
+        public void paint(Graphics g, Rectangle rect) {
+            t.animate();
+            t.paint(g);
+        }
+    }
+
+    private static class SendPointerReleaseToOtherForm extends Form {
+        protected boolean shouldSendPointerReleaseToOtherForm() {
+            return true;
         }
     }
 

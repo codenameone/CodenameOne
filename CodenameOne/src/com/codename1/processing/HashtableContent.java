@@ -38,7 +38,7 @@ import java.util.Map;
 import java.util.Vector;
 
 /**
- * Internal class, do not use.
+ * Internal class do not use.
  * <p>
  * A DOM accessor implementation for working with Map data.
  *
@@ -54,7 +54,7 @@ class MapContent implements StructuredContent {
      *
      * @param content parsed Map content
      */
-    public MapContent(Map content) {
+    public MapContent(Map<?, ?> content) {
         this.root = content;
     }
 
@@ -130,7 +130,9 @@ class MapContent implements StructuredContent {
      * @see java.lang.Object#equals(Object)
      */
     public boolean equals(Object o) {
-        return root.hashCode() == o.hashCode();
+        return o instanceof MapContent &&
+                (root == ((MapContent) o).root ||
+                (root != null && root.equals(((MapContent) o).root)));
     }
 
     /**

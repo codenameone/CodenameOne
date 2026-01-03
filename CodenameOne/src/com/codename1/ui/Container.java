@@ -40,7 +40,6 @@ import com.codename1.ui.plaf.UIManager;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Vector;
@@ -78,13 +77,13 @@ import java.util.Vector;
  * @see Component
  */
 public class Container extends Component implements Iterable<Component> {
-    static boolean enableLayoutOnPaint = true;
+    private static boolean enableLayoutOnPaint = true;
     /**
      * Workaround for the behavior of the sidemenu bar on iOS etc. which translates aggressively,
      * this is visible with the table component where the lines slide out of place
      */
     static int sidemenuBarTranslation;
-    static boolean blockOverdraw = false;
+    private static boolean blockOverdraw;
     boolean scrollableX;
     boolean scrollableY;
     /**
@@ -147,9 +146,17 @@ public class Container extends Component implements Iterable<Component> {
      */
     public Container(Layout layout, String uiid) {
         super();
-        setUIID(uiid);
+        setUIIDFinal(uiid);
         this.layout = layout;
         setFocusable(false);
+    }
+
+    static void setBlockOverdraw(boolean b) {
+        blockOverdraw = b;
+    }
+
+    static boolean isBlockOverdraw() {
+        return blockOverdraw;
     }
 
     /**
@@ -296,24 +303,12 @@ public class Container extends Component implements Iterable<Component> {
         };
         AnimationManager a = getAnimationManager();
         if (a != null && a.isAnimating()) {
-
-            a.addAnimation(new ComponentAnimation() {
-                @Override
-                public boolean isInProgress() {
-                    return false;
-                }
-
-                @Override
-                protected void updateState() {
-                    r.run();
-                }
-            });
+            a.addAnimation(new RefreshThemeCallback(r));
             return newParent;
         } else {
             r.run();
             return newParent;
         }
-
     }
 
     /**
@@ -379,7 +374,7 @@ public class Container extends Component implements Iterable<Component> {
      * @param cmp the component to add
      * @return this for call chaining
      */
-    public Container add(Component cmp) {
+    public final Container add(Component cmp) {
         addComponent(cmp);
         return this;
     }
@@ -490,7 +485,7 @@ public class Container extends Component implements Iterable<Component> {
      *
      * @param lead component that takes over the hierarchy
      */
-    public void setLeadComponent(Component lead) {
+    public final void setLeadComponent(Component lead) {
         if (lead == leadComponent) {
             return;
         }
@@ -953,11 +948,7 @@ public class Container extends Component implements Iterable<Component> {
         boolean refreshLaf = manager != cmp.getUIManager();
         cmp.setParent(this);
         if (refreshLaf) {
-            Display.getInstance().callSerially(new Runnable() {
-                public void run() {
-                    cmp.refreshTheme(false);
-                }
-            });
+            Display.getInstance().callSerially(new RefreshThemeRunnable(cmp));
         }
         components.add(index, cmp);
         if (layout instanceof BorderLayout && !BorderLayout.OVERLAY.equals(layout.getComponentConstraint(cmp))) {
@@ -1002,6 +993,10 @@ public class Container extends Component implements Iterable<Component> {
         replaceComponents(current, next, t, true, false, null, 0, 0, true);
     }
 
+    static void setEnableLayoutOnPaint(boolean val) {
+        enableLayoutOnPaint = val;
+    }
+
     /**
      * This method replaces the current Component with the next Component.
      * Current Component must be contained in this Container.
@@ -1014,13 +1009,13 @@ public class Container extends Component implements Iterable<Component> {
      * @param layoutAnimationSpeed the speed of the layout animation after replace  is completed
      */
     public void replaceAndWait(final Component current, final Component next, final Transition t, int layoutAnimationSpeed) {
-        enableLayoutOnPaint = false;
+        setEnableLayoutOnPaint(false);
         replaceComponents(current, next, t, true, false, null, 0, layoutAnimationSpeed, true);
         if (layoutAnimationSpeed > 0) {
             animateLayoutAndWait(layoutAnimationSpeed);
         }
         dontRecurseContainer = false;
-        enableLayoutOnPaint = true;
+        setEnableLayoutOnPaint(true);
     }
 
     /**
@@ -1892,18 +1887,7 @@ public class Container extends Component implements Iterable<Component> {
                 _tmpRenderingElevatedComponents.clear();
                 _tmpRenderingElevatedComponents.addAll(elevatedComponents);
             }
-            Collections.sort(_tmpRenderingElevatedComponents, new Comparator<Component>() {
-
-                public int compare(Component o1, Component o2) {
-                    int e1 = o1.getStyle().getElevation();
-                    int e2 = o2.getStyle().getElevation();
-                    if (e1 < e2) return -1;
-                    else if (e1 > e2) return 1;
-                    else {
-                        return o1.renderedElevationComponentIndex - o2.renderedElevationComponentIndex;
-                    }
-                }
-            });
+            Collections.sort(_tmpRenderingElevatedComponents, new ElevationComparator());
             for (Component child : _tmpRenderingElevatedComponents) {
                 int relativeX = child.getRelativeX(this) + child.getScrollX();
                 int relativeY = child.getRelativeY(this) + child.getScrollY();
@@ -3700,7 +3684,7 @@ public class Container extends Component implements Iterable<Component> {
 
     private void morph(Component source, Component destination, int duration, boolean wait, Runnable onCompletion) {
         setShouldCalcPreferredSize(true);
-        enableLayoutOnPaint = false;
+        setEnableLayoutOnPaint(false);
         dontRecurseContainer = true;
         int deltaX = getAbsoluteX();
         int deltaY = getAbsoluteY();
@@ -3755,7 +3739,7 @@ public class Container extends Component implements Iterable<Component> {
      */
     private ComponentAnimation animateHierarchy(final int duration, boolean wait, int opacity, boolean add) {
         setShouldCalcPreferredSize(true);
-        enableLayoutOnPaint = false;
+        setEnableLayoutOnPaint(false);
         dontRecurseContainer = true;
         Vector comps = new Vector();
         findComponentsInHierachy(comps);
@@ -3853,7 +3837,7 @@ public class Container extends Component implements Iterable<Component> {
      */
     private ComponentAnimation animateUnlayout(final int duration, boolean wait, int opacity, Runnable callback, boolean add) {
         setShouldCalcPreferredSize(true);
-        enableLayoutOnPaint = false;
+        setEnableLayoutOnPaint(false);
         final int componentCount = getComponentCount();
         int[] beforeX = new int[componentCount];
         int[] beforeY = new int[componentCount];
@@ -3913,7 +3897,7 @@ public class Container extends Component implements Iterable<Component> {
             return null;
         }
         setShouldCalcPreferredSize(true);
-        enableLayoutOnPaint = false;
+        setEnableLayoutOnPaint(false);
         final int componentCount = getComponentCount();
         int[] beforeX = new int[componentCount];
         int[] beforeY = new int[componentCount];
@@ -4190,9 +4174,6 @@ public class Container extends Component implements Iterable<Component> {
     static class TransitionAnimation extends ComponentAnimation {
         int growSpeed;
         int layoutAnimationSpeed;
-        Vector animatedComponents;
-        Motion[] opacity;
-        boolean dontRevalidate;
         private final Transition t;
         private final Container thisContainer;
         private boolean started = false;
@@ -4265,10 +4246,8 @@ public class Container extends Component implements Iterable<Component> {
                 if (growSpeed > 0) {
                     current.growShrink(growSpeed);
                 } else {
-                    if (layoutAnimationSpeed <= 0 && !dontRevalidate) {
-                        if (parent != null) {
-                            parent.revalidate();
-                        }
+                    if (layoutAnimationSpeed <= 0 && parent != null) {
+                        parent.revalidate();
                     }
                 }
             }
@@ -4277,9 +4256,6 @@ public class Container extends Component implements Iterable<Component> {
     }
 
     static class MorphAnimation extends ComponentAnimation {
-        Runnable onFinish;
-        int growSpeed;
-        int layoutAnimationSpeed;
         Vector animatedComponents;
         Motion[] opacity;
         boolean dontRevalidate;
@@ -4362,7 +4338,7 @@ public class Container extends Component implements Iterable<Component> {
             }
             thisContainer.repaint();
             if (System.currentTimeMillis() - startTime >= duration) {
-                enableLayoutOnPaint = true;
+                setEnableLayoutOnPaint(true);
                 thisContainer.dontRecurseContainer = false;
                 Form f = thisContainer.getComponentForm();
                 finished = true;

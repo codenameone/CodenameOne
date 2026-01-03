@@ -119,7 +119,7 @@ public class JavascriptContext {
      * is packaged by the JavascriptContext class in response to a
      * BrowserNavigationCallback.
      */
-    private final ActionListener scriptMessageListener;
+    private final ActionListener<JavascriptEvent> scriptMessageListener;
     /**
      * A handler for navigation attempts.  This intercepts URLs of the
      * form cn1command:... .  This is how Javascript communicates/calls
@@ -180,7 +180,7 @@ public class JavascriptContext {
     }
 
     /**
-     * Increments the reference count for a the javascript object wrapped by
+     * Increments the reference count for the javascript object wrapped by
      * the given JSObject.  This may also trigger a cleanup of the object map if
      * the map grows too big, or it randomly decided to perform cleanup.
      *
@@ -420,13 +420,7 @@ public class JavascriptContext {
      * @param callback   Callback to be called with the result of the expression.
      */
     public void getAsync(String javascript, final SuccessCallback callback) {
-        getAsync(javascript, new CallbackAdapter() {
-
-            @Override
-            public void onSucess(Object value) {
-                callback.onSucess(value);
-            }
-        });
+        getAsync(javascript, new GetAsyncCallbackAdapter(callback));
     }
 
     /**
@@ -841,14 +835,7 @@ public class JavascriptContext {
      *                 object type.
      */
     public void callAsync(String jsFunc, JSObject self, Object[] params, final SuccessCallback callback) {
-        callAsync(jsFunc, self, params, new CallbackAdapter() {
-
-            @Override
-            public void onSucess(Object value) {
-                callback.onSucess(value);
-            }
-
-        });
+        callAsync(jsFunc, self, params, new CallAsyncCallbackAdapter(callback));
     }
 
     /**
@@ -960,6 +947,35 @@ public class JavascriptContext {
         });
     }
 
+    private static class GetAsyncCallbackAdapter extends CallbackAdapter {
+
+        private final SuccessCallback callback;
+
+        public GetAsyncCallbackAdapter(SuccessCallback callback) {
+            this.callback = callback;
+        }
+
+        @Override
+        public void onSucess(Object value) {
+            callback.onSucess(value);
+        }
+    }
+
+    private static class CallAsyncCallbackAdapter extends CallbackAdapter {
+
+        private final SuccessCallback callback;
+
+        public CallAsyncCallbackAdapter(SuccessCallback callback) {
+            this.callback = callback;
+        }
+
+        @Override
+        public void onSucess(Object value) {
+            callback.onSucess(value);
+        }
+
+    }
+
     /**
      * A navigation callback that handles navigations to urls of the form
      * cn1command:...
@@ -1000,9 +1016,9 @@ public class JavascriptContext {
      * @see addCallback()
      * @see JSObject.addCallback()
      */
-    private class ScriptMessageListener implements ActionListener {
+    private class ScriptMessageListener implements ActionListener<JavascriptEvent> {
 
-        public void actionPerformed(ActionEvent evt) {
+        public void actionPerformed(JavascriptEvent evt) {
             JavascriptEvent jevt = (JavascriptEvent) evt;
             JSObject source = jevt.getSelf();
             String method = jevt.getMethod();

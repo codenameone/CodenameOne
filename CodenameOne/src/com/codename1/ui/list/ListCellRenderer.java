@@ -60,7 +60,7 @@ public interface ListCellRenderer<T> {
      * and is animated to provide smooth scrolling.
      * When the selection moves, this component is drawn above/below the list items -
      * it is recommended to give this component some level of transparency (see above code example).
-     * This method is optional an implementation
+     * This method is optional, an implementation
      * can choose to return null.
      *
      * @param list the parent list

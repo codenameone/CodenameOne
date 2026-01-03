@@ -424,18 +424,7 @@ public class Validator {
                         }
                     };
 
-                    FocusListener myFocusListener = new FocusListener() {
-
-                        @Override
-                        public void focusLost(Component cmp) {
-                            showError.run();
-                        }
-
-                        @Override
-                        public void focusGained(Component cmp) {
-                            // no code here
-                        }
-                    };
+                    FocusListener myFocusListener = new ConstraintFocusListener(showError);
 
                     if (inputComponent instanceof TextComponent) {
                         ((TextComponent) inputComponent).getField().addFocusListener(myFocusListener);
@@ -728,6 +717,24 @@ public class Validator {
         EMBLEM,
         UIID_AND_EMBLEM,
         NONE
+    }
+
+    private static class ConstraintFocusListener implements FocusListener {
+        private final Runnable showError;
+
+        public ConstraintFocusListener(Runnable showError) {
+            this.showError = showError;
+        }
+
+        @Override
+        public void focusLost(Component cmp) {
+            showError.run();
+        }
+
+        @Override
+        public void focusGained(Component cmp) {
+            // no code here
+        }
     }
 
     class ComponentListener implements ActionListener, DataChangedListener, Painter {

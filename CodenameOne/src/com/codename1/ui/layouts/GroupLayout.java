@@ -402,7 +402,6 @@ public class GroupLayout extends Layout {
         String padding = "";
         if (spring instanceof ComponentSpring) {
             ComponentSpring cSpring = (ComponentSpring) spring;
-            origin = cSpring.getOrigin() + " ";
             String name = cSpring.getComponent().toString();
             origin = "name=" + name + ", ";
         }

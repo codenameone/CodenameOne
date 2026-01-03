@@ -161,12 +161,7 @@ class ButtonListTest extends UITestBase {
         private int refreshCount = 0;
 
         public TestButtonList(DefaultListModel<String> model) {
-            super(model);
-        }
-
-        @Override
-        public boolean isAllowMultipleSelection() {
-            return false;
+            super(model, false);
         }
 
         @Override

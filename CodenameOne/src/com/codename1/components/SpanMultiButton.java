@@ -83,7 +83,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
      * Default constructor allowing the designer to create an instance of this class
      */
     public SpanMultiButton() {
-        setUIID("MultiButton");
+        setUIIDFinal("MultiButton");
 
         firstRow.setActAsLabel(true);
         firstRow.setGrowByContent(true);

@@ -131,7 +131,7 @@ public abstract class ComponentAnimation {
                 completed = true;
                 if (notifyLock != null) {
                     synchronized (notifyLock) {
-                        notifyLock.notify();
+                        notifyLock.notifyAll();
                     }
                 }
                 if (onCompletion != null) {

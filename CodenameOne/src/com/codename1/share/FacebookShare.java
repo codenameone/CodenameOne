@@ -130,7 +130,6 @@ public class FacebookShare extends ShareService {
                                 FaceBookAccess.getInstance().addResponseCodeListener(new ActionListener() {
 
                                     public void actionPerformed(ActionEvent evt) {
-                                        NetworkEvent ne = (NetworkEvent) evt;
                                         FaceBookAccess.getInstance().removeResponseCodeListener(this);
                                         progress.dispose();
                                         Dialog.show("Failed to Share", "for some reason sharing has failed, try again later.", "Ok", null);
@@ -163,8 +162,7 @@ public class FacebookShare extends ShareService {
                             FaceBookAccess.getInstance().addResponseCodeListener(new ActionListener() {
 
                                 public void actionPerformed(ActionEvent evt) {
-                                    NetworkEvent ne = (NetworkEvent) evt;
-                                      FaceBookAccess.getInstance().removeResponseCodeListener(this);
+                                    FaceBookAccess.getInstance().removeResponseCodeListener(this);
                                     progress.dispose();
                                     Dialog.show("Failed to Share", "for some reason sharing has failed, try again later.", "Ok", null);
                                     finish();

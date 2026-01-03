@@ -81,7 +81,7 @@ public class Accordion extends Container {
                 FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_RIGHT, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon));
         this.openIcon = FontImage.createMaterial(FontImage.MATERIAL_KEYBOARD_ARROW_DOWN, UIManager.getInstance().getComponentStyle(uiidOpenCloseIcon));
 
-        setScrollableY(true);
+        super.setScrollableY(true);
     }
 
     /**
@@ -420,7 +420,7 @@ public class Accordion extends Container {
         private String topUiid = uiidHeader;
 
         public AccordionContent(Component header, final Component body) {
-            setUIID(uiidBackGroundItem);
+            setUIIDFinal(uiidBackGroundItem);
             setLayout(new BorderLayout());
             this.body = body;
             this.header = header;

@@ -95,13 +95,7 @@ class ShareForm extends Form {
             addComponent(BorderLayout.CENTER, body);
         }
         addComponent(BorderLayout.SOUTH, post);
-        Command back = new Command("Back") {
-
-            public void actionPerformed(ActionEvent evt) {
-
-                contacts.showBack();
-            }
-        };
+        Command back = new BackCommand(contacts);
         addCommand(back);
         setBackCommand(back);
     }
@@ -114,4 +108,32 @@ class ShareForm extends Form {
         return message.getText();
     }
 
+    private static class BackCommand extends Command {
+        private final Form contacts;
+
+        public BackCommand(Form contacts) {
+            super("Back");
+            this.contacts = contacts;
+        }
+
+        @Override
+        public final boolean equals(Object o) {
+            if (!(o instanceof BackCommand)) return false;
+            if (!super.equals(o)) return false;
+
+            BackCommand that = (BackCommand) o;
+            return (contacts == null ? that.contacts == null : contacts.equals(that.contacts));
+        }
+
+        @Override
+        public int hashCode() {
+            int result = super.hashCode();
+            result = 31 * result + (contacts != null ? contacts.hashCode() : 0);
+            return result;
+        }
+
+        public void actionPerformed(ActionEvent evt) {
+            contacts.showBack();
+        }
+    }
 }

@@ -249,7 +249,7 @@ public class List<T> extends Component implements ActionSource {
      * @param model the model instance
      */
     public List(ListModel model) {
-        setUIID("List");
+        setUIIDFinal("List");
         setModel(model);
     }
 
@@ -777,7 +777,7 @@ public class List<T> extends Component implements ActionSource {
      *
      * @return the renderer which is used to draw list elements
      */
-    public ListCellRenderer getRenderer() {
+    public final ListCellRenderer getRenderer() {
         return renderer;
     }
 
@@ -786,7 +786,7 @@ public class List<T> extends Component implements ActionSource {
      *
      * @param renderer cell renderer instance
      */
-    public void setRenderer(ListCellRenderer renderer) {
+    public final void setRenderer(ListCellRenderer renderer) {
         setListCellRenderer(renderer);
     }
 

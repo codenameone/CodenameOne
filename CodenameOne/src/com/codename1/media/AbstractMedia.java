@@ -185,21 +185,8 @@ public abstract class AbstractMedia implements AsyncMedia {
         }
 
         if (pendingPlayRequest != null && pendingPlayRequest != out) {
-            pendingPlayRequest.ready(new SuccessCallback<AsyncMedia>() {
-                @Override
-                public void onSucess(AsyncMedia value) {
-                    if (!out.isDone()) {
-                        out.complete(value);
-                    }
-                }
-            }).except(new SuccessCallback<Throwable>() {
-                @Override
-                public void onSucess(Throwable value) {
-                    if (!out.isDone()) {
-                        out.error(value);
-                    }
-                }
-            });
+            pendingPlayRequest.ready(new PlayAsyncSuccessCallback(out))
+                    .except(new PlayAsyncExceptSuccessCallback(out));
             return out;
         } else {
             pendingPlayRequest = out;
@@ -304,21 +291,8 @@ public abstract class AbstractMedia implements AsyncMedia {
             return out;
         }
         if (pendingPauseRequest != null && pendingPauseRequest != out) {
-            pendingPauseRequest.ready(new SuccessCallback<AsyncMedia>() {
-                @Override
-                public void onSucess(AsyncMedia value) {
-                    if (!out.isDone()) {
-                        out.complete(value);
-                    }
-                }
-            }).except(new SuccessCallback<Throwable>() {
-                @Override
-                public void onSucess(Throwable value) {
-                    if (!out.isDone()) {
-                        out.error(value);
-                    }
-                }
-            });
+            pendingPauseRequest.ready(new PauseAsyncSuccessCallback(out))
+                    .except(new PauseAsyncExceptSuccessCallback(out));
             return out;
         } else {
             pendingPauseRequest = out;
@@ -393,5 +367,65 @@ public abstract class AbstractMedia implements AsyncMedia {
     @Override
     public final void pause() {
         pauseAsync();
+    }
+
+    private static class PauseAsyncSuccessCallback implements SuccessCallback<AsyncMedia> {
+        private final PauseRequest out;
+
+        public PauseAsyncSuccessCallback(PauseRequest out) {
+            this.out = out;
+        }
+
+        @Override
+        public void onSucess(AsyncMedia value) {
+            if (!out.isDone()) {
+                out.complete(value);
+            }
+        }
+    }
+
+    private static class PauseAsyncExceptSuccessCallback implements SuccessCallback<Throwable> {
+        private final PauseRequest out;
+
+        public PauseAsyncExceptSuccessCallback(PauseRequest out) {
+            this.out = out;
+        }
+
+        @Override
+        public void onSucess(Throwable value) {
+            if (!out.isDone()) {
+                out.error(value);
+            }
+        }
+    }
+
+    private static class PlayAsyncSuccessCallback implements SuccessCallback<AsyncMedia> {
+        private final PlayRequest out;
+
+        public PlayAsyncSuccessCallback(PlayRequest out) {
+            this.out = out;
+        }
+
+        @Override
+        public void onSucess(AsyncMedia value) {
+            if (!out.isDone()) {
+                out.complete(value);
+            }
+        }
+    }
+
+    private static class PlayAsyncExceptSuccessCallback implements SuccessCallback<Throwable> {
+        private final PlayRequest out;
+
+        public PlayAsyncExceptSuccessCallback(PlayRequest out) {
+            this.out = out;
+        }
+
+        @Override
+        public void onSucess(Throwable value) {
+            if (!out.isDone()) {
+                out.error(value);
+            }
+        }
     }
 }

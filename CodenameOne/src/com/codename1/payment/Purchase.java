@@ -53,11 +53,12 @@ public abstract class Purchase {
     private static final String RECEIPTS_KEY = "CN1SubscriptionsData.dat";
     private static final String RECEIPTS_REFRESH_TIME_KEY = "CN1SubscriptionsDataRefreshTime.dat";
     private static final String PENDING_PURCHASE_KEY = "PendingPurchases.dat";
+    private static final Object PENDING_PURCHASE_LOCK = new Object();
     private static final Object synchronizationLock = new Object();
     private static final Object receiptsLock = new Object();
-    private static ReceiptStore receiptStore;
-    private static List<Receipt> receipts;
-    private static Date receiptsRefreshTime;
+    private ReceiptStore receiptStore;
+    private List<Receipt> receipts;
+    private Date receiptsRefreshTime;
     /**
      * Boolean flag to prevent {@link #synchronizeReceipts(long, com.codename1.util.SuccessCallback) }
      * re-entry.
@@ -280,7 +281,7 @@ public abstract class Purchase {
     /**
      * Returns the product list for the given SKU array
      *
-     * @param sku the ids for the specific products
+     * @param skus the ids for the specific products
      * @return the product instances
      * @throws RuntimeException This method is a part of the managed payments API and will fail if
      *                          isManagedPaymentSupported() returns false
@@ -394,8 +395,9 @@ public abstract class Purchase {
      *
      * @return List of receipts that haven't been sent to the server.
      */
+    @SuppressWarnings("unchecked")
     public List<Receipt> getPendingPurchases() {
-        synchronized (PENDING_PURCHASE_KEY) {
+        synchronized (PENDING_PURCHASE_LOCK) {
             Storage s = Storage.getInstance();
             Util.register(new Receipt());
             if (s.exists(PENDING_PURCHASE_KEY)) {
@@ -409,10 +411,10 @@ public abstract class Purchase {
     /**
      * Adds a receipt to be pushed to the server.
      *
-     * @param receipt
+     * @param receipt the receipt
      */
     private void addPendingPurchase(Receipt receipt) {
-        synchronized (PENDING_PURCHASE_KEY) {
+        synchronized (PENDING_PURCHASE_LOCK) {
             Storage s = Storage.getInstance();
             List<Receipt> pendingPurchases = getPendingPurchases();
             pendingPurchases.add(receipt);
@@ -423,11 +425,11 @@ public abstract class Purchase {
     /**
      * Removes a receipt from pending purchases.
      *
-     * @param transactionId
-     * @return
+     * @param transactionId the transaction id
+     * @return the removed receipt
      */
     private Receipt removePendingPurchase(String transactionId) {
-        synchronized (PENDING_PURCHASE_KEY) {
+        synchronized (PENDING_PURCHASE_LOCK) {
             Storage s = Storage.getInstance();
             List<Receipt> pendingPurchases = getPendingPurchases();
             Receipt found = null;
@@ -490,7 +492,7 @@ public abstract class Purchase {
             syncInProgress = true;
         }
 
-        synchronized (PENDING_PURCHASE_KEY) {
+        synchronized (PENDING_PURCHASE_LOCK) {
 
             List<Receipt> pending = getPendingPurchases();
             if (!pending.isEmpty() && receiptStore != null) {
@@ -539,7 +541,6 @@ public abstract class Purchase {
                 synchronizeReceipts();
             }
         });
-
     }
 
     /**
@@ -551,38 +552,10 @@ public abstract class Purchase {
     public final boolean synchronizeReceiptsSync(long ifOlderThanMs) {
         final boolean[] complete = new boolean[1];
         final boolean[] success = new boolean[1];
-        synchronizeReceipts(ifOlderThanMs, new SuccessCallback<Boolean>() {
-
-            public void onSucess(Boolean value) {
-                complete[0] = true;
-                success[0] = value;
-
-                synchronized (complete) {
-                    complete.notifyAll();
-                }
-
-            }
-
-        });
+        synchronizeReceipts(ifOlderThanMs, new SynchronizeReceiptsSyncSuccessCallback(complete, success));
 
         if (!complete[0]) {
-            Display.getInstance().invokeAndBlock(new Runnable() {
-
-                public void run() {
-
-                        while (!complete[0]) {
-                            synchronized (complete) {
-                                try {
-                                    complete.wait();
-                                } catch (InterruptedException ex) {
-                                    Thread.currentThread().interrupt();
-                                    return;
-                                }
-                            }
-                        }
-                }
-
-            });
+            Display.getInstance().invokeAndBlock(new SynchronizeReceiptsSyncRunnable(complete));
         }
         return success[0];
     }
@@ -747,51 +720,6 @@ public abstract class Purchase {
     }
 
     /**
-     * Fetch receipts from IAP service synchronously.
-     *
-     * @param ifOlderThanMs If the current data is not older than this number of milliseconds
-     *                      then it will not attempt to fetch the receipts.
-     * @return true if data was successfully retrieved.  false otherwise.
-     */
-    private boolean loadReceiptsSync(long ifOlderThanMs) {
-        final boolean[] complete = new boolean[1];
-        final boolean[] success = new boolean[1];
-        loadReceipts(ifOlderThanMs, new SuccessCallback<Boolean>() {
-
-            public void onSucess(Boolean value) {
-                complete[0] = true;
-                success[0] = value;
-
-                synchronized (complete) {
-                    complete.notifyAll();
-                }
-
-            }
-
-        });
-
-        if (!complete[0]) {
-            Display.getInstance().invokeAndBlock(new Runnable() {
-
-                public void run() {
-                    while (!complete[0]) {
-                        synchronized (complete) {
-                            try {
-                                complete.wait();
-                            } catch (InterruptedException ex) {
-                                Thread.currentThread().interrupt();
-                                return;
-                            }
-                        }
-                    }
-                }
-
-            });
-        }
-        return success[0];
-    }
-
-    /**
      * Indicates whether refunding is possible when the SKU is purchased
      *
      * @param sku the sku
@@ -880,4 +808,52 @@ public abstract class Purchase {
         return null;
     }
 
+    private static class SynchronizeReceiptsSyncRunnable implements Runnable {
+
+        private final boolean[] complete;
+
+        public SynchronizeReceiptsSyncRunnable(boolean[] complete) {
+            this.complete = complete;
+        }
+
+        public void run() {
+
+                while (!complete[0]) {
+                    synchronized (complete) {
+                        try {
+                            // need to recheck condition within the synchronized block
+                            if(!complete[0]) {
+                                complete.wait();
+                            }
+                        } catch (InterruptedException ex) {
+                            Thread.currentThread().interrupt();
+                            return;
+                        }
+                    }
+                }
+        }
+
+    }
+
+    private static class SynchronizeReceiptsSyncSuccessCallback implements SuccessCallback<Boolean> {
+
+        private final boolean[] complete;
+        private final boolean[] success;
+
+        public SynchronizeReceiptsSyncSuccessCallback(boolean[] complete, boolean[] success) {
+            this.complete = complete;
+            this.success = success;
+        }
+
+        public void onSucess(Boolean value) {
+            complete[0] = true;
+            success[0] = value;
+
+            synchronized (complete) {
+                complete.notifyAll();
+            }
+
+        }
+
+    }
 }

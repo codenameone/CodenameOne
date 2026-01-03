@@ -32,6 +32,7 @@ import com.codename1.ui.Label;
 import com.codename1.ui.SelectableIconHolder;
 import com.codename1.ui.TextArea;
 import com.codename1.ui.TextHolder;
+import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
 import com.codename1.ui.layouts.BorderLayout;
@@ -53,7 +54,7 @@ import static com.codename1.ui.ComponentSelector.$;
  *
  * @author Shai Almog
  */
-public class SpanButton extends Container implements ActionSource, SelectableIconHolder, TextHolder {
+public class SpanButton extends Container implements ActionSource<ActionEvent>, SelectableIconHolder, TextHolder {
 
     private int gap = Label.getDefaultGap();
     private final Button actualButton;
@@ -82,9 +83,9 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
      * Constructor accepting default text
      */
     public SpanButton(String txt) {
-        setUIID("Button");
+        setUIIDFinal("Button");
         setLayout(new BorderLayout());
-        text = new TextArea(getUIManager().localize(txt, txt));
+        text = new TextArea(super.getUIManager().localize(txt, txt));
         text.setColumns(100);
         text.setUIID("Button");
         text.setGrowByContent(true);
@@ -98,11 +99,11 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
         removeBackground(text.getDisabledStyle());
         actualButton = new Button();
         actualButton.setUIID("icon");
-        addComponent(BorderLayout.WEST, actualButton);
+        super.addComponent(BorderLayout.WEST, actualButton);
         Container center = BoxLayout.encloseYCenter(text);
         center.getStyle().setMargin(0, 0, 0, 0);
         center.getStyle().setPadding(0, 0, 0, 0);
-        addComponent(BorderLayout.CENTER, center);
+        super.addComponent(BorderLayout.CENTER, center);
         setLeadComponent(actualButton);
         updateGap();
     }
@@ -318,7 +319,7 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
      *
      * @param l the listener
      */
-    public void addActionListener(ActionListener l) {
+    public void addActionListener(ActionListener<ActionEvent> l) {
         actualButton.addActionListener(l);
     }
 
@@ -327,7 +328,7 @@ public class SpanButton extends Container implements ActionSource, SelectableIco
      *
      * @param l the listener
      */
-    public void removeActionListener(ActionListener l) {
+    public void removeActionListener(ActionListener<ActionEvent> l) {
         actualButton.removeActionListener(l);
     }
 

@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
+import java.util.Arrays;
 
 /**
  * Implementation of the HTML components document request handler to allow simple
@@ -116,41 +117,67 @@ public class AsyncDocumentRequestHandlerImpl extends DefaultDocumentRequestHandl
 
     protected ConnectionRequest createConnectionRequest(final DocumentInfo docInfo,
                                                         final IOCallback callback, final Object[] response) {
-        return new ConnectionRequest() {
-
-            protected void buildRequestBody(OutputStream os) throws IOException {
-                if (isPost()) {
-                    if (docInfo.getParams() != null) {
-                        OutputStreamWriter w = new OutputStreamWriter(os, docInfo.getEncoding());
-                        w.write(docInfo.getParams());
-                    }
-                }
-            }
-
-            protected void handleIOException(IOException err) {
-                if (callback == null) {
-                    response[0] = err;
-                }
-                super.handleIOException(err);
-            }
-
-            protected boolean shouldAutoCloseResponse() {
-                return callback != null;
-            }
-
-            protected void readResponse(InputStream input) throws IOException {
-                if (callback != null) {
-                    callback.streamReady(input, docInfo);
-                } else {
-                    response[0] = input;
-                    synchronized (LOCK) {
-                        LOCK.notify();
-                    }
-                }
-            }
-
-        };
-
+        return new AsyncDocumentConnectionRequest(docInfo, callback, response);
     }
 
+    private static class AsyncDocumentConnectionRequest extends ConnectionRequest {
+        private final DocumentInfo docInfo;
+        private final IOCallback callback;
+        private final Object[] response;
+
+        public AsyncDocumentConnectionRequest(DocumentInfo docInfo, IOCallback callback, Object[] response) {
+            this.docInfo = docInfo;
+            this.callback = callback;
+            this.response = response;
+        }
+
+        protected void buildRequestBody(OutputStream os) throws IOException {
+            if (isPost()) {
+                if (docInfo.getParams() != null) {
+                    OutputStreamWriter w = new OutputStreamWriter(os, docInfo.getEncoding());
+                    w.write(docInfo.getParams());
+                }
+            }
+        }
+
+        protected void handleIOException(IOException err) {
+            if (callback == null) {
+                response[0] = err;
+            }
+            super.handleIOException(err);
+        }
+
+        protected boolean shouldAutoCloseResponse() {
+            return callback != null;
+        }
+
+        protected void readResponse(InputStream input) throws IOException {
+            if (callback != null) {
+                callback.streamReady(input, docInfo);
+            } else {
+                response[0] = input;
+                synchronized (LOCK) {
+                    LOCK.notifyAll();
+                }
+            }
+        }
+
+        @Override
+        public final boolean equals(Object o) {
+            if (!(o instanceof AsyncDocumentConnectionRequest)) return false;
+            if (!super.equals(o)) return false;
+
+            AsyncDocumentConnectionRequest that = (AsyncDocumentConnectionRequest) o;
+            return (docInfo == null ? that.docInfo == null : docInfo.equals(that.docInfo)) && (callback == null ? that.callback == null : callback.equals(that.callback)) && Arrays.equals(response, that.response);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = super.hashCode();
+            result = 31 * result + (docInfo != null ? docInfo.hashCode() : 0);
+            result = 31 * result + (callback != null ? callback.hashCode() : 0);
+            result = 31 * result + Arrays.hashCode(response);
+            return result;
+        }
+    }
 }

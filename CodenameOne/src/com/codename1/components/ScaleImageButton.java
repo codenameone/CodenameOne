@@ -49,7 +49,7 @@ public class ScaleImageButton extends Button {
      * Default constructor
      */
     public ScaleImageButton() {
-        setUIID("ScaleImageButton");
+        setUIIDFinal("ScaleImageButton");
         setShowEvenIfBlank(true);
         getAllStyles().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FIT);
         getAllStyles().setBgTransparency(255);
@@ -61,7 +61,7 @@ public class ScaleImageButton extends Button {
      * @param i image
      */
     public ScaleImageButton(Image i) {
-        setUIID("ScaleImageButton");
+        setUIIDFinal("ScaleImageButton");
         setShowEvenIfBlank(true);
         getAllStyles().setBackgroundType(Style.BACKGROUND_IMAGE_SCALED_FIT);
         getAllStyles().setBgTransparency(255);

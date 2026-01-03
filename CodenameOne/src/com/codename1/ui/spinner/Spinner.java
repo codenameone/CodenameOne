@@ -103,7 +103,7 @@ class Spinner extends List {
         }
         SpinnerRenderer.iOS7Mode = ios7Mode;
         setRenderer(rendererInstance);
-        setUIID("Spinner");
+        setUIIDFinal("Spinner");
         setFixedSelection(FIXED_CENTER);
         setOrientation(VERTICAL);
         setInputOnFocus(false);

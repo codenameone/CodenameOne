@@ -114,7 +114,7 @@ public class Picker extends Button {
      * Default constructor
      */
     public Picker() {
-        setUIID("Picker");
+        setUIIDFinal("Picker");
         setPreferredTabIndex(0);
 
         // Fixes iOS picker issue https://github.com/codenameone/CodenameOne/issues/3283
@@ -1207,8 +1207,17 @@ public class Picker extends Button {
      */
     public int getSelectedStringIndex() {
         int offset = 0;
+        if (value == null) {
+            for (String s : (String[]) metaData) {
+                if (s == null) {
+                    return offset;
+                }
+                offset++;
+            }
+            return -1;
+        }
         for (String s : (String[]) metaData) {
-            if (s == value) {
+            if (value.equals(s)) {
                 return offset;
             }
             offset++;

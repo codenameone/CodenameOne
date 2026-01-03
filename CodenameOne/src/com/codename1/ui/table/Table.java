@@ -140,7 +140,7 @@ public class Table extends Container {
      * @param model the model underlying this table
      */
     public Table(TableModel model) {
-        setUIID("Table");
+        setUIIDFinal("Table");
         this.model = model;
         updateModel();
     }
@@ -152,7 +152,7 @@ public class Table extends Container {
      * @param includeHeader Indicates whether the table should render a table header as the first row
      */
     public Table(TableModel model, boolean includeHeader) {
-        setUIID("Table");
+        setUIIDFinal("Table");
         this.includeHeader = includeHeader;
         this.model = model;
         updateModel();
@@ -236,16 +236,13 @@ public class Table extends Container {
                     Component cell = createCellImpl(value, r, c, e);
                     TableLayout.Constraint con = createCellConstraint(value, r, c);
 
-                    // returns the current row we iterate about
-                        int currentRow = ((TableLayout) getLayout()).getNextRow();
-
-                        if (r > model.getRowCount()) {
-                            return;
-                        }
-                        addComponent(con, cell);
-                        if (r == selectionRow && c == selectionColumn) {
-                            cell.requestFocus();
-                        }
+                    if (r > model.getRowCount()) {
+                        return;
+                    }
+                    addComponent(con, cell);
+                    if (r == selectionRow && c == selectionColumn) {
+                        cell.requestFocus();
+                    }
                 }
             }
         }
@@ -426,53 +423,14 @@ public class Table extends Container {
 
     /**
      * Returns a generic comparator that tries to work in a way that will sort columns with similar object types.
-     * This method can be overriden to create custom sort orders or return null and thus disable sorting for a
+     * This method can be overridden to create custom sort orders or return null and thus disable sorting for a
      * specific column
      *
      * @param column the column that's sorted
      * @return the comparator instance
      */
-    protected Comparator createColumnSortComparator(int column) {
-        final CaseInsensitiveOrder ccmp = new CaseInsensitiveOrder();
-        return new Comparator() {
-            public int compare(Object o1, Object o2) {
-                if (o1 == null) {
-                    if (o2 == null) {
-                        return 0;
-                    }
-                    return -1;
-                } else {
-                    if (o2 == null) {
-                        return 1;
-                    }
-                }
-                if (o1 instanceof String && o2 instanceof String) {
-                    return ccmp.compare((String) o1, (String) o2);
-                }
-                try {
-                    double d1 = Util.toDoubleValue(o1);
-                    double d2 = Util.toDoubleValue(o2);
-                    if (d1 < d2) {
-                        return -1;
-                    }
-                    if (d1 > d2) {
-                        return 1;
-                    }
-                    long bits1 = Double.doubleToLongBits(d1);
-                    long bits2 = Double.doubleToLongBits(d2);
-                    if (bits1 < bits2) {
-                        return -1;
-                    }
-                    if (bits1 > bits2) {
-                        return 1;
-                    }
-                } catch (IllegalArgumentException err) {
-                    long dd = Util.toDateValue(o1).getTime() - Util.toDateValue(o2).getTime();
-                    return (int) dd;
-                }
-                return 0;
-            }
-        };
+    protected Comparator<Object> createColumnSortComparator(int column) {
+        return new ColumnSortComparator(new CaseInsensitiveOrder());
     }
 
     /**
@@ -483,7 +441,7 @@ public class Table extends Container {
      */
     public void sort(int column, boolean ascending) {
         sortedColumn = column;
-        Comparator cmp = createColumnSortComparator(column);
+        Comparator<Object> cmp = createColumnSortComparator(column);
         if (model instanceof SortableTableModel) {
             model = ((SortableTableModel) model).getUnderlying();
         }
@@ -505,9 +463,9 @@ public class Table extends Container {
             header.getAllStyles().setAlignment(titleAlignment);
             header.setTextPosition(LEFT);
             if (isSortSupported()) {
-                header.addActionListener(new ActionListener() {
+                header.addActionListener(new ActionListener<ActionEvent>() {
                     public void actionPerformed(ActionEvent evt) {
-                        Comparator cmp = createColumnSortComparator(column);
+                        Comparator<Object> cmp = createColumnSortComparator(column);
                         if (column == sortedColumn) {
                             ascending = !ascending;
                         } else {
@@ -989,6 +947,38 @@ public class Table extends Container {
             return ((SortableTableModel) model).getUnderlying() instanceof AbstractTableModel;
         }
         return model instanceof AbstractTableModel;
+    }
+
+    private static class ColumnSortComparator implements Comparator<Object> {
+        private final CaseInsensitiveOrder ccmp;
+
+        public ColumnSortComparator(CaseInsensitiveOrder ccmp) {
+            this.ccmp = ccmp;
+        }
+
+        public int compare(Object o1, Object o2) {
+            if (o1 == null) {
+                if (o2 == null) {
+                    return 0;
+                }
+                return -1;
+            } else {
+                if (o2 == null) {
+                    return 1;
+                }
+            }
+            if (o1 instanceof String && o2 instanceof String) {
+                return ccmp.compare((String) o1, (String) o2);
+            }
+            try {
+                double d1 = Util.toDoubleValue(o1);
+                double d2 = Util.toDoubleValue(o2);
+                return Double.compare(d1, d2);
+            } catch (IllegalArgumentException err) {
+                long dd = Util.toDateValue(o1).getTime() - Util.toDateValue(o2).getTime();
+                return (int) dd;
+            }
+        }
     }
 
     class Listener implements DataChangedListener, ActionListener {

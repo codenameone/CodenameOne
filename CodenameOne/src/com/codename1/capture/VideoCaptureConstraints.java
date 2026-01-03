@@ -190,7 +190,7 @@ public class VideoCaptureConstraints {
 
     @Override
     public boolean equals(Object obj) {
-        if (obj.getClass() == VideoCaptureConstraints.class) {
+        if (obj instanceof VideoCaptureConstraints) {
             VideoCaptureConstraints c = (VideoCaptureConstraints) obj;
             return c.preferredHeight == preferredHeight &&
                     c.preferredWidth == preferredWidth &&

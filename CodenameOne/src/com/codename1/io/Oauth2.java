@@ -23,6 +23,7 @@
  */
 package com.codename1.io;
 
+import com.codename1.compat.java.util.Objects;
 import com.codename1.components.InfiniteProgress;
 import com.codename1.components.WebBrowser;
 import com.codename1.ui.BrowserWindow;
@@ -329,7 +330,7 @@ public class Oauth2 {
      * @param al a listener that will receive at its source either a token for
      *           the service or an exception in case of a failure
      */
-    public void showAuthentication(final ActionListener al) {
+    public void showAuthentication(final ActionListener<ActionEvent> al) {
 
 
         if ("HTML5".equals(CN.getPlatformName()) && useRedirectForWeb) {
@@ -343,15 +344,7 @@ public class Oauth2 {
         if (useBrowserWindow) {
             final BrowserWindow win = new BrowserWindow(buildURL());
             win.setTitle("Login");
-            win.addLoadListener(new ActionListener() {
-                public void actionPerformed(ActionEvent evt) {
-                    String url = (String) evt.getSource();
-                    if (url.startsWith(redirectURI)) {
-                        win.close();
-                        handleURL((String) evt.getSource(), null, al, null, null, null);
-                    }
-                }
-            });
+            win.addLoadListener(new ShowAuthenticationActionListener(win, al));
 
             win.show();
             return;
@@ -364,14 +357,7 @@ public class Oauth2 {
         Form authenticationForm = new Form("Login");
         authenticationForm.setScrollable(false);
         if (old != null) {
-            Command cancel = new Command("Cancel") {
-                public void actionPerformed(ActionEvent ev) {
-                    if (Display.getInstance().getCurrent() == progress) {
-                        progress.dispose();
-                    }
-                    old.showBack();
-                }
-            };
+            Command cancel = new ShowAuthenticationCommand(progress, old);
             if (authenticationForm.getToolbar() != null) {
                 authenticationForm.getToolbar().addCommandToLeftBar(cancel);
             } else {
@@ -407,7 +393,7 @@ public class Oauth2 {
         return URL.toString();
     }
 
-    private Component createLoginComponent(final ActionListener al, final Form frm, final Form backToForm, final Dialog progress) {
+    private Component createLoginComponent(final ActionListener<ActionEvent> al, final Form frm, final Form backToForm, final Dialog progress) {
 
         String URL = buildURL();
 
@@ -499,26 +485,15 @@ public class Oauth2 {
 
     public RefreshTokenRequest refreshToken(String refreshToken) {
         final RefreshTokenRequest out = new RefreshTokenRequest();
-        refreshToken(refreshToken, new ActionListener() {
-            public void actionPerformed(ActionEvent evt) {
-                if (out.isDone()) {
-                    return;
-                }
-                if (evt.getSource() instanceof Throwable) {
-                    out.error(new AsyncResource.AsyncExecutionException((Throwable) evt.getSource()));
-                } else {
-                    out.complete((AccessToken) evt.getSource());
-                }
-            }
-        });
+        refreshToken(refreshToken, new RefreshTokenActionListener(out));
         return out;
     }
 
-    private void refreshToken(String refreshToken, ActionListener al) {
+    private void refreshToken(String refreshToken, ActionListener<ActionEvent> al) {
         handleURL(redirectURI + "?code=" + Util.encodeUrl(refreshToken) + "&cn1_refresh_token=1", null, al, null, null, null);
     }
 
-    private void handleURL(String url, WebBrowser web, final ActionListener al, final Form frm, final Form backToForm, final Dialog progress) {
+    private void handleURL(String url, WebBrowser web, final ActionListener<ActionEvent> al, final Form frm, final Form backToForm, final Dialog progress) {
         if ((url.startsWith(redirectURI))) {
             if (progress != null && Display.getInstance().getCurrent() == progress) {
                 progress.dispose();
@@ -568,27 +543,20 @@ public class Oauth2 {
                         }
                     }
 
-                    /**
-                     * {@inheritDoc}
-                     */
-                    public boolean equals(Object o) {
-                        if (this == o) {
-                            return true;
-                        }
-                        if (o == null || getClass() != o.getClass()) {
-                            return false;
-                        }
-                        if (!super.equals(o)) {
-                            return false;
-                        }
-                        return true;
+                    @Override
+                    public final boolean equals(Object o) {
+                        if (!(o instanceof TokenRequest)) return false;
+                        if (!super.equals(o)) return false;
+
+                        TokenRequest that = (TokenRequest) o;
+                        return callbackCalled == that.callbackCalled;
                     }
 
-                    /**
-                     * {@inheritDoc}
-                     */
+                    @Override
                     public int hashCode() {
-                        return super.hashCode();
+                        int result = super.hashCode();
+                        result = 31 * result + (callbackCalled ? 1 : 0);
+                        return result;
                     }
 
                     protected void postResponse() {
@@ -686,6 +654,79 @@ public class Oauth2 {
     }
 
     public static class RefreshTokenRequest extends AsyncResource<AccessToken> {
+    }
 
+    private static class RefreshTokenActionListener implements ActionListener<ActionEvent> {
+        private final RefreshTokenRequest out;
+
+        public RefreshTokenActionListener(RefreshTokenRequest out) {
+            this.out = out;
+        }
+
+        public void actionPerformed(ActionEvent evt) {
+            if (out.isDone()) {
+                return;
+            }
+            if (evt.getSource() instanceof Throwable) {
+                out.error(new AsyncResource.AsyncExecutionException((Throwable) evt.getSource()));
+            } else {
+                out.complete((AccessToken) evt.getSource());
+            }
+        }
+    }
+
+    private static class ShowAuthenticationCommand extends Command {
+        private final Dialog progress;
+        private final Form old;
+
+        public ShowAuthenticationCommand(Dialog progress, Form old) {
+            super("Cancel");
+            this.progress = progress;
+            this.old = old;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if(obj instanceof ShowAuthenticationCommand) {
+                ShowAuthenticationCommand c = (ShowAuthenticationCommand) obj;
+                return super.equals(c) &&
+                        Objects.equals(progress, c.progress) &&
+                        Objects.equals(old, c.old);
+            }
+            return false;
+        }
+
+        @Override
+        public int hashCode() {
+            int result = super.hashCode();
+            result = 31 * result + (progress != null ? progress.hashCode() : 0);
+            result = 31 * result + (old != null ? old.hashCode() : 0);
+            return result;
+        }
+
+        public void actionPerformed(ActionEvent ev) {
+            if (Display.getInstance().getCurrent() == progress) {
+                progress.dispose();
+            }
+            old.showBack();
+        }
+    }
+
+    private class ShowAuthenticationActionListener implements ActionListener<NetworkEvent> {
+        private final BrowserWindow win;
+        private final ActionListener<ActionEvent> al;
+
+        public ShowAuthenticationActionListener(BrowserWindow win, ActionListener<ActionEvent> al) {
+            this.win = win;
+            this.al = al;
+        }
+
+        public void actionPerformed(NetworkEvent evt) {
+            String url = (String) evt.getSource();
+            if (url.startsWith(redirectURI)) {
+                win.close();
+                handleURL((String) evt.getSource(), null, al, null, null, null);
+            }
+        }
     }
 }

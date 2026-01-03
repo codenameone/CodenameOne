@@ -164,7 +164,7 @@ public class AsyncResource<V> extends Observable {
                     public void onSucess(Object arg) {
                         synchronized (complete) {
                             complete[0] = true;
-                            complete.notify();
+                            complete.notifyAll();
                         }
                     }
                 }).except(new SuccessCallback<Throwable>() {
@@ -173,7 +173,7 @@ public class AsyncResource<V> extends Observable {
                         synchronized (complete) {
                             t[0] = ex;
                             complete[0] = true;
-                            complete.notify();
+                            complete.notifyAll();
                         }
                     }
                 });
@@ -282,7 +282,7 @@ public class AsyncResource<V> extends Observable {
                 if (isDone()) {
                     complete[0] = true;
                     synchronized (complete) {
-                        complete.notify();
+                        complete.notifyAll();
                     }
                 }
             }

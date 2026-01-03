@@ -49,7 +49,7 @@ public abstract class DeviceRunner {
         passedTests = 0;
         Log.p("-----STARTING TESTS-----");
         try {
-            InputStream is = getClass().getResourceAsStream("/tests.dat");
+            InputStream is = DeviceRunner.class.getResourceAsStream("/tests.dat");
 
             if (is == null) {
                 is = Display.getInstance().getResourceAsStream(null, "/tests.dat");

@@ -42,7 +42,7 @@ import static com.codename1.ui.ComponentSelector.$;
 public class SwitchList extends ButtonList {
 
 
-    private final ActionListener changeListener = new ActionListener() {
+    private final ActionListener<ActionEvent> changeListener = new ActionListener<ActionEvent>() {
         @Override
         public void actionPerformed(ActionEvent evt) {
             if (evt.getSource() instanceof Switch && contains((Switch) evt.getSource())) {
@@ -59,15 +59,8 @@ public class SwitchList extends ButtonList {
     };
 
     public SwitchList(MultipleSelectionListModel model) {
-        super(model);
-
+        super(model, true);
         fireReady();
-
-    }
-
-    @Override
-    public boolean isAllowMultipleSelection() {
-        return true;
     }
 
     @Override
@@ -80,16 +73,7 @@ public class SwitchList extends ButtonList {
 
     @Override
     protected void setSelected(Component button, final boolean selected) {
-        $(".switch", button).each(new ComponentSelector.ComponentClosure() {
-            @Override
-            public void call(Component c) {
-                if (selected) {
-                    ((Switch) c).setOn();
-                } else {
-                    ((Switch) c).setOff();
-                }
-            }
-        });
+        $(".switch", button).each(new SetSelectedComponentClosure(selected));
     }
 
 
@@ -111,4 +95,20 @@ public class SwitchList extends ButtonList {
     }
 
 
+    private static class SetSelectedComponentClosure implements ComponentSelector.ComponentClosure {
+        private final boolean selected;
+
+        public SetSelectedComponentClosure(boolean selected) {
+            this.selected = selected;
+        }
+
+        @Override
+        public void call(Component c) {
+            if (selected) {
+                ((Switch) c).setOn();
+            } else {
+                ((Switch) c).setOff();
+            }
+        }
+    }
 }

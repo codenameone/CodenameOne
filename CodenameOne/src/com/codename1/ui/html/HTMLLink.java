@@ -58,7 +58,7 @@ class HTMLLink extends Button implements ActionListener {
      */
     HTMLLink(String text, String link, HTMLComponent htmlC, HTMLLink parentLink, boolean linkVisited) {
         super(text);
-        setUIID("HTMLLink");
+        setUIIDFinal("HTMLLink");
         this.link = link;
         this.htmlC = htmlC;
         this.parentLink = parentLink;

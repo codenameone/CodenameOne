@@ -248,21 +248,12 @@ public abstract class FullScreenAdService {
         AdForm adf = (AdForm) Display.getInstance().getCurrent();
         synchronized (LOCK) {
             adf.blocked = false;
-            LOCK.notify();
+            LOCK.notifyAll();
         }
 
         // move to the next screen so the ad will be shown and so we 
         // can return to the next screen and not this screen
-        Display.getInstance().callSerially(new Runnable() {
-            public void run() {
-                // prevent a potential race condition with the locking
-                if (Display.getInstance().getCurrent() instanceof AdForm) {
-                    Display.getInstance().callSerially(this);
-                    return;
-                }
-                callback.actionPerformed(null);
-            }
-        });
+        Display.getInstance().callSerially(new UnlockRunnable(callback));
     }
 
     class AdForm extends Form {
@@ -280,7 +271,7 @@ public abstract class FullScreenAdService {
                 public void actionPerformed(ActionEvent ev) {
                     synchronized (LOCK) {
                         blocked = false;
-                        LOCK.notify();
+                        LOCK.notifyAll();
                     }
 
                     // move to the next screen so the ad will be shown and so we 
@@ -301,7 +292,7 @@ public abstract class FullScreenAdService {
                 public void actionPerformed(ActionEvent ev) {
                     synchronized (LOCK) {
                         blocked = false;
-                        LOCK.notify();
+                        LOCK.notifyAll();
                     }
                 }
             };
@@ -348,6 +339,23 @@ public abstract class FullScreenAdService {
                 blocked = false;
             }
             return false;
+        }
+    }
+
+    private static class UnlockRunnable implements Runnable {
+        private final ActionListener callback;
+
+        public UnlockRunnable(ActionListener callback) {
+            this.callback = callback;
+        }
+
+        public void run() {
+            // prevent a potential race condition with the locking
+            if (Display.getInstance().getCurrent() instanceof AdForm) {
+                Display.getInstance().callSerially(this);
+                return;
+            }
+            callback.actionPerformed(null);
         }
     }
 }

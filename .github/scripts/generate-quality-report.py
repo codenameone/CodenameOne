@@ -776,12 +776,53 @@ def main() -> None:
             "EQ_ALWAYS_FALSE",
             "SBSC_USE_STRINGBUFFER_CONCATENATION",
             "SIC_INNER_SHOULD_BE_STATIC",
-            "EQ_DOESNT_OVERRIDE_EQUALS"
+            "EQ_DOESNT_OVERRIDE_EQUALS",
+            "CO_COMPARETO_INCORRECT_FLOATING",
+            "DL_SYNCHRONIZATION_ON_SHARED_CONSTANT",
+            "DLS_DEAD_LOCAL_STORE",
+            "DM_NUMBER_CTOR",
+            "DMI_INVOKING_TOSTRING_ON_ARRAY",
+            "EC_NULL_ARG",
+            "EC_UNRELATED_TYPES_USING_POINTER_EQUALITY",
+            "EQ_GETCLASS_AND_CLASS_CONSTANT",
+            "EQ_UNUSUAL",
+            "ES_COMPARING_STRINGS_WITH_EQ",
+            "FI_EMPTY",
+            "ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD",
+            "DM_GC",
+            "CN_IMPLEMENTS_CLONE_BUT_NOT_CLONEABLE",
+            "BC_UNCONFIRMED_CAST",
+            "BC_UNCONFIRMED_CAST_OF_RETURN_VALUE",
+            "CN_IDIOM_NO_SUPER_CALL",
+            "DM_BOOLEAN_CTOR",
+            "DM_EXIT",
+            "EI_EXPOSE_REP",
+            "EI_EXPOSE_REP2",
+            "EI_EXPOSE_STATIC_REP2",
+            "EQ_COMPARETO_USE_OBJECT_EQUALS",
+            "MS_EXPOSE_REP",
+            "NM_CONFUSING",
+            "NO_NOTIFY_NOT_NOTIFYALL",
+            "NP_BOOLEAN_RETURN_NULL",
+            "REFLC_REFLECTION_MAY_INCREASE_ACCESSIBILITY_OF_CLASS",
+            "UI_INHERITANCE_UNSAFE_GETRESOURCE",
+            "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD",
+            "UW_UNCOND_WAIT",
+            "SIC_INNER_SHOULD_BE_STATIC_ANON"
         }
+
+        def _is_exempt(f: Finding) -> bool:
+            loc = f.path or f.location or ""
+            if f.rule == "SA_FIELD_SELF_ASSIGNMENT" and "InfBlocks.java" in loc:
+                return True
+            if f.rule == "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" and "TarEntry.java" in loc:
+                return True
+            return False
+
+
         violations = [
             f for f in spotbugs.findings
-            if f.rule in forbidden_rules
-            and not (f.rule == "SA_FIELD_SELF_ASSIGNMENT" and "InfBlocks.java" in f.location)
+            if f.rule in forbidden_rules and not _is_exempt(f)
         ]
         if violations:
             print("\n❌ Build failed due to forbidden SpotBugs violations:")

@@ -117,8 +117,8 @@ public class ImageViewer extends Component {
      */
     public ImageViewer() {
         setFocusable(true);
-        setUIID("ImageViewer");
-        $(this).selectAllStyles().setBgTransparency(0x0);
+        setUIIDFinal("ImageViewer");
+        getAllStyles().setBgTransparency(0x0);
     }
 
     /**
@@ -779,7 +779,7 @@ public class ImageViewer extends Component {
      *
      * @param image the image to set
      */
-    public void setImage(Image image) {
+    public final void setImage(Image image) {
         if (this.image != image) {
             panPositionX = 0.5f;
             panPositionY = 0.5f;

@@ -86,12 +86,12 @@ import java.util.TimerTask;
  * specific event delivery and painting semantics and enables threading features such as
  * animations etc...
  * <p>The EDT should not be blocked since paint operations and events would also be blocked
- * in much the same way as they would be in other platforms. In order to serialize calls back
- * into the EDT use the methods {@link Display#callSerially} &amp; {@link Display#callSeriallyAndWait}.
- * <p>Notice that all Codename One calls occur on the EDT (events, painting, animations etc...), Codename One
+ * in much the same way as they would be in other platforms. To serialize calls back
+ * into the EDT, use the methods {@link Display#callSerially} &amp; {@link Display#callSeriallyAndWait}.
+ * <p>Notice that all Codename One calls occur on the EDT (events, painting, animations, etc...), Codename One
  * should normally be manipulated on the EDT as well (hence the {@link Display#callSerially} &amp;
- * {@link Display#callSeriallyAndWait} methods). Theoretically it should be possible to manipulate
- * some Codename One features from other threads but this can't be guaranteed to work for all use cases.
+ * {@link Display#callSeriallyAndWait} methods). Theoretically, it should be possible to manipulate
+ * some Codename One features from other threads, but this can't be guaranteed to work for all use cases.
  *
  * @author Chen Fishbein, Shai Almog
  */
@@ -134,11 +134,11 @@ public final class Display extends CN1Constants {
      */
     public static final int KEYBOARD_TYPE_QWERTY = 2;
     /**
-     * Touch device without a physical keyboard that should popup a keyboad
+     * A touch based device that doesn't have a physical keyboard. Such a device pops up a virtual keyboad.
      */
     public static final int KEYBOARD_TYPE_VIRTUAL = 3;
     /**
-     * Half QWERTY which needs software assistance for completion
+     * Half-QWERTY which needs software assistance for completion
      */
     public static final int KEYBOARD_TYPE_HALF_QWERTY = 4;
     /**
@@ -146,7 +146,7 @@ public final class Display extends CN1Constants {
      */
     public static final int GAME_FIRE = 8;
     /**
-     * Game action for left key
+     * Game action for the left key
      */
     public static final int GAME_LEFT = 2;
     /**
@@ -288,9 +288,9 @@ public final class Display extends CN1Constants {
     private static final int MAX_ASYNC_EXCEPTION_DEPTH = 10;
     private static final int[] xArray1 = new int[1];
     private static final int[] yArray1 = new int[1];
-    static int transitionDelay = -1;
+    private int transitionDelay = -1;
     static CodenameOneImplementation impl;
-    private static String selectedVirtualKeyboard = null;
+    private String selectedVirtualKeyboard = null;
     private static final Map<String, VirtualKeyboardInterface> virtualKeyboards = new HashMap<String, VirtualKeyboardInterface>();
     private final LinkedList<Runnable> runningSerialCallsQueue = new LinkedList<Runnable>();
     boolean codenameOneExited;
@@ -338,7 +338,7 @@ public final class Display extends CN1Constants {
      * Indicates the maximum drawing speed of no more than 10 frames per second
      * by default (this can be increased or decreased) the advantage of limiting
      * framerate is to allow the CPU to perform other tasks besides drawing.
-     * Notice that when no change is occurring on the screen no frame is drawn and
+     * Notice that when no change is occurring on the screen, no frame is drawn and
      * so a high/low FPS will have no effect then.
      */
     private int framerateLock = 15;
@@ -388,8 +388,6 @@ public final class Display extends CN1Constants {
     private int longPressInterval = 500;
     private long nextKeyRepeatEvent;
     private int keyRepeatValue;
-    private final int keyRepeatInitialIntervalTime = 800;
-    private final int keyRepeatNextIntervalTime = 10;
     private boolean lastInteractionWasKeypad;
     private boolean dragOccured;
     private boolean processingSerialCalls;
@@ -1240,6 +1238,7 @@ public final class Display extends CN1Constants {
             long t = System.currentTimeMillis();
             if (keyRepeatCharged && nextKeyRepeatEvent <= t) {
                 current.keyRepeated(keyRepeatValue);
+                int keyRepeatNextIntervalTime = 10;
                 nextKeyRepeatEvent = t + keyRepeatNextIntervalTime;
             }
             if (longPressCharged && longPressInterval <= t - longKeyPressTime) {
@@ -1314,7 +1313,7 @@ public final class Display extends CN1Constants {
             // after finishing an event cycle there might be serial calls waiting
             // to return.
             synchronized (lock) {
-                lock.notify();
+                lock.notifyAll();
             }
         }
         processingSerialCalls = false;
@@ -1333,7 +1332,7 @@ public final class Display extends CN1Constants {
 
     void notifyDisplay() {
         synchronized (lock) {
-            lock.notify();
+            lock.notifyAll();
         }
     }
 
@@ -1622,7 +1621,7 @@ public final class Display extends CN1Constants {
             }
         }
         synchronized (lock) {
-            lock.notify();
+            lock.notifyAll();
         }
 
         if (!transitionExists) {
@@ -1848,7 +1847,7 @@ public final class Display extends CN1Constants {
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = code;
             inputEventStackPointer++;
-            lock.notify();
+            lock.notifyAll();
         }
     }
 
@@ -1926,6 +1925,7 @@ public final class Display extends CN1Constants {
         longPressCharged = keyRepeatCharged;
         longKeyPressTime = System.currentTimeMillis();
         keyRepeatValue = keyCode;
+        int keyRepeatInitialIntervalTime = 800;
         nextKeyRepeatEvent = System.currentTimeMillis() + keyRepeatInitialIntervalTime;
         previousKeyPressed = lastKeyPressed;
         lastKeyPressed = keyCode;
@@ -1977,7 +1977,7 @@ public final class Display extends CN1Constants {
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = y;
             inputEventStackPointer++;
-            lock.notify();
+            lock.notifyAll();
         }
     }
 
@@ -2000,7 +2000,7 @@ public final class Display extends CN1Constants {
                 inputEventStack[inputEventStackPointer] = y[iter];
                 inputEventStackPointer++;
             }
-            lock.notify();
+            lock.notifyAll();
         }
     }
 
@@ -2029,7 +2029,7 @@ public final class Display extends CN1Constants {
                 Log.p("EDT performance is very slow triggering this exception!");
                 Log.e(err);
             }
-            lock.notify();
+            lock.notifyAll();
         }
     }
 
@@ -2051,7 +2051,7 @@ public final class Display extends CN1Constants {
                 Log.p("EDT performance is very slow triggering this exception!");
                 Log.e(err);
             }
-            lock.notify();
+            lock.notifyAll();
         }
     }
 
@@ -2165,7 +2165,7 @@ public final class Display extends CN1Constants {
             inputEventStackPointer++;
             inputEventStack[inputEventStackPointer] = h;
             inputEventStackPointer++;
-            lock.notify();
+            lock.notifyAll();
         }
     }
 
@@ -2196,7 +2196,7 @@ public final class Display extends CN1Constants {
         synchronized (lock) {
             inputEventStack[inputEventStackPointer] = type;
             inputEventStackPointer++;
-            lock.notify();
+            lock.notifyAll();
         }
     }
 
@@ -3491,7 +3491,7 @@ public final class Display extends CN1Constants {
             return out == null ? defaultValue : out;
         }
         if ("Component.revalidateOnStyleChange".equals(key)) {
-            return Component.revalidateOnStyleChange ? "true" : "false";
+            return Component.isRevalidateOnStyleChange() ? "true" : "false";
         }
         if (localProperties != null) {
             String v = localProperties.get(key);
@@ -3516,14 +3516,14 @@ public final class Display extends CN1Constants {
             return;
         }
         if ("blockOverdraw".equals(key)) {
-            Container.blockOverdraw = true;
+            Container.setBlockOverdraw(true);
             return;
         }
         if ("blockCopyPaste".equals(key)) {
             impl.blockCopyPaste("true".equals(value));
         }
         if ("Component.revalidateOnStyleChange".equals(key)) {
-            Component.revalidateOnStyleChange = "true".equalsIgnoreCase(value);
+            Component.setRevalidateOnStyleChange("true".equalsIgnoreCase(value));
         }
         if (key.startsWith("platformHint.")) {
             impl.setPlatformHint(key, value);
@@ -3989,7 +3989,7 @@ public final class Display extends CN1Constants {
      * @param response a callback Object to retrieve the file path
      * @throws RuntimeException if this feature failed or unsupported on the platform
      */
-    public void captureAudio(ActionListener response) {
+    public void captureAudio(ActionListener<ActionEvent> response) {
         impl.captureAudio(response);
     }
 

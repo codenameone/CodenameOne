@@ -347,19 +347,6 @@ public class StyleParser {
         return null;
     }
 
-    private static int getPixelValue(String val) {
-        ScalarValue v = parseSingleTRBLValue(val);
-        switch (v.getUnit()) {
-            case Style.UNIT_TYPE_PIXELS:
-                return (int) Math.round(v.getValue());
-            case Style.UNIT_TYPE_DIPS:
-                return Display.getInstance().convertToPixels((float) v.getValue());
-            case Style.UNIT_TYPE_SCREEN_PERCENTAGE:
-                return (int) Math.round(Display.getInstance().getDisplayWidth() * v.getValue() / 100.0);
-        }
-        return 0;
-    }
-
     private static float getMMValue(String val) {
         ScalarValue v = parseSingleTRBLValue(val);
         switch (v.getUnit()) {
@@ -621,10 +608,6 @@ public class StyleParser {
             Log.p("failed to parse image");
         }
         return im;
-    }
-
-    static Integer parseTextDecoration(String decoration) {
-        return null;
     }
 
     private static FontInfo parseFontSize(FontInfo out, String arg) {

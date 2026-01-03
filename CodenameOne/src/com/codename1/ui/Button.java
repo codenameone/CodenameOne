@@ -27,6 +27,7 @@ package com.codename1.ui;
 import com.codename1.ui.events.ActionEvent;
 import com.codename1.ui.events.ActionListener;
 import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.events.ComponentStateChangeEvent;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.plaf.Border;
 import com.codename1.ui.plaf.UIManager;
@@ -57,7 +58,7 @@ import java.util.Vector;
  *
  * @author Chen Fishbein
  */
-public class Button extends Label implements ReleasableComponent, ActionSource, SelectableIconHolder {
+public class Button extends Label implements ReleasableComponent, ActionSource<ActionEvent>, SelectableIconHolder {
     /**
      * Indicates the rollover state of a button which is equivalent to focused for
      * most uses
@@ -100,7 +101,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
      *
      * @since 7.0
      */
-    private ActionListener bindListener;
+    private ActionListener<? extends ActionEvent> bindListener;
     private int pressedX, pressedY;
 
     /**
@@ -186,7 +187,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
      */
     public Button(String text, Image icon, String id) {
         super(text);
-        setUIID(id);
+        setUIIDFinal(id);
         setFocusable(true);
         setIcon(icon);
         this.pressedIcon = icon;
@@ -308,9 +309,9 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
         }
     }
 
-    private ActionListener bindListener() {
+    private ActionListener<? extends ActionEvent> bindListener() {
         if (bindListener == null) {
-            bindListener = new ActionListener() {
+            bindListener = new ActionListener<ActionEvent>() {
                 public void actionPerformed(ActionEvent e) {
                     if (e.getSource() instanceof Button) {
                         Button b = (Button) e.getSource();
@@ -334,7 +335,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
      * @since 7.0
      */
     public void bindStateTo(Button button) {
-        button.addStateChangeListener(bindListener());
+        button.addStateChangeListener((ActionListener<ComponentStateChangeEvent>) bindListener());
     }
 
     /**
@@ -346,7 +347,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
      */
     public void unbindStateFrom(Button button) {
         if (bindListener != null) {
-            button.removeStateChangeListener(bindListener);
+            button.removeStateChangeListener((ActionListener<ComponentStateChangeEvent>) bindListener);
         }
     }
 
@@ -528,7 +529,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
      * @see #removeStateChangeListener(com.codename1.ui.events.ActionListener)
      * @since 7.0
      */
-    public void addStateChangeListener(ActionListener l) {
+    public void addStateChangeListener(ActionListener<ComponentStateChangeEvent> l) {
         if (stateChangeListeners == null) {
             stateChangeListeners = new EventDispatcher();
         }
@@ -544,7 +545,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
      * @see #setState(int)
      * @since 7.0
      */
-    public void removeStateChangeListener(ActionListener l) {
+    public void removeStateChangeListener(ActionListener<ComponentStateChangeEvent> l) {
         if (stateChangeListeners != null) {
             stateChangeListeners.removeListener(l);
         }
@@ -561,7 +562,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
      *
      * @param l implementation of the action listener interface
      */
-    public void addActionListener(ActionListener l) {
+    public void addActionListener(ActionListener<ActionEvent> l) {
         dispatcher.addListener(l);
     }
 
@@ -570,7 +571,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
      *
      * @param l implementation of the action listener interface
      */
-    public void removeActionListener(ActionListener l) {
+    public void removeActionListener(ActionListener<ActionEvent> l) {
         dispatcher.removeListener(l);
     }
 
@@ -580,7 +581,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
      * @return the action listeners
      * @deprecated use getListeners instead
      */
-    public Vector getActionListeners() {
+    public Vector<ActionListener<ActionEvent>> getActionListeners() {
         return dispatcher.getListenerVector();
     }
 
@@ -589,7 +590,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
      *
      * @return the action listeners
      */
-    public Collection getListeners() {
+    public Collection<ActionListener<ActionEvent>> getListeners() {
         return dispatcher.getListenerCollection();
     }
 
@@ -1086,7 +1087,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource, 
             if (capsTextDefault) {
                 String uiid = getUIID();
                 return uiid.equals("Button") || uiid.equals("RaisedButton") ||
-                        getUIManager().getThemeConstant("capsButtonUiids", "").indexOf(uiid) > -1;
+                        super.getUIManager().getThemeConstant("capsButtonUiids", "").indexOf(uiid) > -1;
             }
             return false;
         }

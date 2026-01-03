@@ -84,7 +84,7 @@ public class CheckBox extends Button {
      */
     public CheckBox(String text, Image icon) {
         super(text, icon);
-        setUIID("CheckBox");
+        setUIIDFinal("CheckBox");
         updateSide();
     }
 
@@ -267,6 +267,7 @@ public class CheckBox extends Button {
 
     /**
      * {@inheritDoc}
+     * @deprecated uses the deprecated BindTarget interface
      */
     public void bindProperty(String prop, BindTarget target) {
         if (prop.equals("selected")) {
@@ -281,6 +282,7 @@ public class CheckBox extends Button {
 
     /**
      * {@inheritDoc}
+     * @deprecated uses the deprecated BindTarget interface
      */
     public void unbindProperty(String prop, BindTarget target) {
         if (prop.equals("selected")) {

@@ -80,9 +80,9 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
      * Constructor accepting default text
      */
     public SpanLabel(String txt) {
-        setUIID("Container");
-        setLayout(new BorderLayout());
-        text = new TextArea(getUIManager().localize(txt, txt));
+        setUIIDFinal("Container");
+        super.setLayout(new BorderLayout());
+        text = new TextArea(super.getUIManager().localize(txt, txt));
         text.setActAsLabel(true);
         text.setColumns(text.getText().length() + 1);
         text.setGrowByContent(true);
@@ -94,8 +94,8 @@ public class SpanLabel extends Container implements IconHolder, TextHolder {
         iconWrapper = new Container(new FlowLayout(CENTER, CENTER));
         iconWrapper.getAllStyles().stripMarginAndPadding();
         iconWrapper.add(icon);
-        addComponent(BorderLayout.WEST, iconWrapper);
-        addComponent(BorderLayout.CENTER, BoxLayout.encloseYCenter(text));
+        super.addComponent(BorderLayout.WEST, iconWrapper);
+        super.addComponent(BorderLayout.CENTER, BoxLayout.encloseYCenter(text));
         updateGap();
     }
 

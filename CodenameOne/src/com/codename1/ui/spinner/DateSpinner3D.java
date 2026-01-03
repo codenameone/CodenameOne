@@ -101,42 +101,13 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     void initSpinner() {
         if (month == null) {
             day = Spinner3D.create(1, 31, currentDay, 1);
-            day.setRowFormatter(new SpinnerNode.RowFormatter() {
-
-                @Override
-                public String format(String input) {
-                    if (input != null) {
-                        return String.valueOf((int) Double.parseDouble(input));
-                    }
-                    return null;
-                }
-            });
+            day.setRowFormatter(new DayRowFormatter());
 
             month = Spinner3D.create(1, 12, currentMonth, 1);
-            month.setRowFormatter(new SpinnerNode.RowFormatter() {
-                @Override
-                public String format(String input) {
-                        if (input != null) {
-                            Calendar c = Calendar.getInstance();
-                            c.set(Calendar.MONTH, (int) Double.parseDouble(input) - 1);
-                        c.set(Calendar.DAY_OF_MONTH, 15);
-                        return monthFormat.format(c.getTime());
-                    }
-                    return null;
-                }
-            });
+            month.setRowFormatter(new MonthRowFormatter());
 
             year = Spinner3D.create(startYear, endYear, currentYear, 1);
-            year.setRowFormatter(new SpinnerNode.RowFormatter() {
-
-                @Override
-                public String format(String input) {
-                    if (input != null) {
-                        return String.valueOf((int) Double.parseDouble(input));
-                    }
-                    return null;
-                }
-            });
+            year.setRowFormatter(new YearRowFormatter());
             addComponents();
 
             //getAllStyles().setBgColor(year.getUnselectedStyle().getBgColor());
@@ -637,4 +608,38 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     }
 
 
+    private static class YearRowFormatter implements SpinnerNode.RowFormatter {
+
+        @Override
+        public String format(String input) {
+            if (input != null) {
+                return String.valueOf((int) Double.parseDouble(input));
+            }
+            return null;
+        }
+    }
+
+    private static class DayRowFormatter implements SpinnerNode.RowFormatter {
+
+        @Override
+        public String format(String input) {
+            if (input != null) {
+                return String.valueOf((int) Double.parseDouble(input));
+            }
+            return null;
+        }
+    }
+
+    private class MonthRowFormatter implements SpinnerNode.RowFormatter {
+        @Override
+        public String format(String input) {
+                if (input != null) {
+                    Calendar c = Calendar.getInstance();
+                    c.set(Calendar.MONTH, (int) Double.parseDouble(input) - 1);
+                c.set(Calendar.DAY_OF_MONTH, 15);
+                return monthFormat.format(c.getTime());
+            }
+            return null;
+        }
+    }
 }

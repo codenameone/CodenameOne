@@ -602,7 +602,7 @@ public class NetworkManager {
                     addSortedToQueue(request, i);
                     break;
             }
-            LOCK.notify();
+            LOCK.notifyAll();
         }
     }
 
@@ -663,7 +663,7 @@ public class NetworkManager {
      *
      * @param al action listener
      */
-    public void addProgressListener(ActionListener<NetworkEvent> al) {
+    public final void addProgressListener(ActionListener<NetworkEvent> al) {
         if (progressListeners == null) {
             progressListeners = new EventDispatcher();
             progressListeners.setBlocking(false);
@@ -836,7 +836,7 @@ public class NetworkManager {
                             return false;
                         }
                         pending.addElement(currentRequest);
-                        LOCK.notify();
+                        LOCK.notifyAll();
                         long end = System.currentTimeMillis() + 30;
                         while (true) {
                             long remaining = end - System.currentTimeMillis();

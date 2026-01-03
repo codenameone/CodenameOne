@@ -149,7 +149,7 @@ public class Tabs extends Container {
         press = new SwipeListener(SwipeListener.PRESS);
         drag = new SwipeListener(SwipeListener.DRAG);
         release = new SwipeListener(SwipeListener.RELEASE);
-        setUIID("Tabs");
+        setUIIDFinal("Tabs");
         BorderLayout bd = (BorderLayout) super.getLayout();
         if (bd != null) {
             if (UIManager.getInstance().isThemeConstant("tabsOnTopBool", false)) {
@@ -304,7 +304,7 @@ public class Tabs extends Container {
                     component.paintLockRelease();
                 }
                 slideToDestMotion = null;
-                enableLayoutOnPaint = true;
+                setEnableLayoutOnPaint(true);
                 deregisterAnimatedInternal();
                 setSelectedIndex(active);
             }
@@ -1653,7 +1653,7 @@ public class Tabs extends Container {
                                 component.setX(component.getX() + diffX);
                                 component.paintLock(false);
                             }
-                            enableLayoutOnPaint = false;
+                            setEnableLayoutOnPaint(false);
                             repaint();
                         }
                     }
@@ -1667,7 +1667,7 @@ public class Tabs extends Container {
                                 component.setY(component.getY() + diffY);
                                 component.paintLock(false);
                             }
-                            enableLayoutOnPaint = false;
+                            setEnableLayoutOnPaint(false);
                             repaint();
                         }
                     }

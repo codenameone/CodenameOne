@@ -70,8 +70,8 @@ import java.util.Set;
 public class Form extends Container {
     private static final String Z_INDEX_PROP = "cn1$_zIndex";
     static int activePeerCount;
-    static Motion rippleMotion;
-    static Component rippleComponent;
+    private static Motion rippleMotion;
+    private static Component rippleComponent;
     static int rippleX;
     static int rippleY;
     /**
@@ -220,7 +220,7 @@ public class Form extends Container {
         super(new BorderLayout());
         setSafeAreaRoot(true);
         contentPane = new Container(contentPaneLayout);
-        setUIID("Form");
+        setUIIDFinal("Form");
         // forms/dialogs are not visible by default
         setVisible(false);
         Style formStyle = getStyle();
@@ -254,6 +254,14 @@ public class Form extends Container {
         formStyle.setBgTransparency(0xFF);
 
         initGlobalToolbar();
+    }
+
+    static Motion getRippleMotion() {
+        return rippleMotion;
+    }
+
+    static void setRippleMotion(Motion m) {
+        rippleMotion = m;
     }
 
     /**
@@ -728,14 +736,7 @@ public class Form extends Container {
      * @see Component#isEditing()
      */
     public Component findCurrentlyEditingComponent() {
-        return ComponentSelector.select("*", this).filter(new Filter() {
-
-
-            public boolean filter(Component c) {
-                return c.isEditing();
-            }
-
-        }).asComponent();
+        return ComponentSelector.select("*", this).filter(new CurrentlyEditingFilter()).asComponent();
     }
 
     /**
@@ -1196,7 +1197,7 @@ public class Form extends Container {
      *
      * @return the number of softbuttons
      */
-    public int getSoftButtonCount() {
+    public final int getSoftButtonCount() {
         return menuBar.getSoftButtons().length;
     }
 
@@ -1722,7 +1723,6 @@ public class Form extends Container {
     @Override
     public void stopEditing(Runnable onFinish) {
         Display.getInstance().stopEditing(this, onFinish);
-
     }
 
     @Override
@@ -1956,18 +1956,28 @@ public class Form extends Container {
     /**
      * The given component is interested in animating its appearance and will start
      * receiving callbacks when it is visible in the form allowing it to animate
-     * its appearance. This method would not register a compnent instance more than once
+     * its appearance. This method would not register a component instance more than once
      *
      * @param cmp component that would be animated
      */
-    public void registerAnimated(Animation cmp) {
+    public final void registerAnimated(Animation cmp) {
         if (animatableComponents == null) {
             animatableComponents = new ArrayList<Animation>();
         }
         if (!animatableComponents.contains(cmp)) {
             animatableComponents.add(cmp);
         }
+        onRegisterAnimated(cmp);
         Display.getInstance().notifyDisplay();
+    }
+
+    /**
+     * Callback that's invoked by registerAnimated to let subclasses keep
+     * track of animation registration.
+     *
+     * @param cmp component that would be animated
+     */
+    protected void onRegisterAnimated(Animation cmp) {
     }
 
     /**
@@ -2031,6 +2041,14 @@ public class Form extends Container {
         return super.animate();
     }
 
+    static Component getRippleComponent() {
+        return rippleComponent;
+    }
+
+    private static void resetRippleComponent() {
+        rippleComponent = null;
+    }
+
     /**
      * Makes sure all animations are repainted so they would be rendered in every
      * frame
@@ -2039,7 +2057,7 @@ public class Form extends Container {
         if (rippleComponent != null) {
             rippleComponent.repaint();
             if (rippleMotion == null) {
-                rippleComponent = null;
+                resetRippleComponent();
             }
         }
         if (animatableComponents != null) {
@@ -2929,25 +2947,8 @@ public class Form extends Container {
     public TabIterator getTabIterator(Component start) {
         updateTabIndices(0);
         java.util.List<Component> out = new ArrayList<Component>();
-        out.addAll(ComponentSelector.select("*", this).filter(new Filter() {
-
-
-            public boolean filter(Component c) {
-                return c.getTabIndex() >= 0 && c.isVisible() && c.isFocusable() && c.isEnabled() && !c.isHidden(true);
-            }
-
-        }));
-        Collections.sort(out, new Comparator<Component>() {
-
-
-            public int compare(Component o1, Component o2) {
-                return o1.getTabIndex() < o2.getTabIndex() ? -1 :
-                        o2.getTabIndex() < o1.getTabIndex() ? 1 :
-                                0;
-            }
-
-        });
-
+        out.addAll(ComponentSelector.select("*", this).filter(new TabIteratorFilter()));
+        Collections.sort(out, new TabIteratorComparator());
         return new TabIterator(out, start);
     }
 
@@ -3089,11 +3090,16 @@ public class Form extends Container {
         }
     }
 
+    static void setRippleComponent(Component cmp) {
+        rippleComponent = cmp;
+    }
+
     private void initRippleEffect(int x, int y, Component cmp) {
         if (cmp.isRippleEffect()) {
-            rippleMotion = Motion.createEaseInMotion(0, 1000, 800);
-            rippleMotion.start();
-            rippleComponent = cmp;
+            Motion motion = Motion.createEaseInMotion(0, 1000, 800);
+            motion.start();
+            setRippleMotion(motion);
+            setRippleComponent(cmp);
             rippleX = x;
             rippleY = y;
         }
@@ -3375,7 +3381,7 @@ public class Form extends Container {
             }
         }
 
-        rippleMotion = null;
+        setRippleMotion(null);
 
         if (dragged != null) {
             LeadUtil.pointerDragged(dragged, x, y);
@@ -3447,7 +3453,7 @@ public class Form extends Container {
             }
         }
 
-        rippleMotion = null;
+        setRippleMotion(null);
 
         if (dragged != null) {
             LeadUtil.pointerDragged(dragged, x, y);
@@ -3652,7 +3658,7 @@ public class Form extends Container {
     public void pointerReleased(int x, int y) {
         try {
             Component origPressedCmp = pressedCmp;
-            rippleMotion = null;
+            setRippleMotion(null);
             setPressedCmp(null);
             boolean isScrollWheeling = Display.impl.isScrollWheeling();
             Container actual = getActualPane(formLayeredPane, x, y);
@@ -3903,7 +3909,7 @@ public class Form extends Container {
      * @param cmd the Form command to be added
      * @deprecated Please use {@link Toolbar#addCommandToLeftBar(com.codename1.ui.Command)} or similar methods
      */
-    public void addCommand(Command cmd) {
+    public final void addCommand(Command cmd) {
         //menuBar.addCommand(cmd);
         addCommand(cmd, 0);
     }
@@ -4385,6 +4391,7 @@ public class Form extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setScrollableY(boolean scrollableY) {
         getContentPane().setScrollableY(scrollableY);
     }
@@ -4800,4 +4807,23 @@ public class Form extends Container {
     }
 
 
+    private static class CurrentlyEditingFilter implements Filter {
+        public boolean filter(Component c) {
+            return c.isEditing();
+        }
+    }
+
+    private static class TabIteratorComparator implements Comparator<Component> {
+        public int compare(Component o1, Component o2) {
+            return o1.getTabIndex() < o2.getTabIndex() ? -1 :
+                    o2.getTabIndex() < o1.getTabIndex() ? 1 :
+                            0;
+        }
+    }
+
+    private static class TabIteratorFilter implements Filter {
+        public boolean filter(Component c) {
+            return c.getTabIndex() >= 0 && c.isVisible() && c.isFocusable() && c.isEnabled() && !c.isHidden(true);
+        }
+    }
 }

@@ -140,7 +140,7 @@ public class EasyThread {
         synchronized (LOCK) {
             queue.add(r);
             queue.add(t);
-            LOCK.notify();
+            LOCK.notifyAll();
         }
     }
 
@@ -152,7 +152,7 @@ public class EasyThread {
     public void run(Runnable r) {
         synchronized (LOCK) {
             queue.add(r);
-            LOCK.notify();
+            LOCK.notifyAll();
         }
     }
 
@@ -163,38 +163,18 @@ public class EasyThread {
      * @return value returned by r
      */
     public <T> T run(final RunnableWithResultSync<T> r) {
-        // we need the flag and can't use the result object. Since null would be a valid value for the result
-        // we would have a hard time of detecting the case of the code completing before the wait call
+        // we need the flag and can't use the result object. Since null would be a valid value for the result,
+        // we would have a hard time of detecting the case of code completing before the wait call
         final boolean[] flag = new boolean[1];
         final Object[] result = new Object[1];
-        final SuccessCallback<T> sc = new SuccessCallback<T>() {
-            public void onSucess(T value) {
-                synchronized (flag) {
-                    result[0] = value;
-                    flag[0] = true;
-                    flag.notify();
-                }
-            }
-        };
-        RunnableWithResult<T> rr = new RunnableWithResult<T>() {
-            public void run(SuccessCallback<T> onSuccess) {
-                sc.onSucess(r.run());
-            }
-        };
+        final SuccessCallback<T> sc = new RunSuccessCallback<T>(flag, result);
+        RunnableWithResult<T> rr = new RunCallbackRunnableWithResult<T>(sc, r);
         synchronized (LOCK) {
             queue.add(rr);
             queue.add(sc);
-            LOCK.notify();
+            LOCK.notifyAll();
         }
-        Display.getInstance().invokeAndBlock(new Runnable() {
-            public void run() {
-                synchronized (flag) {
-                    if (!flag[0]) {
-                        Util.wait(flag);
-                    }
-                }
-            }
-        });
+        Display.getInstance().invokeAndBlock(new RunInvokeAndBlockRunnable(flag));
         return (T) result[0];
     }
 
@@ -206,29 +186,10 @@ public class EasyThread {
     public void runAndWait(final Runnable r) {
         final boolean[] flag = new boolean[1];
         synchronized (LOCK) {
-            queue.add(new Runnable() {
-                public void run() {
-                    try {
-                        r.run();
-                    } finally {
-                        synchronized (flag) {
-                            flag[0] = true;
-                            flag.notify();
-                        }
-                    }
-                }
-            });
-            LOCK.notify();
+            queue.add(new InQueueRunnable(r, flag));
+            LOCK.notifyAll();
         }
-        Display.getInstance().invokeAndBlock(new Runnable() {
-            public void run() {
-                synchronized (flag) {
-                    if (!flag[0]) {
-                        Util.wait(flag);
-                    }
-                }
-            }
-        });
+        Display.getInstance().invokeAndBlock(new RunAndWaitRunnable(flag));
     }
 
     /**
@@ -237,7 +198,7 @@ public class EasyThread {
     public void kill() {
         synchronized (LOCK) {
             running = false;
-            LOCK.notify();
+            LOCK.notifyAll();
         }
     }
 
@@ -305,5 +266,90 @@ public class EasyThread {
          * @param error    the exception that occurred
          */
         void onError(EasyThread t, T callback, Throwable error);
+    }
+
+    private static class RunAndWaitRunnable implements Runnable {
+        private final boolean[] flag;
+
+        public RunAndWaitRunnable(boolean[] flag) {
+            this.flag = flag;
+        }
+
+        public void run() {
+            synchronized (flag) {
+                if (!flag[0]) {
+                    Util.wait(flag);
+                }
+            }
+        }
+    }
+
+    private static class InQueueRunnable implements Runnable {
+        private final Runnable r;
+        private final boolean[] flag;
+
+        public InQueueRunnable(Runnable r, boolean[] flag) {
+            this.r = r;
+            this.flag = flag;
+        }
+
+        public void run() {
+            try {
+                r.run();
+            } finally {
+                synchronized (flag) {
+                    flag[0] = true;
+                    flag.notifyAll();
+                }
+            }
+        }
+    }
+
+    private static class RunInvokeAndBlockRunnable implements Runnable {
+        private final boolean[] flag;
+
+        public RunInvokeAndBlockRunnable(boolean[] flag) {
+            this.flag = flag;
+        }
+
+        public void run() {
+            synchronized (flag) {
+                if (!flag[0]) {
+                    Util.wait(flag);
+                }
+            }
+        }
+    }
+
+    private static class RunCallbackRunnableWithResult<T> implements RunnableWithResult<T> {
+        private final SuccessCallback<T> sc;
+        private final RunnableWithResultSync<T> r;
+
+        public RunCallbackRunnableWithResult(SuccessCallback<T> sc, RunnableWithResultSync<T> r) {
+            this.sc = sc;
+            this.r = r;
+        }
+
+        public void run(SuccessCallback<T> onSuccess) {
+            sc.onSucess(r.run());
+        }
+    }
+
+    private static class RunSuccessCallback<T> implements SuccessCallback<T> {
+        private final boolean[] flag;
+        private final Object[] result;
+
+        public RunSuccessCallback(boolean[] flag, Object[] result) {
+            this.flag = flag;
+            this.result = result;
+        }
+
+        public void onSucess(T value) {
+            synchronized (flag) {
+                result[0] = value;
+                flag[0] = true;
+                flag.notifyAll();
+            }
+        }
     }
 }

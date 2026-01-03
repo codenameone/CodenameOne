@@ -1,31 +1,68 @@
 <FindBugsFilter>
+    <!-- We don't support serialization -->
     <Match>
-        <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
+        <Bug pattern="SE_NO_SERIALVERSIONID"/>
     </Match>
-    <Match>
-        <Bug pattern="DM_GC"/>
-    </Match>
+
+    <!-- We don't support clone() -->
     <Match>
         <Bug pattern="CN_IMPLEMENTS_CLONE_BUT_NOT_CLONEABLE"/>
     </Match>
+    <Match>
+        <Bug pattern="CN_IDIOM_NO_SUPER_CALL"/>
+    </Match>
+
+    <!--
+    We have a lot of those in the code, they might produce
+    a class cast exception, but those are easy to debug/fix
+    with fail-fast semantics. If we wrap them with an if
+    statement, we might get a bug that's harder to spot.
+    -->
     <Match>
         <Bug pattern="BC_UNCONFIRMED_CAST"/>
     </Match>
     <Match>
         <Bug pattern="BC_UNCONFIRMED_CAST_OF_RETURN_VALUE"/>
     </Match>
-    <Match>
-        <Bug pattern="CN_IDIOM_NO_SUPER_CALL"/>
-    </Match>
-    <Match>
-        <Bug pattern="DM_BOOLEAN_CTOR"/>
-    </Match>
+
+    <!--
+    We don't support the locale sensitive version of case conversion.
+    -->
     <Match>
         <Bug pattern="DM_CONVERT_CASE"/>
     </Match>
+
+    <!--
+    This inspection seems buggy. It highlighted the wrong line in
+    a file that didn't have any visible related problem.
+    -->
     <Match>
-        <Bug pattern="DM_EXIT"/>
+        <Bug pattern="NM_CONFUSING"/>
     </Match>
+
+    <!--
+    This fails on writing to a static field from a non-static method.
+    This is a bad practice in general because it could indicate a state
+    that changes across threads. However, in our case, we have many such
+    fields and threads are typically mostly the EDT. The risk is much lower
+    as a result.
+    -->
+    <Match>
+        <Bug pattern="ST_WRITE_TO_STATIC_FROM_INSTANCE_METHOD"/>
+    </Match>
+
+    <!--
+    Null is superior to zero length arrays. It fails fast and doesn't take up
+    ram or CPU. We often use null and it is good.
+    -->
+    <Match>
+        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
+    </Match>
+
+    <!--
+    Since the code runs on the clientside performance is more important than
+    abstraction. We don't always copy values or wrap them in immutable data.
+    -->
     <Match>
         <Bug pattern="EI_EXPOSE_REP"/>
     </Match>
@@ -33,53 +70,123 @@
         <Bug pattern="EI_EXPOSE_REP2"/>
     </Match>
     <Match>
-        <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
-    </Match>
-    <Match>
-        <Bug pattern="EQ_COMPARETO_USE_OBJECT_EQUALS"/>
-    </Match>
-    <Match>
-        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR"/>
+        <Bug pattern="MS_EXPOSE_REP"/>
     </Match>
     <Match>
         <Bug pattern="MS_EXPOSE_REP"/>
     </Match>
     <Match>
-        <Bug pattern="NM_CONFUSING"/>
+        <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
     </Match>
+
+    <!--
+    We don't have many public fields. In fact, we have one.
+    But since we're an API we can't remove it.
+    -->
     <Match>
-        <Bug pattern="NO_NOTIFY_NOT_NOTIFYALL"/>
+        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" />
     </Match>
-    <Match>
-        <Bug pattern="NP_BOOLEAN_RETURN_NULL"/>
-    </Match>
-    <Match>
-        <Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/>
-    </Match>
+
+    <!--
+    This rule prevents Class.newInstance() which we generally avoid anyway.
+    However, the solution is to use java.beans or reflection to create a class
+    via its constructor. That's a problem since that API isn't available in
+    Codename One.
+    -->
     <Match>
         <Bug pattern="REFLC_REFLECTION_MAY_INCREASE_ACCESSIBILITY_OF_CLASS"/>
     </Match>
-    <Match>
-        <Bug pattern="SE_NO_SERIALVERSIONID"/>
-    </Match>
-    <Match>
-        <Bug pattern="UI_INHERITANCE_UNSAFE_GETRESOURCE"/>
-    </Match>
-    <Match>
-        <Bug pattern="URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD"/>
-    </Match>
-    <Match>
-        <Bug pattern="UW_UNCOND_WAIT"/>
-    </Match>
-    <Match>
-        <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON" />
-    </Match>
+
+    <!-- This seems to be a problem with the check -->
     <Match>
         <Class name="~com\.codename1\.io\.Socket.*" />
         <Bug pattern="RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE" />
     </Match>
+
+    <!--
+    There's a single call to an external class from a constructor
+    that's too hard to fix and might break compatibility if modified.
+    Since the class is deprecated anyway it shouldn't be a problem.
+    -->
+    <Match>
+        <Class name="~com\.codename1\.javascript\.JavascriptContext.*" />
+        <Bug pattern="SIC_INNER_SHOULD_BE_STATIC_ANON" />
+    </Match>
+
+    <!--
+    Map adapters register themselves in the constructor for simplicity.
+    Changing this would force developers to use a more obtuse API for no
+    valid reason.
+    -->
+    <Match>
+        <Class name="~com\.codename1\.properties\.MapAdapter.*" />
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR" />
+    </Match>
+
+    <!--
+    Unfortunately, Codename One does this all over the place.
+    It's bad, but we can't fix it without breaking everything...
+    -->
+    <Match>
+        <Bug pattern="MC_OVERRIDABLE_METHOD_CALL_IN_CONSTRUCTOR" />
+    </Match>
+
+    <!-- This is a 3rd party file that's really hard to fix properly  -->
     <Match>
         <Class name="~com\.codename1\.io\.gzip\.InfBlocks.*" />
         <Bug pattern="SA_FIELD_SELF_ASSIGNMENT" />
+    </Match>
+
+    <!-- Excluding since the class explicitly compares interned strings -->
+    <Match>
+        <Class name="~com\.codename1\.io\.ConnectionRequest.*" />
+        <Bug pattern="ES_COMPARING_STRINGS_WITH_EQ" />
+    </Match>
+
+    <!-- The class has too many casts like this to go over -->
+    <Match>
+        <Class name="~com\.codename1\.facebook\.FaceBookAccess.*" />
+        <Bug pattern="BC_UNCONFIRMED_CAST" />
+    </Match>
+
+    <!-- The API isThemeConstant should return null when the value isn't found -->
+    <Match>
+        <Class name="com.codename1.ui.plaf.UIManager" />
+        <Method name="isThemeConstant" />
+        <Bug pattern="NP_BOOLEAN_RETURN_NULL" />
+    </Match>
+
+    <!-- The API canExecute should return null when we don't know the answer -->
+    <Match>
+        <Class name="com.codename1.impl.CodenameOneImplementation" />
+        <Method name="canExecute" />
+        <Bug pattern="NP_BOOLEAN_RETURN_NULL" />
+    </Match>
+
+    <!-- The testing framework invokes System.exit() legitimately -->
+    <Match>
+        <Class name="com.codename1.testing.DeviceRunner" />
+        <Method name="runTests" />
+        <Bug pattern="DM_EXIT" />
+    </Match>
+
+    <!--
+    GroupLayout is pretty niche behavior of a class we mostly added for porting/compatibility.
+    -->
+    <Match>
+        <Class name="~com\.codename1\.ui\.layouts\.GroupLayout(\$.*)?" />
+        <Bug pattern="EQ_COMPARETO_USE_OBJECT_EQUALS" />
+    </Match>
+
+    <!-- Excluded classes... -->
+
+    <!-- Badly written 3rd party class -->
+    <Match>
+        <Source name="TarEntry.java" />
+    </Match>
+
+    <!-- Deprecated classes that should be excluded from checks -->
+    <Match>
+        <Class name="~com\.codename1\.db\.ThreadSafeDatabase(\$.*)?" />
     </Match>
 </FindBugsFilter>

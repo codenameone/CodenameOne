@@ -30,6 +30,8 @@ import com.codename1.io.NetworkManager;
 import com.codename1.io.Oauth2;
 import com.codename1.util.Callback;
 
+import java.util.Arrays;
+
 /**
  * Invokes the native bundled facebook SDK to login/logout of facebook, notice
  * that in order for this to work server build arguments must indicate that you
@@ -42,7 +44,7 @@ import com.codename1.util.Callback;
  */
 public class FacebookConnect extends Login {
 
-    static Class implClass;
+    static Class<?> implClass;
     private static FacebookConnect instance;
     private final String[] permissions = new String[]{"public_profile", "email", "user_friends"};
 
@@ -252,22 +254,45 @@ public class FacebookConnect extends Login {
         //valid anymore
         final boolean[] retval = new boolean[1];
         retval[0] = true;
-        ConnectionRequest req = new ConnectionRequest() {
-            @Override
-            protected void handleErrorResponseCode(int code, String message) {
-                //access token not valid anymore
-                if (code >= 400 && code <= 410) {
-                    retval[0] = false;
-                    return;
-                }
-                super.handleErrorResponseCode(code, message);
-            }
-
-        };
+        ConnectionRequest req = new ValidateTokenConnectionRequest(retval);
         req.setPost(false);
         req.setUrl("https://graph.facebook.com/v2.4/me");
         req.addArgumentNoEncoding("access_token", token);
         NetworkManager.getInstance().addToQueueAndWait(req);
         return retval[0];
+    }
+
+    private static class ValidateTokenConnectionRequest extends ConnectionRequest {
+        private final boolean[] retval;
+
+        public ValidateTokenConnectionRequest(boolean[] retval) {
+            this.retval = retval;
+        }
+
+        @Override
+        public final boolean equals(Object o) {
+            if (!(o instanceof ValidateTokenConnectionRequest)) return false;
+            if (!super.equals(o)) return false;
+
+            ValidateTokenConnectionRequest that = (ValidateTokenConnectionRequest) o;
+            return Arrays.equals(retval, that.retval);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = super.hashCode();
+            result = 31 * result + Arrays.hashCode(retval);
+            return result;
+        }
+
+        @Override
+        protected void handleErrorResponseCode(int code, String message) {
+            //access token not valid anymore
+            if (code >= 400 && code <= 410) {
+                retval[0] = false;
+                return;
+            }
+            super.handleErrorResponseCode(code, message);
+        }
     }
 }

@@ -26,6 +26,7 @@ import com.codename1.io.ConnectionRequest;
 import com.codename1.io.NetworkManager;
 import com.codename1.io.Oauth2;
 
+import java.util.Arrays;
 import java.util.Hashtable;
 
 /**
@@ -99,18 +100,7 @@ public class GoogleConnect extends Login {
         //valid anymore
         final boolean[] retval = new boolean[1];
         retval[0] = true;
-        ConnectionRequest req = new ConnectionRequest() {
-            @Override
-            protected void handleErrorResponseCode(int code, String message) {
-                //access token not valid anymore
-                if (code >= 400 && code <= 410) {
-                    retval[0] = false;
-                    return;
-                }
-                super.handleErrorResponseCode(code, message);
-            }
-
-        };
+        ConnectionRequest req = new ValidateTokenConnectionRequest(retval);
         req.setPost(false);
         req.setUrl("https://www.googleapis.com/plus/v1/people/me");
         req.addRequestHeader("Authorization", "Bearer " + token);
@@ -119,4 +109,38 @@ public class GoogleConnect extends Login {
 
     }
 
+    private static class ValidateTokenConnectionRequest extends ConnectionRequest {
+        private final boolean[] retval;
+
+        public ValidateTokenConnectionRequest(boolean[] retval) {
+            this.retval = retval;
+        }
+
+        @Override
+        public final boolean equals(Object o) {
+            if (!(o instanceof ValidateTokenConnectionRequest)) return false;
+            if (!super.equals(o)) return false;
+
+            ValidateTokenConnectionRequest that = (ValidateTokenConnectionRequest) o;
+            return Arrays.equals(retval, that.retval);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = super.hashCode();
+            result = 31 * result + Arrays.hashCode(retval);
+            return result;
+        }
+
+        @Override
+        protected void handleErrorResponseCode(int code, String message) {
+            //access token not valid anymore
+            if (code >= 400 && code <= 410) {
+                retval[0] = false;
+                return;
+            }
+            super.handleErrorResponseCode(code, message);
+        }
+
+    }
 }
