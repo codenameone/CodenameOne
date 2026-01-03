@@ -739,7 +739,12 @@ class StampedLockIntegrationTest {
         String content = new String(Files.readAllBytes(nativeMethods), StandardCharsets.UTF_8);
 
         content = content.replaceFirst("#include \\\"java_lang_System.h\\\"\\n\\n",
-                "#include \"java_lang_System.h\"\n\nJAVA_OBJECT java_lang_Class_getName___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls);\nJAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT t);\n\n");
+                "#include \"java_lang_System.h\"\n\n" +
+                        "JAVA_OBJECT java_lang_Class_getName___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls);\n" +
+                        "JAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT t);\n" +
+                        "JAVA_VOID java_lang_Thread_runImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT t, JAVA_LONG id);\n" +
+                        "JAVA_OBJECT java_lang_String_toCharNoCopy___R_char_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str);\n" +
+                        "JAVA_OBJECT java_lang_StringToReal_invalidReal___java_lang_String_boolean_R_java_lang_NumberFormatException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s, JAVA_BOOLEAN strict);\n\n");
 
         String[][] duplicateRuntimeSymbols = new String[][] {
                 {"JAVA_BOOLEAN java_lang_String_equals___java_lang_Object_R_boolean", "JAVA_BOOLEAN java_lang_String_equals___java_lang_Object_R_boolean\\(.*?\n}\\n"},
