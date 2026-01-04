@@ -169,6 +169,18 @@ class LockIntegrationTest {
                 "    public Integer(int value) { this.value = value; }\n" +
                 "    public int intValue() { return value; }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Float.java"), ("package java.lang;\n" +
+                "public final class Float {\n" +
+                "    private final float value;\n" +
+                "    public Float(float value) { this.value = value; }\n" +
+                "    public float floatValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Double.java"), ("package java.lang;\n" +
+                "public final class Double {\n" +
+                "    private final double value;\n" +
+                "    public Double(double value) { this.value = value; }\n" +
+                "    public double doubleValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("Long.java"), ("package java.lang;\n" +
                 "public final class Long {\n" +
                 "    private final long value;\n" +
