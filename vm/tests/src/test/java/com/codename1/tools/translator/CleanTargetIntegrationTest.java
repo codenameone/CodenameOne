@@ -202,6 +202,29 @@ class CleanTargetIntegrationTest {
         return output;
     }
 
+    static CommandResult runCommandWithResult(List<String> command, Path workingDir) throws Exception {
+        ProcessBuilder builder = new ProcessBuilder(command);
+        builder.directory(workingDir.toFile());
+        builder.redirectErrorStream(true);
+        Process process = builder.start();
+        String output;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            output = reader.lines().collect(Collectors.joining("\n"));
+        }
+        int exit = process.waitFor();
+        return new CommandResult(exit, output);
+    }
+
+    static final class CommandResult {
+        final int exitCode;
+        final String output;
+
+        CommandResult(int exitCode, String output) {
+            this.exitCode = exitCode;
+            this.output = output;
+        }
+    }
+
     static void patchCn1Globals(Path srcRoot) throws IOException {
         Path cn1Globals = srcRoot.resolve("cn1_globals.h");
         String content = new String(Files.readAllBytes(cn1Globals), StandardCharsets.UTF_8);
