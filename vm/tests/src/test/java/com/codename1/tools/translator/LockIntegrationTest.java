@@ -169,6 +169,12 @@ class LockIntegrationTest {
                 "    public Integer(int value) { this.value = value; }\n" +
                 "    public int intValue() { return value; }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Long.java"), ("package java.lang;\n" +
+                "public final class Long {\n" +
+                "    private final long value;\n" +
+                "    public Long(long value) { this.value = value; }\n" +
+                "    public long longValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("Short.java"), ("package java.lang;\n" +
                 "public final class Short {\n" +
                 "    private final short value;\n" +
