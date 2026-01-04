@@ -111,7 +111,7 @@ class CleanTargetIntegrationTest {
                 "-B", buildDir.toString(),
                 "-DCMAKE_C_COMPILER=clang",
                 "-DCMAKE_OBJC_COMPILER=clang",
-                "-DCMAKE_C_FLAGS=-Wno-error=literal-range"
+                "-DCMAKE_C_FLAGS=-Wno-error=literal-range -Wno-literal-range"
         ), distDir);
 
         runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
@@ -192,7 +192,7 @@ class CleanTargetIntegrationTest {
 
     static void relaxLiteralRangeWarnings(Path cmakeLists) throws IOException {
         String content = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
-        String flagLine = "set(CMAKE_C_FLAGS \"${CMAKE_C_FLAGS} -Wno-error=literal-range\")";
+        String flagLine = "set(CMAKE_C_FLAGS \"${CMAKE_C_FLAGS} -Wno-error=literal-range -Wno-literal-range\")";
         if (!content.contains(flagLine)) {
             content = flagLine + "\n" + content;
             Files.write(cmakeLists, content.getBytes(StandardCharsets.UTF_8));
