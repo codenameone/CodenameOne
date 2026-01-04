@@ -35,7 +35,7 @@ import com.codename1.util.MathUtil;
  */
 public class ArrowLinesLayer extends LinesLayer {
 
-    private final int minArrowSementLength = 20;
+    private static final int minArrowSementLength = 20;
     private int arrowSegmentLength = 60;
     private int arrowWidth = 5;
     private int arrowHeight = 10;
