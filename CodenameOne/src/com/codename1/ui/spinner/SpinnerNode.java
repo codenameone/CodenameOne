@@ -45,7 +45,7 @@ class SpinnerNode extends Node {
     private boolean setScrollYReentrantLock;
     private RowFormatter rowFormatter;
     private double flatScrollPos;
-    private final int numSides = 14;
+    private static final int numSides = 14;
     private final Label renderer = new Label("Testing", "Spinner3DRow");
     private final DataChangedListener listChangedListener = new DataChangedListener() {
         public void dataChanged(int type, int index) {

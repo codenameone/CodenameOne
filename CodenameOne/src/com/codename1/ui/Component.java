@@ -321,7 +321,7 @@ public class Component implements Animation, StyleListener, Editable {
      * is too slow to be useful.  This may not be the case on other platforms, but, for now, we'll leave this flag on.
      * Later on, after evaluation, this flag will likely be removed, and the best strategy will be decided upon.
      */
-    private final boolean useLightweightElevationShadow = true;
+    private static final boolean useLightweightElevationShadow = true;
     /**
      * This property is useful for blocking in z-order touch events, sometimes we might want to grab touch events in
      * a specific component without making it focusable.
