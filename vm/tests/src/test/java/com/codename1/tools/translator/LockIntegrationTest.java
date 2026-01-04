@@ -163,6 +163,12 @@ class LockIntegrationTest {
                 "    public Byte(byte value) { this.value = value; }\n" +
                 "    public byte byteValue() { return value; }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Integer.java"), ("package java.lang;\n" +
+                "public final class Integer {\n" +
+                "    private final int value;\n" +
+                "    public Integer(int value) { this.value = value; }\n" +
+                "    public int intValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("Short.java"), ("package java.lang;\n" +
                 "public final class Short {\n" +
                 "    private final short value;\n" +
