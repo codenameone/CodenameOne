@@ -95,13 +95,13 @@ class LockIntegrationTest {
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
 
-        CleanTargetIntegrationTest.runCommand(Arrays.asList(
+        List<String> cmakeCommand = new ArrayList<>(Arrays.asList(
                 "cmake",
                 "-S", distDir.toString(),
-                "-B", buildDir.toString(),
-                "-DCMAKE_C_COMPILER=clang",
-                "-DCMAKE_OBJC_COMPILER=clang"
-        ), distDir);
+                "-B", buildDir.toString()
+        ));
+        cmakeCommand.addAll(CleanTargetIntegrationTest.cmakeCompilerArgs());
+        CleanTargetIntegrationTest.runCommand(cmakeCommand, distDir);
 
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
@@ -148,6 +148,44 @@ class LockIntegrationTest {
                 "    private int offset;\n" +
                 "    private int count;\n" +
                 "    public String(char[] v) { value = v; count=v.length; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
+        // Primitive wrappers
+        Files.write(lang.resolve("Boolean.java"), ("package java.lang;\n" +
+                "public final class Boolean {\n" +
+                "    private final boolean value;\n" +
+                "    public Boolean(boolean value) { this.value = value; }\n" +
+                "    public boolean booleanValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Byte.java"), ("package java.lang;\n" +
+                "public final class Byte {\n" +
+                "    private final byte value;\n" +
+                "    public Byte(byte value) { this.value = value; }\n" +
+                "    public byte byteValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Integer.java"), ("package java.lang;\n" +
+                "public final class Integer {\n" +
+                "    private final int value;\n" +
+                "    public Integer(int value) { this.value = value; }\n" +
+                "    public int intValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Long.java"), ("package java.lang;\n" +
+                "public final class Long {\n" +
+                "    private final long value;\n" +
+                "    public Long(long value) { this.value = value; }\n" +
+                "    public long longValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Short.java"), ("package java.lang;\n" +
+                "public final class Short {\n" +
+                "    private final short value;\n" +
+                "    public Short(short value) { this.value = value; }\n" +
+                "    public short shortValue() { return value; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("Character.java"), ("package java.lang;\n" +
+                "public final class Character {\n" +
+                "    private final char value;\n" +
+                "    public Character(char value) { this.value = value; }\n" +
+                "    public char charValue() { return value; }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
         // java.lang.Class
@@ -330,6 +368,8 @@ class LockIntegrationTest {
         String globWithObjc = String.format("file(GLOB TRANSLATOR_SOURCES \"%s/*.c\" \"%s/*.m\")", sourceDirName, sourceDirName);
         String globCOnly = String.format("file(GLOB TRANSLATOR_SOURCES \"%s/*.c\")", sourceDirName);
         content = content.replace(globWithObjc, globCOnly);
+        content = content.replaceAll("LANGUAGES\\s+C\\s+OBJC", "LANGUAGES C");
+        content = content.replaceAll("(?m)^enable_language\\(OBJC OPTIONAL\\)\\s*$\\n?", "");
         String replacement = content.replace(
                 "add_library(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})",
                 "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m pthread)"
