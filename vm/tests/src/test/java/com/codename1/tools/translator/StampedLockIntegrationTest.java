@@ -742,6 +742,8 @@ class StampedLockIntegrationTest {
                 "#include \"java_lang_System.h\"\n\n" +
                         "JAVA_OBJECT java_lang_Class_getName___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT cls);\n" +
                         "JAVA_OBJECT java_lang_Throwable_getStack___R_java_lang_String(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT t);\n" +
+                        "JAVA_OBJECT get_field_java_lang_Throwable_stack(JAVA_OBJECT t);\n" +
+                        "JAVA_VOID set_field_java_lang_Throwable_stack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT val, JAVA_OBJECT t);\n" +
                         "JAVA_VOID java_lang_Thread_runImpl___long(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT t, JAVA_LONG id);\n" +
                         "JAVA_OBJECT java_lang_String_toCharNoCopy___R_char_1ARRAY(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT str);\n" +
                         "JAVA_OBJECT java_lang_StringToReal_invalidReal___java_lang_String_boolean_R_java_lang_NumberFormatException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT s, JAVA_BOOLEAN strict);\n\n");
