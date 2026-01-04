@@ -808,7 +808,8 @@ def main() -> None:
             "UI_INHERITANCE_UNSAFE_GETRESOURCE",
             "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD",
             "UW_UNCOND_WAIT",
-            "SIC_INNER_SHOULD_BE_STATIC_ANON"
+            "SIC_INNER_SHOULD_BE_STATIC_ANON",
+            "SS_SHOULD_BE_STATIC"
         }
 
         def _is_exempt(f: Finding) -> bool:
