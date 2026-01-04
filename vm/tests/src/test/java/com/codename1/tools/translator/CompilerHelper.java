@@ -560,7 +560,9 @@ public class CompilerHelper {
 
             java.nio.file.Files.write(stubs, content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
-            CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(outputDir.resolve("dist").resolve("CMakeLists.txt"), "ExecutorApp-src");
+            java.nio.file.Path cmakeLists = outputDir.resolve("dist").resolve("CMakeLists.txt");
+            CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, "ExecutorApp-src");
+            CleanTargetIntegrationTest.relaxLiteralRangeWarnings(cmakeLists);
 
             java.nio.file.Path buildDir = distDir.resolve("build");
             java.nio.file.Files.createDirectories(buildDir);

@@ -100,6 +100,7 @@ class CleanTargetIntegrationTest {
         writeRuntimeStubs(srcRoot);
 
         replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
+        relaxLiteralRangeWarnings(cmakeLists);
 
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
@@ -187,6 +188,15 @@ class CleanTargetIntegrationTest {
                 "add_executable(${PROJECT_NAME} ${TRANSLATOR_SOURCES} ${TRANSLATOR_HEADERS})\ntarget_link_libraries(${PROJECT_NAME} m)"
         );
         Files.write(cmakeLists, replacement.getBytes(StandardCharsets.UTF_8));
+    }
+
+    static void relaxLiteralRangeWarnings(Path cmakeLists) throws IOException {
+        String content = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
+        String flagLine = "set(CMAKE_C_FLAGS \"${CMAKE_C_FLAGS} -Wno-error=literal-range\")";
+        if (!content.contains(flagLine)) {
+            content = flagLine + "\n" + content;
+            Files.write(cmakeLists, content.getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     static String runCommand(List<String> command, Path workingDir) throws Exception {
