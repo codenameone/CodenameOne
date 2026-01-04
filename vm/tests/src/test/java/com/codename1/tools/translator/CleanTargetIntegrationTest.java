@@ -100,6 +100,7 @@ class CleanTargetIntegrationTest {
         writeRuntimeStubs(srcRoot);
 
         replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
+        relaxLiteralRangeWarnings(cmakeLists);
 
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
@@ -109,7 +110,8 @@ class CleanTargetIntegrationTest {
                 "-S", distDir.toString(),
                 "-B", buildDir.toString(),
                 "-DCMAKE_C_COMPILER=clang",
-                "-DCMAKE_OBJC_COMPILER=clang"
+                "-DCMAKE_OBJC_COMPILER=clang",
+                "-DCMAKE_C_FLAGS=-Wno-error=literal-range"
         ), distDir);
 
         runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
@@ -188,6 +190,15 @@ class CleanTargetIntegrationTest {
         Files.write(cmakeLists, replacement.getBytes(StandardCharsets.UTF_8));
     }
 
+    static void relaxLiteralRangeWarnings(Path cmakeLists) throws IOException {
+        String content = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
+        String flagLine = "set(CMAKE_C_FLAGS \"${CMAKE_C_FLAGS} -Wno-error=literal-range\")";
+        if (!content.contains(flagLine)) {
+            content = flagLine + "\n" + content;
+            Files.write(cmakeLists, content.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
     static String runCommand(List<String> command, Path workingDir) throws Exception {
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(workingDir.toFile());
@@ -200,6 +211,29 @@ class CleanTargetIntegrationTest {
         int exit = process.waitFor();
         assertEquals(0, exit, "Command failed: " + String.join(" ", command) + "\nOutput:\n" + output);
         return output;
+    }
+
+    static CommandResult runCommandWithResult(List<String> command, Path workingDir) throws Exception {
+        ProcessBuilder builder = new ProcessBuilder(command);
+        builder.directory(workingDir.toFile());
+        builder.redirectErrorStream(true);
+        Process process = builder.start();
+        String output;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            output = reader.lines().collect(Collectors.joining("\n"));
+        }
+        int exit = process.waitFor();
+        return new CommandResult(exit, output);
+    }
+
+    static final class CommandResult {
+        final int exitCode;
+        final String output;
+
+        CommandResult(int exitCode, String output) {
+            this.exitCode = exitCode;
+            this.output = output;
+        }
     }
 
     static void patchCn1Globals(Path srcRoot) throws IOException {

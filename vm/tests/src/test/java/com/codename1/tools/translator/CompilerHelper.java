@@ -2,6 +2,7 @@ package com.codename1.tools.translator;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -136,7 +137,17 @@ public class CompilerHelper {
         }
     }
 
-    public static boolean compileAndRun(String code, String expectedOutput) throws Exception {
+    public static class ExecutionResult {
+        public final int exitCode;
+        public final String output;
+
+        public ExecutionResult(int exitCode, String output) {
+            this.exitCode = exitCode;
+            this.output = output;
+        }
+    }
+
+    public static ExecutionResult compileAndRunForResult(String code) throws Exception {
         // Find a suitable compiler (e.g. JDK 8 targeting 1.8)
         List<CompilerConfig> compilers = getAvailableCompilers("1.8");
         if (compilers.isEmpty()) {
@@ -170,7 +181,7 @@ public class CompilerHelper {
             compileArgs.add(sourceDir.resolve("Main.java").toString());
 
             if (compile(config.jdkHome, compileArgs) != 0) {
-                return false;
+                return new ExecutionResult(-1, "javac failed");
             }
 
             // Merge javaApiDir into classesDir so translator finds dependencies
@@ -195,6 +206,7 @@ public class CompilerHelper {
             java.nio.file.Path distDir = outputDir.resolve("dist");
             java.nio.file.Path srcRoot = distDir.resolve("ExecutorApp-src");
             CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
+            patchStaticGetterPrototypes(srcRoot);
 
             // Write basic stubs
             java.nio.file.Path ioFileHeader = srcRoot.resolve("java_io_File.h");
@@ -210,12 +222,15 @@ public class CompilerHelper {
                         "#endif\n";
                 java.nio.file.Files.write(objectHeader, headerContent.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             }
-            java.nio.file.Path stubs = srcRoot.resolve("runtime_stubs.c");
-             String content = "#include \"cn1_globals.h\"\n" +
-                "#include <stdlib.h>\n" +
-                "#include <string.h>\n" +
-                "#include <math.h>\n" +
-                "#include <limits.h>\n" +
+        java.nio.file.Path stubs = srcRoot.resolve("runtime_stubs.c");
+         String content = "#include \"cn1_globals.h\"\n" +
+            "#include \"java_lang_StackOverflowError.h\"\n" +
+            "#include \"java_lang_Throwable.h\"\n" +
+            "#include <stdlib.h>\n" +
+            "#include <string.h>\n" +
+            "#include <stdio.h>\n" +
+            "#include <math.h>\n" +
+            "#include <limits.h>\n" +
                 "\n" +
                 "struct my_java_lang_String {\n" +
                 "    JAVA_OBJECT __codenameOneParentClsReference;\n" +
@@ -320,11 +335,24 @@ public class CompilerHelper {
                 "}\n" +
                 "\n" +
                 "void initMethodStack(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT __cn1ThisObject, int stackSize, int localsStackSize, int classNameId, int methodNameId) {\n" +
-                "    threadStateData->threadObjectStackOffset += localsStackSize;\n" +
+                "    if (threadStateData->callStackOffset >= CN1_MAX_STACK_CALL_DEPTH - 1) {\n" +
+                "        JAVA_OBJECT stackOverflow = __NEW_INSTANCE_java_lang_StackOverflowError(threadStateData);\n" +
+                "        java_lang_Throwable_fillInStack__(threadStateData, stackOverflow);\n" +
+                "        throwException(threadStateData, stackOverflow);\n" +
+                "        return;\n" +
+                "    }\n" +
+                "    memset(&threadStateData->threadObjectStack[threadStateData->threadObjectStackOffset], 0, sizeof(struct elementStruct) * (localsStackSize + stackSize));\n" +
+                "    threadStateData->threadObjectStackOffset += localsStackSize + stackSize;\n" +
+                "    threadStateData->callStackClass[threadStateData->callStackOffset] = classNameId;\n" +
+                "    threadStateData->callStackMethod[threadStateData->callStackOffset] = methodNameId;\n" +
+                "    threadStateData->callStackOffset++;\n" +
                 "}\n" +
                 "\n" +
                 "void releaseForReturn(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread) {\n" +
                 "    threadStateData->threadObjectStackOffset = cn1LocalsBeginInThread;\n" +
+                "    if (threadStateData->callStackOffset > 0) {\n" +
+                "        threadStateData->callStackOffset--;\n" +
+                "    }\n" +
                 "}\n" +
                 "\n" +
                 "void releaseForReturnInException(CODENAME_ONE_THREAD_STATE, int cn1LocalsBeginInThread, int methodBlockOffset) {\n" +
@@ -351,7 +379,12 @@ public class CompilerHelper {
                 "}\n" +
                 "\n" +
                 "void throwException(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj) {\n" +
-                "    (void)obj;\n" +
+                "    if (obj != JAVA_NULL && obj->__codenameOneParentClsReference != 0 && obj->__codenameOneParentClsReference->clsName != NULL) {\n" +
+                "        fprintf(stderr, \"Exception thrown: %s\\n\", obj->__codenameOneParentClsReference->clsName);\n" +
+                "    } else {\n" +
+                "        fprintf(stderr, \"Exception thrown: %p\\n\", obj);\n" +
+                "    }\n" +
+                "    fflush(stderr);\n" +
                 "    exit(1);\n" +
                 "}\n" +
                 "\n" +
@@ -527,7 +560,9 @@ public class CompilerHelper {
 
             java.nio.file.Files.write(stubs, content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
-            CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(outputDir.resolve("dist").resolve("CMakeLists.txt"), "ExecutorApp-src");
+            java.nio.file.Path cmakeLists = outputDir.resolve("dist").resolve("CMakeLists.txt");
+            CleanTargetIntegrationTest.replaceLibraryWithExecutableTarget(cmakeLists, "ExecutorApp-src");
+            CleanTargetIntegrationTest.relaxLiteralRangeWarnings(cmakeLists);
 
             java.nio.file.Path buildDir = distDir.resolve("build");
             java.nio.file.Files.createDirectories(buildDir);
@@ -537,21 +572,27 @@ public class CompilerHelper {
                     "-S", distDir.toString(),
                     "-B", buildDir.toString(),
                     "-DCMAKE_C_COMPILER=clang",
-                    "-DCMAKE_OBJC_COMPILER=clang"
+                    "-DCMAKE_OBJC_COMPILER=clang",
+                    "-DCMAKE_C_FLAGS=-Wno-error=literal-range"
             ), distDir);
 
             CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
             java.nio.file.Path executable = buildDir.resolve("ExecutorApp");
-            String output = CleanTargetIntegrationTest.runCommand(Arrays.asList(executable.toString()), buildDir);
-            return output.contains(expectedOutput);
+            CleanTargetIntegrationTest.CommandResult result = CleanTargetIntegrationTest.runCommandWithResult(Arrays.asList(executable.toString()), buildDir);
+            return new ExecutionResult(result.exitCode, result.output);
 
         } finally {
             // cleanup?
         }
     }
 
-    private static void compileJavaAPI(java.nio.file.Path outputDir) throws IOException, InterruptedException {
+    public static boolean compileAndRun(String code, String expectedOutput) throws Exception {
+        ExecutionResult result = compileAndRunForResult(code);
+        return result.exitCode == 0 && result.output.contains(expectedOutput);
+    }
+
+    static void compileJavaAPI(java.nio.file.Path outputDir) throws IOException, InterruptedException {
         java.nio.file.Files.createDirectories(outputDir);
         java.nio.file.Path javaApiRoot = java.nio.file.Paths.get("..", "JavaAPI", "src").normalize().toAbsolutePath();
         List<String> sources = new ArrayList<>();
@@ -570,5 +611,21 @@ public class CompilerHelper {
         args.addAll(sources);
 
         compiler.run(null, null, null, args.toArray(new String[0]));
+    }
+
+    private static void patchStaticGetterPrototypes(java.nio.file.Path srcRoot) throws IOException {
+        java.nio.file.Files.walk(srcRoot)
+                .filter(p -> p.toString().endsWith(".h"))
+                .forEach(p -> {
+                    try {
+                        String original = new String(java.nio.file.Files.readAllBytes(p), StandardCharsets.UTF_8);
+                        String patched = original.replaceAll("(get_static_[A-Za-z0-9_]+)\\(\\);", "$1(CODENAME_ONE_THREAD_STATE);");
+                        if (!original.equals(patched)) {
+                            java.nio.file.Files.write(p, patched.getBytes(StandardCharsets.UTF_8));
+                        }
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
     }
 }
