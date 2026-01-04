@@ -570,7 +570,8 @@ public class CompilerHelper {
                     "-S", distDir.toString(),
                     "-B", buildDir.toString(),
                     "-DCMAKE_C_COMPILER=clang",
-                    "-DCMAKE_OBJC_COMPILER=clang"
+                    "-DCMAKE_OBJC_COMPILER=clang",
+                    "-DCMAKE_C_FLAGS=-Wno-error=literal-range"
             ), distDir);
 
             CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
