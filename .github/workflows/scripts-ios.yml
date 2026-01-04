@@ -85,6 +85,17 @@ jobs:
           set -euo pipefail
           echo "hash=$(shasum -a 256 scripts/setup-workspace.sh | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
+
+      - name: Cache codenameone-tools
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/codenameone-tools
+          key: ${{ runner.os }}-cn1-tools-${{ steps.setup_hash.outputs.hash }}
+          restore-keys: |
+            ${{ runner.os }}-cn1-tools-
+
       - name: Restore cn1-binaries cache
         uses: actions/cache@v4
         with:

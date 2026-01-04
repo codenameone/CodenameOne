@@ -95,6 +95,8 @@ jobs:
       GH_TOKEN: ${{ secrets.CN1SS_GH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+      - name: Set TMPDIR
+        run: echo "TMPDIR=${{ runner.temp }}" >> $GITHUB_ENV
       - name: Free Disk Space
         if: matrix.id != 'default'
         run: |
