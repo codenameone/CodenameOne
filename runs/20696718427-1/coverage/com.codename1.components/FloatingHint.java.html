@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FloatingHint.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">FloatingHint.java</span></div><h1>FloatingHint.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.ui.Button;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Label;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.FocusListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.LayeredLayout;
+
+/**
+ * &lt;p&gt;A floating hint is similar to a text field with a hint. However, when the text field has text in it the hint appears
+ * above the text field instead including an animation when focus hits the text field see
+ * &lt;a href=&quot;http://www.google.com/design/spec/components/text-fields.html#text-fields-floating-labels&quot;
+ * target=&quot;_blank&quot;&gt;
+ * Googles take on this&lt;/a&gt;.
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/54e919b2be01561ac91c.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-floatinghint.png&quot; alt=&quot;The FloatingHint component with one component that contains text and another that doesn't&quot; /&gt;
+ *
+ * &lt;h4&gt;The animation effect&lt;/h4&gt;
+ * &lt;img src=&quot;http://www.codenameone.com/img/blog/floatinghint.gif&quot; alt=&quot;Animation&quot; /&gt;
+ *
+ * @author Shai Almog
+ * @deprecated this class is superceded by {@link com.codename1.ui.TextComponent} which includes a more thorough implementation of the functionality and improved API
+ */
+public class FloatingHint extends Container {
+    private final TextArea tf;
+    private final Button hintButton;
+    private final Label hintLabel;
+
+    /**
+     * Wraps a text field in a floating hint
+     *
+     * @param tf the text field
+     */
+    public FloatingHint(final TextArea tf) {
+<span class="fc" id="L64">        super(new LayeredLayout());</span>
+<span class="fc" id="L65">        this.tf = tf;</span>
+<span class="fc" id="L66">        Container content = new Container(new BorderLayout());</span>
+<span class="fc" id="L67">        add(content);</span>
+<span class="fc" id="L68">        hintButton = new HintButtonImpl(tf);</span>
+<span class="fc" id="L69">        hintLabel = new Label(tf.getHint());</span>
+<span class="fc" id="L70">        tf.setHint(&quot;&quot;);</span>
+<span class="fc" id="L71">        hintButton.setFocusable(false);</span>
+<span class="fc" id="L72">        hintButton.setUIID(&quot;FloatingHint&quot;);</span>
+<span class="fc" id="L73">        hintLabel.setUIID(&quot;TextHint&quot;);</span>
+<span class="fc" id="L74">        tf.setLabelForComponent(hintButton);</span>
+
+        // we block user initiated editing to allow the animation time to complete
+<span class="fc" id="L77">        tf.setEditable(false);</span>
+
+<span class="fc" id="L79">        add(BorderLayout.north(new Label(&quot; &quot;)).</span>
+<span class="fc" id="L80">                add(BorderLayout.CENTER, tf));</span>
+
+<span class="fc" id="L82">        add(BorderLayout.north(hintButton).</span>
+<span class="fc" id="L83">                add(BorderLayout.CENTER, hintLabel));</span>
+
+<span class="fc" id="L85">        hintButton.addActionListener(new HintButtonActionListener(tf));</span>
+<span class="pc bpc" id="L86" title="1 of 4 branches missed.">        if (tf.getText() == null || tf.getText().length() == 0) {</span>
+<span class="fc" id="L87">            hintButton.setVisible(false);</span>
+        } else {
+<span class="fc" id="L89">            hintLabel.setVisible(false);</span>
+        }
+<span class="fc" id="L91">        FocusListener fl = new FocusListener() {</span>
+            public void focusGained(Component cmp) {
+<span class="nc" id="L93">                focusGainedImpl();</span>
+<span class="nc" id="L94">            }</span>
+
+            public void focusLost(Component cmp) {
+<span class="nc" id="L97">                focusLostImpl();</span>
+<span class="nc" id="L98">            }</span>
+        };
+<span class="fc" id="L100">        tf.addFocusListener(fl);</span>
+<span class="fc" id="L101">    }</span>
+
+    private void focusGainedImpl() {
+<span class="pc bpc" id="L104" title="1 of 2 branches missed.">        if (isInitializedImpl()) {</span>
+<span class="nc" id="L105">            hintButton.setFocus(true);</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            if (!hintButton.isVisible()) {</span>
+<span class="nc" id="L107">                hintButton.setVisible(true);</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">                if (getComponentForm().grabAnimationLock()) {</span>
+<span class="nc" id="L109">                    morphAndWait(hintLabel, hintButton, 150);</span>
+<span class="nc" id="L110">                    getComponentForm().releaseAnimationLock();</span>
+                }
+<span class="nc" id="L112">                hintLabel.setVisible(false);</span>
+<span class="nc" id="L113">                tf.getComponentForm().revalidate();</span>
+<span class="nc" id="L114">                tf.setEditable(true);</span>
+<span class="nc" id="L115">                tf.startEditingAsync();</span>
+            } else {
+<span class="nc" id="L117">                tf.setEditable(true);</span>
+<span class="nc" id="L118">                tf.startEditingAsync();</span>
+            }
+        } else {
+<span class="pc bpc" id="L121" title="2 of 4 branches missed.">            boolean t = tf.getText() == null || tf.getText().length() == 0;</span>
+<span class="fc" id="L122">            hintButton.setVisible(t);</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">            hintLabel.setVisible(!t);</span>
+<span class="fc" id="L124">            revalidate();</span>
+        }
+<span class="fc" id="L126">    }</span>
+
+    private boolean isInitializedImpl() {
+<span class="pc bpc" id="L129" title="3 of 4 branches missed.">        return isInitialized() &amp;&amp; getComponentForm() == Display.getInstance().getCurrent();</span>
+    }
+
+    private void focusLostImpl() {
+<span class="pc bpc" id="L133" title="1 of 2 branches missed.">        if (isInitializedImpl()) {</span>
+<span class="nc" id="L134">            hintButton.setFocus(false);</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">            if (tf.getText().length() == 0) {</span>
+<span class="nc" id="L136">                hintLabel.setVisible(true);</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">                if (getComponentForm().grabAnimationLock()) {</span>
+<span class="nc" id="L138">                    morphAndWait(hintButton, hintLabel, 150);</span>
+<span class="nc" id="L139">                    getComponentForm().releaseAnimationLock();</span>
+                }
+<span class="nc" id="L141">                hintButton.setVisible(false);</span>
+<span class="nc" id="L142">                tf.getComponentForm().revalidate();</span>
+<span class="nc" id="L143">                revalidate();</span>
+<span class="nc" id="L144">                tf.setEditable(false);</span>
+            }
+        } else {
+<span class="pc bpc" id="L147" title="2 of 4 branches missed.">            boolean t = tf.getText() == null || tf.getText().length() == 0;</span>
+<span class="pc bpc" id="L148" title="1 of 2 branches missed.">            hintButton.setVisible(!t);</span>
+<span class="fc" id="L149">            hintLabel.setVisible(t);</span>
+<span class="fc" id="L150">            revalidate();</span>
+        }
+<span class="fc" id="L152">    }</span>
+
+    @Override
+    protected void initComponent() {
+<span class="nc" id="L156">        super.initComponent();</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (tf.hasFocus()) {</span>
+<span class="nc" id="L158">            focusGainedImpl();</span>
+        }
+
+<span class="nc" id="L161">    }</span>
+
+
+    private static class HintButtonImpl extends Button {
+        public HintButtonImpl(TextArea tf) {
+<span class="fc" id="L166">            super(tf.getHint());</span>
+<span class="fc" id="L167">        }</span>
+
+        @Override
+        protected boolean shouldRenderComponentSelection() {
+<span class="nc" id="L171">            return true;</span>
+        }
+    }
+
+    private static class HintButtonActionListener implements ActionListener&lt;ActionEvent&gt; {
+        private final TextArea tf;
+
+<span class="fc" id="L178">        public HintButtonActionListener(TextArea tf) {</span>
+<span class="fc" id="L179">            this.tf = tf;</span>
+<span class="fc" id="L180">        }</span>
+
+        public void actionPerformed(ActionEvent evt) {
+<span class="fc" id="L183">            tf.startEditingAsync();</span>
+<span class="fc" id="L184">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

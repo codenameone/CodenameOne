@@ -1,0 +1,594 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Ads.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">Ads.java</span></div><h1>Ads.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.ads.AdsService;
+import com.codename1.io.ConnectionRequest;
+import com.codename1.io.NetworkEvent;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Display;
+import com.codename1.ui.Form;
+import com.codename1.ui.Label;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextField;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.geom.Dimension;
+import com.codename1.ui.html.AsyncDocumentRequestHandlerImpl;
+import com.codename1.ui.html.DocumentInfo;
+import com.codename1.ui.html.HTMLCallback;
+import com.codename1.ui.html.HTMLComponent;
+import com.codename1.ui.html.HTMLElement;
+import com.codename1.ui.html.IOCallback;
+import com.codename1.ui.layouts.BorderLayout;
+
+import java.util.Vector;
+
+/**
+ * This is an Ads Component, this Component can displays banner/text ads on a
+ * Form.
+ * This is a generic Ads Component that can support different type of Ads Network
+ * Services, at the Moment Codename One supports innerActive ads, to gain an appId
+ * please refer to
+ * http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
+ *
+ * @author Chen
+ * @deprecated we recommend developers check out newer ad options in the cn1lib section of the Codename One website
+ */
+public class Ads extends Container implements HTMLCallback {
+
+    private long elapsed;
+<span class="fc" id="L62">    private int updateDuration = 60;</span>
+    private String ad;
+    private AdsService service;
+    private boolean refreshAd;
+    private String appId;
+    /**
+     * optional parameters
+     */
+    private String age;
+    private String gender;
+    private String category;
+    private String location;
+    private String[] keywords;
+
+    /**
+     * Default constructor for GUI builder
+     */
+<span class="fc" id="L79">    public Ads() {</span>
+<span class="fc" id="L80">        setUIIDFinal(&quot;Ads&quot;);</span>
+<span class="fc" id="L81">        setLayout(new BorderLayout());</span>
+
+        // special case for iOS. It seems the ad component can inadvertedly steal focus from 
+        // the text field being edited thus blocking the hiding of the lightweight text.
+        // I'm guessing this can affect Android too in some cases
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">        setFocusable(!Display.getInstance().isTouchScreenDevice());</span>
+<span class="fc" id="L87">        Label filler = new Label(&quot; &quot;);</span>
+<span class="fc" id="L88">        filler.setPreferredSize(new Dimension(400, 2));</span>
+<span class="fc" id="L89">        filler.getStyle().setBgTransparency(0);</span>
+<span class="fc" id="L90">        addComponent(BorderLayout.CENTER, filler);</span>
+<span class="fc" id="L91">    }</span>
+
+    /**
+     * Simple constructor to create an Ad Component
+     *
+     * @param appId unique identifier of the app, to gain an appId please refer to
+     *              http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
+     */
+    public Ads(String appId) {
+<span class="fc" id="L100">        this(appId, true);</span>
+<span class="fc" id="L101">    }</span>
+
+    /**
+     * @param appId     unique identifier of the app, to gain an appId please refer to
+     *                  http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
+     * @param refreshAd if true this Component will refresh the Ad every 60 seconds,
+     *                  if false no refresh will occur
+     */
+    public Ads(String appId, boolean refreshAd) {
+<span class="fc" id="L110">        this();</span>
+<span class="fc" id="L111">        this.appId = appId;</span>
+<span class="fc" id="L112">        this.refreshAd = refreshAd;</span>
+<span class="fc" id="L113">        this.service = AdsService.createAdsService();</span>
+<span class="fc" id="L114">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void initComponent() {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (service != null) {</span>
+<span class="nc" id="L121">            service.initialize(this);</span>
+<span class="nc" id="L122">            service.addResponseListener(new ActionListener() {</span>
+
+                public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L125">                    String a = (String) evt.getSource();</span>
+<span class="nc" id="L126">                    setAd(a);</span>
+<span class="nc" id="L127">                }</span>
+            });
+
+<span class="nc bnc" id="L130" title="All 2 branches missed.">            if (refreshAd) {</span>
+<span class="nc" id="L131">                getComponentForm().registerAnimated(this);</span>
+            } else {
+<span class="nc" id="L133">                requestAd();</span>
+            }
+        }
+<span class="nc" id="L136">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    protected void deinitialize() {
+<span class="nc bnc" id="L142" title="All 2 branches missed.">        if (refreshAd) {</span>
+<span class="nc" id="L143">            getComponentForm().deregisterAnimated(this);</span>
+        }
+<span class="nc" id="L145">    }</span>
+
+
+    private void requestAd() {
+<span class="nc" id="L149">        service.requestAd();</span>
+<span class="nc" id="L150">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean animate() {
+<span class="nc" id="L156">        Form parent = getComponentForm();</span>
+<span class="nc bnc" id="L157" title="All 4 branches missed.">        if (parent == null || !parent.isVisible()) {</span>
+<span class="nc" id="L158">            return false;</span>
+        }
+<span class="nc" id="L160">        long t = System.currentTimeMillis();</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        if (t - elapsed &gt; getUpdateDuration() * 1000L) {</span>
+            // we need to update the ad
+<span class="nc" id="L163">            elapsed = t;</span>
+<span class="nc" id="L164">            requestAd();</span>
+        }
+<span class="nc" id="L166">        return super.animate();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void keyReleased(int code) {
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        if (Display.getInstance().getGameAction(code) == Display.GAME_FIRE) {</span>
+<span class="nc" id="L174">            launchAd();</span>
+<span class="nc" id="L175">            requestAd();</span>
+        }
+<span class="nc" id="L177">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void pointerReleased(int x, int y) {
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        if (!isDragActivated()) {</span>
+<span class="nc" id="L184">            launchAd();</span>
+<span class="nc" id="L185">            requestAd();</span>
+        }
+<span class="nc" id="L187">    }</span>
+
+    private void launchAd() {
+<span class="nc" id="L190">        Component c = getComponentAt(0);</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (c instanceof HTMLComponent) {</span>
+<span class="nc" id="L192">            HTMLComponent h = (HTMLComponent) c;</span>
+<span class="nc" id="L193">            h.setSupressExceptions(true);</span>
+<span class="nc" id="L194">            HTMLElement dom = h.getDOM();</span>
+<span class="nc" id="L195">            Vector links = dom.getDescendantsByTagName(&quot;a&quot;);</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">            if (links.size() &gt; 0) {</span>
+<span class="nc" id="L197">                HTMLElement e = (HTMLElement) links.elementAt(0);</span>
+<span class="nc" id="L198">                String link = e.getAttribute(&quot;href&quot;);</span>
+<span class="nc bnc" id="L199" title="All 2 branches missed.">                if (link != null) {</span>
+<span class="nc" id="L200">                    Display.getInstance().execute(link);</span>
+                }
+            }
+        }
+<span class="nc" id="L204">    }</span>
+
+    /**
+     * HTML ad received from the server
+     *
+     * @return the ad
+     */
+    public String getAd() {
+<span class="nc" id="L212">        return ad;</span>
+    }
+
+    /**
+     * HTML ad received from the server
+     *
+     * @param ad the ad to set
+     */
+    public void setAd(String ad) {
+<span class="nc" id="L221">        this.ad = ad;</span>
+<span class="nc" id="L222">        HTMLComponent html = new HTMLComponent(new MyAsyncDocumentRequestHandlerImpl());</span>
+<span class="nc" id="L223">        html.setSupressExceptions(true);</span>
+<span class="nc" id="L224">        html.setHTMLCallback(this);</span>
+<span class="nc" id="L225">        html.setBodyText(&quot;&lt;html&gt;&lt;body&gt;&lt;div align='center'&gt;&quot; + ad + &quot;&lt;/div&gt;&lt;/body&gt;&lt;/html&gt;&quot;);</span>
+<span class="nc" id="L226">        replace(getComponentAt(0), html, null);</span>
+<span class="nc" id="L227">        revalidate();</span>
+<span class="nc" id="L228">        html.setPageUIID(&quot;Container&quot;);</span>
+<span class="nc" id="L229">        html.getStyle().setBgTransparency(0);</span>
+<span class="nc" id="L230">    }</span>
+
+    /**
+     * The amount of time needed to update the ad
+     *
+     * @return the updateDuration
+     */
+    public int getUpdateDuration() {
+<span class="fc" id="L238">        return updateDuration;</span>
+    }
+
+    /**
+     * The amount of time needed to update the ad
+     *
+     * @param updateDuration the updateDuration to set
+     */
+    public void setUpdateDuration(int updateDuration) {
+<span class="fc" id="L247">        this.updateDuration = updateDuration;</span>
+<span class="fc" id="L248">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void titleUpdated(HTMLComponent htmlC, String title) {
+<span class="nc" id="L254">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void pageStatusChanged(HTMLComponent htmlC, int status, String url) {
+<span class="nc bnc" id="L260" title="All 2 branches missed.">        if (status == STATUS_COMPLETED) {</span>
+            // loop the component and prevent entries within it from receiving focus 
+<span class="nc" id="L262">            unfocus(htmlC);</span>
+            //notify the service the ad is being displayed
+<span class="nc bnc" id="L264" title="All 2 branches missed.">        } else if (status == STATUS_DISPLAYED) {</span>
+<span class="nc" id="L265">            service.onAdDisplay(htmlC);</span>
+        }
+<span class="nc" id="L267">    }</span>
+
+    private void unfocus(Container c) {
+<span class="nc" id="L270">        c.setFocusable(false);</span>
+<span class="nc" id="L271">        c.setFocus(false);</span>
+<span class="nc" id="L272">        int s = c.getComponentCount();</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">        for (int iter = 0; iter &lt; s; iter++) {</span>
+<span class="nc" id="L274">            Component current = c.getComponentAt(iter);</span>
+<span class="nc bnc" id="L275" title="All 2 branches missed.">            if (current instanceof Container) {</span>
+<span class="nc" id="L276">                unfocus((Container) current);</span>
+            } else {
+<span class="nc" id="L278">                current.setFocusable(false);</span>
+<span class="nc" id="L279">                current.setFocus(false);</span>
+            }
+        }
+<span class="nc" id="L282">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public String fieldSubmitted(HTMLComponent htmlC, TextArea ta, String actionURL, String id, String value, int type, String errorMsg) {
+<span class="nc" id="L288">        return value;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String getAutoComplete(HTMLComponent htmlC, String actionURL, String id) {
+<span class="nc" id="L295">        return &quot;&quot;;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getLinkProperties(HTMLComponent htmlC, String url) {
+<span class="nc" id="L302">        return LINK_REGULAR;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean linkClicked(HTMLComponent htmlC, String url) {
+        //this is relevant when the Ad is in Full Screen mode
+<span class="nc" id="L310">        launchAd();</span>
+        //reportClick();
+<span class="nc" id="L312">        return false;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void actionPerformed(ActionEvent evt, HTMLComponent htmlC, HTMLElement element) {
+<span class="nc" id="L319">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void focusGained(Component cmp, HTMLComponent htmlC, HTMLElement element) {
+<span class="nc" id="L325">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void focusLost(Component cmp, HTMLComponent htmlC, HTMLElement element) {
+<span class="nc" id="L331">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void dataChanged(int type, int index, HTMLComponent htmlC, TextField textField, HTMLElement element) {
+<span class="nc" id="L337">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public boolean parsingError(int errorId, String tag, String attribute, String value, String description) {
+<span class="nc" id="L343">        return true;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void selectionChanged(int oldSelected, int newSelected, HTMLComponent htmlC, com.codename1.ui.List list, HTMLElement element) {
+<span class="nc" id="L350">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setHeight(int height) {
+<span class="nc" id="L356">        float percent = ((float) height / (float) Display.getInstance().getDisplayHeight());</span>
+<span class="nc" id="L357">        percent *= 100;</span>
+        //if the banner height is more then 25% it's a bad ad we need to 
+        //remove it.
+<span class="nc bnc" id="L360" title="All 2 branches missed.">        if (percent &gt; 25) {</span>
+<span class="nc" id="L361">            removeAll();</span>
+<span class="nc" id="L362">            Label filler = new Label(&quot; &quot;);</span>
+<span class="nc" id="L363">            filler.setPreferredSize(new Dimension(400, 2));</span>
+<span class="nc" id="L364">            filler.getStyle().setBgTransparency(0);</span>
+<span class="nc" id="L365">            addComponent(BorderLayout.CENTER, filler);</span>
+<span class="nc" id="L366">            revalidate();</span>
+<span class="nc" id="L367">        } else {</span>
+<span class="nc" id="L368">            super.setHeight(height);</span>
+        }
+<span class="nc" id="L370">    }</span>
+
+    /**
+     * Simple getter of the unique identifier of the app on the ads service
+     * network.
+     *
+     * @return the app unique identifier.
+     */
+    public String getAppID() {
+<span class="nc" id="L379">        return appId;</span>
+    }
+
+    /**
+     * Simple setter of the unique identifier of the app on the ads service
+     * network, no need to manually use this the createAdsService uses this.
+     *
+     * @param appId unique identifier of the app, to gain an appId please refer to
+     *              http://console.inner-active.com/iamp/publisher/register?ref_id=affiliate_CodenameOne
+     */
+    public void setAppID(String appId) {
+<span class="nc" id="L390">        this.appId = appId;</span>
+<span class="nc bnc" id="L391" title="All 2 branches missed.">        if (service == null) {</span>
+<span class="nc" id="L392">            service = AdsService.createAdsService();</span>
+<span class="nc bnc" id="L393" title="All 2 branches missed.">            if (isInitialized()) {</span>
+<span class="nc" id="L394">                initComponent();</span>
+            }
+        }
+<span class="nc" id="L397">    }</span>
+
+    /**
+     * Users age
+     *
+     * @return the user age
+     */
+    public String getAge() {
+<span class="fc" id="L405">        return age;</span>
+    }
+
+    /**
+     * Sets the users age
+     *
+     * @param age
+     */
+    public void setAge(String age) {
+<span class="fc" id="L414">        this.age = age;</span>
+<span class="fc" id="L415">    }</span>
+
+    /**
+     * The user gender can be: M/m, F/f, Male, Female.
+     *
+     * @return
+     */
+    public String getGender() {
+<span class="fc" id="L423">        return gender;</span>
+    }
+
+    /**
+     * Sets Gender if applicable can be one of the following:
+     * 'F', 'f', 'M', 'm', 'Female', 'female', 'Male', 'male'
+     *
+     * @param gender
+     */
+    public void setGender(String gender) {
+<span class="fc" id="L433">        this.gender = gender;</span>
+<span class="fc" id="L434">    }</span>
+
+    /**
+     * Keywords relevant to this user specific session
+     *
+     * @return
+     */
+    public String[] getKeywords() {
+<span class="fc" id="L442">        return keywords;</span>
+    }
+
+    /**
+     * Keywords relevant to this user specific session
+     *
+     * @param keywords
+     */
+    public void setKeywords(String[] keywords) {
+<span class="fc" id="L451">        this.keywords = keywords;</span>
+<span class="fc" id="L452">    }</span>
+
+    /**
+     * Category is a single word description of the application.
+     *
+     * @return a single word description of the application.
+     */
+    public String getCategory() {
+<span class="fc" id="L460">        return category;</span>
+    }
+
+    /**
+     * Category is a single word description of the application.
+     *
+     * @param category
+     */
+    public void setCategory(String category) {
+<span class="fc" id="L469">        this.category = category;</span>
+<span class="fc" id="L470">    }</span>
+
+    /**
+     * Location string is a comma separated list of country, state/province, city
+     * For example: US, NY, NY
+     *
+     * @return
+     */
+    public String getLocation() {
+<span class="fc" id="L479">        return location;</span>
+    }
+
+    /**
+     * Location string is a comma separated list of country, state/province, city
+     * For example: US, NY, NY
+     *
+     * @param location
+     */
+    public void setLocation(String location) {
+<span class="fc" id="L489">        this.location = location;</span>
+<span class="fc" id="L490">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+<span class="fc" id="L496">        return new String[]{&quot;appId&quot;, &quot;updateDuration&quot;, &quot;age&quot;, &quot;gender&quot;, &quot;category&quot;, &quot;location&quot;, &quot;keywords&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+<span class="nc" id="L503">        Class c = new String[0].getClass();</span>
+<span class="nc" id="L504">        return new Class[]{String.class, Integer.class, String.class, String.class, String.class, String.class, c};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyTypeNames() {
+<span class="nc" id="L511">        return new String[]{&quot;String&quot;, &quot;int&quot;, &quot;String&quot;, &quot;String&quot;, &quot;String&quot;, &quot;String&quot;, &quot;String[]&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+<span class="nc bnc" id="L518" title="All 2 branches missed.">        if (name.equals(&quot;appId&quot;)) {</span>
+<span class="nc" id="L519">            return getAppID();</span>
+        }
+<span class="nc bnc" id="L521" title="All 2 branches missed.">        if (name.equals(&quot;updateDuration&quot;)) {</span>
+<span class="nc" id="L522">            return Integer.valueOf(getUpdateDuration()); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor</span>
+        }
+<span class="nc bnc" id="L524" title="All 2 branches missed.">        if (name.equals(&quot;age&quot;)) {</span>
+<span class="nc" id="L525">            return getAge();</span>
+        }
+<span class="nc bnc" id="L527" title="All 2 branches missed.">        if (name.equals(&quot;gender&quot;)) {</span>
+<span class="nc" id="L528">            return getGender();</span>
+        }
+<span class="nc bnc" id="L530" title="All 2 branches missed.">        if (name.equals(&quot;category&quot;)) {</span>
+<span class="nc" id="L531">            return getCategory();</span>
+        }
+<span class="nc bnc" id="L533" title="All 2 branches missed.">        if (name.equals(&quot;location&quot;)) {</span>
+<span class="nc" id="L534">            return getLocation();</span>
+        }
+<span class="nc bnc" id="L536" title="All 2 branches missed.">        if (name.equals(&quot;keywords&quot;)) {</span>
+<span class="nc" id="L537">            return getKeywords();</span>
+        }
+<span class="nc" id="L539">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+<span class="nc bnc" id="L546" title="All 2 branches missed.">        if (name.equals(&quot;appId&quot;)) {</span>
+<span class="nc" id="L547">            setAppID((String) value);</span>
+<span class="nc" id="L548">            return null;</span>
+        }
+<span class="nc bnc" id="L550" title="All 2 branches missed.">        if (name.equals(&quot;updateDuration&quot;)) {</span>
+<span class="nc" id="L551">            setUpdateDuration(((Integer) value).intValue());</span>
+<span class="nc" id="L552">            return null;</span>
+        }
+<span class="nc bnc" id="L554" title="All 2 branches missed.">        if (name.equals(&quot;age&quot;)) {</span>
+<span class="nc" id="L555">            setAge((String) value);</span>
+<span class="nc" id="L556">            return null;</span>
+        }
+<span class="nc bnc" id="L558" title="All 2 branches missed.">        if (name.equals(&quot;gender&quot;)) {</span>
+<span class="nc" id="L559">            setGender((String) value);</span>
+<span class="nc" id="L560">            return null;</span>
+        }
+<span class="nc bnc" id="L562" title="All 2 branches missed.">        if (name.equals(&quot;category&quot;)) {</span>
+<span class="nc" id="L563">            setCategory((String) value);</span>
+<span class="nc" id="L564">            return null;</span>
+        }
+<span class="nc bnc" id="L566" title="All 2 branches missed.">        if (name.equals(&quot;location&quot;)) {</span>
+<span class="nc" id="L567">            setLocation((String) value);</span>
+<span class="nc" id="L568">            return null;</span>
+        }
+<span class="nc bnc" id="L570" title="All 2 branches missed.">        if (name.equals(&quot;keywords&quot;)) {</span>
+<span class="nc" id="L571">            setKeywords((String[]) value);</span>
+<span class="nc" id="L572">            return null;</span>
+        }
+<span class="nc" id="L574">        return super.setPropertyValue(name, value);</span>
+    }
+
+    private static class MyAsyncDocumentRequestHandlerImpl extends AsyncDocumentRequestHandlerImpl {
+
+        protected ConnectionRequest createConnectionRequest(DocumentInfo docInfo, IOCallback callback, Object[] response) {
+<span class="nc" id="L580">            ConnectionRequest req = super.createConnectionRequest(docInfo, callback, response);</span>
+<span class="nc" id="L581">            req.setFailSilently(true);</span>
+<span class="nc" id="L582">            req.addResponseCodeListener(new NetworkEventActionListener());</span>
+<span class="nc" id="L583">            return req;</span>
+        }
+
+        private static class NetworkEventActionListener implements ActionListener&lt;NetworkEvent&gt; {
+
+            public void actionPerformed(NetworkEvent evt) {
+                //do nothing, just make sure the html won't throw an error
+<span class="nc" id="L590">            }</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

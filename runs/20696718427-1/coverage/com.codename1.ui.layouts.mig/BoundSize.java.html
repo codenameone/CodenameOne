@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>BoundSize.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts.mig</a> &gt; <span class="el_source">BoundSize.java</span></div><h1>BoundSize.java</h1><pre class="source lang-java linenums">package com.codename1.ui.layouts.mig;
+
+/*
+ * License (BSD):
+ * ==============
+ *
+ * Copyright (c) 2004, Mikael Grev, MiG InfoCom AB. (miglayout (at) miginfocom (dot) com)
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * Neither the name of the MiG InfoCom AB nor the names of its contributors may be
+ * used to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ *
+ * @version 1.0
+ * @author Mikael Grev, MiG InfoCom AB
+ *         Date: 2006-sep-08
+ */
+
+/**
+ * A size that contains minimum, preferred and maximum size of type {@link UnitValue}.
+ * &lt;p&gt;
+ * This class is a simple value container and it is immutable.
+ * &lt;p&gt;
+ * If a size is missing (i.e., &lt;code&gt;null&lt;/code&gt;) that boundary should be considered &quot;not in use&quot;.
+ * &lt;p&gt;
+ * You can create a BoundSize from a String with the use of {@link ConstraintParser#parseBoundSize(String, boolean, boolean)}
+ */
+public class BoundSize {
+<span class="fc" id="L47">    public static final BoundSize NULL_SIZE = new BoundSize(null, null);</span>
+<span class="fc" id="L48">    public static final BoundSize ZERO_PIXEL = new BoundSize(UnitValue.ZERO, &quot;0px&quot;);</span>
+
+    private final transient UnitValue min;
+    private final transient UnitValue pref;
+    private final transient UnitValue max;
+    private final transient boolean gapPush;
+
+    /**
+     * Constructor that use the same value for min/preferred/max size.
+     *
+     * @param minMaxPref   The value to use for min/preferred/max size.
+     * @param createString The string used to create the BoundsSize.
+     */
+    public BoundSize(UnitValue minMaxPref, String createString) {
+<span class="fc" id="L62">        this(minMaxPref, minMaxPref, minMaxPref, createString);</span>
+<span class="fc" id="L63">    }</span>
+
+    /**
+     * Constructor. &lt;b&gt;This method is here for serilization only and should normally not be used.&lt;/b&gt; Use
+     * {@link ConstraintParser#parseBoundSize(String, boolean, boolean)} instead.
+     *
+     * @param min          The minimum size. May be &lt;code&gt;null&lt;/code&gt;.
+     * @param preferred    The preferred size. May be &lt;code&gt;null&lt;/code&gt;.
+     * @param max          The maximum size. May be &lt;code&gt;null&lt;/code&gt;.
+     * @param createString The string used to create the BoundsSize.
+     */
+    public BoundSize(UnitValue min, UnitValue preferred, UnitValue max, String createString)    // Bound to old delegate!!!!!
+    {
+<span class="fc" id="L76">        this(min, preferred, max, false, createString);</span>
+<span class="fc" id="L77">    }</span>
+
+    /**
+     * Constructor. &lt;b&gt;This method is here for serilization only and should normally not be used.&lt;/b&gt; Use
+     * {@link ConstraintParser#parseBoundSize(String, boolean, boolean)} instead.
+     *
+     * @param min          The minimum size. May be &lt;code&gt;null&lt;/code&gt;.
+     * @param preferred    The preferred size. May be &lt;code&gt;null&lt;/code&gt;.
+     * @param max          The maximum size. May be &lt;code&gt;null&lt;/code&gt;.
+     * @param gapPush      If the size should be hinted as &quot;pushing&quot; and thus want to occupy free space if no one else is claiming it.
+     * @param createString The string used to create the BoundsSize.
+     */
+<span class="fc" id="L89">    public BoundSize(UnitValue min, UnitValue preferred, UnitValue max, boolean gapPush, String createString) {</span>
+<span class="fc" id="L90">        this.min = min;</span>
+<span class="fc" id="L91">        this.pref = preferred;</span>
+<span class="fc" id="L92">        this.max = max;</span>
+<span class="fc" id="L93">        this.gapPush = gapPush;</span>
+
+<span class="fc" id="L95">        LayoutUtil.putCCString(this, createString);    // this escapes!!</span>
+<span class="fc" id="L96">    }</span>
+
+    /**
+     * Returns the minimum size as sent into the constructor.
+     *
+     * @return The minimum size as sent into the constructor. May be &lt;code&gt;null&lt;/code&gt;.
+     */
+    public final UnitValue getMin() {
+<span class="nc" id="L104">        return min;</span>
+    }
+
+    /**
+     * Returns the preferred size as sent into the constructor.
+     *
+     * @return The preferred size as sent into the constructor. May be &lt;code&gt;null&lt;/code&gt;.
+     */
+    public final UnitValue getPreferred() {
+<span class="nc" id="L113">        return pref;</span>
+    }
+
+    /**
+     * Returns the maximum size as sent into the constructor.
+     *
+     * @return The maximum size as sent into the constructor. May be &lt;code&gt;null&lt;/code&gt;.
+     */
+    public final UnitValue getMax() {
+<span class="nc" id="L122">        return max;</span>
+    }
+
+    /**
+     * If the size should be hinted as &quot;pushing&quot; and thus want to occupy free space if noone else is claiming it.
+     *
+     * @return The value.
+     */
+    public boolean getGapPush() {
+<span class="nc" id="L131">        return gapPush;</span>
+    }
+
+    /**
+     * Returns if this bound size has no min, preferred and maximum size set (they are all &lt;code&gt;null&lt;/code&gt;)
+     *
+     * @return If unset.
+     */
+    public boolean isUnset() {
+        // Most common case by far is this == ZERO_PIXEL...
+<span class="pc bpc" id="L141" title="5 of 10 branches missed.">        return this == ZERO_PIXEL || (pref == null &amp;&amp; min == null &amp;&amp; max == null &amp;&amp; !gapPush);</span>
+    }
+
+    /**
+     * Makes sure that &lt;code&gt;size&lt;/code&gt; is within min and max of this size.
+     *
+     * @param size     The size to constrain.
+     * @param refValue The reference to use for relative sizes.
+     * @param parent   The parent container.
+     * @return The size, constrained within min and max.
+     */
+    public int constrain(int size, float refValue, ContainerWrapper parent) {
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">        if (max != null)</span>
+<span class="nc" id="L154">            size = Math.min(size, max.getPixels(refValue, parent, parent));</span>
+<span class="pc bpc" id="L155" title="1 of 2 branches missed.">        if (min != null)</span>
+<span class="nc" id="L156">            size = Math.max(size, min.getPixels(refValue, parent, parent));</span>
+<span class="fc" id="L157">        return size;</span>
+    }
+
+    /**
+     * Returns the minimum, preferred or maximum size for this bounded size.
+     *
+     * @param sizeType The type. &lt;code&gt;LayoutUtil.MIN&lt;/code&gt;, &lt;code&gt;LayoutUtil.PREF&lt;/code&gt; or &lt;code&gt;LayoutUtil.MAX&lt;/code&gt;.
+     * @return
+     */
+    final UnitValue getSize(int sizeType) {
+<span class="pc bpc" id="L167" title="1 of 4 branches missed.">        switch (sizeType) {</span>
+            case LayoutUtil.MIN:
+<span class="fc" id="L169">                return min;</span>
+            case LayoutUtil.PREF:
+<span class="fc" id="L171">                return pref;</span>
+            case LayoutUtil.MAX:
+<span class="fc" id="L173">                return max;</span>
+            default:
+<span class="nc" id="L175">                throw new IllegalArgumentException(&quot;Unknown size: &quot; + sizeType);</span>
+        }
+    }
+
+    /**
+     * Convert the bound sizes to pixels.
+     * &lt;p&gt;
+     * &lt;code&gt;null&lt;/code&gt; bound sizes will be 0 for min and preferred and {@link net.miginfocom.layout.LayoutUtil#INF} for max.
+     *
+     * @param refSize The reference size.
+     * @param parent  The parent. Not &lt;code&gt;null&lt;/code&gt;.
+     * @param comp    The component, if applicable, can be &lt;code&gt;null&lt;/code&gt;.
+     * @return An array of lenth three (min,pref,max).
+     */
+    final int[] getPixelSizes(float refSize, ContainerWrapper parent, ComponentWrapper comp) {
+<span class="pc bpc" id="L190" title="1 of 2 branches missed.">        return new int[]{</span>
+<span class="pc bpc" id="L191" title="1 of 2 branches missed.">                min != null ? min.getPixels(refSize, parent, comp) : 0,</span>
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">                pref != null ? pref.getPixels(refSize, parent, comp) : 0,</span>
+<span class="pc" id="L193">                max != null ? max.getPixels(refSize, parent, comp) : LayoutUtil.INF</span>
+        };
+    }
+
+    /**
+     * Returns the a constraint string that can be re-parsed to be the exact same UnitValue.
+     *
+     * @return A String. Never &lt;code&gt;null&lt;/code&gt;.
+     */
+    String getConstraintString() {
+<span class="nc" id="L203">        String cs = LayoutUtil.getCCString(this);</span>
+<span class="nc bnc" id="L204" title="All 2 branches missed.">        if (cs != null)</span>
+<span class="nc" id="L205">            return cs;</span>
+
+<span class="nc bnc" id="L207" title="All 4 branches missed.">        if (min == pref &amp;&amp; pref == max)</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">            return min != null ? (min.getConstraintString() + &quot;!&quot;) : &quot;null&quot;;</span>
+
+<span class="nc" id="L210">        StringBuilder sb = new StringBuilder(16);</span>
+
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        if (min != null)</span>
+<span class="nc" id="L213">            sb.append(min.getConstraintString()).append(':');</span>
+
+<span class="nc bnc" id="L215" title="All 2 branches missed.">        if (pref != null) {</span>
+<span class="nc bnc" id="L216" title="All 4 branches missed.">            if (min == null &amp;&amp; max != null)</span>
+<span class="nc" id="L217">                sb.append(&quot;:&quot;);</span>
+<span class="nc" id="L218">            sb.append(pref.getConstraintString());</span>
+<span class="nc bnc" id="L219" title="All 2 branches missed.">        } else if (min != null) {</span>
+<span class="nc" id="L220">            sb.append('n');</span>
+        }
+
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        if (max != null)</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">            sb.append(sb.length() == 0 ? &quot;::&quot; : &quot;:&quot;).append(max.getConstraintString());</span>
+
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        if (gapPush) {</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">            if (sb.length() &gt; 0)</span>
+<span class="nc" id="L228">                sb.append(':');</span>
+<span class="nc" id="L229">            sb.append(&quot;push&quot;);</span>
+        }
+
+<span class="nc" id="L232">        return sb.toString();</span>
+    }
+
+    void checkNotLinked() {
+<span class="pc bpc" id="L236" title="1 of 2 branches missed.">        if (isLinked())</span>
+<span class="nc" id="L237">            throw new IllegalArgumentException(&quot;Size may not contain links&quot;);</span>
+<span class="fc" id="L238">    }</span>
+
+    boolean isLinked() {
+<span class="pc bpc" id="L241" title="8 of 12 branches missed.">        return min != null &amp;&amp; min.isLinkedDeep() || pref != null &amp;&amp; pref.isLinkedDeep() || max != null &amp;&amp; max.isLinkedDeep();</span>
+    }
+
+    boolean isAbsolute() {
+<span class="pc bpc" id="L245" title="9 of 12 branches missed.">        return (min == null || min.isAbsoluteDeep()) &amp;&amp; (pref == null || pref.isAbsoluteDeep()) &amp;&amp; (max == null || max.isAbsoluteDeep());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,516 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InfTree.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.gzip</a> &gt; <span class="el_source">InfTree.java</span></div><h1>InfTree.java</h1><pre class="source lang-java linenums">/* -*-mode:java; c-basic-offset:2; indent-tabs-mode:nil -*- */
+/*
+Copyright (c) 2000,2001,2002,2003 ymnk, JCraft,Inc. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+  1. Redistributions of source code must retain the above copyright notice,
+     this list of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright 
+     notice, this list of conditions and the following disclaimer in 
+     the documentation and/or other materials provided with the distribution.
+
+  3. The names of the authors may not be used to endorse or promote products
+     derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESSED OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND
+FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL JCRAFT,
+INC. OR ANY CONTRIBUTORS TO THIS SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT,
+INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
+EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
+ * This program is based on zlib-1.1.3, so all credit should go authors
+ * Jean-loup Gailly(jloup@gzip.org) and Mark Adler(madler@alumni.caltech.edu)
+ * and contributors of zlib.
+ */
+
+package com.codename1.io.gzip;
+
+<span class="fc" id="L37">final class InfTree {</span>
+
+    static final int fixed_bl = 9;
+    static final int fixed_bd = 5;
+<span class="fc" id="L41">    static final int[] fixed_tl = {</span>
+            96, 7, 256, 0, 8, 80, 0, 8, 16, 84, 8, 115,
+            82, 7, 31, 0, 8, 112, 0, 8, 48, 0, 9, 192,
+            80, 7, 10, 0, 8, 96, 0, 8, 32, 0, 9, 160,
+            0, 8, 0, 0, 8, 128, 0, 8, 64, 0, 9, 224,
+            80, 7, 6, 0, 8, 88, 0, 8, 24, 0, 9, 144,
+            83, 7, 59, 0, 8, 120, 0, 8, 56, 0, 9, 208,
+            81, 7, 17, 0, 8, 104, 0, 8, 40, 0, 9, 176,
+            0, 8, 8, 0, 8, 136, 0, 8, 72, 0, 9, 240,
+            80, 7, 4, 0, 8, 84, 0, 8, 20, 85, 8, 227,
+            83, 7, 43, 0, 8, 116, 0, 8, 52, 0, 9, 200,
+            81, 7, 13, 0, 8, 100, 0, 8, 36, 0, 9, 168,
+            0, 8, 4, 0, 8, 132, 0, 8, 68, 0, 9, 232,
+            80, 7, 8, 0, 8, 92, 0, 8, 28, 0, 9, 152,
+            84, 7, 83, 0, 8, 124, 0, 8, 60, 0, 9, 216,
+            82, 7, 23, 0, 8, 108, 0, 8, 44, 0, 9, 184,
+            0, 8, 12, 0, 8, 140, 0, 8, 76, 0, 9, 248,
+            80, 7, 3, 0, 8, 82, 0, 8, 18, 85, 8, 163,
+            83, 7, 35, 0, 8, 114, 0, 8, 50, 0, 9, 196,
+            81, 7, 11, 0, 8, 98, 0, 8, 34, 0, 9, 164,
+            0, 8, 2, 0, 8, 130, 0, 8, 66, 0, 9, 228,
+            80, 7, 7, 0, 8, 90, 0, 8, 26, 0, 9, 148,
+            84, 7, 67, 0, 8, 122, 0, 8, 58, 0, 9, 212,
+            82, 7, 19, 0, 8, 106, 0, 8, 42, 0, 9, 180,
+            0, 8, 10, 0, 8, 138, 0, 8, 74, 0, 9, 244,
+            80, 7, 5, 0, 8, 86, 0, 8, 22, 192, 8, 0,
+            83, 7, 51, 0, 8, 118, 0, 8, 54, 0, 9, 204,
+            81, 7, 15, 0, 8, 102, 0, 8, 38, 0, 9, 172,
+            0, 8, 6, 0, 8, 134, 0, 8, 70, 0, 9, 236,
+            80, 7, 9, 0, 8, 94, 0, 8, 30, 0, 9, 156,
+            84, 7, 99, 0, 8, 126, 0, 8, 62, 0, 9, 220,
+            82, 7, 27, 0, 8, 110, 0, 8, 46, 0, 9, 188,
+            0, 8, 14, 0, 8, 142, 0, 8, 78, 0, 9, 252,
+            96, 7, 256, 0, 8, 81, 0, 8, 17, 85, 8, 131,
+            82, 7, 31, 0, 8, 113, 0, 8, 49, 0, 9, 194,
+            80, 7, 10, 0, 8, 97, 0, 8, 33, 0, 9, 162,
+            0, 8, 1, 0, 8, 129, 0, 8, 65, 0, 9, 226,
+            80, 7, 6, 0, 8, 89, 0, 8, 25, 0, 9, 146,
+            83, 7, 59, 0, 8, 121, 0, 8, 57, 0, 9, 210,
+            81, 7, 17, 0, 8, 105, 0, 8, 41, 0, 9, 178,
+            0, 8, 9, 0, 8, 137, 0, 8, 73, 0, 9, 242,
+            80, 7, 4, 0, 8, 85, 0, 8, 21, 80, 8, 258,
+            83, 7, 43, 0, 8, 117, 0, 8, 53, 0, 9, 202,
+            81, 7, 13, 0, 8, 101, 0, 8, 37, 0, 9, 170,
+            0, 8, 5, 0, 8, 133, 0, 8, 69, 0, 9, 234,
+            80, 7, 8, 0, 8, 93, 0, 8, 29, 0, 9, 154,
+            84, 7, 83, 0, 8, 125, 0, 8, 61, 0, 9, 218,
+            82, 7, 23, 0, 8, 109, 0, 8, 45, 0, 9, 186,
+            0, 8, 13, 0, 8, 141, 0, 8, 77, 0, 9, 250,
+            80, 7, 3, 0, 8, 83, 0, 8, 19, 85, 8, 195,
+            83, 7, 35, 0, 8, 115, 0, 8, 51, 0, 9, 198,
+            81, 7, 11, 0, 8, 99, 0, 8, 35, 0, 9, 166,
+            0, 8, 3, 0, 8, 131, 0, 8, 67, 0, 9, 230,
+            80, 7, 7, 0, 8, 91, 0, 8, 27, 0, 9, 150,
+            84, 7, 67, 0, 8, 123, 0, 8, 59, 0, 9, 214,
+            82, 7, 19, 0, 8, 107, 0, 8, 43, 0, 9, 182,
+            0, 8, 11, 0, 8, 139, 0, 8, 75, 0, 9, 246,
+            80, 7, 5, 0, 8, 87, 0, 8, 23, 192, 8, 0,
+            83, 7, 51, 0, 8, 119, 0, 8, 55, 0, 9, 206,
+            81, 7, 15, 0, 8, 103, 0, 8, 39, 0, 9, 174,
+            0, 8, 7, 0, 8, 135, 0, 8, 71, 0, 9, 238,
+            80, 7, 9, 0, 8, 95, 0, 8, 31, 0, 9, 158,
+            84, 7, 99, 0, 8, 127, 0, 8, 63, 0, 9, 222,
+            82, 7, 27, 0, 8, 111, 0, 8, 47, 0, 9, 190,
+            0, 8, 15, 0, 8, 143, 0, 8, 79, 0, 9, 254,
+            96, 7, 256, 0, 8, 80, 0, 8, 16, 84, 8, 115,
+            82, 7, 31, 0, 8, 112, 0, 8, 48, 0, 9, 193,
+
+            80, 7, 10, 0, 8, 96, 0, 8, 32, 0, 9, 161,
+            0, 8, 0, 0, 8, 128, 0, 8, 64, 0, 9, 225,
+            80, 7, 6, 0, 8, 88, 0, 8, 24, 0, 9, 145,
+            83, 7, 59, 0, 8, 120, 0, 8, 56, 0, 9, 209,
+            81, 7, 17, 0, 8, 104, 0, 8, 40, 0, 9, 177,
+            0, 8, 8, 0, 8, 136, 0, 8, 72, 0, 9, 241,
+            80, 7, 4, 0, 8, 84, 0, 8, 20, 85, 8, 227,
+            83, 7, 43, 0, 8, 116, 0, 8, 52, 0, 9, 201,
+            81, 7, 13, 0, 8, 100, 0, 8, 36, 0, 9, 169,
+            0, 8, 4, 0, 8, 132, 0, 8, 68, 0, 9, 233,
+            80, 7, 8, 0, 8, 92, 0, 8, 28, 0, 9, 153,
+            84, 7, 83, 0, 8, 124, 0, 8, 60, 0, 9, 217,
+            82, 7, 23, 0, 8, 108, 0, 8, 44, 0, 9, 185,
+            0, 8, 12, 0, 8, 140, 0, 8, 76, 0, 9, 249,
+            80, 7, 3, 0, 8, 82, 0, 8, 18, 85, 8, 163,
+            83, 7, 35, 0, 8, 114, 0, 8, 50, 0, 9, 197,
+            81, 7, 11, 0, 8, 98, 0, 8, 34, 0, 9, 165,
+            0, 8, 2, 0, 8, 130, 0, 8, 66, 0, 9, 229,
+            80, 7, 7, 0, 8, 90, 0, 8, 26, 0, 9, 149,
+            84, 7, 67, 0, 8, 122, 0, 8, 58, 0, 9, 213,
+            82, 7, 19, 0, 8, 106, 0, 8, 42, 0, 9, 181,
+            0, 8, 10, 0, 8, 138, 0, 8, 74, 0, 9, 245,
+            80, 7, 5, 0, 8, 86, 0, 8, 22, 192, 8, 0,
+            83, 7, 51, 0, 8, 118, 0, 8, 54, 0, 9, 205,
+            81, 7, 15, 0, 8, 102, 0, 8, 38, 0, 9, 173,
+            0, 8, 6, 0, 8, 134, 0, 8, 70, 0, 9, 237,
+            80, 7, 9, 0, 8, 94, 0, 8, 30, 0, 9, 157,
+            84, 7, 99, 0, 8, 126, 0, 8, 62, 0, 9, 221,
+            82, 7, 27, 0, 8, 110, 0, 8, 46, 0, 9, 189,
+            0, 8, 14, 0, 8, 142, 0, 8, 78, 0, 9, 253,
+            96, 7, 256, 0, 8, 81, 0, 8, 17, 85, 8, 131,
+            82, 7, 31, 0, 8, 113, 0, 8, 49, 0, 9, 195,
+            80, 7, 10, 0, 8, 97, 0, 8, 33, 0, 9, 163,
+            0, 8, 1, 0, 8, 129, 0, 8, 65, 0, 9, 227,
+            80, 7, 6, 0, 8, 89, 0, 8, 25, 0, 9, 147,
+            83, 7, 59, 0, 8, 121, 0, 8, 57, 0, 9, 211,
+            81, 7, 17, 0, 8, 105, 0, 8, 41, 0, 9, 179,
+            0, 8, 9, 0, 8, 137, 0, 8, 73, 0, 9, 243,
+            80, 7, 4, 0, 8, 85, 0, 8, 21, 80, 8, 258,
+            83, 7, 43, 0, 8, 117, 0, 8, 53, 0, 9, 203,
+            81, 7, 13, 0, 8, 101, 0, 8, 37, 0, 9, 171,
+            0, 8, 5, 0, 8, 133, 0, 8, 69, 0, 9, 235,
+            80, 7, 8, 0, 8, 93, 0, 8, 29, 0, 9, 155,
+            84, 7, 83, 0, 8, 125, 0, 8, 61, 0, 9, 219,
+            82, 7, 23, 0, 8, 109, 0, 8, 45, 0, 9, 187,
+            0, 8, 13, 0, 8, 141, 0, 8, 77, 0, 9, 251,
+            80, 7, 3, 0, 8, 83, 0, 8, 19, 85, 8, 195,
+            83, 7, 35, 0, 8, 115, 0, 8, 51, 0, 9, 199,
+            81, 7, 11, 0, 8, 99, 0, 8, 35, 0, 9, 167,
+            0, 8, 3, 0, 8, 131, 0, 8, 67, 0, 9, 231,
+            80, 7, 7, 0, 8, 91, 0, 8, 27, 0, 9, 151,
+            84, 7, 67, 0, 8, 123, 0, 8, 59, 0, 9, 215,
+            82, 7, 19, 0, 8, 107, 0, 8, 43, 0, 9, 183,
+            0, 8, 11, 0, 8, 139, 0, 8, 75, 0, 9, 247,
+            80, 7, 5, 0, 8, 87, 0, 8, 23, 192, 8, 0,
+            83, 7, 51, 0, 8, 119, 0, 8, 55, 0, 9, 207,
+            81, 7, 15, 0, 8, 103, 0, 8, 39, 0, 9, 175,
+            0, 8, 7, 0, 8, 135, 0, 8, 71, 0, 9, 239,
+            80, 7, 9, 0, 8, 95, 0, 8, 31, 0, 9, 159,
+            84, 7, 99, 0, 8, 127, 0, 8, 63, 0, 9, 223,
+            82, 7, 27, 0, 8, 111, 0, 8, 47, 0, 9, 191,
+            0, 8, 15, 0, 8, 143, 0, 8, 79, 0, 9, 255
+    };
+<span class="fc" id="L172">    static final int[] fixed_td = {</span>
+            80, 5, 1, 87, 5, 257, 83, 5, 17, 91, 5, 4097,
+            81, 5, 5, 89, 5, 1025, 85, 5, 65, 93, 5, 16385,
+            80, 5, 3, 88, 5, 513, 84, 5, 33, 92, 5, 8193,
+            82, 5, 9, 90, 5, 2049, 86, 5, 129, 192, 5, 24577,
+            80, 5, 2, 87, 5, 385, 83, 5, 25, 91, 5, 6145,
+            81, 5, 7, 89, 5, 1537, 85, 5, 97, 93, 5, 24577,
+            80, 5, 4, 88, 5, 769, 84, 5, 49, 92, 5, 12289,
+            82, 5, 13, 90, 5, 3073, 86, 5, 193, 192, 5, 24577
+    };
+    // Tables for deflate from PKZIP's appnote.txt.
+<span class="fc" id="L183">    static final int[] cplens = { // Copy lengths for literal codes 257..285</span>
+            3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31,
+            35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258, 0, 0
+    };
+    // see note #13 above about 258
+<span class="fc" id="L188">    static final int[] cplext = { // Extra bits for literal codes 257..285</span>
+            0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2,
+            3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5, 5, 0, 112, 112  // 112==invalid
+    };
+<span class="fc" id="L192">    static final int[] cpdist = { // Copy offsets for distance codes 0..29</span>
+            1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193,
+            257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145,
+            8193, 12289, 16385, 24577
+    };
+<span class="fc" id="L197">    static final int[] cpdext = { // Extra bits for distance codes</span>
+            0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6,
+            7, 7, 8, 8, 9, 9, 10, 10, 11, 11,
+            12, 12, 13, 13};
+    // If BMAX needs to be larger than 16, then h and x[] should be uLong.
+    static final int BMAX = 15;         // maximum bit length of any code
+    static final private int MANY = 1440;
+    static final private int Z_OK = 0;
+    static final private int Z_STREAM_END = 1;
+    static final private int Z_NEED_DICT = 2;
+    static final private int Z_ERRNO = -1;
+    static final private int Z_STREAM_ERROR = -2;
+    static final private int Z_DATA_ERROR = -3;
+    static final private int Z_MEM_ERROR = -4;
+    static final private int Z_BUF_ERROR = -5;
+    static final private int Z_VERSION_ERROR = -6;
+<span class="fc" id="L213">    int[] hn = null;  // hufts used in space</span>
+<span class="fc" id="L214">    int[] v = null;   // work area for huft_build</span>
+<span class="fc" id="L215">    int[] c = null;   // bit length count table</span>
+<span class="fc" id="L216">    int[] r = null;   // table entry for structure assignment</span>
+<span class="fc" id="L217">    int[] u = null;   // table stack</span>
+<span class="fc" id="L218">    int[] x = null;   // bit offsets, then code stack</span>
+
+    static int inflate_trees_fixed(int[] bl,  //literal desired/actual bit depth
+                                   int[] bd,  //distance desired/actual bit depth
+                                   int[][] tl,//literal/length tree result
+                                   int[][] td,//distance tree result
+                                   ZStream z  //for memory allocation
+    ) {
+<span class="fc" id="L226">        bl[0] = fixed_bl;</span>
+<span class="fc" id="L227">        bd[0] = fixed_bd;</span>
+<span class="fc" id="L228">        tl[0] = fixed_tl;</span>
+<span class="fc" id="L229">        td[0] = fixed_td;</span>
+<span class="fc" id="L230">        return Z_OK;</span>
+    }
+
+    private int huft_build(int[] b, // code lengths in bits (all assumed &lt;= BMAX)
+                           int bindex,
+                           int n,   // number of codes (assumed &lt;= 288)
+                           int s,   // number of simple-valued codes (0..s-1)
+                           int[] d, // list of base values for non-simple codes
+                           int[] e, // list of extra bits for non-simple codes
+                           int[] t, // result: starting table
+                           int[] m, // maximum lookup bits, returns actual
+                           int[] hp,// space for trees
+                           int[] hn,// hufts used in space
+                           int[] v  // working area: values in order of bit length
+    ) {
+        // Given a list of code lengths and a maximum table size, make a set of
+        // tables to decode that set of codes.  Return Z_OK on success, Z_BUF_ERROR
+        // if the given code set is incomplete (the tables are still built in this
+        // case), Z_DATA_ERROR if the input is invalid (an over-subscribed set of
+        // lengths), or Z_MEM_ERROR if not enough memory.
+
+        int a;                       // counter for codes of length k
+        int f;                       // i repeats in table every f entries
+        int g;                       // maximum code length
+        int h;                       // table level
+        int i;                       // counter, current code
+        int j;                       // counter
+        int k;                       // number of bits in current code
+        int l;                       // bits per table (returned in m)
+        int mask;                    // (1 &lt;&lt; w) - 1, to avoid cc -O bug on HP
+        int p;                       // pointer into c[], b[], or v[]
+        int q;                       // points to current table
+        int w;                       // bits before this table == (l * h)
+        int xp;                      // pointer into x
+        int y;                       // number of dummy codes added
+        int z;                       // number of entries in current table
+
+        // Generate counts for each bit length
+
+<span class="nc" id="L269">        p = 0;</span>
+<span class="nc" id="L270">        i = n;</span>
+        do {
+<span class="nc" id="L272">            c[b[bindex + p]]++;</span>
+<span class="nc" id="L273">            p++;</span>
+<span class="nc" id="L274">            i--;   // assume all entries &lt;= BMAX</span>
+<span class="nc bnc" id="L275" title="All 2 branches missed.">        } while (i != 0);</span>
+
+<span class="nc bnc" id="L277" title="All 2 branches missed.">        if (c[0] == n) {                // null input--all zero length codes</span>
+<span class="nc" id="L278">            t[0] = -1;</span>
+<span class="nc" id="L279">            m[0] = 0;</span>
+<span class="nc" id="L280">            return Z_OK;</span>
+        }
+
+        // Find minimum and maximum length, bound *m by those
+<span class="nc" id="L284">        l = m[0];</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">        for (j = 1; j &lt;= BMAX; j++)</span>
+<span class="nc bnc" id="L286" title="All 2 branches missed.">            if (c[j] != 0) break;</span>
+<span class="nc" id="L287">        k = j;                        // minimum code length</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">        if (l &lt; j) {</span>
+<span class="nc" id="L289">            l = j;</span>
+        }
+<span class="nc bnc" id="L291" title="All 2 branches missed.">        for (i = BMAX; i != 0; i--) {</span>
+<span class="nc bnc" id="L292" title="All 2 branches missed.">            if (c[i] != 0) break;</span>
+        }
+<span class="nc" id="L294">        g = i;                        // maximum code length</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">        if (l &gt; i) {</span>
+<span class="nc" id="L296">            l = i;</span>
+        }
+<span class="nc" id="L298">        m[0] = l;</span>
+
+        // Adjust last length count to fill out codes, if needed
+<span class="nc bnc" id="L301" title="All 2 branches missed.">        for (y = 1 &lt;&lt; j; j &lt; i; j++, y &lt;&lt;= 1) {</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">            if ((y -= c[j]) &lt; 0) {</span>
+<span class="nc" id="L303">                return Z_DATA_ERROR;</span>
+            }
+        }
+<span class="nc bnc" id="L306" title="All 2 branches missed.">        if ((y -= c[i]) &lt; 0) {</span>
+<span class="nc" id="L307">            return Z_DATA_ERROR;</span>
+        }
+<span class="nc" id="L309">        c[i] += y;</span>
+
+        // Generate starting offsets into the value table for each length
+<span class="nc" id="L312">        x[1] = j = 0;</span>
+<span class="nc" id="L313">        p = 1;</span>
+<span class="nc" id="L314">        xp = 2;</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">        while (--i != 0) {                 // note that i == g from above</span>
+<span class="nc" id="L316">            x[xp] = (j += c[p]);</span>
+<span class="nc" id="L317">            xp++;</span>
+<span class="nc" id="L318">            p++;</span>
+        }
+
+        // Make a table of values in order of bit lengths
+<span class="nc" id="L322">        i = 0;</span>
+<span class="nc" id="L323">        p = 0;</span>
+        do {
+<span class="nc bnc" id="L325" title="All 2 branches missed.">            if ((j = b[bindex + p]) != 0) {</span>
+<span class="nc" id="L326">                v[x[j]++] = i;</span>
+            }
+<span class="nc" id="L328">            p++;</span>
+        }
+<span class="nc bnc" id="L330" title="All 2 branches missed.">        while (++i &lt; n);</span>
+<span class="nc" id="L331">        n = x[g];                     // set n to length of v</span>
+
+        // Generate the Huffman codes and for each, make the table entries
+<span class="nc" id="L334">        x[0] = i = 0;                 // first Huffman code is zero</span>
+<span class="nc" id="L335">        p = 0;                        // grab values in bit order</span>
+<span class="nc" id="L336">        h = -1;                       // no tables yet--level -1</span>
+<span class="nc" id="L337">        w = -l;                       // bits decoded == (l * h)</span>
+<span class="nc" id="L338">        u[0] = 0;                     // just to keep compilers happy</span>
+<span class="nc" id="L339">        q = 0;                        // ditto</span>
+<span class="nc" id="L340">        z = 0;                        // ditto</span>
+
+        // go through the bit lengths (k already is bits in shortest code)
+<span class="nc bnc" id="L343" title="All 2 branches missed.">        for (; k &lt;= g; k++) {</span>
+<span class="nc" id="L344">            a = c[k];</span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">            while (a-- != 0) {</span>
+                // here i is the Huffman code of length k bits for value *p
+                // make tables up to required level
+<span class="nc bnc" id="L348" title="All 2 branches missed.">                while (k &gt; w + l) {</span>
+<span class="nc" id="L349">                    h++;</span>
+<span class="nc" id="L350">                    w += l;                 // previous table always l bits</span>
+                    // compute minimum size table less than or equal to l bits
+<span class="nc" id="L352">                    z = g - w;</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">                    z = (z &gt; l) ? l : z;        // table size upper limit</span>
+<span class="nc bnc" id="L354" title="All 2 branches missed.">                    if ((f = 1 &lt;&lt; (j = k - w)) &gt; a + 1) {     // try a k-w bit table</span>
+                        // too few codes for k-w bit table
+<span class="nc" id="L356">                        f -= a + 1;               // deduct codes from patterns left</span>
+<span class="nc" id="L357">                        xp = k;</span>
+<span class="nc bnc" id="L358" title="All 2 branches missed.">                        if (j &lt; z) {</span>
+<span class="nc bnc" id="L359" title="All 2 branches missed.">                            while (++j &lt; z) {        // try smaller tables up to z bits</span>
+<span class="nc bnc" id="L360" title="All 2 branches missed.">                                if ((f &lt;&lt;= 1) &lt;= c[++xp])</span>
+<span class="nc" id="L361">                                    break;              // enough codes to use up j bits</span>
+<span class="nc" id="L362">                                f -= c[xp];           // else deduct codes from patterns</span>
+                            }
+                        }
+                    }
+<span class="nc" id="L366">                    z = 1 &lt;&lt; j;                 // table entries for j-bit table</span>
+
+                    // allocate new table
+<span class="nc bnc" id="L369" title="All 2 branches missed.">                    if (hn[0] + z &gt; MANY) {       // (note: doesn't matter for fixed)</span>
+<span class="nc" id="L370">                        return Z_DATA_ERROR;       // overflow of MANY</span>
+                    }
+<span class="nc" id="L372">                    u[h] = q = /*hp+*/ hn[0];   // DEBUG</span>
+<span class="nc" id="L373">                    hn[0] += z;</span>
+
+                    // connect to last table, if there is one
+<span class="nc bnc" id="L376" title="All 2 branches missed.">                    if (h != 0) {</span>
+<span class="nc" id="L377">                        x[h] = i;           // save pattern for backing up</span>
+<span class="nc" id="L378">                        r[0] = (byte) j;     // bits in this table</span>
+<span class="nc" id="L379">                        r[1] = (byte) l;     // bits to dump before this table</span>
+<span class="nc" id="L380">                        j = i &gt;&gt;&gt; (w - l);</span>
+<span class="nc" id="L381">                        r[2] = q - u[h - 1] - j;               // offset to this table</span>
+<span class="nc" id="L382">                        System.arraycopy(r, 0, hp, (u[h - 1] + j) * 3, 3); // connect to last table</span>
+                    } else {
+<span class="nc" id="L384">                        t[0] = q;               // first table is returned result</span>
+                    }
+                }
+
+                // set up table entry in r
+<span class="nc" id="L389">                r[1] = (byte) (k - w);</span>
+<span class="nc bnc" id="L390" title="All 2 branches missed.">                if (p &gt;= n) {</span>
+<span class="nc" id="L391">                    r[0] = 128 + 64;      // out of values--invalid code</span>
+<span class="nc bnc" id="L392" title="All 2 branches missed.">                } else if (v[p] &lt; s) {</span>
+<span class="nc bnc" id="L393" title="All 2 branches missed.">                    r[0] = (byte) (v[p] &lt; 256 ? 0 : 32 + 64);  // 256 is end-of-block</span>
+<span class="nc" id="L394">                    r[2] = v[p++];          // simple code is just the value</span>
+                } else {
+<span class="nc" id="L396">                    r[0] = (byte) (e[v[p] - s] + 16 + 64); // non-simple--look up in lists</span>
+<span class="nc" id="L397">                    r[2] = d[v[p++] - s];</span>
+                }
+
+                // fill code-like entries with r
+<span class="nc" id="L401">                f = 1 &lt;&lt; (k - w);</span>
+<span class="nc bnc" id="L402" title="All 2 branches missed.">                for (j = i &gt;&gt;&gt; w; j &lt; z; j += f) {</span>
+<span class="nc" id="L403">                    System.arraycopy(r, 0, hp, (q + j) * 3, 3);</span>
+                }
+
+                // backwards increment the k-bit code i
+<span class="nc bnc" id="L407" title="All 2 branches missed.">                for (j = 1 &lt;&lt; (k - 1); (i &amp; j) != 0; j &gt;&gt;&gt;= 1) {</span>
+<span class="nc" id="L408">                    i ^= j;</span>
+                }
+<span class="nc" id="L410">                i ^= j;</span>
+
+                // backup over finished tables
+<span class="nc" id="L413">                mask = (1 &lt;&lt; w) - 1;      // needed on HP, cc -O bug</span>
+<span class="nc bnc" id="L414" title="All 2 branches missed.">                while ((i &amp; mask) != x[h]) {</span>
+<span class="nc" id="L415">                    h--;                    // don't need to update q</span>
+<span class="nc" id="L416">                    w -= l;</span>
+<span class="nc" id="L417">                    mask = (1 &lt;&lt; w) - 1;</span>
+                }
+            }
+        }
+        // Return Z_BUF_ERROR if we were given an incomplete table
+<span class="nc bnc" id="L422" title="All 4 branches missed.">        return y != 0 &amp;&amp; g != 1 ? Z_BUF_ERROR : Z_OK;</span>
+    }
+
+    int inflate_trees_bits(int[] c,  // 19 code lengths
+                           int[] bb, // bits tree desired/actual depth
+                           int[] tb, // bits tree result
+                           int[] hp, // space for trees
+                           ZStream z // for messages
+    ) {
+        int result;
+<span class="nc" id="L432">        initWorkArea(19);</span>
+<span class="nc" id="L433">        hn[0] = 0;</span>
+<span class="nc" id="L434">        result = huft_build(c, 0, 19, 19, null, null, tb, bb, hp, hn, v);</span>
+
+<span class="nc bnc" id="L436" title="All 2 branches missed.">        if (result == Z_DATA_ERROR) {</span>
+<span class="nc" id="L437">            z.msg = &quot;oversubscribed dynamic bit lengths tree&quot;;</span>
+<span class="nc bnc" id="L438" title="All 4 branches missed.">        } else if (result == Z_BUF_ERROR || bb[0] == 0) {</span>
+<span class="nc" id="L439">            z.msg = &quot;incomplete dynamic bit lengths tree&quot;;</span>
+<span class="nc" id="L440">            result = Z_DATA_ERROR;</span>
+        }
+<span class="nc" id="L442">        return result;</span>
+    }
+
+    int inflate_trees_dynamic(int nl,   // number of literal/length codes
+                              int nd,   // number of distance codes
+                              int[] c,  // that many (total) code lengths
+                              int[] bl, // literal desired/actual bit depth
+                              int[] bd, // distance desired/actual bit depth
+                              int[] tl, // literal/length tree result
+                              int[] td, // distance tree result
+                              int[] hp, // space for trees
+                              ZStream z // for messages
+    ) {
+        int result;
+
+        // build literal/length tree
+<span class="nc" id="L458">        initWorkArea(288);</span>
+<span class="nc" id="L459">        hn[0] = 0;</span>
+<span class="nc" id="L460">        result = huft_build(c, 0, nl, 257, cplens, cplext, tl, bl, hp, hn, v);</span>
+<span class="nc bnc" id="L461" title="All 4 branches missed.">        if (result != Z_OK || bl[0] == 0) {</span>
+<span class="nc bnc" id="L462" title="All 2 branches missed.">            if (result == Z_DATA_ERROR) {</span>
+<span class="nc" id="L463">                z.msg = &quot;oversubscribed literal/length tree&quot;;</span>
+<span class="nc bnc" id="L464" title="All 2 branches missed.">            } else if (result != Z_MEM_ERROR) {</span>
+<span class="nc" id="L465">                z.msg = &quot;incomplete literal/length tree&quot;;</span>
+<span class="nc" id="L466">                result = Z_DATA_ERROR;</span>
+            }
+<span class="nc" id="L468">            return result;</span>
+        }
+
+        // build distance tree
+<span class="nc" id="L472">        initWorkArea(288);</span>
+<span class="nc" id="L473">        result = huft_build(c, nl, nd, 0, cpdist, cpdext, td, bd, hp, hn, v);</span>
+
+<span class="nc bnc" id="L475" title="All 6 branches missed.">        if (result != Z_OK || (bd[0] == 0 &amp;&amp; nl &gt; 257)) {</span>
+<span class="nc bnc" id="L476" title="All 2 branches missed.">            if (result == Z_DATA_ERROR) {</span>
+<span class="nc" id="L477">                z.msg = &quot;oversubscribed distance tree&quot;;</span>
+<span class="nc bnc" id="L478" title="All 2 branches missed.">            } else if (result == Z_BUF_ERROR) {</span>
+<span class="nc" id="L479">                z.msg = &quot;incomplete distance tree&quot;;</span>
+<span class="nc" id="L480">                result = Z_DATA_ERROR;</span>
+<span class="nc bnc" id="L481" title="All 2 branches missed.">            } else if (result != Z_MEM_ERROR) {</span>
+<span class="nc" id="L482">                z.msg = &quot;empty distance tree with lengths&quot;;</span>
+<span class="nc" id="L483">                result = Z_DATA_ERROR;</span>
+            }
+<span class="nc" id="L485">            return result;</span>
+        }
+
+<span class="nc" id="L488">        return Z_OK;</span>
+    }
+
+    private void initWorkArea(int vsize) {
+<span class="nc bnc" id="L492" title="All 2 branches missed.">        if (hn == null) {</span>
+<span class="nc" id="L493">            hn = new int[1];</span>
+<span class="nc" id="L494">            v = new int[vsize];</span>
+<span class="nc" id="L495">            c = new int[BMAX + 1];</span>
+<span class="nc" id="L496">            r = new int[3];</span>
+<span class="nc" id="L497">            u = new int[BMAX];</span>
+<span class="nc" id="L498">            x = new int[BMAX + 1];</span>
+        }
+<span class="nc bnc" id="L500" title="All 2 branches missed.">        if (v.length &lt; vsize) {</span>
+<span class="nc" id="L501">            v = new int[vsize];</span>
+        }
+<span class="nc bnc" id="L503" title="All 2 branches missed.">        for (int i = 0; i &lt; vsize; i++) {</span>
+<span class="nc" id="L504">            v[i] = 0;</span>
+        }
+<span class="nc bnc" id="L506" title="All 2 branches missed.">        for (int i = 0; i &lt; BMAX + 1; i++) {</span>
+<span class="nc" id="L507">            c[i] = 0;</span>
+        }
+<span class="nc bnc" id="L509" title="All 2 branches missed.">        for (int i = 0; i &lt; 3; i++) {</span>
+<span class="nc" id="L510">            r[i] = 0;</span>
+        }
+<span class="nc" id="L512">        System.arraycopy(c, 0, u, 0, BMAX);</span>
+<span class="nc" id="L513">        System.arraycopy(c, 0, x, 0, BMAX + 1);</span>
+<span class="nc" id="L514">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

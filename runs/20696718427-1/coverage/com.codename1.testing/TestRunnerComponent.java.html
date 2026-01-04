@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TestRunnerComponent.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.testing</a> &gt; <span class="el_source">TestRunnerComponent.java</span></div><h1>TestRunnerComponent.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.testing;
+
+import com.codename1.components.ToastBar;
+import com.codename1.io.Log;
+import com.codename1.ui.Button;
+import com.codename1.ui.CN;
+import com.codename1.ui.Container;
+import com.codename1.ui.Form;
+import com.codename1.ui.Label;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+
+import java.util.ArrayList;
+import java.util.Collections;
+
+import static com.codename1.ui.ComponentSelector.$;
+
+/**
+ * A UI component for running unit tests and displaying the results.
+ *
+ * &lt;p&gt;The sample code below demonstrates usage.&lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/shannah/c54df11845911f928a76b71992a0f76b.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/testrunnercomponent.png&quot; alt=&quot;TestRunnerComponnet&quot; /&gt;
+ *
+ * @author Steve Hannah
+ * @since 7.0
+ */
+public class TestRunnerComponent extends Container {
+<span class="fc" id="L53">    private final ArrayList&lt;AbstractTest&gt; tests = new ArrayList&lt;AbstractTest&gt;();</span>
+<span class="fc" id="L54">    private final Container resultsPane = new Container(BoxLayout.y());</span>
+
+    public TestRunnerComponent() {
+<span class="fc" id="L57">        super(new BorderLayout());</span>
+<span class="fc" id="L58">        Button btn = new Button(&quot;Run Tests&quot;);</span>
+<span class="fc" id="L59">        btn.addActionListener(new ActionListener() {</span>
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L61">                CN.callSerially(new Runnable() {</span>
+                    public void run() {
+<span class="nc" id="L63">                        runTests();</span>
+<span class="nc" id="L64">                    }</span>
+                });
+<span class="nc" id="L66">            }</span>
+        });
+<span class="fc" id="L68">        add(CN.NORTH, btn);</span>
+<span class="fc" id="L69">        resultsPane.setScrollableY(true);</span>
+<span class="fc" id="L70">        add(CN.CENTER, resultsPane);</span>
+<span class="fc" id="L71">    }</span>
+
+    /**
+     * Adds tests to the test runner.
+     *
+     * @param tests The tests to add.
+     * @return Self for chaining.
+     */
+    public TestRunnerComponent add(AbstractTest... tests) {
+<span class="fc" id="L80">        Collections.addAll(this.tests, tests);</span>
+<span class="fc" id="L81">        return this;</span>
+    }
+
+    /**
+     * Shows a form with the testrunner embedded in it.
+     *
+     * @return The form.
+     */
+    public Form showForm() {
+<span class="fc" id="L90">        Form f = getComponentForm();</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">        if (f == null) {</span>
+<span class="fc" id="L92">            f = new Form(&quot;Test Runner&quot;, new BorderLayout());</span>
+<span class="fc" id="L93">            f.add(CN.CENTER, this);</span>
+        }
+<span class="fc" id="L95">        f.show();</span>
+<span class="fc" id="L96">        return f;</span>
+    }
+
+
+    private void runTest(final AbstractTest test, final Button statusLabel) {
+        try {
+<span class="fc bfc" id="L102" title="All 2 branches covered.">            if (test.runTest()) {</span>
+<span class="fc" id="L103">                CN.callSerially(new OnPassedRunnable(statusLabel, test));</span>
+            } else {
+<span class="fc" id="L105">                CN.callSerially(new OnFailedRunnable(statusLabel, test));</span>
+            }
+<span class="fc" id="L107">        } catch (final Throwable t) {</span>
+<span class="fc" id="L108">            Log.e(t);</span>
+<span class="fc" id="L109">            CN.callSerially(new ExceptionHandlerRunnable(statusLabel, test, t));</span>
+<span class="fc" id="L110">        }</span>
+<span class="fc" id="L111">    }</span>
+
+    /**
+     * Runs all of the tests in the test running.
+     */
+    public void runTests() {
+<span class="fc" id="L117">        Form f = getComponentForm();</span>
+<span class="fc" id="L118">        resultsPane.removeAll();</span>
+<span class="fc" id="L119">        resultsPane.revalidate();</span>
+<span class="fc" id="L120">        resultsPane.add(new Label(&quot;Running &quot; + tests.size() + &quot; tests&quot;));</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        for (final AbstractTest test : tests) {</span>
+<span class="fc" id="L122">            final Button statusLabel = new Button(test + &quot;: Running...&quot;);</span>
+<span class="pc bpc" id="L123" title="1 of 2 branches missed.">            if (f != CN.getCurrentForm()) {</span>
+
+<span class="nc" id="L125">                f.showBack();</span>
+            }
+<span class="fc" id="L127">            $(statusLabel).selectAllStyles().setBgColor(0xffff00).setBgTransparency(0xff);</span>
+<span class="fc" id="L128">            resultsPane.add(statusLabel);</span>
+<span class="fc" id="L129">            resultsPane.revalidate();</span>
+<span class="fc bfc" id="L130" title="All 2 branches covered.">            if (test.shouldExecuteOnEDT()) {</span>
+<span class="fc" id="L131">                runTest(test, statusLabel);</span>
+            } else {
+<span class="fc" id="L133">                CN.invokeAndBlock(new Runnable() {</span>
+                    public void run() {
+<span class="fc" id="L135">                        runTest(test, statusLabel);</span>
+<span class="fc" id="L136">                    }</span>
+                });
+            }
+<span class="fc" id="L139">            resultsPane.revalidate();</span>
+<span class="fc" id="L140">        }</span>
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (f != CN.getCurrentForm()) {</span>
+<span class="nc" id="L142">            f.showBack();</span>
+        }
+<span class="fc" id="L144">    }</span>
+
+    private static class ExceptionHandlerRunnable implements Runnable {
+        private final Button statusLabel;
+        private final AbstractTest test;
+        private final Throwable t;
+
+<span class="fc" id="L151">        public ExceptionHandlerRunnable(Button statusLabel, AbstractTest test, Throwable t) {</span>
+<span class="fc" id="L152">            this.statusLabel = statusLabel;</span>
+<span class="fc" id="L153">            this.test = test;</span>
+<span class="fc" id="L154">            this.t = t;</span>
+<span class="fc" id="L155">        }</span>
+
+        public void run() {
+<span class="fc" id="L158">            statusLabel.setText(test + &quot;: Failed&quot;);</span>
+<span class="fc" id="L159">            $(statusLabel).selectAllStyles().setBgColor(0xff0000).revalidate();</span>
+
+<span class="fc" id="L161">            statusLabel.addActionListener(new ActionListener() {</span>
+                public void actionPerformed(ActionEvent ev) {
+<span class="nc" id="L163">                    ToastBar.showInfoMessage(t.getMessage());</span>
+<span class="nc" id="L164">                    Log.e(t);</span>
+<span class="nc" id="L165">                }</span>
+            });
+<span class="fc" id="L167">        }</span>
+    }
+
+    private static class OnFailedRunnable implements Runnable {
+        private final Button statusLabel;
+        private final AbstractTest test;
+
+<span class="fc" id="L174">        public OnFailedRunnable(Button statusLabel, AbstractTest test) {</span>
+<span class="fc" id="L175">            this.statusLabel = statusLabel;</span>
+<span class="fc" id="L176">            this.test = test;</span>
+<span class="fc" id="L177">        }</span>
+
+        public void run() {
+<span class="fc" id="L180">            statusLabel.setText(test + &quot;: Failed&quot;);</span>
+<span class="fc" id="L181">            $(statusLabel).selectAllStyles().setBgColor(0xff0000).revalidate();</span>
+<span class="fc" id="L182">        }</span>
+    }
+
+    private static class OnPassedRunnable implements Runnable {
+        private final Button statusLabel;
+        private final AbstractTest test;
+
+<span class="fc" id="L189">        public OnPassedRunnable(Button statusLabel, AbstractTest test) {</span>
+<span class="fc" id="L190">            this.statusLabel = statusLabel;</span>
+<span class="fc" id="L191">            this.test = test;</span>
+<span class="fc" id="L192">        }</span>
+
+        public void run() {
+<span class="fc" id="L195">            statusLabel.setText(test + &quot;: Passed&quot;);</span>
+<span class="fc" id="L196">            $(statusLabel).selectAllStyles().setBgColor(0x00ff00).revalidate();</span>
+<span class="fc" id="L197">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

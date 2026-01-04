@@ -1,0 +1,512 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DateUtil.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">DateUtil.java</span></div><h1>DateUtil.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.util;
+
+import java.util.Calendar;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.TimeZone;
+
+/**
+ * Utility class for working with dates and timezones.
+ *
+ * @author shannah, Diamond
+ */
+public class DateUtil {
+
+    public static final long MILLISECOND = 1L;
+    public static final long SECOND = 1000 * MILLISECOND;
+    public static final long MINUTE = 60 * SECOND;
+    public static final long HOUR = 60 * MINUTE;
+    public static final long DAY = 24 * HOUR;
+    public static final long MONTH = 2629800000L;
+    public static final long YEAR = 31557600000L;
+    private final TimeZone tz;
+
+    /**
+     * Constructor for timezone.
+     *
+     * @param tz Timezone
+     */
+<span class="fc" id="L51">    public DateUtil(TimeZone tz) {</span>
+<span class="fc" id="L52">        this.tz = tz;</span>
+<span class="fc" id="L53">    }</span>
+
+    /**
+     * Creates DateUtil object in default timezone.
+     */
+    public DateUtil() {
+<span class="nc" id="L59">        this(TimeZone.getDefault());</span>
+<span class="nc" id="L60">    }</span>
+
+    /**
+     * Returns the earliest of a set of dates.
+     *
+     * @param dates
+     * @return The earliest of a set of dates.
+     * @since 6.0
+     */
+    public static Date min(Date... dates) {
+<span class="fc" id="L70">        int len = dates.length;</span>
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        if (len == 0) return null;</span>
+<span class="fc" id="L72">        Date out = null;</span>
+<span class="fc bfc" id="L73" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="pc bpc" id="L74" title="1 of 2 branches missed.">            if (dates[i] == null) {</span>
+<span class="nc" id="L75">                continue;</span>
+            }
+<span class="pc bpc" id="L77" title="1 of 4 branches missed.">            if (out == null || dates[i].getTime() &lt; out.getTime()) {</span>
+<span class="fc" id="L78">                out = dates[i];</span>
+            }
+        }
+<span class="fc" id="L81">        return out;</span>
+    }
+
+    /**
+     * Compares two dates.
+     *
+     * @param d1 A date
+     * @param d2 A date
+     * @return -1 if first date is earlier.  1 if first date is later.  0 if they are the same.
+     * @since 6.0
+     */
+    public static int compare(Date d1, Date d2) {
+<span class="pc bpc" id="L93" title="1 of 4 branches missed.">        if (d1 == null) return d2 == null ? 0 : -1;</span>
+<span class="fc bfc" id="L94" title="All 2 branches covered.">        if (d2 == null) return 1;</span>
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (d1.getTime() &lt; d2.getTime()) {</span>
+<span class="fc" id="L96">            return -1;</span>
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        } else if (d1.getTime() &gt; d2.getTime()) {</span>
+<span class="fc" id="L98">            return 1;</span>
+        }
+<span class="nc" id="L100">        return 0;</span>
+    }
+
+    /**
+     * Compares two dates or sorts multiple dates by the granularity of a specific field.
+     * &lt;p&gt;Compare dates:&lt;br/&gt;
+     * {@code compareByDateField(DateUtil.MONTH).compare(date1, date2)}&lt;/p&gt;
+     * &lt;p&gt;Sort dates:&lt;br/&gt;
+     * {@code dateList.sort(compareByDateField(DateUtil.MONTH))}&lt;/p&gt;
+     *
+     * @param field One of the fields:
+     *              &lt;ul&gt;
+     *               &lt;li&gt;{@code DateUtil.MILLISECOND}
+     *               &lt;li&gt;{@code DateUtil.SECOND}
+     *               &lt;li&gt;{@code DateUtil.MINUTE}
+     *               &lt;li&gt;{@code DateUtil.HOUR}
+     *               &lt;li&gt;{@code DateUtil.DATE}
+     *               &lt;li&gt;{@code DateUtil.MONTH}
+     *               &lt;li&gt;{@code DateUtil.YEAR}
+     * @return &lt;ul&gt;
+     * &lt;li&gt;&amp;gt; 0 - if first date is earlier.
+     * &lt;li&gt;&amp;lt; 0 - if first date is later.
+     * &lt;li&gt;== 0 - if they are equal.
+     * @since 7.0
+     */
+    public static Comparator&lt;Date&gt; compareByDateField(final long field) {
+<span class="fc" id="L126">        return new Comparator&lt;Date&gt;() {</span>
+            public int compare(Date object1, Date object2) {
+
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">                if (field == DateUtil.YEAR) {</span>
+<span class="fc" id="L130">                    Calendar cal = Calendar.getInstance();</span>
+
+<span class="fc" id="L132">                    cal.setTime(object1);</span>
+<span class="fc" id="L133">                    int y1 = cal.get(Calendar.YEAR);</span>
+
+<span class="fc" id="L135">                    cal.setTime(object2);</span>
+<span class="fc" id="L136">                    int y2 = cal.get(Calendar.YEAR);</span>
+
+<span class="fc" id="L138">                    return y1 - y2;</span>
+                }
+
+<span class="nc bnc" id="L141" title="All 2 branches missed.">                if (field == DateUtil.MONTH) {</span>
+<span class="nc" id="L142">                    Calendar cal = Calendar.getInstance();</span>
+
+<span class="nc" id="L144">                    cal.setTime(object1);</span>
+<span class="nc" id="L145">                    int m1 = cal.get(Calendar.YEAR) * 12 + cal.get(Calendar.MONTH);</span>
+
+<span class="nc" id="L147">                    cal.setTime(object2);</span>
+<span class="nc" id="L148">                    int m2 = cal.get(Calendar.YEAR) * 12 + cal.get(Calendar.MONTH);</span>
+
+<span class="nc" id="L150">                    return m1 - m2;</span>
+                }
+
+<span class="nc" id="L153">                long d1 = object1.getTime() / field;</span>
+<span class="nc" id="L154">                long d2 = object2.getTime() / field;</span>
+
+<span class="nc" id="L156">                return (int) (d1 - d2);</span>
+            }
+        };
+    }
+
+    /**
+     * Returns the latest of a set of dates.
+     *
+     * @param dates
+     * @return The latest of a set of dates.
+     * @since 6.0
+     */
+    public static Date max(Date... dates) {
+<span class="fc" id="L169">        int len = dates.length;</span>
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (len == 0) return null;</span>
+<span class="fc" id="L171">        Date out = null;</span>
+<span class="fc bfc" id="L172" title="All 2 branches covered.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="pc bpc" id="L173" title="1 of 2 branches missed.">            if (dates[i] == null) {</span>
+<span class="nc" id="L174">                continue;</span>
+            }
+<span class="pc bpc" id="L176" title="1 of 4 branches missed.">            if (out == null || dates[i].getTime() &gt; out.getTime()) {</span>
+<span class="fc" id="L177">                out = dates[i];</span>
+            }
+        }
+<span class="fc" id="L180">        return out;</span>
+    }
+
+    /**
+     * Gets the offset from GMT in milliseconds for the given date.
+     *
+     * @param date The date at which the offset is calculated.
+     * @return Millisecond offset from GMT in the current timezone for the given date.
+     */
+    public int getOffset(long date) {
+<span class="fc" id="L190">        Calendar cal = Calendar.getInstance(tz);</span>
+<span class="fc" id="L191">        cal.setTime(new Date(date));</span>
+<span class="fc" id="L192">        Calendar calStartOfDay = Calendar.getInstance(tz);</span>
+<span class="fc" id="L193">        calStartOfDay.setTime(new Date(date));</span>
+<span class="fc" id="L194">        calStartOfDay.set(Calendar.MILLISECOND, 0);</span>
+<span class="fc" id="L195">        calStartOfDay.set(Calendar.SECOND, 0);</span>
+<span class="fc" id="L196">        calStartOfDay.set(Calendar.HOUR_OF_DAY, 0);</span>
+<span class="fc" id="L197">        calStartOfDay.set(Calendar.MINUTE, 0);</span>
+
+
+<span class="fc" id="L200">        return tz.getOffset(1,</span>
+<span class="fc" id="L201">                cal.get(Calendar.YEAR),</span>
+<span class="fc" id="L202">                cal.get(Calendar.MONTH),</span>
+<span class="fc" id="L203">                cal.get(Calendar.DAY_OF_MONTH),</span>
+<span class="fc" id="L204">                cal.get(Calendar.DAY_OF_WEEK),</span>
+<span class="fc" id="L205">                (int) (cal.getTime().getTime() - calStartOfDay.getTime().getTime())</span>
+        );
+    }
+
+    /**
+     * Checks whether the given date is in daylight savings time for the given date.
+     *
+     * @param date the date to check
+     * @return True if date is in daylight savings time
+     */
+    public boolean inDaylightTime(Date date) {
+<span class="nc bnc" id="L216" title="All 4 branches missed.">        return tz.useDaylightTime() &amp;&amp; getOffset(date.getTime()) != tz.getRawOffset();</span>
+    }
+
+    /**
+     * Checks if two times are on the same year using {@link Calendar}.
+     *
+     * @param c1 First time to compare.
+     * @param c2 Second time to compare.
+     * @return True if the two times are on the same year.
+     * @since 7.0
+     */
+    public boolean isSameYear(Calendar c1, Calendar c2) {
+
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        return c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR);</span>
+    }
+
+    /**
+     * Checks if two dates are on the same year in the current timezone.
+     *
+     * @param d1 First date to compare.
+     * @param d2 Second date to compare.
+     * @return True if the two dates are on the same year.
+     * @since 7.0
+     */
+    public boolean isSameYear(Date d1, Date d2) {
+<span class="nc" id="L241">        Calendar c1 = Calendar.getInstance(tz);</span>
+<span class="nc" id="L242">        c1.setTime(d1);</span>
+<span class="nc" id="L243">        Calendar c2 = Calendar.getInstance(tz);</span>
+<span class="nc" id="L244">        c2.setTime(d2);</span>
+
+<span class="nc" id="L246">        return isSameYear(c1, c2);</span>
+    }
+
+    /**
+     * Checks if two times are on the same month using {@link Calendar}.
+     *
+     * @param c1 First time to compare.
+     * @param c2 Second time to compare.
+     * @return True if the two times are on the same month.
+     * @since 7.0
+     */
+    public boolean isSameMonth(Calendar c1, Calendar c2) {
+
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        return isSameYear(c1, c2)</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">                &amp;&amp; c1.get(Calendar.MONTH) == c2.get(Calendar.MONTH);</span>
+    }
+
+    /**
+     * Checks if two dates are on the same month in the current timezone.
+     *
+     * @param d1 First date to compare.
+     * @param d2 Second date to compare.
+     * @return True if the two dates are on the same month.
+     * @since 7.0
+     */
+    public boolean isSameMonth(Date d1, Date d2) {
+<span class="nc" id="L272">        Calendar c1 = Calendar.getInstance(tz);</span>
+<span class="nc" id="L273">        c1.setTime(d1);</span>
+<span class="nc" id="L274">        Calendar c2 = Calendar.getInstance(tz);</span>
+<span class="nc" id="L275">        c2.setTime(d2);</span>
+
+<span class="nc" id="L277">        return isSameMonth(c1, c2);</span>
+    }
+
+    /**
+     * Checks if two times are on the same day using {@link Calendar}.
+     *
+     * @param c1 First time to compare.
+     * @param c2 Second time to compare.
+     * @return True if the two times are on the same day.
+     * @since 7.0
+     */
+    public boolean isSameDay(Calendar c1, Calendar c2) {
+
+<span class="nc bnc" id="L290" title="All 2 branches missed.">        return isSameMonth(c1, c2)</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">                &amp;&amp; c1.get(Calendar.DATE) == c2.get(Calendar.DATE);</span>
+    }
+
+    /**
+     * Checks if two dates are on the same day in the current timezone.
+     *
+     * @param d1 First date to compare.
+     * @param d2 Second date to compare.
+     * @return True if the two dates are on the same day.
+     * @since 7.0
+     */
+    public boolean isSameDay(Date d1, Date d2) {
+<span class="nc" id="L303">        Calendar c1 = Calendar.getInstance(tz);</span>
+<span class="nc" id="L304">        c1.setTime(d1);</span>
+<span class="nc" id="L305">        Calendar c2 = Calendar.getInstance(tz);</span>
+<span class="nc" id="L306">        c2.setTime(d2);</span>
+
+<span class="nc" id="L308">        return isSameDay(c1, c2);</span>
+    }
+
+    /**
+     * Checks if two times are on the same hour using {@link Calendar}.
+     *
+     * @param c1 First time to compare.
+     * @param c2 Second time to compare.
+     * @return True if the two times are on the same hour.
+     * @since 7.0
+     */
+    public boolean isSameHour(Calendar c1, Calendar c2) {
+
+<span class="nc bnc" id="L321" title="All 2 branches missed.">        return isSameDay(c1, c2)</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">                &amp;&amp; c1.get(Calendar.HOUR_OF_DAY) == c2.get(Calendar.HOUR_OF_DAY);</span>
+    }
+
+    /**
+     * Checks if two dates are on the same hour in the current timezone.
+     *
+     * @param d1 First date to compare.
+     * @param d2 Second date to compare.
+     * @return True if the two dates are on the same hour.
+     * @since 7.0
+     */
+    public boolean isSameHour(Date d1, Date d2) {
+<span class="nc" id="L334">        Calendar c1 = Calendar.getInstance(tz);</span>
+<span class="nc" id="L335">        c1.setTime(d1);</span>
+<span class="nc" id="L336">        Calendar c2 = Calendar.getInstance(tz);</span>
+<span class="nc" id="L337">        c2.setTime(d2);</span>
+
+<span class="nc" id="L339">        return isSameHour(c1, c2);</span>
+    }
+
+    /**
+     * Checks if two times are on the same minute using {@link Calendar}.
+     *
+     * @param c1 First time to compare.
+     * @param c2 Second time to compare.
+     * @return True if the two times are on the same minute.
+     * @since 7.0
+     */
+    public boolean isSameMinute(Calendar c1, Calendar c2) {
+
+<span class="nc bnc" id="L352" title="All 2 branches missed.">        return isSameHour(c1, c2)</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">                &amp;&amp; c1.get(Calendar.MINUTE) == c2.get(Calendar.MINUTE);</span>
+    }
+
+    /**
+     * Checks if two dates are on the same minute in the current timezone.
+     *
+     * @param d1 First date to compare.
+     * @param d2 Second date to compare.
+     * @return True if the two dates are on the same minute.
+     * @since 7.0
+     */
+    public boolean isSameMinute(Date d1, Date d2) {
+<span class="nc" id="L365">        Calendar c1 = Calendar.getInstance(tz);</span>
+<span class="nc" id="L366">        c1.setTime(d1);</span>
+<span class="nc" id="L367">        Calendar c2 = Calendar.getInstance(tz);</span>
+<span class="nc" id="L368">        c2.setTime(d2);</span>
+
+<span class="nc" id="L370">        return isSameMinute(c1, c2);</span>
+    }
+
+    /**
+     * Checks if two times are on the same second using {@link Calendar}.
+     *
+     * @param c1 First time to compare.
+     * @param c2 Second time to compare.
+     * @return True if the two times are on the same second.
+     * @since 7.0
+     */
+    public boolean isSameSecond(Calendar c1, Calendar c2) {
+
+<span class="nc bnc" id="L383" title="All 2 branches missed.">        return isSameMinute(c1, c2)</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">                &amp;&amp; c1.get(Calendar.SECOND) == c2.get(Calendar.SECOND);</span>
+    }
+
+    /**
+     * Checks if two dates are on the same second in the current timezone.
+     *
+     * @param d1 First date to compare.
+     * @param d2 Second date to compare.
+     * @return True if the two dates are on the same second.
+     * @since 7.0
+     */
+    public boolean isSameSecond(Date d1, Date d2) {
+<span class="nc" id="L396">        Calendar c1 = Calendar.getInstance(tz);</span>
+<span class="nc" id="L397">        c1.setTime(d1);</span>
+<span class="nc" id="L398">        Calendar c2 = Calendar.getInstance(tz);</span>
+<span class="nc" id="L399">        c2.setTime(d2);</span>
+
+<span class="nc" id="L401">        return isSameSecond(c1, c2);</span>
+    }
+
+    /**
+     * Checks if two times are on the same time using {@link Calendar}.
+     *
+     * @param c1 First time to compare.
+     * @param c2 Second time to compare.
+     * @return True if the two times are on the same time.
+     * @since 7.0
+     */
+    public boolean isSameTime(Calendar c1, Calendar c2) {
+
+<span class="nc bnc" id="L414" title="All 2 branches missed.">        return c1.getTime().getTime() == c2.getTime().getTime();</span>
+    }
+
+    /**
+     * Checks if two dates are on the same time in the current timezone.
+     *
+     * @param d1 First date to compare.
+     * @param d2 Second date to compare.
+     * @return True if the two dates are on the same time.
+     * @since 7.0
+     */
+    public boolean isSameTime(Date d1, Date d2) {
+<span class="nc bnc" id="L426" title="All 2 branches missed.">        return d1.getTime() == d2.getTime();</span>
+    }
+
+    /**
+     * Gets the date in &quot;time ago&quot; format.  E.g. &quot;Just now&quot;, or &quot;1 day ago&quot;, etc..
+     *
+     * @param date The date
+     * @return String representing how long ago from now the given date is.
+     * @since 6.0
+     */
+    public String getTimeAgo(Date date) {
+<span class="nc bnc" id="L437" title="All 2 branches missed.">        if (date == null) {</span>
+<span class="nc" id="L438">            return &quot;N/A&quot;;</span>
+        }
+<span class="nc" id="L440">        long time_ago = date.getTime() / 1000L;</span>
+
+<span class="nc" id="L442">        long cur_time = new Date().getTime() / 1000L;</span>
+<span class="nc" id="L443">        long time_elapsed = cur_time - time_ago;</span>
+<span class="nc" id="L444">        long seconds = time_elapsed;</span>
+        // Seconds
+<span class="nc bnc" id="L446" title="All 2 branches missed.">        if (seconds &lt;= 60) {</span>
+<span class="nc" id="L447">            return &quot;Just now&quot;;</span>
+        } //Minutes
+        else {
+<span class="nc" id="L450">            int minutes = Math.round(time_elapsed / 60);</span>
+
+<span class="nc bnc" id="L452" title="All 2 branches missed.">            if (minutes &lt;= 60) {</span>
+<span class="nc bnc" id="L453" title="All 2 branches missed.">                if (minutes == 1) {</span>
+<span class="nc" id="L454">                    return &quot;A minute ago&quot;;</span>
+                } else {
+<span class="nc" id="L456">                    return minutes + &quot; minutes ago&quot;;</span>
+                }
+            } //Hours
+            else {
+<span class="nc" id="L460">                int hours = Math.round(time_elapsed / 3600);</span>
+<span class="nc bnc" id="L461" title="All 2 branches missed.">                if (hours &lt;= 24) {</span>
+<span class="nc bnc" id="L462" title="All 2 branches missed.">                    if (hours == 1) {</span>
+<span class="nc" id="L463">                        return &quot;An hour ago&quot;;</span>
+                    } else {
+<span class="nc" id="L465">                        return hours + &quot; hours ago&quot;;</span>
+                    }
+                } //Days
+                else {
+<span class="nc" id="L469">                    int days = Math.round(time_elapsed / 86400);</span>
+<span class="nc bnc" id="L470" title="All 2 branches missed.">                    if (days &lt;= 7) {</span>
+<span class="nc bnc" id="L471" title="All 2 branches missed.">                        if (days == 1) {</span>
+<span class="nc" id="L472">                            return &quot;Yesterday&quot;;</span>
+                        } else {
+<span class="nc" id="L474">                            return days + &quot; days ago&quot;;</span>
+                        }
+                    } //Weeks
+                    else {
+<span class="nc" id="L478">                        int weeks = Math.round(time_elapsed / 604800);</span>
+<span class="nc bnc" id="L479" title="All 2 branches missed.">                        if (weeks &lt;= 4.3) {</span>
+<span class="nc bnc" id="L480" title="All 2 branches missed.">                            if (weeks == 1) {</span>
+<span class="nc" id="L481">                                return &quot;A week ago&quot;;</span>
+                            } else {
+<span class="nc" id="L483">                                return weeks + &quot; weeks ago&quot;;</span>
+                            }
+                        } //Months
+                        else {
+<span class="nc" id="L487">                            int months = Math.round(time_elapsed / 2600640);</span>
+<span class="nc bnc" id="L488" title="All 2 branches missed.">                            if (months &lt;= 12) {</span>
+<span class="nc bnc" id="L489" title="All 2 branches missed.">                                if (months == 1) {</span>
+<span class="nc" id="L490">                                    return &quot;A month ago&quot;;</span>
+                                } else {
+<span class="nc" id="L492">                                    return months + &quot; months ago&quot;;</span>
+                                }
+                            } //Years
+                            else {
+<span class="nc" id="L496">                                int years = Math.round(time_elapsed / 31207680);</span>
+<span class="nc bnc" id="L497" title="All 2 branches missed.">                                if (years == 1) {</span>
+<span class="nc" id="L498">                                    return &quot;1 year ago&quot;;</span>
+                                } else {
+<span class="nc" id="L500">                                    return years + &quot; years ago&quot;;</span>
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

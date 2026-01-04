@@ -1,0 +1,804 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WebServiceProxyCall.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">WebServiceProxyCall.java</span></div><h1>WebServiceProxyCall.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.io;
+
+import com.codename1.util.Callback;
+import com.codename1.util.FailureCallback;
+import com.codename1.util.SuccessCallback;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+/**
+ * Utility class used by the webservice proxy code to invoke server code
+ *
+ * @author Shai Almog
+ */
+<span class="nc" id="L41">public class WebServiceProxyCall {</span>
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_VOID = 0;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_BYTE = 1;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_CHAR = 2;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_SHORT = 3;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_INT = 4;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_LONG = 5;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_DOUBLE = 6;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_FLOAT = 7;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_BOOLEAN = 8;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_BYTE_OBJECT = 9;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_CHARACTER_OBJECT = 10;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_SHORT_OBJECT = 11;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_INTEGER_OBJECT = 12;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_LONG_OBJECT = 13;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_DOUBLE_OBJECT = 14;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_FLOAT_OBJECT = 15;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_BOOLEAN_OBJECT = 16;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_STRING = 17;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_BYTE_ARRAY = 18;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_CHAR_ARRAY = 19;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_SHORT_ARRAY = 20;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_INT_ARRAY = 21;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_LONG_ARRAY = 22;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_DOUBLE_ARRAY = 23;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_FLOAT_ARRAY = 24;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_BOOLEAN_ARRAY = 25;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_STRING_ARRAY = 26;
+
+    /**
+     * Web protocol argument/return type
+     */
+    public static final int TYPE_EXTERNALIABLE = 1000;
+
+
+    /**
+     * Invokes a webservice synchronously and returns result
+     *
+     * @param def       definition of the webservice request
+     * @param arguments the arguments to the service
+     * @return the value of the sync call
+     * @throws IOException an exception in case of a webservice fail
+     */
+    public static Object invokeWebserviceSync(WSDefinition def, Object... arguments) throws IOException {
+<span class="fc" id="L192">        WSConnection cr = new WSConnection(def, null, arguments);</span>
+<span class="fc" id="L193">        NetworkManager.getInstance().addToQueueAndWait(cr);</span>
+<span class="fc" id="L194">        int rc = cr.getResponseCode();</span>
+<span class="pc bpc" id="L195" title="3 of 4 branches missed.">        if (rc != 200 &amp;&amp; rc != 201) {</span>
+<span class="nc" id="L196">            throw new IOException(&quot;Server error: &quot; + cr.getResponseCode());</span>
+        }
+<span class="fc" id="L198">        return cr.returnValue;</span>
+    }
+
+    /**
+     * Invokes a web asynchronously and calls the callback on completion
+     *
+     * @param def       definition of the webservice request
+     * @param scall     the return value callback
+     * @param fcall     the error callback
+     * @param arguments the arguments to the webservice
+     */
+    public static void invokeWebserviceASync(WSDefinition def, SuccessCallback scall,
+                                             FailureCallback fcall, Object... arguments) {
+<span class="fc" id="L211">        WSConnection cr = new WSConnection(def, scall, fcall, arguments);</span>
+<span class="fc" id="L212">        NetworkManager.getInstance().addToQueue(cr);</span>
+<span class="fc" id="L213">    }</span>
+
+    /**
+     * Invokes a web asynchronously and calls the callback on completion
+     *
+     * @param def       definition of the webservice request
+     * @param call      the return value containing an error callback or value
+     * @param arguments the arguments to the webservice
+     */
+    public static void invokeWebserviceASync(WSDefinition def, final Callback call, Object... arguments) {
+<span class="nc" id="L223">        WSConnection cr = new WSConnection(def, call, arguments);</span>
+<span class="nc" id="L224">        NetworkManager.getInstance().addToQueue(cr);</span>
+<span class="nc" id="L225">    }</span>
+
+    /**
+     * Creates a webservice definition object which can be used to invoke the webservice.
+     *
+     * @param url           the url of the webservice
+     * @param serviceName   the name of the service method
+     * @param returnType    the return type for the webservice one of the TYPE_* constants
+     * @param argumentTypes the arguments for the webservice using the TYPE_* constants
+     * @return a WSDefinition object
+     */
+    public static WSDefinition defineWebService(String url, String serviceName, int returnType, int... argumentTypes) {
+<span class="fc" id="L237">        WSDefinition def = new WSDefinition();</span>
+<span class="fc" id="L238">        def.url = url;</span>
+<span class="fc" id="L239">        def.name = serviceName;</span>
+<span class="fc" id="L240">        def.returnType = returnType;</span>
+<span class="fc" id="L241">        def.arguments = argumentTypes;</span>
+<span class="fc" id="L242">        return def;</span>
+    }
+
+    /**
+     * Webservice definition type, allows defining the argument values for a specific WS call
+     */
+<span class="fc" id="L248">    public static class WSDefinition {</span>
+        String url;
+        String name;
+        int returnType;
+        int[] arguments;
+    }
+
+    static class WSConnection extends ConnectionRequest {
+        Object returnValue;
+        private final WSDefinition def;
+        private final Object[] arguments;
+        private final SuccessCallback scall;
+        private final FailureCallback fcall;
+
+        public WSConnection(WSDefinition def, Callback call, Object... arguments) {
+<span class="fc" id="L263">            this(def, call, call, arguments);</span>
+<span class="fc" id="L264">        }</span>
+
+<span class="fc" id="L266">        public WSConnection(WSDefinition def, SuccessCallback scall, FailureCallback fcall, Object... arguments) {</span>
+<span class="fc" id="L267">            this.def = def;</span>
+<span class="fc" id="L268">            setUrl(def.url);</span>
+<span class="fc" id="L269">            this.arguments = arguments;</span>
+<span class="fc" id="L270">            this.scall = scall;</span>
+<span class="fc" id="L271">            this.fcall = fcall;</span>
+<span class="fc" id="L272">            setPost(true);</span>
+<span class="fc" id="L273">        }</span>
+
+        /**
+         * {@inheritDoc}
+         */
+        public boolean equals(Object o) {
+<span class="pc bpc" id="L279" title="1 of 2 branches missed.">            if (this == o) {</span>
+<span class="nc" id="L280">                return true;</span>
+            }
+<span class="pc bpc" id="L282" title="2 of 4 branches missed.">            if (o == null || getClass() != o.getClass()) {</span>
+<span class="fc" id="L283">                return false;</span>
+            }
+<span class="nc bnc" id="L285" title="All 2 branches missed.">            if (!super.equals(o)) {</span>
+<span class="nc" id="L286">                return false;</span>
+            }
+
+<span class="nc" id="L289">            WSConnection that = (WSConnection) o;</span>
+
+<span class="nc bnc" id="L291" title="All 6 branches missed.">            if (def != null ? !def.equals(that.def) : that.def != null) {</span>
+<span class="nc" id="L292">                return false;</span>
+            }
+<span class="nc bnc" id="L294" title="All 2 branches missed.">            if (arguments == null) {</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">                return that.arguments == null;</span>
+            }
+<span class="nc bnc" id="L297" title="All 2 branches missed.">            if (that.arguments == null) {</span>
+<span class="nc" id="L298">                return false;</span>
+            }
+<span class="nc bnc" id="L300" title="All 2 branches missed.">            if (arguments.length != that.arguments.length) {</span>
+<span class="nc" id="L301">                return false;</span>
+            }
+<span class="nc bnc" id="L303" title="All 2 branches missed.">            for (int i = 0; i &lt; arguments.length; i++) {</span>
+<span class="nc" id="L304">                Object a1 = arguments[i];</span>
+<span class="nc" id="L305">                Object a2 = that.arguments[i];</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">                if (a1 == null) {</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">                    if (a2 != null) {</span>
+<span class="nc" id="L308">                        return false;</span>
+                    }
+                } else {
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                    if (!a1.equals(a2)) {</span>
+<span class="nc" id="L312">                        return false;</span>
+                    }
+                }
+            }
+<span class="nc" id="L316">            return true;</span>
+        }
+
+        /**
+         * {@inheritDoc}
+         */
+        public int hashCode() {
+<span class="nc" id="L323">            int result = super.hashCode();</span>
+<span class="nc bnc" id="L324" title="All 2 branches missed.">            result = 31 * result + (def != null ? def.hashCode() : 0);</span>
+<span class="nc" id="L325">            return result;</span>
+        }
+
+        @Override
+        protected void postResponse() {
+<span class="fc bfc" id="L330" title="All 2 branches covered.">            if (scall != null) {</span>
+<span class="fc" id="L331">                scall.onSucess(returnValue);</span>
+            }
+<span class="fc" id="L333">        }</span>
+
+        @Override
+        protected void handleErrorResponseCode(int code, String message) {
+<span class="nc bnc" id="L337" title="All 2 branches missed.">            if (fcall != null) {</span>
+<span class="nc" id="L338">                fcall.onError(this, null, code, message);</span>
+            }
+<span class="nc" id="L340">        }</span>
+
+        @Override
+        protected void handleException(Exception err) {
+<span class="nc bnc" id="L344" title="All 2 branches missed.">            if (fcall != null) {</span>
+<span class="nc" id="L345">                fcall.onError(this, err, -1, null);</span>
+            }
+<span class="nc" id="L347">        }</span>
+
+
+        @Override
+        protected void readResponse(InputStream input) throws IOException {
+<span class="fc" id="L352">            DataInputStream dis = new DataInputStream(input);</span>
+
+<span class="pc bpc" id="L354" title="1 of 2 branches missed.">            if (def == null) return;</span>
+<span class="pc bpc" id="L355" title="24 of 29 branches missed.">            switch (def.returnType) {</span>
+                case TYPE_VOID:
+<span class="fc" id="L357">                    return;</span>
+
+                case TYPE_BYTE:
+<span class="nc" id="L360">                    returnValue = dis.readByte();</span>
+<span class="nc" id="L361">                    break;</span>
+
+                case TYPE_CHAR:
+<span class="nc" id="L364">                    returnValue = dis.readChar();</span>
+<span class="nc" id="L365">                    break;</span>
+
+                case TYPE_SHORT:
+<span class="nc" id="L368">                    returnValue = dis.readShort();</span>
+<span class="nc" id="L369">                    break;</span>
+
+                case TYPE_INT:
+<span class="fc" id="L372">                    returnValue = dis.readInt();</span>
+<span class="fc" id="L373">                    break;</span>
+
+                case TYPE_LONG:
+<span class="nc" id="L376">                    returnValue = dis.readLong();</span>
+<span class="nc" id="L377">                    break;</span>
+
+                case TYPE_DOUBLE:
+<span class="nc" id="L380">                    returnValue = dis.readDouble();</span>
+<span class="nc" id="L381">                    break;</span>
+
+                case TYPE_FLOAT:
+<span class="nc" id="L384">                    returnValue = dis.readFloat();</span>
+<span class="nc" id="L385">                    break;</span>
+
+                case TYPE_BOOLEAN:
+<span class="nc" id="L388">                    returnValue = dis.readBoolean();</span>
+<span class="nc" id="L389">                    break;</span>
+
+                case TYPE_BYTE_OBJECT:
+<span class="nc bnc" id="L392" title="All 2 branches missed.">                    if (dis.readBoolean()) {</span>
+<span class="nc" id="L393">                        returnValue = dis.readByte();</span>
+                    }
+                    break;
+
+                case TYPE_CHARACTER_OBJECT:
+<span class="nc bnc" id="L398" title="All 2 branches missed.">                    if (dis.readBoolean()) {</span>
+<span class="nc" id="L399">                        returnValue = dis.readChar();</span>
+                    }
+                    break;
+
+                case TYPE_SHORT_OBJECT:
+<span class="nc bnc" id="L404" title="All 2 branches missed.">                    if (dis.readBoolean()) {</span>
+<span class="nc" id="L405">                        returnValue = dis.readShort();</span>
+                    }
+                    break;
+
+                case TYPE_INTEGER_OBJECT:
+<span class="nc bnc" id="L410" title="All 2 branches missed.">                    if (dis.readBoolean()) {</span>
+<span class="nc" id="L411">                        returnValue = dis.readInt();</span>
+                    }
+                    break;
+
+                case TYPE_LONG_OBJECT:
+<span class="nc bnc" id="L416" title="All 2 branches missed.">                    if (dis.readBoolean()) {</span>
+<span class="nc" id="L417">                        returnValue = dis.readLong();</span>
+                    }
+                    break;
+
+                case TYPE_DOUBLE_OBJECT:
+<span class="nc bnc" id="L422" title="All 2 branches missed.">                    if (dis.readBoolean()) {</span>
+<span class="nc" id="L423">                        returnValue = dis.readDouble();</span>
+                    }
+                    break;
+
+                case TYPE_FLOAT_OBJECT:
+<span class="nc bnc" id="L428" title="All 2 branches missed.">                    if (dis.readBoolean()) {</span>
+<span class="nc" id="L429">                        returnValue = dis.readFloat();</span>
+                    }
+                    break;
+
+                case TYPE_BOOLEAN_OBJECT:
+<span class="nc bnc" id="L434" title="All 2 branches missed.">                    if (dis.readBoolean()) {</span>
+<span class="nc" id="L435">                        returnValue = dis.readBoolean();</span>
+                    }
+                    break;
+
+                case TYPE_STRING:
+<span class="pc bpc" id="L440" title="1 of 2 branches missed.">                    if (dis.readBoolean()) {</span>
+<span class="fc" id="L441">                        returnValue = dis.readUTF();</span>
+                    }
+                    break;
+
+                case TYPE_BYTE_ARRAY: {
+<span class="fc" id="L446">                    int size = dis.readInt();</span>
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">                    if (size &gt; -1) {</span>
+<span class="fc" id="L448">                        byte[] b = new byte[size];</span>
+<span class="fc bfc" id="L449" title="All 2 branches covered.">                        for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="fc" id="L450">                            b[iter] = dis.readByte();</span>
+                        }
+<span class="fc" id="L452">                        returnValue = b;</span>
+<span class="fc" id="L453">                    }</span>
+                    break;
+                }
+
+                case TYPE_CHAR_ARRAY: {
+<span class="nc" id="L458">                    int size = dis.readInt();</span>
+<span class="nc bnc" id="L459" title="All 2 branches missed.">                    if (size &gt; -1) {</span>
+<span class="nc" id="L460">                        char[] b = new char[size];</span>
+<span class="nc bnc" id="L461" title="All 2 branches missed.">                        for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc" id="L462">                            b[iter] = dis.readChar();</span>
+                        }
+<span class="nc" id="L464">                        returnValue = b;</span>
+<span class="nc" id="L465">                    }</span>
+                    break;
+                }
+
+                case TYPE_SHORT_ARRAY: {
+<span class="nc" id="L470">                    int size = dis.readInt();</span>
+<span class="nc bnc" id="L471" title="All 2 branches missed.">                    if (size &gt; -1) {</span>
+<span class="nc" id="L472">                        short[] b = new short[size];</span>
+<span class="nc bnc" id="L473" title="All 2 branches missed.">                        for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc" id="L474">                            b[iter] = dis.readShort();</span>
+                        }
+<span class="nc" id="L476">                        returnValue = b;</span>
+<span class="nc" id="L477">                    }</span>
+                    break;
+                }
+
+                case TYPE_INT_ARRAY: {
+<span class="fc" id="L482">                    int size = dis.readInt();</span>
+<span class="pc bpc" id="L483" title="1 of 2 branches missed.">                    if (size &gt; -1) {</span>
+<span class="fc" id="L484">                        int[] b = new int[size];</span>
+<span class="fc bfc" id="L485" title="All 2 branches covered.">                        for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="fc" id="L486">                            b[iter] = dis.readInt();</span>
+                        }
+<span class="fc" id="L488">                        returnValue = b;</span>
+<span class="fc" id="L489">                    }</span>
+                    break;
+                }
+
+                case TYPE_LONG_ARRAY: {
+<span class="nc" id="L494">                    int size = dis.readInt();</span>
+<span class="nc bnc" id="L495" title="All 2 branches missed.">                    if (size &gt; -1) {</span>
+<span class="nc" id="L496">                        long[] b = new long[size];</span>
+<span class="nc bnc" id="L497" title="All 2 branches missed.">                        for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc" id="L498">                            b[iter] = dis.readLong();</span>
+                        }
+<span class="nc" id="L500">                        returnValue = b;</span>
+<span class="nc" id="L501">                    }</span>
+                    break;
+                }
+
+                case TYPE_DOUBLE_ARRAY: {
+<span class="nc" id="L506">                    int size = dis.readInt();</span>
+<span class="nc bnc" id="L507" title="All 2 branches missed.">                    if (size &gt; -1) {</span>
+<span class="nc" id="L508">                        double[] b = new double[size];</span>
+<span class="nc bnc" id="L509" title="All 2 branches missed.">                        for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc" id="L510">                            b[iter] = dis.readDouble();</span>
+                        }
+<span class="nc" id="L512">                        returnValue = b;</span>
+<span class="nc" id="L513">                    }</span>
+                    break;
+                }
+
+                case TYPE_FLOAT_ARRAY: {
+<span class="nc" id="L518">                    int size = dis.readInt();</span>
+<span class="nc bnc" id="L519" title="All 2 branches missed.">                    if (size &gt; -1) {</span>
+<span class="nc" id="L520">                        float[] b = new float[size];</span>
+<span class="nc bnc" id="L521" title="All 2 branches missed.">                        for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc" id="L522">                            b[iter] = dis.readFloat();</span>
+                        }
+<span class="nc" id="L524">                        returnValue = b;</span>
+<span class="nc" id="L525">                    }</span>
+                    break;
+                }
+
+                case TYPE_BOOLEAN_ARRAY: {
+<span class="nc" id="L530">                    int size = dis.readInt();</span>
+<span class="nc bnc" id="L531" title="All 2 branches missed.">                    if (size &gt; -1) {</span>
+<span class="nc" id="L532">                        boolean[] b = new boolean[size];</span>
+<span class="nc bnc" id="L533" title="All 2 branches missed.">                        for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc" id="L534">                            b[iter] = dis.readBoolean();</span>
+                        }
+<span class="nc" id="L536">                        returnValue = b;</span>
+<span class="nc" id="L537">                    }</span>
+                    break;
+                }
+
+                case TYPE_STRING_ARRAY: {
+<span class="nc" id="L542">                    int size = dis.readInt();</span>
+<span class="nc bnc" id="L543" title="All 2 branches missed.">                    if (size &gt; -1) {</span>
+<span class="nc" id="L544">                        String[] b = new String[size];</span>
+<span class="nc bnc" id="L545" title="All 2 branches missed.">                        for (int iter = 0; iter &lt; size; iter++) {</span>
+<span class="nc" id="L546">                            b[iter] = dis.readUTF();</span>
+                        }
+<span class="nc" id="L548">                        returnValue = b;</span>
+<span class="nc" id="L549">                    }</span>
+                    break;
+                }
+
+                case TYPE_EXTERNALIABLE:
+<span class="nc" id="L554">                    returnValue = Util.readObject(dis);</span>
+<span class="nc" id="L555">                    break;</span>
+
+                default:
+<span class="nc" id="L558">                    throw new RuntimeException(&quot;Unrecognized type: &quot; + returnValue);</span>
+            }
+<span class="fc" id="L560">        }</span>
+
+
+        @Override
+        protected void buildRequestBody(OutputStream os) throws IOException {
+<span class="fc" id="L565">            DataOutputStream dos = new DataOutputStream(os);</span>
+<span class="fc" id="L566">            dos.writeUTF(def.name);</span>
+<span class="fc" id="L567">            int alen = arguments.length;</span>
+<span class="fc bfc" id="L568" title="All 2 branches covered.">            for (int iter = 0; iter &lt; alen; iter++) {</span>
+<span class="pc bpc" id="L569" title="2 of 4 branches missed.">                if (def == null || def.arguments == null) continue;</span>
+<span class="pc bpc" id="L570" title="11 of 28 branches missed.">                switch (def.arguments[iter]) {</span>
+                    case TYPE_BYTE:
+<span class="fc" id="L572">                        dos.writeByte(((Byte) arguments[iter]).byteValue());</span>
+<span class="fc" id="L573">                        break;</span>
+
+                    case TYPE_CHAR:
+<span class="fc" id="L576">                        dos.writeChar(((Character) arguments[iter]).charValue());</span>
+<span class="fc" id="L577">                        break;</span>
+
+                    case TYPE_SHORT:
+<span class="fc" id="L580">                        dos.writeShort(((Short) arguments[iter]).shortValue());</span>
+<span class="fc" id="L581">                        break;</span>
+
+                    case TYPE_INT:
+<span class="fc" id="L584">                        dos.writeInt(((Integer) arguments[iter]).intValue());</span>
+<span class="fc" id="L585">                        break;</span>
+
+                    case TYPE_LONG:
+<span class="fc" id="L588">                        dos.writeLong(((Long) arguments[iter]).longValue());</span>
+<span class="fc" id="L589">                        break;</span>
+
+                    case TYPE_DOUBLE:
+<span class="fc" id="L592">                        dos.writeDouble(((Double) arguments[iter]).doubleValue());</span>
+<span class="fc" id="L593">                        break;</span>
+
+                    case TYPE_FLOAT:
+<span class="fc" id="L596">                        dos.writeFloat(((Float) arguments[iter]).floatValue());</span>
+<span class="fc" id="L597">                        break;</span>
+
+                    case TYPE_BOOLEAN:
+<span class="fc" id="L600">                        dos.writeBoolean(((Boolean) arguments[iter]).booleanValue());</span>
+<span class="fc" id="L601">                        break;</span>
+
+                    case TYPE_BYTE_OBJECT:
+<span class="pc bpc" id="L604" title="1 of 2 branches missed.">                        if (arguments[iter] != null) {</span>
+<span class="fc" id="L605">                            dos.writeBoolean(true);</span>
+<span class="fc" id="L606">                            dos.writeByte(((Byte) arguments[iter]).byteValue());</span>
+                        } else {
+<span class="nc" id="L608">                            dos.writeBoolean(false);</span>
+                        }
+<span class="nc" id="L610">                        break;</span>
+
+                    case TYPE_CHARACTER_OBJECT:
+<span class="pc bpc" id="L613" title="1 of 2 branches missed.">                        if (arguments[iter] != null) {</span>
+<span class="fc" id="L614">                            dos.writeBoolean(true);</span>
+<span class="fc" id="L615">                            dos.writeChar(((Character) arguments[iter]).charValue());</span>
+                        } else {
+<span class="nc" id="L617">                            dos.writeBoolean(false);</span>
+                        }
+<span class="nc" id="L619">                        break;</span>
+
+                    case TYPE_SHORT_OBJECT:
+<span class="pc bpc" id="L622" title="1 of 2 branches missed.">                        if (arguments[iter] != null) {</span>
+<span class="fc" id="L623">                            dos.writeBoolean(true);</span>
+<span class="fc" id="L624">                            dos.writeShort(((Short) arguments[iter]).shortValue());</span>
+                        } else {
+<span class="nc" id="L626">                            dos.writeBoolean(false);</span>
+                        }
+<span class="nc" id="L628">                        break;</span>
+
+                    case TYPE_INTEGER_OBJECT:
+<span class="nc bnc" id="L631" title="All 2 branches missed.">                        if (arguments[iter] != null) {</span>
+<span class="nc" id="L632">                            dos.writeBoolean(true);</span>
+<span class="nc" id="L633">                            dos.writeInt(((Integer) arguments[iter]).intValue());</span>
+                        } else {
+<span class="nc" id="L635">                            dos.writeBoolean(false);</span>
+                        }
+<span class="nc" id="L637">                        break;</span>
+
+                    case TYPE_LONG_OBJECT:
+<span class="pc bpc" id="L640" title="1 of 2 branches missed.">                        if (arguments[iter] != null) {</span>
+<span class="fc" id="L641">                            dos.writeBoolean(true);</span>
+<span class="fc" id="L642">                            dos.writeLong(((Long) arguments[iter]).longValue());</span>
+                        } else {
+<span class="nc" id="L644">                            dos.writeBoolean(false);</span>
+                        }
+<span class="nc" id="L646">                        break;</span>
+
+                    case TYPE_DOUBLE_OBJECT:
+<span class="pc bpc" id="L649" title="1 of 2 branches missed.">                        if (arguments[iter] != null) {</span>
+<span class="fc" id="L650">                            dos.writeBoolean(true);</span>
+<span class="fc" id="L651">                            dos.writeDouble(((Double) arguments[iter]).doubleValue());</span>
+                        } else {
+<span class="nc" id="L653">                            dos.writeBoolean(false);</span>
+                        }
+<span class="nc" id="L655">                        break;</span>
+
+                    case TYPE_FLOAT_OBJECT:
+<span class="pc bpc" id="L658" title="1 of 2 branches missed.">                        if (arguments[iter] != null) {</span>
+<span class="fc" id="L659">                            dos.writeBoolean(true);</span>
+<span class="fc" id="L660">                            dos.writeFloat(((Float) arguments[iter]).floatValue());</span>
+                        } else {
+<span class="nc" id="L662">                            dos.writeBoolean(false);</span>
+                        }
+<span class="nc" id="L664">                        break;</span>
+
+                    case TYPE_BOOLEAN_OBJECT:
+<span class="nc bnc" id="L667" title="All 2 branches missed.">                        if (arguments[iter] != null) {</span>
+<span class="nc" id="L668">                            dos.writeBoolean(true);</span>
+<span class="nc" id="L669">                            dos.writeBoolean(((Boolean) arguments[iter]).booleanValue());</span>
+                        } else {
+<span class="nc" id="L671">                            dos.writeBoolean(false);</span>
+                        }
+<span class="nc" id="L673">                        break;</span>
+
+                    case TYPE_STRING:
+<span class="pc bpc" id="L676" title="1 of 2 branches missed.">                        if (arguments[iter] != null) {</span>
+<span class="fc" id="L677">                            dos.writeBoolean(true);</span>
+<span class="fc" id="L678">                            dos.writeUTF((String) arguments[iter]);</span>
+                        } else {
+<span class="nc" id="L680">                            dos.writeBoolean(false);</span>
+                        }
+<span class="nc" id="L682">                        break;</span>
+
+                    case TYPE_BYTE_ARRAY:
+<span class="pc bpc" id="L685" title="1 of 2 branches missed.">                        if (arguments[iter] != null) {</span>
+<span class="fc" id="L686">                            byte[] b = (byte[]) arguments[iter];</span>
+<span class="fc" id="L687">                            dos.writeInt(b.length);</span>
+<span class="fc bfc" id="L688" title="All 2 branches covered.">                            for (byte bb : b) {</span>
+<span class="fc" id="L689">                                dos.writeByte(bb);</span>
+                            }
+<span class="fc" id="L691">                        } else {</span>
+<span class="nc" id="L692">                            dos.writeInt(-1);</span>
+                        }
+<span class="nc" id="L694">                        break;</span>
+
+                    case TYPE_CHAR_ARRAY:
+<span class="nc bnc" id="L697" title="All 2 branches missed.">                        if (arguments[iter] != null) {</span>
+<span class="nc" id="L698">                            char[] b = (char[]) arguments[iter];</span>
+<span class="nc" id="L699">                            dos.writeInt(b.length);</span>
+<span class="nc bnc" id="L700" title="All 2 branches missed.">                            for (char bb : b) {</span>
+<span class="nc" id="L701">                                dos.writeChar(bb);</span>
+                            }
+<span class="nc" id="L703">                        } else {</span>
+<span class="nc" id="L704">                            dos.writeInt(-1);</span>
+                        }
+<span class="nc" id="L706">                        break;</span>
+
+                    case TYPE_SHORT_ARRAY:
+<span class="nc bnc" id="L709" title="All 2 branches missed.">                        if (arguments[iter] != null) {</span>
+<span class="nc" id="L710">                            short[] b = (short[]) arguments[iter];</span>
+<span class="nc" id="L711">                            dos.writeInt(b.length);</span>
+<span class="nc bnc" id="L712" title="All 2 branches missed.">                            for (short bb : b) {</span>
+<span class="nc" id="L713">                                dos.writeShort(bb);</span>
+                            }
+<span class="nc" id="L715">                        } else {</span>
+<span class="nc" id="L716">                            dos.writeInt(-1);</span>
+                        }
+<span class="nc" id="L718">                        break;</span>
+
+                    case TYPE_INT_ARRAY:
+<span class="nc bnc" id="L721" title="All 2 branches missed.">                        if (arguments[iter] != null) {</span>
+<span class="nc" id="L722">                            int[] b = (int[]) arguments[iter];</span>
+<span class="nc" id="L723">                            dos.writeInt(b.length);</span>
+<span class="nc bnc" id="L724" title="All 2 branches missed.">                            for (int bb : b) {</span>
+<span class="nc" id="L725">                                dos.writeInt(bb);</span>
+                            }
+<span class="nc" id="L727">                        } else {</span>
+<span class="nc" id="L728">                            dos.writeInt(-1);</span>
+                        }
+<span class="nc" id="L730">                        break;</span>
+
+                    case TYPE_LONG_ARRAY:
+<span class="nc bnc" id="L733" title="All 2 branches missed.">                        if (arguments[iter] != null) {</span>
+<span class="nc" id="L734">                            long[] b = (long[]) arguments[iter];</span>
+<span class="nc" id="L735">                            dos.writeInt(b.length);</span>
+<span class="nc bnc" id="L736" title="All 2 branches missed.">                            for (long bb : b) {</span>
+<span class="nc" id="L737">                                dos.writeLong(bb);</span>
+                            }
+<span class="nc" id="L739">                        } else {</span>
+<span class="nc" id="L740">                            dos.writeInt(-1);</span>
+                        }
+<span class="nc" id="L742">                        break;</span>
+
+                    case TYPE_DOUBLE_ARRAY:
+<span class="nc bnc" id="L745" title="All 2 branches missed.">                        if (arguments[iter] != null) {</span>
+<span class="nc" id="L746">                            double[] b = (double[]) arguments[iter];</span>
+<span class="nc" id="L747">                            dos.writeInt(b.length);</span>
+<span class="nc bnc" id="L748" title="All 2 branches missed.">                            for (double bb : b) {</span>
+<span class="nc" id="L749">                                dos.writeDouble(bb);</span>
+                            }
+<span class="nc" id="L751">                        } else {</span>
+<span class="nc" id="L752">                            dos.writeInt(-1);</span>
+                        }
+<span class="nc" id="L754">                        break;</span>
+
+                    case TYPE_FLOAT_ARRAY:
+<span class="nc bnc" id="L757" title="All 2 branches missed.">                        if (arguments[iter] != null) {</span>
+<span class="nc" id="L758">                            float[] b = (float[]) arguments[iter];</span>
+<span class="nc" id="L759">                            dos.writeInt(b.length);</span>
+<span class="nc bnc" id="L760" title="All 2 branches missed.">                            for (float bb : b) {</span>
+<span class="nc" id="L761">                                dos.writeFloat(bb);</span>
+                            }
+<span class="nc" id="L763">                        } else {</span>
+<span class="nc" id="L764">                            dos.writeInt(-1);</span>
+                        }
+<span class="nc" id="L766">                        break;</span>
+
+                    case TYPE_BOOLEAN_ARRAY:
+<span class="nc bnc" id="L769" title="All 2 branches missed.">                        if (arguments[iter] != null) {</span>
+<span class="nc" id="L770">                            boolean[] b = (boolean[]) arguments[iter];</span>
+<span class="nc" id="L771">                            dos.writeInt(b.length);</span>
+<span class="nc bnc" id="L772" title="All 2 branches missed.">                            for (boolean bb : b) {</span>
+<span class="nc" id="L773">                                dos.writeBoolean(bb);</span>
+                            }
+<span class="nc" id="L775">                        } else {</span>
+<span class="nc" id="L776">                            dos.writeInt(-1);</span>
+                        }
+<span class="nc" id="L778">                        break;</span>
+
+                    case TYPE_STRING_ARRAY:
+<span class="pc bpc" id="L781" title="1 of 2 branches missed.">                        if (arguments[iter] != null) {</span>
+<span class="fc" id="L782">                            String[] b = (String[]) arguments[iter];</span>
+<span class="fc" id="L783">                            dos.writeInt(b.length);</span>
+<span class="fc bfc" id="L784" title="All 2 branches covered.">                            for (String bb : b) {</span>
+<span class="fc" id="L785">                                dos.writeUTF(bb);</span>
+                            }
+<span class="fc" id="L787">                        } else {</span>
+<span class="nc" id="L788">                            dos.writeInt(-1);</span>
+                        }
+<span class="nc" id="L790">                        break;</span>
+
+                    case TYPE_EXTERNALIABLE:
+<span class="nc" id="L793">                        Util.writeObject(arguments[iter], dos);</span>
+<span class="nc" id="L794">                        break;</span>
+
+                    default:
+<span class="nc" id="L797">                        throw new RuntimeException(&quot;Unrecognized type: &quot; + def.arguments[iter]);</span>
+                }
+            }
+<span class="fc" id="L800">        }</span>
+
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Storage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io</a> &gt; <span class="el_source">Storage.java</span></div><h1>Storage.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.io;
+
+import com.codename1.impl.CodenameOneImplementation;
+import com.codename1.util.StringUtil;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+
+/**
+ * &lt;p&gt;Abstracts the underlying application specific storage system, unlike the {@link com.codename1.io.FileSystemStorage}
+ * this class is a higher level abstraction. The {@code Storage} class is designed to be very portable and as
+ * such it has no support for staple file system capabilities such as hierarchies. &lt;br&gt;
+ * Check out a more thorough discussion of this API {@link com.codename1.io here}.
+ * &lt;/p&gt;
+ * &lt;p&gt;
+ * The sample code below shows a simple storage browser tool in action:
+ * &lt;/p&gt;
+ *
+ * &lt;script src=&quot;https://gist.github.com/codenameone/a941ef1f2f398b2c1074.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/storage-list.png&quot; alt=&quot;List of files within the storage&quot; /&gt;
+ *
+ * @author Shai Almog
+ */
+<span class="fc" id="L51">public class Storage {</span>
+    private static Storage INSTANCE;
+<span class="fc" id="L53">    private final CacheMap cache = new CacheMap();</span>
+<span class="fc" id="L54">    private boolean normalizeNames = true;</span>
+
+    /**
+     * This method must be invoked before using the storage otherwise some platforms
+     * might fail without the application data.
+     *
+     * @param data either the name of the application e.g. on CDC platforms or
+     *             a context object on other platforms
+     */
+    private static void init(Object data) {
+<span class="pc bpc" id="L64" title="1 of 2 branches missed.">        if (Util.getImplementation() != null) {</span>
+<span class="fc" id="L65">            Util.getImplementation().setStorageData(data);</span>
+        }
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (INSTANCE == null) {</span>
+<span class="fc" id="L68">            INSTANCE = new Storage();</span>
+        }
+<span class="fc" id="L70">    }</span>
+
+    /**
+     * Returns true if the storage is initialized
+     *
+     * @return true if the storage is initialized
+     */
+    public static boolean isInitialized() {
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        return INSTANCE != null;</span>
+    }
+
+    /**
+     * Returns the storage instance or null if the storage wasn't initialized using
+     * a call to init(String) first.
+     *
+     * @return storage instance
+     */
+    public static Storage getInstance() {
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (INSTANCE == null) {</span>
+<span class="fc" id="L89">            init(&quot;cn1&quot;);</span>
+        }
+<span class="fc" id="L91">        return INSTANCE;</span>
+    }
+
+    /**
+     * Allows installing a custom storage instance to provide functionality such as seamless encryption
+     *
+     * @param s the storage instance
+     */
+    public static void setStorageInstance(Storage s) {
+<span class="fc" id="L100">        INSTANCE = s;</span>
+<span class="fc" id="L101">    }</span>
+
+    /**
+     * Indicates the caching size, storage can be pretty slow
+     *
+     * @param size size in elements (not kb!)
+     */
+    public void setHardCacheSize(int size) {
+<span class="nc" id="L109">        cache.setCacheSize(size);</span>
+<span class="nc" id="L110">    }</span>
+
+    /**
+     * If a file name contains slashes replace them with underscores, same goes for *, %, ? etc.
+     *
+     * @param name the file name
+     * @return the fixed filename
+     */
+    private String fixFileName(String name) {
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (normalizeNames) {</span>
+<span class="fc" id="L120">            name = StringUtil.replaceAll(name, &quot;/&quot;, &quot;_&quot;);</span>
+<span class="fc" id="L121">            name = StringUtil.replaceAll(name, &quot;\\&quot;, &quot;_&quot;);</span>
+<span class="fc" id="L122">            name = StringUtil.replaceAll(name, &quot;%&quot;, &quot;_&quot;);</span>
+<span class="fc" id="L123">            name = StringUtil.replaceAll(name, &quot;?&quot;, &quot;_&quot;);</span>
+<span class="fc" id="L124">            name = StringUtil.replaceAll(name, &quot;*&quot;, &quot;_&quot;);</span>
+<span class="fc" id="L125">            name = StringUtil.replaceAll(name, &quot;:&quot;, &quot;_&quot;);</span>
+<span class="fc" id="L126">            name = StringUtil.replaceAll(name, &quot;=&quot;, &quot;_&quot;);</span>
+        }
+<span class="fc" id="L128">        return name;</span>
+    }
+
+    /**
+     * Storage is cached for faster access, however this might cause a problem with refreshing
+     * objects since they are not cloned. Clearing the cache allows to actually reload from the
+     * storage file.
+     */
+    public void clearCache() {
+<span class="fc" id="L137">        cache.clearAllCache();</span>
+<span class="fc" id="L138">    }</span>
+
+    /**
+     * Flush the storage cache allowing implementations that cache storage objects
+     * to store
+     */
+    public void flushStorageCache() {
+<span class="fc" id="L145">        Util.getImplementation().flushStorageCache();</span>
+<span class="fc" id="L146">    }</span>
+
+    /**
+     * Deletes the given file name from the storage
+     *
+     * @param name the name of the storage file
+     */
+    public void deleteStorageFile(String name) {
+<span class="fc" id="L154">        name = fixFileName(name);</span>
+<span class="fc" id="L155">        Util.getImplementation().deleteStorageFile(name);</span>
+<span class="fc" id="L156">        cache.delete(name);</span>
+<span class="fc" id="L157">    }</span>
+
+    /**
+     * Deletes all the files in the application storage
+     */
+    public void clearStorage() {
+<span class="fc" id="L163">        Util.getImplementation().clearStorage();</span>
+<span class="fc" id="L164">        cache.clearAllCache();</span>
+<span class="fc" id="L165">    }</span>
+
+    /**
+     * Creates an output stream to the storage with the given name
+     *
+     * @param name the storage file name
+     * @return an output stream of limited capacity
+     */
+    public OutputStream createOutputStream(String name) throws IOException {
+<span class="fc" id="L174">        name = fixFileName(name);</span>
+<span class="fc" id="L175">        return Util.getImplementation().createStorageOutputStream(name);</span>
+    }
+
+    /**
+     * Creates an input stream to the given storage source file
+     *
+     * @param name the name of the source file
+     * @return the input stream
+     */
+    public InputStream createInputStream(String name) throws IOException {
+<span class="fc bfc" id="L185" title="All 2 branches covered.">        if (!exists(name)) {</span>
+<span class="fc" id="L186">            throw new IOException(&quot;Storage key &quot; + name + &quot; does not exist&quot;);</span>
+        }
+<span class="fc" id="L188">        name = fixFileName(name);</span>
+<span class="fc" id="L189">        return Util.getImplementation().createStorageInputStream(name);</span>
+    }
+
+    /**
+     * Returns true if the given storage file exists
+     *
+     * @param name the storage file name
+     * @return true if it exists
+     */
+    public boolean exists(String name) {
+<span class="fc" id="L199">        name = fixFileName(name);</span>
+<span class="fc" id="L200">        CodenameOneImplementation implementation = Util.getImplementation();</span>
+<span class="pc bpc" id="L201" title="1 of 4 branches missed.">        return implementation != null &amp;&amp; implementation.storageFileExists(name);</span>
+    }
+
+    /**
+     * Lists the names of the storage files
+     *
+     * @return the names of all the storage files
+     */
+    public String[] listEntries() {
+<span class="fc" id="L210">        return Util.getImplementation().listStorageEntries();</span>
+    }
+
+    /**
+     * Returns the size in bytes of the given entry
+     *
+     * @param name the name of the entry
+     * @return the size in bytes
+     */
+    public int entrySize(String name) {
+<span class="fc" id="L220">        name = fixFileName(name);</span>
+<span class="fc" id="L221">        return Util.getImplementation().getStorageEntrySize(name);</span>
+    }
+
+    /**
+     * &lt;p&gt;Writes the given object to storage assuming it is an externalizable type
+     * or one of the supported types.&lt;/p&gt;
+     *
+     * &lt;p&gt;
+     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
+     * &lt;/p&gt;
+     * &lt;script src=&quot;https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js&quot;&gt;&lt;/script&gt;
+     *
+     * @param name store name
+     * @param o    object to store
+     * @return true for success, false for failure
+     */
+    public boolean writeObject(String name, Object o) {
+<span class="fc" id="L238">        return writeObject(name, o, true);</span>
+    }
+
+    /**
+     * &lt;p&gt;Writes the given object to storage assuming it is an externalizable type
+     * or one of the supported types.&lt;/p&gt;
+     *
+     * &lt;p&gt;
+     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
+     * &lt;/p&gt;
+     * &lt;script src=&quot;https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js&quot;&gt;&lt;/script&gt;
+     *
+     * @param name store name
+     * @param o    object to store
+     * @param includeLogging During app initialization, the logging on error might impact the apps stability
+     * @return true for success, false for failure
+     */
+    public boolean writeObject(String name, Object o, boolean includeLogging) {
+<span class="fc" id="L256">        name = fixFileName(name);</span>
+<span class="fc" id="L257">        cache.put(name, o);</span>
+<span class="fc" id="L258">        DataOutputStream d = null;</span>
+        try {
+<span class="fc" id="L260">            d = new DataOutputStream(createOutputStream(name));</span>
+<span class="fc" id="L261">            Util.writeObject(o, d);</span>
+<span class="fc" id="L262">            d.close();</span>
+<span class="fc" id="L263">            return true;</span>
+<span class="nc" id="L264">        } catch (Exception err) {</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">            if(includeLogging) {</span>
+<span class="nc" id="L266">                Log.e(err);</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">                if (Log.isCrashBound()) {</span>
+<span class="nc" id="L268">                    Log.sendLog();</span>
+                }
+            }
+<span class="nc" id="L271">            Util.getImplementation().deleteStorageFile(name);</span>
+<span class="nc" id="L272">            Util.getImplementation().cleanup(d);</span>
+<span class="nc" id="L273">            return false;</span>
+        }
+    }
+
+    /**
+     * &lt;p&gt;Reads the object from the storage, returns null if the object isn't there&lt;/p&gt;
+     * &lt;p&gt;
+     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
+     * &lt;/p&gt;
+     * &lt;script src=&quot;https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js&quot;&gt;&lt;/script&gt;
+     *
+     * @param name name of the store
+     * @return object stored under that name
+     */
+    public Object readObject(String name) {
+<span class="fc" id="L288">        return readObject(name, true);</span>
+    }
+
+    /**
+     * &lt;p&gt;Reads the object from the storage, returns null if the object isn't there&lt;/p&gt;
+     * &lt;p&gt;
+     * The sample below demonstrates the usage and registration of the {@link com.codename1.io.Externalizable} interface:
+     * &lt;/p&gt;
+     * &lt;script src=&quot;https://gist.github.com/codenameone/858d8634e3cf1a82a1eb.js&quot;&gt;&lt;/script&gt;
+     *
+     * @param name name of the store
+     * @param includeLogging During app initialization, the logging on error might impact the apps stability
+     * @return object stored under that name
+     */
+    public Object readObject(String name, boolean includeLogging) {
+<span class="fc" id="L303">        name = fixFileName(name);</span>
+<span class="fc" id="L304">        Object o = cache.get(name);</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">        if (o != null) {</span>
+<span class="fc" id="L306">            return o;</span>
+        }
+<span class="fc" id="L308">        DataInputStream d = null;</span>
+        try {
+<span class="fc bfc" id="L310" title="All 2 branches covered.">            if (!exists(name)) {</span>
+<span class="fc" id="L311">                return null;</span>
+            }
+<span class="fc" id="L313">            d = new DataInputStream(createInputStream(name));</span>
+<span class="fc" id="L314">            o = Util.readObject(d);</span>
+<span class="fc" id="L315">            d.close();</span>
+<span class="fc" id="L316">            cache.put(name, o);</span>
+<span class="fc" id="L317">            return o;</span>
+<span class="nc" id="L318">        } catch (Throwable err) {</span>
+<span class="nc bnc" id="L319" title="All 2 branches missed.">            if(includeLogging) {</span>
+<span class="nc" id="L320">                Log.p(&quot;Error while reading: &quot; + name);</span>
+<span class="nc" id="L321">                Log.e(err);</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">                if (Log.isCrashBound()) {</span>
+<span class="nc" id="L323">                    Log.sendLog();</span>
+                }
+            }
+<span class="nc" id="L326">            Util.getImplementation().cleanup(d);</span>
+<span class="nc" id="L327">            return null;</span>
+        }
+    }
+
+    /**
+     * Indicates whether characters that are typically illegal in filesystems should
+     * be sanitized and replaced with underscore
+     *
+     * @return the normalizeNames
+     */
+    public boolean isNormalizeNames() {
+<span class="nc" id="L338">        return normalizeNames;</span>
+    }
+
+    /**
+     * Indicates whether characters that are typically illegal in filesystems should
+     * be sanitized and replaced with underscore
+     *
+     * @param normalizeNames the normalizeNames to set
+     */
+    public void setNormalizeNames(boolean normalizeNames) {
+<span class="fc" id="L348">        this.normalizeNames = normalizeNames;</span>
+<span class="fc" id="L349">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

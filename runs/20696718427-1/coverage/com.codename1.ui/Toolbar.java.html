@@ -1,0 +1,2791 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Toolbar.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui</a> &gt; <span class="el_source">Toolbar.java</span></div><h1>Toolbar.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.ui;
+
+import com.codename1.components.InteractionDialog;
+import com.codename1.io.Log;
+import com.codename1.ui.animations.BubbleTransition;
+import com.codename1.ui.animations.CommonTransitions;
+import com.codename1.ui.animations.Motion;
+import com.codename1.ui.animations.Transition;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ScrollListener;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.layouts.Layout;
+import com.codename1.ui.list.DefaultListCellRenderer;
+import com.codename1.ui.plaf.LookAndFeel;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+import java.util.ArrayList;
+import java.util.Vector;
+
+/**
+ * &lt;p&gt;
+ * Toolbar replaces the default title area with a powerful abstraction that
+ * allows functionality ranging from side menus (hamburger) to title animations
+ * and any arbitrary component type. Toolbar allows customizing the Form title
+ * with different commands on the title area, within the side menu or the
+ * overflow menu.&lt;/p&gt;
+ *
+ * &lt;p&gt;
+ * The Toolbar allows placing components in one of 4 positions as illustrated by
+ * the sample below:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/e72cfa6aedd7fcd1af72.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-toolbar.png&quot; alt=&quot;Simple usage of Toolbar&quot; /&gt;
+ *
+ * &lt;p&gt;
+ * {@code Toolbar} supports a search mode that implicitly replaces the title
+ * with a search field/magnifying glass effect. The code below demonstrates
+ * searching thru the contacts using this API:
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/cd227aaca486889f7c940e2e97985426.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/toolbar-search-mode.jpg&quot; alt=&quot;Dynamic search mode in the Toolbar&quot; /&gt;
+ *
+ * &lt;p&gt;
+ * The following code also demonstrates search with a more custom UX where the
+ * title area was replaced dynamically. This code predated the builtin search
+ * support above. Notice that the {@code TextField} and its hint are styled to
+ * look like the title.
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/dce6598a226aaf9a3157.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-toolbar-search.png&quot; alt=&quot;Dynamic TextField search using the Toolbar&quot; /&gt;
+ *
+ * &lt;p&gt;
+ * This sample code show off title animations that allow a title to change (and
+ * potentially shrink) as the user scrolls down the UI. The 3 frames below show
+ * a step by step process in the change.
+ * &lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/085e3a8fa1c36829d812.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-toolbar-animation-1.png&quot; alt=&quot;Toolbar animation stages&quot; /&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-toolbar-animation-2.png&quot; alt=&quot;Toolbar animation stages&quot; /&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-toolbar-animation-3.png&quot; alt=&quot;Toolbar animation stages&quot; /&gt;
+ *
+ * @author Chen, Francesco Galgani
+ */
+public class Toolbar extends Container {
+
+    /**
+     * Enables/Disables the side menu bar swipe, defaults to true
+     */
+<span class="fc" id="L94">    private static boolean enableSideMenuSwipe = true;</span>
+    private static boolean permanentSideMenu;
+    /**
+     * Sets the side menu to &quot;on-top&quot; mode
+     */
+<span class="fc" id="L99">    private static boolean onTopSideMenu = true;</span>
+    private static boolean globalToolbar;
+    /**
+     * Indicates whether the toolbar should be properly centered by default
+     */
+<span class="fc" id="L104">    private static boolean centeredDefault = true;</span>
+    private Component titleComponent;
+    private final ToolbarSideMenu sideMenu;
+    private Vector&lt;Command&gt; overflowCommands;
+    private Button menuButton;
+    private Command leftSideMenuCommand;
+    private Command rightSideMenuCommand;
+    private ScrollListener scrollListener;
+    private ActionListener releasedListener;
+<span class="fc" id="L113">    private boolean scrollOff = false;</span>
+    private int initialY;
+    private int actualPaneInitialY;
+    private int actualPaneInitialH;
+    private Motion hideShowMotion;
+    private boolean showing;
+<span class="fc" id="L119">    private boolean layered = false;</span>
+<span class="fc" id="L120">    private boolean initialized = false;</span>
+    private InteractionDialog sidemenuDialog;
+    private InteractionDialog rightSidemenuDialog;
+<span class="fc" id="L123">    private boolean isPointerReleasedListenerAdded = false;</span>
+<span class="fc" id="L124">    private boolean isPointerPressedListenerAdded = false;</span>
+<span class="fc" id="L125">    private boolean isPointerDraggedListenerAdded = false;</span>
+<span class="fc" id="L126">    private boolean rightSideMenuCmdsAlignedToLeft = false;</span>
+    private Container permanentSideMenuContainer;
+    private Container permanentRightSideMenuContainer;
+    private Command searchCommand;
+    /**
+     * Component placed on the bottom (south) portion of the permanent/on-top
+     * side menu.
+     */
+    private Component sidemenuSouthComponent;
+    private Component rightSidemenuSouthComponent;
+    private float searchIconSize;
+    // Flag for the scrollChanged listener to prevent it from being re-entered.
+    private boolean entered;
+    private int lastNonZeroScrollDiff;
+
+    /**
+     * Empty Constructor
+     */
+<span class="fc" id="L144">    public Toolbar() {</span>
+<span class="fc" id="L145">        setLayout(new BorderLayout());</span>
+<span class="pc bpc" id="L146" title="1 of 2 branches missed.">        if (UIManager.getInstance().isThemeConstant(&quot;landscapeTitleUiidBool&quot;, false)) {</span>
+<span class="nc" id="L147">            setUIID(&quot;Toolbar&quot;, &quot;ToolbarLandscape&quot;);</span>
+        } else {
+<span class="fc" id="L149">            setUIIDFinal(&quot;Toolbar&quot;);</span>
+        }
+<span class="fc" id="L151">        sideMenu = new ToolbarSideMenu();</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">        if (centeredDefault</span>
+<span class="pc bpc" id="L153" title="1 of 2 branches missed.">                &amp;&amp; UIManager.getInstance().getComponentStyle(&quot;Title&quot;).getAlignment() == CENTER) {</span>
+<span class="fc" id="L154">            setTitleCentered(true);</span>
+        }
+<span class="fc" id="L156">    }</span>
+
+    /**
+     * This constructor places the Toolbar on a different layer on top of the
+     * Content Pane.
+     *
+     * @param layered if true places the Toolbar on top of the Content Pane
+     */
+    public Toolbar(boolean layered) {
+<span class="nc" id="L165">        this();</span>
+<span class="nc" id="L166">        this.layered = layered;</span>
+<span class="nc" id="L167">    }</span>
+
+    /**
+     * Indicates whether the toolbar should be properly centered by default
+     *
+     * @return the centeredDefault
+     */
+    public static boolean isCenteredDefault() {
+<span class="fc" id="L175">        return centeredDefault;</span>
+    }
+
+    /**
+     * Indicates whether the toolbar should be properly centered by default
+     *
+     * @param aCenteredDefault the centeredDefault to set
+     */
+    public static void setCenteredDefault(boolean aCenteredDefault) {
+<span class="fc" id="L184">        centeredDefault = aCenteredDefault;</span>
+<span class="fc" id="L185">    }</span>
+
+    /**
+     * Indicates if the side menu is in &quot;on-top&quot; mode
+     *
+     * @return the onTopSideMenu
+     */
+    public static boolean isOnTopSideMenu() {
+<span class="fc" id="L193">        return onTopSideMenu;</span>
+    }
+
+    /**
+     * Sets the side menu to &quot;on-top&quot; mode
+     *
+     * @param aOnTopSideMenu the onTopSideMenu to set
+     */
+    public static void setOnTopSideMenu(boolean aOnTopSideMenu) {
+<span class="fc" id="L202">        onTopSideMenu = aOnTopSideMenu;</span>
+<span class="fc" id="L203">    }</span>
+
+    /**
+     * Enables/Disables the side menu bar swipe, defaults to true
+     *
+     * @return the enableSideMenuSwipe
+     */
+    public static boolean isEnableSideMenuSwipe() {
+<span class="nc" id="L211">        return enableSideMenuSwipe;</span>
+    }
+
+    /**
+     * Enables/Disables the side menu bar swipe, defaults to true
+     *
+     * @param aEnableSideMenuSwipe the enableSideMenuSwipe to set
+     */
+    public static void setEnableSideMenuSwipe(boolean aEnableSideMenuSwipe) {
+<span class="nc" id="L220">        enableSideMenuSwipe = aEnableSideMenuSwipe;</span>
+<span class="nc" id="L221">    }</span>
+
+    /**
+     * Enables/disables the Toolbar for all the forms in the application. This
+     * flag can be flipped via the theme constant {@code globalToobarBool}.
+     * Notice that the name of this method might imply that one toolbar instance
+     * will be used for all forms which isn't the case, separate instances will
+     * be used for each form
+     *
+     * @return true if the toolbar API is turned on by default
+     */
+    public static boolean isGlobalToolbar() {
+<span class="fc" id="L233">        return globalToolbar;</span>
+    }
+
+    /**
+     * Enables/disables the Toolbar for all the forms in the application. This
+     * flag can be flipped via the theme constant {@code globalToobarBool}.
+     * Notice that the name of this method might imply that one toolbar instance
+     * will be used for all forms which isn't the case, separate instances will
+     * be used for each form
+     *
+     * @param gt true to enable the toolbar globally
+     */
+    public static void setGlobalToolbar(boolean gt) {
+<span class="fc" id="L246">        globalToolbar = gt;</span>
+<span class="fc" id="L247">    }</span>
+
+    /**
+     * Creates a static side menu that doesn't fold instead of the standard
+     * sidemenu. This is common for tablet UI's where folding the side menu
+     * doesn't make as much sense.
+     *
+     * @return true if we will use a permanent sidemenu
+     */
+    public static boolean isPermanentSideMenu() {
+<span class="nc" id="L257">        return permanentSideMenu;</span>
+    }
+
+    /**
+     * Creates a static side menu that doesn't fold instead of the standard
+     * sidemenu. This is common for tablet UI's where folding the side menu
+     * doesn't make as much sense.
+     *
+     * @param p true to have a permanent side menu
+     */
+    public static void setPermanentSideMenu(boolean p) {
+<span class="nc" id="L268">        permanentSideMenu = p;</span>
+<span class="nc" id="L269">        onTopSideMenu = false;</span>
+<span class="nc" id="L270">    }</span>
+
+    /**
+     * Sets the title of the Toolbar.
+     *
+     * @param title the Toolbar title
+     */
+    public void setTitle(String title) {
+<span class="fc" id="L278">        checkIfInitialized();</span>
+<span class="fc" id="L279">        Component center = ((BorderLayout) getLayout()).getCenter();</span>
+<span class="fc bfc" id="L280" title="All 2 branches covered.">        if (center instanceof Label) {</span>
+<span class="fc" id="L281">            ((Label) center).setText(title);</span>
+        } else {
+<span class="fc" id="L283">            titleComponent = new Label(title);</span>
+<span class="fc" id="L284">            titleComponent.setUIID(&quot;Title&quot;);</span>
+<span class="pc bpc" id="L285" title="1 of 2 branches missed.">            if (center != null) {</span>
+<span class="nc" id="L286">                replace(center, titleComponent, null);</span>
+            } else {
+<span class="fc" id="L288">                addComponent(BorderLayout.CENTER, titleComponent);</span>
+            }
+        }
+<span class="fc" id="L291">    }</span>
+
+    /**
+     * Returns true if the title is centered via the layout
+     *
+     * @return true if the title is centered
+     */
+    public boolean isTitleCentered() {
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        return ((BorderLayout) getLayout()).getCenterBehavior() == BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE;</span>
+    }
+
+    /**
+     * Makes the title align to the center accurately by doing it at the layout
+     * level which also takes into account right/left commands
+     *
+     * @param cent whether the title should be centered
+     */
+    public void setTitleCentered(boolean cent) {
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">        if (cent) {</span>
+<span class="fc" id="L310">            ((BorderLayout) getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_CENTER_ABSOLUTE);</span>
+        } else {
+<span class="nc" id="L312">            ((BorderLayout) getLayout()).setCenterBehavior(BorderLayout.CENTER_BEHAVIOR_SCALE);</span>
+        }
+<span class="fc" id="L314">    }</span>
+
+    /**
+     * This is a convenience method to open the left side menu bar. It's useful
+     * for cases where we want to place the menu button in a &quot;creative way&quot; in
+     * which case we can bind the side menu to this
+     */
+    public void openSideMenu() {
+<span class="pc bpc" id="L322" title="1 of 2 branches missed.">        if (onTopSideMenu) {</span>
+<span class="fc" id="L323">            showOnTopSidemenu(-1, false);</span>
+        } else {
+<span class="nc" id="L325">            ((SideMenuBar) getMenuBar()).openMenu(null);</span>
+        }
+<span class="fc" id="L327">    }</span>
+
+    /**
+     * Returns true if the left or right side menu is open which is useful for walk through
+     * tours etc.
+     */
+    public boolean isSideMenuShowing() {
+<span class="pc bpc" id="L334" title="4 of 6 branches missed.">        return (sidemenuDialog != null &amp;&amp; sidemenuDialog.isShowing()) ||</span>
+<span class="pc bnc" id="L335" title="All 2 branches missed.">                (rightSidemenuDialog != null &amp;&amp; rightSidemenuDialog.isShowing());</span>
+    }
+
+    /**
+     * This is a convenience method to open the right side menu bar. It's useful
+     * for cases where we want to place the menu button in a &quot;creative way&quot; in
+     * which case we can bind the side menu to this
+     */
+    public void openRightSideMenu() {
+<span class="pc bpc" id="L344" title="1 of 2 branches missed.">        if (onTopSideMenu) {</span>
+<span class="fc" id="L345">            showOnTopRightSidemenu(-1, false);</span>
+        }
+<span class="fc" id="L347">    }</span>
+
+    /**
+     * Closes the current side menu
+     */
+    public void closeSideMenu() {
+<span class="fc" id="L353">        closeLeftSideMenu();</span>
+<span class="fc" id="L354">        closeRightSideMenu();</span>
+<span class="fc" id="L355">    }</span>
+
+    /**
+     * Closes the left side menu
+     */
+    public void closeLeftSideMenu() {
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">        if (onTopSideMenu) {</span>
+<span class="pc bpc" id="L362" title="1 of 4 branches missed.">            if (sidemenuDialog != null &amp;&amp; sidemenuDialog.isShowing()) {</span>
+<span class="pc bpc" id="L363" title="1 of 2 branches missed.">                if (!isRTL()) {</span>
+<span class="fc" id="L364">                    sidemenuDialog.disposeToTheLeft();</span>
+                } else {
+<span class="nc" id="L366">                    sidemenuDialog.disposeToTheRight();</span>
+                }
+<span class="fc" id="L368">                Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);</span>
+<span class="fc" id="L369">                Style s = cnt.getUnselectedStyle();</span>
+<span class="fc" id="L370">                s.setBgTransparency(0);</span>
+<span class="fc" id="L371">                cnt.remove();</span>
+<span class="fc" id="L372">            }</span>
+        } else {
+<span class="nc" id="L374">            SideMenuBar.closeCurrentMenu();</span>
+        }
+<span class="fc" id="L376">    }</span>
+
+    /**
+     * Closes the right side menu
+     */
+    public void closeRightSideMenu() {
+<span class="pc bpc" id="L382" title="1 of 2 branches missed.">        if (onTopSideMenu) {</span>
+<span class="pc bpc" id="L383" title="1 of 4 branches missed.">            if (rightSidemenuDialog != null &amp;&amp; rightSidemenuDialog.isShowing()) {</span>
+<span class="pc bpc" id="L384" title="1 of 2 branches missed.">                if (!isRTL()) {</span>
+<span class="fc" id="L385">                    rightSidemenuDialog.disposeToTheRight();</span>
+                } else {
+<span class="nc" id="L387">                    rightSidemenuDialog.disposeToTheLeft();</span>
+                }
+<span class="fc" id="L389">                Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);</span>
+<span class="fc" id="L390">                Style s = cnt.getUnselectedStyle();</span>
+<span class="fc" id="L391">                s.setBgTransparency(0);</span>
+<span class="fc" id="L392">                cnt.remove();</span>
+            }
+        }
+<span class="fc" id="L395">    }</span>
+
+    /**
+     * Returns the Toolbar title Component.
+     *
+     * @return the Toolbar title component
+     */
+    public Component getTitleComponent() {
+<span class="fc" id="L403">        return titleComponent;</span>
+    }
+
+    /**
+     * Sets the Toolbar title component. This method allow placing any component
+     * in the Toolbar center instead of the regular Label. Can be used to place
+     * a TextField to perform search operations
+     *
+     * @param titleCmp Component to place in the Toolbar center.
+     */
+    public void setTitleComponent(Component titleCmp) {
+<span class="fc" id="L414">        checkIfInitialized();</span>
+<span class="pc bpc" id="L415" title="1 of 2 branches missed.">        if (titleComponent != null) {</span>
+<span class="fc" id="L416">            titleComponent.remove();</span>
+        }
+<span class="fc" id="L418">        titleComponent = titleCmp;</span>
+<span class="fc" id="L419">        addComponent(BorderLayout.CENTER, titleComponent);</span>
+<span class="fc" id="L420">    }</span>
+
+    /**
+     * Adds a Command to the overflow menu
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToOverflowMenu(String name, Image icon, final ActionListener ev) {
+<span class="fc" id="L431">        Command cmd = Command.create(name, icon, ev);</span>
+<span class="fc" id="L432">        addCommandToOverflowMenu(cmd);</span>
+<span class="fc" id="L433">        return cmd;</span>
+    }
+
+    /**
+     * Sets the back command in the title bar to an arrow type and maps the back
+     * command hardware key if applicable. This is functionally identical to {@code setBackCommand(title, Toolbar.BackCommandPolicy.AS_ARROW, listener);
+     * }
+     *
+     * @param title    command title
+     * @param listener action event for the back command
+     * @return the created command
+     */
+    public Command setBackCommand(String title, ActionListener&lt;ActionEvent&gt; listener) {
+<span class="nc" id="L446">        Command cmd = Command.create(title, null, listener);</span>
+<span class="nc" id="L447">        setBackCommand(cmd, BackCommandPolicy.AS_ARROW);</span>
+<span class="nc" id="L448">        return cmd;</span>
+    }
+
+    /**
+     * Sets the back command in the title bar to an arrow type and maps the back
+     * command hardware key if applicable. This is functionally identical to {@code setBackCommand(cmd, Toolbar.BackCommandPolicy.AS_ARROW);
+     * }
+     *
+     * @param cmd the command
+     */
+    public void setBackCommand(Command cmd) {
+<span class="fc" id="L459">        setBackCommand(cmd, BackCommandPolicy.AS_ARROW);</span>
+<span class="fc" id="L460">    }</span>
+
+    /**
+     * Sets the back command in the title bar and in the form, back command
+     * behaves based on the given policy type
+     *
+     * @param title    command title
+     * @param policy   the behavior of the back command in the title
+     * @param listener action event for the back command
+     * @return the created command
+     */
+    public Command setBackCommand(String title, BackCommandPolicy policy, ActionListener&lt;ActionEvent&gt; listener) {
+<span class="nc" id="L472">        Command cmd = Command.create(title, null, listener);</span>
+<span class="nc" id="L473">        setBackCommand(cmd, policy);</span>
+<span class="nc" id="L474">        return cmd;</span>
+    }
+
+    /**
+     * Sets the back command in the title bar and in the form, back command
+     * behaves based on the given policy type
+     *
+     * @param cmd      the command
+     * @param policy   the behavior of the back command in the title
+     * @param iconSize the size of the back command icon in millimeters
+     */
+    public void setBackCommand(Command cmd, BackCommandPolicy policy, float iconSize) {
+<span class="fc bfc" id="L486" title="All 2 branches covered.">        if (iconSize &lt; 0) {</span>
+<span class="fc" id="L487">            iconSize = 3;</span>
+        }
+<span class="fc" id="L489">        getComponentForm().setBackCommand(cmd);</span>
+<span class="pc bpc" id="L490" title="5 of 6 branches missed.">        switch (policy) {</span>
+            case ALWAYS:
+<span class="nc bnc" id="L492" title="All 2 branches missed.">                if (UIManager.getInstance().isThemeConstant(&quot;landscapeTitleUiidBool&quot;, false)) {</span>
+<span class="nc" id="L493">                    cmd.putClientProperty(&quot;luiid&quot;, &quot;BackCommandLandscape&quot;);</span>
+                }
+<span class="nc" id="L495">                cmd.putClientProperty(&quot;uiid&quot;, &quot;BackCommand&quot;);</span>
+<span class="nc" id="L496">                addCommandToLeftBar(cmd);</span>
+<span class="nc" id="L497">                break;</span>
+            case WHEN_USES_TITLE_OTHERWISE_ARROW:
+<span class="nc bnc" id="L499" title="All 2 branches missed.">                if (UIManager.getInstance().isThemeConstant(&quot;landscapeTitleUiidBool&quot;, false)) {</span>
+<span class="nc" id="L500">                    cmd.putClientProperty(&quot;luiid&quot;, &quot;BackCommandLandscape&quot;);</span>
+                }
+<span class="nc" id="L502">                cmd.putClientProperty(&quot;uiid&quot;, &quot;BackCommand&quot;);</span>
+<span class="nc bnc" id="L503" title="All 2 branches missed.">                if (getUIManager().isThemeConstant(&quot;backUsesTitleBool&quot;, false)) {</span>
+<span class="nc bnc" id="L504" title="All 2 branches missed.">                    if (getUIManager().isThemeConstant(&quot;iosStyleBackArrowBool&quot;, false)) {</span>
+<span class="nc" id="L505">                        cmd.setIconGapMM(0.5f);</span>
+<span class="nc" id="L506">                        cmd.setMaterialIcon(FontImage.MATERIAL_KEYBOARD_ARROW_LEFT);</span>
+                    }
+<span class="nc" id="L508">                    addCommandToLeftBar(cmd);</span>
+<span class="nc" id="L509">                    break;</span>
+                }
+                // we now internally fallback to as arrow...
+            case AS_ARROW:
+<span class="fc" id="L513">                cmd.setCommandName(&quot;&quot;);</span>
+<span class="pc bpc" id="L514" title="1 of 2 branches missed.">                if (!isRTL()) {</span>
+<span class="fc" id="L515">                    cmd.setMaterialIcon(FontImage.MATERIAL_ARROW_BACK);</span>
+                } else {
+<span class="nc" id="L517">                    cmd.setMaterialIcon(FontImage.MATERIAL_ARROW_FORWARD);</span>
+                }
+<span class="fc" id="L519">                cmd.setMaterialIconSize(iconSize);</span>
+<span class="fc" id="L520">                addCommandToLeftBar(cmd);</span>
+<span class="fc" id="L521">                break;</span>
+            case AS_REGULAR_COMMAND:
+<span class="nc" id="L523">                addCommandToLeftBar(cmd);</span>
+<span class="nc" id="L524">                break;</span>
+            case ONLY_WHEN_USES_TITLE:
+<span class="nc bnc" id="L526" title="All 2 branches missed.">                if (getUIManager().isThemeConstant(&quot;backUsesTitleBool&quot;, false)) {</span>
+<span class="nc bnc" id="L527" title="All 2 branches missed.">                    if (UIManager.getInstance().isThemeConstant(&quot;landscapeTitleUiidBool&quot;, false)) {</span>
+<span class="nc" id="L528">                        cmd.putClientProperty(&quot;luiid&quot;, &quot;BackCommandLandscape&quot;);</span>
+                    }
+<span class="nc" id="L530">                    cmd.putClientProperty(&quot;uiid&quot;, &quot;BackCommand&quot;);</span>
+<span class="nc bnc" id="L531" title="All 2 branches missed.">                    if (getUIManager().isThemeConstant(&quot;iosStyleBackArrowBool&quot;, false)) {</span>
+<span class="nc" id="L532">                        cmd.setIconGapMM(0.5f);</span>
+<span class="nc" id="L533">                        cmd.setMaterialIcon(FontImage.MATERIAL_KEYBOARD_ARROW_LEFT);</span>
+                    }
+<span class="nc" id="L535">                    addCommandToLeftBar(cmd);</span>
+                }
+                break;
+            case NEVER:
+                break;
+        }
+<span class="fc" id="L541">    }</span>
+
+    /**
+     * Sets the back command in the title bar and in the form, back command
+     * behaves based on the given policy type
+     *
+     * @param cmd    the command
+     * @param policy the behavior of the back command in the title
+     */
+    public void setBackCommand(Command cmd, BackCommandPolicy policy) {
+<span class="fc" id="L551">        setBackCommand(cmd, policy, -1);</span>
+<span class="fc" id="L552">    }</span>
+
+    /**
+     * &lt;p&gt;
+     * This method add a search Command on the right bar of the {@code Toolbar}.
+     * When the search Command is invoked the current {@code Toolbar} is
+     * replaced with a search {@code Toolbar} to perform a search on the Current
+     * Form.&lt;/p&gt;
+     * &lt;p&gt;
+     * The callback ActionListener gets the search string and it's up to
+     * developer to do the actual filtering on the Form.&lt;/&gt;
+     * &lt;p&gt;
+     * It is possible to customize the default look of the search
+     * {@code Toolbar} with the following uiid's: {@code ToolbarSearch},
+     * {@code TextFieldSearch} &amp;amp; {@code TextHintSearch}.&lt;/&gt;
+     * &lt;script src=&quot;https://gist.github.com/codenameone/cd227aaca486889f7c940e2e97985426.js&quot;&gt;&lt;/script&gt;
+     * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/toolbar-search-mode.jpg&quot; alt=&quot;Dynamic search mode in the Toolbar&quot; /&gt;
+     *
+     * @param callback gets the search string callbacks
+     * @param iconSize indicates the size of the icons used in the search/back
+     *                 in millimeters
+     */
+    public void addSearchCommand(final ActionListener callback, final float iconSize) {
+<span class="fc" id="L575">        searchIconSize = iconSize;</span>
+<span class="fc" id="L576">        searchCommand = new Command(&quot;&quot;) {</span>
+
+            @Override
+            public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L580">                showSearchBar(callback);</span>
+<span class="nc" id="L581">            }</span>
+
+        };
+<span class="fc" id="L584">        searchCommand.setMaterialIcon(FontImage.MATERIAL_SEARCH);</span>
+<span class="fc" id="L585">        searchCommand.setMaterialIconSize(iconSize);</span>
+<span class="fc" id="L586">        addCommandToRightBar(searchCommand);</span>
+<span class="fc" id="L587">    }</span>
+
+    /**
+     * Shows the search bar manually which is useful for use cases of popping
+     * up search from code
+     *
+     * @param callback gets the search string callbacks
+     */
+    public void showSearchBar(final ActionListener&lt;ActionEvent&gt; callback) {
+<span class="fc" id="L596">        SearchBar s = new CallbackSearchBar(callback);</span>
+<span class="fc" id="L597">        Form f = Toolbar.this.getComponentForm();</span>
+<span class="fc" id="L598">        setHidden(true);</span>
+<span class="fc" id="L599">        f.removeComponentFromForm(Toolbar.this);</span>
+<span class="fc" id="L600">        f.setToolbar(s);</span>
+<span class="fc" id="L601">        s.initSearchBar();</span>
+<span class="pc bpc" id="L602" title="1 of 2 branches missed.">        if (f == Display.INSTANCE.getCurrent()) {</span>
+<span class="fc" id="L603">            f.animateLayout(100);</span>
+        }
+<span class="fc" id="L605">    }</span>
+
+    /**
+     * Removes a previously installed search command
+     */
+    public void removeSearchCommand() {
+<span class="nc bnc" id="L611" title="All 2 branches missed.">        if (searchCommand != null) {</span>
+<span class="nc" id="L612">            sideMenu.removeCommand(searchCommand);</span>
+<span class="nc" id="L613">            searchCommand = null;</span>
+        }
+<span class="nc" id="L615">    }</span>
+
+    /**
+     * &lt;p&gt;
+     * This method add a search Command on the right bar of the {@code Toolbar}.
+     * When the search Command is invoked the current {@code Toolbar} is
+     * replaced with a search {@code Toolbar} to perform a search on the Current
+     * Form.&lt;/p&gt;
+     * &lt;p&gt;
+     * The callback ActionListener gets the search string and it's up to
+     * developer to do the actual filtering on the Form.&lt;/&gt;
+     * &lt;p&gt;
+     * It is possible to customize the default look of the search
+     * {@code Toolbar} with the following uiid's: {@code ToolbarSearch},
+     * {@code TextFieldSearch} &amp;amp; {@code TextHintSearch}.&lt;/&gt;
+     * &lt;script src=&quot;https://gist.github.com/codenameone/cd227aaca486889f7c940e2e97985426.js&quot;&gt;&lt;/script&gt;
+     * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/toolbar-search-mode.jpg&quot; alt=&quot;Dynamic search mode in the Toolbar&quot; /&gt;
+     *
+     * @param callback gets the search string callbacks
+     */
+    public void addSearchCommand(final ActionListener callback) {
+<span class="fc" id="L636">        addSearchCommand(callback, -1);</span>
+<span class="fc" id="L637">    }</span>
+
+    /**
+     * Adds a Command to the overflow menu
+     *
+     * @param cmd a Command
+     */
+    public void addCommandToOverflowMenu(Command cmd) {
+<span class="fc" id="L645">        checkIfInitialized();</span>
+<span class="fc bfc" id="L646" title="All 2 branches covered.">        if (overflowCommands == null) {</span>
+<span class="fc" id="L647">            overflowCommands = new Vector&lt;Command&gt;();</span>
+        }
+<span class="fc" id="L649">        overflowCommands.add(cmd);</span>
+<span class="fc" id="L650">        sideMenu.installRightCommands();</span>
+<span class="fc" id="L651">    }</span>
+
+    /**
+     * Returns the commands within the overflow menu which can be useful for
+     * things like unit testing. Notice that you should not mutate the commands
+     * or the iteratable set in any way!
+     *
+     * @return the commands in the overflow menu
+     */
+    public Iterable&lt;Command&gt; getOverflowCommands() {
+<span class="nc" id="L661">        return overflowCommands;</span>
+    }
+
+    /**
+     * Adds a Command to the left or right side navigation menu according to the
+     * state of RTL.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToSideMenu(String name, Image icon, final ActionListener ev) {
+<span class="fc" id="L674">        return addCommandToLeftSideMenu(name, icon, ev);</span>
+    }
+
+    /**
+     * Adds a Command to the left side navigation menu
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToLeftSideMenu(String name, Image icon, final ActionListener ev) {
+<span class="fc" id="L686">        Command cmd = Command.create(name, icon, ev);</span>
+<span class="fc" id="L687">        addCommandToLeftSideMenu(cmd);</span>
+<span class="fc" id="L688">        return cmd;</span>
+    }
+
+    /**
+     * Adds a Command to the right side navigation menu (it requires a permanent
+     * sidemenu or an onTop mode sidemenu, otherwise it does nothing)
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToRightSideMenu(String name, Image icon, final ActionListener ev) {
+<span class="fc" id="L701">        Command cmd = Command.create(name, icon, ev);</span>
+<span class="fc" id="L702">        addCommandToRightSideMenu(cmd);</span>
+<span class="fc" id="L703">        return cmd;</span>
+    }
+
+    /**
+     * Adds a Component to the left or right side navigation menu, according to
+     * the state of RTL.
+     *
+     * @param cmp c Component to be added to the menu
+     */
+    public void addComponentToSideMenu(Component cmp) {
+<span class="fc" id="L713">        addComponentToLeftSideMenu(cmp);</span>
+<span class="fc" id="L714">    }</span>
+
+    /**
+     * This method is responsible to add a Component to the left or right side
+     * navigation panel according to the state of RTL.
+     *
+     * @param menu the Menu Container that was created in the
+     *             constructSideNavigationComponent() method
+     * @param cmp  the Component to add to the side menu
+     */
+    protected void addComponentToSideMenu(Container menu, Component cmp) {
+<span class="nc" id="L725">        sideMenu.addComponentToSideMenuImpl(menu, cmp);</span>
+<span class="nc" id="L726">    }</span>
+
+    /**
+     * Adds a Component to the left or right side navigation menu, according to
+     * the state of RTL. The Component is added to the navigation menu and the
+     * command gets the events once the Component is being pressed.
+     *
+     * @param cmp c Component to be added to the menu
+     * @param cmd a Command to handle the events
+     */
+    public void addComponentToSideMenu(Component cmp, Command cmd) {
+<span class="nc" id="L737">        addComponentToLeftSideMenu(cmp, cmd);</span>
+<span class="nc" id="L738">    }</span>
+
+    /**
+     * Adds a Command to the left side navigation menu with a material design
+     * icon reference {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToLeftSideMenu(String name, char icon, final ActionListener ev) {
+<span class="fc" id="L750">        Command cmd = Command.create(name, null, ev);</span>
+<span class="fc" id="L751">        setCommandMaterialIcon(cmd, icon, &quot;SideCommand&quot;);</span>
+<span class="fc" id="L752">        addCommandToLeftSideMenu(cmd);</span>
+<span class="fc" id="L753">        return cmd;</span>
+    }
+
+    /**
+     * Adds a Command to the right side navigation menu with a material design
+     * icon reference {@link com.codename1.ui.FontImage} (it requires a
+     * permanent sidemenu or an onTop mode sidemenu, otherwise it does nothing).
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToRightSideMenu(String name, char icon, final ActionListener ev) {
+<span class="nc" id="L767">        Command cmd = Command.create(name, null, ev);</span>
+<span class="nc" id="L768">        setCommandMaterialIcon(cmd, icon, &quot;RightSideCommand&quot;);</span>
+<span class="nc" id="L769">        addCommandToRightSideMenu(cmd);</span>
+<span class="nc" id="L770">        return cmd;</span>
+    }
+
+    /**
+     * Adds a Command to the left or right side navigation menu (according to
+     * the state of RTL) with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param size size in millimeters for the icon
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToSideMenu(String name, char icon, float size, final ActionListener ev) {
+<span class="nc" id="L785">        return addMaterialCommandToLeftSideMenu(name, icon, size, ev);</span>
+    }
+
+    /**
+     * Adds a Command to the left or right side navigation menu (according to
+     * the state of RTL) with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToSideMenu(String name, char icon, final ActionListener ev) {
+<span class="fc" id="L799">        return addMaterialCommandToLeftSideMenu(name, icon, ev);</span>
+    }
+
+    /**
+     * Adds a Command to the left side navigation menu with a material design
+     * icon reference {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param size size in millimeters for the icon
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToLeftSideMenu(String name, char icon, float size, final ActionListener ev) {
+<span class="nc" id="L813">        Command cmd = Command.create(name, null, ev);</span>
+<span class="nc" id="L814">        setCommandMaterialIcon(cmd, icon, size, &quot;SideCommand&quot;);</span>
+<span class="nc" id="L815">        addCommandToSideMenu(cmd);</span>
+<span class="nc" id="L816">        return cmd;</span>
+    }
+
+    /**
+     * Adds a Command to the right side navigation menu with a material design
+     * icon reference {@link com.codename1.ui.FontImage} (it requires a
+     * permanent sidemenu or an onTop mode sidemenu, otherwise it does nothing).
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param size size in millimeters for the icon
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToRightSideMenu(String name, char icon, float size, final ActionListener ev) {
+<span class="nc" id="L831">        Command cmd = Command.create(name, null, ev);</span>
+<span class="nc" id="L832">        setCommandMaterialIcon(cmd, icon, size, &quot;RightSideCommand&quot;);</span>
+<span class="nc" id="L833">        addCommandToRightSideMenu(cmd);</span>
+<span class="nc" id="L834">        return cmd;</span>
+    }
+
+    /**
+     * Adds a Command to the TitleArea on the right side with a material design
+     * icon reference {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToRightBar(String name, char icon, final ActionListener ev) {
+<span class="fc" id="L847">        Command cmd = Command.create(name, null, ev);</span>
+<span class="fc" id="L848">        setCommandMaterialIcon(cmd, icon, &quot;TitleCommand&quot;);</span>
+<span class="fc" id="L849">        addCommandToRightBar(cmd);</span>
+<span class="fc" id="L850">        return cmd;</span>
+    }
+
+    /**
+     * Adds a Command to the TitleArea on the right side with a material design
+     * icon reference {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param size size of the icon in millimeters
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToRightBar(String name, char icon, float size, final ActionListener ev) {
+<span class="fc" id="L864">        Command cmd = Command.create(name, null, ev);</span>
+<span class="fc" id="L865">        setCommandMaterialIcon(cmd, icon, size, &quot;TitleCommand&quot;);</span>
+<span class="fc" id="L866">        addCommandToRightBar(cmd);</span>
+<span class="fc" id="L867">        return cmd;</span>
+    }
+
+    private void setCommandMaterialIcon(Command cmd, char icon, String defaultUIID) {
+<span class="fc" id="L871">        cmd.setMaterialIcon(icon);</span>
+<span class="fc" id="L872">    }</span>
+
+    private void setCommandMaterialIcon(Command cmd, char icon, float size, String defaultUIID) {
+<span class="fc" id="L875">        cmd.setMaterialIcon(icon);</span>
+<span class="fc" id="L876">        cmd.setMaterialIconSize(size);</span>
+<span class="fc" id="L877">    }</span>
+
+    /**
+     * Adds a Command to the TitleArea on the left side with a material design
+     * icon reference {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToLeftBar(String name, char icon, final ActionListener ev) {
+<span class="nc" id="L889">        Command cmd = Command.create(name, null, ev);</span>
+<span class="nc" id="L890">        setCommandMaterialIcon(cmd, icon, &quot;TitleCommand&quot;);</span>
+<span class="nc" id="L891">        addCommandToLeftBar(cmd);</span>
+<span class="nc" id="L892">        return cmd;</span>
+    }
+
+    /**
+     * Adds a Command to the TitleArea on the left side with a material design
+     * icon reference {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param size size in millimeters for the icon
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToLeftBar(String name, char icon, float size, final ActionListener ev) {
+<span class="fc" id="L906">        Command cmd = Command.create(name, null, ev);</span>
+<span class="fc" id="L907">        setCommandMaterialIcon(cmd, icon, size, &quot;TitleCommand&quot;);</span>
+<span class="fc" id="L908">        addCommandToLeftBar(cmd);</span>
+<span class="fc" id="L909">        return cmd;</span>
+    }
+
+    /**
+     * Adds a Command to the overflow menu with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToOverflowMenu(String name, char icon, final ActionListener ev) {
+<span class="nc" id="L922">        Command cmd = Command.create(name, null, ev);</span>
+<span class="nc" id="L923">        setCommandMaterialIcon(cmd, icon, &quot;Command&quot;);</span>
+<span class="nc" id="L924">        addCommandToOverflowMenu(cmd);</span>
+<span class="nc" id="L925">        return cmd;</span>
+    }
+
+    /**
+     * Adds a Command to the overflow menu with a material design icon reference
+     * {@link com.codename1.ui.FontImage}.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param size size in millimeters for the icon
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     */
+    public Command addMaterialCommandToOverflowMenu(String name, char icon, float size, final ActionListener ev) {
+<span class="nc" id="L939">        Command cmd = Command.create(name, null, ev);</span>
+<span class="nc" id="L940">        setCommandMaterialIcon(cmd, icon, size, &quot;Command&quot;);</span>
+<span class="nc" id="L941">        addCommandToOverflowMenu(cmd);</span>
+<span class="nc" id="L942">        return cmd;</span>
+    }
+
+    boolean isComponentInOnTopSidemenu(Component cmp) {
+<span class="nc bnc" id="L946" title="All 2 branches missed.">        if (cmp != null) {</span>
+<span class="nc bnc" id="L947" title="All 6 branches missed.">            if (cmp == permanentSideMenuContainer || cmp == this || cmp == sidemenuSouthComponent) {</span>
+<span class="nc" id="L948">                return true;</span>
+            }
+<span class="nc bnc" id="L950" title="All 2 branches missed.">            while (cmp.getParent() != null) {</span>
+<span class="nc" id="L951">                cmp = cmp.getParent();</span>
+<span class="nc bnc" id="L952" title="All 6 branches missed.">                if (cmp == permanentSideMenuContainer || cmp == this || cmp == sidemenuSouthComponent) {</span>
+<span class="nc" id="L953">                    return true;</span>
+                }
+            }
+        }
+<span class="nc" id="L957">        return false;</span>
+    }
+
+    boolean isComponentInOnTopRightSidemenu(Component cmp) {
+<span class="nc bnc" id="L961" title="All 2 branches missed.">        if (cmp != null) {</span>
+<span class="nc bnc" id="L962" title="All 6 branches missed.">            if (cmp == permanentRightSideMenuContainer || cmp == this</span>
+                    || cmp == rightSidemenuSouthComponent) {
+<span class="nc" id="L964">                return true;</span>
+            }
+<span class="nc bnc" id="L966" title="All 2 branches missed.">            while (cmp.getParent() != null) {</span>
+<span class="nc" id="L967">                cmp = cmp.getParent();</span>
+<span class="nc bnc" id="L968" title="All 6 branches missed.">                if (cmp == permanentRightSideMenuContainer || cmp == this</span>
+                        || cmp == rightSidemenuSouthComponent) {
+<span class="nc" id="L970">                    return true;</span>
+                }
+            }
+        }
+<span class="nc" id="L974">        return false;</span>
+    }
+
+    /**
+     * Adds a Command to the left or right side navigation menu according to the
+     * state of RTL.
+     *
+     * @param cmd a Command
+     */
+    public void addCommandToSideMenu(Command cmd) {
+<span class="nc" id="L984">        addCommandToLeftSideMenu(cmd);</span>
+<span class="nc" id="L985">    }</span>
+
+    /**
+     * Adds a Command to the left side navigation menu
+     *
+     * @param cmd a Command
+     */
+    public void addCommandToLeftSideMenu(Command cmd) {
+<span class="fc" id="L993">        addCommandToSideMenu(cmd, true);</span>
+<span class="fc" id="L994">    }</span>
+
+    /**
+     * Adds a Command to the right side navigation menu (it requires a permanent
+     * sidemenu or an onTop mode sidemenu, otherwise it does nothing).
+     *
+     * @param cmd a Command
+     */
+    public void addCommandToRightSideMenu(Command cmd) {
+<span class="fc" id="L1003">        addCommandToSideMenu(cmd, false);</span>
+<span class="fc" id="L1004">    }</span>
+
+    private void addCommandToSideMenu(Command cmd, boolean isLeft) {
+<span class="fc" id="L1007">        checkIfInitialized();</span>
+<span class="pc bpc" id="L1008" title="1 of 2 branches missed.">        if (permanentSideMenu) {</span>
+<span class="nc bnc" id="L1009" title="All 2 branches missed.">            if (isLeft) {</span>
+<span class="nc" id="L1010">                constructPermanentSideMenu();</span>
+            } else {
+<span class="nc" id="L1012">                constructPermanentRightSideMenu();</span>
+            }
+
+<span class="nc" id="L1015">            Button b = new Button(cmd);</span>
+<span class="nc" id="L1016">            b.setEndsWith3Points(false);</span>
+<span class="nc" id="L1017">            Integer gap = (Integer) cmd.getClientProperty(&quot;iconGap&quot;);</span>
+<span class="nc bnc" id="L1018" title="All 2 branches missed.">            if (gap != null) {</span>
+<span class="nc" id="L1019">                b.setGap(gap.intValue());</span>
+            }
+<span class="nc bnc" id="L1021" title="All 4 branches missed.">            if (isLeft || rightSideMenuCmdsAlignedToLeft) {</span>
+<span class="nc" id="L1022">                b.setTextPosition(Label.RIGHT);</span>
+            } else {
+<span class="nc" id="L1024">                b.setTextPosition(Label.LEFT);</span>
+            }
+<span class="nc" id="L1026">            String uiid = (String) cmd.getClientProperty(&quot;uiid&quot;);</span>
+<span class="nc bnc" id="L1027" title="All 2 branches missed.">            if (uiid != null) {</span>
+<span class="nc" id="L1028">                String luiid = (String) cmd.getClientProperty(&quot;luiid&quot;);</span>
+<span class="nc" id="L1029">                b.setUIID(uiid, luiid);</span>
+<span class="nc" id="L1030">            } else {</span>
+<span class="nc bnc" id="L1031" title="All 4 branches missed.">                if (isLeft || rightSideMenuCmdsAlignedToLeft) {</span>
+<span class="nc" id="L1032">                    b.setUIID(&quot;SideCommand&quot;);</span>
+                } else {
+<span class="nc" id="L1034">                    b.setUIID(&quot;RightSideCommand&quot;);</span>
+                }
+            }
+<span class="nc bnc" id="L1037" title="All 2 branches missed.">            if (isLeft) {</span>
+<span class="nc" id="L1038">                addComponentToLeftSideMenu(permanentSideMenuContainer, b);</span>
+            } else {
+<span class="nc" id="L1040">                addComponentToRightSideMenu(permanentRightSideMenuContainer, b);</span>
+            }
+<span class="nc" id="L1042">        } else {</span>
+<span class="fc bfc" id="L1043" title="All 2 branches covered.">            if (onTopSideMenu) {</span>
+<span class="fc bfc" id="L1044" title="All 2 branches covered.">                if (isLeft) {</span>
+<span class="fc" id="L1045">                    constructOnTopSideMenu();</span>
+                } else {
+<span class="fc" id="L1047">                    constructOnTopRightSideMenu();</span>
+                }
+
+<span class="fc" id="L1050">                Button b = new Button(sideMenu.wrapCommand(cmd));</span>
+<span class="fc" id="L1051">                b.setEndsWith3Points(false);</span>
+<span class="fc" id="L1052">                Integer gap = (Integer) cmd.getClientProperty(&quot;iconGap&quot;);</span>
+<span class="pc bpc" id="L1053" title="1 of 2 branches missed.">                if (gap != null) {</span>
+<span class="nc" id="L1054">                    b.setGap(gap.intValue());</span>
+                }
+<span class="pc bpc" id="L1056" title="1 of 4 branches missed.">                if (isLeft || rightSideMenuCmdsAlignedToLeft) {</span>
+<span class="fc" id="L1057">                    b.setTextPosition(Label.RIGHT);</span>
+                } else {
+<span class="fc" id="L1059">                    b.setTextPosition(Label.LEFT);</span>
+                }
+<span class="fc" id="L1061">                String uiid = (String) cmd.getClientProperty(&quot;uiid&quot;);</span>
+<span class="pc bpc" id="L1062" title="1 of 2 branches missed.">                if (uiid != null) {</span>
+<span class="nc" id="L1063">                    String luiid = (String) cmd.getClientProperty(&quot;luiid&quot;);</span>
+<span class="nc" id="L1064">                    b.setUIID(uiid, luiid);</span>
+<span class="nc" id="L1065">                } else {</span>
+<span class="pc bpc" id="L1066" title="1 of 4 branches missed.">                    if (isLeft || rightSideMenuCmdsAlignedToLeft) {</span>
+<span class="fc" id="L1067">                        b.setUIID(&quot;SideCommand&quot;);</span>
+                    } else {
+<span class="fc" id="L1069">                        b.setUIID(&quot;RightSideCommand&quot;);</span>
+                    }
+                }
+<span class="fc bfc" id="L1072" title="All 2 branches covered.">                if (isLeft) {</span>
+<span class="fc" id="L1073">                    addComponentToLeftSideMenu(permanentSideMenuContainer, b);</span>
+                } else {
+<span class="fc" id="L1075">                    addComponentToRightSideMenu(permanentRightSideMenuContainer, b);</span>
+                }
+<span class="fc" id="L1077">            } else {</span>
+<span class="pc bpc" id="L1078" title="1 of 2 branches missed.">                if (isLeft) {</span>
+<span class="fc" id="L1079">                    sideMenu.addCommand(cmd);</span>
+<span class="fc" id="L1080">                    sideMenu.installMenuBar();</span>
+                } else {
+<span class="nc" id="L1082">                    throw new IllegalStateException(&quot;Right sidemenu bar only works in on-top mode or permanent mode&quot;);</span>
+                }
+            }
+        }
+<span class="fc" id="L1086">    }</span>
+
+    private void constructPermanentSideMenu() {
+<span class="nc bnc" id="L1089" title="All 2 branches missed.">        if (permanentSideMenuContainer == null) {</span>
+<span class="nc" id="L1090">            permanentSideMenuContainer = constructSideNavigationComponent();</span>
+<span class="nc" id="L1091">            Form parent = getComponentForm();</span>
+<span class="nc bnc" id="L1092" title="All 2 branches missed.">            if (sidemenuSouthComponent != null) {</span>
+<span class="nc" id="L1093">                Container c = BorderLayout.center(permanentSideMenuContainer);</span>
+<span class="nc" id="L1094">                c.add(BorderLayout.SOUTH, sidemenuSouthComponent);</span>
+<span class="nc" id="L1095">                parent.addComponentToForm(BorderLayout.WEST, c);</span>
+<span class="nc" id="L1096">            } else {</span>
+<span class="nc" id="L1097">                parent.addComponentToForm(BorderLayout.WEST, permanentSideMenuContainer);</span>
+            }
+        }
+<span class="nc" id="L1100">    }</span>
+
+    private void constructPermanentRightSideMenu() {
+<span class="nc bnc" id="L1103" title="All 2 branches missed.">        if (permanentRightSideMenuContainer == null) {</span>
+<span class="nc" id="L1104">            permanentRightSideMenuContainer = constructRightSideNavigationComponent();</span>
+<span class="nc" id="L1105">            Form parent = getComponentForm();</span>
+<span class="nc bnc" id="L1106" title="All 2 branches missed.">            if (rightSidemenuSouthComponent != null) {</span>
+<span class="nc" id="L1107">                Container c = BorderLayout.center(permanentRightSideMenuContainer);</span>
+<span class="nc" id="L1108">                c.add(BorderLayout.SOUTH, rightSidemenuSouthComponent);</span>
+<span class="nc" id="L1109">                parent.addComponentToForm(BorderLayout.EAST, c);</span>
+<span class="nc" id="L1110">            } else {</span>
+<span class="nc" id="L1111">                parent.addComponentToForm(BorderLayout.EAST, permanentRightSideMenuContainer);</span>
+            }
+        }
+<span class="nc" id="L1114">    }</span>
+
+    private void constructOnTopSideMenu(boolean isLeft) {
+
+<span class="pc bpc" id="L1118" title="3 of 8 branches missed.">        if ((isLeft &amp;&amp; sidemenuDialog == null) || (!isLeft &amp;&amp; rightSidemenuDialog == null)) {</span>
+<span class="fc bfc" id="L1119" title="All 2 branches covered.">            if (isLeft) {</span>
+<span class="fc" id="L1120">                permanentSideMenuContainer = constructSideNavigationComponent();</span>
+            } else {
+<span class="fc" id="L1122">                permanentRightSideMenuContainer = constructRightSideNavigationComponent();</span>
+            }
+
+<span class="fc" id="L1125">            final Form parent = getComponentForm();</span>
+<span class="pc bpc" id="L1126" title="1 of 2 branches missed.">            if (!isPointerPressedListenerAdded) {</span>
+<span class="fc" id="L1127">                parent.addPointerPressedListener(new ActionListener() {</span>
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L1129" title="All 2 branches missed.">                        if (Display.getInstance().getImplementation().isScrollWheeling()) {</span>
+<span class="nc" id="L1130">                            return;</span>
+                        }
+<span class="nc bnc" id="L1132" title="All 4 branches missed.">                        if (sidemenuDialog != null &amp;&amp; !isRTL()) {</span>
+<span class="nc bnc" id="L1133" title="All 2 branches missed.">                            if (sidemenuDialog.isShowing()) {</span>
+<span class="nc bnc" id="L1134" title="All 2 branches missed.">                                if (evt.getX() &gt; sidemenuDialog.getWidth()) {</span>
+<span class="nc" id="L1135">                                    evt.consume();</span>
+                                } else {
+<span class="nc bnc" id="L1137" title="All 2 branches missed.">                                    if (evt.getX() + Display.getInstance().convertToPixels(8) &gt; sidemenuDialog.getWidth()) {</span>
+<span class="nc" id="L1138">                                        parent.putClientProperty(&quot;cn1$sidemenuCharged&quot;, Boolean.TRUE);</span>
+                                    } else {
+<span class="nc" id="L1140">                                        parent.putClientProperty(&quot;cn1$sidemenuCharged&quot;, Boolean.FALSE);</span>
+                                    }
+<span class="nc bnc" id="L1142" title="All 2 branches missed.">                                    if (!isComponentInOnTopSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {</span>
+<span class="nc" id="L1143">                                        evt.consume();</span>
+                                    }
+                                }
+                            } else {
+<span class="nc" id="L1147">                                int displayWidth = Display.getInstance().getDisplayWidth();</span>
+<span class="nc" id="L1148">                                final int sensitiveSection = displayWidth / getUIManager().getThemeConstant(&quot;sideSwipeSensitiveInt&quot;, 10);</span>
+<span class="nc bnc" id="L1149" title="All 2 branches missed.">                                if (evt.getX() &lt; sensitiveSection) {</span>
+<span class="nc" id="L1150">                                    parent.putClientProperty(&quot;cn1$sidemenuCharged&quot;, Boolean.TRUE);</span>
+                                    //evt.consume();
+                                } else {
+<span class="nc" id="L1153">                                    parent.putClientProperty(&quot;cn1$sidemenuCharged&quot;, Boolean.FALSE);</span>
+<span class="nc" id="L1154">                                    permanentSideMenuContainer.pointerPressed(evt.getX(), evt.getY());</span>
+                                }
+                            }
+                        }
+<span class="nc bnc" id="L1158" title="All 4 branches missed.">                        if (sidemenuDialog != null &amp;&amp; isRTL()) {</span>
+<span class="nc bnc" id="L1159" title="All 2 branches missed.">                            if (sidemenuDialog.isShowing()) {</span>
+<span class="nc bnc" id="L1160" title="All 2 branches missed.">                                if (evt.getX() &lt; Display.getInstance().getDisplayWidth() - sidemenuDialog.getWidth()) {</span>
+                                    //parent.putClientProperty(&quot;cn1$sidemenuCharged&quot;, Boolean.FALSE);
+                                    //closeSideMenu();
+<span class="nc" id="L1163">                                    evt.consume();</span>
+                                } else {
+<span class="nc bnc" id="L1165" title="All 2 branches missed.">                                    if (evt.getX() - Display.getInstance().convertToPixels(8) &lt; Display.getInstance().getDisplayWidth() - sidemenuDialog.getWidth()) {</span>
+<span class="nc" id="L1166">                                        parent.putClientProperty(&quot;cn1$sidemenuCharged&quot;, Boolean.TRUE);</span>
+                                    } else {
+<span class="nc" id="L1168">                                        parent.putClientProperty(&quot;cn1$sidemenuCharged&quot;, Boolean.FALSE);</span>
+                                    }
+<span class="nc bnc" id="L1170" title="All 2 branches missed.">                                    if (!isComponentInOnTopSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {</span>
+<span class="nc" id="L1171">                                        evt.consume();</span>
+                                    }
+                                }
+                            } else {
+<span class="nc" id="L1175">                                int displayWidth = Display.getInstance().getDisplayWidth();</span>
+<span class="nc" id="L1176">                                final int sensitiveSection = displayWidth / getUIManager().getThemeConstant(&quot;sideSwipeSensitiveInt&quot;, 10);</span>
+<span class="nc bnc" id="L1177" title="All 2 branches missed.">                                if (evt.getX() &gt; displayWidth - sensitiveSection) {</span>
+<span class="nc" id="L1178">                                    parent.putClientProperty(&quot;cn1$sidemenuCharged&quot;, Boolean.TRUE);</span>
+                                    //evt.consume();
+                                } else {
+<span class="nc" id="L1181">                                    parent.putClientProperty(&quot;cn1$sidemenuCharged&quot;, Boolean.FALSE);</span>
+<span class="nc" id="L1182">                                    permanentSideMenuContainer.pointerPressed(evt.getX(), evt.getY());</span>
+                                }
+                            }
+                        }
+<span class="nc bnc" id="L1186" title="All 4 branches missed.">                        if (rightSidemenuDialog != null &amp;&amp; !isRTL()) {</span>
+<span class="nc bnc" id="L1187" title="All 2 branches missed.">                            if (rightSidemenuDialog.isShowing()) {</span>
+<span class="nc bnc" id="L1188" title="All 2 branches missed.">                                if (evt.getX() &lt; Display.getInstance().getDisplayWidth() - rightSidemenuDialog.getWidth()) {</span>
+<span class="nc" id="L1189">                                    parent.putClientProperty(&quot;cn1$rightSidemenuCharged&quot;, Boolean.FALSE);</span>
+<span class="nc" id="L1190">                                    closeRightSideMenu();</span>
+<span class="nc" id="L1191">                                    evt.consume();</span>
+                                } else {
+<span class="nc bnc" id="L1193" title="All 2 branches missed.">                                    if (evt.getX() - Display.getInstance().convertToPixels(8) &lt; Display.getInstance().getDisplayWidth() - rightSidemenuDialog.getWidth()) {</span>
+<span class="nc" id="L1194">                                        parent.putClientProperty(&quot;cn1$rightSidemenuCharged&quot;, Boolean.TRUE);</span>
+                                    } else {
+<span class="nc" id="L1196">                                        parent.putClientProperty(&quot;cn1$rightSidemenuCharged&quot;, Boolean.FALSE);</span>
+                                    }
+<span class="nc bnc" id="L1198" title="All 2 branches missed.">                                    if (!isComponentInOnTopRightSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {</span>
+<span class="nc" id="L1199">                                        evt.consume();</span>
+                                    }
+                                }
+                            } else {
+<span class="nc" id="L1203">                                int displayWidth = Display.getInstance().getDisplayWidth();</span>
+<span class="nc" id="L1204">                                final int sensitiveSection = displayWidth / getUIManager().getThemeConstant(&quot;sideSwipeSensitiveInt&quot;, 10);</span>
+<span class="nc bnc" id="L1205" title="All 2 branches missed.">                                if (evt.getX() &gt; displayWidth - sensitiveSection) {</span>
+<span class="nc" id="L1206">                                    parent.putClientProperty(&quot;cn1$rightSidemenuCharged&quot;, Boolean.TRUE);</span>
+                                    //evt.consume();
+                                } else {
+<span class="nc" id="L1209">                                    parent.putClientProperty(&quot;cn1$rightSidemenuCharged&quot;, Boolean.FALSE);</span>
+<span class="nc" id="L1210">                                    permanentRightSideMenuContainer.pointerPressed(evt.getX(), evt.getY());</span>
+                                }
+                            }
+                        }
+<span class="nc bnc" id="L1214" title="All 4 branches missed.">                        if (rightSidemenuDialog != null &amp;&amp; isRTL()) {</span>
+<span class="nc bnc" id="L1215" title="All 2 branches missed.">                            if (rightSidemenuDialog.isShowing()) {</span>
+<span class="nc bnc" id="L1216" title="All 2 branches missed.">                                if (evt.getX() &gt; rightSidemenuDialog.getWidth()) {</span>
+<span class="nc" id="L1217">                                    parent.putClientProperty(&quot;cn1$rightSidemenuCharged&quot;, Boolean.FALSE);</span>
+<span class="nc" id="L1218">                                    closeRightSideMenu();</span>
+<span class="nc" id="L1219">                                    evt.consume();</span>
+                                } else {
+<span class="nc bnc" id="L1221" title="All 2 branches missed.">                                    if (evt.getX() + Display.getInstance().convertToPixels(8) &gt; rightSidemenuDialog.getWidth()) {</span>
+<span class="nc" id="L1222">                                        parent.putClientProperty(&quot;cn1$rightSidemenuCharged&quot;, Boolean.TRUE);</span>
+                                    } else {
+<span class="nc" id="L1224">                                        parent.putClientProperty(&quot;cn1$rightSidemenuCharged&quot;, Boolean.FALSE);</span>
+                                    }
+<span class="nc bnc" id="L1226" title="All 2 branches missed.">                                    if (!isComponentInOnTopSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {</span>
+<span class="nc" id="L1227">                                        evt.consume();</span>
+                                    }
+                                }
+                            } else {
+<span class="nc" id="L1231">                                int displayWidth = Display.getInstance().getDisplayWidth();</span>
+<span class="nc" id="L1232">                                final int sensitiveSection = displayWidth / getUIManager().getThemeConstant(&quot;sideSwipeSensitiveInt&quot;, 10);</span>
+<span class="nc bnc" id="L1233" title="All 2 branches missed.">                                if (evt.getX() &lt; sensitiveSection) {</span>
+<span class="nc" id="L1234">                                    parent.putClientProperty(&quot;cn1$rightSidemenuCharged&quot;, Boolean.TRUE);</span>
+<span class="nc" id="L1235">                                    evt.consume();</span>
+                                } else {
+<span class="nc" id="L1237">                                    parent.putClientProperty(&quot;cn1$rightSidemenuCharged&quot;, Boolean.FALSE);</span>
+<span class="nc" id="L1238">                                    permanentRightSideMenuContainer.pointerPressed(evt.getX(), evt.getY());</span>
+                                }
+                            }
+                        }
+<span class="nc" id="L1242">                    }</span>
+                });
+            }
+<span class="fc" id="L1245">            isPointerPressedListenerAdded = true;</span>
+<span class="pc bpc" id="L1246" title="1 of 2 branches missed.">            if (!isPointerDraggedListenerAdded) {</span>
+<span class="fc" id="L1247">                parent.addPointerDraggedListener(new ActionListener() {</span>
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L1249">                        Form f = getComponentForm();</span>
+<span class="nc bnc" id="L1250" title="All 10 branches missed.">                        if (f == null || Display.getInstance().getImplementation().isScrollWheeling() || !enableSideMenuSwipe || f.findCurrentlyEditingComponent() != null || f.isEditing()) {</span>
+<span class="nc" id="L1251">                            return;</span>
+                        }
+<span class="nc bnc" id="L1253" title="All 2 branches missed.">                        if (sidemenuDialog != null) {</span>
+<span class="nc" id="L1254">                            Boolean b = (Boolean) parent.getClientProperty(&quot;cn1$sidemenuCharged&quot;);</span>
+<span class="nc bnc" id="L1255" title="All 4 branches missed.">                            if (b != null &amp;&amp; b.booleanValue()) {</span>
+<span class="nc" id="L1256">                                parent.putClientProperty(&quot;cn1$sidemenuActivated&quot;, Boolean.TRUE);</span>
+<span class="nc bnc" id="L1257" title="All 2 branches missed.">                                if (!isRTL()) {</span>
+<span class="nc" id="L1258">                                    showOnTopSidemenu(evt.getX(), false);</span>
+                                } else {
+<span class="nc" id="L1260">                                    showOnTopSidemenu(Display.getInstance().getDisplayWidth() - evt.getX(), false);</span>
+                                }
+                            } else {
+<span class="nc bnc" id="L1263" title="All 2 branches missed.">                                if (sidemenuDialog.isShowing()) {</span>
+<span class="nc" id="L1264">                                    permanentSideMenuContainer.pointerDragged(evt.getX(), evt.getY());</span>
+                                }
+                            }
+                        }
+<span class="nc bnc" id="L1268" title="All 2 branches missed.">                        if (rightSidemenuDialog != null) {</span>
+<span class="nc" id="L1269">                            Boolean b = (Boolean) parent.getClientProperty(&quot;cn1$rightSidemenuCharged&quot;);</span>
+<span class="nc bnc" id="L1270" title="All 4 branches missed.">                            if (b != null &amp;&amp; b.booleanValue()) {</span>
+<span class="nc" id="L1271">                                parent.putClientProperty(&quot;cn1$rightSidemenuActivated&quot;, Boolean.TRUE);</span>
+<span class="nc bnc" id="L1272" title="All 2 branches missed.">                                if (!isRTL()) {</span>
+<span class="nc" id="L1273">                                    showOnTopRightSidemenu(Display.getInstance().getDisplayWidth() - evt.getX(), false);</span>
+                                } else {
+<span class="nc" id="L1275">                                    showOnTopRightSidemenu(evt.getX(), false);</span>
+                                }
+                            } else {
+<span class="nc bnc" id="L1278" title="All 2 branches missed.">                                if (rightSidemenuDialog.isShowing()) {</span>
+<span class="nc" id="L1279">                                    permanentRightSideMenuContainer.pointerDragged(evt.getX(), evt.getY());</span>
+                                }
+                            }
+                        }
+<span class="nc" id="L1283">                    }</span>
+                });
+            }
+<span class="fc" id="L1286">            isPointerDraggedListenerAdded = true;</span>
+<span class="pc bpc" id="L1287" title="1 of 2 branches missed.">            if (!isPointerReleasedListenerAdded) {</span>
+<span class="fc" id="L1288">                parent.addPointerReleasedListener(new ActionListener() {</span>
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc" id="L1290">                        parent.putClientProperty(&quot;cn1$sidemenuCharged&quot;, Boolean.FALSE);</span>
+<span class="nc bnc" id="L1291" title="All 2 branches missed.">                        if (Display.getInstance().getImplementation().isScrollWheeling()) {</span>
+<span class="nc" id="L1292">                            return;</span>
+                        }
+<span class="nc bnc" id="L1294" title="All 2 branches missed.">                        if (sidemenuDialog != null) {</span>
+<span class="nc bnc" id="L1295" title="All 8 branches missed.">                            if ((!isRTL() &amp;&amp; evt.getX() &gt; sidemenuDialog.getWidth()) || (isRTL() &amp;&amp; evt.getX() &lt; Display.getInstance().getDisplayWidth() - sidemenuDialog.getWidth())) {</span>
+<span class="nc bnc" id="L1296" title="All 4 branches missed.">                                if (sidemenuDialog.isShowing() &amp;&amp; !isRTL()) {</span>
+<span class="nc" id="L1297">                                    parent.putClientProperty(&quot;cn1$sidemenuCharged&quot;, Boolean.FALSE);</span>
+<span class="nc" id="L1298">                                    evt.consume();</span>
+<span class="nc" id="L1299">                                    closeSideMenu();</span>
+                                }
+<span class="nc" id="L1301">                                return;</span>
+                            }
+<span class="nc" id="L1303">                            Boolean b = (Boolean) parent.getClientProperty(&quot;cn1$sidemenuActivated&quot;);</span>
+<span class="nc bnc" id="L1304" title="All 4 branches missed.">                            if (b != null &amp;&amp; b.booleanValue()) {</span>
+<span class="nc" id="L1305">                                parent.putClientProperty(&quot;cn1$sidemenuActivated&quot;, null);</span>
+<span class="nc bnc" id="L1306" title="All 8 branches missed.">                                if ((evt.getX() &lt; parent.getWidth() / 4 &amp;&amp; !isRTL()) || (evt.getX() &gt; Display.getInstance().getDisplayWidth() - (parent.getWidth() / 4) &amp;&amp; isRTL())) {</span>
+<span class="nc" id="L1307">                                    closeSideMenu();</span>
+                                } else {
+<span class="nc" id="L1309">                                    showOnTopSidemenu(-1, true);</span>
+                                }
+                                // evt.consume();
+                            } else {
+<span class="nc bnc" id="L1313" title="All 2 branches missed.">                                if (sidemenuDialog.isShowing()) {</span>
+<span class="nc bnc" id="L1314" title="All 2 branches missed.">                                    if (!isComponentInOnTopSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {</span>
+                                        // evt.consume();
+                                    }
+<span class="nc" id="L1317">                                    permanentSideMenuContainer.pointerReleased(evt.getX(), evt.getY());</span>
+                                }
+                            }
+                        }
+<span class="nc bnc" id="L1321" title="All 2 branches missed.">                        if (rightSidemenuDialog != null) {</span>
+<span class="nc" id="L1322">                            Boolean b = (Boolean) parent.getClientProperty(&quot;cn1$rightSidemenuActivated&quot;);</span>
+<span class="nc bnc" id="L1323" title="All 4 branches missed.">                            if (b != null &amp;&amp; b.booleanValue()) {</span>
+<span class="nc" id="L1324">                                parent.putClientProperty(&quot;cn1$rightSidemenuActivated&quot;, null);</span>
+<span class="nc bnc" id="L1325" title="All 8 branches missed.">                                if ((evt.getX() &gt; Display.getInstance().getDisplayWidth() - (parent.getWidth() / 4) &amp;&amp; !isRTL()) || (evt.getX() &lt; parent.getWidth() / 4 &amp;&amp; isRTL())) {</span>
+<span class="nc" id="L1326">                                    closeRightSideMenu();</span>
+                                } else {
+<span class="nc" id="L1328">                                    showOnTopRightSidemenu(-1, true);</span>
+                                }
+                                // evt.consume();
+                            } else {
+<span class="nc bnc" id="L1332" title="All 2 branches missed.">                                if (rightSidemenuDialog.isShowing()) {</span>
+<span class="nc bnc" id="L1333" title="All 2 branches missed.">                                    if (!isComponentInOnTopRightSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {</span>
+                                        // evt.consume();
+                                    }
+<span class="nc" id="L1336">                                    permanentRightSideMenuContainer.pointerReleased(evt.getX(), evt.getY());</span>
+                                }
+                            }
+                        }
+<span class="nc" id="L1340">                    }</span>
+                });
+            }
+<span class="fc" id="L1343">            isPointerReleasedListenerAdded = true;</span>
+
+<span class="fc bfc" id="L1345" title="All 2 branches covered.">            if (isLeft) {</span>
+<span class="fc" id="L1346">                sidemenuDialog = new InteractionDialog(new BorderLayout());</span>
+
+<span class="fc" id="L1348">                sidemenuDialog.setFormMode(true);</span>
+<span class="fc" id="L1349">                sidemenuDialog.setUIID(&quot;Container&quot;);</span>
+<span class="fc" id="L1350">                sidemenuDialog.setDialogUIID(&quot;Container&quot;);</span>
+<span class="fc" id="L1351">                sidemenuDialog.getTitleComponent().remove();</span>
+<span class="fc" id="L1352">                sidemenuDialog.add(BorderLayout.CENTER, permanentSideMenuContainer);</span>
+<span class="pc bpc" id="L1353" title="1 of 2 branches missed.">                if (sidemenuSouthComponent != null) {</span>
+<span class="nc" id="L1354">                    sidemenuDialog.add(BorderLayout.SOUTH, sidemenuSouthComponent);</span>
+                }
+<span class="fc" id="L1356">                float size = 4.5f;</span>
+                try {
+<span class="fc" id="L1358">                    size = Float.parseFloat(getUIManager().getThemeConstant(&quot;menuImageSize&quot;, &quot;4.5&quot;));</span>
+<span class="nc" id="L1359">                } catch (Throwable t) {</span>
+<span class="nc" id="L1360">                    Log.e(t);</span>
+<span class="fc" id="L1361">                }</span>
+
+<span class="pc bpc" id="L1363" title="1 of 2 branches missed.">                if (!parent.getUIManager().isThemeConstant(&quot;hideLeftSideMenuBool&quot;, false)) {</span>
+<span class="fc" id="L1364">                    Image i = parent.getUIManager().getThemeImageConstant(&quot;sideMenuImage&quot;);</span>
+<span class="pc bpc" id="L1365" title="1 of 2 branches missed.">                    if (i != null) {</span>
+<span class="nc" id="L1366">                        Command cmd = addCommandToLeftBar(&quot;&quot;, i, new ActionListener() {</span>
+                            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L1368" title="All 2 branches missed.">                                if (sidemenuDialog.isShowing()) {</span>
+<span class="nc" id="L1369">                                    closeSideMenu();</span>
+<span class="nc" id="L1370">                                    return;</span>
+                                }
+<span class="nc" id="L1372">                                showOnTopSidemenu(-1, false);</span>
+<span class="nc" id="L1373">                            }</span>
+                        });
+<span class="nc" id="L1375">                        Image p = parent.getUIManager().getThemeImageConstant(&quot;sideMenuPressImage&quot;);</span>
+<span class="nc bnc" id="L1376" title="All 2 branches missed.">                        if (p != null) {</span>
+<span class="nc" id="L1377">                            findCommandComponent(cmd).setPressedIcon(p);</span>
+                        }
+<span class="nc" id="L1379">                    } else {</span>
+<span class="fc" id="L1380">                        leftSideMenuCommand = addMaterialCommandToLeftBar(&quot;&quot;, FontImage.MATERIAL_MENU, size, new ActionListener() {</span>
+                            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L1382" title="All 2 branches missed.">                                if (sidemenuDialog.isShowing()) {</span>
+<span class="nc" id="L1383">                                    closeSideMenu();</span>
+<span class="nc" id="L1384">                                    return;</span>
+                                }
+<span class="nc" id="L1386">                                showOnTopSidemenu(-1, false);</span>
+<span class="nc" id="L1387">                            }</span>
+                        });
+                    }
+                }
+<span class="fc" id="L1391">            } else {</span>
+<span class="fc" id="L1392">                rightSidemenuDialog = new InteractionDialog(new BorderLayout());</span>
+
+<span class="fc" id="L1394">                rightSidemenuDialog.setFormMode(true);</span>
+<span class="fc" id="L1395">                rightSidemenuDialog.setUIID(&quot;Container&quot;);</span>
+<span class="fc" id="L1396">                rightSidemenuDialog.setDialogUIID(&quot;Container&quot;);</span>
+<span class="fc" id="L1397">                rightSidemenuDialog.getTitleComponent().remove();</span>
+<span class="fc" id="L1398">                rightSidemenuDialog.add(BorderLayout.CENTER, permanentRightSideMenuContainer);</span>
+<span class="pc bpc" id="L1399" title="1 of 2 branches missed.">                if (rightSidemenuSouthComponent != null) {</span>
+<span class="nc" id="L1400">                    rightSidemenuDialog.add(BorderLayout.SOUTH, rightSidemenuSouthComponent);</span>
+                }
+<span class="fc" id="L1402">                float size = 4.5f;</span>
+                try {
+<span class="fc" id="L1404">                    size = Float.parseFloat(getUIManager().getThemeConstant(&quot;menuImageSize&quot;, &quot;4.5&quot;));</span>
+<span class="nc" id="L1405">                } catch (Throwable t) {</span>
+<span class="nc" id="L1406">                    Log.e(t);</span>
+<span class="fc" id="L1407">                }</span>
+
+<span class="pc bpc" id="L1409" title="1 of 2 branches missed.">                if (!parent.getUIManager().isThemeConstant(&quot;hideRightSideMenuBool&quot;, false)) {</span>
+<span class="fc" id="L1410">                    Image i = parent.getUIManager().getThemeImageConstant(&quot;rightSideMenuImage&quot;);</span>
+<span class="pc bpc" id="L1411" title="1 of 2 branches missed.">                    if (i != null) {</span>
+<span class="nc" id="L1412">                        Command cmd = addCommandToRightBar(&quot;&quot;, i, new ActionListener() {</span>
+                            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L1414" title="All 2 branches missed.">                                if (rightSidemenuDialog.isShowing()) {</span>
+<span class="nc" id="L1415">                                    closeRightSideMenu();</span>
+<span class="nc" id="L1416">                                    return;</span>
+                                }
+<span class="nc" id="L1418">                                showOnTopRightSidemenu(-1, false);</span>
+<span class="nc" id="L1419">                            }</span>
+                        });
+<span class="nc" id="L1421">                        Image p = parent.getUIManager().getThemeImageConstant(&quot;rightSideMenuPressImage&quot;);</span>
+<span class="nc bnc" id="L1422" title="All 2 branches missed.">                        if (p != null) {</span>
+<span class="nc" id="L1423">                            findCommandComponent(cmd).setPressedIcon(p);</span>
+                        }
+<span class="nc" id="L1425">                    } else {</span>
+<span class="fc" id="L1426">                        rightSideMenuCommand = addMaterialCommandToRightBar(&quot;&quot;, FontImage.MATERIAL_MENU, size, new ActionListener() {</span>
+                            public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L1428" title="All 2 branches missed.">                                if (rightSidemenuDialog.isShowing()) {</span>
+<span class="nc" id="L1429">                                    closeRightSideMenu();</span>
+<span class="nc" id="L1430">                                    return;</span>
+                                }
+<span class="nc" id="L1432">                                showOnTopRightSidemenu(-1, false);</span>
+<span class="nc" id="L1433">                            }</span>
+                        });
+                    }
+                }
+            }
+        }
+<span class="fc" id="L1439">    }</span>
+
+    /**
+     * Allows runtime manipulation of the side menu button, notice this will
+     * only work after the menu was created
+     *
+     * @return a button or null if the menu isn't there yet
+     */
+    public Button getLeftSideMenuButton() {
+<span class="nc" id="L1448">        return findCommandComponent(leftSideMenuCommand);</span>
+    }
+
+    /**
+     * Allows runtime manipulation of the side menu button, notice this will
+     * only work after the menu was created
+     *
+     * @return a button or null if the menu isn't there yet
+     */
+    public Button getRightSideMenuButton() {
+<span class="nc" id="L1458">        return findCommandComponent(rightSideMenuCommand);</span>
+    }
+
+    /**
+     * Allows runtime manipulation of the overflow button, notice this will
+     * only work after the menu was created
+     *
+     * @return a button or null if the menu isn't there yet
+     */
+    public Button getOverflowButton() {
+<span class="nc" id="L1468">        return menuButton;</span>
+    }
+
+    private void constructOnTopSideMenu() {
+<span class="fc" id="L1472">        constructOnTopSideMenu(true);</span>
+<span class="fc" id="L1473">    }</span>
+
+    private void constructOnTopRightSideMenu() {
+<span class="fc" id="L1476">        constructOnTopSideMenu(false);</span>
+<span class="fc" id="L1477">    }</span>
+
+    void showOnTopSidemenu(final int draggedX, final boolean fromCurrent) {
+<span class="fc" id="L1480">        Form f = Display.getInstance().getCurrent();</span>
+<span class="pc bpc" id="L1481" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="fc" id="L1482">            Component currEditing = f.findCurrentlyEditingComponent();</span>
+<span class="pc bpc" id="L1483" title="1 of 2 branches missed.">            if (currEditing != null) {</span>
+<span class="nc" id="L1484">                currEditing.stopEditing(new Runnable() {</span>
+
+                    @Override
+                    public void run() {
+<span class="nc" id="L1488">                        showOnTopSidemenu(draggedX, fromCurrent);</span>
+<span class="nc" id="L1489">                    }</span>
+
+                });
+<span class="nc" id="L1492">                return;</span>
+            } else {
+                // On iOS, if async editing is enabled, it is possible
+                // that the keyboard will be opened even if no component
+                // is currently being edited.  In such a case, we still need
+                // to close the keyboard.  This &quot;hack&quot; achieves that.
+                // It would *probably* work to just do this in every case,
+                // rather than first try to find the editing component and stop
+                // its editing - but I chose to do it this way to minimize
+                // changes in code path - since it already worked correctly on
+                // every platform except for iOS.
+                // Ref https://github.com/codenameone/CodenameOne/issues/2444
+<span class="fc" id="L1504">                f.stopEditing(null);</span>
+            }
+        }
+<span class="fc" id="L1507">        AnimationManager a = getAnimationManager();</span>
+<span class="pc bpc" id="L1508" title="1 of 2 branches missed.">        if (a != null) {</span>
+<span class="fc" id="L1509">            a.flushAnimation(new Runnable() {</span>
+
+                @Override
+                public void run() {
+<span class="fc" id="L1513">                    showOnTopSidemenuImpl(draggedX, fromCurrent);</span>
+<span class="fc" id="L1514">                }</span>
+
+            });
+        }
+<span class="fc" id="L1518">    }</span>
+
+    void showOnTopSidemenuImpl(int draggedX, boolean fromCurrent) {
+<span class="fc" id="L1521">        int v = 0;</span>
+<span class="fc" id="L1522">        int dw = Display.getInstance().getDisplayWidth();</span>
+<span class="pc bpc" id="L1523" title="1 of 2 branches missed.">        if (Display.getInstance().isPortrait()) {</span>
+<span class="pc bpc" id="L1524" title="1 of 2 branches missed.">            if (Display.getInstance().isTablet()) {</span>
+<span class="nc" id="L1525">                v = getUIManager().getThemeConstant(&quot;sideMenuSizeTabPortraitInt&quot;, -1);</span>
+<span class="nc bnc" id="L1526" title="All 2 branches missed.">                if (v &lt; 0) {</span>
+<span class="nc" id="L1527">                    v = dw * 2 / 3;</span>
+                } else {
+<span class="nc" id="L1529">                    v = dw * (100 - v) / 100;</span>
+                }
+            } else {
+<span class="fc" id="L1532">                v = getUIManager().getThemeConstant(&quot;sideMenuSizePortraitInt&quot;, -1);</span>
+<span class="pc bpc" id="L1533" title="1 of 2 branches missed.">                if (v &lt; 0) {</span>
+<span class="fc" id="L1534">                    v = dw - Display.getInstance().convertToPixels(10);</span>
+                } else {
+<span class="nc" id="L1536">                    v = dw * (100 - v) / 100;</span>
+                }
+            }
+        } else {
+<span class="nc bnc" id="L1540" title="All 2 branches missed.">            if (Display.getInstance().isTablet()) {</span>
+<span class="nc" id="L1541">                v = getUIManager().getThemeConstant(&quot;sideMenuSizeTabLandscapeInt&quot;, -1);</span>
+<span class="nc bnc" id="L1542" title="All 2 branches missed.">                if (v &lt; 0) {</span>
+<span class="nc" id="L1543">                    v = dw * 3 / 4;</span>
+                } else {
+<span class="nc" id="L1545">                    v = dw * (100 - v) / 100;</span>
+                }
+            } else {
+<span class="nc" id="L1548">                v = getUIManager().getThemeConstant(&quot;sideMenuSizeLandscapeInt&quot;, -1);</span>
+<span class="nc bnc" id="L1549" title="All 2 branches missed.">                if (v &lt; 0) {</span>
+<span class="nc" id="L1550">                    v = dw * 4 / 10;</span>
+                } else {
+<span class="nc" id="L1552">                    v = dw * (100 - v) / 100;</span>
+                }
+            }
+        }
+<span class="fc" id="L1556">        int actualV = v;</span>
+<span class="pc bpc" id="L1557" title="1 of 2 branches missed.">        if (draggedX &gt; 0) {</span>
+<span class="nc" id="L1558">            v = Math.min(v, draggedX);</span>
+<span class="nc" id="L1559">            sidemenuDialog.setAnimateShow(false);</span>
+<span class="nc" id="L1560">            sidemenuDialog.dispose();</span>
+        } else {
+<span class="fc" id="L1562">            sidemenuDialog.setAnimateShow(true);</span>
+        }
+
+        // workaround for layout issue on first show
+<span class="pc bpc" id="L1566" title="1 of 2 branches missed.">        if (sidemenuDialog.getClientProperty(&quot;cn1$firstShow&quot;) == null) {</span>
+<span class="fc" id="L1567">            sidemenuDialog.setAnimateShow(false);</span>
+<span class="fc" id="L1568">            sidemenuDialog.setVisible(false);</span>
+<span class="pc bpc" id="L1569" title="1 of 2 branches missed.">            if (!isRTL()) {</span>
+<span class="fc" id="L1570">                sidemenuDialog.show(0, 0, 0, dw - v);</span>
+<span class="fc" id="L1571">                sidemenuDialog.disposeToTheLeft();</span>
+            } else {
+<span class="nc" id="L1573">                sidemenuDialog.show(0, 0, dw - v, 0);</span>
+<span class="nc" id="L1574">                sidemenuDialog.disposeToTheRight();</span>
+            }
+<span class="fc" id="L1576">            sidemenuDialog.setVisible(true);</span>
+<span class="fc" id="L1577">            sidemenuDialog.putClientProperty(&quot;cn1$firstShow&quot;, Boolean.TRUE);</span>
+<span class="pc bpc" id="L1578" title="1 of 2 branches missed.">            sidemenuDialog.setAnimateShow(draggedX &lt; 1);</span>
+        }
+<span class="fc" id="L1580">        sidemenuDialog.setHeight(Display.getInstance().getDisplayHeight());</span>
+<span class="fc" id="L1581">        sidemenuDialog.setWidth(v);</span>
+<span class="pc bpc" id="L1582" title="1 of 2 branches missed.">        if (!fromCurrent) {</span>
+<span class="pc bpc" id="L1583" title="1 of 2 branches missed.">            if (!isRTL()) {</span>
+<span class="fc" id="L1584">                sidemenuDialog.setX(-v);</span>
+            } else {
+<span class="nc" id="L1586">                sidemenuDialog.setX(Display.getInstance().getDisplayWidth() + v);</span>
+            }
+        }
+<span class="fc" id="L1589">        sidemenuDialog.setRepositionAnimation(false);</span>
+<span class="fc" id="L1590">        sidemenuDialog.layoutContainer();</span>
+<span class="pc bpc" id="L1591" title="1 of 2 branches missed.">        if (!getUIManager().isThemeConstant(&quot;sideMenuTensileDragBool&quot;, true)) {</span>
+<span class="nc" id="L1592">            sidemenuDialog.getContentPane().setTensileDragEnabled(false);</span>
+        }
+
+<span class="fc" id="L1595">        float f = ((float) v) / ((float) dw) * 80.0f;</span>
+<span class="fc" id="L1596">        Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);</span>
+<span class="fc" id="L1597">        Style s = cnt.getUnselectedStyle();</span>
+<span class="fc" id="L1598">        s.setBgTransparency((int) f);</span>
+<span class="fc" id="L1599">        s.setBgColor(0);</span>
+
+<span class="fc" id="L1601">        sidemenuDialog.show(0, 0, 0, dw - actualV);</span>
+<span class="pc bpc" id="L1602" title="1 of 2 branches missed.">        if (!isRTL()) {</span>
+<span class="pc bpc" id="L1603" title="1 of 2 branches missed.">            if (draggedX &gt; 0) {</span>
+<span class="nc" id="L1604">                sidemenuDialog.setX(Math.min(0, draggedX - actualV));</span>
+            }
+        } else {
+<span class="nc bnc" id="L1607" title="All 2 branches missed.">            if (draggedX &gt; 0) {</span>
+<span class="nc" id="L1608">                sidemenuDialog.setX(Math.max(dw - draggedX, dw - actualV));</span>
+            }
+        }
+<span class="fc" id="L1611">    }</span>
+
+    void showOnTopRightSidemenu(final int draggedX, final boolean fromCurrent) {
+<span class="fc" id="L1614">        Form f = Display.getInstance().getCurrent();</span>
+<span class="pc bpc" id="L1615" title="1 of 2 branches missed.">        if (f != null) {</span>
+<span class="fc" id="L1616">            Component currEditing = f.findCurrentlyEditingComponent();</span>
+<span class="pc bpc" id="L1617" title="1 of 2 branches missed.">            if (currEditing != null) {</span>
+<span class="nc" id="L1618">                currEditing.stopEditing(new Runnable() {</span>
+
+                    @Override
+                    public void run() {
+<span class="nc" id="L1622">                        showOnTopRightSidemenu(draggedX, fromCurrent);</span>
+<span class="nc" id="L1623">                    }</span>
+
+                });
+<span class="nc" id="L1626">                return;</span>
+            } else {
+                // On iOS, if async editing is enabled, it is possible
+                // that the keyboard will be opened even if no component
+                // is currently being edited.  In such a case, we still need
+                // to close the keyboard.  This &quot;hack&quot; achieves that.
+                // It would *probably* work to just do this in every case,
+                // rather than first try to find the editing component and stop
+                // its editing - but I chose to do it this way to minimize
+                // changes in code path - since it already worked correctly on
+                // every platform except for iOS.
+                // Ref https://github.com/codenameone/CodenameOne/issues/2444
+<span class="fc" id="L1638">                f.stopEditing(null);</span>
+            }
+        }
+<span class="fc" id="L1641">        AnimationManager a = getAnimationManager();</span>
+<span class="pc bpc" id="L1642" title="1 of 2 branches missed.">        if (a != null) {</span>
+<span class="fc" id="L1643">            a.flushAnimation(new Runnable() {</span>
+
+                @Override
+                public void run() {
+<span class="fc" id="L1647">                    showOnTopRightSidemenuImpl(draggedX, fromCurrent);</span>
+<span class="fc" id="L1648">                }</span>
+
+            });
+        }
+
+<span class="fc" id="L1653">    }</span>
+
+    void showOnTopRightSidemenuImpl(int draggedX, boolean fromCurrent) {
+<span class="fc" id="L1656">        int v = 0;</span>
+<span class="fc" id="L1657">        int dw = Display.getInstance().getDisplayWidth();</span>
+<span class="pc bpc" id="L1658" title="1 of 2 branches missed.">        if (Display.getInstance().isPortrait()) {</span>
+<span class="pc bpc" id="L1659" title="1 of 2 branches missed.">            if (Display.getInstance().isTablet()) {</span>
+<span class="nc" id="L1660">                v = getUIManager().getThemeConstant(&quot;sideMenuSizeTabPortraitInt&quot;, -1);</span>
+<span class="nc bnc" id="L1661" title="All 2 branches missed.">                if (v &lt; 0) {</span>
+<span class="nc" id="L1662">                    v = dw / 3;</span>
+                } else {
+<span class="nc" id="L1664">                    v = dw * (100 - v) / 100;</span>
+                }
+            } else {
+<span class="fc" id="L1667">                v = getUIManager().getThemeConstant(&quot;sideMenuSizePortraitInt&quot;, -1);</span>
+<span class="pc bpc" id="L1668" title="1 of 2 branches missed.">                if (v &lt; 0) {</span>
+<span class="fc" id="L1669">                    v = dw - Display.getInstance().convertToPixels(10);</span>
+                } else {
+<span class="nc" id="L1671">                    v = dw * (100 - v) / 100;</span>
+                }
+            }
+        } else {
+<span class="nc bnc" id="L1675" title="All 2 branches missed.">            if (Display.getInstance().isTablet()) {</span>
+<span class="nc" id="L1676">                v = getUIManager().getThemeConstant(&quot;sideMenuSizeTabLandscapeInt&quot;, -1);</span>
+<span class="nc bnc" id="L1677" title="All 2 branches missed.">                if (v &lt; 0) {</span>
+<span class="nc" id="L1678">                    v = dw / 4;</span>
+                } else {
+<span class="nc" id="L1680">                    v = dw * (100 - v) / 100;</span>
+                }
+            } else {
+<span class="nc" id="L1683">                v = getUIManager().getThemeConstant(&quot;sideMenuSizeLandscapeInt&quot;, -1);</span>
+<span class="nc bnc" id="L1684" title="All 2 branches missed.">                if (v &lt; 0) {</span>
+<span class="nc" id="L1685">                    v = dw * 4 / 10;</span>
+                } else {
+<span class="nc" id="L1687">                    v = dw * (100 - v) / 100;</span>
+                }
+            }
+        }
+<span class="fc" id="L1691">        int actualV = v;</span>
+<span class="pc bpc" id="L1692" title="1 of 2 branches missed.">        if (draggedX &gt; 0) {</span>
+<span class="nc" id="L1693">            v = Math.min(v, draggedX);</span>
+<span class="nc" id="L1694">            rightSidemenuDialog.setAnimateShow(false);</span>
+<span class="nc" id="L1695">            rightSidemenuDialog.dispose();</span>
+        } else {
+<span class="fc" id="L1697">            rightSidemenuDialog.setAnimateShow(true);</span>
+        }
+
+        // workaround for layout issue on first show
+<span class="pc bpc" id="L1701" title="1 of 2 branches missed.">        if (rightSidemenuDialog.getClientProperty(&quot;cn1$firstRightShow&quot;) == null) {</span>
+<span class="fc" id="L1702">            rightSidemenuDialog.setAnimateShow(false);</span>
+<span class="fc" id="L1703">            rightSidemenuDialog.setVisible(false);</span>
+<span class="pc bpc" id="L1704" title="1 of 2 branches missed.">            if (!isRTL()) {</span>
+<span class="fc" id="L1705">                rightSidemenuDialog.show(0, 0, dw - v, 0);</span>
+<span class="fc" id="L1706">                rightSidemenuDialog.disposeToTheRight();</span>
+            } else {
+<span class="nc" id="L1708">                rightSidemenuDialog.show(0, 0, 0, dw - v);</span>
+<span class="nc" id="L1709">                rightSidemenuDialog.disposeToTheLeft();</span>
+            }
+<span class="fc" id="L1711">            rightSidemenuDialog.setVisible(true);</span>
+<span class="fc" id="L1712">            rightSidemenuDialog.putClientProperty(&quot;cn1$firstRightShow&quot;, Boolean.TRUE);</span>
+<span class="pc bpc" id="L1713" title="1 of 2 branches missed.">            rightSidemenuDialog.setAnimateShow(draggedX &lt; 1);</span>
+        }
+<span class="fc" id="L1715">        rightSidemenuDialog.setHeight(Display.getInstance().getDisplayHeight());</span>
+<span class="fc" id="L1716">        rightSidemenuDialog.setWidth(v);</span>
+<span class="pc bpc" id="L1717" title="1 of 2 branches missed.">        if (!fromCurrent) {</span>
+<span class="pc bpc" id="L1718" title="1 of 2 branches missed.">            if (!isRTL()) {</span>
+<span class="fc" id="L1719">                rightSidemenuDialog.setX(Display.getInstance().getDisplayWidth() + v);</span>
+            } else {
+<span class="nc" id="L1721">                rightSidemenuDialog.setX(-v);</span>
+            }
+        }
+<span class="fc" id="L1724">        rightSidemenuDialog.setRepositionAnimation(false);</span>
+<span class="fc" id="L1725">        rightSidemenuDialog.layoutContainer();</span>
+<span class="pc bpc" id="L1726" title="1 of 2 branches missed.">        if (!getUIManager().isThemeConstant(&quot;sideMenuTensileDragBool&quot;, true)) {</span>
+<span class="nc" id="L1727">            rightSidemenuDialog.getContentPane().setTensileDragEnabled(false);</span>
+        }
+
+<span class="fc" id="L1730">        float f = ((float) v) / ((float) dw) * 80.0f;</span>
+<span class="fc" id="L1731">        Container cnt = getComponentForm().getFormLayeredPane(Toolbar.class, false);</span>
+<span class="fc" id="L1732">        Style s = cnt.getUnselectedStyle();</span>
+<span class="fc" id="L1733">        s.setBgTransparency((int) f);</span>
+<span class="fc" id="L1734">        s.setBgColor(0);</span>
+
+<span class="fc" id="L1736">        rightSidemenuDialog.show(0, 0, dw - actualV, 0);</span>
+<span class="pc bpc" id="L1737" title="1 of 2 branches missed.">        if (!isRTL()) {</span>
+<span class="pc bpc" id="L1738" title="1 of 2 branches missed.">            if (draggedX &gt; 0) {</span>
+<span class="nc" id="L1739">                rightSidemenuDialog.setX(Math.max(dw - draggedX, dw - actualV));</span>
+            }
+        } else {
+<span class="nc bnc" id="L1742" title="All 2 branches missed.">            if (draggedX &gt; 0) {</span>
+<span class="nc" id="L1743">                rightSidemenuDialog.setX(Math.min(0, draggedX - actualV));</span>
+            }
+        }
+<span class="fc" id="L1746">    }</span>
+
+    /**
+     * Places a component in the south portion (bottom) of the left side menu.
+     * Notice this only works with on-top side menu and the permanent side menu.
+     * Setting this value to null will remove the existing component. Only one
+     * component can be placed in the south but it can be a container that
+     * includes many components
+     *
+     * @param sidemenuSouthComponent the new component to place in the south or
+     *                               null to remove the current component
+     */
+    public void setComponentToSideMenuSouth(Component sidemenuSouthComponent) {
+<span class="nc bnc" id="L1759" title="All 2 branches missed.">        if (this.sidemenuSouthComponent != null) {</span>
+<span class="nc" id="L1760">            sidemenuSouthComponent.remove();</span>
+        }
+<span class="nc" id="L1762">        this.sidemenuSouthComponent = sidemenuSouthComponent;</span>
+<span class="nc bnc" id="L1763" title="All 2 branches missed.">        if (this.sidemenuSouthComponent != null) {</span>
+<span class="nc bnc" id="L1764" title="All 2 branches missed.">            if (sidemenuDialog != null) {</span>
+<span class="nc" id="L1765">                sidemenuDialog.add(BorderLayout.SOUTH, sidemenuSouthComponent);</span>
+            } else {
+<span class="nc bnc" id="L1767" title="All 4 branches missed.">                if (permanentSideMenu &amp;&amp; permanentSideMenuContainer != null) {</span>
+<span class="nc" id="L1768">                    Form parent = getComponentForm();</span>
+<span class="nc" id="L1769">                    parent.removeComponentFromForm(permanentSideMenuContainer);</span>
+<span class="nc" id="L1770">                    Container c = BorderLayout.center(permanentSideMenuContainer);</span>
+<span class="nc" id="L1771">                    c.add(BorderLayout.SOUTH, sidemenuSouthComponent);</span>
+<span class="nc" id="L1772">                    parent.addComponentToForm(BorderLayout.WEST, c);</span>
+                }
+            }
+        }
+<span class="nc" id="L1776">    }</span>
+
+    /**
+     * Places a component in the south portion (bottom) of the right side menu.
+     * Notice this only works with on-top side menu and the permanent side menu.
+     * Setting this value to null will remove the existing component. Only one
+     * component can be placed in the south but it can be a container that
+     * includes many components
+     *
+     * @param sidemenuSouthComponent the new component to place in the south or
+     *                               null to remove the current component
+     */
+    public void setComponentToRightSideMenuSouth(Component sidemenuSouthComponent) {
+<span class="nc bnc" id="L1789" title="All 2 branches missed.">        if (this.rightSidemenuSouthComponent != null) {</span>
+<span class="nc" id="L1790">            rightSidemenuSouthComponent.remove();</span>
+        }
+<span class="nc" id="L1792">        this.rightSidemenuSouthComponent = sidemenuSouthComponent;</span>
+<span class="nc bnc" id="L1793" title="All 2 branches missed.">        if (this.rightSidemenuSouthComponent != null) {</span>
+<span class="nc bnc" id="L1794" title="All 2 branches missed.">            if (rightSidemenuDialog != null) {</span>
+<span class="nc" id="L1795">                rightSidemenuDialog.add(BorderLayout.SOUTH, sidemenuSouthComponent);</span>
+            } else {
+<span class="nc bnc" id="L1797" title="All 4 branches missed.">                if (permanentSideMenu &amp;&amp; permanentSideMenuContainer != null) {</span>
+<span class="nc" id="L1798">                    Form parent = getComponentForm();</span>
+<span class="nc" id="L1799">                    parent.removeComponentFromForm(permanentRightSideMenuContainer);</span>
+<span class="nc" id="L1800">                    Container c = BorderLayout.center(permanentRightSideMenuContainer);</span>
+<span class="nc" id="L1801">                    c.add(BorderLayout.SOUTH, sidemenuSouthComponent);</span>
+<span class="nc" id="L1802">                    parent.addComponentToForm(BorderLayout.EAST, c);</span>
+                }
+            }
+        }
+<span class="nc" id="L1806">    }</span>
+
+    /**
+     * Adds a Component to the left side navigation menu. The Component is added
+     * to the navigation menu and the command gets the events once the Component
+     * is being pressed.
+     *
+     * @param cmp c Component to be added to the menu
+     * @param cmd a Command to handle the events
+     */
+    public void addComponentToLeftSideMenu(Component cmp, Command cmd) {
+<span class="nc" id="L1817">        checkIfInitialized();</span>
+<span class="nc bnc" id="L1818" title="All 2 branches missed.">        if (permanentSideMenu) {</span>
+<span class="nc" id="L1819">            constructPermanentSideMenu();</span>
+<span class="nc" id="L1820">            Container cnt = new Container(new BorderLayout());</span>
+<span class="nc" id="L1821">            cnt.addComponent(BorderLayout.CENTER, cmp);</span>
+<span class="nc" id="L1822">            Button btn = new Button(cmd);</span>
+<span class="nc" id="L1823">            btn.setParent(cnt);</span>
+<span class="nc" id="L1824">            cnt.setLeadComponent(btn);</span>
+<span class="nc" id="L1825">            addComponentToSideMenu(permanentSideMenuContainer, cnt);</span>
+<span class="nc" id="L1826">        } else {</span>
+<span class="nc bnc" id="L1827" title="All 2 branches missed.">            if (onTopSideMenu) {</span>
+<span class="nc" id="L1828">                constructOnTopSideMenu();</span>
+<span class="nc" id="L1829">                Container cnt = new Container(new BorderLayout());</span>
+<span class="nc" id="L1830">                cnt.addComponent(BorderLayout.CENTER, cmp);</span>
+<span class="nc" id="L1831">                Button btn = new Button(cmd);</span>
+<span class="nc" id="L1832">                btn.setParent(cnt);</span>
+<span class="nc" id="L1833">                cnt.setLeadComponent(btn);</span>
+<span class="nc" id="L1834">                addComponentToSideMenu(permanentSideMenuContainer, cnt);</span>
+<span class="nc" id="L1835">            } else {</span>
+<span class="nc" id="L1836">                cmd.putClientProperty(SideMenuBar.COMMAND_SIDE_COMPONENT, cmp);</span>
+<span class="nc" id="L1837">                cmd.putClientProperty(SideMenuBar.COMMAND_ACTIONABLE, Boolean.TRUE);</span>
+<span class="nc" id="L1838">                sideMenu.addCommand(cmd);</span>
+<span class="nc" id="L1839">                sideMenu.installMenuBar();</span>
+            }
+        }
+<span class="nc" id="L1842">    }</span>
+
+    /**
+     * Adds a Component to the right side navigation menu (it requires a
+     * permanent sidemenu or an onTop sidemenu, otherwise it does nothing). The
+     * Component is added to the navigation menu and the command gets the events
+     * once the Component is being pressed.
+     *
+     * @param cmp c Component to be added to the menu
+     * @param cmd a Command to handle the events
+     */
+    public void addComponentToRightSideMenu(Component cmp, Command cmd) {
+<span class="nc" id="L1854">        checkIfInitialized();</span>
+<span class="nc bnc" id="L1855" title="All 2 branches missed.">        if (permanentSideMenu) {</span>
+<span class="nc" id="L1856">            constructPermanentRightSideMenu();</span>
+<span class="nc" id="L1857">            Container cnt = new Container(new BorderLayout());</span>
+<span class="nc" id="L1858">            cnt.addComponent(BorderLayout.CENTER, cmp);</span>
+<span class="nc" id="L1859">            Button btn = new Button(cmd);</span>
+<span class="nc" id="L1860">            btn.setParent(cnt);</span>
+<span class="nc" id="L1861">            cnt.setLeadComponent(btn);</span>
+<span class="nc" id="L1862">            addComponentToRightSideMenu(permanentRightSideMenuContainer, cnt);</span>
+<span class="nc" id="L1863">        } else {</span>
+<span class="nc bnc" id="L1864" title="All 2 branches missed.">            if (onTopSideMenu) {</span>
+<span class="nc" id="L1865">                constructOnTopRightSideMenu();</span>
+<span class="nc" id="L1866">                Container cnt = new Container(new BorderLayout());</span>
+<span class="nc" id="L1867">                cnt.addComponent(BorderLayout.CENTER, cmp);</span>
+<span class="nc" id="L1868">                Button btn = new Button(cmd);</span>
+<span class="nc" id="L1869">                btn.setParent(cnt);</span>
+<span class="nc" id="L1870">                cnt.setLeadComponent(btn);</span>
+<span class="nc" id="L1871">                addComponentToRightSideMenu(permanentRightSideMenuContainer, cnt);</span>
+<span class="nc" id="L1872">            } else {</span>
+<span class="nc" id="L1873">                throw new IllegalStateException(&quot;Right sidemenu bar only works in on-top mode or permanent mode&quot;);</span>
+            }
+        }
+<span class="nc" id="L1876">    }</span>
+
+    /**
+     * Adds a Component to the left side navigation menu.
+     *
+     * @param cmp c Component to be added to the menu
+     */
+    public void addComponentToLeftSideMenu(Component cmp) {
+<span class="fc" id="L1884">        checkIfInitialized();</span>
+<span class="pc bpc" id="L1885" title="1 of 2 branches missed.">        if (permanentSideMenu) {</span>
+<span class="nc" id="L1886">            constructPermanentSideMenu();</span>
+<span class="nc" id="L1887">            addComponentToLeftSideMenu(permanentSideMenuContainer, cmp);</span>
+        } else {
+<span class="pc bpc" id="L1889" title="1 of 2 branches missed.">            if (onTopSideMenu) {</span>
+<span class="nc" id="L1890">                constructOnTopSideMenu();</span>
+<span class="nc" id="L1891">                addComponentToLeftSideMenu(permanentSideMenuContainer, cmp);</span>
+            } else {
+<span class="fc" id="L1893">                Command cmd = new Command(&quot;&quot;);</span>
+<span class="fc" id="L1894">                cmd.putClientProperty(SideMenuBar.COMMAND_SIDE_COMPONENT, cmp);</span>
+<span class="fc" id="L1895">                cmd.putClientProperty(SideMenuBar.COMMAND_ACTIONABLE, Boolean.FALSE);</span>
+<span class="fc" id="L1896">                sideMenu.addCommand(cmd);</span>
+<span class="fc" id="L1897">                sideMenu.installMenuBar();</span>
+            }
+        }
+<span class="fc" id="L1900">    }</span>
+
+    /**
+     * Adds a Component to the right side navigation menu (it requires a
+     * permanent sidemenu or an onTop sidemenu, otherwise it does nothing).
+     *
+     * @param cmp c Component to be added to the menu
+     */
+    public void addComponentToRightSideMenu(Component cmp) {
+<span class="nc" id="L1909">        checkIfInitialized();</span>
+<span class="nc bnc" id="L1910" title="All 2 branches missed.">        if (permanentSideMenu) {</span>
+<span class="nc" id="L1911">            constructPermanentRightSideMenu();</span>
+<span class="nc" id="L1912">            addComponentToRightSideMenu(permanentRightSideMenuContainer, cmp);</span>
+        } else {
+<span class="nc bnc" id="L1914" title="All 2 branches missed.">            if (onTopSideMenu) {</span>
+<span class="nc" id="L1915">                constructOnTopRightSideMenu();</span>
+<span class="nc" id="L1916">                addComponentToRightSideMenu(permanentRightSideMenuContainer, cmp);</span>
+            } else {
+<span class="nc" id="L1918">                throw new IllegalStateException(&quot;Right sidemenu bar only works in on-top mode or permanent mode&quot;);</span>
+            }
+        }
+<span class="nc" id="L1921">    }</span>
+
+    /**
+     * Find the command component instance if such an instance exists
+     *
+     * @param c the command instance
+     * @return the button instance
+     */
+    public Button findCommandComponent(Command c) {
+<span class="pc bpc" id="L1930" title="1 of 4 branches missed.">        if (permanentSideMenu || onTopSideMenu) {</span>
+<span class="fc bfc" id="L1931" title="All 2 branches covered.">            if (permanentSideMenuContainer != null) {</span>
+<span class="fc" id="L1932">                Button b = findCommandComponent(c, permanentSideMenuContainer);</span>
+<span class="pc bpc" id="L1933" title="1 of 2 branches missed.">                if (b != null) {</span>
+<span class="fc" id="L1934">                    return b;</span>
+                }
+            }
+<span class="pc bpc" id="L1937" title="1 of 2 branches missed.">            if (permanentRightSideMenuContainer != null) {</span>
+<span class="fc" id="L1938">                Button b = findCommandComponent(c, permanentRightSideMenuContainer);</span>
+<span class="pc bpc" id="L1939" title="1 of 2 branches missed.">                if (b != null) {</span>
+<span class="fc" id="L1940">                    return b;</span>
+                }
+            }
+        }
+<span class="fc" id="L1944">        Button b = sideMenu.findCommandComponent(c);</span>
+<span class="fc bfc" id="L1945" title="All 2 branches covered.">        if (b != null) {</span>
+<span class="fc" id="L1946">            return b;</span>
+        }
+<span class="fc" id="L1948">        return findCommandComponent(c, this);</span>
+    }
+
+    private Button findCommandComponent(Command c, Container cnt) {
+<span class="fc" id="L1952">        int count = cnt.getComponentCount();</span>
+<span class="fc bfc" id="L1953" title="All 2 branches covered.">        for (int iter = 0; iter &lt; count; iter++) {</span>
+<span class="fc" id="L1954">            Component current = cnt.getComponentAt(iter);</span>
+<span class="fc bfc" id="L1955" title="All 2 branches covered.">            if (current instanceof Button) {</span>
+<span class="fc" id="L1956">                Button b = (Button) current;</span>
+<span class="pc bpc" id="L1957" title="2 of 4 branches missed.">                if (b.getCommand() == c || sideMenu.unwrapCommand(b.getCommand()) == c) {</span>
+<span class="fc" id="L1958">                    return b;</span>
+                }
+<span class="nc" id="L1960">            } else {</span>
+<span class="pc bpc" id="L1961" title="1 of 2 branches missed.">                if (current instanceof Container) {</span>
+<span class="nc" id="L1962">                    Button b = findCommandComponent(c, (Container) current);</span>
+<span class="nc bnc" id="L1963" title="All 2 branches missed.">                    if (b != null) {</span>
+<span class="nc" id="L1964">                        return b;</span>
+                    }
+                }
+            }
+        }
+<span class="fc" id="L1969">        return null;</span>
+    }
+
+    /**
+     * Adds a Command to the TitleArea on the right side.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToRightBar(String name, Image icon, final ActionListener ev) {
+<span class="fc" id="L1981">        Command cmd = Command.create(name, icon, ev);</span>
+<span class="fc" id="L1982">        addCommandToRightBar(cmd);</span>
+<span class="fc" id="L1983">        return cmd;</span>
+    }
+
+    /**
+     * Removes a Command from the MenuBar
+     *
+     * @param cmd Command to remove
+     */
+    public void removeCommand(Command cmd) {
+<span class="fc" id="L1992">        getMenuBar().removeCommand(cmd);</span>
+<span class="fc" id="L1993">    }</span>
+
+    /**
+     * Adds a Command to the TitleArea on the right side.
+     *
+     * @param cmd a Command
+     */
+    public void addCommandToRightBar(Command cmd) {
+<span class="fc" id="L2001">        checkIfInitialized();</span>
+<span class="fc" id="L2002">        cmd.putClientProperty(&quot;TitleCommand&quot;, Boolean.TRUE);</span>
+<span class="fc" id="L2003">        cmd.putClientProperty(&quot;Left&quot;, null);</span>
+<span class="fc" id="L2004">        sideMenu.addCommand(cmd, 0);</span>
+<span class="fc" id="L2005">    }</span>
+
+    /**
+     * Adds a Command to the TitleArea on the left side.
+     *
+     * @param name the name/title of the command
+     * @param icon the icon for the command
+     * @param ev   the even handler
+     * @return a newly created Command instance
+     */
+    public Command addCommandToLeftBar(String name, Image icon, final ActionListener ev) {
+<span class="fc" id="L2016">        Command cmd = Command.create(name, icon, ev);</span>
+<span class="fc" id="L2017">        addCommandToLeftBar(cmd);</span>
+<span class="fc" id="L2018">        return cmd;</span>
+    }
+
+    /**
+     * Adds a Command to the TitleArea on the left side.
+     *
+     * @param cmd a Command
+     */
+    public void addCommandToLeftBar(Command cmd) {
+<span class="fc" id="L2027">        checkIfInitialized();</span>
+<span class="fc" id="L2028">        cmd.putClientProperty(&quot;TitleCommand&quot;, Boolean.TRUE);</span>
+<span class="fc" id="L2029">        cmd.putClientProperty(&quot;Left&quot;, Boolean.TRUE);</span>
+<span class="fc" id="L2030">        sideMenu.addCommand(cmd, 0);</span>
+<span class="fc" id="L2031">    }</span>
+
+    /**
+     * Returns the commands within the right bar section which can be useful for
+     * things like unit testing. Notice that you should not mutate the commands
+     * or the iteratable set in any way!
+     *
+     * @return the commands in the overflow menu
+     */
+    public Iterable&lt;Command&gt; getRightBarCommands() {
+<span class="nc" id="L2041">        return getBarCommands(null);</span>
+    }
+
+    /**
+     * Returns the commands within the left bar section which can be useful for
+     * things like unit testing. Notice that you should not mutate the commands
+     * or the iteratable set in any way!
+     *
+     * @return the commands in the overflow menu
+     */
+    public Iterable&lt;Command&gt; getLeftBarCommands() {
+<span class="nc" id="L2052">        return getBarCommands(Boolean.TRUE);</span>
+    }
+
+    private Iterable&lt;Command&gt; getBarCommands(Object leftValue) {
+<span class="nc" id="L2056">        ArrayList&lt;Command&gt; cmds = new ArrayList&lt;Command&gt;();</span>
+<span class="nc" id="L2057">        findAllCommands(this, cmds);</span>
+<span class="nc" id="L2058">        int commandCount = cmds.size() - 1;</span>
+<span class="nc bnc" id="L2059" title="All 2 branches missed.">        while (commandCount &gt; 0) {</span>
+<span class="nc" id="L2060">            Command c = cmds.get(commandCount);</span>
+<span class="nc bnc" id="L2061" title="All 2 branches missed.">            if (c.getClientProperty(&quot;Left&quot;) != leftValue) {</span>
+<span class="nc" id="L2062">                cmds.remove(commandCount);</span>
+            }
+<span class="nc" id="L2064">            commandCount--;</span>
+<span class="nc" id="L2065">        }</span>
+<span class="nc" id="L2066">        return cmds;</span>
+    }
+
+    private void findAllCommands(Container cnt, ArrayList&lt;Command&gt; cmds) {
+<span class="nc bnc" id="L2070" title="All 2 branches missed.">        for (Component c : cnt) {</span>
+<span class="nc bnc" id="L2071" title="All 2 branches missed.">            if (c instanceof Container) {</span>
+<span class="nc" id="L2072">                findAllCommands((Container) c, cmds);</span>
+<span class="nc" id="L2073">                continue;</span>
+            }
+<span class="nc bnc" id="L2075" title="All 2 branches missed.">            if (c instanceof Button) {</span>
+<span class="nc" id="L2076">                Command b = ((Button) c).getCommand();</span>
+<span class="nc bnc" id="L2077" title="All 2 branches missed.">                if (b != null) {</span>
+<span class="nc" id="L2078">                    cmds.add(b);</span>
+                }
+            }
+<span class="nc" id="L2081">        }</span>
+<span class="nc" id="L2082">    }</span>
+
+    /**
+     * Returns the associated SideMenuBar object of this Toolbar.
+     *
+     * @return the associated SideMenuBar object
+     */
+    public MenuBar getMenuBar() {
+<span class="fc" id="L2090">        return sideMenu;</span>
+    }
+
+    /*
+     * A Overflow Menu is implemented as a dialog, this method allows you to
+     * override the dialog display in order to customize the dialog menu in
+     * various ways
+     *
+     * @param menu a dialog containing Overflow Menu options that can be
+     * customized
+     * @return the command selected by the user in the dialog
+     */
+    protected Command showOverflowMenu(Dialog menu) {
+<span class="nc" id="L2103">        Form parent = sideMenu.getParentForm();</span>
+        int height;
+        int marginLeft;
+<span class="nc" id="L2106">        int marginRight = 0;</span>
+<span class="nc" id="L2107">        Container dialogContentPane = menu.getDialogComponent();</span>
+<span class="nc" id="L2108">        marginLeft = parent.getWidth() - (dialogContentPane.getPreferredW()</span>
+<span class="nc" id="L2109">                + menu.getStyle().getHorizontalPadding());</span>
+<span class="nc" id="L2110">        marginLeft = Math.max(0, marginLeft);</span>
+<span class="nc bnc" id="L2111" title="All 2 branches missed.">        if (parent.getSoftButtonCount() &gt; 1) {</span>
+<span class="nc" id="L2112">            height = parent.getHeight() - parent.getSoftButton(0).getParent().getPreferredH() - dialogContentPane.getPreferredH();</span>
+        } else {
+<span class="nc" id="L2114">            height = parent.getHeight() - dialogContentPane.getPreferredH();</span>
+        }
+<span class="nc" id="L2116">        height = Math.max(0, height);</span>
+<span class="nc" id="L2117">        int th = getHeight();</span>
+        Transition transitionIn;
+        Transition transitionOut;
+<span class="nc" id="L2120">        UIManager manager = parent.getUIManager();</span>
+<span class="nc" id="L2121">        LookAndFeel lf = manager.getLookAndFeel();</span>
+<span class="nc bnc" id="L2122" title="All 4 branches missed.">        if (lf.getDefaultMenuTransitionIn() != null || lf.getDefaultMenuTransitionOut() != null) {</span>
+<span class="nc" id="L2123">            transitionIn = lf.getDefaultMenuTransitionIn();</span>
+<span class="nc bnc" id="L2124" title="All 2 branches missed.">            if (transitionIn instanceof BubbleTransition) {</span>
+<span class="nc" id="L2125">                ((BubbleTransition) transitionIn).setComponentName(&quot;OverflowButton&quot;);</span>
+            }
+<span class="nc" id="L2127">            transitionOut = lf.getDefaultMenuTransitionOut();</span>
+        } else {
+<span class="nc" id="L2129">            transitionIn = CommonTransitions.createEmpty();</span>
+<span class="nc" id="L2130">            transitionOut = CommonTransitions.createEmpty();</span>
+        }
+<span class="nc" id="L2132">        menu.setTransitionInAnimator(transitionIn);</span>
+<span class="nc" id="L2133">        menu.setTransitionOutAnimator(transitionOut);</span>
+
+<span class="nc bnc" id="L2135" title="All 2 branches missed.">        if (isRTL()) {</span>
+<span class="nc" id="L2136">            marginRight = marginLeft;</span>
+<span class="nc" id="L2137">            marginLeft = 0;</span>
+        }
+<span class="nc" id="L2139">        int tint = parent.getTintColor();</span>
+<span class="nc" id="L2140">        parent.setTintColor(manager.getThemeConstant(&quot;overflowTintColorInt&quot;, 0x00FFFFFF));</span>
+<span class="nc" id="L2141">        parent.tint = false;</span>
+<span class="nc" id="L2142">        boolean showBelowTitle = manager.isThemeConstant(&quot;showMenuBelowTitleBool&quot;, true);</span>
+<span class="nc" id="L2143">        int topPadding = 0;</span>
+<span class="nc" id="L2144">        Component statusBar = ((BorderLayout) getLayout()).getNorth();</span>
+<span class="nc bnc" id="L2145" title="All 2 branches missed.">        if (statusBar != null) {</span>
+<span class="nc" id="L2146">            topPadding = statusBar.getAbsoluteY() + statusBar.getHeight();</span>
+        }
+<span class="nc bnc" id="L2148" title="All 2 branches missed.">        if (showBelowTitle) {</span>
+<span class="nc" id="L2149">            topPadding = th;</span>
+        }
+
+<span class="nc" id="L2152">        Command r = menu.show(topPadding, Math.max(topPadding, height - topPadding), marginLeft, marginRight, true);</span>
+<span class="nc" id="L2153">        parent.setTintColor(tint);</span>
+<span class="nc" id="L2154">        return r;</span>
+    }
+
+    /**
+     * Creates the list component containing the commands within the given
+     * vector used for showing the menu dialog
+     *
+     * @param commands list of command objects
+     * @return List object
+     */
+    protected List createOverflowCommandList(Vector commands) {
+<span class="nc" id="L2165">        List l = new List(commands);</span>
+<span class="nc" id="L2166">        l.setRenderingPrototype(null);</span>
+<span class="nc" id="L2167">        l.setListSizeCalculationSampleCount(commands.size());</span>
+<span class="nc" id="L2168">        l.setUIID(&quot;CommandList&quot;);</span>
+<span class="nc" id="L2169">        Component c = (Component) l.getRenderer();</span>
+<span class="nc" id="L2170">        c.setUIID(&quot;Command&quot;);</span>
+<span class="nc" id="L2171">        c = l.getRenderer().getListFocusComponent(l);</span>
+<span class="nc" id="L2172">        c.setUIID(&quot;CommandFocus&quot;);</span>
+<span class="nc" id="L2173">        l.setFixedSelection(List.FIXED_NONE_CYCLIC);</span>
+<span class="nc" id="L2174">        l.setScrollVisible(false);</span>
+<span class="nc" id="L2175">        ((DefaultListCellRenderer) l.getRenderer()).setShowNumbers(false);</span>
+<span class="nc" id="L2176">        return l;</span>
+    }
+
+    /**
+     * Adds a status bar space to the north of the Component, subclasses can
+     * override this default behavior.
+     */
+    protected void initTitleBarStatus() {
+<span class="fc" id="L2184">        Form f = getComponentForm();</span>
+<span class="pc bpc" id="L2185" title="2 of 4 branches missed.">        if (f != null &amp;&amp; !f.shouldPaintStatusBar()) {</span>
+<span class="fc" id="L2186">            setSafeArea(true);</span>
+<span class="fc" id="L2187">            return;</span>
+        }
+<span class="nc bnc" id="L2189" title="All 2 branches missed.">        if (getUIManager().isThemeConstant(&quot;paintsTitleBarBool&quot;, false)) {</span>
+            // check if its already added:
+<span class="nc bnc" id="L2191" title="All 2 branches missed.">            if (((BorderLayout) getLayout()).getNorth() == null) {</span>
+<span class="nc" id="L2192">                Container bar = new Container();</span>
+<span class="nc bnc" id="L2193" title="All 2 branches missed.">                if (getUIManager().isThemeConstant(&quot;landscapeTitleUiidBool&quot;, false)) {</span>
+<span class="nc" id="L2194">                    bar.setUIID(&quot;StatusBar&quot;, &quot;StatusBarLandscape&quot;);</span>
+                } else {
+<span class="nc" id="L2196">                    bar.setUIID(&quot;StatusBar&quot;);</span>
+                }
+<span class="nc" id="L2198">                reallocateVerticalPaddingAndMarginsToTop(bar);</span>
+<span class="nc" id="L2199">                bar.setSafeArea(true);</span>
+<span class="nc" id="L2200">                addComponent(BorderLayout.NORTH, bar);</span>
+<span class="nc" id="L2201">            }</span>
+        } else {
+<span class="nc" id="L2203">            setSafeArea(true);</span>
+        }
+<span class="nc" id="L2205">    }</span>
+
+    /**
+     * Reallocates vertical padding and margins to be all on top, so that bottom padding/margin
+     * is zero, but the total padding/margin is the same.
+     * &lt;p&gt;
+     * This is helpful for the status bar so that, when the padding is adjusted by the safeArea
+     * we don't end up with extra padding at the bottom of the component, which would increase
+     * the height of the status bar.
+     *
+     * @param cmp
+     */
+    private void reallocateVerticalPaddingAndMarginsToTop(Component cmp) {
+<span class="nc" id="L2218">        Style allStyles = cmp.getAllStyles();</span>
+<span class="nc" id="L2219">        Style style = cmp.getStyle();</span>
+<span class="nc" id="L2220">        int topPadding = style.getPaddingTop();</span>
+<span class="nc" id="L2221">        int topMargin = style.getMarginTop();</span>
+<span class="nc" id="L2222">        int bottomPadding = style.getPaddingBottom();</span>
+<span class="nc" id="L2223">        int bottomMargin = style.getMarginBottom();</span>
+<span class="nc" id="L2224">        allStyles.setPaddingUnitTop(Style.UNIT_TYPE_PIXELS);</span>
+<span class="nc" id="L2225">        allStyles.setMarginUnitTop(Style.UNIT_TYPE_PIXELS);</span>
+<span class="nc" id="L2226">        allStyles.setPaddingUnitBottom(Style.UNIT_TYPE_PIXELS);</span>
+<span class="nc" id="L2227">        allStyles.setMarginUnitBottom(Style.UNIT_TYPE_PIXELS);</span>
+<span class="nc" id="L2228">        allStyles.setPaddingTop(topPadding + bottomPadding);</span>
+<span class="nc" id="L2229">        allStyles.setMarginTop(topMargin + bottomMargin);</span>
+<span class="nc" id="L2230">        allStyles.setPaddingBottom(0);</span>
+<span class="nc" id="L2231">        allStyles.setMarginBottom(0);</span>
+<span class="nc" id="L2232">    }</span>
+
+    private void checkIfInitialized() {
+<span class="pc bpc" id="L2235" title="1 of 2 branches missed.">        if (!initialized) {</span>
+<span class="nc" id="L2236">            throw new IllegalStateException(&quot;Need to call &quot;</span>
+                    + &quot;Form#setToolBar(Toolbar toolbar) before calling this method&quot;);
+        }
+<span class="fc" id="L2239">    }</span>
+
+    /**
+     * Sets the Toolbar to scroll off the screen upon content scroll. This
+     * feature can only work if the Form contentPane is scrollableY
+     *
+     * @param scrollOff if true the Toolbar needs to scroll off the screen when
+     *                  the Form ContentPane is scrolled
+     */
+    public void setScrollOffUponContentPane(boolean scrollOff) {
+<span class="nc bnc" id="L2249" title="All 6 branches missed.">        if (initialized &amp;&amp; !this.scrollOff &amp;&amp; scrollOff) {</span>
+<span class="nc" id="L2250">            bindScrollListener(true);</span>
+        }
+<span class="nc" id="L2252">        this.scrollOff = scrollOff;</span>
+<span class="nc" id="L2253">    }</span>
+
+    /**
+     * Hide the Toolbar if it is currently showing
+     */
+    public void hideToolbar() {
+<span class="fc" id="L2259">        showing = false;</span>
+<span class="fc bfc" id="L2260" title="All 2 branches covered.">        if (Display.INSTANCE.getCurrent() != getComponentForm()) {</span>
+<span class="fc" id="L2261">            setVisible(false);</span>
+<span class="fc" id="L2262">            setHidden(true);</span>
+<span class="fc" id="L2263">            return;</span>
+        }
+<span class="fc bfc" id="L2265" title="All 2 branches covered.">        if (actualPaneInitialH == 0) {</span>
+<span class="fc" id="L2266">            Form f = getComponentForm();</span>
+<span class="pc bpc" id="L2267" title="1 of 2 branches missed.">            if (f != null) {</span>
+<span class="fc" id="L2268">                initVars(f.getActualPane());</span>
+            }
+        }
+<span class="fc" id="L2271">        hideShowMotion = Motion.createSplineMotion(getY(), -getHeight(), 300);</span>
+<span class="fc" id="L2272">        getComponentForm().registerAnimated(this);</span>
+<span class="fc" id="L2273">        hideShowMotion.start();</span>
+<span class="fc" id="L2274">    }</span>
+
+    /**
+     * Show the Toolbar if it is currently not showing
+     */
+    public void showToolbar() {
+<span class="fc" id="L2280">        showing = true;</span>
+<span class="pc bpc" id="L2281" title="1 of 2 branches missed.">        if (!isVisible()) {</span>
+<span class="nc" id="L2282">            setVisible(true);</span>
+<span class="nc" id="L2283">            setHidden(false);</span>
+<span class="nc" id="L2284">            getComponentForm().animateLayout(200);</span>
+<span class="nc" id="L2285">            return;</span>
+        }
+<span class="fc" id="L2287">        hideShowMotion = Motion.createSplineMotion(getY(), initialY, 300);</span>
+<span class="fc" id="L2288">        getComponentForm().registerAnimated(this);</span>
+<span class="fc" id="L2289">        hideShowMotion.start();</span>
+<span class="fc" id="L2290">    }</span>
+
+    public boolean animate() {
+<span class="pc bpc" id="L2293" title="1 of 2 branches missed.">        if (hideShowMotion != null) {</span>
+<span class="fc" id="L2294">            Form f = getComponentForm();</span>
+<span class="fc" id="L2295">            final Container actualPane = f.getActualPane();</span>
+<span class="fc" id="L2296">            int val = hideShowMotion.getValue();</span>
+<span class="fc" id="L2297">            setY(val);</span>
+<span class="pc bpc" id="L2298" title="1 of 2 branches missed.">                if (!layered) {</span>
+<span class="fc" id="L2299">                    actualPane.setY(actualPaneInitialY + val);</span>
+<span class="fc" id="L2300">                    actualPane.setHeight(actualPaneInitialH - val);</span>
+<span class="fc" id="L2301">                    actualPane.doLayout();</span>
+                }
+<span class="fc" id="L2303">            f.repaint();</span>
+<span class="fc" id="L2304">            boolean finished = hideShowMotion.isFinished();</span>
+<span class="pc bpc" id="L2305" title="1 of 2 branches missed.">            if (finished) {</span>
+<span class="nc" id="L2306">                f.deregisterAnimated(this);</span>
+<span class="nc" id="L2307">                hideShowMotion = null;</span>
+            }
+<span class="pc bpc" id="L2309" title="1 of 2 branches missed.">            return !finished;</span>
+        }
+<span class="nc" id="L2311">        return false;</span>
+    }
+
+    private void initVars(Container actualPane) {
+<span class="fc" id="L2315">        initialY = getY();</span>
+<span class="fc" id="L2316">        actualPaneInitialY = actualPane.getY();</span>
+<span class="fc" id="L2317">        actualPaneInitialH = actualPane.getHeight();</span>
+<span class="fc" id="L2318">    }</span>
+
+    private void bindScrollListener(boolean bind) {
+<span class="nc" id="L2321">        final Form f = getComponentForm();</span>
+<span class="nc bnc" id="L2322" title="All 2 branches missed.">        if (f != null) {</span>
+<span class="nc" id="L2323">            final Container actualPane = f.getActualPane();</span>
+<span class="nc" id="L2324">            final Container contentPane = f.getContentPane();</span>
+<span class="nc bnc" id="L2325" title="All 2 branches missed.">            if (bind) {</span>
+<span class="nc" id="L2326">                initVars(actualPane);</span>
+<span class="nc" id="L2327">                scrollListener = new ScrollListener() {</span>
+
+                    public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
+<span class="nc bnc" id="L2330" title="All 4 branches missed.">                        if (entered || contentPane.isTensileMotionInProgress()) return;</span>
+
+                        // When the content pane is resized, it may trigger a scroll event --
+                        // we need to make sure that *that* scroll event doesn't trigger
+                        // us - or we get unexpected results.
+<span class="nc" id="L2335">                        entered = true;</span>
+                        try {
+<span class="nc" id="L2337">                            int diff = scrollY - oldscrollY;</span>
+<span class="nc bnc" id="L2338" title="All 2 branches missed.">                            if (diff != 0) {</span>
+<span class="nc" id="L2339">                                lastNonZeroScrollDiff = diff;</span>
+                            }
+
+<span class="nc" id="L2342">                            int toolbarNewY = getY() - diff;</span>
+<span class="nc bnc" id="L2343" title="All 4 branches missed.">                            if (scrollY &lt; 0 || Math.abs(toolbarNewY) &lt; 2) {</span>
+<span class="nc" id="L2344">                                return;</span>
+                            }
+<span class="nc" id="L2346">                            toolbarNewY = Math.max(toolbarNewY, -getHeight());</span>
+<span class="nc" id="L2347">                            toolbarNewY = Math.min(toolbarNewY, initialY);</span>
+<span class="nc bnc" id="L2348" title="All 2 branches missed.">                            if (toolbarNewY != getY()) {</span>
+<span class="nc" id="L2349">                                setY(toolbarNewY);</span>
+<span class="nc bnc" id="L2350" title="All 2 branches missed.">                                if (!layered) {</span>
+<span class="nc" id="L2351">                                    int oldY = actualPane.getY();</span>
+
+<span class="nc" id="L2353">                                    actualPane.setY(getHeight() + getY());</span>
+<span class="nc" id="L2354">                                    boolean smooth = actualPane.isSmoothScrolling();</span>
+<span class="nc" id="L2355">                                    actualPane.setSmoothScrolling(false);</span>
+<span class="nc" id="L2356">                                    actualPane.setScrollY(scrollY - oldY + actualPane.getY());</span>
+<span class="nc" id="L2357">                                    actualPane.setSmoothScrolling(smooth);</span>
+<span class="nc" id="L2358">                                    actualPane.setHeight(f.getHeight() - getHeight() - getY());</span>
+
+<span class="nc" id="L2360">                                    actualPane.doLayout();</span>
+                                }
+<span class="nc" id="L2362">                                f.repaint();</span>
+                            }
+                        } finally {
+<span class="nc" id="L2365">                            entered = false;</span>
+                        }
+<span class="nc" id="L2367">                    }</span>
+                };
+
+<span class="nc" id="L2370">                contentPane.addScrollListener(scrollListener);</span>
+<span class="nc" id="L2371">                releasedListener = new ActionListener() {</span>
+
+                    public void actionPerformed(ActionEvent evt) {
+<span class="nc bnc" id="L2374" title="All 2 branches missed.">                        if (getY() + getHeight() / 2 &gt; 0) {</span>
+<span class="nc bnc" id="L2375" title="All 4 branches missed.">                            if (!showing &amp;&amp; lastNonZeroScrollDiff &lt; 0) {</span>
+<span class="nc" id="L2376">                                showToolbar();</span>
+                            }
+                        } else {
+<span class="nc bnc" id="L2379" title="All 4 branches missed.">                            if (showing &amp;&amp; lastNonZeroScrollDiff &gt; 0) {</span>
+<span class="nc" id="L2380">                                hideToolbar();</span>
+                            }
+                        }
+<span class="nc" id="L2383">                        f.repaint();</span>
+<span class="nc" id="L2384">                    }</span>
+                };
+<span class="nc" id="L2386">                contentPane.addPointerReleasedListener(releasedListener);</span>
+            } else {
+<span class="nc bnc" id="L2388" title="All 2 branches missed.">                if (scrollListener != null) {</span>
+<span class="nc" id="L2389">                    contentPane.removeScrollListener(scrollListener);</span>
+<span class="nc" id="L2390">                    contentPane.removePointerReleasedListener(releasedListener);</span>
+                }
+
+            }
+        }
+
+<span class="nc" id="L2396">    }</span>
+
+    /**
+     * Creates the side navigation component with the Commands.
+     *
+     * @param commands the Command objects
+     * @return the Component to display on the side navigation
+     */
+    protected Container createSideNavigationComponent(Vector commands, String placement) {
+<span class="nc" id="L2405">        return sideMenu.createSideNavigationPanel(commands, placement);</span>
+    }
+
+    /**
+     * Creates an empty left side navigation panel.
+     */
+    protected Container constructSideNavigationComponent() {
+<span class="fc" id="L2412">        return sideMenu.constructSideNavigationPanel();</span>
+    }
+
+    /**
+     * Creates an empty right side navigation panel.
+     */
+    protected Container constructRightSideNavigationComponent() {
+<span class="fc" id="L2419">        return sideMenu.constructRightSideNavigationPanel();</span>
+    }
+
+    /**
+     * This method responsible to add a Component to the left side navigation panel.
+     *
+     * @param menu the Menu Container that was created in the
+     *             constructSideNavigationComponent() method
+     * @param cmp  the Component to add to the side menu
+     */
+    protected void addComponentToLeftSideMenu(Container menu, Component cmp) {
+<span class="fc" id="L2430">        sideMenu.addComponentToSideMenuImpl(menu, cmp);</span>
+<span class="fc" id="L2431">    }</span>
+
+    /**
+     * This method responsible to add a Component to the right side navigation
+     * panel.
+     *
+     * @param menu the Menu Container that was created in the
+     *             constructSideNavigationComponent() method
+     * @param cmp  the Component to add to the side menu
+     */
+    protected void addComponentToRightSideMenu(Container menu, Component cmp) {
+<span class="fc" id="L2442">        sideMenu.addComponentToSideMenuImpl(menu, cmp);</span>
+<span class="fc" id="L2443">    }</span>
+
+    /**
+     * Returns the commands within the left side menu which can be useful for
+     * things like unit testing. Notice that you should not mutate the commands
+     * or the iteratable set in any way!
+     *
+     * @return the commands in the left side menu
+     */
+    public Iterable&lt;Command&gt; getSideMenuCommands() {
+<span class="nc" id="L2453">        ArrayList&lt;Command&gt; cmds = new ArrayList&lt;Command&gt;();</span>
+<span class="nc bnc" id="L2454" title="All 4 branches missed.">        if (permanentSideMenu || onTopSideMenu) {</span>
+<span class="nc bnc" id="L2455" title="All 2 branches missed.">            if (permanentSideMenuContainer != null) {</span>
+<span class="nc" id="L2456">                findAllCommands(permanentSideMenuContainer, cmds);</span>
+            }
+<span class="nc" id="L2458">            return cmds;</span>
+        }
+<span class="nc" id="L2460">        Form f = getComponentForm();</span>
+<span class="nc" id="L2461">        int commands = f.getCommandCount();</span>
+<span class="nc bnc" id="L2462" title="All 2 branches missed.">        for (int iter = 0; iter &lt; commands; iter++) {</span>
+<span class="nc" id="L2463">            cmds.add(f.getCommand(iter));</span>
+        }
+<span class="nc" id="L2465">        return cmds;</span>
+    }
+
+    /**
+     * Returns the commands within the right side menu which can be useful for
+     * things like unit testing. Notice that you should not mutate the commands
+     * or the iteratable set in any way!
+     *
+     * @return the commands in the right side menu
+     */
+    public Iterable&lt;Command&gt; getRightSideMenuCommands() {
+<span class="nc" id="L2476">        ArrayList&lt;Command&gt; cmds = new ArrayList&lt;Command&gt;();</span>
+<span class="nc bnc" id="L2477" title="All 4 branches missed.">        if (permanentSideMenu || onTopSideMenu) {</span>
+<span class="nc bnc" id="L2478" title="All 2 branches missed.">            if (permanentRightSideMenuContainer != null) {</span>
+<span class="nc" id="L2479">                findAllCommands(permanentRightSideMenuContainer, cmds);</span>
+            }
+        }
+<span class="nc" id="L2482">        return cmds;</span>
+    }
+
+    /**
+     * Removes the given overflow menu command, notice that this has no effect
+     * on the menu that is currently showing (if it is currently showing) only
+     * on the upcoming iterations.
+     *
+     * @param cmd the command to remove from the overflow
+     */
+    public void removeOverflowCommand(Command cmd) {
+<span class="nc" id="L2493">        overflowCommands.remove(cmd);</span>
+<span class="nc" id="L2494">    }</span>
+
+    /**
+     * Normally on a right side menu the alignment should be &quot;mirrored&quot; in
+     * comparision with the left side menu, also for non-RTL languages: this
+     * method allows to change this default behaviour for non-RTL languages,
+     * forcing the alignment of the Commands of the right side menu to left.
+     * Note that for RTL languages this method does nothing. This method should
+     * be called before adding commands to the right side menu.
+     *
+     * @param toLeft false is the default, true changes the alignment.
+     */
+    public void setRightSideMenuCmdsAlignedToLeft(boolean toLeft) {
+<span class="nc bnc" id="L2507" title="All 2 branches missed.">        if (!isRTL()) {</span>
+<span class="nc" id="L2508">            rightSideMenuCmdsAlignedToLeft = toLeft;</span>
+        }
+<span class="nc" id="L2510">    }</span>
+
+    /**
+     * The behavior of the back command in the title
+     */
+<span class="fc" id="L2515">    public enum BackCommandPolicy {</span>
+        /**
+         * Show the back command always within the title bar on the left hand
+         * side
+         */
+<span class="fc" id="L2520">        ALWAYS,</span>
+        /**
+         * Show the back command always but shows it with the UIID standard UIID
+         */
+<span class="fc" id="L2524">        AS_REGULAR_COMMAND,</span>
+        /**
+         * Show the back command always as a back arrow image from the material
+         * design style
+         */
+<span class="fc" id="L2529">        AS_ARROW,</span>
+        /**
+         * Shows the back command only if the {@code backUsesTitleBool} theme
+         * constant is defined to true which is the case for iOS themes
+         */
+<span class="fc" id="L2534">        ONLY_WHEN_USES_TITLE,</span>
+        /**
+         * Shows the back command only if the {@code backUsesTitleBool} theme
+         * constant is defined to true on other platforms uses the left arrow
+         * material icon
+         */
+<span class="fc" id="L2540">        WHEN_USES_TITLE_OTHERWISE_ARROW,</span>
+        /**
+         * Never show the command in the title area and only set the back
+         * command to the toolbar
+         */
+<span class="fc" id="L2545">        NEVER</span>
+    }
+
+<span class="fc" id="L2548">    class ToolbarSideMenu extends SideMenuBar {</span>
+
+        @Override
+        protected void removeCommand(Command cmd) {
+<span class="fc" id="L2552">            super.removeCommand(cmd);</span>
+<span class="pc bpc" id="L2553" title="1 of 4 branches missed.">            if (onTopSideMenu || permanentSideMenu) {</span>
+<span class="fc" id="L2554">                Button b = Toolbar.this.findCommandComponent(cmd);</span>
+<span class="pc bpc" id="L2555" title="1 of 2 branches missed.">                if (b != null) {</span>
+<span class="fc" id="L2556">                    b.remove();</span>
+                }
+            }
+<span class="fc" id="L2559">        }</span>
+
+        @Override
+        protected Container createSideNavigationComponent(Vector commands, String placement) {
+<span class="nc" id="L2563">            return Toolbar.this.createSideNavigationComponent(commands, placement);</span>
+        }
+
+        @Override
+        protected Container constructSideNavigationComponent() {
+<span class="nc" id="L2568">            return Toolbar.this.constructSideNavigationComponent();</span>
+        }
+
+        @Override
+        protected void addComponentToSideMenu(Container menu, Component cmp) {
+<span class="nc" id="L2573">            Toolbar.this.addComponentToSideMenu(menu, cmp);</span>
+<span class="nc" id="L2574">        }</span>
+
+        @Override
+        protected Container getTitleAreaContainer() {
+<span class="fc" id="L2578">            return Toolbar.this;</span>
+        }
+
+        @Override
+        protected Component getTitleComponent() {
+<span class="fc" id="L2583">            return Toolbar.this.getTitleComponent();</span>
+        }
+
+        @Override
+        protected void initMenuBar(Form parent) {
+<span class="fc" id="L2588">            Container ta = parent.getTitleArea();</span>
+<span class="pc bpc" id="L2589" title="1 of 2 branches missed.">            if (ta != null) {</span>
+<span class="fc" id="L2590">                ta.setSafeArea(true);</span>
+<span class="fc" id="L2591">                parent.removeComponentFromForm(ta);</span>
+            }
+<span class="fc" id="L2593">            super.initMenuBar(parent);</span>
+<span class="pc bpc" id="L2594" title="1 of 2 branches missed.">            if (layered) {</span>
+<span class="nc" id="L2595">                Container layeredPane = parent.getLayeredPane();</span>
+<span class="nc" id="L2596">                Container p = layeredPane.getParent();</span>
+<span class="nc" id="L2597">                Container top = new Container(new BorderLayout());</span>
+<span class="nc" id="L2598">                top.addComponent(BorderLayout.NORTH, Toolbar.this);</span>
+<span class="nc" id="L2599">                p.addComponent(top);</span>
+
+<span class="nc" id="L2601">            } else {</span>
+<span class="fc" id="L2602">                parent.addComponentToForm(BorderLayout.NORTH, Toolbar.this);</span>
+            }
+
+<span class="fc" id="L2605">            initialized = true;</span>
+<span class="fc" id="L2606">            setTitle(parent.getTitle());</span>
+<span class="fc" id="L2607">            parent.revalidate();</span>
+<span class="fc" id="L2608">            initTitleBarStatus();</span>
+<span class="fc" id="L2609">            Display.getInstance().callSerially(new Runnable() {</span>
+
+                public void run() {
+<span class="pc bpc" id="L2612" title="1 of 2 branches missed.">                    if (scrollOff) {</span>
+<span class="nc" id="L2613">                        bindScrollListener(true);</span>
+                    }
+<span class="fc" id="L2615">                }</span>
+            });
+<span class="fc" id="L2617">        }</span>
+
+        @Override
+        public boolean contains(int x, int y) {
+<span class="nc" id="L2621">            return Toolbar.this.contains(x, y);</span>
+        }
+
+        @Override
+        public Component getComponentAt(int x, int y) {
+<span class="nc" id="L2626">            return Toolbar.this.getComponentAt(x, y);</span>
+        }
+
+        @Override
+        void installRightCommands() {
+<span class="fc" id="L2631">            super.installRightCommands();</span>
+<span class="pc bpc" id="L2632" title="1 of 4 branches missed.">            if (overflowCommands != null &amp;&amp; overflowCommands.size() &gt; 0) {</span>
+<span class="fc" id="L2633">                UIManager uim = UIManager.getInstance();</span>
+<span class="fc" id="L2634">                Image i = uim.getThemeImageConstant(&quot;menuImage&quot;);</span>
+<span class="pc bpc" id="L2635" title="1 of 2 branches missed.">                if (uim.getThemeConstant(&quot;overflowImageSize&quot;, null) != null) {</span>
+<span class="nc" id="L2636">                    float size = 4.5f;</span>
+                    try {
+<span class="nc" id="L2638">                        size = Float.parseFloat(uim.getThemeConstant(&quot;overflowImageSize&quot;, &quot;4.5&quot;));</span>
+<span class="nc" id="L2639">                    } catch (Throwable t) {</span>
+<span class="nc" id="L2640">                        Log.e(t);</span>
+<span class="nc" id="L2641">                    }</span>
+<span class="nc" id="L2642">                    i = FontImage.createMaterial(FontImage.MATERIAL_MORE_VERT, UIManager.getInstance().getComponentStyle(&quot;TitleCommand&quot;), size);</span>
+                }
+<span class="fc" id="L2644">                menuButton = sideMenu.createTouchCommandButton(new Command(&quot;&quot;, i) {</span>
+
+                    public void actionPerformed(ActionEvent ev) {
+<span class="nc" id="L2647">                        sideMenu.showMenu();</span>
+<span class="nc" id="L2648">                    }</span>
+                });
+<span class="pc bpc" id="L2650" title="1 of 2 branches missed.">                if (i == null) {</span>
+<span class="fc" id="L2651">                    menuButton.setMaterialIcon(FontImage.MATERIAL_MORE_VERT);</span>
+                }
+<span class="fc" id="L2653">                menuButton.putClientProperty(&quot;overflow&quot;, Boolean.TRUE);</span>
+<span class="fc" id="L2654">                menuButton.setUIID(&quot;TitleCommand&quot;);</span>
+<span class="fc" id="L2655">                menuButton.setName(&quot;OverflowButton&quot;);</span>
+<span class="fc" id="L2656">                Layout l = getTitleAreaContainer().getLayout();</span>
+<span class="pc bpc" id="L2657" title="1 of 2 branches missed.">                if (l instanceof BorderLayout) {</span>
+<span class="fc" id="L2658">                    BorderLayout bl = (BorderLayout) l;</span>
+<span class="fc" id="L2659">                    Component east = bl.getEast();</span>
+<span class="fc bfc" id="L2660" title="All 2 branches covered.">                    if (east == null) {</span>
+<span class="fc" id="L2661">                        getTitleAreaContainer().addComponent(BorderLayout.EAST, menuButton);</span>
+                    } else {
+<span class="pc bpc" id="L2663" title="1 of 2 branches missed.">                        if (east instanceof Container) {</span>
+<span class="nc" id="L2664">                            Container cnt = (Container) east;</span>
+<span class="nc bnc" id="L2665" title="All 2 branches missed.">                            for (int j = 0; j &lt; cnt.getComponentCount(); j++) {</span>
+<span class="nc" id="L2666">                                Component c = cnt.getComponentAt(j);</span>
+<span class="nc bnc" id="L2667" title="All 2 branches missed.">                                if (c instanceof Button) {</span>
+                                    //remove the menu button and add it last
+<span class="nc bnc" id="L2669" title="All 2 branches missed.">                                    if (c.getClientProperty(&quot;overflow&quot;) != null) {</span>
+<span class="nc" id="L2670">                                        cnt.removeComponent(c);</span>
+                                    }
+                                }
+                            }
+<span class="nc" id="L2674">                            cnt.addComponent(cnt.getComponentCount(), menuButton);</span>
+<span class="nc" id="L2675">                        } else {</span>
+<span class="pc bpc" id="L2676" title="1 of 2 branches missed.">                            if (east instanceof Button) {</span>
+<span class="pc bpc" id="L2677" title="1 of 2 branches missed.">                                if (east.getClientProperty(&quot;overflow&quot;) != null) {</span>
+<span class="fc" id="L2678">                                    return;</span>
+                                }
+                            }
+<span class="nc" id="L2681">                            east.getParent().removeComponent(east);</span>
+<span class="nc" id="L2682">                            Container buttons = new Container(new BoxLayout(BoxLayout.X_AXIS));</span>
+<span class="nc" id="L2683">                            buttons.addComponent(east);</span>
+<span class="nc" id="L2684">                            buttons.addComponent(menuButton);</span>
+<span class="nc" id="L2685">                            getTitleAreaContainer().addComponent(BorderLayout.EAST, buttons);</span>
+                        }
+                    }
+                }
+            }
+<span class="fc" id="L2690">        }</span>
+
+        @Override
+        protected Component createCommandComponent(Vector commands) {
+<span class="nc" id="L2694">            return createOverflowCommandList(overflowCommands);</span>
+        }
+
+        @Override
+        protected Button createBackCommandButton() {
+<span class="nc" id="L2699">            Button back = new Button(getBackCommand());</span>
+<span class="nc" id="L2700">            return back;</span>
+        }
+
+        @Override
+        protected Command showMenuDialog(Dialog menu) {
+<span class="nc" id="L2705">            return showOverflowMenu(menu);</span>
+        }
+
+        @Override
+        public int getCommandBehavior() {
+<span class="fc" id="L2710">            return Display.COMMAND_BEHAVIOR_ICS;</span>
+        }
+
+        @Override
+        void synchronizeCommandsWithButtonsInBackbutton() {
+<span class="nc" id="L2715">            boolean hasSideCommands = false;</span>
+<span class="nc" id="L2716">            Vector commands = getCommands();</span>
+<span class="nc bnc" id="L2717" title="All 2 branches missed.">            for (int iter = commands.size() - 1; iter &gt; -1; iter--) {</span>
+<span class="nc" id="L2718">                Command c = (Command) commands.elementAt(iter);</span>
+<span class="nc bnc" id="L2719" title="All 2 branches missed.">                if (c.getClientProperty(&quot;TitleCommand&quot;) == null) {</span>
+<span class="nc" id="L2720">                    hasSideCommands = true;</span>
+<span class="nc" id="L2721">                    break;</span>
+                }
+
+            }
+
+<span class="nc" id="L2726">            boolean hideBack = UIManager.getInstance().isThemeConstant(&quot;hideBackCommandBool&quot;, false);</span>
+<span class="nc" id="L2727">            boolean showBackOnTitle = UIManager.getInstance().isThemeConstant(&quot;showBackCommandOnTitleBool&quot;, false);</span>
+            //need to put the back command
+<span class="nc bnc" id="L2729" title="All 2 branches missed.">            if (getBackCommand() != null) {</span>
+
+<span class="nc bnc" id="L2731" title="All 4 branches missed.">                if (hasSideCommands &amp;&amp; !hideBack) {</span>
+<span class="nc" id="L2732">                    getCommands().remove(getBackCommand());</span>
+<span class="nc" id="L2733">                    getCommands().add(getCommands().size(), getBackCommand());</span>
+
+                } else {
+<span class="nc bnc" id="L2736" title="All 4 branches missed.">                    if (!hideBack || showBackOnTitle) {</span>
+                        //put the back command on the title
+<span class="nc" id="L2738">                        Layout l = getTitleAreaContainer().getLayout();</span>
+<span class="nc bnc" id="L2739" title="All 2 branches missed.">                        if (l instanceof BorderLayout) {</span>
+<span class="nc" id="L2740">                            BorderLayout bl = (BorderLayout) l;</span>
+<span class="nc" id="L2741">                            Component west = bl.getWest();</span>
+<span class="nc" id="L2742">                            Button back = createBackCommandButton();</span>
+<span class="nc bnc" id="L2743" title="All 2 branches missed.">                            if (!back.getUIID().startsWith(&quot;BackCommand&quot;)) {</span>
+<span class="nc" id="L2744">                                back.setUIID(&quot;BackCommand&quot;);</span>
+                            }
+<span class="nc" id="L2746">                            hideEmptyCommand(back);</span>
+<span class="nc" id="L2747">                            verifyBackCommandRTL(back);</span>
+
+<span class="nc bnc" id="L2749" title="All 2 branches missed.">                            if (west instanceof Container) {</span>
+<span class="nc" id="L2750">                                ((Container) west).addComponent(0, back);</span>
+                            } else {
+<span class="nc" id="L2752">                                Container left = new Container(new BoxLayout(BoxLayout.X_AXIS));</span>
+<span class="nc" id="L2753">                                left.addComponent(back);</span>
+<span class="nc bnc" id="L2754" title="All 2 branches missed.">                                if (west != null) {</span>
+<span class="nc" id="L2755">                                    west.getParent().removeComponent(west);</span>
+<span class="nc" id="L2756">                                    left.addComponent(west);</span>
+                                }
+<span class="nc" id="L2758">                                getTitleAreaContainer().addComponent(BorderLayout.WEST, left);</span>
+                            }
+                        }
+                    }
+
+                }
+
+            }
+
+<span class="nc" id="L2767">        }</span>
+
+        @Override
+        void initTitleBarStatus() {
+<span class="fc" id="L2771">            Toolbar.this.initTitleBarStatus();</span>
+<span class="fc" id="L2772">        }</span>
+
+    }
+
+
+    private class CallbackSearchBar extends SearchBar {
+        private final ActionListener&lt;ActionEvent&gt; callback;
+
+<span class="fc" id="L2780">        public CallbackSearchBar(ActionListener&lt;ActionEvent&gt; callback) {</span>
+<span class="fc" id="L2781">            super(Toolbar.this, Toolbar.this.searchIconSize);</span>
+<span class="fc" id="L2782">            this.callback = callback;</span>
+<span class="fc" id="L2783">        }</span>
+
+        @Override
+        public void onSearch(String text) {
+<span class="fc" id="L2787">            callback.actionPerformed(new ActionEvent(text));</span>
+<span class="fc" id="L2788">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

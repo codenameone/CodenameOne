@@ -1,0 +1,2616 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Grid.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.layouts.mig</a> &gt; <span class="el_source">Grid.java</span></div><h1>Grid.java</h1><pre class="source lang-java linenums">/*
+ * License (BSD):
+ * ==============
+ *
+ * Copyright (c) 2004, Mikael Grev, MiG InfoCom AB. (miglayout (at) miginfocom (dot) com)
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without modification,
+ * are permitted provided that the following conditions are met:
+ * Redistributions of source code must retain the above copyright notice, this list
+ * of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice, this
+ * list of conditions and the following disclaimer in the documentation and/or other
+ * materials provided with the distribution.
+ * Neither the name of the MiG InfoCom AB nor the names of its contributors may be
+ * used to endorse or promote products derived from this software without specific
+ * prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS &quot;AS IS&quot; AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
+ * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
+ * OF SUCH DAMAGE.
+ *
+ * @version 1.0
+ * @author Mikael Grev, MiG InfoCom AB
+ *         Date: 2006-sep-08
+ */
+
+package com.codename1.ui.layouts.mig;
+
+import com.codename1.compat.java.util.Objects;
+import com.codename1.ui.Display;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.TreeSet;
+
+/**
+ * Holds components in a grid. Does most of the logic behind the layout manager.
+ */
+public final class Grid {
+
+    public static final boolean TEST_GAPS = true;
+
+<span class="fc" id="L56">    private static final Float[] GROW_100 = new Float[]{ResizeConstraint.WEIGHT_100};</span>
+
+<span class="fc" id="L58">    private static final DimConstraint DOCK_DIM_CONSTRAINT = new DimConstraint();</span>
+    /**
+     * This is the maximum grid position for &quot;normal&quot; components. Docking
+     * components use the space out to &lt;code&gt;MAX_DOCK_GRID&lt;/code&gt; and below 0.
+     */
+    private static final int MAX_GRID = 30000;
+    /**
+     * Docking components will use the grid coordinates
+     * &lt;code&gt;-MAX_DOCK_GRID -&gt; 0&lt;/code&gt; and
+     * &lt;code&gt;MAX_GRID -&gt; MAX_DOCK_GRID&lt;/code&gt;.
+     */
+    private static final int MAX_DOCK_GRID = 32767;
+    /**
+     * A constraint used for gaps.
+     */
+<span class="fc" id="L73">    private static final ResizeConstraint GAP_RC_CONST = new ResizeConstraint(200, ResizeConstraint.WEIGHT_100, 50, null);</span>
+<span class="fc" id="L74">    private static final ResizeConstraint GAP_RC_CONST_PUSH = new ResizeConstraint(200, ResizeConstraint.WEIGHT_100, 50, ResizeConstraint.WEIGHT_100);</span>
+    /**
+     * Used for components that doesn't have a CC set. Not that it's really
+     * really important that the CC is never changed in this Grid class.
+     */
+<span class="fc" id="L79">    private static final CC DEF_CC = new CC();</span>
+<span class="fc" id="L80">    private static HashMap&lt;Object, int[][]&gt;[] PARENT_ROWCOL_SIZES_MAP = null;</span>
+<span class="fc" id="L81">    private static HashMap&lt;Object, ArrayList&lt;WeakCell&gt;&gt; PARENT_GRIDPOS_MAP = null;</span>
+
+    static {
+<span class="fc" id="L84">        DOCK_DIM_CONSTRAINT.setGrowPriority(0);</span>
+<span class="fc" id="L85">    }</span>
+
+    /**
+     * The constraints. Never &lt;code&gt;null&lt;/code&gt;.
+     */
+    private final LC lc;
+    /**
+     * The parent that is layout out and this grid is done for. Never
+     * &lt;code&gt;null&lt;/code&gt;.
+     */
+    private final ContainerWrapper container;
+    /**
+     * An x, y array implemented as a sparse array to accommodate for any grid
+     * size without wasting memory (or rather 15 bit (0-MAX_GRID * 0-MAX_GRID).
+     */
+<span class="fc" id="L100">    private final LinkedHashMap&lt;Integer, Cell&gt; grid = new LinkedHashMap&lt;Integer, Cell&gt;();   // [(y &lt;&lt; 16) + x] -&gt; Cell. null key for absolute positioned compwraps</span>
+    /**
+     * The size of the grid. Row count and column count.
+     */
+<span class="fc" id="L104">    private final TreeSet&lt;Integer&gt; rowIndexes = new TreeSet&lt;Integer&gt;(), colIndexes = new TreeSet&lt;Integer&gt;();</span>
+    /**
+     * The row and column specifications.
+     */
+    private final AC rowConstr, colConstr;
+    /**
+     * Components that are connections in one dimension (such as baseline
+     * alignment for instance) are grouped together and stored here. One for
+     * each row/column.
+     */
+    private final ArrayList&lt;LinkedDimGroup&gt;[] colGroupLists, rowGroupLists;   //[(start)row/col number]
+    private final int dockOffY, dockOffX;
+    private final Float[] pushXs, pushYs;
+    private final ArrayList&lt;LayoutCallback&gt; callbackList;
+<span class="fc" id="L118">    private HashMap&lt;Integer, BoundSize&gt; wrapGapMap = null;   // Row or Column index depending in the dimension that &quot;wraps&quot;. Normally row indexes but may be column indexes if &quot;flowy&quot;. 0 means before first row/col.</span>
+    /**
+     * The in the constructor calculated min/pref/max sizes of the rows and
+     * columns.
+     */
+<span class="fc" id="L123">    private FlowSizeSpec colFlowSpecs = null, rowFlowSpecs = null;</span>
+    /**
+     * The in the constructor calculated min/pref/max size of the whole grid.
+     */
+<span class="fc" id="L127">    private int[] width = null, height = null;</span>
+    /**
+     * If debug is on contains the bounds for things to paint when calling
+     * {@link ContainerWrapper#paintDebugCell(int, int, int, int)}
+     */
+<span class="fc" id="L132">    private ArrayList&lt;int[]&gt; debugRects = null; // [x, y, width, height]</span>
+    /**
+     * If any of the absolute coordinates for component bounds has links the
+     * name of the target is in this Set. Since it requires some memory and
+     * computations this is checked at the creation so that the link information
+     * is only created if needed later.
+     * &lt;p&gt;
+     * The boolean is true for groups id:s and null for normal id:s.
+     */
+<span class="fc" id="L141">    private HashMap&lt;String, Boolean&gt; linkTargetIDs = null;</span>
+<span class="fc" id="L142">    private int lastRefWidth = 0, lastRefHeight = 0;</span>
+
+    /**
+     * Constructor.
+     *
+     * @param container    The container that will be laid out.
+     * @param lc           The form flow constraints.
+     * @param rowConstr    The rows specifications. If more cell rows are required,
+     *                     the last element will be used for when there is no corresponding element
+     *                     in this array.
+     * @param colConstr    The columns specifications. If more cell rows are
+     *                     required, the last element will be used for when there is no
+     *                     corresponding element in this array.
+     * @param ccMap        The map containing the parsed constraints for each child
+     *                     component of &lt;code&gt;parent&lt;/code&gt;. Will not be altered. Can have null CC
+     *                     which will use a common cached one.
+     * @param callbackList A list of callbacks or &lt;code&gt;null&lt;/code&gt; if none.
+     *                     Will not be altered.
+     */
+<span class="fc" id="L161">    public Grid(ContainerWrapper container, LC lc, AC rowConstr, AC colConstr, Map&lt;? extends ComponentWrapper, CC&gt; ccMap, ArrayList&lt;LayoutCallback&gt; callbackList) {</span>
+//		System.out.println(&quot;new grid!&quot;);
+<span class="fc" id="L163">        this.lc = lc;</span>
+<span class="fc" id="L164">        this.rowConstr = rowConstr;</span>
+<span class="fc" id="L165">        this.colConstr = colConstr;</span>
+<span class="fc" id="L166">        this.container = container;</span>
+<span class="fc" id="L167">        this.callbackList = callbackList;</span>
+
+<span class="pc bpc" id="L169" title="3 of 4 branches missed.">        int wrap = lc.getWrapAfter() != 0 ? lc.getWrapAfter() : (lc.isFlowX() ? colConstr : rowConstr).getConstaints().length;</span>
+<span class="fc" id="L170">        boolean useVisualPadding = lc.isVisualPadding();</span>
+
+<span class="fc" id="L172">        final ComponentWrapper[] comps = container.getComponents();</span>
+
+<span class="fc" id="L174">        boolean hasTagged = false;  // So we do not have to sort if it will not do any good</span>
+<span class="fc" id="L175">        boolean hasPushX = false, hasPushY = false;</span>
+<span class="fc" id="L176">        boolean hitEndOfRow = false;</span>
+<span class="fc" id="L177">        final int[] cellXY = new int[2];</span>
+<span class="fc" id="L178">        final ArrayList&lt;int[]&gt; spannedRects = new ArrayList&lt;int[]&gt;(2);</span>
+
+<span class="pc bpc" id="L180" title="1 of 2 branches missed.">        final DimConstraint[] specs = (lc.isFlowX() ? rowConstr : colConstr).getConstaints();</span>
+
+<span class="fc" id="L182">        int sizeGroupsX = 0, sizeGroupsY = 0;</span>
+<span class="fc" id="L183">        int[] dockInsets = null;    // top, left, bottom, right insets for docks.</span>
+
+<span class="fc" id="L185">        LinkHandler.clearTemporaryBounds(container.getLayout());</span>
+
+<span class="fc bfc" id="L187" title="All 2 branches covered.">        for (int i = 0; i &lt; comps.length; ) {</span>
+<span class="fc" id="L188">            ComponentWrapper comp = comps[i];</span>
+<span class="fc" id="L189">            CC rootCc = getCC(comp, ccMap);</span>
+
+<span class="fc" id="L191">            addLinkIDs(rootCc);</span>
+
+<span class="pc bpc" id="L193" title="3 of 4 branches missed.">            int hideMode = comp.isVisible() ? -1 : rootCc.getHideMode() != -1 ? rootCc.getHideMode() : lc.getHideMode();</span>
+
+<span class="pc bpc" id="L195" title="1 of 2 branches missed.">            if (hideMode == 3) { // To work with situations where there are components that does not have a layout manager, or not this one.</span>
+<span class="nc" id="L196">                setLinkedBounds(comp, rootCc, comp.getX(), comp.getY(), comp.getWidth(), comp.getHeight(), rootCc.isExternal());</span>
+<span class="nc" id="L197">                i++;</span>
+<span class="nc" id="L198">                continue;   // The &quot;external&quot; component should not be handled further.</span>
+            }
+
+<span class="fc" id="L201">            String sgX = rootCc.getHorizontal().getSizeGroup();</span>
+<span class="pc bpc" id="L202" title="1 of 2 branches missed.">            if (sgX != null) {</span>
+<span class="nc" id="L203">                sizeGroupsX++;</span>
+            }
+<span class="fc" id="L205">            String sgY = rootCc.getVertical().getSizeGroup();</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">            if (sgY != null) {</span>
+<span class="nc" id="L207">                sizeGroupsY++;</span>
+            }
+
+            // Special treatment of absolute positioned components.
+<span class="pc bpc" id="L211" title="2 of 4 branches missed.">            if (getPos(comp, rootCc) != null || rootCc.isExternal()) {</span>
+
+<span class="nc" id="L213">                CompWrap cw = new CompWrap(comp, rootCc, hideMode, useVisualPadding);</span>
+<span class="nc" id="L214">                Cell cell = grid.get(null);</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">                if (cell == null) {</span>
+<span class="nc" id="L216">                    grid.put(null, new Cell(cw));</span>
+                } else {
+<span class="nc" id="L218">                    cell.compWraps.add(cw);</span>
+                }
+
+<span class="nc bnc" id="L221" title="All 4 branches missed.">                if (!rootCc.isBoundsInGrid() || rootCc.isExternal()) {</span>
+<span class="nc" id="L222">                    setLinkedBounds(comp, rootCc, comp.getX(), comp.getY(), comp.getWidth(), comp.getHeight(), rootCc.isExternal());</span>
+<span class="nc" id="L223">                    i++;</span>
+<span class="nc" id="L224">                    continue;</span>
+                }
+            }
+
+<span class="pc bpc" id="L228" title="1 of 2 branches missed.">            if (rootCc.getDockSide() != -1) {</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                if (dockInsets == null) {</span>
+<span class="nc" id="L230">                    dockInsets = new int[]{-MAX_DOCK_GRID, -MAX_DOCK_GRID, MAX_DOCK_GRID, MAX_DOCK_GRID};</span>
+                }
+
+<span class="nc" id="L233">                addDockingCell(dockInsets, rootCc.getDockSide(), new CompWrap(comp, rootCc, hideMode, useVisualPadding));</span>
+<span class="nc" id="L234">                i++;</span>
+<span class="nc" id="L235">                continue;</span>
+            }
+
+<span class="fc" id="L238">            Boolean cellFlowX = rootCc.getFlowX();</span>
+<span class="fc" id="L239">            Cell cell = null;</span>
+
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">            if (rootCc.isNewline()) {</span>
+<span class="nc" id="L242">                wrap(cellXY, rootCc.getNewlineGapSize());</span>
+<span class="pc bpc" id="L243" title="1 of 2 branches missed.">            } else if (hitEndOfRow) {</span>
+<span class="nc" id="L244">                wrap(cellXY, null);</span>
+            }
+<span class="fc" id="L246">            hitEndOfRow = false;</span>
+
+<span class="pc bpc" id="L248" title="3 of 6 branches missed.">            final boolean rowNoGrid = lc.isNoGrid() || ((DimConstraint) LayoutUtil.getIndexSafe(specs, lc.isFlowX() ? cellXY[1] : cellXY[0])).isNoGrid();</span>
+
+            // Move to a free y, x  if no absolute grid specified
+<span class="fc" id="L251">            int cx = rootCc.getCellX();</span>
+<span class="fc" id="L252">            int cy = rootCc.getCellY();</span>
+<span class="pc bpc" id="L253" title="5 of 8 branches missed.">            if ((cx &lt; 0 || cy &lt; 0) &amp;&amp; !rowNoGrid &amp;&amp; rootCc.getSkip() == 0) { // 3.7.2: If skip, don't find an empty cell first.</span>
+<span class="pc bpc" id="L254" title="1 of 2 branches missed.">                while (!isCellFree(cellXY[1], cellXY[0], spannedRects)) {</span>
+<span class="nc bnc" id="L255" title="All 2 branches missed.">                    if (Math.abs(increase(cellXY, 1)) &gt;= wrap) {</span>
+<span class="nc" id="L256">                        wrap(cellXY, null);</span>
+                    }
+                }
+            } else {
+<span class="nc bnc" id="L260" title="All 4 branches missed.">                if (cx &gt;= 0 &amp;&amp; cy &gt;= 0) {</span>
+<span class="nc" id="L261">                    cellXY[0] = cx;</span>
+<span class="nc" id="L262">                    cellXY[1] = cy;</span>
+                }
+<span class="nc" id="L264">                cell = getCell(cellXY[1], cellXY[0]);   // Might be null</span>
+            }
+
+            // Skip a number of cells. Changed for 3.6.1 to take wrap into account and thus &quot;skip&quot; to the next and possibly more rows.
+<span class="pc bpc" id="L268" title="1 of 2 branches missed.">            for (int s = 0, skipCount = rootCc.getSkip(); s &lt; skipCount; s++) {</span>
+                do {
+<span class="nc bnc" id="L270" title="All 2 branches missed.">                    if (Math.abs(increase(cellXY, 1)) &gt;= wrap) {</span>
+<span class="nc" id="L271">                        wrap(cellXY, null);</span>
+                    }
+<span class="nc bnc" id="L273" title="All 2 branches missed.">                } while (!isCellFree(cellXY[1], cellXY[0], spannedRects));</span>
+            }
+
+            // If cell is not created yet, create it and set it.
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">            if (cell == null) {</span>
+<span class="pc bpc" id="L278" title="3 of 4 branches missed.">                int spanx = Math.min(rowNoGrid &amp;&amp; lc.isFlowX() ? LayoutUtil.INF : rootCc.getSpanX(), MAX_GRID - cellXY[0]);</span>
+<span class="pc bpc" id="L279" title="3 of 4 branches missed.">                int spany = Math.min(rowNoGrid &amp;&amp; !lc.isFlowX() ? LayoutUtil.INF : rootCc.getSpanY(), MAX_GRID - cellXY[1]);</span>
+
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">                cell = new Cell(spanx, spany, cellFlowX != null ? cellFlowX : lc.isFlowX());</span>
+
+<span class="fc" id="L283">                setCell(cellXY[1], cellXY[0], cell);</span>
+
+                // Add a rectangle so we can know that spanned cells occupy more space.
+<span class="pc bpc" id="L286" title="2 of 4 branches missed.">                if (spanx &gt; 1 || spany &gt; 1) {</span>
+<span class="nc" id="L287">                    spannedRects.add(new int[]{cellXY[0], cellXY[1], spanx, spany});</span>
+                }
+            }
+
+            // Add the one, or all, components that split the grid position to the same Cell.
+<span class="fc" id="L292">            boolean wrapHandled = false;</span>
+<span class="pc bpc" id="L293" title="1 of 2 branches missed.">            int splitLeft = rowNoGrid ? LayoutUtil.INF : rootCc.getSplit() - 1;</span>
+<span class="fc" id="L294">            boolean splitExit = false;</span>
+<span class="pc bpc" id="L295" title="2 of 4 branches missed.">            final boolean spanRestOfRow = (lc.isFlowX() ? rootCc.getSpanX() : rootCc.getSpanY()) == LayoutUtil.INF;</span>
+
+<span class="pc bpc" id="L297" title="1 of 4 branches missed.">            for (; splitLeft &gt;= 0 &amp;&amp; i &lt; comps.length; splitLeft--) {</span>
+<span class="fc" id="L298">                ComponentWrapper compAdd = comps[i];</span>
+<span class="fc" id="L299">                CC cc = getCC(compAdd, ccMap);</span>
+
+<span class="fc" id="L301">                addLinkIDs(cc);</span>
+
+<span class="fc" id="L303">                boolean visible = compAdd.isVisible();</span>
+<span class="pc bpc" id="L304" title="3 of 4 branches missed.">                hideMode = visible ? -1 : cc.getHideMode() != -1 ? cc.getHideMode() : lc.getHideMode();</span>
+
+<span class="pc bpc" id="L306" title="2 of 4 branches missed.">                if (cc.isExternal() || hideMode == 3) {</span>
+<span class="nc" id="L307">                    i++;</span>
+<span class="nc" id="L308">                    splitLeft++;    // Added for 3.5.5 so that these components does not &quot;take&quot; a split slot.</span>
+<span class="nc" id="L309">                    continue;       // To work with situations where there are components that does not have a layout manager, or not this one.</span>
+                }
+
+<span class="pc bpc" id="L312" title="4 of 6 branches missed.">                hasPushX |= (visible || hideMode &gt; 1) &amp;&amp; (cc.getPushX() != null);</span>
+<span class="pc bpc" id="L313" title="4 of 6 branches missed.">                hasPushY |= (visible || hideMode &gt; 1) &amp;&amp; (cc.getPushY() != null);</span>
+
+<span class="pc bpc" id="L315" title="1 of 2 branches missed.">                if (cc != rootCc) { // If not first in a cell</span>
+<span class="nc bnc" id="L316" title="All 6 branches missed.">                    if (cc.isNewline() || !cc.isBoundsInGrid() || cc.getDockSide() != -1) {</span>
+<span class="nc" id="L317">                        break;</span>
+                    }
+
+<span class="nc bnc" id="L320" title="All 4 branches missed.">                    if (splitLeft &gt; 0 &amp;&amp; cc.getSkip() &gt; 0) {</span>
+<span class="nc" id="L321">                        splitExit = true;</span>
+<span class="nc" id="L322">                        break;</span>
+                    }
+
+//					pos = getPos(compAdd, cc);
+//					cbSz = getCallbackSize(compAdd);
+                }
+
+<span class="fc" id="L329">                CompWrap cw = new CompWrap(compAdd, cc, hideMode, useVisualPadding);</span>
+<span class="fc" id="L330">                cell.compWraps.add(cw);</span>
+<span class="pc bpc" id="L331" title="1 of 2 branches missed.">                cell.hasTagged |= cc.getTag() != null;</span>
+<span class="fc" id="L332">                hasTagged |= cell.hasTagged;</span>
+
+<span class="pc bpc" id="L334" title="1 of 2 branches missed.">                if (cc != rootCc) {</span>
+<span class="nc bnc" id="L335" title="All 2 branches missed.">                    if (cc.getHorizontal().getSizeGroup() != null) {</span>
+<span class="nc" id="L336">                        sizeGroupsX++;</span>
+                    }
+<span class="nc bnc" id="L338" title="All 2 branches missed.">                    if (cc.getVertical().getSizeGroup() != null) {</span>
+<span class="nc" id="L339">                        sizeGroupsY++;</span>
+                    }
+                }
+
+<span class="fc" id="L343">                i++;</span>
+
+<span class="pc bpc" id="L345" title="4 of 6 branches missed.">                if ((cc.isWrap() || (spanRestOfRow &amp;&amp; splitLeft == 0))) {</span>
+<span class="nc bnc" id="L346" title="All 2 branches missed.">                    if (cc.isWrap()) {</span>
+<span class="nc" id="L347">                        wrap(cellXY, cc.getWrapGapSize());</span>
+                    } else {
+<span class="nc" id="L349">                        hitEndOfRow = true;</span>
+                    }
+<span class="nc" id="L351">                    wrapHandled = true;</span>
+<span class="nc" id="L352">                    break;</span>
+                }
+            }
+
+<span class="pc bpc" id="L356" title="2 of 4 branches missed.">            if (!wrapHandled &amp;&amp; !rowNoGrid) {</span>
+<span class="pc bpc" id="L357" title="1 of 2 branches missed.">                int span = lc.isFlowX() ? cell.spanx : cell.spany;</span>
+<span class="pc bpc" id="L358" title="1 of 4 branches missed.">                if (Math.abs((lc.isFlowX() ? cellXY[0] : cellXY[1])) + span &gt;= wrap) {</span>
+<span class="fc" id="L359">                    hitEndOfRow = true;</span>
+                } else {
+<span class="pc bpc" id="L361" title="1 of 2 branches missed.">                    increase(cellXY, splitExit ? span - 1 : span);</span>
+                }
+            }
+<span class="fc" id="L364">        }</span>
+
+        // If there were size groups, calculate the largest values in the groups (for min/pref/max) and enforce them on the rest in the group.
+<span class="pc bpc" id="L367" title="2 of 4 branches missed.">        if (sizeGroupsX &gt; 0 || sizeGroupsY &gt; 0) {</span>
+<span class="nc bnc" id="L368" title="All 2 branches missed.">            HashMap&lt;String, int[]&gt; sizeGroupMapX = sizeGroupsX &gt; 0 ? new HashMap&lt;String, int[]&gt;(sizeGroupsX) : null;</span>
+<span class="nc bnc" id="L369" title="All 2 branches missed.">            HashMap&lt;String, int[]&gt; sizeGroupMapY = sizeGroupsY &gt; 0 ? new HashMap&lt;String, int[]&gt;(sizeGroupsY) : null;</span>
+<span class="nc" id="L370">            ArrayList&lt;CompWrap&gt; sizeGroupCWs = new ArrayList&lt;CompWrap&gt;(Math.max(sizeGroupsX, sizeGroupsY));</span>
+
+<span class="nc bnc" id="L372" title="All 2 branches missed.">            for (Cell cell : grid.values()) {</span>
+<span class="nc bnc" id="L373" title="All 2 branches missed.">                for (int i = 0; i &lt; cell.compWraps.size(); i++) {</span>
+<span class="nc" id="L374">                    CompWrap cw = cell.compWraps.get(i);</span>
+<span class="nc" id="L375">                    String sgx = cw.cc.getHorizontal().getSizeGroup();</span>
+<span class="nc" id="L376">                    String sgy = cw.cc.getVertical().getSizeGroup();</span>
+
+<span class="nc bnc" id="L378" title="All 4 branches missed.">                    if (sgx != null || sgy != null) {</span>
+<span class="nc bnc" id="L379" title="All 4 branches missed.">                        if (sgx != null &amp;&amp; sizeGroupMapX != null) {</span>
+<span class="nc" id="L380">                            addToSizeGroup(sizeGroupMapX, sgx, cw.getSizes(true));</span>
+                        }
+<span class="nc bnc" id="L382" title="All 4 branches missed.">                        if (sgy != null &amp;&amp; sizeGroupMapY != null) {</span>
+<span class="nc" id="L383">                            addToSizeGroup(sizeGroupMapY, sgy, cw.getSizes(false));</span>
+                        }
+<span class="nc" id="L385">                        sizeGroupCWs.add(cw);</span>
+                    }
+                }
+<span class="nc" id="L388">            }</span>
+
+            // Set/equalize the sizeGroups to same the values.
+<span class="nc bnc" id="L391" title="All 2 branches missed.">            for (CompWrap cw : sizeGroupCWs) {</span>
+<span class="nc bnc" id="L392" title="All 2 branches missed.">                if (sizeGroupMapX != null) {</span>
+<span class="nc" id="L393">                    cw.setForcedSizes(sizeGroupMapX.get(cw.cc.getHorizontal().getSizeGroup()), true);  // Target method handles null sizes</span>
+                }
+<span class="nc bnc" id="L395" title="All 2 branches missed.">                if (sizeGroupMapY != null) {</span>
+<span class="nc" id="L396">                    cw.setForcedSizes(sizeGroupMapY.get(cw.cc.getVertical().getSizeGroup()), false); // Target method handles null sizes</span>
+                }
+<span class="nc" id="L398">            }</span>
+        } // Component loop
+
+<span class="pc bpc" id="L401" title="1 of 2 branches missed.">        if (hasTagged) {</span>
+<span class="nc" id="L402">            sortCellsByPlatform(grid.values(), container);</span>
+        }
+
+        // Calculate gaps now that the cells are filled and we know all adjacent components.
+<span class="fc" id="L406">        boolean ltr = LayoutUtil.isLeftToRight(lc, container);</span>
+<span class="fc bfc" id="L407" title="All 2 branches covered.">        for (Cell cell : grid.values()) {</span>
+<span class="fc" id="L408">            ArrayList&lt;CompWrap&gt; cws = cell.compWraps;</span>
+
+<span class="fc bfc" id="L410" title="All 2 branches covered.">            for (int i = 0, lastI = cws.size() - 1; i &lt;= lastI; i++) {</span>
+<span class="fc" id="L411">                CompWrap cw = cws.get(i);</span>
+<span class="pc bpc" id="L412" title="1 of 2 branches missed.">                ComponentWrapper cwBef = i &gt; 0 ? cws.get(i - 1).comp : null;</span>
+<span class="pc bpc" id="L413" title="1 of 2 branches missed.">                ComponentWrapper cwAft = i &lt; lastI ? cws.get(i + 1).comp : null;</span>
+
+<span class="fc" id="L415">                String tag = getCC(cw.comp, ccMap).getTag();</span>
+<span class="pc bpc" id="L416" title="1 of 2 branches missed.">                CC ccBef = cwBef != null ? getCC(cwBef, ccMap) : null;</span>
+<span class="pc bpc" id="L417" title="1 of 2 branches missed.">                CC ccAft = cwAft != null ? getCC(cwAft, ccMap) : null;</span>
+
+<span class="fc" id="L419">                cw.calcGaps(cwBef, ccBef, cwAft, ccAft, tag, cell.flowx, ltr);</span>
+            }
+<span class="fc" id="L421">        }</span>
+
+<span class="fc" id="L423">        dockOffX = getDockInsets(colIndexes);</span>
+<span class="fc" id="L424">        dockOffY = getDockInsets(rowIndexes);</span>
+
+        // Add synthetic indexes for empty rows and columns so they can get a size
+<span class="fc bfc" id="L427" title="All 2 branches covered.">        for (int i = 0, iSz = rowConstr.getCount(); i &lt; iSz; i++) {</span>
+<span class="fc" id="L428">            rowIndexes.add(Integer.valueOf(i));</span>
+        }
+<span class="fc bfc" id="L430" title="All 2 branches covered.">        for (int i = 0, iSz = colConstr.getCount(); i &lt; iSz; i++) {</span>
+<span class="fc" id="L431">            colIndexes.add(Integer.valueOf(i));</span>
+        }
+
+<span class="fc" id="L434">        colGroupLists = divideIntoLinkedGroups(false);</span>
+<span class="fc" id="L435">        rowGroupLists = divideIntoLinkedGroups(true);</span>
+
+<span class="pc bpc" id="L437" title="2 of 4 branches missed.">        pushXs = hasPushX || lc.isFillX() ? getDefaultPushWeights(false) : null;</span>
+<span class="pc bpc" id="L438" title="2 of 4 branches missed.">        pushYs = hasPushY || lc.isFillY() ? getDefaultPushWeights(true) : null;</span>
+
+<span class="fc bfc" id="L440" title="All 2 branches covered.">        if (LayoutUtil.isDesignTime(container)) {</span>
+<span class="fc" id="L441">            saveGrid(container, grid);</span>
+        }
+<span class="fc" id="L443">    }</span>
+
+    private static CC getCC(ComponentWrapper comp, Map&lt;? extends ComponentWrapper, CC&gt; ccMap) {
+<span class="fc" id="L446">        CC cc = ccMap.get(comp);</span>
+<span class="pc bpc" id="L447" title="1 of 2 branches missed.">        return cc != null ? cc : DEF_CC;</span>
+    }
+
+    private static int getDockInsets(TreeSet&lt;Integer&gt; set) {
+<span class="fc" id="L451">        int c = 0;</span>
+<span class="pc bpc" id="L452" title="1 of 2 branches missed.">        for (Integer i : set) {</span>
+<span class="pc bpc" id="L453" title="1 of 2 branches missed.">            if (i &lt; -MAX_GRID) {</span>
+<span class="nc" id="L454">                c++;</span>
+            } else {
+                break;  // Since they are sorted we can break
+            }
+<span class="nc" id="L458">        }</span>
+<span class="fc" id="L459">        return c;</span>
+    }
+
+    /**
+     * Sort components (normally buttons in a button bar) so they appear in the
+     * correct order.
+     *
+     * @param cells  The cells to sort.
+     * @param parent The parent.
+     */
+    private static void sortCellsByPlatform(Collection&lt;Cell&gt; cells, ContainerWrapper parent) {
+<span class="nc" id="L470">        String order = PlatformDefaults.getButtonOrder();</span>
+<span class="nc" id="L471">        String orderLo = order.toLowerCase();</span>
+
+<span class="nc" id="L473">        int unrelSize = PlatformDefaults.convertToPixels(1, &quot;u&quot;, true, 0, parent, null);</span>
+
+<span class="nc bnc" id="L475" title="All 2 branches missed.">        if (unrelSize == UnitConverter.UNABLE) {</span>
+<span class="nc" id="L476">            throw new IllegalArgumentException(&quot;'unrelated' not recognized by PlatformDefaults!&quot;);</span>
+        }
+
+<span class="nc" id="L479">        int[] gapUnrel = new int[]{unrelSize, unrelSize, LayoutUtil.NOT_SET};</span>
+<span class="nc" id="L480">        int[] flGap = new int[]{0, 0, LayoutUtil.NOT_SET};</span>
+
+<span class="nc bnc" id="L482" title="All 2 branches missed.">        for (Cell cell : cells) {</span>
+<span class="nc bnc" id="L483" title="All 2 branches missed.">            if (!cell.hasTagged) {</span>
+<span class="nc" id="L484">                continue;</span>
+            }
+
+<span class="nc" id="L487">            CompWrap prevCW = null;</span>
+<span class="nc" id="L488">            boolean nextUnrel = false;</span>
+<span class="nc" id="L489">            boolean nextPush = false;</span>
+<span class="nc" id="L490">            ArrayList&lt;CompWrap&gt; sortedList = new ArrayList&lt;CompWrap&gt;(cell.compWraps.size());</span>
+
+<span class="nc bnc" id="L492" title="All 2 branches missed.">            for (int i = 0, iSz = orderLo.length(); i &lt; iSz; i++) {</span>
+<span class="nc" id="L493">                char c = orderLo.charAt(i);</span>
+<span class="nc bnc" id="L494" title="All 4 branches missed.">                if (c == '+' || c == '_') {</span>
+<span class="nc" id="L495">                    nextUnrel = true;</span>
+<span class="nc bnc" id="L496" title="All 2 branches missed.">                    if (c == '+') {</span>
+<span class="nc" id="L497">                        nextPush = true;</span>
+                    }
+                } else {
+<span class="nc" id="L500">                    String tag = PlatformDefaults.getTagForChar(c);</span>
+<span class="nc bnc" id="L501" title="All 2 branches missed.">                    if (tag != null) {</span>
+<span class="nc bnc" id="L502" title="All 2 branches missed.">                        for (int j = 0, jSz = cell.compWraps.size(); j &lt; jSz; j++) {</span>
+<span class="nc" id="L503">                            CompWrap cw = cell.compWraps.get(j);</span>
+<span class="nc bnc" id="L504" title="All 2 branches missed.">                            if (tag.equals(cw.cc.getTag())) {</span>
+<span class="nc bnc" id="L505" title="All 2 branches missed.">                                if (Character.isUpperCase(order.charAt(i))) {</span>
+<span class="nc" id="L506">                                    cw.adjustMinHorSizeUp(PlatformDefaults.getMinimumButtonWidth().getPixels(0, parent, cw.comp));</span>
+                                }
+
+<span class="nc" id="L509">                                sortedList.add(cw);</span>
+
+<span class="nc bnc" id="L511" title="All 2 branches missed.">                                if (nextUnrel) {</span>
+<span class="nc bnc" id="L512" title="All 4 branches missed.">                                    (prevCW != null ? prevCW : cw).mergeGapSizes(gapUnrel, cell.flowx, prevCW == null);</span>
+<span class="nc bnc" id="L513" title="All 2 branches missed.">                                    if (nextPush) {</span>
+<span class="nc" id="L514">                                        cw.forcedPushGaps = 1;</span>
+<span class="nc" id="L515">                                        nextUnrel = false;</span>
+<span class="nc" id="L516">                                        nextPush = false;</span>
+                                    }
+                                }
+
+                                // &quot;unknown&quot; components will always get an Unrelated gap.
+<span class="nc bnc" id="L521" title="All 2 branches missed.">                                if (c == 'u') {</span>
+<span class="nc" id="L522">                                    nextUnrel = true;</span>
+                                }
+<span class="nc" id="L524">                                prevCW = cw;</span>
+                            }
+                        }
+                    }
+                }
+            }
+
+            // If we have a gap that was supposed to push but no more components was found to but the &quot;gap before&quot; then compensate.
+<span class="nc bnc" id="L532" title="All 2 branches missed.">            if (sortedList.size() &gt; 0) {</span>
+<span class="nc" id="L533">                CompWrap cw = sortedList.get(sortedList.size() - 1);</span>
+<span class="nc bnc" id="L534" title="All 2 branches missed.">                if (nextUnrel) {</span>
+<span class="nc" id="L535">                    cw.mergeGapSizes(gapUnrel, cell.flowx, false);</span>
+<span class="nc bnc" id="L536" title="All 2 branches missed.">                    if (nextPush) {</span>
+<span class="nc" id="L537">                        cw.forcedPushGaps |= 2;</span>
+                    }
+                }
+
+                // Remove first and last gap if not set explicitly.
+<span class="nc bnc" id="L542" title="All 2 branches missed.">                if (cw.cc.getHorizontal().getGapAfter() == null) {</span>
+<span class="nc" id="L543">                    cw.setGaps(flGap, 3);</span>
+                }
+
+<span class="nc" id="L546">                cw = sortedList.get(0);</span>
+<span class="nc bnc" id="L547" title="All 2 branches missed.">                if (cw.cc.getHorizontal().getGapBefore() == null) {</span>
+<span class="nc" id="L548">                    cw.setGaps(flGap, 1);</span>
+                }
+            }
+
+            // Exchange the unsorted CompWraps for the sorted one.
+<span class="nc bnc" id="L553" title="All 2 branches missed.">            if (cell.compWraps.size() == sortedList.size()) {</span>
+<span class="nc" id="L554">                cell.compWraps.clear();</span>
+            } else {
+<span class="nc" id="L556">                cell.compWraps.removeAll(sortedList);</span>
+            }
+<span class="nc" id="L558">            cell.compWraps.addAll(sortedList);</span>
+<span class="nc" id="L559">        }</span>
+<span class="nc" id="L560">    }</span>
+
+    /**
+     * Returns the {@link net.miginfocom.layout.Grid.LinkedDimGroup} that has
+     * the {@link net.miginfocom.layout.Grid.CompWrap} &lt;code&gt;cw&lt;/code&gt;.
+     *
+     * @param groupLists The lists to search in.
+     * @param cw         The component wrap to find.
+     * @return The linked group or &lt;code&gt;null&lt;/code&gt; if none had the component
+     * wrap.
+     */
+    private static LinkedDimGroup getGroupContaining(ArrayList&lt;LinkedDimGroup&gt;[] groupLists, CompWrap cw) {
+<span class="nc bnc" id="L572" title="All 2 branches missed.">        for (ArrayList&lt;LinkedDimGroup&gt; groups : groupLists) {</span>
+<span class="nc bnc" id="L573" title="All 2 branches missed.">            for (int j = 0, jSz = groups.size(); j &lt; jSz; j++) {</span>
+<span class="nc" id="L574">                ArrayList&lt;CompWrap&gt; cwList = groups.get(j)._compWraps;</span>
+<span class="nc bnc" id="L575" title="All 2 branches missed.">                for (int k = 0, kSz = cwList.size(); k &lt; kSz; k++) {</span>
+<span class="nc bnc" id="L576" title="All 2 branches missed.">                    if (cwList.get(k) == cw) {</span>
+<span class="nc" id="L577">                        return groups.get(j);</span>
+                    }
+                }
+            }
+        }
+<span class="nc" id="L582">        return null;</span>
+    }
+
+    private static void addToSizeGroup(HashMap&lt;String, int[]&gt; sizeGroups, String sizeGroup, int[] size) {
+<span class="fc" id="L586">        int[] sgSize = sizeGroups.get(sizeGroup);</span>
+<span class="fc bfc" id="L587" title="All 2 branches covered.">        if (sgSize == null) {</span>
+<span class="fc" id="L588">            sizeGroups.put(sizeGroup, new int[]{size[LayoutUtil.MIN], size[LayoutUtil.PREF], size[LayoutUtil.MAX]});</span>
+        } else {
+<span class="fc" id="L590">            sgSize[LayoutUtil.MIN] = Math.max(size[LayoutUtil.MIN], sgSize[LayoutUtil.MIN]);</span>
+<span class="fc" id="L591">            sgSize[LayoutUtil.PREF] = Math.max(size[LayoutUtil.PREF], sgSize[LayoutUtil.PREF]);</span>
+<span class="fc" id="L592">            sgSize[LayoutUtil.MAX] = Math.min(size[LayoutUtil.MAX], sgSize[LayoutUtil.MAX]);</span>
+        }
+<span class="fc" id="L594">    }</span>
+
+    private static HashMap&lt;String, Integer&gt; addToEndGroup(HashMap&lt;String, Integer&gt; endGroups, String endGroup, int end) {
+<span class="nc bnc" id="L597" title="All 2 branches missed.">        if (endGroup != null) {</span>
+<span class="nc bnc" id="L598" title="All 2 branches missed.">            if (endGroups == null) {</span>
+<span class="nc" id="L599">                endGroups = new HashMap&lt;String, Integer&gt;(4);</span>
+            }
+
+<span class="nc" id="L602">            Integer oldEnd = endGroups.get(endGroup);</span>
+<span class="nc bnc" id="L603" title="All 4 branches missed.">            if (oldEnd == null || end &gt; oldEnd) {</span>
+<span class="nc" id="L604">                endGroups.put(endGroup, Integer.valueOf(end));</span>
+            }
+        }
+<span class="nc" id="L607">        return endGroups;</span>
+    }
+
+    private static int getParentSize(ComponentWrapper cw, boolean isHor) {
+<span class="fc" id="L611">        ContainerWrapper p = cw.getParent();</span>
+<span class="fc bfc" id="L612" title="All 4 branches covered.">        return p != null ? (isHor ? cw.getWidth() : cw.getHeight()) : 0;</span>
+    }
+
+    private static ResizeConstraint[] getRowResizeConstraints(DimConstraint[] specs) {
+<span class="fc" id="L616">        ResizeConstraint[] resConsts = new ResizeConstraint[specs.length];</span>
+<span class="fc bfc" id="L617" title="All 2 branches covered.">        for (int i = 0; i &lt; resConsts.length; i++) {</span>
+<span class="fc" id="L618">            resConsts[i] = specs[i].resize;</span>
+        }
+<span class="fc" id="L620">        return resConsts;</span>
+    }
+
+    private static ResizeConstraint[] getComponentResizeConstraints(ArrayList&lt;CompWrap&gt; compWraps, boolean isHor) {
+<span class="nc" id="L624">        ResizeConstraint[] resConsts = new ResizeConstraint[compWraps.size()];</span>
+<span class="nc bnc" id="L625" title="All 2 branches missed.">        for (int i = 0; i &lt; resConsts.length; i++) {</span>
+<span class="nc" id="L626">            CC fc = compWraps.get(i).cc;</span>
+<span class="nc" id="L627">            resConsts[i] = fc.getDimConstraint(isHor).resize;</span>
+
+            // Always grow docking components in the correct dimension.
+<span class="nc" id="L630">            int dock = fc.getDockSide();</span>
+<span class="nc bnc" id="L631" title="All 10 branches missed.">            if (isHor ? (dock == 0 || dock == 2) : (dock == 1 || dock == 3)) {</span>
+<span class="nc" id="L632">                ResizeConstraint dc = resConsts[i];</span>
+<span class="nc" id="L633">                resConsts[i] = new ResizeConstraint(dc.shrinkPrio, dc.shrink, dc.growPrio, ResizeConstraint.WEIGHT_100);</span>
+            }
+        }
+<span class="nc" id="L636">        return resConsts;</span>
+    }
+
+    private static boolean[] getComponentGapPush(ArrayList&lt;CompWrap&gt; compWraps, boolean isHor) {
+        // Make one element bigger and or the after gap with the next before gap.
+<span class="nc" id="L641">        boolean[] barr = new boolean[compWraps.size() + 1];</span>
+<span class="nc bnc" id="L642" title="All 2 branches missed.">        for (int i = 0; i &lt; barr.length; i++) {</span>
+
+<span class="nc bnc" id="L644" title="All 4 branches missed.">            boolean push = i &gt; 0 &amp;&amp; compWraps.get(i - 1).isPushGap(isHor, false);</span>
+
+<span class="nc bnc" id="L646" title="All 4 branches missed.">            if (!push &amp;&amp; i &lt; (barr.length - 1)) {</span>
+<span class="nc" id="L647">                push = compWraps.get(i).isPushGap(isHor, true);</span>
+            }
+
+<span class="nc" id="L650">            barr[i] = push;</span>
+        }
+<span class="nc" id="L652">        return barr;</span>
+    }
+
+    private static int[][] getGaps(ArrayList&lt;CompWrap&gt; compWraps, boolean isHor) {
+<span class="nc" id="L656">        int compCount = compWraps.size();</span>
+<span class="nc" id="L657">        int[][] retValues = new int[compCount + 1][];</span>
+
+<span class="nc" id="L659">        retValues[0] = compWraps.get(0).getGaps(isHor, true);</span>
+<span class="nc bnc" id="L660" title="All 2 branches missed.">        for (int i = 0; i &lt; compCount; i++) {</span>
+<span class="nc" id="L661">            int[] gap1 = compWraps.get(i).getGaps(isHor, false);</span>
+<span class="nc bnc" id="L662" title="All 2 branches missed.">            int[] gap2 = i &lt; compCount - 1 ? compWraps.get(i + 1).getGaps(isHor, true) : null;</span>
+
+<span class="nc" id="L664">            retValues[i + 1] = mergeSizes(gap1, gap2);</span>
+        }
+
+<span class="nc" id="L667">        return retValues;</span>
+    }
+
+    /**
+     * Spanning is specified in the uncompressed grid number. They can for
+     * instance be more than 60000 for the outer edge dock grid cells. When the
+     * grid is compressed and indexed after only the cells that area occupied
+     * the span is erratic. This method use the row/col indexes and corrects the
+     * span to be correct for the compressed grid.
+     *
+     * @param span    The span un the uncompressed grid.
+     *                &lt;code&gt;LayoutUtil.INF&lt;/code&gt; will be interpreted to span the rest of the
+     *                column/row excluding the surrounding docking components.
+     * @param indexes The indexes in the correct dimension.
+     * @return The converted span.
+     */
+    private static int convertSpanToSparseGrid(int curIx, int span, TreeSet&lt;Integer&gt; indexes) {
+<span class="nc" id="L684">        int lastIx = curIx + span;</span>
+<span class="nc" id="L685">        int retSpan = 1;</span>
+
+<span class="nc bnc" id="L687" title="All 2 branches missed.">        for (Integer ix : indexes) {</span>
+<span class="nc bnc" id="L688" title="All 2 branches missed.">            if (ix &lt;= curIx) {</span>
+<span class="nc" id="L689">                continue;   // We have not arrived to the correct index yet</span>
+            }
+<span class="nc bnc" id="L691" title="All 2 branches missed.">            if (ix &gt;= lastIx) {</span>
+<span class="nc" id="L692">                break;</span>
+            }
+
+<span class="nc" id="L695">            retSpan++;</span>
+<span class="nc" id="L696">        }</span>
+<span class="nc" id="L697">        return retSpan;</span>
+    }
+
+    //***************************************************************************************
+    //* Helper Methods
+    //***************************************************************************************
+    private static void layoutBaseline(ContainerWrapper parent, ArrayList&lt;CompWrap&gt; compWraps, DimConstraint dc, int start, int size, int sizeType, int spanCount) {
+<span class="fc" id="L704">        int[] aboveBelow = getBaselineAboveBelow(compWraps, sizeType, true);</span>
+<span class="fc" id="L705">        int blRowSize = aboveBelow[0] + aboveBelow[1];</span>
+
+<span class="fc" id="L707">        CC cc = compWraps.get(0).cc;</span>
+
+        // Align for the whole baseline component array
+<span class="fc" id="L710">        UnitValue align = cc.getVertical().getAlign();</span>
+<span class="pc bpc" id="L711" title="2 of 4 branches missed.">        if (spanCount == 1 &amp;&amp; align == null) {</span>
+<span class="fc" id="L712">            align = dc.getAlignOrDefault(false);</span>
+        }
+<span class="pc bpc" id="L714" title="1 of 2 branches missed.">        if (align == UnitValue.BASELINE_IDENTITY) {</span>
+<span class="fc" id="L715">            align = UnitValue.CENTER;</span>
+        }
+
+<span class="pc bpc" id="L718" title="1 of 2 branches missed.">        int offset = start + aboveBelow[0] + (align != null ? Math.max(0, align.getPixels(size - blRowSize, parent, null)) : 0);</span>
+<span class="fc bfc" id="L719" title="All 2 branches covered.">        for (CompWrap cw : compWraps) {</span>
+<span class="fc" id="L720">            cw.y += offset;</span>
+<span class="pc bpc" id="L721" title="1 of 2 branches missed.">            if (cw.y + cw.h &gt; start + size) {</span>
+<span class="nc" id="L722">                cw.h = start + size - cw.y;</span>
+            }
+<span class="fc" id="L724">        }</span>
+<span class="fc" id="L725">    }</span>
+
+    private static void layoutSerial(ContainerWrapper parent, ArrayList&lt;CompWrap&gt; compWraps, DimConstraint dc, int start, int size, boolean isHor, int spanCount, boolean fromEnd) {
+<span class="nc" id="L728">        FlowSizeSpec fss = mergeSizesGapsAndResConstrs(</span>
+<span class="nc" id="L729">                getComponentResizeConstraints(compWraps, isHor),</span>
+<span class="nc" id="L730">                getComponentGapPush(compWraps, isHor),</span>
+<span class="nc" id="L731">                getComponentSizes(compWraps, isHor),</span>
+<span class="nc" id="L732">                getGaps(compWraps, isHor));</span>
+
+<span class="nc bnc" id="L734" title="All 2 branches missed.">        Float[] pushW = dc.isFill() ? GROW_100 : null;</span>
+<span class="nc" id="L735">        int[] sizes = LayoutUtil.calculateSerial(fss.sizes, fss.resConstsInclGaps, pushW, LayoutUtil.PREF, size);</span>
+<span class="nc" id="L736">        setCompWrapBounds(parent, sizes, compWraps, dc.getAlignOrDefault(isHor), start, size, isHor, fromEnd);</span>
+<span class="nc" id="L737">    }</span>
+
+    private static void setCompWrapBounds(ContainerWrapper parent, int[] allSizes, ArrayList&lt;CompWrap&gt; compWraps, UnitValue rowAlign, int start, int size, boolean isHor, boolean fromEnd) {
+<span class="nc" id="L740">        int totSize = LayoutUtil.sum(allSizes);</span>
+<span class="nc" id="L741">        CC cc = compWraps.get(0).cc;</span>
+<span class="nc" id="L742">        UnitValue align = correctAlign(cc, rowAlign, isHor, fromEnd);</span>
+
+<span class="nc" id="L744">        int cSt = start;</span>
+<span class="nc" id="L745">        int slack = size - totSize;</span>
+<span class="nc bnc" id="L746" title="All 4 branches missed.">        if (slack &gt; 0 &amp;&amp; align != null) {</span>
+<span class="nc" id="L747">            int al = Math.min(slack, Math.max(0, align.getPixels(slack, parent, null)));</span>
+<span class="nc bnc" id="L748" title="All 2 branches missed.">            cSt += (fromEnd ? -al : al);</span>
+        }
+
+<span class="nc bnc" id="L751" title="All 2 branches missed.">        for (int i = 0, bIx = 0, iSz = compWraps.size(); i &lt; iSz; i++) {</span>
+<span class="nc" id="L752">            CompWrap cw = compWraps.get(i);</span>
+<span class="nc bnc" id="L753" title="All 2 branches missed.">            if (fromEnd) {</span>
+<span class="nc" id="L754">                cSt -= allSizes[bIx++];</span>
+<span class="nc" id="L755">                cw.setDimBounds(cSt - allSizes[bIx], allSizes[bIx], isHor);</span>
+<span class="nc" id="L756">                cSt -= allSizes[bIx++];</span>
+            } else {
+<span class="nc" id="L758">                cSt += allSizes[bIx++];</span>
+<span class="nc" id="L759">                cw.setDimBounds(cSt, allSizes[bIx], isHor);</span>
+<span class="nc" id="L760">                cSt += allSizes[bIx++];</span>
+            }
+        }
+<span class="nc" id="L763">    }</span>
+
+    private static void layoutParallel(ContainerWrapper parent, ArrayList&lt;CompWrap&gt; compWraps, DimConstraint dc, int start, int size, boolean isHor, boolean fromEnd) {
+<span class="fc" id="L766">        int[][] sizes = new int[compWraps.size()][];    // [compIx][gapBef,compSize,gapAft]</span>
+
+<span class="fc bfc" id="L768" title="All 2 branches covered.">        for (int i = 0; i &lt; sizes.length; i++) {</span>
+<span class="fc" id="L769">            CompWrap cw = compWraps.get(i);</span>
+
+<span class="fc" id="L771">            DimConstraint cDc = cw.cc.getDimConstraint(isHor);</span>
+
+<span class="fc" id="L773">            ResizeConstraint[] resConstr = new ResizeConstraint[]{</span>
+<span class="pc bpc" id="L774" title="1 of 2 branches missed.">                    cw.isPushGap(isHor, true) ? GAP_RC_CONST_PUSH : GAP_RC_CONST,</span>
+                    cDc.resize,
+<span class="pc bpc" id="L776" title="1 of 2 branches missed.">                    cw.isPushGap(isHor, false) ? GAP_RC_CONST_PUSH : GAP_RC_CONST,};</span>
+
+<span class="fc" id="L778">            int[][] sz = new int[][]{</span>
+<span class="fc" id="L779">                    cw.getGaps(isHor, true), cw.getSizes(isHor), cw.getGaps(isHor, false)</span>
+            };
+
+<span class="pc bpc" id="L782" title="1 of 2 branches missed.">            Float[] pushW = dc.isFill() ? GROW_100 : null;</span>
+
+<span class="fc" id="L784">            sizes[i] = LayoutUtil.calculateSerial(sz, resConstr, pushW, LayoutUtil.PREF, size);</span>
+        }
+
+<span class="fc" id="L787">        UnitValue rowAlign = dc.getAlignOrDefault(isHor);</span>
+<span class="fc" id="L788">        setCompWrapBounds(parent, sizes, compWraps, rowAlign, start, size, isHor, fromEnd);</span>
+<span class="fc" id="L789">    }</span>
+
+    private static void setCompWrapBounds(ContainerWrapper parent, int[][] sizes, ArrayList&lt;CompWrap&gt; compWraps, UnitValue rowAlign, int start, int size, boolean isHor, boolean fromEnd) {
+<span class="fc bfc" id="L792" title="All 2 branches covered.">        for (int i = 0; i &lt; sizes.length; i++) {</span>
+<span class="fc" id="L793">            CompWrap cw = compWraps.get(i);</span>
+
+<span class="fc" id="L795">            UnitValue align = correctAlign(cw.cc, rowAlign, isHor, fromEnd);</span>
+
+<span class="fc" id="L797">            int[] cSizes = sizes[i];</span>
+<span class="fc" id="L798">            int gapBef = cSizes[0];</span>
+<span class="fc" id="L799">            int cSize = cSizes[1];  // No Math.min(size, cSizes[1]) here!</span>
+<span class="fc" id="L800">            int gapAft = cSizes[2];</span>
+
+<span class="pc bpc" id="L802" title="1 of 2 branches missed.">            int cSt = fromEnd ? start - gapBef : start + gapBef;</span>
+<span class="fc" id="L803">            int slack = size - cSize - gapBef - gapAft;</span>
+<span class="pc bpc" id="L804" title="1 of 4 branches missed.">            if (slack &gt; 0 &amp;&amp; align != null) {</span>
+<span class="fc" id="L805">                int al = Math.min(slack, Math.max(0, align.getPixels(slack, parent, null)));</span>
+<span class="pc bpc" id="L806" title="1 of 2 branches missed.">                cSt += (fromEnd ? -al : al);</span>
+            }
+
+<span class="pc bpc" id="L809" title="1 of 2 branches missed.">            cw.setDimBounds(fromEnd ? cSt - cSize : cSt, cSize, isHor);</span>
+        }
+<span class="fc" id="L811">    }</span>
+
+    private static UnitValue correctAlign(CC cc, UnitValue rowAlign, boolean isHor, boolean fromEnd) {
+<span class="fc bfc" id="L814" title="All 2 branches covered.">        UnitValue align = (isHor ? cc.getHorizontal() : cc.getVertical()).getAlign();</span>
+<span class="pc bpc" id="L815" title="1 of 2 branches missed.">        if (align == null) {</span>
+<span class="fc" id="L816">            align = rowAlign;</span>
+        }
+<span class="fc bfc" id="L818" title="All 2 branches covered.">        if (align == UnitValue.BASELINE_IDENTITY) {</span>
+<span class="fc" id="L819">            align = UnitValue.CENTER;</span>
+        }
+
+<span class="pc bpc" id="L822" title="1 of 2 branches missed.">        if (fromEnd) {</span>
+<span class="nc bnc" id="L823" title="All 2 branches missed.">            if (align == UnitValue.LEFT) {</span>
+<span class="nc" id="L824">                align = UnitValue.RIGHT;</span>
+<span class="nc bnc" id="L825" title="All 2 branches missed.">            } else if (align == UnitValue.RIGHT) {</span>
+<span class="nc" id="L826">                align = UnitValue.LEFT;</span>
+            }
+        }
+<span class="fc" id="L829">        return align;</span>
+    }
+
+    private static int[] getBaselineAboveBelow(ArrayList&lt;CompWrap&gt; compWraps, int sType, boolean centerBaseline) {
+<span class="fc" id="L833">        int maxAbove = Integer.MIN_VALUE;</span>
+<span class="fc" id="L834">        int maxBelow = Integer.MIN_VALUE;</span>
+<span class="fc bfc" id="L835" title="All 2 branches covered.">        for (CompWrap cw : compWraps) {</span>
+<span class="fc" id="L836">            int height = cw.getSize(sType, false);</span>
+<span class="pc bpc" id="L837" title="1 of 2 branches missed.">            if (height &gt;= LayoutUtil.INF) {</span>
+<span class="nc" id="L838">                return new int[]{LayoutUtil.INF / 2, LayoutUtil.INF / 2};</span>
+            }
+
+<span class="fc" id="L841">            int baseline = cw.getBaseline(sType);</span>
+<span class="fc" id="L842">            int above = baseline + cw.getGapBefore(sType, false);</span>
+<span class="fc" id="L843">            maxAbove = Math.max(above, maxAbove);</span>
+<span class="fc" id="L844">            maxBelow = Math.max(height - baseline + cw.getGapAfter(sType, false), maxBelow);</span>
+
+<span class="fc bfc" id="L846" title="All 2 branches covered.">            if (centerBaseline) {</span>
+<span class="fc" id="L847">                cw.setDimBounds(-baseline, height, false);</span>
+            }
+<span class="fc" id="L849">        }</span>
+<span class="fc" id="L850">        return new int[]{maxAbove, maxBelow};</span>
+    }
+
+    private static int getTotalSizeParallel(ArrayList&lt;CompWrap&gt; compWraps, int sType, boolean isHor) {
+<span class="pc bpc" id="L854" title="1 of 2 branches missed.">        int size = sType == LayoutUtil.MAX ? LayoutUtil.INF : 0;</span>
+
+<span class="fc bfc" id="L856" title="All 2 branches covered.">        for (CompWrap cw : compWraps) {</span>
+<span class="fc" id="L857">            int cwSize = cw.getSizeInclGaps(sType, isHor);</span>
+<span class="pc bpc" id="L858" title="1 of 2 branches missed.">            if (cwSize &gt;= LayoutUtil.INF) {</span>
+<span class="nc" id="L859">                return LayoutUtil.INF;</span>
+            }
+
+<span class="pc bpc" id="L862" title="4 of 6 branches missed.">            if (sType == LayoutUtil.MAX ? cwSize &lt; size : cwSize &gt; size) {</span>
+<span class="fc" id="L863">                size = cwSize;</span>
+            }
+<span class="fc" id="L865">        }</span>
+<span class="fc" id="L866">        return constrainSize(size);</span>
+    }
+
+    private static int getTotalSizeSerial(ArrayList&lt;CompWrap&gt; compWraps, int sType, boolean isHor) {
+<span class="nc" id="L870">        int totSize = 0;</span>
+<span class="nc bnc" id="L871" title="All 2 branches missed.">        for (int i = 0, iSz = compWraps.size(), lastGapAfter = 0; i &lt; iSz; i++) {</span>
+<span class="nc" id="L872">            CompWrap wrap = compWraps.get(i);</span>
+<span class="nc" id="L873">            int gapBef = wrap.getGapBefore(sType, isHor);</span>
+<span class="nc bnc" id="L874" title="All 2 branches missed.">            if (gapBef &gt; lastGapAfter) {</span>
+<span class="nc" id="L875">                totSize += gapBef - lastGapAfter;</span>
+            }
+
+<span class="nc" id="L878">            totSize += wrap.getSize(sType, isHor);</span>
+<span class="nc" id="L879">            totSize += (lastGapAfter = wrap.getGapAfter(sType, isHor));</span>
+
+<span class="nc bnc" id="L881" title="All 2 branches missed.">            if (totSize &gt;= LayoutUtil.INF) {</span>
+<span class="nc" id="L882">                return LayoutUtil.INF;</span>
+            }
+        }
+<span class="nc" id="L885">        return constrainSize(totSize);</span>
+    }
+
+    private static int getTotalGroupsSizeParallel(ArrayList&lt;LinkedDimGroup&gt; groups, int sType, boolean countSpanning) {
+<span class="pc bpc" id="L889" title="1 of 2 branches missed.">        int size = sType == LayoutUtil.MAX ? LayoutUtil.INF : 0;</span>
+<span class="fc bfc" id="L890" title="All 2 branches covered.">        for (LinkedDimGroup group : groups) {</span>
+<span class="pc bpc" id="L891" title="2 of 4 branches missed.">            if (countSpanning || group.span == 1) {</span>
+<span class="fc" id="L892">                int grpSize = group.getMinPrefMax()[sType];</span>
+<span class="pc bpc" id="L893" title="1 of 2 branches missed.">                if (grpSize &gt;= LayoutUtil.INF) {</span>
+<span class="nc" id="L894">                    return LayoutUtil.INF;</span>
+                }
+
+<span class="pc bpc" id="L897" title="3 of 6 branches missed.">                if (sType == LayoutUtil.MAX ? grpSize &lt; size : grpSize &gt; size) {</span>
+<span class="fc" id="L898">                    size = grpSize;</span>
+                }
+            }
+<span class="fc" id="L901">        }</span>
+<span class="fc" id="L902">        return constrainSize(size);</span>
+    }
+
+    /**
+     * @param compWraps
+     * @param isHor
+     * @return Might contain LayoutUtil.NOT_SET
+     */
+    private static int[][] getComponentSizes(ArrayList&lt;CompWrap&gt; compWraps, boolean isHor) {
+<span class="nc" id="L911">        int[][] compSizes = new int[compWraps.size()][];</span>
+<span class="nc bnc" id="L912" title="All 2 branches missed.">        for (int i = 0; i &lt; compSizes.length; i++) {</span>
+<span class="nc" id="L913">            compSizes[i] = compWraps.get(i).getSizes(isHor);</span>
+        }
+<span class="nc" id="L915">        return compSizes;</span>
+    }
+
+    /**
+     * Merges sizes and gaps together with Resize Constraints. For gaps
+     * {@link #GAP_RC_CONST} is used.
+     *
+     * @param resConstr       One resize constriant for every row/component. Can be
+     *                        lesser in length and the last element should be used for missing
+     *                        elements.
+     * @param gapPush         If the corresponding gap should be considered pushing and
+     *                        thus want to take free space if left over. Should be one more than
+     *                        resConstrs!
+     * @param minPrefMaxSizes The sizes (min/pref/max) for every row/component.
+     * @param gapSizes        The gaps before and after each row/component packed in
+     *                        one double sized array.
+     * @return A holder for the merged values.
+     */
+    private static FlowSizeSpec mergeSizesGapsAndResConstrs(ResizeConstraint[] resConstr, boolean[] gapPush, int[][] minPrefMaxSizes, int[][] gapSizes) {
+<span class="fc" id="L934">        int[][] sizes = new int[(minPrefMaxSizes.length &lt;&lt; 1) + 1][];  // Make room for gaps around.</span>
+<span class="fc" id="L935">        ResizeConstraint[] resConstsInclGaps = new ResizeConstraint[sizes.length];</span>
+
+<span class="fc" id="L937">        sizes[0] = gapSizes[0];</span>
+<span class="fc bfc" id="L938" title="All 2 branches covered.">        for (int i = 0, crIx = 1; i &lt; minPrefMaxSizes.length; i++, crIx += 2) {</span>
+
+            // Component bounds and constraints
+<span class="fc" id="L941">            resConstsInclGaps[crIx] = resConstr[i];</span>
+<span class="fc" id="L942">            sizes[crIx] = minPrefMaxSizes[i];</span>
+
+<span class="fc" id="L944">            sizes[crIx + 1] = gapSizes[i + 1];</span>
+
+<span class="pc bpc" id="L946" title="1 of 2 branches missed.">            if (sizes[crIx - 1] != null) {</span>
+<span class="pc bpc" id="L947" title="2 of 4 branches missed.">                resConstsInclGaps[crIx - 1] = gapPush[i &lt; gapPush.length ? i : gapPush.length - 1] ? GAP_RC_CONST_PUSH : GAP_RC_CONST;</span>
+            }
+
+<span class="pc bpc" id="L950" title="1 of 4 branches missed.">            if (i == (minPrefMaxSizes.length - 1) &amp;&amp; sizes[crIx + 1] != null) {</span>
+<span class="pc bpc" id="L951" title="2 of 4 branches missed.">                resConstsInclGaps[crIx + 1] = gapPush[(i + 1) &lt; gapPush.length ? (i + 1) : gapPush.length - 1] ? GAP_RC_CONST_PUSH : GAP_RC_CONST;</span>
+            }
+        }
+
+        // Check for null and set it to 0, 0, 0.
+<span class="fc bfc" id="L956" title="All 2 branches covered.">        for (int i = 0; i &lt; sizes.length; i++) {</span>
+<span class="pc bpc" id="L957" title="1 of 2 branches missed.">            if (sizes[i] == null) {</span>
+<span class="nc" id="L958">                sizes[i] = new int[3];</span>
+            }
+        }
+
+<span class="fc" id="L962">        return new FlowSizeSpec(sizes, resConstsInclGaps);</span>
+    }
+
+    private static int[] mergeSizes(int[] oldValues, int[] newValues) {
+<span class="nc bnc" id="L966" title="All 2 branches missed.">        if (oldValues == null) {</span>
+<span class="nc" id="L967">            return newValues;</span>
+        }
+
+<span class="nc bnc" id="L970" title="All 2 branches missed.">        if (newValues == null) {</span>
+<span class="nc" id="L971">            return oldValues;</span>
+        }
+
+<span class="nc" id="L974">        int[] ret = new int[oldValues.length];</span>
+<span class="nc bnc" id="L975" title="All 2 branches missed.">        for (int i = 0; i &lt; ret.length; i++) {</span>
+<span class="nc" id="L976">            ret[i] = mergeSizes(oldValues[i], newValues[i], true);</span>
+        }
+
+<span class="nc" id="L979">        return ret;</span>
+    }
+
+    private static int mergeSizes(int oldValue, int newValue, boolean toMax) {
+<span class="nc bnc" id="L983" title="All 4 branches missed.">        if (oldValue == LayoutUtil.NOT_SET || oldValue == newValue) {</span>
+<span class="nc" id="L984">            return newValue;</span>
+        }
+
+<span class="nc bnc" id="L987" title="All 2 branches missed.">        if (newValue == LayoutUtil.NOT_SET) {</span>
+<span class="nc" id="L988">            return oldValue;</span>
+        }
+
+<span class="nc bnc" id="L991" title="All 4 branches missed.">        return toMax != oldValue &gt; newValue ? newValue : oldValue;</span>
+    }
+
+    private static int constrainSize(int s) {
+<span class="pc bpc" id="L995" title="2 of 4 branches missed.">        return s &gt; 0 ? (s &lt; LayoutUtil.INF ? s : LayoutUtil.INF) : 0;</span>
+    }
+
+    private static void correctMinMax(int[] s) {
+<span class="pc bpc" id="L999" title="1 of 2 branches missed.">        if (s[LayoutUtil.MIN] &gt; s[LayoutUtil.MAX]) {</span>
+<span class="nc" id="L1000">            s[LayoutUtil.MIN] = s[LayoutUtil.MAX];  // Since MAX is almost always explicitly set use that</span>
+        }
+<span class="pc bpc" id="L1002" title="1 of 2 branches missed.">        if (s[LayoutUtil.PREF] &lt; s[LayoutUtil.MIN]) {</span>
+<span class="nc" id="L1003">            s[LayoutUtil.PREF] = s[LayoutUtil.MIN];</span>
+        }
+
+<span class="pc bpc" id="L1006" title="1 of 2 branches missed.">        if (s[LayoutUtil.PREF] &gt; s[LayoutUtil.MAX]) {</span>
+<span class="nc" id="L1007">            s[LayoutUtil.PREF] = s[LayoutUtil.MAX];</span>
+        }
+<span class="fc" id="L1009">    }</span>
+
+    private static Float[] extractSubArray(DimConstraint[] specs, Float[] arr, int ix, int len) {
+<span class="nc bnc" id="L1012" title="All 4 branches missed.">        if (arr == null || arr.length &lt; ix + len) {</span>
+<span class="nc" id="L1013">            Float[] growLastArr = new Float[len];</span>
+
+            // Handle a group where some rows (first one/few and/or last one/few) are docks.
+<span class="nc bnc" id="L1016" title="All 2 branches missed.">            for (int i = ix + len - 1; i &gt;= 0; i -= 2) {</span>
+<span class="nc" id="L1017">                int specIx = (i &gt;&gt; 1);</span>
+<span class="nc bnc" id="L1018" title="All 2 branches missed.">                if (specs[specIx] != DOCK_DIM_CONSTRAINT) {</span>
+<span class="nc" id="L1019">                    growLastArr[i - ix] = ResizeConstraint.WEIGHT_100;</span>
+<span class="nc" id="L1020">                    return growLastArr;</span>
+                }
+            }
+<span class="nc" id="L1023">            return growLastArr;</span>
+        }
+
+<span class="nc" id="L1026">        Float[] newArr = new Float[len];</span>
+<span class="nc" id="L1027">        System.arraycopy(arr, ix + 0, newArr, 0, len);</span>
+<span class="nc" id="L1028">        return newArr;</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static synchronized void putSizesAndIndexes(Object parComp, int[] sizes, int[] ixArr, boolean isRows) {
+<span class="fc bfc" id="L1033" title="All 2 branches covered.">        if (PARENT_ROWCOL_SIZES_MAP == null) // Lazy since only if designing in IDEs</span>
+        {
+<span class="fc" id="L1035">            PARENT_ROWCOL_SIZES_MAP = new HashMap[]{new HashMap&lt;Object, int[][]&gt;(4), new HashMap&lt;Object, int[][]&gt;(4)};</span>
+        }
+
+<span class="fc bfc" id="L1038" title="All 2 branches covered.">        PARENT_ROWCOL_SIZES_MAP[isRows ? 0 : 1].put(parComp, new int[][]{ixArr, sizes});</span>
+<span class="fc" id="L1039">    }</span>
+
+    static synchronized int[][] getSizesAndIndexes(Object parComp, boolean isRows) {
+<span class="nc bnc" id="L1042" title="All 2 branches missed.">        if (PARENT_ROWCOL_SIZES_MAP == null) {</span>
+<span class="nc" id="L1043">            return null;</span>
+        }
+
+<span class="nc bnc" id="L1046" title="All 2 branches missed.">        return PARENT_ROWCOL_SIZES_MAP[isRows ? 0 : 1].get(parComp);</span>
+    }
+
+    private static synchronized void saveGrid(ComponentWrapper parComp, LinkedHashMap&lt;Integer, Cell&gt; grid) {
+<span class="pc bpc" id="L1050" title="1 of 2 branches missed.">        if (PARENT_GRIDPOS_MAP == null) // Lazy since only if designing in IDEs</span>
+        {
+<span class="fc" id="L1052">            PARENT_GRIDPOS_MAP = new HashMap&lt;Object, ArrayList&lt;WeakCell&gt;&gt;(4);</span>
+        }
+
+<span class="fc" id="L1055">        ArrayList&lt;WeakCell&gt; weakCells = new ArrayList&lt;WeakCell&gt;(grid.size());</span>
+
+<span class="fc bfc" id="L1057" title="All 2 branches covered.">        for (Map.Entry&lt;Integer, Cell&gt; entry : grid.entrySet()) {</span>
+<span class="fc" id="L1058">            Integer xyInt = entry.getKey();</span>
+<span class="fc" id="L1059">            Cell cell = entry.getValue();</span>
+<span class="pc bpc" id="L1060" title="1 of 2 branches missed.">            if (xyInt != null) {</span>
+<span class="fc" id="L1061">                int x = xyInt &amp; 0x0000ffff;</span>
+<span class="fc" id="L1062">                int y = xyInt &gt;&gt; 16;</span>
+
+<span class="fc bfc" id="L1064" title="All 2 branches covered.">                for (CompWrap cw : cell.compWraps) {</span>
+<span class="fc" id="L1065">                    weakCells.add(new WeakCell(cw.comp.getComponent(), x, y, cell.spanx, cell.spany));</span>
+<span class="fc" id="L1066">                }</span>
+            }
+<span class="fc" id="L1068">        }</span>
+
+<span class="fc" id="L1070">        PARENT_GRIDPOS_MAP.put(parComp.getComponent(), weakCells);</span>
+<span class="fc" id="L1071">    }</span>
+
+    static synchronized HashMap&lt;Object, int[]&gt; getGridPositions(Object parComp) {
+<span class="pc bpc" id="L1074" title="1 of 2 branches missed.">        ArrayList&lt;WeakCell&gt; weakCells = PARENT_GRIDPOS_MAP != null ? PARENT_GRIDPOS_MAP.get(parComp) : null;</span>
+<span class="pc bpc" id="L1075" title="1 of 2 branches missed.">        if (weakCells == null) {</span>
+<span class="nc" id="L1076">            return null;</span>
+        }
+
+<span class="fc" id="L1079">        HashMap&lt;Object, int[]&gt; retMap = new HashMap&lt;Object, int[]&gt;();</span>
+
+<span class="fc bfc" id="L1081" title="All 2 branches covered.">        for (WeakCell wc : weakCells) {</span>
+<span class="fc" id="L1082">            Object component = Display.getInstance().extractHardRef(wc.componentRef);</span>
+<span class="pc bpc" id="L1083" title="1 of 2 branches missed.">            if (component != null) {</span>
+<span class="fc" id="L1084">                retMap.put(component, new int[]{wc.x, wc.y, wc.spanX, wc.spanY});</span>
+            }
+<span class="fc" id="L1086">        }</span>
+
+<span class="fc" id="L1088">        return retMap;</span>
+    }
+
+    private void addLinkIDs(CC cc) {
+<span class="fc" id="L1092">        String[] linkIDs = cc.getLinkTargets();</span>
+<span class="pc bpc" id="L1093" title="1 of 2 branches missed.">        for (String linkID : linkIDs) {</span>
+<span class="nc bnc" id="L1094" title="All 2 branches missed.">            if (linkTargetIDs == null) {</span>
+<span class="nc" id="L1095">                linkTargetIDs = new HashMap&lt;String, Boolean&gt;();</span>
+            }
+<span class="nc" id="L1097">            linkTargetIDs.put(linkID, null);</span>
+        }
+<span class="fc" id="L1099">    }</span>
+
+    /**
+     * If the container (parent) that this grid is laying out has changed its
+     * bounds, call this method to clear any cached values min/pref/max sizes of
+     * the components and rows/columns.
+     * &lt;p&gt;
+     * If any component can have changed cell the grid needs to be recreated.
+     */
+    public void invalidateContainerSize() {
+<span class="nc" id="L1109">        colFlowSpecs = null;</span>
+<span class="nc" id="L1110">        invalidateComponentSizes();</span>
+<span class="nc" id="L1111">    }</span>
+
+    private void invalidateComponentSizes() {
+<span class="nc bnc" id="L1114" title="All 2 branches missed.">        for (Cell cell : grid.values()) {</span>
+<span class="nc bnc" id="L1115" title="All 2 branches missed.">            for (CompWrap compWrap : cell.compWraps) {</span>
+<span class="nc" id="L1116">                compWrap.invalidateSizes();</span>
+<span class="nc" id="L1117">            }</span>
+<span class="nc" id="L1118">        }</span>
+<span class="nc" id="L1119">    }</span>
+
+    /**
+     * @deprecated since 5.0 Last boolean is not needed and is gotten from the
+     * new {@link net.miginfocom.layout.ComponentWrapper#getContentBias()}
+     * instead;
+     */
+    public boolean layout(int[] bounds, UnitValue alignX, UnitValue alignY, boolean debug, boolean notUsed) {
+<span class="nc" id="L1127">        return layoutImpl(bounds, alignX, alignY, debug, false);</span>
+    }
+
+    /**
+     * Does the actual layout. Uses many values calculated in the constructor.
+     *
+     * @param bounds The bounds to layout against. Normally that of the parent.
+     *               [x, y, width, height].
+     * @param alignX The alignment for the x-axis. Can be null.
+     * @param alignY The alignment for the y-axis. Can be null.
+     * @param debug  If debug information should be saved in {@link #debugRects}.
+     * @return If the layout has changed the preferred size and there is need
+     * for a new layout. This can happen if one or more components in the grid
+     * has a content bias according to
+     * {@link net.miginfocom.layout.ComponentWrapper#getContentBias()}.
+     * @since 5.0
+     */
+    public boolean layout(int[] bounds, UnitValue alignX, UnitValue alignY, boolean debug) {
+<span class="fc" id="L1145">        return layoutImpl(bounds, alignX, alignY, debug, false);</span>
+    }
+
+    /**
+     * Does the actual layout. Uses many values calculated in the constructor.
+     *
+     * @param bounds   The bounds to layout against. Normally that of the parent.
+     *                 [x, y, width, height].
+     * @param alignX   The alignment for the x-axis. Can be null.
+     * @param alignY   The alignment for the y-axis. Can be null.
+     * @param debug    If debug information should be saved in {@link #debugRects}.
+     * @param trialRun If true the bounds calculated will not be transferred to
+     *                 the components. Only the internal size of the components will be
+     *                 calculated.
+     * @return If the layout has changed the preferred size and there is need
+     * for a new layout. This can happen if one or more components in the grid
+     * has a content bias according to
+     * {@link net.miginfocom.layout.ComponentWrapper#getContentBias()}.
+     * @since 5.0
+     */
+    private boolean layoutImpl(int[] bounds, UnitValue alignX, UnitValue alignY, boolean debug, boolean trialRun) {
+<span class="pc bpc" id="L1166" title="1 of 2 branches missed.">        if (debug) {</span>
+<span class="nc" id="L1167">            debugRects = new ArrayList&lt;int[]&gt;();</span>
+        }
+
+<span class="fc bfc" id="L1170" title="All 2 branches covered.">        if (colFlowSpecs == null) {</span>
+<span class="fc" id="L1171">            checkSizeCalcs(bounds[2], bounds[3]);</span>
+        }
+
+<span class="fc" id="L1174">        resetLinkValues(true, true);</span>
+
+<span class="fc" id="L1176">        layoutInOneDim(bounds[2], alignX, false, pushXs);</span>
+<span class="fc" id="L1177">        layoutInOneDim(bounds[3], alignY, true, pushYs);</span>
+
+<span class="fc" id="L1179">        HashMap&lt;String, Integer&gt; endGrpXMap = null, endGrpYMap = null;</span>
+<span class="fc" id="L1180">        int compCount = container.getComponentCount();</span>
+
+        // Transfer the calculated bound from the ComponentWrappers to the actual Components.
+<span class="fc" id="L1183">        boolean addVisualPadding = lc.isVisualPadding();</span>
+<span class="fc" id="L1184">        boolean layoutAgain = false;</span>
+<span class="pc bpc" id="L1185" title="1 of 2 branches missed.">        if (compCount &gt; 0) {</span>
+<span class="pc bpc" id="L1186" title="1 of 4 branches missed.">            for (int j = 0; j &lt; (linkTargetIDs != null ? 2 : 1); j++) {   // First do the calculations (maybe more than once) then set the bounds when done</span>
+                boolean doAgain;
+<span class="fc" id="L1188">                int count = 0;</span>
+                do {
+<span class="fc" id="L1190">                    doAgain = false;</span>
+<span class="fc bfc" id="L1191" title="All 2 branches covered.">                    for (Cell cell : grid.values()) {</span>
+<span class="fc" id="L1192">                        ArrayList&lt;CompWrap&gt; compWraps = cell.compWraps;</span>
+<span class="fc bfc" id="L1193" title="All 2 branches covered.">                        for (CompWrap cw : compWraps) {</span>
+<span class="pc bpc" id="L1194" title="1 of 2 branches missed.">                            if (j == 0) {</span>
+<span class="fc" id="L1195">                                doAgain |= doAbsoluteCorrections(cw, bounds);</span>
+<span class="pc bpc" id="L1196" title="1 of 2 branches missed.">                                if (!doAgain) { // If we are going to do this again, do not bother this time around</span>
+<span class="pc bpc" id="L1197" title="1 of 2 branches missed.">                                    if (cw.cc.getHorizontal().getEndGroup() != null) {</span>
+<span class="nc" id="L1198">                                        endGrpXMap = addToEndGroup(endGrpXMap, cw.cc.getHorizontal().getEndGroup(), cw.x + cw.w);</span>
+                                    }
+
+<span class="pc bpc" id="L1201" title="1 of 2 branches missed.">                                    if (cw.cc.getVertical().getEndGroup() != null) {</span>
+<span class="nc" id="L1202">                                        endGrpYMap = addToEndGroup(endGrpYMap, cw.cc.getVertical().getEndGroup(), cw.y + cw.h);</span>
+                                    }
+                                }
+
+                                // @since 3.7.2 Needed or absolute &quot;pos&quot; pointing to &quot;visual&quot; or &quot;container&quot; didn't work if
+                                // their bounds changed during the layout cycle. At least not in SWT.
+<span class="pc bpc" id="L1208" title="5 of 6 branches missed.">                                if (linkTargetIDs != null &amp;&amp; (linkTargetIDs.containsKey(&quot;visual&quot;) || linkTargetIDs.containsKey(&quot;container&quot;))) {</span>
+<span class="nc" id="L1209">                                    layoutAgain = true;</span>
+                                }
+                            }
+
+<span class="pc bpc" id="L1213" title="3 of 4 branches missed.">                            if (linkTargetIDs == null || j == 1) {</span>
+<span class="pc bpc" id="L1214" title="1 of 2 branches missed.">                                if (cw.cc.getHorizontal().getEndGroup() != null) {</span>
+<span class="nc" id="L1215">                                    cw.w = endGrpXMap.get(cw.cc.getHorizontal().getEndGroup()) - cw.x;</span>
+                                }
+
+<span class="pc bpc" id="L1218" title="1 of 2 branches missed.">                                if (cw.cc.getVertical().getEndGroup() != null) {</span>
+<span class="nc" id="L1219">                                    cw.h = endGrpYMap.get(cw.cc.getVertical().getEndGroup()) - cw.y;</span>
+                                }
+
+<span class="fc" id="L1222">                                cw.x += bounds[0];</span>
+<span class="fc" id="L1223">                                cw.y += bounds[1];</span>
+
+<span class="fc bfc" id="L1225" title="All 2 branches covered.">                                if (!trialRun) {</span>
+<span class="fc" id="L1226">                                    cw.transferBounds(addVisualPadding);</span>
+                                }
+
+<span class="pc bpc" id="L1229" title="1 of 2 branches missed.">                                if (callbackList != null) {</span>
+<span class="nc bnc" id="L1230" title="All 2 branches missed.">                                    for (LayoutCallback callback : callbackList) {</span>
+<span class="nc" id="L1231">                                        callback.correctBounds(cw.comp);</span>
+<span class="nc" id="L1232">                                    }</span>
+                                }
+                            }
+<span class="fc" id="L1235">                        }</span>
+<span class="fc" id="L1236">                    }</span>
+<span class="fc" id="L1237">                    clearGroupLinkBounds();</span>
+<span class="pc bpc" id="L1238" title="1 of 2 branches missed.">                    if (++count &gt; ((compCount &lt;&lt; 3) + 10)) {</span>
+<span class="nc" id="L1239">                        System.err.println(&quot;Unstable cyclic dependency in absolute linked values!&quot;);</span>
+<span class="nc" id="L1240">                        break;</span>
+                    }
+
+<span class="pc bpc" id="L1243" title="1 of 2 branches missed.">                } while (doAgain);</span>
+            }
+        }
+
+        // Add debug shapes for the &quot;cells&quot;. Use the CompWraps as base for inding the cells.
+<span class="pc bpc" id="L1248" title="1 of 2 branches missed.">        if (debug) {</span>
+<span class="nc bnc" id="L1249" title="All 2 branches missed.">            for (Cell cell : grid.values()) {</span>
+<span class="nc" id="L1250">                ArrayList&lt;CompWrap&gt; compWraps = cell.compWraps;</span>
+<span class="nc bnc" id="L1251" title="All 2 branches missed.">                for (CompWrap cw : compWraps) {</span>
+<span class="nc" id="L1252">                    LinkedDimGroup hGrp = getGroupContaining(colGroupLists, cw);</span>
+<span class="nc" id="L1253">                    LinkedDimGroup vGrp = getGroupContaining(rowGroupLists, cw);</span>
+
+<span class="nc bnc" id="L1255" title="All 4 branches missed.">                    if (hGrp != null &amp;&amp; vGrp != null) {</span>
+<span class="nc bnc" id="L1256" title="All 4 branches missed.">                        debugRects.add(new int[]{hGrp.lStart + bounds[0] - (hGrp.fromEnd ? hGrp.lSize : 0), vGrp.lStart + bounds[1] - (vGrp.fromEnd ? vGrp.lSize : 0), hGrp.lSize, vGrp.lSize});</span>
+                    }
+<span class="nc" id="L1258">                }</span>
+<span class="nc" id="L1259">            }</span>
+        }
+<span class="fc" id="L1261">        return layoutAgain;</span>
+    }
+
+    public void paintDebug() {
+<span class="nc bnc" id="L1265" title="All 2 branches missed.">        if (debugRects != null) {</span>
+<span class="nc" id="L1266">            container.paintDebugOutline(lc.isVisualPadding());</span>
+
+<span class="nc" id="L1268">            ArrayList&lt;int[]&gt; painted = new ArrayList&lt;int[]&gt;();</span>
+<span class="nc bnc" id="L1269" title="All 2 branches missed.">            for (int[] r : debugRects) {</span>
+<span class="nc bnc" id="L1270" title="All 2 branches missed.">                if (!painted.contains(r)) {</span>
+<span class="nc" id="L1271">                    container.paintDebugCell(r[0], r[1], r[2], r[3]);</span>
+<span class="nc" id="L1272">                    painted.add(r);</span>
+                }
+<span class="nc" id="L1274">            }</span>
+
+<span class="nc bnc" id="L1276" title="All 2 branches missed.">            for (Cell cell : grid.values()) {</span>
+<span class="nc" id="L1277">                ArrayList&lt;CompWrap&gt; compWraps = cell.compWraps;</span>
+<span class="nc bnc" id="L1278" title="All 2 branches missed.">                for (CompWrap compWrap : compWraps) {</span>
+<span class="nc" id="L1279">                    compWrap.comp.paintDebugOutline(lc.isVisualPadding());</span>
+<span class="nc" id="L1280">                }</span>
+<span class="nc" id="L1281">            }</span>
+        }
+<span class="nc" id="L1283">    }</span>
+
+    public ContainerWrapper getContainer() {
+<span class="nc" id="L1286">        return container;</span>
+    }
+
+    public int[] getWidth() {
+<span class="fc" id="L1290">        return getWidth(lastRefHeight);</span>
+    }
+
+    public int[] getWidth(int refHeight) {
+<span class="fc" id="L1294">        checkSizeCalcs(lastRefWidth, refHeight);</span>
+<span class="fc" id="L1295">        return width;</span>
+    }
+
+    public int[] getHeight() {
+<span class="fc" id="L1299">        return getHeight(lastRefWidth);</span>
+    }
+
+    public int[] getHeight(int refWidth) {
+<span class="fc" id="L1303">        checkSizeCalcs(refWidth, lastRefHeight);</span>
+<span class="fc" id="L1304">        return height;</span>
+    }
+
+    private void checkSizeCalcs(int refWidth, int refHeight) {
+<span class="fc bfc" id="L1308" title="All 2 branches covered.">        if (colFlowSpecs == null) {</span>
+<span class="fc" id="L1309">            calcGridSizes(refWidth, refHeight);</span>
+        }
+
+<span class="pc bpc" id="L1312" title="1 of 8 branches missed.">        if ((refWidth &gt; 0 &amp;&amp; refWidth != lastRefWidth) || (refHeight &gt; 0 &amp;&amp; refHeight != lastRefHeight)) {</span>
+//			System.out.println(&quot;prelayout for w: &quot; + refWidth + &quot;, h: &quot; + refHeight);
+<span class="pc bpc" id="L1314" title="2 of 4 branches missed.">            int[] refBounds = new int[]{0, 0, (refWidth &gt; 0 ? refWidth : width[LayoutUtil.PREF]), (refHeight &gt; 0 ? refHeight : height[LayoutUtil.PREF])};</span>
+<span class="fc" id="L1315">            layoutImpl(refBounds, null, null, false, true);</span>
+<span class="fc" id="L1316">            calcGridSizes(refWidth, refHeight);</span>
+        }
+
+<span class="fc" id="L1319">        lastRefWidth = refWidth;</span>
+<span class="fc" id="L1320">        lastRefHeight = refHeight;</span>
+<span class="fc" id="L1321">    }</span>
+
+    private void calcGridSizes(int refWidth, int refHeight) {
+//		System.out.println(&quot;REcalc grid size for w: &quot; + refWidth + &quot;, h: &quot; + refHeight);
+
+<span class="fc" id="L1326">        colFlowSpecs = calcRowsOrColsSizes(true, refWidth);</span>
+<span class="fc" id="L1327">        rowFlowSpecs = calcRowsOrColsSizes(false, refHeight);</span>
+
+<span class="fc" id="L1329">        width = getMinPrefMaxSumSize(true);</span>
+<span class="fc" id="L1330">        height = getMinPrefMaxSumSize(false);</span>
+
+<span class="pc bpc" id="L1332" title="1 of 2 branches missed.">        if (linkTargetIDs == null) {</span>
+<span class="fc" id="L1333">            resetLinkValues(false, true);</span>
+        } else {
+            // This call makes some components flicker on SWT. They get their bounds changed twice since
+            // the change might affect the absolute size adjustment below. There's no way around this that
+            // I know of.
+<span class="nc" id="L1338">            layout(new int[4], null, null, false);</span>
+<span class="nc" id="L1339">            resetLinkValues(false, false);</span>
+        }
+
+<span class="fc" id="L1342">        adjustSizeForAbsolute(true);</span>
+<span class="fc" id="L1343">        adjustSizeForAbsolute(false);</span>
+<span class="fc" id="L1344">    }</span>
+
+    private UnitValue[] getPos(ComponentWrapper cw, CC cc) {
+<span class="fc" id="L1347">        UnitValue[] callbackPos = null;</span>
+<span class="pc bpc" id="L1348" title="1 of 2 branches missed.">        if (callbackList != null) {</span>
+<span class="nc bnc" id="L1349" title="All 4 branches missed.">            for (int i = 0; i &lt; callbackList.size() &amp;&amp; callbackPos == null; i++) {</span>
+<span class="nc" id="L1350">                callbackPos = callbackList.get(i).getPosition(cw);   // NOT a copy!</span>
+            }
+        }
+
+        // If one is null, return the other (which many also be null)
+<span class="fc" id="L1355">        UnitValue[] ccPos = cc.getPos();    // A copy!!</span>
+<span class="pc bpc" id="L1356" title="3 of 4 branches missed.">        if (callbackPos == null || ccPos == null) {</span>
+<span class="pc bpc" id="L1357" title="1 of 2 branches missed.">            return callbackPos != null ? callbackPos : ccPos;</span>
+        }
+
+        // Merge
+<span class="nc bnc" id="L1361" title="All 2 branches missed.">        for (int i = 0; i &lt; 4; i++) {</span>
+<span class="nc" id="L1362">            UnitValue cbUv = callbackPos[i];</span>
+<span class="nc bnc" id="L1363" title="All 2 branches missed.">            if (cbUv != null) {</span>
+<span class="nc" id="L1364">                ccPos[i] = cbUv;</span>
+            }
+        }
+
+<span class="nc" id="L1368">        return ccPos;</span>
+    }
+
+    private BoundSize[] getCallbackSize(ComponentWrapper cw) {
+<span class="pc bpc" id="L1372" title="1 of 2 branches missed.">        if (callbackList != null) {</span>
+<span class="nc bnc" id="L1373" title="All 2 branches missed.">            for (LayoutCallback callback : callbackList) {</span>
+<span class="nc" id="L1374">                BoundSize[] bs = callback.getSize(cw);   // NOT a copy!</span>
+<span class="nc bnc" id="L1375" title="All 2 branches missed.">                if (bs != null) {</span>
+<span class="nc" id="L1376">                    return bs;</span>
+                }
+<span class="nc" id="L1378">            }</span>
+        }
+<span class="fc" id="L1380">        return null;</span>
+    }
+
+    /**
+     * @param cw       Never &lt;code&gt;null&lt;/code&gt;.
+     * @param cc       Never &lt;code&gt;null&lt;/code&gt;.
+     * @param external The bounds should be stored even if they are not in
+     *                 {@link #linkTargetIDs}.
+     * @return If a change has been made.
+     */
+    private boolean setLinkedBounds(ComponentWrapper cw, CC cc, int x, int y, int w, int h, boolean external) {
+<span class="nc bnc" id="L1391" title="All 2 branches missed.">        String id = cc.getId() != null ? cc.getId() : cw.getLinkId();</span>
+<span class="nc bnc" id="L1392" title="All 2 branches missed.">        if (id == null) {</span>
+<span class="nc" id="L1393">            return false;</span>
+        }
+
+<span class="nc" id="L1396">        String gid = null;</span>
+<span class="nc" id="L1397">        int grIx = id.indexOf('.');</span>
+<span class="nc bnc" id="L1398" title="All 2 branches missed.">        if (grIx != -1) {</span>
+<span class="nc" id="L1399">            gid = id.substring(0, grIx);</span>
+<span class="nc" id="L1400">            id = id.substring(grIx + 1);</span>
+        }
+
+<span class="nc" id="L1403">        Object lay = container.getLayout();</span>
+<span class="nc" id="L1404">        boolean changed = false;</span>
+<span class="nc bnc" id="L1405" title="All 6 branches missed.">        if (external || (linkTargetIDs != null &amp;&amp; linkTargetIDs.containsKey(id))) {</span>
+<span class="nc bnc" id="L1406" title="All 2 branches missed.">            changed = LinkHandler.setBounds(lay, id, x, y, w, h, !external, false);</span>
+        }
+
+<span class="nc bnc" id="L1409" title="All 8 branches missed.">        if (gid != null &amp;&amp; (external || (linkTargetIDs != null &amp;&amp; linkTargetIDs.containsKey(gid)))) {</span>
+<span class="nc bnc" id="L1410" title="All 2 branches missed.">            if (linkTargetIDs == null) {</span>
+<span class="nc" id="L1411">                linkTargetIDs = new HashMap&lt;String, Boolean&gt;(4);</span>
+            }
+
+<span class="nc" id="L1414">            linkTargetIDs.put(gid, Boolean.TRUE);</span>
+<span class="nc bnc" id="L1415" title="All 2 branches missed.">            changed |= LinkHandler.setBounds(lay, gid, x, y, w, h, !external, true);</span>
+        }
+
+<span class="nc" id="L1418">        return changed;</span>
+    }
+
+    /**
+     * Go to next cell.
+     *
+     * @param p   The point to increase
+     * @param cnt How many cells to advance.
+     * @return The new value in the &quot;incresing&quot; dimension.
+     */
+    private int increase(int[] p, int cnt) {
+<span class="pc bpc" id="L1429" title="1 of 2 branches missed.">        return lc.isFlowX() ? (p[0] += cnt) : (p[1] += cnt);</span>
+    }
+
+    /**
+     * Wraps to the next row or column depending on if horizontal flow or
+     * vertical flow is used.
+     *
+     * @param cellXY  The point to wrap and thus set either x or y to 0 and
+     *                increase the other one.
+     * @param gapSize The gaps size specified in a &quot;wrap XXX&quot; or &quot;newline XXX&quot;
+     *                or &lt;code&gt;null&lt;/code&gt; if none.
+     */
+    private void wrap(int[] cellXY, BoundSize gapSize) {
+<span class="nc" id="L1442">        boolean flowx = lc.isFlowX();</span>
+<span class="nc bnc" id="L1443" title="All 2 branches missed.">        cellXY[0] = flowx ? 0 : cellXY[0] + 1;</span>
+<span class="nc bnc" id="L1444" title="All 2 branches missed.">        cellXY[1] = flowx ? cellXY[1] + 1 : 0;</span>
+
+<span class="nc bnc" id="L1446" title="All 2 branches missed.">        if (gapSize != null) {</span>
+<span class="nc bnc" id="L1447" title="All 2 branches missed.">            if (wrapGapMap == null) {</span>
+<span class="nc" id="L1448">                wrapGapMap = new HashMap&lt;Integer, BoundSize&gt;(8);</span>
+            }
+
+<span class="nc bnc" id="L1451" title="All 2 branches missed.">            wrapGapMap.put(Integer.valueOf(cellXY[flowx ? 1 : 0]), gapSize);</span>
+        }
+
+        // add the row/column so that the gap in the last row/col will not be removed.
+<span class="nc bnc" id="L1455" title="All 2 branches missed.">        if (flowx) {</span>
+<span class="nc" id="L1456">            rowIndexes.add(Integer.valueOf(cellXY[1]));</span>
+        } else {
+<span class="nc" id="L1458">            colIndexes.add(Integer.valueOf(cellXY[0]));</span>
+        }
+<span class="nc" id="L1460">    }</span>
+
+    private Float[] getDefaultPushWeights(boolean isRows) {
+<span class="nc bnc" id="L1463" title="All 2 branches missed.">        ArrayList&lt;LinkedDimGroup&gt;[] groupLists = isRows ? rowGroupLists : colGroupLists;</span>
+
+<span class="nc" id="L1465">        Float[] pushWeightArr = GROW_100;   // Only create specific if any of the components have grow.</span>
+<span class="nc bnc" id="L1466" title="All 2 branches missed.">        for (int i = 0, ix = 1; i &lt; groupLists.length; i++, ix += 2) {</span>
+<span class="nc" id="L1467">            ArrayList&lt;LinkedDimGroup&gt; grps = groupLists[i];</span>
+<span class="nc" id="L1468">            Float rowPushWeight = null;</span>
+<span class="nc bnc" id="L1469" title="All 2 branches missed.">            for (LinkedDimGroup grp : grps) {</span>
+<span class="nc bnc" id="L1470" title="All 2 branches missed.">                for (int c = 0; c &lt; grp._compWraps.size(); c++) {</span>
+<span class="nc" id="L1471">                    CompWrap cw = grp._compWraps.get(c);</span>
+<span class="nc bnc" id="L1472" title="All 4 branches missed.">                    int hideMode = cw.comp.isVisible() ? -1 : cw.cc.getHideMode() != -1 ? cw.cc.getHideMode() : lc.getHideMode();</span>
+
+<span class="nc bnc" id="L1474" title="All 4 branches missed.">                    Float pushWeight = hideMode &lt; 2 ? (isRows ? cw.cc.getPushY() : cw.cc.getPushX()) : null;</span>
+<span class="nc bnc" id="L1475" title="All 6 branches missed.">                    if (rowPushWeight == null || (pushWeight != null &amp;&amp; pushWeight.floatValue() &gt; rowPushWeight.floatValue())) {</span>
+<span class="nc" id="L1476">                        rowPushWeight = pushWeight;</span>
+                    }
+                }
+<span class="nc" id="L1479">            }</span>
+
+<span class="nc bnc" id="L1481" title="All 2 branches missed.">            if (rowPushWeight != null) {</span>
+<span class="nc bnc" id="L1482" title="All 2 branches missed.">                if (pushWeightArr == GROW_100) {</span>
+<span class="nc" id="L1483">                    pushWeightArr = new Float[(groupLists.length &lt;&lt; 1) + 1];</span>
+                }
+<span class="nc" id="L1485">                pushWeightArr[ix] = rowPushWeight;</span>
+            }
+        }
+
+<span class="nc" id="L1489">        return pushWeightArr;</span>
+    }
+
+    private void clearGroupLinkBounds() {
+<span class="pc bpc" id="L1493" title="1 of 2 branches missed.">        if (linkTargetIDs == null) {</span>
+<span class="fc" id="L1494">            return;</span>
+        }
+
+<span class="nc bnc" id="L1497" title="All 2 branches missed.">        for (Map.Entry&lt;String, Boolean&gt; entry : linkTargetIDs.entrySet()) {</span>
+<span class="nc bnc" id="L1498" title="All 2 branches missed.">            if (Boolean.TRUE.equals(entry.getValue())) {</span>
+<span class="nc" id="L1499">                LinkHandler.clearBounds(container.getLayout(), entry.getKey());</span>
+            }
+<span class="nc" id="L1501">        }</span>
+<span class="nc" id="L1502">    }</span>
+
+    private void resetLinkValues(boolean parentSize, boolean compLinks) {
+<span class="fc" id="L1505">        Object lay = container.getLayout();</span>
+<span class="pc bpc" id="L1506" title="1 of 2 branches missed.">        if (compLinks) {</span>
+<span class="fc" id="L1507">            LinkHandler.clearTemporaryBounds(lay);</span>
+        }
+
+<span class="pc bpc" id="L1510" title="1 of 2 branches missed.">        boolean defIns = !hasDocks();</span>
+
+<span class="fc bfc" id="L1512" title="All 2 branches covered.">        int parW = parentSize ? lc.getWidth().constrain(container.getWidth(), getParentSize(container, true), container) : 0;</span>
+<span class="fc bfc" id="L1513" title="All 2 branches covered.">        int parH = parentSize ? lc.getHeight().constrain(container.getHeight(), getParentSize(container, false), container) : 0;</span>
+
+<span class="fc" id="L1515">        int insX = LayoutUtil.getInsets(lc, 0, defIns).getPixels(0, container, null);</span>
+<span class="fc" id="L1516">        int insY = LayoutUtil.getInsets(lc, 1, defIns).getPixels(0, container, null);</span>
+<span class="fc" id="L1517">        int visW = parW - insX - LayoutUtil.getInsets(lc, 2, defIns).getPixels(0, container, null);</span>
+<span class="fc" id="L1518">        int visH = parH - insY - LayoutUtil.getInsets(lc, 3, defIns).getPixels(0, container, null);</span>
+
+<span class="fc" id="L1520">        LinkHandler.setBounds(lay, &quot;visual&quot;, insX, insY, visW, visH, true, false);</span>
+<span class="fc" id="L1521">        LinkHandler.setBounds(lay, &quot;container&quot;, 0, 0, parW, parH, true, false);</span>
+<span class="fc" id="L1522">    }</span>
+
+    private boolean doAbsoluteCorrections(CompWrap cw, int[] bounds) {
+<span class="fc" id="L1525">        boolean changed = false;</span>
+
+<span class="fc" id="L1527">        int[] stSz = getAbsoluteDimBounds(cw, bounds[2], true);</span>
+<span class="pc bpc" id="L1528" title="1 of 2 branches missed.">        if (stSz != null) {</span>
+<span class="nc" id="L1529">            cw.setDimBounds(stSz[0], stSz[1], true);</span>
+        }
+
+<span class="fc" id="L1532">        stSz = getAbsoluteDimBounds(cw, bounds[3], false);</span>
+<span class="pc bpc" id="L1533" title="1 of 2 branches missed.">        if (stSz != null) {</span>
+<span class="nc" id="L1534">            cw.setDimBounds(stSz[0], stSz[1], false);</span>
+        }
+
+        // If there is a link id, store the new bounds.
+<span class="pc bpc" id="L1538" title="1 of 2 branches missed.">        if (linkTargetIDs != null) {</span>
+<span class="nc" id="L1539">            changed = setLinkedBounds(cw.comp, cw.cc, cw.x, cw.y, cw.w, cw.h, false);</span>
+        }
+
+<span class="fc" id="L1542">        return changed;</span>
+    }
+
+    /**
+     * Adjust grid's width or height for the absolute components' positions.
+     */
+    private void adjustSizeForAbsolute(boolean isHor) {
+<span class="fc bfc" id="L1549" title="All 2 branches covered.">        int[] curSizes = isHor ? width : height;</span>
+
+<span class="fc" id="L1551">        Cell absCell = grid.get(null);</span>
+<span class="pc bpc" id="L1552" title="3 of 4 branches missed.">        if (absCell == null || absCell.compWraps.size() == 0) {</span>
+<span class="fc" id="L1553">            return;</span>
+        }
+
+<span class="nc" id="L1556">        ArrayList&lt;CompWrap&gt; cws = absCell.compWraps;</span>
+
+<span class="nc" id="L1558">        int maxEnd = 0;</span>
+<span class="nc bnc" id="L1559" title="All 2 branches missed.">        for (int j = 0, cwSz = absCell.compWraps.size(); j &lt; cwSz + 3; j++) {  // &quot;Do Again&quot; max absCell.compWraps.size() + 3 times.</span>
+<span class="nc" id="L1560">            boolean doAgain = false;</span>
+<span class="nc bnc" id="L1561" title="All 2 branches missed.">            for (int i = 0; i &lt; cwSz; i++) {</span>
+<span class="nc" id="L1562">                CompWrap cw = cws.get(i);</span>
+<span class="nc" id="L1563">                int[] stSz = getAbsoluteDimBounds(cw, 0, isHor);</span>
+<span class="nc" id="L1564">                int end = stSz[0] + stSz[1];</span>
+<span class="nc bnc" id="L1565" title="All 2 branches missed.">                if (maxEnd &lt; end) {</span>
+<span class="nc" id="L1566">                    maxEnd = end;</span>
+                }
+
+                // If there is a link id, store the new bounds.
+<span class="nc bnc" id="L1570" title="All 2 branches missed.">                if (linkTargetIDs != null) {</span>
+<span class="nc" id="L1571">                    doAgain |= setLinkedBounds(cw.comp, cw.cc, stSz[0], stSz[0], stSz[1], stSz[1], false);</span>
+                }
+            }
+<span class="nc bnc" id="L1574" title="All 2 branches missed.">            if (!doAgain) {</span>
+<span class="nc" id="L1575">                break;</span>
+            }
+
+            // We need to check this again since the coords may be smaller this round.
+<span class="nc" id="L1579">            maxEnd = 0;</span>
+<span class="nc" id="L1580">            clearGroupLinkBounds();</span>
+        }
+
+<span class="nc bnc" id="L1583" title="All 4 branches missed.">        maxEnd += LayoutUtil.getInsets(lc, isHor ? 3 : 2, !hasDocks()).getPixels(0, container, null);</span>
+
+<span class="nc bnc" id="L1585" title="All 2 branches missed.">        if (curSizes[LayoutUtil.MIN] &lt; maxEnd) {</span>
+<span class="nc" id="L1586">            curSizes[LayoutUtil.MIN] = maxEnd;</span>
+        }
+<span class="nc bnc" id="L1588" title="All 2 branches missed.">        if (curSizes[LayoutUtil.PREF] &lt; maxEnd) {</span>
+<span class="nc" id="L1589">            curSizes[LayoutUtil.PREF] = maxEnd;</span>
+        }
+<span class="nc" id="L1591">    }</span>
+
+    private int[] getAbsoluteDimBounds(CompWrap cw, int refSize, boolean isHor) {
+<span class="pc bpc" id="L1594" title="1 of 2 branches missed.">        if (cw.cc.isExternal()) {</span>
+<span class="nc bnc" id="L1595" title="All 2 branches missed.">            if (isHor) {</span>
+<span class="nc" id="L1596">                return new int[]{cw.comp.getX(), cw.comp.getWidth()};</span>
+            } else {
+<span class="nc" id="L1598">                return new int[]{cw.comp.getY(), cw.comp.getHeight()};</span>
+            }
+        }
+
+<span class="fc" id="L1602">        UnitValue[] pad = cw.cc.getPadding();</span>
+
+        // If no changes do not create a lot of objects
+<span class="fc" id="L1605">        UnitValue[] pos = getPos(cw.comp, cw.cc);</span>
+<span class="pc bpc" id="L1606" title="2 of 4 branches missed.">        if (pos == null &amp;&amp; pad == null) {</span>
+<span class="fc" id="L1607">            return null;</span>
+        }
+
+        // Set start
+<span class="nc bnc" id="L1611" title="All 2 branches missed.">        int st = isHor ? cw.x : cw.y;</span>
+<span class="nc bnc" id="L1612" title="All 2 branches missed.">        int sz = isHor ? cw.w : cw.h;</span>
+
+        // If absolute, use those coordinates instead.
+<span class="nc bnc" id="L1615" title="All 2 branches missed.">        if (pos != null) {</span>
+<span class="nc bnc" id="L1616" title="All 2 branches missed.">                UnitValue stUV = pos[isHor ? 0 : 1];</span>
+<span class="nc bnc" id="L1617" title="All 2 branches missed.">                UnitValue endUV = pos[isHor ? 2 : 3];</span>
+
+<span class="nc" id="L1619">            int minSz = cw.getSize(LayoutUtil.MIN, isHor);</span>
+<span class="nc" id="L1620">            int maxSz = cw.getSize(LayoutUtil.MAX, isHor);</span>
+<span class="nc" id="L1621">            sz = Math.min(Math.max(cw.getSize(LayoutUtil.PREF, isHor), minSz), maxSz);</span>
+
+<span class="nc bnc" id="L1623" title="All 2 branches missed.">            if (stUV != null) {</span>
+<span class="nc bnc" id="L1624" title="All 2 branches missed.">                st = stUV.getPixels(stUV.getUnit() == UnitValue.ALIGN ? sz : refSize, container, cw.comp);</span>
+
+<span class="nc bnc" id="L1626" title="All 2 branches missed.">                if (endUV != null) // if (endUV == null &amp;&amp; cw.cc.isBoundsIsGrid() == true)</span>
+                {
+<span class="nc bnc" id="L1628" title="All 2 branches missed.">                    sz = Math.min(Math.max((isHor ? (cw.x + cw.w) : (cw.y + cw.h)) - st, minSz), maxSz);</span>
+                }
+            }
+
+<span class="nc bnc" id="L1632" title="All 2 branches missed.">            if (endUV != null) {</span>
+<span class="nc bnc" id="L1633" title="All 2 branches missed.">                if (stUV != null) {   // if (stUV != null || cw.cc.isBoundsIsGrid()) {</span>
+<span class="nc" id="L1634">                    sz = Math.min(Math.max(endUV.getPixels(refSize, container, cw.comp) - st, minSz), maxSz);</span>
+                } else {
+<span class="nc" id="L1636">                    st = endUV.getPixels(refSize, container, cw.comp) - sz;</span>
+                }
+            }
+        }
+
+        // If constraint has padding -&gt; correct the start/size
+<span class="nc bnc" id="L1642" title="All 2 branches missed.">        if (pad != null) {</span>
+<span class="nc bnc" id="L1643" title="All 2 branches missed.">            UnitValue uv = pad[isHor ? 1 : 0];</span>
+<span class="nc bnc" id="L1644" title="All 2 branches missed.">            int p = uv != null ? uv.getPixels(refSize, container, cw.comp) : 0;</span>
+<span class="nc" id="L1645">            st += p;</span>
+<span class="nc bnc" id="L1646" title="All 2 branches missed.">            uv = pad[isHor ? 3 : 2];</span>
+<span class="nc bnc" id="L1647" title="All 2 branches missed.">            sz += -p + (uv != null ? uv.getPixels(refSize, container, cw.comp) : 0);</span>
+        }
+
+<span class="nc" id="L1650">        return new int[]{st, sz};</span>
+    }
+
+    private void layoutInOneDim(int refSize, UnitValue align, boolean isRows, Float[] defaultPushWeights) {
+<span class="pc bpc" id="L1654" title="2 of 6 branches missed.">        boolean fromEnd = !(isRows ? lc.isTopToBottom() : LayoutUtil.isLeftToRight(lc, container));</span>
+<span class="fc bfc" id="L1655" title="All 2 branches covered.">        DimConstraint[] primDCs = (isRows ? rowConstr : colConstr).getConstaints();</span>
+<span class="fc bfc" id="L1656" title="All 2 branches covered.">        FlowSizeSpec fss = isRows ? rowFlowSpecs : colFlowSpecs;</span>
+<span class="fc bfc" id="L1657" title="All 2 branches covered.">        ArrayList&lt;LinkedDimGroup&gt;[] rowCols = isRows ? rowGroupLists : colGroupLists;</span>
+
+<span class="fc" id="L1659">        int[] rowColSizes = LayoutUtil.calculateSerial(fss.sizes, fss.resConstsInclGaps, defaultPushWeights, LayoutUtil.PREF, refSize);</span>
+
+<span class="fc bfc" id="L1661" title="All 2 branches covered.">        if (LayoutUtil.isDesignTime(container)) {</span>
+<span class="fc bfc" id="L1662" title="All 2 branches covered.">            TreeSet&lt;Integer&gt; indexes = isRows ? rowIndexes : colIndexes;</span>
+<span class="fc" id="L1663">            int[] ixArr = new int[indexes.size()];</span>
+<span class="fc" id="L1664">            int ix = 0;</span>
+<span class="fc bfc" id="L1665" title="All 2 branches covered.">            for (Integer i : indexes) {</span>
+<span class="fc" id="L1666">                ixArr[ix++] = i;</span>
+<span class="fc" id="L1667">            }</span>
+
+<span class="fc" id="L1669">            putSizesAndIndexes(container.getComponent(), rowColSizes, ixArr, isRows);</span>
+        }
+
+<span class="pc bpc" id="L1672" title="1 of 2 branches missed.">        int curPos = align != null ? align.getPixels(refSize - LayoutUtil.sum(rowColSizes), container, null) : 0;</span>
+
+<span class="pc bpc" id="L1674" title="1 of 2 branches missed.">        if (fromEnd) {</span>
+<span class="nc" id="L1675">            curPos = refSize - curPos;</span>
+        }
+
+<span class="fc bfc" id="L1678" title="All 2 branches covered.">        for (int i = 0; i &lt; rowCols.length; i++) {</span>
+<span class="fc" id="L1679">            ArrayList&lt;LinkedDimGroup&gt; linkedGroups = rowCols[i];</span>
+<span class="fc bfc" id="L1680" title="All 2 branches covered.">            int scIx = i - (isRows ? dockOffY : dockOffX);</span>
+
+<span class="fc" id="L1682">            int bIx = i &lt;&lt; 1;</span>
+<span class="fc" id="L1683">            int bIx2 = bIx + 1;</span>
+
+<span class="pc bpc" id="L1685" title="1 of 2 branches missed.">            curPos += (fromEnd ? -rowColSizes[bIx] : rowColSizes[bIx]);</span>
+
+<span class="pc bpc" id="L1687" title="2 of 4 branches missed.">            DimConstraint primDC = scIx &gt;= 0 ? primDCs[scIx &gt;= primDCs.length ? primDCs.length - 1 : scIx] : DOCK_DIM_CONSTRAINT;</span>
+
+<span class="fc" id="L1689">            int rowSize = rowColSizes[bIx2];</span>
+
+<span class="fc bfc" id="L1691" title="All 2 branches covered.">            for (LinkedDimGroup group : linkedGroups) {</span>
+<span class="fc" id="L1692">                int groupSize = rowSize;</span>
+<span class="pc bpc" id="L1693" title="1 of 2 branches missed.">                if (group.span &gt; 1) {</span>
+<span class="nc" id="L1694">                    groupSize = LayoutUtil.sum(rowColSizes, bIx2, Math.min((group.span &lt;&lt; 1) - 1, rowColSizes.length - bIx2 - 1));</span>
+                }
+
+<span class="fc" id="L1697">                group.layout(primDC, curPos, groupSize, group.span);</span>
+<span class="fc" id="L1698">            }</span>
+
+<span class="pc bpc" id="L1700" title="1 of 2 branches missed.">            curPos += (fromEnd ? -rowSize : rowSize);</span>
+        }
+<span class="fc" id="L1702">    }</span>
+
+    /**
+     * Calculates Min, Preferred and Max size for the columns OR rows.
+     *
+     * @param isHor         If it is the horizontal dimension to calculate.
+     * @param containerSize The reference container size in the dimension. If &lt;=
+     *                      0 it will be replaced by the actual container's size. @return The sizes
+     *                      in a {@link net.miginfocom.layout
+     *                      .Grid.FlowSizeSpec}.
+     */
+    private FlowSizeSpec calcRowsOrColsSizes(boolean isHor, int containerSize) {
+<span class="fc bfc" id="L1714" title="All 2 branches covered.">        ArrayList&lt;LinkedDimGroup&gt;[] groupsLists = isHor ? colGroupLists : rowGroupLists;</span>
+<span class="fc bfc" id="L1715" title="All 2 branches covered.">        Float[] defPush = isHor ? pushXs : pushYs;</span>
+
+<span class="fc bfc" id="L1717" title="All 2 branches covered.">        if (containerSize &lt;= 0) {</span>
+<span class="fc bfc" id="L1718" title="All 2 branches covered.">            containerSize = isHor ? container.getWidth() : container.getHeight();</span>
+        }
+
+<span class="fc bfc" id="L1721" title="All 2 branches covered.">        BoundSize cSz = isHor ? lc.getWidth() : lc.getHeight();</span>
+<span class="pc bpc" id="L1722" title="1 of 2 branches missed.">        if (!cSz.isUnset()) {</span>
+<span class="nc" id="L1723">            containerSize = cSz.constrain(containerSize, getParentSize(container, isHor), container);</span>
+        }
+
+<span class="fc bfc" id="L1726" title="All 2 branches covered.">        DimConstraint[] primDCs = (isHor ? colConstr : rowConstr).getConstaints();</span>
+<span class="fc bfc" id="L1727" title="All 2 branches covered.">        TreeSet&lt;Integer&gt; primIndexes = isHor ? colIndexes : rowIndexes;</span>
+
+<span class="fc" id="L1729">        int[][] rowColBoundSizes = new int[primIndexes.size()][];</span>
+<span class="fc" id="L1730">        HashMap&lt;String, int[]&gt; sizeGroupMap = new HashMap&lt;String, int[]&gt;(4);</span>
+<span class="fc" id="L1731">        DimConstraint[] allDCs = new DimConstraint[primIndexes.size()];</span>
+
+<span class="fc" id="L1733">        Iterator&lt;Integer&gt; primIt = primIndexes.iterator();</span>
+<span class="fc bfc" id="L1734" title="All 2 branches covered.">        for (int r = 0; r &lt; rowColBoundSizes.length; r++) {</span>
+<span class="fc" id="L1735">            int cellIx = primIt.next();</span>
+<span class="fc" id="L1736">            int[] rowColSizes = new int[3];</span>
+
+<span class="pc bpc" id="L1738" title="2 of 4 branches missed.">            if (cellIx &gt;= -MAX_GRID &amp;&amp; cellIx &lt;= MAX_GRID) {  // If not dock cell</span>
+<span class="pc bpc" id="L1739" title="1 of 2 branches missed.">                allDCs[r] = primDCs[cellIx &gt;= primDCs.length ? primDCs.length - 1 : cellIx];</span>
+            } else {
+<span class="nc" id="L1741">                allDCs[r] = DOCK_DIM_CONSTRAINT;</span>
+            }
+
+<span class="fc" id="L1744">            ArrayList&lt;LinkedDimGroup&gt; groups = groupsLists[r];</span>
+
+<span class="fc" id="L1746">            int[] groupSizes = new int[]{</span>
+<span class="fc" id="L1747">                    getTotalGroupsSizeParallel(groups, LayoutUtil.MIN, false),</span>
+<span class="fc" id="L1748">                    getTotalGroupsSizeParallel(groups, LayoutUtil.PREF, false),</span>
+                    LayoutUtil.INF};
+
+<span class="fc" id="L1751">            correctMinMax(groupSizes);</span>
+<span class="fc" id="L1752">            BoundSize dimSize = allDCs[r].getSize();</span>
+
+<span class="fc bfc" id="L1754" title="All 2 branches covered.">            for (int sType = LayoutUtil.MIN; sType &lt;= LayoutUtil.MAX; sType++) {</span>
+
+<span class="fc" id="L1756">                int rowColSize = groupSizes[sType];</span>
+
+<span class="fc" id="L1758">                UnitValue uv = dimSize.getSize(sType);</span>
+<span class="fc bfc" id="L1759" title="All 2 branches covered.">                if (uv != null) {</span>
+                    // If the size of the column is a link to some other size, use that instead
+<span class="fc" id="L1761">                    int unit = uv.getUnit();</span>
+<span class="pc bpc" id="L1762" title="1 of 2 branches missed.">                    if (unit == UnitValue.PREF_SIZE) {</span>
+<span class="nc" id="L1763">                        rowColSize = groupSizes[LayoutUtil.PREF];</span>
+<span class="pc bpc" id="L1764" title="1 of 2 branches missed.">                    } else if (unit == UnitValue.MIN_SIZE) {</span>
+<span class="nc" id="L1765">                        rowColSize = groupSizes[LayoutUtil.MIN];</span>
+<span class="pc bpc" id="L1766" title="1 of 2 branches missed.">                    } else if (unit == UnitValue.MAX_SIZE) {</span>
+<span class="nc" id="L1767">                        rowColSize = groupSizes[LayoutUtil.MAX];</span>
+                    } else {
+<span class="fc" id="L1769">                        rowColSize = uv.getPixels(containerSize, container, null);</span>
+                    }
+<span class="pc bpc" id="L1771" title="3 of 6 branches missed.">                } else if (cellIx &gt;= -MAX_GRID &amp;&amp; cellIx &lt;= MAX_GRID &amp;&amp; rowColSize == 0) {</span>
+<span class="nc bnc" id="L1772" title="All 2 branches missed.">                    rowColSize = LayoutUtil.isDesignTime(container) ? LayoutUtil.getDesignTimeEmptySize() : 0;    // Empty rows with no size set gets XX pixels if design time</span>
+                }
+
+<span class="fc" id="L1775">                rowColSizes[sType] = rowColSize;</span>
+            }
+
+<span class="fc" id="L1778">            correctMinMax(rowColSizes);</span>
+<span class="fc" id="L1779">            addToSizeGroup(sizeGroupMap, allDCs[r].getSizeGroup(), rowColSizes);</span>
+
+<span class="fc" id="L1781">            rowColBoundSizes[r] = rowColSizes;</span>
+        }
+
+        // Set/equalize the size groups to same the values.
+<span class="pc bpc" id="L1785" title="1 of 2 branches missed.">        if (sizeGroupMap.size() &gt; 0) {</span>
+<span class="fc bfc" id="L1786" title="All 2 branches covered.">            for (int r = 0; r &lt; rowColBoundSizes.length; r++) {</span>
+<span class="pc bpc" id="L1787" title="1 of 2 branches missed.">                if (allDCs[r].getSizeGroup() != null) {</span>
+<span class="nc" id="L1788">                    rowColBoundSizes[r] = sizeGroupMap.get(allDCs[r].getSizeGroup());</span>
+                }
+            }
+        }
+
+        // Add the gaps
+<span class="fc" id="L1794">        ResizeConstraint[] resConstrs = getRowResizeConstraints(allDCs);</span>
+
+<span class="fc" id="L1796">        boolean[] fillInPushGaps = new boolean[allDCs.length + 1];</span>
+<span class="fc" id="L1797">        int[][] gapSizes = getRowGaps(allDCs, containerSize, isHor, fillInPushGaps);</span>
+
+<span class="fc" id="L1799">        FlowSizeSpec fss = mergeSizesGapsAndResConstrs(resConstrs, fillInPushGaps, rowColBoundSizes, gapSizes);</span>
+
+        // Spanning components are not handled yet. Check and adjust the multi-row min/pref they enforce.
+<span class="fc" id="L1802">        adjustMinPrefForSpanningComps(allDCs, defPush, fss, groupsLists);</span>
+
+<span class="fc" id="L1804">        return fss;</span>
+    }
+
+    private int[] getMinPrefMaxSumSize(boolean isHor) {
+<span class="fc bfc" id="L1808" title="All 2 branches covered.">        int[][] sizes = isHor ? colFlowSpecs.sizes : rowFlowSpecs.sizes;</span>
+
+<span class="fc" id="L1810">        int[] retSizes = new int[3];</span>
+
+<span class="fc bfc" id="L1812" title="All 2 branches covered.">        BoundSize sz = isHor ? lc.getWidth() : lc.getHeight();</span>
+
+<span class="fc bfc" id="L1814" title="All 2 branches covered.">        for (int i = 0; i &lt; sizes.length; i++) {</span>
+<span class="pc bpc" id="L1815" title="1 of 2 branches missed.">            if (sizes[i] != null) {</span>
+<span class="fc" id="L1816">                int[] size = sizes[i];</span>
+<span class="fc bfc" id="L1817" title="All 2 branches covered.">                for (int sType = LayoutUtil.MIN; sType &lt;= LayoutUtil.MAX; sType++) {</span>
+<span class="pc bpc" id="L1818" title="1 of 2 branches missed.">                    if (sz.getSize(sType) != null) {</span>
+<span class="nc bnc" id="L1819" title="All 2 branches missed.">                        if (i == 0) {</span>
+<span class="nc" id="L1820">                            retSizes[sType] = sz.getSize(sType).getPixels(getParentSize(container, isHor), container, null);</span>
+                        }
+                    } else {
+<span class="fc" id="L1823">                        int s = size[sType];</span>
+
+<span class="pc bpc" id="L1825" title="1 of 2 branches missed.">                        if (s != LayoutUtil.NOT_SET) {</span>
+<span class="fc bfc" id="L1826" title="All 2 branches covered.">                            if (sType == LayoutUtil.PREF) {</span>
+<span class="fc" id="L1827">                                int bnd = size[LayoutUtil.MAX];</span>
+<span class="pc bpc" id="L1828" title="2 of 4 branches missed.">                                if (bnd != LayoutUtil.NOT_SET &amp;&amp; bnd &lt; s) {</span>
+<span class="nc" id="L1829">                                    s = bnd;</span>
+                                }
+
+<span class="fc" id="L1832">                                bnd = size[LayoutUtil.MIN];</span>
+<span class="pc bpc" id="L1833" title="1 of 2 branches missed.">                                if (bnd &gt; s) // Includes s == LayoutUtil.NOT_SET since &lt; 0.</span>
+                                {
+<span class="nc" id="L1835">                                    s = bnd;</span>
+                                }
+                            }
+
+<span class="fc" id="L1839">                            retSizes[sType] += s;   // MAX compensated below.</span>
+                        }
+
+                        // So that MAX is always correct.
+<span class="pc bpc" id="L1843" title="1 of 4 branches missed.">                        if (size[LayoutUtil.MAX] == LayoutUtil.NOT_SET || retSizes[LayoutUtil.MAX] &gt; LayoutUtil.INF) {</span>
+<span class="fc" id="L1844">                            retSizes[LayoutUtil.MAX] = LayoutUtil.INF;</span>
+                        }
+                    }
+                }
+            }
+        }
+
+<span class="fc" id="L1851">        correctMinMax(retSizes);</span>
+
+<span class="fc" id="L1853">        return retSizes;</span>
+    }
+
+    /**
+     * Returns the row gaps in pixel sizes. One more than there are
+     * &lt;code&gt;specs&lt;/code&gt; sent in.
+     *
+     * @param specs
+     * @param refSize
+     * @param isHor
+     * @param fillInPushGaps If the gaps are pushing. &lt;b&gt;NOTE!&lt;/b&gt; this argument
+     *                       will be filled in and thus changed!
+     * @return The row gaps in pixel sizes. One more than there are
+     * &lt;code&gt;specs&lt;/code&gt; sent in.
+     */
+    private int[][] getRowGaps(DimConstraint[] specs, int refSize, boolean isHor, boolean[] fillInPushGaps) {
+<span class="fc bfc" id="L1869" title="All 2 branches covered.">        BoundSize defGap = isHor ? lc.getGridGapX() : lc.getGridGapY();</span>
+<span class="pc bpc" id="L1870" title="1 of 2 branches missed.">        if (defGap == null) {</span>
+<span class="fc bfc" id="L1871" title="All 2 branches covered.">            defGap = isHor ? PlatformDefaults.getGridGapX() : PlatformDefaults.getGridGapY();</span>
+        }
+<span class="fc" id="L1873">        int[] defGapArr = defGap.getPixelSizes(refSize, container, null);</span>
+
+<span class="pc bpc" id="L1875" title="1 of 2 branches missed.">        boolean defIns = !hasDocks();</span>
+
+<span class="fc bfc" id="L1877" title="All 2 branches covered.">        UnitValue firstGap = LayoutUtil.getInsets(lc, isHor ? 1 : 0, defIns);</span>
+<span class="fc bfc" id="L1878" title="All 2 branches covered.">        UnitValue lastGap = LayoutUtil.getInsets(lc, isHor ? 3 : 2, defIns);</span>
+
+<span class="fc" id="L1880">        int[][] retValues = new int[specs.length + 1][];</span>
+
+<span class="fc bfc" id="L1882" title="All 2 branches covered.">        for (int i = 0, wgIx = 0; i &lt; retValues.length; i++) {</span>
+<span class="fc bfc" id="L1883" title="All 2 branches covered.">            DimConstraint specBefore = i &gt; 0 ? specs[i - 1] : null;</span>
+<span class="fc bfc" id="L1884" title="All 2 branches covered.">            DimConstraint specAfter = i &lt; specs.length ? specs[i] : null;</span>
+
+            // No gap if between docking components.
+<span class="pc bpc" id="L1887" title="1 of 4 branches missed.">            boolean edgeBefore = (specBefore == DOCK_DIM_CONSTRAINT || specBefore == null);</span>
+<span class="pc bpc" id="L1888" title="1 of 4 branches missed.">            boolean edgeAfter = (specAfter == DOCK_DIM_CONSTRAINT || specAfter == null);</span>
+<span class="pc bpc" id="L1889" title="1 of 4 branches missed.">            if (edgeBefore &amp;&amp; edgeAfter) {</span>
+<span class="nc" id="L1890">                continue;</span>
+            }
+
+<span class="pc bpc" id="L1893" title="3 of 4 branches missed.">            BoundSize wrapGapSize = (wrapGapMap == null || isHor == lc.isFlowX() ? null : wrapGapMap.get(Integer.valueOf(wgIx++)));</span>
+
+<span class="pc bpc" id="L1895" title="1 of 2 branches missed.">            if (wrapGapSize == null) {</span>
+
+<span class="fc bfc" id="L1897" title="All 2 branches covered.">                int[] gapBefore = specBefore != null ? specBefore.getRowGaps(container, null, refSize, false) : null;</span>
+<span class="fc bfc" id="L1898" title="All 2 branches covered.">                int[] gapAfter = specAfter != null ? specAfter.getRowGaps(container, null, refSize, true) : null;</span>
+
+<span class="pc bpc" id="L1900" title="2 of 6 branches missed.">                if (edgeBefore &amp;&amp; gapAfter == null &amp;&amp; firstGap != null) {</span>
+
+<span class="fc" id="L1902">                    int bef = firstGap.getPixels(refSize, container, null);</span>
+<span class="fc" id="L1903">                    retValues[i] = new int[]{bef, bef, bef};</span>
+
+<span class="pc bpc" id="L1905" title="2 of 6 branches missed.">                } else if (edgeAfter &amp;&amp; gapBefore == null &amp;&amp; firstGap != null) {</span>
+
+<span class="fc" id="L1907">                    int aft = lastGap.getPixels(refSize, container, null);</span>
+<span class="fc" id="L1908">                    retValues[i] = new int[]{aft, aft, aft};</span>
+
+<span class="fc" id="L1910">                } else {</span>
+<span class="pc bpc" id="L1911" title="1 of 2 branches missed.">                    retValues[i] = gapAfter != gapBefore ? mergeSizes(gapAfter, gapBefore) : new int[]{defGapArr[0], defGapArr[1], defGapArr[2]};</span>
+                }
+
+<span class="pc bpc" id="L1914" title="2 of 8 branches missed.">                if (specBefore != null &amp;&amp; specBefore.isGapAfterPush() || specAfter != null &amp;&amp; specAfter.isGapBeforePush()) {</span>
+<span class="nc" id="L1915">                    fillInPushGaps[i] = true;</span>
+                }
+<span class="fc" id="L1917">            } else {</span>
+
+<span class="nc bnc" id="L1919" title="All 2 branches missed.">                if (wrapGapSize.isUnset()) {</span>
+<span class="nc" id="L1920">                    retValues[i] = new int[]{defGapArr[0], defGapArr[1], defGapArr[2]};</span>
+                } else {
+<span class="nc" id="L1922">                    retValues[i] = wrapGapSize.getPixelSizes(refSize, container, null);</span>
+                }
+<span class="nc" id="L1924">                fillInPushGaps[i] = wrapGapSize.getGapPush();</span>
+            }
+        }
+<span class="fc" id="L1927">        return retValues;</span>
+    }
+
+    private boolean hasDocks() {
+<span class="pc bpc" id="L1931" title="4 of 8 branches missed.">        return (dockOffX &gt; 0 || dockOffY &gt; 0 || rowIndexes.last() &gt; MAX_GRID || colIndexes.last() &gt; MAX_GRID);</span>
+    }
+
+    /**
+     * Adjust min/pref size for columns(or rows) that has components that spans
+     * multiple columns (or rows).
+     *
+     * @param specs       The specs for the columns or rows. Last index will be used
+     *                    if &lt;code&gt;count&lt;/code&gt; is greater than this array's length.
+     * @param defPush     The default grow weight if the specs does not have anyone
+     *                    that will grow. Comes from &quot;push&quot; in the CC.
+     * @param fss
+     * @param groupsLists
+     */
+    private void adjustMinPrefForSpanningComps(DimConstraint[] specs, Float[] defPush, FlowSizeSpec fss, ArrayList&lt;LinkedDimGroup&gt;[] groupsLists) {
+<span class="fc bfc" id="L1946" title="All 2 branches covered.">        for (int r = groupsLists.length - 1; r &gt;= 0; r--) { // Since 3.7.3 Iterate from end to start. Will solve some multiple spanning components hard to solve problems.</span>
+<span class="fc" id="L1947">            ArrayList&lt;LinkedDimGroup&gt; groups = groupsLists[r];</span>
+
+<span class="fc bfc" id="L1949" title="All 2 branches covered.">            for (LinkedDimGroup group : groups) {</span>
+<span class="pc bpc" id="L1950" title="1 of 2 branches missed.">                if (group.span == 1) {</span>
+<span class="fc" id="L1951">                    continue;</span>
+                }
+
+<span class="nc" id="L1954">                int[] sizes = group.getMinPrefMax();</span>
+<span class="nc bnc" id="L1955" title="All 2 branches missed.">                for (int s = LayoutUtil.MIN; s &lt;= LayoutUtil.PREF; s++) {</span>
+<span class="nc" id="L1956">                    int cSize = sizes[s];</span>
+<span class="nc bnc" id="L1957" title="All 2 branches missed.">                    if (cSize == LayoutUtil.NOT_SET) {</span>
+<span class="nc" id="L1958">                        continue;</span>
+                    }
+
+<span class="nc" id="L1961">                    int rowSize = 0;</span>
+<span class="nc" id="L1962">                    int sIx = (r &lt;&lt; 1) + 1;</span>
+<span class="nc" id="L1963">                    int len = Math.min((group.span &lt;&lt; 1), fss.sizes.length - sIx) - 1;</span>
+<span class="nc bnc" id="L1964" title="All 2 branches missed.">                    for (int j = sIx; j &lt; sIx + len; j++) {</span>
+<span class="nc" id="L1965">                        int sz = fss.sizes[j][s];</span>
+<span class="nc bnc" id="L1966" title="All 2 branches missed.">                        if (sz != LayoutUtil.NOT_SET) {</span>
+<span class="nc" id="L1967">                            rowSize += sz;</span>
+                        }
+                    }
+
+<span class="nc bnc" id="L1971" title="All 4 branches missed.">                    if (rowSize &lt; cSize &amp;&amp; len &gt; 0) {</span>
+<span class="nc bnc" id="L1972" title="All 4 branches missed.">                        for (int eagerness = 0, newRowSize = 0; eagerness &lt; 4 &amp;&amp; newRowSize &lt; cSize; eagerness++) {</span>
+<span class="nc" id="L1973">                            newRowSize = fss.expandSizes(specs, defPush, cSize, sIx, len, s, eagerness);</span>
+                        }
+                    }
+                }
+<span class="nc" id="L1977">            }</span>
+        }
+<span class="fc" id="L1979">    }</span>
+
+    /**
+     * For one dimension divide the component wraps into logical groups. One
+     * group for component wraps that share a common something, line the
+     * property to layout by base line.
+     *
+     * @param isRows If rows, and not columns, are to be divided.
+     * @return One &lt;code&gt;ArrayList&lt;LinkedDimGroup&gt;&lt;/code&gt; for every row/column.
+     */
+    private ArrayList&lt;LinkedDimGroup&gt;[] divideIntoLinkedGroups(boolean isRows) {
+<span class="pc bpc" id="L1990" title="2 of 6 branches missed.">        boolean fromEnd = !(isRows ? lc.isTopToBottom() : LayoutUtil.isLeftToRight(lc, container));</span>
+<span class="fc bfc" id="L1991" title="All 2 branches covered.">        TreeSet&lt;Integer&gt; primIndexes = isRows ? rowIndexes : colIndexes;</span>
+<span class="fc bfc" id="L1992" title="All 2 branches covered.">        TreeSet&lt;Integer&gt; secIndexes = isRows ? colIndexes : rowIndexes;</span>
+<span class="fc bfc" id="L1993" title="All 2 branches covered.">        DimConstraint[] primDCs = (isRows ? rowConstr : colConstr).getConstaints();</span>
+
+        @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L1996">        ArrayList&lt;LinkedDimGroup&gt;[] groupLists = new ArrayList[primIndexes.size()];</span>
+
+<span class="fc" id="L1998">        int gIx = 0;</span>
+<span class="fc bfc" id="L1999" title="All 2 branches covered.">        for (int i : primIndexes) {</span>
+
+            DimConstraint dc;
+<span class="pc bpc" id="L2002" title="2 of 4 branches missed.">            if (i &gt;= -MAX_GRID &amp;&amp; i &lt;= MAX_GRID) {  // If not dock cell</span>
+<span class="pc bpc" id="L2003" title="1 of 2 branches missed.">                dc = primDCs[i &gt;= primDCs.length ? primDCs.length - 1 : i];</span>
+            } else {
+<span class="nc" id="L2005">                dc = DOCK_DIM_CONSTRAINT;</span>
+            }
+
+<span class="fc" id="L2008">            ArrayList&lt;LinkedDimGroup&gt; groupList = new ArrayList&lt;LinkedDimGroup&gt;(4);</span>
+<span class="fc" id="L2009">            groupLists[gIx++] = groupList;</span>
+
+<span class="fc bfc" id="L2011" title="All 2 branches covered.">            for (Integer ix : secIndexes) {</span>
+<span class="fc bfc" id="L2012" title="All 2 branches covered.">                Cell cell = isRows ? getCell(i, ix) : getCell(ix, i);</span>
+<span class="pc bpc" id="L2013" title="2 of 4 branches missed.">                if (cell == null || cell.compWraps.size() == 0) {</span>
+<span class="nc" id="L2014">                    continue;</span>
+                }
+
+<span class="fc bfc" id="L2017" title="All 2 branches covered.">                int span = (isRows ? cell.spany : cell.spanx);</span>
+<span class="pc bpc" id="L2018" title="1 of 2 branches missed.">                if (span &gt; 1) {</span>
+<span class="nc" id="L2019">                    span = convertSpanToSparseGrid(i, span, primIndexes);</span>
+                }
+
+<span class="fc bfc" id="L2022" title="All 2 branches covered.">                boolean isPar = (cell.flowx == isRows);</span>
+
+<span class="pc bpc" id="L2024" title="2 of 6 branches missed.">                if ((!isPar &amp;&amp; cell.compWraps.size() &gt; 1) || span &gt; 1) {</span>
+
+<span class="nc bnc" id="L2026" title="All 2 branches missed.">                    int linkType = isPar ? LinkedDimGroup.TYPE_PARALLEL : LinkedDimGroup.TYPE_SERIAL;</span>
+<span class="nc bnc" id="L2027" title="All 2 branches missed.">                    LinkedDimGroup lg = new LinkedDimGroup(&quot;p,&quot; + ix, span, linkType, !isRows, fromEnd);</span>
+<span class="nc" id="L2028">                    lg.setCompWraps(cell.compWraps);</span>
+<span class="nc" id="L2029">                    groupList.add(lg);</span>
+<span class="nc" id="L2030">                } else {</span>
+<span class="fc bfc" id="L2031" title="All 2 branches covered.">                    for (int cwIx = 0; cwIx &lt; cell.compWraps.size(); cwIx++) {</span>
+<span class="fc" id="L2032">                        CompWrap cw = cell.compWraps.get(cwIx);</span>
+<span class="pc bpc" id="L2033" title="3 of 8 branches missed.">                        boolean rowBaselineAlign = (isRows &amp;&amp; lc.isTopToBottom() &amp;&amp; dc.getAlignOrDefault(!isRows) == UnitValue.BASELINE_IDENTITY); // Disable baseline for bottomToTop since I can not verify it working.</span>
+<span class="fc bfc" id="L2034" title="All 4 branches covered.">                        boolean isBaseline = isRows &amp;&amp; cw.isBaselineAlign(rowBaselineAlign);</span>
+
+<span class="fc bfc" id="L2036" title="All 2 branches covered.">                        String linkCtx = isBaseline ? &quot;baseline&quot; : null;</span>
+
+                        // Find a group with same link context and put it in that group.
+<span class="fc" id="L2039">                        boolean foundList = false;</span>
+<span class="fc bfc" id="L2040" title="All 2 branches covered.">                        for (int glIx = 0, lastGl = groupList.size() - 1; glIx &lt;= lastGl; glIx++) {</span>
+<span class="fc" id="L2041">                            LinkedDimGroup group = groupList.get(glIx);</span>
+<span class="pc bpc" id="L2042" title="1 of 2 branches missed.">                            if (Objects.equals(linkCtx, group.linkCtx)) {</span>
+<span class="nc" id="L2043">                                group.addCompWrap(cw);</span>
+<span class="nc" id="L2044">                                foundList = true;</span>
+<span class="nc" id="L2045">                                break;</span>
+                            }
+                        }
+
+                        // If none found and at last add a new group.
+<span class="pc bpc" id="L2050" title="1 of 2 branches missed.">                        if (!foundList) {</span>
+<span class="fc bfc" id="L2051" title="All 2 branches covered.">                            int linkType = isBaseline ? LinkedDimGroup.TYPE_BASELINE : LinkedDimGroup.TYPE_PARALLEL;</span>
+<span class="fc bfc" id="L2052" title="All 2 branches covered.">                            LinkedDimGroup lg = new LinkedDimGroup(linkCtx, 1, linkType, !isRows, fromEnd);</span>
+<span class="fc" id="L2053">                            lg.addCompWrap(cw);</span>
+<span class="fc" id="L2054">                            groupList.add(lg);</span>
+                        }
+                    }
+                }
+<span class="fc" id="L2058">            }</span>
+<span class="fc" id="L2059">        }</span>
+<span class="fc" id="L2060">        return groupLists;</span>
+    }
+
+    private boolean isCellFree(int r, int c, ArrayList&lt;int[]&gt; occupiedRects) {
+<span class="pc bpc" id="L2064" title="1 of 2 branches missed.">        if (getCell(r, c) != null) {</span>
+<span class="nc" id="L2065">            return false;</span>
+        }
+
+<span class="pc bpc" id="L2068" title="1 of 2 branches missed.">        for (int[] rect : occupiedRects) {</span>
+<span class="nc bnc" id="L2069" title="All 8 branches missed.">            if (rect[0] &lt;= c &amp;&amp; rect[1] &lt;= r &amp;&amp; rect[0] + rect[2] &gt; c &amp;&amp; rect[1] + rect[3] &gt; r) {</span>
+<span class="nc" id="L2070">                return false;</span>
+            }
+<span class="nc" id="L2072">        }</span>
+<span class="fc" id="L2073">        return true;</span>
+    }
+
+    private Cell getCell(int r, int c) {
+<span class="fc" id="L2077">        return grid.get(Integer.valueOf((r &lt;&lt; 16) + c));</span>
+    }
+
+    private void setCell(int r, int c, Cell cell) {
+<span class="pc bpc" id="L2081" title="2 of 4 branches missed.">        if (c &lt; 0 || r &lt; 0) {</span>
+<span class="nc" id="L2082">            throw new IllegalArgumentException(&quot;Cell position cannot be negative. row: &quot; + r + &quot;, col: &quot; + c);</span>
+        }
+
+<span class="pc bpc" id="L2085" title="2 of 4 branches missed.">        if (c &gt; MAX_GRID || r &gt; MAX_GRID) {</span>
+<span class="nc" id="L2086">            throw new IllegalArgumentException(&quot;Cell position out of bounds. Out of cells. row: &quot; + r + &quot;, col: &quot; + c);</span>
+        }
+
+<span class="fc" id="L2089">        rowIndexes.add(Integer.valueOf(r));</span>
+<span class="fc" id="L2090">        colIndexes.add(Integer.valueOf(c));</span>
+
+<span class="fc" id="L2092">        grid.put(Integer.valueOf((r &lt;&lt; 16) + c), cell);</span>
+<span class="fc" id="L2093">    }</span>
+
+    /**
+     * Adds a docking cell. That cell is outside the normal cell indexes.
+     *
+     * @param dockInsets The current dock insets. Will be updated!
+     * @param side       top == 0, left == 1, bottom = 2, right = 3.
+     * @param cw         The compwrap to put in a cell and add.
+     */
+    private void addDockingCell(int[] dockInsets, int side, CompWrap cw) {
+<span class="nc" id="L2103">        int r, c, spanx = 1, spany = 1;</span>
+<span class="nc bnc" id="L2104" title="All 3 branches missed.">        switch (side) {</span>
+            case 0:
+            case 2:
+<span class="nc bnc" id="L2107" title="All 2 branches missed.">                r = side == 0 ? dockInsets[0]++ : dockInsets[2]--;</span>
+<span class="nc" id="L2108">                c = dockInsets[1];</span>
+<span class="nc" id="L2109">                spanx = dockInsets[3] - dockInsets[1] + 1;  // The +1 is for cell 0.</span>
+<span class="nc" id="L2110">                colIndexes.add(Integer.valueOf(dockInsets[3])); // Make sure there is a receiving cell</span>
+<span class="nc" id="L2111">                break;</span>
+
+            case 1:
+            case 3:
+<span class="nc bnc" id="L2115" title="All 2 branches missed.">                c = side == 1 ? dockInsets[1]++ : dockInsets[3]--;</span>
+<span class="nc" id="L2116">                r = dockInsets[0];</span>
+<span class="nc" id="L2117">                spany = dockInsets[2] - dockInsets[0] + 1;  // The +1 is for cell 0.</span>
+<span class="nc" id="L2118">                rowIndexes.add(Integer.valueOf(dockInsets[2])); // Make sure there is a receiving cell</span>
+<span class="nc" id="L2119">                break;</span>
+
+            default:
+<span class="nc" id="L2122">                throw new IllegalArgumentException(&quot;Internal error 123.&quot;);</span>
+        }
+
+<span class="nc" id="L2125">        rowIndexes.add(Integer.valueOf(r));</span>
+<span class="nc" id="L2126">        colIndexes.add(Integer.valueOf(c));</span>
+
+<span class="nc bnc" id="L2128" title="All 2 branches missed.">        grid.put(Integer.valueOf((r &lt;&lt; 16) + c), new Cell(cw, spanx, spany, spanx &gt; 1));</span>
+<span class="nc" id="L2129">    }</span>
+
+    /**
+     * A simple representation of a cell in the grid. Contains a number of
+     * component wraps, if they span more than one cell.
+     */
+    private static class Cell {
+
+        private final int spanx, spany;
+        private final boolean flowx;
+<span class="fc" id="L2139">        private final ArrayList&lt;CompWrap&gt; compWraps = new ArrayList&lt;CompWrap&gt;(2);</span>
+
+<span class="fc" id="L2141">        private boolean hasTagged = false;  // If one or more components have styles and need to be checked by the component sorter</span>
+
+        private Cell(CompWrap cw) {
+<span class="nc" id="L2144">            this(cw, 1, 1, true);</span>
+<span class="nc" id="L2145">        }</span>
+
+        private Cell(int spanx, int spany, boolean flowx) {
+<span class="fc" id="L2148">            this(null, spanx, spany, flowx);</span>
+<span class="fc" id="L2149">        }</span>
+
+<span class="fc" id="L2151">        private Cell(CompWrap cw, int spanx, int spany, boolean flowx) {</span>
+<span class="pc bpc" id="L2152" title="1 of 2 branches missed.">            if (cw != null) {</span>
+<span class="nc" id="L2153">                compWraps.add(cw);</span>
+            }
+<span class="fc" id="L2155">            this.spanx = spanx;</span>
+<span class="fc" id="L2156">            this.spany = spany;</span>
+<span class="fc" id="L2157">            this.flowx = flowx;</span>
+<span class="fc" id="L2158">        }</span>
+    }
+
+    /**
+     * A number of component wraps that share a layout &quot;something&quot; &lt;b&gt;in one
+     * dimension&lt;/b&gt;
+     */
+    private static class LinkedDimGroup {
+
+        private static final int TYPE_SERIAL = 0;
+        private static final int TYPE_PARALLEL = 1;
+        private static final int TYPE_BASELINE = 2;
+
+        private final String linkCtx;
+        private final int span;
+        private final int linkType;
+        private final boolean isHor, fromEnd;
+
+<span class="fc" id="L2176">        private final ArrayList&lt;CompWrap&gt; _compWraps = new ArrayList&lt;CompWrap&gt;(4);</span>
+
+<span class="fc" id="L2178">        private int lStart = 0, lSize = 0;  // Currently mostly for debug painting</span>
+
+<span class="fc" id="L2180">        private LinkedDimGroup(String linkCtx, int span, int linkType, boolean isHor, boolean fromEnd) {</span>
+<span class="fc" id="L2181">            this.linkCtx = linkCtx;</span>
+<span class="fc" id="L2182">            this.span = span;</span>
+<span class="fc" id="L2183">            this.linkType = linkType;</span>
+<span class="fc" id="L2184">            this.isHor = isHor;</span>
+<span class="fc" id="L2185">            this.fromEnd = fromEnd;</span>
+<span class="fc" id="L2186">        }</span>
+
+        private void addCompWrap(CompWrap cw) {
+<span class="fc" id="L2189">            _compWraps.add(cw);</span>
+<span class="fc" id="L2190">        }</span>
+
+        private void setCompWraps(ArrayList&lt;CompWrap&gt; cws) {
+<span class="nc bnc" id="L2193" title="All 2 branches missed.">            if (_compWraps != cws) {</span>
+<span class="nc" id="L2194">                _compWraps.clear();</span>
+<span class="nc" id="L2195">                _compWraps.addAll(cws);</span>
+            }
+<span class="nc" id="L2197">        }</span>
+
+        private void layout(DimConstraint dc, int start, int size, int spanCount) {
+<span class="fc" id="L2200">            lStart = start;</span>
+<span class="fc" id="L2201">            lSize = size;</span>
+
+<span class="pc bpc" id="L2203" title="1 of 2 branches missed.">            if (_compWraps.isEmpty()) {</span>
+<span class="nc" id="L2204">                return;</span>
+            }
+
+<span class="fc" id="L2207">            ContainerWrapper parent = _compWraps.get(0).comp.getParent();</span>
+<span class="fc bfc" id="L2208" title="All 2 branches covered.">            if (linkType == TYPE_PARALLEL) {</span>
+<span class="fc" id="L2209">                layoutParallel(parent, _compWraps, dc, start, size, isHor, fromEnd);</span>
+<span class="pc bpc" id="L2210" title="1 of 2 branches missed.">            } else if (linkType == TYPE_BASELINE) {</span>
+<span class="fc" id="L2211">                layoutBaseline(parent, _compWraps, dc, start, size, LayoutUtil.PREF, spanCount);</span>
+            } else {
+<span class="nc" id="L2213">                layoutSerial(parent, _compWraps, dc, start, size, isHor, spanCount, fromEnd);</span>
+            }
+<span class="fc" id="L2215">        }</span>
+
+        /**
+         * Returns the min/pref/max sizes for this cell. Returned array &lt;b&gt;must
+         * not be altered&lt;/b&gt;
+         *
+         * @return A shared min/pref/max array of sizes. Always of length 3 and
+         * never &lt;code&gt;null&lt;/code&gt;. Will always be of type STATIC and PIXEL.
+         */
+        private int[] getMinPrefMax() {
+<span class="fc" id="L2225">            int[] sizes = new int[3];</span>
+<span class="pc bpc" id="L2226" title="1 of 2 branches missed.">            if (!_compWraps.isEmpty()) {</span>
+<span class="fc bfc" id="L2227" title="All 2 branches covered.">                for (int sType = LayoutUtil.MIN; sType &lt;= LayoutUtil.PREF; sType++) {</span>
+<span class="fc bfc" id="L2228" title="All 2 branches covered.">                    if (linkType == TYPE_PARALLEL) {</span>
+<span class="fc" id="L2229">                        sizes[sType] = getTotalSizeParallel(_compWraps, sType, isHor);</span>
+<span class="pc bpc" id="L2230" title="1 of 2 branches missed.">                    } else if (linkType == TYPE_BASELINE) {</span>
+<span class="fc" id="L2231">                        int[] aboveBelow = getBaselineAboveBelow(_compWraps, sType, false);</span>
+<span class="fc" id="L2232">                        sizes[sType] = aboveBelow[0] + aboveBelow[1];</span>
+<span class="fc" id="L2233">                    } else {</span>
+<span class="nc" id="L2234">                        sizes[sType] = getTotalSizeSerial(_compWraps, sType, isHor);</span>
+                    }
+                }
+<span class="fc" id="L2237">                sizes[LayoutUtil.MAX] = LayoutUtil.INF;</span>
+            }
+<span class="fc" id="L2239">            return sizes;</span>
+        }
+    }
+
+    private static final class FlowSizeSpec {
+
+        private final int[][] sizes;  // [row/col index][min, pref, max]
+        private final ResizeConstraint[] resConstsInclGaps;  // [row/col index]
+
+<span class="fc" id="L2248">        private FlowSizeSpec(int[][] sizes, ResizeConstraint[] resConstsInclGaps) {</span>
+<span class="fc" id="L2249">            this.sizes = sizes;</span>
+<span class="fc" id="L2250">            this.resConstsInclGaps = resConstsInclGaps;</span>
+<span class="fc" id="L2251">        }</span>
+
+        /**
+         * @param specs      The specs for the columns or rows. Last index will be
+         *                   used of &lt;code&gt;fromIx + len&lt;/code&gt; is greater than this array's
+         *                   length.
+         * @param targetSize The size to try to meet.
+         * @param defGrow    The default grow weight if the specs does not have
+         *                   anyone that will grow. Comes from &quot;push&quot; in the CC.
+         * @param fromIx
+         * @param len
+         * @param sizeType
+         * @param eagerness  How eager the algorithm should be to try to expand
+         *                   the sizes.
+         *                   &lt;ul&gt;
+         *                   &lt;li&gt;0 - Grow only rows/columns which have the &lt;code&gt;sizeType&lt;/code&gt;
+         *                   set to be the containing components AND which has a grow weight &amp;gt;
+         *                   0.
+         *                   &lt;li&gt;1 - Grow only rows/columns which have the &lt;code&gt;sizeType&lt;/code&gt;
+         *                   set to be the containing components AND which has a grow weight &amp;gt;
+         *                   0 OR unspecified.
+         *                   &lt;li&gt;2 - Grow all rows/columns that have a grow weight &amp;gt; 0.
+         *                   &lt;li&gt;3 - Grow all rows/columns that have a grow weight &amp;gt; 0 OR
+         *                   unspecified.
+         *                   &lt;/ul&gt;
+         * @return The new size.
+         */
+        private int expandSizes(DimConstraint[] specs, Float[] defGrow, int targetSize, int fromIx, int len, int sizeType, int eagerness) {
+<span class="nc" id="L2279">            ResizeConstraint[] resConstr = new ResizeConstraint[len];</span>
+<span class="nc" id="L2280">            int[][] sizesToExpand = new int[len][];</span>
+<span class="nc bnc" id="L2281" title="All 2 branches missed.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L2282">                int[] minPrefMax = sizes[i + fromIx];</span>
+<span class="nc" id="L2283">                sizesToExpand[i] = new int[]{minPrefMax[sizeType], minPrefMax[LayoutUtil.PREF], minPrefMax[LayoutUtil.MAX]};</span>
+
+<span class="nc bnc" id="L2285" title="All 4 branches missed.">                if (eagerness &lt;= 1 &amp;&amp; i % 2 == 0) { // (i % 2 == 0) means only odd indexes, which is only rows/col indexes and not gaps.</span>
+<span class="nc" id="L2286">                    int cIx = (i + fromIx - 1) &gt;&gt; 1;</span>
+<span class="nc" id="L2287">                    DimConstraint spec = (DimConstraint) LayoutUtil.getIndexSafe(specs, cIx);</span>
+
+<span class="nc" id="L2289">                    BoundSize sz = spec.getSize();</span>
+<span class="nc bnc" id="L2290" title="All 8 branches missed.">                    if ((sizeType == LayoutUtil.MIN &amp;&amp; sz.getMin() != null &amp;&amp; sz.getMin().getUnit() != UnitValue.MIN_SIZE)</span>
+<span class="nc bnc" id="L2291" title="All 4 branches missed.">                            || (sizeType == LayoutUtil.PREF &amp;&amp; sz.getPreferred() != null &amp;&amp; sz.getPreferred().getUnit() != UnitValue.PREF_SIZE)) {</span>
+<span class="nc" id="L2292">                        continue;</span>
+                    }
+                }
+<span class="nc" id="L2295">                resConstr[i] = (ResizeConstraint) LayoutUtil.getIndexSafe(resConstsInclGaps, i + fromIx);</span>
+            }
+
+<span class="nc bnc" id="L2298" title="All 4 branches missed.">            Float[] growW = (eagerness == 1 || eagerness == 3) ? extractSubArray(specs, defGrow, fromIx, len) : null;</span>
+<span class="nc" id="L2299">            int[] newSizes = LayoutUtil.calculateSerial(sizesToExpand, resConstr, growW, LayoutUtil.PREF, targetSize);</span>
+<span class="nc" id="L2300">            int newSize = 0;</span>
+
+<span class="nc bnc" id="L2302" title="All 2 branches missed.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc" id="L2303">                int s = newSizes[i];</span>
+<span class="nc" id="L2304">                sizes[i + fromIx][sizeType] = s;</span>
+<span class="nc" id="L2305">                newSize += s;</span>
+            }
+<span class="nc" id="L2307">            return newSize;</span>
+        }
+    }
+
+    private static class WeakCell {
+
+        private final Object componentRef;
+        private final int x, y, spanX, spanY;
+
+<span class="fc" id="L2316">        private WeakCell(Object component, int x, int y, int spanX, int spanY) {</span>
+<span class="fc" id="L2317">            this.componentRef = Display.getInstance().createSoftWeakRef(component);</span>
+<span class="fc" id="L2318">            this.x = x;</span>
+<span class="fc" id="L2319">            this.y = y;</span>
+<span class="fc" id="L2320">            this.spanX = spanX;</span>
+<span class="fc" id="L2321">            this.spanY = spanY;</span>
+<span class="fc" id="L2322">        }</span>
+    }
+
+    /**
+     * Wraps a {@link java.awt.Component} together with its constraint. Caches a
+     * lot of information about the component so for instance not the preferred
+     * size has to be calculated more than once.
+     * &lt;p&gt;
+     * Note! Does not ask the min/pref/max sizes again after the constructor.
+     * This means that
+     */
+    private final class CompWrap {
+
+        private final ComponentWrapper comp;
+        private final CC cc;
+        private final int eHideMode;
+        private final boolean useVisualPadding;
+<span class="fc" id="L2339">        private final int[] horSizes = new int[3];</span>
+<span class="fc" id="L2340">        private final int[] verSizes = new int[3];</span>
+<span class="fc" id="L2341">        private boolean sizesOk = false;</span>
+        private final boolean isAbsolute;
+        private int[][] gaps; // [top,left(actually before),bottom,right(actually after)][min,pref,max]
+<span class="fc" id="L2344">        private int x = LayoutUtil.NOT_SET, y = LayoutUtil.NOT_SET, w = LayoutUtil.NOT_SET, h = LayoutUtil.NOT_SET;</span>
+
+<span class="fc" id="L2346">        private int forcedPushGaps = 0;   // 1 == before, 2 = after. Bitwise.</span>
+
+        /**
+         * @param c
+         * @param cc
+         * @param eHideMode Effective hide mode. &lt;= 0 means visible. @param useVis
+         *                  ualPadding
+         */
+<span class="fc" id="L2354">        private CompWrap(ComponentWrapper c, CC cc, int eHideMode, boolean useVisualPadding) {</span>
+<span class="fc" id="L2355">            this.comp = c;</span>
+<span class="fc" id="L2356">            this.cc = cc;</span>
+<span class="fc" id="L2357">            this.eHideMode = eHideMode;</span>
+<span class="fc" id="L2358">            this.useVisualPadding = useVisualPadding;</span>
+<span class="pc bpc" id="L2359" title="2 of 4 branches missed.">            this.isAbsolute = cc.getHorizontal().getSize().isAbsolute() &amp;&amp; cc.getVertical().getSize().isAbsolute();</span>
+
+<span class="pc bpc" id="L2361" title="1 of 2 branches missed.">            if (eHideMode &gt; 1) {</span>
+<span class="nc" id="L2362">                gaps = new int[4][];</span>
+<span class="nc bnc" id="L2363" title="All 2 branches missed.">                for (int i = 0; i &lt; gaps.length; i++) {</span>
+<span class="nc" id="L2364">                    gaps[i] = new int[3];</span>
+                }
+            }
+<span class="fc" id="L2367">        }</span>
+
+        private int[] getSizes(boolean isHor) {
+<span class="fc" id="L2370">            validateSize();</span>
+<span class="fc bfc" id="L2371" title="All 2 branches covered.">            return isHor ? horSizes : verSizes;</span>
+        }
+
+        private void validateSize() {
+<span class="fc" id="L2375">            BoundSize[] callbackSz = getCallbackSize(comp);</span>
+
+<span class="pc bpc" id="L2377" title="2 of 6 branches missed.">            if (isAbsolute &amp;&amp; sizesOk &amp;&amp; callbackSz == null) {</span>
+<span class="fc" id="L2378">                return;</span>
+            }
+
+<span class="pc bpc" id="L2381" title="1 of 2 branches missed.">            if (eHideMode &lt;= 0) {</span>
+<span class="fc" id="L2382">                int contentBias = comp.getContentBias();</span>
+
+<span class="pc bpc" id="L2384" title="7 of 8 branches missed.">                int sizeHint = contentBias == -1 ? -1 : (contentBias == 0 ? (w != LayoutUtil.NOT_SET ? w : comp.getWidth()) : (h != LayoutUtil.NOT_SET ? h : comp.getHeight()));</span>
+
+<span class="pc bpc" id="L2386" title="3 of 4 branches missed.">                BoundSize hBS = (callbackSz != null &amp;&amp; callbackSz[0] != null) ? callbackSz[0] : cc.getHorizontal().getSize();</span>
+<span class="pc bpc" id="L2387" title="3 of 4 branches missed.">                BoundSize vBS = (callbackSz != null &amp;&amp; callbackSz[1] != null) ? callbackSz[1] : cc.getVertical().getSize();</span>
+
+<span class="fc bfc" id="L2389" title="All 2 branches covered.">                for (int i = LayoutUtil.MIN; i &lt;= LayoutUtil.MAX; i++) {</span>
+<span class="pc bpc" id="L2390" title="2 of 3 branches missed.">                    switch (contentBias) {</span>
+                        case -1: // None
+                        default:
+<span class="fc" id="L2393">                            horSizes[i] = getSize(hBS, i, true, useVisualPadding, -1);</span>
+<span class="fc" id="L2394">                            verSizes[i] = getSize(vBS, i, false, useVisualPadding, -1);</span>
+<span class="fc" id="L2395">                            break;</span>
+                        case 0: // Hor
+<span class="nc" id="L2397">                            horSizes[i] = getSize(hBS, i, true, useVisualPadding, -1);</span>
+<span class="nc bnc" id="L2398" title="All 2 branches missed.">                            verSizes[i] = getSize(vBS, i, false, useVisualPadding, sizeHint &gt; 0 ? sizeHint : horSizes[i]);</span>
+<span class="nc" id="L2399">                            break;</span>
+                        case 1: // Ver
+<span class="nc" id="L2401">                            verSizes[i] = getSize(vBS, i, false, useVisualPadding, -1);</span>
+<span class="nc bnc" id="L2402" title="All 2 branches missed.">                            horSizes[i] = getSize(hBS, i, true, useVisualPadding, sizeHint &gt; 0 ? sizeHint : verSizes[i]);</span>
+                            break;
+                    }
+                }
+
+<span class="fc" id="L2407">                correctMinMax(horSizes);</span>
+<span class="fc" id="L2408">                correctMinMax(verSizes);</span>
+<span class="fc" id="L2409">            } else {</span>
+<span class="nc" id="L2410">                Arrays.fill(horSizes, 0); // Needed if component goes from visible -&gt; invisible without recreating the grid.</span>
+<span class="nc" id="L2411">                Arrays.fill(verSizes, 0);</span>
+            }
+<span class="fc" id="L2413">            sizesOk = true;</span>
+<span class="fc" id="L2414">        }</span>
+
+        private int getSize(BoundSize uvs, int sizeType, boolean isHor, boolean useVP, int sizeHint) {
+            int size;
+<span class="pc bpc" id="L2418" title="2 of 4 branches missed.">            if (uvs == null || uvs.getSize(sizeType) == null) {</span>
+<span class="fc bfc" id="L2419" title="All 3 branches covered.">                switch (sizeType) {</span>
+                    case LayoutUtil.MIN:
+<span class="fc bfc" id="L2421" title="All 2 branches covered.">                        size = isHor ? comp.getMinimumWidth(sizeHint) : comp.getMinimumHeight(sizeHint);</span>
+<span class="fc" id="L2422">                        break;</span>
+                    case LayoutUtil.PREF:
+<span class="fc bfc" id="L2424" title="All 2 branches covered.">                        size = isHor ? comp.getPreferredWidth(sizeHint) : comp.getPreferredHeight(sizeHint);</span>
+<span class="fc" id="L2425">                        break;</span>
+                    default:
+<span class="fc bfc" id="L2427" title="All 2 branches covered.">                        size = isHor ? comp.getMaximumWidth(sizeHint) : comp.getMaximumHeight(sizeHint);</span>
+                        break;
+                }
+<span class="pc bpc" id="L2430" title="1 of 2 branches missed.">                if (useVP) {</span>
+                    //Do not include visual padding when calculating layout
+<span class="fc" id="L2432">                    int[] visualPadding = comp.getVisualPadding();</span>
+
+                    // Assume visualPadding is of length 4: top, left, bottom, right
+<span class="pc bpc" id="L2435" title="2 of 4 branches missed.">                    if (visualPadding != null &amp;&amp; visualPadding.length &gt; 0) {</span>
+<span class="fc bfc" id="L2436" title="All 2 branches covered.">                        size -= isHor ? (visualPadding[1] + visualPadding[3]) : (visualPadding[0] + visualPadding[2]);</span>
+                    }
+<span class="fc" id="L2438">                }</span>
+            } else {
+<span class="nc" id="L2440">                ContainerWrapper par = comp.getParent();</span>
+<span class="nc bnc" id="L2441" title="All 2 branches missed.">                float refValue = isHor ? par.getWidth() : par.getHeight();</span>
+<span class="nc" id="L2442">                size = uvs.getSize(sizeType).getPixels(refValue, par, comp);</span>
+            }
+<span class="fc" id="L2444">            return size;</span>
+        }
+
+        private void calcGaps(ComponentWrapper before, CC befCC, ComponentWrapper after, CC aftCC, String tag, boolean flowX, boolean isLTR) {
+<span class="fc" id="L2448">            ContainerWrapper par = comp.getParent();</span>
+<span class="fc" id="L2449">            int parW = par.getWidth();</span>
+<span class="fc" id="L2450">            int parH = par.getHeight();</span>
+
+<span class="pc bpc" id="L2452" title="3 of 4 branches missed.">            BoundSize befGap = before != null ? (flowX ? befCC.getHorizontal() : befCC.getVertical()).getGapAfter() : null;</span>
+<span class="pc bpc" id="L2453" title="3 of 4 branches missed.">            BoundSize aftGap = after != null ? (flowX ? aftCC.getHorizontal() : aftCC.getVertical()).getGapBefore() : null;</span>
+
+<span class="pc bpc" id="L2455" title="1 of 2 branches missed.">            mergeGapSizes(cc.getVertical().getComponentGaps(par, comp, befGap, (flowX ? null : before), tag, parH, 0, isLTR), false, true);</span>
+<span class="pc bpc" id="L2456" title="1 of 2 branches missed.">            mergeGapSizes(cc.getHorizontal().getComponentGaps(par, comp, befGap, (flowX ? before : null), tag, parW, 1, isLTR), true, true);</span>
+<span class="pc bpc" id="L2457" title="1 of 2 branches missed.">            mergeGapSizes(cc.getVertical().getComponentGaps(par, comp, aftGap, (flowX ? null : after), tag, parH, 2, isLTR), false, false);</span>
+<span class="pc bpc" id="L2458" title="1 of 2 branches missed.">            mergeGapSizes(cc.getHorizontal().getComponentGaps(par, comp, aftGap, (flowX ? after : null), tag, parW, 3, isLTR), true, false);</span>
+<span class="fc" id="L2459">        }</span>
+
+        private void setDimBounds(int start, int size, boolean isHor) {
+<span class="fc bfc" id="L2462" title="All 2 branches covered.">            if (isHor) {</span>
+<span class="pc bpc" id="L2463" title="1 of 4 branches missed.">                if (start != x || w != size) {</span>
+<span class="fc" id="L2464">                    x = start;</span>
+<span class="fc" id="L2465">                    w = size;</span>
+<span class="pc bpc" id="L2466" title="1 of 2 branches missed.">                    if (comp.getContentBias() == LayoutUtil.HORIZONTAL) {</span>
+<span class="nc" id="L2467">                        invalidateSizes(); // Only for components that have a bias the sizes will have changed.</span>
+                    }
+                }
+            } else {
+<span class="pc bpc" id="L2471" title="1 of 4 branches missed.">                if (start != y || h != size) {</span>
+<span class="fc" id="L2472">                    y = start;</span>
+<span class="fc" id="L2473">                    h = size;</span>
+<span class="pc bpc" id="L2474" title="1 of 2 branches missed.">                    if (comp.getContentBias() == LayoutUtil.VERTICAL) {</span>
+<span class="nc" id="L2475">                        invalidateSizes(); // Only for components that have a bias the sizes will have changed.</span>
+                    }
+                }
+            }
+<span class="fc" id="L2479">        }</span>
+
+        void invalidateSizes() {
+<span class="nc" id="L2482">            sizesOk = false;</span>
+<span class="nc" id="L2483">        }</span>
+
+        private boolean isPushGap(boolean isHor, boolean isBefore) {
+<span class="pc bpc" id="L2486" title="1 of 6 branches missed.">            if (isHor &amp;&amp; ((isBefore ? 1 : 2) &amp; forcedPushGaps) != 0) {</span>
+<span class="nc" id="L2487">                return true;    // Forced</span>
+            }
+<span class="fc" id="L2489">            DimConstraint dc = cc.getDimConstraint(isHor);</span>
+<span class="fc bfc" id="L2490" title="All 2 branches covered.">            BoundSize s = isBefore ? dc.getGapBefore() : dc.getGapAfter();</span>
+<span class="pc bpc" id="L2491" title="3 of 4 branches missed.">            return s != null &amp;&amp; s.getGapPush();</span>
+        }
+
+        /**
+         * Transfers the bounds to the component
+         */
+        private void transferBounds(boolean addVisualPadding) {
+<span class="pc bpc" id="L2498" title="1 of 2 branches missed.">            if (cc.isExternal()) {</span>
+<span class="nc" id="L2499">                return;</span>
+            }
+
+<span class="fc" id="L2502">            int compX = x;</span>
+<span class="fc" id="L2503">            int compY = y;</span>
+<span class="fc" id="L2504">            int compW = w;</span>
+<span class="fc" id="L2505">            int compH = h;</span>
+
+<span class="pc bpc" id="L2507" title="1 of 2 branches missed.">            if (addVisualPadding) {</span>
+                //Add the visual padding back to the component when changing its size
+<span class="fc" id="L2509">                int[] visualPadding = comp.getVisualPadding();</span>
+<span class="pc bpc" id="L2510" title="1 of 2 branches missed.">                if (visualPadding != null) {</span>
+                    //assume visualPadding is of length 4: top, left, bottom, right
+<span class="fc" id="L2512">                    compX -= visualPadding[1];</span>
+<span class="fc" id="L2513">                    compY -= visualPadding[0];</span>
+<span class="fc" id="L2514">                    compW += (visualPadding[1] + visualPadding[3]);</span>
+<span class="fc" id="L2515">                    compH += (visualPadding[0] + visualPadding[2]);</span>
+                }
+            }
+
+<span class="fc" id="L2519">            comp.setBounds(compX, compY, compW, compH);</span>
+<span class="fc" id="L2520">        }</span>
+
+        private void setForcedSizes(int[] sizes, boolean isHor) {
+<span class="nc bnc" id="L2523" title="All 2 branches missed.">            if (sizes == null) {</span>
+<span class="nc" id="L2524">                return;</span>
+            }
+
+<span class="nc" id="L2527">            System.arraycopy(sizes, 0, getSizes(isHor), 0, 3);</span>
+<span class="nc" id="L2528">            sizesOk = true;</span>
+<span class="nc" id="L2529">        }</span>
+
+        private void setGaps(int[] minPrefMax, int ix) {
+<span class="nc bnc" id="L2532" title="All 2 branches missed.">            if (gaps == null) {</span>
+<span class="nc" id="L2533">                gaps = new int[][]{null, null, null, null};</span>
+            }
+
+<span class="nc" id="L2536">            gaps[ix] = minPrefMax;</span>
+<span class="nc" id="L2537">        }</span>
+
+        private void mergeGapSizes(int[] sizes, boolean isHor, boolean isTL) {
+<span class="fc bfc" id="L2540" title="All 2 branches covered.">            if (gaps == null) {</span>
+<span class="fc" id="L2541">                gaps = new int[][]{null, null, null, null};</span>
+            }
+
+<span class="pc bpc" id="L2544" title="1 of 2 branches missed.">            if (sizes == null) {</span>
+<span class="fc" id="L2545">                return;</span>
+            }
+
+<span class="nc" id="L2548">            int gapIX = getGapIx(isHor, isTL);</span>
+<span class="nc" id="L2549">            int[] oldGaps = gaps[gapIX];</span>
+<span class="nc bnc" id="L2550" title="All 2 branches missed.">            if (oldGaps == null) {</span>
+<span class="nc" id="L2551">                oldGaps = new int[]{0, 0, LayoutUtil.INF};</span>
+<span class="nc" id="L2552">                gaps[gapIX] = oldGaps;</span>
+            }
+
+<span class="nc" id="L2555">            oldGaps[LayoutUtil.MIN] = Math.max(sizes[LayoutUtil.MIN], oldGaps[LayoutUtil.MIN]);</span>
+<span class="nc" id="L2556">            oldGaps[LayoutUtil.PREF] = Math.max(sizes[LayoutUtil.PREF], oldGaps[LayoutUtil.PREF]);</span>
+<span class="nc" id="L2557">            oldGaps[LayoutUtil.MAX] = Math.min(sizes[LayoutUtil.MAX], oldGaps[LayoutUtil.MAX]);</span>
+<span class="nc" id="L2558">        }</span>
+
+        private int getGapIx(boolean isHor, boolean isTL) {
+<span class="fc bfc" id="L2561" title="All 6 branches covered.">            return isHor ? (isTL ? 1 : 3) : (isTL ? 0 : 2);</span>
+        }
+
+        private int getSizeInclGaps(int sizeType, boolean isHor) {
+<span class="fc" id="L2565">            return filter(sizeType, getGapBefore(sizeType, isHor) + getSize(sizeType, isHor) + getGapAfter(sizeType, isHor));</span>
+        }
+
+        private int getSize(int sizeType, boolean isHor) {
+<span class="fc" id="L2569">            return filter(sizeType, getSizes(isHor)[sizeType]);</span>
+        }
+
+        private int getGapBefore(int sizeType, boolean isHor) {
+<span class="fc" id="L2573">            int[] gaps = getGaps(isHor, true);</span>
+<span class="pc bpc" id="L2574" title="1 of 2 branches missed.">            return gaps != null ? filter(sizeType, gaps[sizeType]) : 0;</span>
+        }
+
+        private int getGapAfter(int sizeType, boolean isHor) {
+<span class="fc" id="L2578">            int[] gaps = getGaps(isHor, false);</span>
+<span class="pc bpc" id="L2579" title="1 of 2 branches missed.">            return gaps != null ? filter(sizeType, gaps[sizeType]) : 0;</span>
+        }
+
+        private int[] getGaps(boolean isHor, boolean isTL) {
+<span class="fc" id="L2583">            return gaps[getGapIx(isHor, isTL)];</span>
+        }
+
+        private int filter(int sizeType, int size) {
+<span class="pc bpc" id="L2587" title="1 of 2 branches missed.">            if (size == LayoutUtil.NOT_SET) {</span>
+<span class="nc bnc" id="L2588" title="All 2 branches missed.">                return sizeType != LayoutUtil.MAX ? 0 : LayoutUtil.INF;</span>
+            }
+<span class="fc" id="L2590">            return constrainSize(size);</span>
+        }
+
+        private boolean isBaselineAlign(boolean defValue) {
+<span class="fc" id="L2594">            Float g = cc.getVertical().getGrow();</span>
+<span class="pc bpc" id="L2595" title="1 of 4 branches missed.">            if (g != null &amp;&amp; g.intValue() != 0) {</span>
+<span class="fc" id="L2596">                return false;</span>
+            }
+
+<span class="fc" id="L2599">            UnitValue al = cc.getVertical().getAlign();</span>
+<span class="pc bpc" id="L2600" title="5 of 8 branches missed.">            return (al != null ? al == UnitValue.BASELINE_IDENTITY : defValue) &amp;&amp; comp.hasBaseline();</span>
+        }
+
+        private int getBaseline(int sizeType) {
+<span class="fc" id="L2604">            return comp.getBaseline(getSize(sizeType, true), getSize(sizeType, false));</span>
+        }
+
+        public void adjustMinHorSizeUp(int minSize) {
+<span class="nc" id="L2608">            int[] sz = getSizes(true);</span>
+<span class="nc bnc" id="L2609" title="All 2 branches missed.">            if (sz[LayoutUtil.MIN] &lt; minSize) {</span>
+<span class="nc" id="L2610">                sz[LayoutUtil.MIN] = minSize;</span>
+            }
+<span class="nc" id="L2612">            correctMinMax(sz);</span>
+<span class="nc" id="L2613">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

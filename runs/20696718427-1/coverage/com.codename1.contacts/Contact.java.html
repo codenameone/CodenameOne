@@ -1,0 +1,373 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Contact.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.contacts</a> &gt; <span class="el_source">Contact.java</span></div><h1>Contact.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.contacts;
+
+import com.codename1.ui.Display;
+import com.codename1.ui.Image;
+
+import java.util.Collection;
+import java.util.Hashtable;
+
+/**
+ * &lt;p&gt;Represents a Contact entry from the device Address Book.&lt;br&gt;
+ * The sample below demonstrates listing all the contacts within the device with their photos&lt;/p&gt;
+ *
+ * &lt;script src=&quot;https://gist.github.com/codenameone/15f39e1eef77f6059aff.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/contacts-with-photos.png&quot; alt=&quot;Contacts with the default photos on the simulator, on device these will use actual user photos when available&quot; /&gt;
+ *
+ * @author Chen
+ */
+public class Contact {
+
+    private String id;
+
+    private String firstName;
+
+    private String familyName;
+
+    private String displayName;
+
+    private Hashtable phoneNumbers;
+
+    private String primaryPhoneNumber;
+
+    private Hashtable emails;
+
+    private String primaryEmail;
+
+    private Hashtable addresses;
+
+    private long birthday;
+
+    private String note;
+
+    private Image photo;
+
+    private String[] urls;
+
+    private String[] linkedIds;
+
+    /**
+     * Empty Constructor
+     */
+<span class="fc" id="L73">    public Contact() {</span>
+<span class="fc" id="L74">    }</span>
+
+    /**
+     * Gets the Contact Addresses, the Hashtable contains key/value pairs where
+     * the key is a String which represents the type of the Address, types can
+     * be: &quot;home&quot;, &quot;work&quot;, &quot;other&quot; the value is an Address Object.
+     *
+     * @return Hashtable of available addresses
+     */
+    public Hashtable getAddresses() {
+<span class="fc" id="L84">        return addresses;</span>
+    }
+
+    /**
+     * Sets the Contact Addresses
+     *
+     * @param addresses the Hashtable contains key/value pairs where
+     *                  the key is a String which represents the type of the Address, types can
+     *                  be: &quot;home&quot;, &quot;work&quot;, &quot;other&quot; the value is an Address Object.
+     */
+    public void setAddresses(Hashtable addresses) {
+<span class="fc" id="L95">        this.addresses = addresses;</span>
+<span class="fc" id="L96">    }</span>
+
+    /**
+     * Gets the Contact birthday
+     *
+     * @return birth time
+     */
+    public long getBirthday() {
+<span class="fc" id="L104">        return birthday;</span>
+    }
+
+    /**
+     * Sets the Contact birthday date
+     *
+     * @param birthday
+     */
+    public void setBirthday(long birthday) {
+<span class="fc" id="L113">        this.birthday = birthday;</span>
+<span class="fc" id="L114">    }</span>
+
+    /**
+     * Gets the Contact Display Name
+     *
+     * @return Display Name
+     */
+    public String getDisplayName() {
+<span class="pc bpc" id="L122" title="1 of 4 branches missed.">        if (displayName == null || &quot;&quot;.equals(displayName)) {</span>
+<span class="pc bpc" id="L123" title="1 of 4 branches missed.">            if (familyName != null &amp;&amp; firstName != null) {</span>
+<span class="fc" id="L124">                displayName = firstName + &quot; &quot; + familyName;</span>
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">            } else if (getPrimaryPhoneNumber() != null) {</span>
+<span class="fc" id="L126">                displayName = getPrimaryPhoneNumber();</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">            } else if (getPrimaryEmail() != null) {</span>
+<span class="nc" id="L128">                displayName = getPrimaryEmail();</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">            } else if (getFirstName() != null) {</span>
+<span class="nc" id="L130">                displayName = getFirstName();</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">            } else if (getFamilyName() != null) {</span>
+<span class="nc" id="L132">                displayName = getFamilyName();</span>
+            } else {
+<span class="nc" id="L134">                displayName = id;</span>
+            }
+        }
+<span class="fc" id="L137">        return displayName;</span>
+    }
+
+    /**
+     * Sets the Contact display name
+     *
+     * @param displayName
+     */
+    public void setDisplayName(String displayName) {
+<span class="fc" id="L146">        this.displayName = displayName;</span>
+<span class="fc" id="L147">    }</span>
+
+    /**
+     * Gets the Contact Emails, the Hashtable contains key/value pairs where
+     * the key is a String which represents the type of the Email, types can
+     * be: &quot;home&quot;, &quot;mobile&quot;, &quot;work&quot;, &quot;other&quot; the value is String of the email.
+     *
+     * @return Hashtable of available emails
+     */
+    public Hashtable getEmails() {
+<span class="fc" id="L157">        return emails;</span>
+    }
+
+    /**
+     * Sets the Contact emails
+     *
+     * @param emails the Hashtable contains key/value pairs where
+     *               the key is a String which represents the type of the Email, types can
+     *               be: &quot;home&quot;, &quot;mobile&quot;, &quot;work&quot;, &quot;other&quot; the value is String of the email.
+     */
+    public void setEmails(Hashtable emails) {
+<span class="fc" id="L168">        this.emails = emails;</span>
+<span class="fc" id="L169">    }</span>
+
+    /**
+     * Gets the Contact unique id
+     *
+     * @return Contact unique id
+     */
+    public String getId() {
+<span class="fc" id="L177">        return id;</span>
+    }
+
+    /**
+     * Sets the Contact unique id
+     *
+     * @param id
+     */
+    public void setId(String id) {
+<span class="fc" id="L186">        this.id = id;</span>
+<span class="fc" id="L187">    }</span>
+
+    /**
+     * Gets Contact First Name
+     *
+     * @return Contact Name
+     */
+    public String getFirstName() {
+<span class="fc" id="L195">        return firstName;</span>
+    }
+
+    /**
+     * Sets Contact first name
+     *
+     * @param name
+     */
+    public void setFirstName(String name) {
+<span class="fc" id="L204">        this.firstName = name;</span>
+<span class="fc" id="L205">    }</span>
+
+    /**
+     * Gets Contact family name
+     *
+     * @return
+     */
+    public String getFamilyName() {
+<span class="fc" id="L213">        return familyName;</span>
+    }
+
+    /**
+     * Sets Contact family name
+     *
+     * @param familyName
+     */
+    public void setFamilyName(String familyName) {
+<span class="fc" id="L222">        this.familyName = familyName;</span>
+<span class="fc" id="L223">    }</span>
+
+    /**
+     * Gets Contact Note
+     *
+     * @return Contact Note
+     */
+    public String getNote() {
+<span class="fc" id="L231">        return note;</span>
+    }
+
+    /**
+     * Sets Contact note
+     *
+     * @param note
+     */
+    public void setNote(String note) {
+<span class="fc" id="L240">        this.note = note;</span>
+<span class="fc" id="L241">    }</span>
+
+    /**
+     * Gets the Contact phone numbers, the Hashtable contains key/value pairs where
+     * the key is a String which represents the type of the phone number, types can
+     * be: &quot;home&quot;, &quot;mobile&quot;, &quot;work&quot;, &quot;fax&quot;, &quot;other&quot; the value is String of the
+     * phone number.
+     *
+     * @return Hashtable of available phone numbers
+     */
+    public Hashtable getPhoneNumbers() {
+<span class="fc" id="L252">        return phoneNumbers;</span>
+    }
+
+    /**
+     * Sets Contact phone numbers
+     *
+     * @param phoneNumbers the Hashtable contains key/value pairs where
+     *                     the key is a String which represents the type of the phone number, types can
+     *                     be: &quot;home&quot;, &quot;mobile&quot;, &quot;work&quot;, &quot;fax&quot;, &quot;other&quot; the value is String of the
+     *                     phone number.
+     */
+    public void setPhoneNumbers(Hashtable phoneNumbers) {
+<span class="fc" id="L264">        this.phoneNumbers = phoneNumbers;</span>
+<span class="fc" id="L265">    }</span>
+
+    /**
+     * Gets the Contact photo
+     *
+     * @return the Contact Photo or null if not available
+     */
+    public Image getPhoto() {
+<span class="fc" id="L273">        return photo;</span>
+    }
+
+    /**
+     * Sets Contact photo
+     *
+     * @param photo
+     */
+    public void setPhoto(Image photo) {
+<span class="fc" id="L282">        this.photo = photo;</span>
+<span class="fc" id="L283">    }</span>
+
+    /**
+     * Gets the primary email of this Contact, notice this can be null even though
+     * the Contact has emails declared
+     *
+     * @return the Contact primary email or null if not declared
+     */
+    public String getPrimaryEmail() {
+<span class="pc bpc" id="L292" title="1 of 4 branches missed.">        if (primaryEmail == null &amp;&amp; emails != null) {</span>
+<span class="nc" id="L293">            Collection c = emails.values();</span>
+<span class="nc bnc" id="L294" title="All 2 branches missed.">            if (c.size() &gt; 0) {</span>
+<span class="nc" id="L295">                return (String) c.iterator().next();</span>
+            }
+        }
+<span class="fc" id="L298">        return primaryEmail;</span>
+    }
+
+    /**
+     * Sets Contact primary email
+     *
+     * @param primaryEmail
+     */
+    public void setPrimaryEmail(String primaryEmail) {
+<span class="fc" id="L307">        this.primaryEmail = primaryEmail;</span>
+<span class="fc" id="L308">    }</span>
+
+    /**
+     * Gets the primary phone number of this Contact, notice this can be null
+     * even though the Contact has phone numbers declared
+     *
+     * @return the Contact primary phone number or null if not declared
+     */
+    public String getPrimaryPhoneNumber() {
+<span class="pc bpc" id="L317" title="3 of 4 branches missed.">        if (primaryPhoneNumber == null &amp;&amp; phoneNumbers != null) {</span>
+<span class="nc" id="L318">            Collection c = phoneNumbers.values();</span>
+<span class="nc bnc" id="L319" title="All 2 branches missed.">            if (c.size() &gt; 0) {</span>
+<span class="nc" id="L320">                return (String) c.iterator().next();</span>
+            }
+        }
+<span class="fc" id="L323">        return primaryPhoneNumber;</span>
+    }
+
+    /**
+     * Sets Contact primary phone number
+     *
+     * @param primaryPhoneNumber
+     */
+    public void setPrimaryPhoneNumber(String primaryPhoneNumber) {
+<span class="fc" id="L332">        this.primaryPhoneNumber = primaryPhoneNumber;</span>
+<span class="fc" id="L333">    }</span>
+
+    /**
+     * Gets Contact urls
+     *
+     * @return
+     */
+    public String[] getUrls() {
+<span class="fc" id="L341">        return urls;</span>
+    }
+
+    /**
+     * Sets Contact urls
+     *
+     * @param urls
+     */
+    public void setUrls(String[] urls) {
+<span class="fc" id="L350">        this.urls = urls;</span>
+<span class="fc" id="L351">    }</span>
+
+    /**
+     * Returns all of the contacts that are linked to this contact.
+     * @return The contacts that are linked to this contact.
+     */
+    //public Contact[] getLinkedContacts() {
+    //    return ContactsManager.getLinkedContacts(this);
+    //}
+
+    /**
+     * Returns the IDs of all contacts that are linked to this contact.
+     *
+     * @return IDs of all contacts that are linked to this contact.
+     */
+    public String[] getLinkedContactIds() {
+<span class="nc bnc" id="L367" title="All 2 branches missed.">        if (linkedIds == null) {</span>
+<span class="nc" id="L368">            linkedIds = Display.getInstance().getLinkedContactIds(this);</span>
+        }
+<span class="nc" id="L370">        return linkedIds;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

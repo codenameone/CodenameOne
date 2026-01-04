@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Property.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.properties</a> &gt; <span class="el_source">Property.java</span></div><h1>Property.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+
+package com.codename1.properties;
+
+import com.codename1.compat.java.util.Objects;
+
+/**
+ * Base class for a property, it can store a generic value of any type and broadcast change events to
+ * external listeners
+ *
+ * @author Shai Almog
+ */
+public class Property&lt;T, K&gt; extends PropertyBase&lt;T, K&gt; {
+    private T value;
+
+    /**
+     * Constructs a property with the given name and value
+     *
+     * @param name  the name of the property
+     * @param value the default value for the property
+     */
+    public Property(String name, T value) {
+<span class="fc" id="L44">        super(name);</span>
+<span class="fc" id="L45">        this.value = value;</span>
+<span class="fc" id="L46">    }</span>
+
+    /**
+     * Constructs a property with the given name and value
+     *
+     * @param name        the name of the property
+     * @param genericType the type of the property
+     * @param value       the default value for the property
+     */
+    public Property(String name, Class genericType, T value) {
+<span class="fc" id="L56">        super(name, genericType);</span>
+<span class="fc" id="L57">        this.value = value;</span>
+<span class="fc" id="L58">    }</span>
+
+    /**
+     * Constructs a property with null value
+     *
+     * @param name the name of the property
+     */
+    public Property(String name) {
+<span class="fc" id="L66">        super(name);</span>
+<span class="fc" id="L67">    }</span>
+
+    /**
+     * Constructs a property with null value
+     *
+     * @param genericType the type of the property
+     * @param name        the name of the property
+     */
+    public Property(String name, Class genericType) {
+<span class="fc" id="L76">        super(name, genericType);</span>
+<span class="fc" id="L77">    }</span>
+
+    /**
+     * Gets the property value
+     *
+     * @return the property value
+     */
+    public T get() {
+<span class="fc" id="L85">        internalGet();</span>
+<span class="fc" id="L86">        return value;</span>
+    }
+
+
+    /**
+     * Sets the property value and potentially fires a change event
+     *
+     * @param value the new value
+     */
+    public K set(T value) {
+<span class="fc bfc" id="L96" title="All 2 branches covered.">        if (!(Objects.equals(this.value, value))) {</span>
+<span class="fc" id="L97">            this.value = value;</span>
+<span class="fc" id="L98">            firePropertyChanged();</span>
+<span class="fc" id="L99">            internalSet();</span>
+        }
+<span class="fc bfc" id="L101" title="All 2 branches covered.">        if (parent == null) {</span>
+            // allows properties to work even if they aren't registered in the index
+<span class="fc" id="L103">            return null;</span>
+        }
+<span class="fc" id="L105">        return (K) parent.parent;</span>
+    }
+
+    /**
+     * Compares this property to another property
+     *
+     * @param obj the other property
+     * @return true if they are equal in name and value
+     */
+    @Override
+    public boolean equals(Object obj) {
+<span class="pc bpc" id="L116" title="1 of 2 branches missed.">        if (!super.equals(obj)) {</span>
+<span class="nc" id="L117">            return false;</span>
+        }
+<span class="fc" id="L119">        Property other = (Property) obj;</span>
+<span class="fc" id="L120">        Object otherval = other.get();</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        if (otherval == value) {</span>
+<span class="fc" id="L122">            return true;</span>
+        }
+<span class="pc bpc" id="L124" title="2 of 4 branches missed.">        return otherval != null &amp;&amp; otherval.equals(value);</span>
+    }
+
+    /**
+     * Returns the internal hashcode or 0 for null property
+     *
+     * @return the hashcode value
+     */
+    @Override
+    public int hashCode() {
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        if (value == null) return 0;</span>
+<span class="nc" id="L135">        return value.hashCode();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="fc" id="L140">        return &quot;&quot; + value;</span>
+    }
+
+    @Override
+    void setImpl(Object val) {
+<span class="fc" id="L145">        set((T) val);</span>
+<span class="fc" id="L146">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

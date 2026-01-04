@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TRoundingMode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">TRoundingMode.java</span></div><h1>TRoundingMode.java</h1><pre class="source lang-java linenums">/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the &quot;License&quot;); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package com.codename1.util;
+
+/**
+ * Specifies the rounding behavior for operations whose results cannot be
+ * represented exactly.
+ */
+<span class="fc" id="L24">enum TRoundingMode {</span>
+
+    /**
+     * Rounding mode where positive values are rounded towards positive infinity
+     * and negative values towards negative infinity.
+     * &lt;br&gt;
+     * Rule: {@code x.round().abs() &gt;= x.abs()}
+     */
+<span class="fc" id="L32">    UP(TBigDecimal.ROUND_UP),</span>
+
+    /**
+     * Rounding mode where the values are rounded towards zero.
+     * &lt;br&gt;
+     * Rule: {@code x.round().abs() &lt;= x.abs()}
+     */
+<span class="fc" id="L39">    DOWN(TBigDecimal.ROUND_DOWN),</span>
+
+    /**
+     * Rounding mode to round towards positive infinity. For positive values
+     * this rounding mode behaves as {@link #UP}, for negative values as
+     * {@link #DOWN}.
+     * &lt;br&gt;
+     * Rule: {@code x.round() &gt;= x}
+     */
+<span class="fc" id="L48">    CEILING(TBigDecimal.ROUND_CEILING),</span>
+
+    /**
+     * Rounding mode to round towards negative infinity. For positive values
+     * this rounding mode behaves as {@link #DOWN}, for negative values as
+     * {@link #UP}.
+     * &lt;br&gt;
+     * Rule: {@code x.round() &lt;= x}
+     */
+<span class="fc" id="L57">    FLOOR(TBigDecimal.ROUND_FLOOR),</span>
+
+    /**
+     * Rounding mode where values are rounded towards the nearest neighbor. Ties
+     * are broken by rounding up.
+     */
+<span class="fc" id="L63">    HALF_UP(TBigDecimal.ROUND_HALF_UP),</span>
+
+    /**
+     * Rounding mode where values are rounded towards the nearest neighbor. Ties
+     * are broken by rounding down.
+     */
+<span class="fc" id="L69">    HALF_DOWN(TBigDecimal.ROUND_HALF_DOWN),</span>
+
+    /**
+     * Rounding mode where values are rounded towards the nearest neighbor. Ties
+     * are broken by rounding to the even neighbor.
+     */
+<span class="fc" id="L75">    HALF_EVEN(TBigDecimal.ROUND_HALF_EVEN),</span>
+
+    /**
+     * Rounding mode where the rounding operations throws an ArithmeticException
+     * for the case that rounding is necessary, i.e. for the case that the value
+     * cannot be represented exactly.
+     */
+<span class="fc" id="L82">    UNNECESSARY(TBigDecimal.ROUND_UNNECESSARY);</span>
+
+    /**
+     * The old constant of &lt;code&gt;BigDecimal&lt;/code&gt;.
+     */
+    @SuppressWarnings(&quot;unused&quot;)
+    private final int bigDecimalRM;
+
+    /**
+     * It sets the old constant.
+     */
+<span class="fc" id="L93">    TRoundingMode(int rm) {</span>
+<span class="fc" id="L94">        bigDecimalRM = rm;</span>
+<span class="fc" id="L95">    }</span>
+
+    /**
+     * Converts rounding mode constants from class {@code BigDecimal} into
+     * {@code RoundingMode} values.
+     *
+     * @param mode rounding mode constant as defined in class {@code BigDecimal}
+     * @return corresponding rounding mode object
+     */
+    public static TRoundingMode valueOf(int mode) {
+<span class="pc bpc" id="L105" title="8 of 9 branches missed.">        switch (mode) {</span>
+            case TBigDecimal.ROUND_CEILING:
+<span class="nc" id="L107">                return CEILING;</span>
+            case TBigDecimal.ROUND_DOWN:
+<span class="nc" id="L109">                return DOWN;</span>
+            case TBigDecimal.ROUND_FLOOR:
+<span class="nc" id="L111">                return FLOOR;</span>
+            case TBigDecimal.ROUND_HALF_DOWN:
+<span class="nc" id="L113">                return HALF_DOWN;</span>
+            case TBigDecimal.ROUND_HALF_EVEN:
+<span class="fc" id="L115">                return HALF_EVEN;</span>
+            case TBigDecimal.ROUND_HALF_UP:
+<span class="nc" id="L117">                return HALF_UP;</span>
+            case TBigDecimal.ROUND_UNNECESSARY:
+<span class="nc" id="L119">                return UNNECESSARY;</span>
+            case TBigDecimal.ROUND_UP:
+<span class="nc" id="L121">                return UP;</span>
+            default:
+<span class="nc" id="L123">                throw new IllegalArgumentException(&quot;Invalid rounding mode&quot;);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

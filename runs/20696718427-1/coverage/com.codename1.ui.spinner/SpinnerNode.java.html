@@ -1,0 +1,462 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SpinnerNode.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.spinner</a> &gt; <span class="el_source">SpinnerNode.java</span></div><h1>SpinnerNode.java</h1><pre class="source lang-java linenums">/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package com.codename1.ui.spinner;
+
+import com.codename1.ui.Component;
+import com.codename1.ui.Graphics;
+import com.codename1.ui.Label;
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.events.ScrollListener;
+import com.codename1.ui.events.SelectionListener;
+import com.codename1.ui.geom.Rectangle;
+import com.codename1.ui.geom.Rectangle2D;
+import com.codename1.ui.list.ListModel;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.scene.Bounds;
+import com.codename1.ui.scene.Node;
+import com.codename1.ui.scene.NodePainter;
+import com.codename1.ui.scene.Point3D;
+import com.codename1.ui.scene.TextPainter;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * A spinner node for rendering spinnable lists.
+ *
+ * @author shannah
+ */
+class SpinnerNode extends Node {
+    ListModel&lt;String&gt; listModel;
+<span class="fc" id="L36">    Node selectedRowOverlay = new Node();</span>
+<span class="fc" id="L37">    private final Label rowTemplate = new Label(&quot;&quot;, &quot;Spinner3DRow&quot;);</span>
+<span class="fc" id="L38">    private final Label overlayTemplate = new Label(&quot;&quot;, &quot;Spinner3DOverlay&quot;);</span>
+    private final Style rowStyle;
+    private final Style selectedRowStyle;
+    private final Style overlayStyle;
+<span class="fc" id="L42">    private final Map&lt;Integer, Node&gt; childIndex = new HashMap&lt;Integer, Node&gt;();</span>
+    private List&lt;ScrollListener&gt; scrollListeners;
+    private boolean setSelectedIndexReentrantLock;
+    private boolean setScrollYReentrantLock;
+    private RowFormatter rowFormatter;
+    private double flatScrollPos;
+    private static final int numSides = 14;
+<span class="fc" id="L49">    private final Label renderer = new Label(&quot;Testing&quot;, &quot;Spinner3DRow&quot;);</span>
+<span class="fc" id="L50">    private final DataChangedListener listChangedListener = new DataChangedListener() {</span>
+        public void dataChanged(int type, int index) {
+<span class="nc" id="L52">            rebuildChildren();</span>
+<span class="nc" id="L53">        }</span>
+    };
+<span class="fc" id="L55">    private int selectedIndex = -1;</span>
+    private List&lt;SelectionListener&gt; selectionListeners;
+<span class="fc" id="L57">    private final SelectionListener selectionListener = new SelectionListener() {</span>
+        public void selectionChanged(int oldSelected, int newSelected) {
+<span class="pc bpc" id="L59" title="3 of 4 branches missed.">            if (newSelected &lt; 0 &amp;&amp; listModel != null) {</span>
+<span class="nc" id="L60">                newSelected = listModel.getSelectedIndex();</span>
+            }
+<span class="pc bpc" id="L62" title="2 of 6 branches missed.">            if (newSelected &gt;= 0 &amp;&amp; newSelected &lt; listModel.getSize() &amp;&amp; newSelected != selectedIndex) {</span>
+<span class="fc" id="L63">                setSelectedIndex(newSelected);</span>
+            }
+<span class="fc" id="L65">        }</span>
+    };
+<span class="fc" id="L67">    public SpinnerNode() {</span>
+<span class="fc" id="L68">        rowStyle = rowTemplate.getUnselectedStyle();</span>
+<span class="fc" id="L69">        selectedRowStyle = rowTemplate.getSelectedStyle();</span>
+<span class="fc" id="L70">        overlayStyle = overlayTemplate.getUnselectedStyle();</span>
+<span class="fc" id="L71">        selectedRowOverlay.setStyle(overlayStyle);</span>
+<span class="fc" id="L72">        selectedRowOverlay.setRenderer(new SpinnerNodePainter());</span>
+<span class="fc" id="L73">    }</span>
+
+    private static boolean usePerspective() {
+        // Disabling perspective for now because need to work out a few issues
+<span class="fc" id="L77">        return false;</span>
+    }
+
+    public void addScrollListener(ScrollListener l) {
+<span class="pc bpc" id="L81" title="1 of 2 branches missed.">        if (scrollListeners == null) {</span>
+<span class="fc" id="L82">            scrollListeners = new ArrayList&lt;ScrollListener&gt;();</span>
+        }
+<span class="fc" id="L84">        scrollListeners.add(l);</span>
+<span class="fc" id="L85">    }</span>
+
+    public void removeScrollListener(ScrollListener l) {
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        if (scrollListeners != null) {</span>
+<span class="nc" id="L89">            scrollListeners.remove(l);</span>
+<span class="nc bnc" id="L90" title="All 2 branches missed.">            if (scrollListeners.isEmpty()) {</span>
+<span class="nc" id="L91">                scrollListeners = null;</span>
+            }
+        }
+<span class="nc" id="L94">    }</span>
+
+    private void fireScrollEvent(int scrollPos) {
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        if (scrollListeners != null) {</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">            for (ScrollListener l : scrollListeners) {</span>
+<span class="fc" id="L99">                l.scrollChanged(-1, scrollPos, -1, -1);</span>
+<span class="fc" id="L100">            }</span>
+        }
+<span class="fc" id="L102">    }</span>
+
+    public void setRowFormatter(RowFormatter formatter) {
+<span class="pc bpc" id="L105" title="1 of 2 branches missed.">        if (rowFormatter != formatter) {</span>
+<span class="fc" id="L106">            rowFormatter = formatter;</span>
+<span class="fc" id="L107">            rebuildChildren();</span>
+        }
+<span class="fc" id="L109">    }</span>
+
+    public Style getRowStyle() {
+<span class="fc" id="L112">        return rowStyle;</span>
+    }
+
+    public int getNumSides() {
+<span class="nc" id="L116">        return numSides;</span>
+    }
+
+    public Style getSelectedRowStyle() {
+<span class="fc" id="L120">        return selectedRowStyle;</span>
+    }
+
+    public Style getSelectedOverlayStyle() {
+<span class="fc" id="L124">        return overlayStyle;</span>
+    }
+
+    public ListModel&lt;String&gt; getListModel() {
+<span class="fc" id="L128">        return listModel;</span>
+    }
+
+    public void setListModel(ListModel&lt;String&gt; list) {
+<span class="fc bfc" id="L132" title="All 2 branches covered.">        if (listModel != null) {</span>
+<span class="fc" id="L133">            listModel.removeSelectionListener(selectionListener);</span>
+<span class="fc" id="L134">            listModel.removeDataChangedListener(listChangedListener);</span>
+        }
+<span class="fc" id="L136">        listModel = list;</span>
+<span class="pc bpc" id="L137" title="1 of 2 branches missed.">        if (listModel != null) {</span>
+<span class="fc" id="L138">            listModel.addSelectionListener(selectionListener);</span>
+<span class="fc" id="L139">            listModel.addDataChangedListener(listChangedListener);</span>
+        }
+<span class="fc" id="L141">        rebuildChildren();</span>
+<span class="fc" id="L142">    }</span>
+
+    private void rebuildChildren() {
+<span class="fc" id="L145">        childIndex.clear();</span>
+<span class="fc" id="L146">        removeAll();</span>
+<span class="fc" id="L147">        setSelectedIndex(listModel.getSelectedIndex());</span>
+<span class="fc" id="L148">        add(selectedRowOverlay);</span>
+<span class="fc" id="L149">    }</span>
+
+    public Node getSelectedRowOverlay() {
+<span class="nc" id="L152">        return selectedRowOverlay;</span>
+    }
+
+    public double calcRowHeight() {
+<span class="fc" id="L156">        return renderer.getPreferredH();</span>
+    }
+
+    public double calcFlatListHeight() {
+<span class="fc" id="L160">        return renderer.getPreferredH() * listModel.getSize();</span>
+    }
+
+    public double calcViewportHeight() {
+<span class="fc" id="L164">        double circumference = renderer.getPreferredH() * numSides;</span>
+<span class="fc" id="L165">        double diameter = circumference / Math.PI;</span>
+<span class="fc" id="L166">        return diameter;</span>
+    }
+
+    private double calculateRotationForChild(int index) {
+<span class="fc" id="L170">        double degreeOffset = flatScrollPos * 360.0 / (numSides * renderer.getPreferredH());</span>
+
+<span class="fc" id="L172">        int pos = index % numSides;</span>
+<span class="fc" id="L173">        return (-(360.0 / numSides) * pos + degreeOffset) % 360;</span>
+    }
+
+    private double getRotationRangeForSide() {
+<span class="fc" id="L177">        return 360.0 / numSides;</span>
+    }
+
+    private double getFlatVisibleHeight() {
+<span class="nc" id="L181">        return renderer.getPreferredH() * numSides / 2;</span>
+    }
+
+    public int getSelectedIndex() {
+<span class="fc" id="L185">        return (int) (flatScrollPos / calcFlatListHeight() * listModel.getSize());</span>
+    }
+
+    public void setSelectedIndex(int index) {
+<span class="pc bpc" id="L189" title="1 of 2 branches missed.">        if (setSelectedIndexReentrantLock) {</span>
+<span class="nc" id="L190">            return;</span>
+        }
+<span class="fc" id="L192">        setSelectedIndexReentrantLock = true;</span>
+        try {
+<span class="pc bpc" id="L194" title="2 of 4 branches missed.">            if (index &lt; 0 || index &gt; listModel.getSize() - 1) {</span>
+<span class="nc" id="L195">                throw new ArrayIndexOutOfBoundsException(&quot;Index out of bounds:&quot; + index + &quot;, must be between 0 and &quot; + (listModel.getSize() - 1));</span>
+            }
+
+<span class="fc" id="L198">            setScrollY(index * calcFlatListHeight() / listModel.getSize());</span>
+        } finally {
+<span class="fc" id="L200">            setSelectedIndexReentrantLock = false;</span>
+        }
+<span class="fc" id="L202">    }</span>
+
+    private void updateSelectedIndex() {
+<span class="fc" id="L205">        int newSelectedIndex = getSelectedIndex();</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if (newSelectedIndex != selectedIndex) {</span>
+<span class="fc" id="L207">            int oldSelectedIndex = selectedIndex;</span>
+<span class="fc" id="L208">            selectedIndex = newSelectedIndex;</span>
+<span class="fc" id="L209">            listModel.setSelectedIndex(newSelectedIndex);</span>
+<span class="pc bpc" id="L210" title="3 of 4 branches missed.">            if (selectionListeners != null &amp;&amp; !selectionListeners.isEmpty()) {</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">                for (SelectionListener l : selectionListeners) {</span>
+<span class="nc" id="L212">                    l.selectionChanged(oldSelectedIndex, newSelectedIndex);</span>
+<span class="nc" id="L213">                }</span>
+            }
+
+        }
+<span class="fc" id="L217">    }</span>
+
+    public void addSelectionListener(SelectionListener l) {
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        if (selectionListeners == null) {</span>
+<span class="nc" id="L221">            selectionListeners = new ArrayList&lt;SelectionListener&gt;();</span>
+        }
+<span class="nc" id="L223">        selectionListeners.add(l);</span>
+<span class="nc" id="L224">    }</span>
+
+    public void removeSelectionListener(SelectionListener l) {
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        if (selectionListeners != null) {</span>
+<span class="nc" id="L228">            selectionListeners.remove(l);</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">            if (selectionListeners.isEmpty()) {</span>
+<span class="nc" id="L230">                selectionListeners = null;</span>
+            }
+        }
+<span class="nc" id="L233">    }</span>
+
+    private int getMinVisibleIndex(int selectedIndex) {
+<span class="fc" id="L236">        return selectedIndex - numSides / 4;</span>
+    }
+
+    private int getMaxVisibleIndex(int selectedIndex) {
+<span class="fc" id="L240">        return selectedIndex + numSides / 4;</span>
+    }
+
+    public double getScrollY() {
+<span class="fc" id="L244">        return flatScrollPos;</span>
+    }
+
+    public void setScrollY(double pos) {
+<span class="fc bfc" id="L248" title="All 2 branches covered.">        if (setScrollYReentrantLock) {</span>
+<span class="fc" id="L249">            return;</span>
+        }
+<span class="fc" id="L251">        setScrollYReentrantLock = true;</span>
+        try {
+<span class="fc" id="L253">            final int prevScrollPos = (int) flatScrollPos;</span>
+<span class="fc" id="L254">            final int posInt = (int) pos;</span>
+<span class="fc bfc" id="L255" title="All 2 branches covered.">            if (prevScrollPos != posInt) {</span>
+<span class="fc" id="L256">                this.flatScrollPos = posInt;</span>
+<span class="fc" id="L257">                setNeedsLayout(true);</span>
+<span class="fc bfc" id="L258" title="All 2 branches covered.">                if (getScene() != null) {</span>
+<span class="fc" id="L259">                    getScene().repaint();</span>
+                }
+<span class="fc" id="L261">                updateSelectedIndex();</span>
+<span class="fc" id="L262">                fireScrollEvent((int) pos);</span>
+            }
+        } finally {
+<span class="fc" id="L265">            setScrollYReentrantLock = false;</span>
+        }
+<span class="fc" id="L267">    }</span>
+
+    private Node getOrCreateChild(int i) {
+<span class="fc bfc" id="L270" title="All 2 branches covered.">        if (childIndex.containsKey(i)) {</span>
+<span class="fc" id="L271">            return childIndex.get(i);</span>
+        }
+<span class="pc bpc" id="L273" title="1 of 2 branches missed.">        if (listModel != null) {</span>
+<span class="fc" id="L274">            ListModel&lt;String&gt; list = listModel;</span>
+<span class="fc" id="L275">            final Node n = new Node();</span>
+<span class="fc" id="L276">            String lbl = list.getItemAt(i);</span>
+<span class="pc bpc" id="L277" title="1 of 2 branches missed.">            if (rowFormatter != null) {</span>
+<span class="nc" id="L278">                lbl = rowFormatter.format(lbl);</span>
+            }
+<span class="fc" id="L280">            Label renderer = new SpinnerRenderer(lbl, n);</span>
+
+<span class="fc" id="L282">            renderer.setSelectedStyle(getSelectedRowStyle());</span>
+<span class="fc" id="L283">            renderer.setUnselectedStyle(getRowStyle());</span>
+<span class="fc" id="L284">            n.setRenderer(new TextPainter(lbl, Component.CENTER));</span>
+<span class="fc" id="L285">            remove(selectedRowOverlay);</span>
+<span class="fc" id="L286">            add(n);</span>
+<span class="fc" id="L287">            add(selectedRowOverlay);</span>
+<span class="fc" id="L288">            childIndex.put(i, n);</span>
+
+<span class="fc" id="L290">            return n;</span>
+        }
+
+<span class="nc" id="L293">        return null;</span>
+    }
+
+    @Override
+    protected void layoutChildren() {
+<span class="fc" id="L298">        double width = boundsInLocal.get().getWidth();</span>
+<span class="fc" id="L299">        double rendererHeight = renderer.getPreferredH();</span>
+<span class="fc" id="L300">        double circumference = rendererHeight * numSides;</span>
+<span class="fc" id="L301">        double diameter = circumference / Math.PI;</span>
+<span class="fc" id="L302">        int index = 0;</span>
+<span class="fc" id="L303">        int selectedIndex = getSelectedIndex();</span>
+<span class="fc" id="L304">        int minVisibleIndex = getMinVisibleIndex(selectedIndex);</span>
+<span class="fc" id="L305">        int maxVisibleIndex = getMaxVisibleIndex(selectedIndex);</span>
+<span class="pc bpc" id="L306" title="1 of 2 branches missed.">        if (hasChildren()) {</span>
+<span class="fc" id="L307">            int len = listModel.getSize();</span>
+<span class="fc bfc" id="L308" title="All 2 branches covered.">            for (int i = 0; i &lt; len; i++) {</span>
+<span class="pc bpc" id="L309" title="4 of 6 branches missed.">                if ((minVisibleIndex &gt; index || maxVisibleIndex &lt; index) &amp;&amp; !childIndex.containsKey(i)) {</span>
+<span class="nc" id="L310">                    index++;</span>
+<span class="nc" id="L311">                    continue;</span>
+                }
+<span class="fc" id="L313">                Node child = getOrCreateChild(i);</span>
+<span class="pc bpc" id="L314" title="2 of 4 branches missed.">                if (minVisibleIndex &gt; index || maxVisibleIndex &lt; index) {</span>
+<span class="nc" id="L315">                    child.visible.set(false);</span>
+<span class="nc" id="L316">                    index++;</span>
+<span class="nc" id="L317">                    continue;</span>
+                }
+<span class="fc" id="L319">                child.visible.set(true);</span>
+<span class="fc" id="L320">                Bounds localBounds = child.boundsInLocal.get();</span>
+<span class="fc" id="L321">                localBounds.setWidth(width);</span>
+<span class="fc" id="L322">                localBounds.setDepth(0);</span>
+<span class="fc" id="L323">                localBounds.setHeight(diameter);</span>
+<span class="fc" id="L324">                localBounds.setMinX(0.0);</span>
+<span class="fc" id="L325">                localBounds.setMinY(0.0);</span>
+<span class="fc" id="L326">                child.paintingRect.set(new Rectangle(0, (int) (diameter / 2 - rendererHeight / 2), (int) width, (int) rendererHeight));</span>
+<span class="pc bpc" id="L327" title="1 of 2 branches missed.">                if (usePerspective()) {</span>
+<span class="nc" id="L328">                    localBounds.setDepth(diameter);</span>
+<span class="nc" id="L329">                    double angle = calculateRotationForChild(index);</span>
+<span class="nc bnc" id="L330" title="All 2 branches missed.">                    if (Math.abs(angle) &lt; 10) {</span>
+<span class="nc" id="L331">                        child.addTags(&quot;selected&quot;);</span>
+<span class="nc" id="L332">                        child.setStyle(getSelectedRowStyle());</span>
+<span class="nc" id="L333">                        child.opacity.set(1.0);</span>
+                    } else {
+<span class="nc" id="L335">                        child.removeTags(&quot;selected&quot;);</span>
+<span class="nc" id="L336">                        double opacity = Math.cos(angle * Math.PI / 180);</span>
+<span class="nc" id="L337">                        child.setStyle(getRowStyle());</span>
+<span class="nc" id="L338">                        child.opacity.set(opacity);</span>
+                    }
+<span class="nc" id="L340">                    child.rotate.set(-angle);</span>
+<span class="nc" id="L341">                    child.rotationAxis.set(new Point3D(1, 0, 0)); // Rotate along X-Axis</span>
+<span class="nc" id="L342">                    child.layoutX.set(0.0);</span>
+<span class="nc" id="L343">                    child.layoutY.set(0.0);</span>
+<span class="nc" id="L344">                    child.layoutZ.set(-diameter / 2);</span>
+<span class="nc" id="L345">                } else {</span>
+<span class="fc" id="L346">                    double angle = calculateRotationForChild(index) * Math.PI / 180.0;</span>
+<span class="fc" id="L347">                    double minAngle = angle + getRotationRangeForSide() * Math.PI / 180.0 / 2;</span>
+<span class="fc" id="L348">                    double maxAngle = angle - getRotationRangeForSide() * Math.PI / 180.0 / 2;</span>
+<span class="fc bfc" id="L349" title="All 2 branches covered.">                    if (Math.abs(angle) &lt; 10 * Math.PI / 180) {</span>
+<span class="fc" id="L350">                        child.addTags(&quot;selected&quot;);</span>
+<span class="fc" id="L351">                        child.setStyle(selectedRowStyle);</span>
+<span class="fc" id="L352">                        child.opacity.set(1.0);</span>
+                    } else {
+<span class="fc" id="L354">                        child.removeTags(&quot;selected&quot;);</span>
+<span class="fc" id="L355">                        child.setStyle(rowStyle);</span>
+<span class="fc" id="L356">                        double opacity = Math.cos(angle);</span>
+<span class="fc" id="L357">                        child.opacity.set(opacity);</span>
+                    }
+<span class="fc" id="L359">                    double projectedHeight = Math.abs((diameter / 2) * (Math.sin(minAngle) - Math.sin(maxAngle)));</span>
+<span class="fc" id="L360">                    child.layoutX.set(0.0);</span>
+<span class="fc" id="L361">                    child.layoutY.set(-(diameter / 2) * Math.sin(angle));</span>
+<span class="fc" id="L362">                    child.layoutZ.set(0.0);</span>
+<span class="fc" id="L363">                    child.scaleY.set(projectedHeight / rendererHeight);</span>
+                }
+
+<span class="fc" id="L366">                index++;</span>
+            }
+
+<span class="fc" id="L369">            Bounds b = selectedRowOverlay.boundsInLocal.get();</span>
+<span class="fc" id="L370">            b.setWidth(width);</span>
+<span class="fc" id="L371">            b.setHeight(rendererHeight);</span>
+<span class="fc" id="L372">            b.setMinX(0);</span>
+<span class="fc" id="L373">            b.setMinY(0);</span>
+<span class="fc" id="L374">            selectedRowOverlay.layoutX.set(0.0);</span>
+<span class="fc" id="L375">            selectedRowOverlay.layoutY.set(diameter / 2 - rendererHeight / 2);</span>
+        }
+<span class="fc" id="L377">    }</span>
+
+    public void render(Graphics g) {
+<span class="fc" id="L380">        g.setColor(overlayStyle.getBgColor());</span>
+<span class="fc" id="L381">        int alpha = g.getAlpha();</span>
+<span class="fc" id="L382">        g.setAlpha(255);</span>
+<span class="fc" id="L383">        g.fillRect(0, 0, (int) boundsInLocal.get().getWidth(), (int) boundsInLocal.get().getHeight());</span>
+<span class="fc" id="L384">        g.setAlpha(alpha);</span>
+<span class="fc" id="L385">        super.render(g);</span>
+
+<span class="fc" id="L387">        int clipX = g.getClipX();</span>
+<span class="fc" id="L388">        int clipY = g.getClipY();</span>
+<span class="fc" id="L389">        int clipW = g.getClipWidth();</span>
+<span class="fc" id="L390">        int clipH = g.getClipHeight();</span>
+<span class="fc" id="L391">        Rectangle2D overlayRect = selectedRowOverlay.getBoundsInScene(new Rectangle2D());</span>
+
+<span class="fc" id="L393">        double magnification = 1.35;</span>
+<span class="fc" id="L394">        double oldScaleX = scaleX.get();</span>
+<span class="fc" id="L395">        double oldScaleY = scaleY.get();</span>
+<span class="fc" id="L396">        double oldTranslateX = translateX.get();</span>
+<span class="fc" id="L397">        scaleX.set(oldScaleX * magnification);</span>
+<span class="fc" id="L398">        scaleY.set(oldScaleY * magnification);</span>
+<span class="pc bpc" id="L399" title="2 of 3 branches missed.">        switch (getRowStyle().getAlignment()) {</span>
+            case Component.LEFT:
+<span class="nc" id="L401">                translateX.set(oldTranslateX + boundsInLocal.get().getWidth() * (magnification - 1.0) / 2 / magnification);</span>
+<span class="nc" id="L402">                break;</span>
+            case Component.RIGHT:
+<span class="nc" id="L404">                translateX.set(oldTranslateX - boundsInLocal.get().getWidth() * (magnification - 1.0) / 2 / magnification);</span>
+<span class="nc" id="L405">                break;</span>
+            default:
+                break;
+        }
+
+<span class="fc" id="L410">        selectedRowOverlay.visible.set(false);</span>
+<span class="fc" id="L411">        g.setClip(</span>
+<span class="fc" id="L412">                (int) overlayRect.getX(),</span>
+<span class="fc" id="L413">                (int) overlayRect.getY() + 1,</span>
+<span class="fc" id="L414">                (int) overlayRect.getWidth(),</span>
+<span class="fc" id="L415">                (int) overlayRect.getHeight() - 2</span>
+        );
+<span class="fc" id="L417">        super.render(g);</span>
+<span class="fc" id="L418">        selectedRowOverlay.visible.set(true);</span>
+<span class="fc" id="L419">        g.setClip(clipX, clipY, clipW, clipH);</span>
+<span class="fc" id="L420">        scaleX.set(oldScaleX);</span>
+<span class="fc" id="L421">        scaleY.set(oldScaleY);</span>
+<span class="fc" id="L422">        translateX.set(oldTranslateX);</span>
+<span class="fc" id="L423">    }</span>
+
+    public interface RowFormatter {
+        String format(String input);
+    }
+
+    private static class SpinnerRenderer extends Label {
+        private final Node n;
+
+        public SpinnerRenderer(String lbl, Node n) {
+<span class="fc" id="L433">            super(lbl, &quot;Spinner3DRow&quot;);</span>
+<span class="fc" id="L434">            this.n = n;</span>
+<span class="fc" id="L435">        }</span>
+
+        @Override
+        public Style getStyle() {
+<span class="pc bpc" id="L439" title="1 of 2 branches missed.">            if (n.hasTag(&quot;selected&quot;)) {</span>
+<span class="nc" id="L440">                return this.getSelectedStyle();</span>
+            } else {
+<span class="fc" id="L442">                return this.getUnselectedStyle();</span>
+            }
+        }
+    }
+
+    private static class SpinnerNodePainter implements NodePainter {
+        public void paint(Graphics g, Rectangle bounds, Node node) {
+<span class="fc" id="L449">            Style style = node.getStyle();</span>
+<span class="fc" id="L450">            g.setColor(style.getBgColor());</span>
+<span class="fc" id="L451">            g.fillRect(bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight());</span>
+<span class="fc" id="L452">            g.setColor(style.getFgColor());</span>
+<span class="fc" id="L453">            int alpha = g.concatenateAlpha(style.getFgAlpha());</span>
+<span class="fc" id="L454">            g.drawLine(bounds.getX(), bounds.getY(), bounds.getWidth() + bounds.getX(), bounds.getY());</span>
+<span class="fc" id="L455">            g.drawLine(bounds.getX(), bounds.getY() + bounds.getHeight(),</span>
+<span class="fc" id="L456">                    bounds.getX() + bounds.getWidth(), bounds.getY() + bounds.getHeight()</span>
+            );
+<span class="fc" id="L458">            g.setAlpha(alpha);</span>
+<span class="fc" id="L459">        }</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

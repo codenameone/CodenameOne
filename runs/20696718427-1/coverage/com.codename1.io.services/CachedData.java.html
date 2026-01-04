@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CachedData.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.services</a> &gt; <span class="el_source">CachedData.java</span></div><h1>CachedData.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.io.services;
+
+import com.codename1.io.Externalizable;
+import com.codename1.io.Util;
+
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
+
+/**
+ * Cached data class for use with the cached data service
+ *
+ * @author Shai Almog
+ */
+<span class="fc" id="L37">public class CachedData implements Externalizable {</span>
+    private byte[] data;
+    private String url;
+    private String etag;
+    private String modified;
+
+    // lock to prevent multiple requests to the same data
+    private boolean fetching;
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getVersion() {
+<span class="fc" id="L50">        return 1;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public void externalize(DataOutputStream out) throws IOException {
+<span class="fc" id="L57">        Util.writeUTF(url, out);</span>
+<span class="fc" id="L58">        Util.writeUTF(etag, out);</span>
+<span class="fc" id="L59">        Util.writeUTF(modified, out);</span>
+<span class="fc" id="L60">        out.writeInt(data.length);</span>
+<span class="fc" id="L61">        out.write(data);</span>
+<span class="fc" id="L62">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void internalize(int version, DataInputStream in) throws IOException {
+<span class="fc" id="L68">        url = Util.readUTF(in);</span>
+<span class="fc" id="L69">        etag = Util.readUTF(in);</span>
+<span class="fc" id="L70">        modified = Util.readUTF(in);</span>
+<span class="fc" id="L71">        data = new byte[in.readInt()];</span>
+<span class="fc" id="L72">        in.readFully(data);</span>
+<span class="fc" id="L73">    }</span>
+
+    public String getObjectId() {
+<span class="nc" id="L76">        return &quot;CachedData&quot;;</span>
+    }
+
+    /**
+     * @return the data
+     */
+    public byte[] getData() {
+<span class="fc" id="L83">        return data;</span>
+    }
+
+    /**
+     * @param data the data to set
+     */
+    public void setData(byte[] data) {
+<span class="fc" id="L90">        this.data = data;</span>
+<span class="fc" id="L91">    }</span>
+
+    /**
+     * @return the url
+     */
+    public String getUrl() {
+<span class="fc" id="L97">        return url;</span>
+    }
+
+    /**
+     * @param url the url to set
+     */
+    public void setUrl(String url) {
+<span class="fc" id="L104">        this.url = url;</span>
+<span class="fc" id="L105">    }</span>
+
+    /**
+     * @return the etag
+     */
+    String getEtag() {
+<span class="fc" id="L111">        return etag;</span>
+    }
+
+    /**
+     * @param etag the etag to set
+     */
+    void setEtag(String etag) {
+<span class="fc" id="L118">        this.etag = etag;</span>
+<span class="fc" id="L119">    }</span>
+
+    /**
+     * @return the modified
+     */
+    String getModified() {
+<span class="fc" id="L125">        return modified;</span>
+    }
+
+    /**
+     * @param modified the modified to set
+     */
+    void setModified(String modified) {
+<span class="fc" id="L132">        this.modified = modified;</span>
+<span class="fc" id="L133">    }</span>
+
+    /**
+     * @return the fetching
+     */
+    boolean isFetching() {
+<span class="fc" id="L139">        return fetching;</span>
+    }
+
+    /**
+     * @param fetching the fetching to set
+     */
+    void setFetching(boolean fetching) {
+<span class="fc" id="L146">        this.fetching = fetching;</span>
+<span class="fc" id="L147">    }</span>
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

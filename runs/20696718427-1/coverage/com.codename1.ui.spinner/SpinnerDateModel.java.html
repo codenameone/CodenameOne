@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SpinnerDateModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.spinner</a> &gt; <span class="el_source">SpinnerDateModel.java</span></div><h1>SpinnerDateModel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.ui.spinner;
+
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.events.SelectionListener;
+import com.codename1.ui.list.ListModel;
+import com.codename1.ui.util.EventDispatcher;
+
+import java.util.Calendar;
+import java.util.Date;
+
+/**
+ * Represents a date model for the spinner
+ *
+ * @author Shai Almog
+ * @deprecated use Picker instead
+ */
+class SpinnerDateModel implements ListModel {
+    private static final long DAY = 24 * 60 * 60 * 1000;
+<span class="fc" id="L43">    private final EventDispatcher dataListener = new EventDispatcher();</span>
+<span class="fc" id="L44">    private final EventDispatcher selectionListener = new EventDispatcher();</span>
+    private final long min;
+    private final long max;
+    private long currentValue;
+
+    /**
+     * Indicates the range of the spinner
+     *
+     * @param min          lowest value allowed
+     * @param max          maximum value allowed
+     * @param currentValue the starting value for the mode
+     */
+<span class="fc" id="L56">    public SpinnerDateModel(long min, long max, long currentValue) {</span>
+<span class="fc" id="L57">        Calendar cal = Calendar.getInstance();</span>
+<span class="fc" id="L58">        cal.setTime(new Date(max));</span>
+<span class="fc" id="L59">        cal.set(Calendar.HOUR_OF_DAY, 0);</span>
+<span class="fc" id="L60">        cal.add(Calendar.MINUTE, 0);</span>
+<span class="fc" id="L61">        cal.add(Calendar.SECOND, 0);</span>
+<span class="fc" id="L62">        cal.add(Calendar.MILLISECOND, 0);</span>
+        //this.max = max - max % DAY;
+<span class="fc" id="L64">        this.max = cal.getTime().getTime();</span>
+
+<span class="fc" id="L66">        cal.setTime(new Date(min));</span>
+<span class="fc" id="L67">        cal.set(Calendar.HOUR_OF_DAY, 0);</span>
+<span class="fc" id="L68">        cal.add(Calendar.MINUTE, 0);</span>
+<span class="fc" id="L69">        cal.add(Calendar.SECOND, 0);</span>
+<span class="fc" id="L70">        cal.add(Calendar.MILLISECOND, 0);</span>
+        //this.min = min - min % DAY;
+<span class="fc" id="L72">        this.min = cal.getTime().getTime();</span>
+
+<span class="fc" id="L74">        cal.setTime(new Date(currentValue));</span>
+<span class="fc" id="L75">        cal.set(Calendar.HOUR_OF_DAY, 0);</span>
+<span class="fc" id="L76">        cal.add(Calendar.MINUTE, 0);</span>
+<span class="fc" id="L77">        cal.add(Calendar.SECOND, 0);</span>
+<span class="fc" id="L78">        cal.add(Calendar.MILLISECOND, 0);</span>
+        //this.currentValue = currentValue - currentValue % DAY + 12 * 60 * 60000;
+<span class="fc" id="L80">        this.currentValue = cal.getTime().getTime();</span>
+<span class="fc" id="L81">    }</span>
+
+    Object getValue() {
+        //return new Date(currentValue - currentValue % DAY + 12 * 60 * 60000);
+<span class="nc" id="L85">        return new Date(currentValue);</span>
+    }
+
+    void setValue(Date value) {
+<span class="fc" id="L89">        int oldIndex = getSelectedIndex();</span>
+<span class="fc" id="L90">        Calendar cal = Calendar.getInstance();</span>
+<span class="fc" id="L91">        cal.setTime(value);</span>
+<span class="fc" id="L92">        cal.set(Calendar.HOUR_OF_DAY, 12);</span>
+<span class="fc" id="L93">        cal.add(Calendar.MINUTE, 0);</span>
+<span class="fc" id="L94">        cal.add(Calendar.SECOND, 0);</span>
+<span class="fc" id="L95">        cal.add(Calendar.MILLISECOND, 0);</span>
+        //currentValue = value.getTime() - value.getTime() % DAY + 12 * 60 * 60000;
+<span class="fc" id="L97">        currentValue = cal.getTime().getTime();</span>
+<span class="fc bfc" id="L98" title="All 2 branches covered.">        if (oldIndex != getSelectedIndex()) {</span>
+<span class="fc" id="L99">            selectionListener.fireSelectionEvent(oldIndex, getSelectedIndex());</span>
+        }
+<span class="fc" id="L101">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getItemAt(int index) {
+        //return new Date(min + DAY * index + 12 * 60 * 60000);
+<span class="fc" id="L108">        return new Date(min + DAY * index);</span>
+    }
+
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getSize() {
+<span class="fc" id="L116">        return (int) ((max - min) / DAY) + 1;</span>
+    }
+
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getSelectedIndex() {
+<span class="fc" id="L124">        int out = (int) ((currentValue - min) / DAY);</span>
+<span class="fc" id="L125">        return out;</span>
+    }
+
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setSelectedIndex(int index) {
+<span class="fc" id="L133">        int oldIndex = getSelectedIndex();</span>
+<span class="fc" id="L134">        currentValue = min + (index * DAY);</span>
+<span class="fc" id="L135">        int newIndex = getSelectedIndex();</span>
+<span class="fc" id="L136">        selectionListener.fireSelectionEvent(oldIndex, newIndex);</span>
+<span class="fc" id="L137">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addDataChangedListener(DataChangedListener l) {
+<span class="fc" id="L143">        dataListener.addListener(l);</span>
+<span class="fc" id="L144">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void removeDataChangedListener(DataChangedListener l) {
+<span class="fc" id="L150">        dataListener.removeListener(l);</span>
+<span class="fc" id="L151">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addSelectionListener(SelectionListener l) {
+<span class="fc" id="L157">        selectionListener.addListener(l);</span>
+<span class="fc" id="L158">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void removeSelectionListener(SelectionListener l) {
+<span class="fc" id="L164">        selectionListener.removeListener(l);</span>
+<span class="fc" id="L165">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addItem(Object item) {
+<span class="nc" id="L171">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void removeItem(int index) {
+<span class="nc" id="L177">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

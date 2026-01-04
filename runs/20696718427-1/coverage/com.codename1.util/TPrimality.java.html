@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TPrimality.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">TPrimality.java</span></div><h1>TPrimality.java</h1><pre class="source lang-java linenums">/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the &quot;License&quot;); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package com.codename1.util;
+
+import java.util.Arrays;
+import java.util.Random;
+
+/**
+ * Provides primality probabilistic methods.
+ */
+class TPrimality {
+
+    /**
+     * All prime numbers with bit length lesser than 10 bits.
+     */
+<span class="fc" id="L31">    private static final int[] primes = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71,</span>
+            73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181,
+            191, 193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, 257, 263, 269, 271, 277, 281, 283, 293, 307,
+            311, 313, 317, 331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389, 397, 401, 409, 419, 421, 431, 433,
+            439, 443, 449, 457, 461, 463, 467, 479, 487, 491, 499, 503, 509, 521, 523, 541, 547, 557, 563, 569, 571,
+            577, 587, 593, 599, 601, 607, 613, 617, 619, 631, 641, 643, 647, 653, 659, 661, 673, 677, 683, 691, 701,
+            709, 719, 727, 733, 739, 743, 751, 757, 761, 769, 773, 787, 797, 809, 811, 821, 823, 827, 829, 839, 853,
+            857, 859, 863, 877, 881, 883, 887, 907, 911, 919, 929, 937, 941, 947, 953, 967, 971, 977, 983, 991, 997,
+            1009, 1013, 1019, 1021};
+    /**
+     * All {@code BigInteger} prime numbers with bit length lesser than 8 bits.
+     */
+<span class="fc" id="L43">    private static final TBigInteger[] BIprimes = new TBigInteger[primes.length];</span>
+    /**
+     * It encodes how many iterations of Miller-Rabin test are need to get an
+     * error bound not greater than {@code 2&lt;sup&gt;(-100)&lt;/sup&gt;}. For example: for
+     * a {@code 1000}-bit number we need {@code 4} iterations, since
+     * {@code BITS[3] &lt; 1000 &lt;= BITS[4]}.
+     */
+<span class="fc" id="L50">    private static final int[] BITS = {0, 0, 1854, 1233, 927, 747, 627, 543, 480, 431, 393, 361, 335, 314, 295, 279,</span>
+            265, 253, 242, 232, 223, 216, 181, 169, 158, 150, 145, 140, 136, 132, 127, 123, 119, 114, 110, 105, 101,
+            96, 92, 87, 83, 78, 73, 69, 64, 59, 54, 49, 44, 38, 32, 26, 1};
+    /**
+     * It encodes how many i-bit primes there are in the table for
+     * {@code i=2,...,10}. For example {@code offsetPrimes[6]} says that from
+     * index {@code 11} exists {@code 7} consecutive {@code 6}-bit prime numbers
+     * in the array.
+     */
+<span class="fc" id="L59">    private static final int[][] offsetPrimes = {null, null, {0, 2}, {2, 2}, {4, 2}, {6, 5}, {11, 7},</span>
+            {18, 13}, {31, 23}, {54, 43}, {97, 75}};
+
+    static {// To initialize the dual table of BigInteger primes
+<span class="fc bfc" id="L63" title="All 2 branches covered.">        for (int i = 0; i &lt; primes.length; i++) {</span>
+<span class="fc" id="L64">            BIprimes[i] = TBigInteger.valueOf(primes[i]);</span>
+        }
+<span class="fc" id="L66">    }</span>
+
+    /**
+     * Just to denote that this class can't be instantiated.
+     */
+    private TPrimality() {
+    }
+
+    /**
+     * It uses the sieve of Eratosthenes to discard several composite numbers in
+     * some appropriate range (at the moment {@code [this, this + 1024]}). After
+     * this process it applies the Miller-Rabin test to the numbers that were
+     * not discarded in the sieve.
+     *
+     * @see TBigInteger#nextProbablePrime()
+     * @see #millerRabin(TBigInteger, int)
+     */
+    static TBigInteger nextProbablePrime(TBigInteger n) {
+        // PRE: n &gt;= 0
+        int i, j;
+        int certainty;
+<span class="nc" id="L87">        int gapSize = 1024; // for searching of the next probable prime number</span>
+<span class="nc" id="L88">        int[] modules = new int[primes.length];</span>
+<span class="nc" id="L89">        boolean[] isDivisible = new boolean[gapSize];</span>
+        TBigInteger startPoint;
+        TBigInteger probPrime;
+        // If n &lt; &quot;last prime of table&quot; searches next prime in the table
+<span class="nc bnc" id="L93" title="All 6 branches missed.">        if ((n.numberLength == 1) &amp;&amp; (n.digits[0] &gt;= 0) &amp;&amp; (n.digits[0] &lt; primes[primes.length - 1])) {</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">            for (i = 0; n.digits[0] &gt;= primes[i]; i++) {</span>
+                // do nothing
+            }
+<span class="nc" id="L97">            return BIprimes[i];</span>
+        }
+        /*
+         * Creates a &quot;N&quot; enough big to hold the next probable prime Note that: N
+         * &lt; &quot;next prime&quot; &lt; 2*N
+         */
+<span class="nc" id="L103">        startPoint = new TBigInteger(1, n.numberLength, new int[n.numberLength + 1]);</span>
+<span class="nc" id="L104">        System.arraycopy(n.digits, 0, startPoint.digits, 0, n.numberLength);</span>
+        // To fix N to the &quot;next odd number&quot;
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (n.testBit(0)) {</span>
+<span class="nc" id="L107">            TElementary.inplaceAdd(startPoint, 2);</span>
+        } else {
+<span class="nc" id="L109">            startPoint.digits[0] |= 1;</span>
+        }
+        // To set the improved certainly of Miller-Rabin
+<span class="nc" id="L112">        j = startPoint.bitLength();</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        for (certainty = 2; j &lt; BITS[certainty]; certainty++) {</span>
+            // do nothing
+        }
+        // To calculate modules: N mod p1, N mod p2, ... for first primes.
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        for (i = 0; i &lt; primes.length; i++) {</span>
+<span class="nc" id="L118">            modules[i] = TDivision.remainder(startPoint, primes[i]) - gapSize;</span>
+        }
+        while (true) {
+            // At this point, all numbers in the gap are initialized as
+            // probably primes
+<span class="nc" id="L123">            Arrays.fill(isDivisible, false);</span>
+            // To discard multiples of first primes
+<span class="nc bnc" id="L125" title="All 2 branches missed.">            for (i = 0; i &lt; primes.length; i++) {</span>
+<span class="nc" id="L126">                modules[i] = (modules[i] + gapSize) % primes[i];</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">                j = (modules[i] == 0) ? 0 : (primes[i] - modules[i]);</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">                for (; j &lt; gapSize; j += primes[i]) {</span>
+<span class="nc" id="L129">                    isDivisible[j] = true;</span>
+                }
+            }
+            // To execute Miller-Rabin for non-divisible numbers by all first
+            // primes
+<span class="nc bnc" id="L134" title="All 2 branches missed.">            for (j = 0; j &lt; gapSize; j++) {</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                if (!isDivisible[j]) {</span>
+<span class="nc" id="L136">                    probPrime = startPoint.copy();</span>
+<span class="nc" id="L137">                    TElementary.inplaceAdd(probPrime, j);</span>
+
+<span class="nc bnc" id="L139" title="All 2 branches missed.">                    if (millerRabin(probPrime, certainty)) {</span>
+<span class="nc" id="L140">                        return probPrime;</span>
+                    }
+                }
+            }
+<span class="nc" id="L144">            TElementary.inplaceAdd(startPoint, gapSize);</span>
+        }
+    }
+
+    /**
+     * A random number is generated until a probable prime number is found.
+     *
+     * @see TBigInteger#BigInteger(int, int, Random)
+     * @see TBigInteger#probablePrime(int, Random)
+     * @see #isProbablePrime(TBigInteger, int)
+     */
+    static TBigInteger consBigInteger(int bitLength, int certainty, Random rnd) {
+        // PRE: bitLength &gt;= 2;
+        // For small numbers get a random prime from the prime table
+<span class="pc bpc" id="L158" title="1 of 2 branches missed.">        if (bitLength &lt;= 10) {</span>
+<span class="nc" id="L159">            int[] rp = offsetPrimes[bitLength];</span>
+<span class="nc" id="L160">            return BIprimes[rp[0] + rnd.nextInt(rp[1])];</span>
+        }
+<span class="fc" id="L162">        int shiftCount = (-bitLength) &amp; 31;</span>
+<span class="fc" id="L163">        int last = (bitLength + 31) &gt;&gt; 5;</span>
+<span class="fc" id="L164">        TBigInteger n = new TBigInteger(1, last, new int[last]);</span>
+
+<span class="fc" id="L166">        last--;</span>
+        do {// To fill the array with random integers
+<span class="fc bfc" id="L168" title="All 2 branches covered.">            for (int i = 0; i &lt; n.numberLength; i++) {</span>
+<span class="fc" id="L169">                n.digits[i] = rnd.nextInt();</span>
+            }
+            // To fix to the correct bitLength
+<span class="fc" id="L172">            n.digits[last] |= 0x80000000;</span>
+<span class="fc" id="L173">            n.digits[last] &gt;&gt;&gt;= shiftCount;</span>
+            // To create an odd number
+<span class="fc" id="L175">            n.digits[0] |= 1;</span>
+<span class="fc bfc" id="L176" title="All 2 branches covered.">        } while (!isProbablePrime(n, certainty));</span>
+<span class="fc" id="L177">        return n;</span>
+    }
+
+    /**
+     * @ar.org.fitc.ref Optimizations: &quot;A. Menezes - Handbook of applied
+     * Cryptography, Chapter 4&quot;.
+     * @see TBigInteger#isProbablePrime(int)
+     * @see #millerRabin(TBigInteger, int)
+     */
+    static boolean isProbablePrime(TBigInteger n, int certainty) {
+        // PRE: n &gt;= 0;
+<span class="pc bpc" id="L188" title="3 of 6 branches missed.">        if ((certainty &lt;= 0) || ((n.numberLength == 1) &amp;&amp; (n.digits[0] == 2))) {</span>
+<span class="nc" id="L189">            return true;</span>
+        }
+        // To discard all even numbers
+<span class="pc bpc" id="L192" title="1 of 2 branches missed.">        if (!n.testBit(0)) {</span>
+<span class="nc" id="L193">            return false;</span>
+        }
+        // To check if 'n' exists in the table (it fit in 10 bits)
+<span class="pc bpc" id="L196" title="2 of 4 branches missed.">        if ((n.numberLength == 1) &amp;&amp; ((n.digits[0] &amp; 0XFFFFFC00) == 0)) {</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">            return (Arrays.binarySearch(primes, n.digits[0]) &gt;= 0);</span>
+        }
+        // To check if 'n' is divisible by some prime of the table
+<span class="fc bfc" id="L200" title="All 2 branches covered.">        for (int i = 1; i &lt; primes.length; i++) {</span>
+<span class="fc bfc" id="L201" title="All 2 branches covered.">            if (TDivision.remainderArrayByInt(n.digits, n.numberLength, primes[i]) == 0) {</span>
+<span class="fc" id="L202">                return false;</span>
+            }
+        }
+        // To set the number of iterations necessary for Miller-Rabin test
+        int i;
+<span class="fc" id="L207">        int bitLength = n.bitLength();</span>
+
+<span class="fc bfc" id="L209" title="All 2 branches covered.">        for (i = 2; bitLength &lt; BITS[i]; i++) {</span>
+            // do nothing
+        }
+<span class="fc" id="L212">        certainty = Math.min(i, 1 + ((certainty - 1) &gt;&gt; 1));</span>
+
+<span class="fc" id="L214">        return millerRabin(n, certainty);</span>
+    }
+
+    /**
+     * The Miller-Rabin primality test.
+     *
+     * @param n the input number to be tested.
+     * @param t the number of trials.
+     * @return {@code false} if the number is definitely compose, otherwise
+     * {@code true} with probability {@code 1 - 4&lt;sup&gt;(-t)&lt;/sup&gt;}.
+     * @ar.org.fitc.ref &quot;D. Knuth, The Art of Computer Programming Vo.2, Section
+     * 4.5.4., Algorithm P&quot;
+     */
+    private static boolean millerRabin(TBigInteger n, int t) {
+        // PRE: n &gt;= 0, t &gt;= 0
+        TBigInteger x; // x := UNIFORM{2...n-1}
+        TBigInteger y; // y := x^(q * 2^j) mod n
+<span class="fc" id="L231">        TBigInteger n_minus_1 = n.subtract(TBigInteger.ONE); // n-1</span>
+<span class="fc" id="L232">        int bitLength = n_minus_1.bitLength(); // ~ log2(n-1)</span>
+        // (q,k) such that: n-1 = q * 2^k and q is odd
+<span class="fc" id="L234">        int k = n_minus_1.getLowestSetBit();</span>
+<span class="fc" id="L235">        TBigInteger q = n_minus_1.shiftRight(k);</span>
+<span class="fc" id="L236">        Random rnd = new Random();</span>
+
+<span class="fc bfc" id="L238" title="All 2 branches covered.">        for (int i = 0; i &lt; t; i++) {</span>
+            // To generate a witness 'x', first it use the primes of table
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">            if (i &lt; primes.length) {</span>
+<span class="fc" id="L241">                x = BIprimes[i];</span>
+            } else {/*
+             * It generates random witness only if it's necesssary. Note
+             * that all methods would call Miller-Rabin with t &lt;= 50 so
+             * this part is only to do more robust the algorithm
+             */
+                do {
+<span class="nc" id="L248">                    x = new TBigInteger(bitLength, rnd);</span>
+<span class="nc bnc" id="L249" title="All 6 branches missed.">                } while ((x.compareTo(n) &gt;= TBigInteger.EQUALS) || (x.sign == 0) || x.isOne());</span>
+            }
+<span class="fc" id="L251">            y = x.modPow(q, n);</span>
+<span class="fc bfc" id="L252" title="All 4 branches covered.">            if (y.isOne() || y.equals(n_minus_1)) {</span>
+<span class="fc" id="L253">                continue;</span>
+            }
+<span class="fc bfc" id="L255" title="All 2 branches covered.">            for (int j = 1; j &lt; k; j++) {</span>
+<span class="pc bpc" id="L256" title="1 of 2 branches missed.">                if (y.equals(n_minus_1)) {</span>
+<span class="nc" id="L257">                    continue;</span>
+                }
+<span class="fc" id="L259">                y = y.multiply(y).mod(n);</span>
+<span class="pc bpc" id="L260" title="1 of 2 branches missed.">                if (y.isOne()) {</span>
+<span class="nc" id="L261">                    return false;</span>
+                }
+            }
+<span class="pc bpc" id="L264" title="1 of 2 branches missed.">            if (!y.equals(n_minus_1)) {</span>
+<span class="nc" id="L265">                return false;</span>
+            }
+        }
+<span class="fc" id="L268">        return true;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,743 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SpanButton.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.components</a> &gt; <span class="el_source">SpanButton.java</span></div><h1>SpanButton.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2012, Codename One and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Codename One designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Codename One through http://www.codenameone.com/ if you
+ * need additional information or have any questions.
+ */
+package com.codename1.components;
+
+import com.codename1.ui.Button;
+import com.codename1.ui.Command;
+import com.codename1.ui.Component;
+import com.codename1.ui.Container;
+import com.codename1.ui.Font;
+import com.codename1.ui.Image;
+import com.codename1.ui.Label;
+import com.codename1.ui.SelectableIconHolder;
+import com.codename1.ui.TextArea;
+import com.codename1.ui.TextHolder;
+import com.codename1.ui.events.ActionEvent;
+import com.codename1.ui.events.ActionListener;
+import com.codename1.ui.events.ActionSource;
+import com.codename1.ui.layouts.BorderLayout;
+import com.codename1.ui.layouts.BoxLayout;
+import com.codename1.ui.plaf.Style;
+import com.codename1.ui.plaf.UIManager;
+
+import static com.codename1.ui.CN.EAST;
+import static com.codename1.ui.CN.WEST;
+import static com.codename1.ui.ComponentSelector.$;
+
+/**
+ * &lt;p&gt;
+ * A complex button similar to MultiButton that breaks lines automatically and
+ * looks like a regular button (more or less). Unlike the multi button the span
+ * button has the UIID style of a button.&lt;/p&gt;
+ * &lt;script src=&quot;https://gist.github.com/codenameone/7bc6baa3a0229ec9d6f6.js&quot;&gt;&lt;/script&gt;
+ * &lt;img src=&quot;https://www.codenameone.com/img/developer-guide/components-spanbutton.png&quot; alt=&quot;SpanButton Sample&quot; /&gt;
+ *
+ * @author Shai Almog
+ */
+public class SpanButton extends Container implements ActionSource&lt;ActionEvent&gt;, SelectableIconHolder, TextHolder {
+
+<span class="fc" id="L59">    private int gap = Label.getDefaultGap();</span>
+    private final Button actualButton;
+    private final TextArea text;
+<span class="fc" id="L62">    private boolean shouldLocalize = true;</span>
+
+    /**
+     * Default constructor will be useful when adding this to the GUI builder
+     */
+    public SpanButton() {
+<span class="fc" id="L68">        this(&quot;&quot;);</span>
+<span class="fc" id="L69">    }</span>
+
+    /**
+     * Constructor accepting default text and uiid for the text
+     *
+     * @param txt      the text
+     * @param textUiid the new text UIID
+     */
+    public SpanButton(String txt, String textUiid) {
+<span class="fc" id="L78">        this(txt);</span>
+<span class="fc" id="L79">        text.setUIID(textUiid);</span>
+<span class="fc" id="L80">    }</span>
+
+    /**
+     * Constructor accepting default text
+     */
+<span class="fc" id="L85">    public SpanButton(String txt) {</span>
+<span class="fc" id="L86">        setUIIDFinal(&quot;Button&quot;);</span>
+<span class="fc" id="L87">        setLayout(new BorderLayout());</span>
+<span class="fc" id="L88">        text = new TextArea(super.getUIManager().localize(txt, txt));</span>
+<span class="fc" id="L89">        text.setColumns(100);</span>
+<span class="fc" id="L90">        text.setUIID(&quot;Button&quot;);</span>
+<span class="fc" id="L91">        text.setGrowByContent(true);</span>
+<span class="fc" id="L92">        text.setEditable(false);</span>
+<span class="fc" id="L93">        text.setFocusable(false);</span>
+<span class="fc" id="L94">        text.setActAsLabel(true);</span>
+<span class="fc" id="L95">        setFocusable(true);</span>
+<span class="fc" id="L96">        removeBackground(text.getUnselectedStyle());</span>
+<span class="fc" id="L97">        removeBackground(text.getSelectedStyle());</span>
+<span class="fc" id="L98">        removeBackground(text.getPressedStyle());</span>
+<span class="fc" id="L99">        removeBackground(text.getDisabledStyle());</span>
+<span class="fc" id="L100">        actualButton = new Button();</span>
+<span class="fc" id="L101">        actualButton.setUIID(&quot;icon&quot;);</span>
+<span class="fc" id="L102">        super.addComponent(BorderLayout.WEST, actualButton);</span>
+<span class="fc" id="L103">        Container center = BoxLayout.encloseYCenter(text);</span>
+<span class="fc" id="L104">        center.getStyle().setMargin(0, 0, 0, 0);</span>
+<span class="fc" id="L105">        center.getStyle().setPadding(0, 0, 0, 0);</span>
+<span class="fc" id="L106">        super.addComponent(BorderLayout.CENTER, center);</span>
+<span class="fc" id="L107">        setLeadComponent(actualButton);</span>
+<span class="fc" id="L108">        updateGap();</span>
+<span class="fc" id="L109">    }</span>
+
+    @Override
+    public void styleChanged(String propertyName, Style source) {
+<span class="fc" id="L113">        super.styleChanged(propertyName, source);</span>
+<span class="pc bpc" id="L114" title="1 of 2 branches missed.">        if (Style.ICON_GAP.equals(propertyName)) {</span>
+<span class="nc" id="L115">            int gap = source.getIconGap();</span>
+<span class="nc bnc" id="L116" title="All 4 branches missed.">            if (gap &gt;= 0 &amp;&amp; gap != getGap()) {</span>
+<span class="nc" id="L117">                setGap(gap);</span>
+<span class="nc" id="L118">                updateGap();</span>
+            }
+        }
+<span class="fc" id="L121">    }</span>
+
+    @Override
+    protected void initUnselectedStyle(Style unselectedStyle) {
+<span class="fc" id="L125">        super.initUnselectedStyle(unselectedStyle);</span>
+<span class="pc bpc" id="L126" title="1 of 2 branches missed.">        if (unselectedStyle.getIconGap() &gt; 0) {</span>
+<span class="nc" id="L127">            int gap = unselectedStyle.getIconGap();</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">            if (gap != getGap()) {</span>
+<span class="nc" id="L129">                setGap(unselectedStyle.getIconGap());</span>
+<span class="nc" id="L130">                updateGap();</span>
+            }
+        }
+<span class="fc" id="L133">    }</span>
+
+    private void updateGap() {
+<span class="fc bfc" id="L136" title="All 2 branches covered.">        if (getIcon() == null) {</span>
+<span class="fc" id="L137">            $(actualButton).setMargin(0);</span>
+<span class="pc bpc" id="L138" title="1 of 2 branches missed.">        } else if (BorderLayout.NORTH.equals(getIconPosition())) {</span>
+<span class="nc" id="L139">            $(actualButton).selectAllStyles().setMargin(0, 0, gap, 0);</span>
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        } else if (BorderLayout.SOUTH.equals(getIconPosition())) {</span>
+<span class="nc" id="L141">            $(actualButton).selectAllStyles().setMargin(gap, 0, 0, 0);</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">        } else if (BorderLayout.EAST.equals(getIconPosition())) {</span>
+<span class="nc" id="L143">            $(actualButton).selectAllStyles().setMargin(0, 0, 0, gap);</span>
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        } else if (BorderLayout.WEST.equals(getIconPosition())) {</span>
+<span class="fc" id="L145">            $(actualButton).selectAllStyles().setMargin(0, gap, 0, 0);</span>
+        }
+<span class="fc" id="L147">    }</span>
+
+    /**
+     * Returns the TextArea holding the actual text
+     *
+     * @return the component
+     */
+    public TextArea getTextComponent() {
+<span class="fc" id="L155">        return text;</span>
+    }
+
+    /**
+     * Returns the uiid of the actual text
+     *
+     * @return the uiid
+     */
+    public String getTextUIID() {
+<span class="fc" id="L164">        return text.getUIID();</span>
+    }
+
+    /**
+     * Sets the UIID for the actual text
+     *
+     * @param uiid the uiid
+     */
+    public void setTextUIID(String uiid) {
+<span class="fc" id="L173">        text.setUIID(uiid);</span>
+<span class="fc" id="L174">    }</span>
+
+    @Override
+    public void setUIID(String id) {
+<span class="fc" id="L178">        super.setUIID(id);</span>
+<span class="pc bpc" id="L179" title="2 of 4 branches missed.">        if (id != null &amp;&amp; id.length() &gt; 0) {</span>
+<span class="fc" id="L180">            String iconUIID = getUIManager().getIconUIIDFor(id);</span>
+<span class="pc bpc" id="L181" title="1 of 2 branches missed.">            if (iconUIID != null) {</span>
+<span class="nc" id="L182">                setIconUIID(iconUIID);</span>
+            }
+        }
+<span class="fc" id="L185">    }</span>
+
+    @Override
+    protected void initLaf(UIManager uim) {
+<span class="pc bpc" id="L189" title="2 of 4 branches missed.">        if (uim == getUIManager() &amp;&amp; isInitialized()) {</span>
+<span class="nc" id="L190">            return;</span>
+        }
+<span class="fc" id="L192">        super.initLaf(uim);</span>
+<span class="fc" id="L193">        String uiid = getUIID();</span>
+<span class="pc bpc" id="L194" title="1 of 4 branches missed.">        if (uiid != null &amp;&amp; uiid.length() &gt; 0) {</span>
+<span class="fc" id="L195">            String iconUiid = uim.getIconUIIDFor(uiid);</span>
+<span class="pc bpc" id="L196" title="1 of 2 branches missed.">            if (iconUiid != null) {</span>
+<span class="nc" id="L197">                setIconUIID(iconUiid);</span>
+            }
+        }
+<span class="fc" id="L200">    }</span>
+
+    /**
+     * Gets the component used for styling font icons on this SpanLabel.
+     *
+     * @return The component used for styling font icons on this SpanLabel.
+     * @since 7.0
+     */
+    public Component getIconStyleComponent() {
+<span class="fc" id="L209">        return actualButton.getIconStyleComponent();</span>
+    }
+
+    /**
+     * Returns the Style proxy object for the text of this span button.
+     *
+     * @return The Style object for the text of this span button.
+     */
+    public Style getTextAllStyles() {
+<span class="fc" id="L218">        return text.getAllStyles();</span>
+    }
+
+    /**
+     * Returns the Style object for the text of this span button.
+     *
+     * @return The Style object for the text of this span button.
+     */
+    public Style getTextStyle() {
+<span class="fc" id="L227">        return text.getStyle();</span>
+    }
+
+    /**
+     * Returns the UIID for the icon
+     *
+     * @return the uiid
+     */
+    public String getIconUIID() {
+<span class="fc" id="L236">        return actualButton.getUIID();</span>
+    }
+
+    /**
+     * Sets the uiid for the icon if present
+     *
+     * @param uiid the uiid for the icon
+     */
+    public void setIconUIID(String uiid) {
+<span class="fc" id="L245">        actualButton.setUIID(uiid);</span>
+<span class="fc" id="L246">        updateGap();</span>
+<span class="fc" id="L247">    }</span>
+
+    private void removeBackground(Style s) {
+<span class="fc" id="L250">        s.setBackgroundType(Style.BACKGROUND_NONE);</span>
+<span class="fc" id="L251">        s.setBgImage(null);</span>
+<span class="fc" id="L252">        s.setBorder(null);</span>
+<span class="fc" id="L253">        s.setBgTransparency(0);</span>
+<span class="fc" id="L254">    }</span>
+
+    /**
+     * Returns the text of the button
+     *
+     * @return the text
+     */
+    public String getText() {
+<span class="fc" id="L262">        return text.getText();</span>
+    }
+
+    /**
+     * Set the text of the button
+     *
+     * @param t text of the button
+     */
+    public void setText(String t) {
+<span class="pc bpc" id="L271" title="1 of 2 branches missed.">        if (shouldLocalize) {</span>
+<span class="fc" id="L272">            text.setText(getUIManager().localize(t, t));</span>
+        } else {
+<span class="nc" id="L274">            text.setText(t);</span>
+        }
+<span class="fc" id="L276">    }</span>
+
+    /**
+     * Returns the image of the icon
+     *
+     * @return the icon
+     */
+    public Image getIcon() {
+<span class="fc" id="L284">        return actualButton.getIcon();</span>
+    }
+
+    /**
+     * Sets the icon for the button
+     *
+     * @param i the icon
+     */
+    public void setIcon(Image i) {
+<span class="fc" id="L293">        actualButton.setIcon(i);</span>
+<span class="fc" id="L294">        updateGap();</span>
+<span class="fc" id="L295">    }</span>
+
+    /**
+     * Binds long press listener to button events.
+     *
+     * @param l
+     * @since 7.0
+     */
+    public void addLongPressListener(ActionListener l) {
+<span class="nc" id="L304">        actualButton.addLongPressListener(l);</span>
+<span class="nc" id="L305">    }</span>
+
+    /**
+     * Unbinds long press listener to button events.
+     *
+     * @param l
+     * @since 7.0
+     */
+    public void removeLongPressListener(ActionListener l) {
+<span class="nc" id="L314">        actualButton.removeLongPressListener(l);</span>
+<span class="nc" id="L315">    }</span>
+
+    /**
+     * Binds an action listener to button events
+     *
+     * @param l the listener
+     */
+    public void addActionListener(ActionListener&lt;ActionEvent&gt; l) {
+<span class="fc" id="L323">        actualButton.addActionListener(l);</span>
+<span class="fc" id="L324">    }</span>
+
+    /**
+     * Removes the listener from tracking button events
+     *
+     * @param l the listener
+     */
+    public void removeActionListener(ActionListener&lt;ActionEvent&gt; l) {
+<span class="fc" id="L332">        actualButton.removeActionListener(l);</span>
+<span class="fc" id="L333">    }</span>
+
+    /**
+     * Returns the icon position based on border layout constraints
+     *
+     * @return position either North/South/East/West
+     */
+    public String getIconPosition() {
+<span class="fc" id="L341">        return (String) getLayout().getComponentConstraint(actualButton);</span>
+    }
+
+    /**
+     * Sets the icon position based on border layout constraints
+     *
+     * @param s position either North/South/East/West
+     */
+    public void setIconPosition(String t) {
+<span class="fc" id="L350">        removeComponent(actualButton);</span>
+<span class="fc" id="L351">        addComponent(t, actualButton);</span>
+<span class="fc" id="L352">        updateGap();</span>
+<span class="fc" id="L353">        revalidateLater();</span>
+<span class="fc" id="L354">    }</span>
+
+    /**
+     * Returns the command instance of the button
+     *
+     * @return the command instance of the button
+     */
+    public Command getCommand() {
+<span class="fc" id="L362">        return actualButton.getCommand();</span>
+    }
+
+    /**
+     * Sets the command for the component
+     *
+     * @param cmd the command
+     */
+    public void setCommand(Command cmd) {
+<span class="fc" id="L371">        actualButton.setCommand(cmd);</span>
+<span class="fc" id="L372">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyNames() {
+<span class="fc" id="L378">        return new String[]{</span>
+                &quot;text&quot;, &quot;icon&quot;, &quot;iconPosition&quot;, &quot;textUiid&quot;, &quot;iconUiid&quot;
+        };
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Class[] getPropertyTypes() {
+<span class="fc" id="L387">        return new Class[]{</span>
+                String.class, // text
+                Image.class, // icon
+                String.class, // iconPosition
+                String.class,
+                String.class
+        };
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String[] getPropertyTypeNames() {
+<span class="nc" id="L400">        return new String[]{&quot;String&quot;, &quot;Image&quot;, &quot;String&quot;, &quot;String&quot;, &quot;String&quot;};</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getPropertyValue(String name) {
+<span class="pc bpc" id="L407" title="1 of 2 branches missed.">        if (name.equals(&quot;text&quot;)) {</span>
+<span class="fc" id="L408">            return getText();</span>
+        }
+<span class="nc bnc" id="L410" title="All 2 branches missed.">        if (name.equals(&quot;icon&quot;)) {</span>
+<span class="nc" id="L411">            return getIcon();</span>
+        }
+<span class="nc bnc" id="L413" title="All 2 branches missed.">        if (name.equals(&quot;iconPosition&quot;)) {</span>
+<span class="nc" id="L414">            return getIconPosition();</span>
+        }
+<span class="nc bnc" id="L416" title="All 2 branches missed.">        if (name.equals(&quot;textUiid&quot;)) {</span>
+<span class="nc" id="L417">            return getTextUIID();</span>
+        }
+<span class="nc bnc" id="L419" title="All 2 branches missed.">        if (name.equals(&quot;iconUiid&quot;)) {</span>
+<span class="nc" id="L420">            return getIconUIID();</span>
+        }
+<span class="nc" id="L422">        return null;</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public String setPropertyValue(String name, Object value) {
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">        if (name.equals(&quot;text&quot;)) {</span>
+<span class="fc" id="L430">            setText((String) value);</span>
+<span class="fc" id="L431">            return null;</span>
+        }
+<span class="nc bnc" id="L433" title="All 2 branches missed.">        if (name.equals(&quot;icon&quot;)) {</span>
+<span class="nc" id="L434">            setIcon((Image) value);</span>
+<span class="nc" id="L435">            return null;</span>
+        }
+<span class="nc bnc" id="L437" title="All 2 branches missed.">        if (name.equals(&quot;iconPosition&quot;)) {</span>
+<span class="nc" id="L438">            setIconPosition((String) value);</span>
+<span class="nc" id="L439">            return null;</span>
+        }
+<span class="nc bnc" id="L441" title="All 2 branches missed.">        if (name.equals(&quot;textUiid&quot;)) {</span>
+<span class="nc" id="L442">            setTextUIID((String) value);</span>
+<span class="nc" id="L443">            return null;</span>
+        }
+<span class="nc bnc" id="L445" title="All 2 branches missed.">        if (name.equals(&quot;iconUiid&quot;)) {</span>
+<span class="nc" id="L446">            setIconUIID((String) value);</span>
+<span class="nc" id="L447">            return null;</span>
+        }
+<span class="nc" id="L449">        return super.setPropertyValue(name, value);</span>
+    }
+
+    /**
+     * Indicates if text should be localized when set to the component, by
+     * default all text is localized so this allows disabling automatic
+     * localization for a specific component.
+     *
+     * @return the shouldLocalize value
+     */
+    public boolean isShouldLocalize() {
+<span class="fc" id="L460">        return shouldLocalize;</span>
+    }
+
+    /**
+     * Indicates if text should be localized when set to the component, by
+     * default all text is localized so this allows disabling automatic
+     * localization for a specific component.
+     *
+     * @param shouldLocalize the shouldLocalize to set
+     */
+    public void setShouldLocalize(boolean shouldLocalize) {
+<span class="fc" id="L471">        this.shouldLocalize = shouldLocalize;</span>
+<span class="fc" id="L472">    }</span>
+
+    /**
+     * Returns the pressed icon of the button
+     *
+     * @return the pressed icon
+     */
+    public Image getPressedIcon() {
+<span class="fc" id="L480">        return actualButton.getPressedIcon();</span>
+    }
+
+    /**
+     * Sets the pressed icon for the button
+     *
+     * @param i the icon
+     */
+    public void setPressedIcon(Image i) {
+<span class="fc" id="L489">        actualButton.setPressedIcon(i);</span>
+<span class="fc" id="L490">    }</span>
+
+    /**
+     * Returns the rollover icon of the button
+     *
+     * @return the pressed icon
+     */
+    public Image getRolloverIcon() {
+<span class="fc" id="L498">        return actualButton.getRolloverIcon();</span>
+    }
+
+    /**
+     * Sets the rollover icon for the button
+     *
+     * @param i the icon
+     */
+    public void setRolloverIcon(Image i) {
+<span class="fc" id="L507">        actualButton.setRolloverIcon(i);</span>
+<span class="fc" id="L508">    }</span>
+
+    /**
+     * Returns the disabled icon of the button
+     *
+     * @return the pressed icon
+     */
+    public Image getDisabledIcon() {
+<span class="fc" id="L516">        return actualButton.getDisabledIcon();</span>
+    }
+
+    /**
+     * Sets the disabled icon for the button
+     *
+     * @param i the icon
+     */
+    public void setDisabledIcon(Image i) {
+<span class="fc" id="L525">        actualButton.setDisabledIcon(i);</span>
+<span class="fc" id="L526">    }</span>
+
+    /**
+     * Returns if this is an auto released Button. Auto released Buttons will
+     * are been disarmed when a drag is happening within the Button.
+     *
+     * @return true if it's an auto released Button.
+     */
+    public boolean isAutoRelease() {
+<span class="nc" id="L535">        return actualButton.isAutoRelease();</span>
+    }
+
+    /**
+     * Sets the auto released mode of this button, by default it's not an auto
+     * released Button
+     */
+    public void setAutoRelease(boolean autoRelease) {
+<span class="nc" id="L543">        this.actualButton.setAutoRelease(autoRelease);</span>
+<span class="nc" id="L544">    }</span>
+
+    @Override
+    public void setWidth(int width) {
+<span class="fc" id="L548">        int w = getWidth();</span>
+<span class="fc bfc" id="L549" title="All 2 branches covered.">        if (w != width) {</span>
+            // We need to update the textarea width whenever we set the width
+            // so that preferred height will be calculated correctly.
+<span class="fc" id="L552">            int newTextW = width;</span>
+<span class="fc" id="L553">            String iconPos = getIconPosition();</span>
+<span class="pc bpc" id="L554" title="1 of 6 branches missed.">            if (getIcon() != null &amp;&amp; EAST.equals(iconPos) || WEST.equals(iconPos)) {</span>
+<span class="fc" id="L555">                newTextW -= actualButton.getOuterWidth();</span>
+            }
+<span class="fc" id="L557">            newTextW -= getStyle().getHorizontalPadding();</span>
+<span class="fc" id="L558">            newTextW -= text.getStyle().getHorizontalMargins();</span>
+<span class="fc" id="L559">            text.setWidth(newTextW);</span>
+<span class="fc" id="L560">            super.setWidth(width);</span>
+<span class="fc" id="L561">            setShouldCalcPreferredSize(true);</span>
+
+        }
+
+<span class="fc" id="L565">    }</span>
+
+    @Override
+    public int getGap() {
+<span class="fc" id="L569">        return gap;</span>
+    }
+
+    @Override
+    public void setGap(int gap) {
+<span class="pc bpc" id="L574" title="1 of 2 branches missed.">        if (gap != this.gap) {</span>
+<span class="fc" id="L575">            this.gap = gap;</span>
+<span class="fc" id="L576">            updateGap();</span>
+        }
+<span class="fc" id="L578">    }</span>
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public int getTextPosition() {
+<span class="fc" id="L585">        String iconPosition = getIconPosition();</span>
+<span class="pc bpc" id="L586" title="1 of 2 branches missed.">        if (BorderLayout.NORTH.equals(iconPosition)) {</span>
+<span class="nc" id="L587">            return Component.BOTTOM;</span>
+        }
+<span class="pc bpc" id="L589" title="1 of 2 branches missed.">        if (BorderLayout.SOUTH.equals(iconPosition)) {</span>
+<span class="nc" id="L590">            return Component.TOP;</span>
+        }
+<span class="fc bfc" id="L592" title="All 2 branches covered.">        if (BorderLayout.EAST.equals(iconPosition)) {</span>
+<span class="fc" id="L593">            return Component.LEFT;</span>
+        }
+<span class="pc bpc" id="L595" title="1 of 2 branches missed.">        if (BorderLayout.WEST.equals(iconPosition)) {</span>
+<span class="fc" id="L596">            return Component.RIGHT;</span>
+        }
+<span class="nc" id="L598">        return Component.LEFT;</span>
+
+    }
+
+    /**
+     * {@inheritDoc }
+     */
+    @Override
+    public void setTextPosition(int textPosition) {
+<span class="pc bpc" id="L607" title="3 of 5 branches missed.">        switch (textPosition) {</span>
+            case Component.TOP:
+<span class="nc" id="L609">                setIconPosition(BorderLayout.SOUTH);</span>
+<span class="nc" id="L610">                break;</span>
+            case Component.BOTTOM:
+<span class="nc" id="L612">                setIconPosition(BorderLayout.NORTH);</span>
+<span class="nc" id="L613">                break;</span>
+            case Component.LEFT:
+<span class="fc" id="L615">                setIconPosition(BorderLayout.EAST);</span>
+<span class="fc" id="L616">                break;</span>
+            case Component.RIGHT:
+<span class="fc" id="L618">                setIconPosition(BorderLayout.WEST);</span>
+<span class="fc" id="L619">                break;</span>
+            default:
+<span class="nc" id="L621">                setIconPosition(BorderLayout.EAST);</span>
+        }
+
+<span class="fc" id="L624">    }</span>
+
+    /**
+     * {@inheritDoc }
+     *
+     * @since 7.0
+     */
+    @Override
+    public Image getRolloverPressedIcon() {
+<span class="fc" id="L633">        return actualButton.getRolloverIcon();</span>
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * @since 7.0
+     */
+    @Override
+    public void setRolloverPressedIcon(Image arg0) {
+<span class="fc" id="L643">        actualButton.setRolloverPressedIcon(arg0);</span>
+<span class="fc" id="L644">    }</span>
+
+    /**
+     * {@inheritDoc }
+     *
+     * @since 7.0
+     */
+    @Override
+    public Image getIconFromState() {
+<span class="nc" id="L653">        return actualButton.getIconFromState();</span>
+    }
+
+    /**
+     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, com.codename1.ui.Font, char)}
+     *
+     * @param c one of the constants from the font
+     */
+    public void setFontIcon(Font font, char c) {
+<span class="nc" id="L662">        actualButton.setFontIcon(font, c);</span>
+<span class="nc" id="L663">    }</span>
+
+    /**
+     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char, float)}
+     *
+     * @param c    one of the constants from {@link com.codename1.ui.FontImage}
+     * @param size the size of the icon in millimeters
+     */
+    public void setMaterialIcon(char c, float size) {
+<span class="fc" id="L672">        actualButton.setMaterialIcon(c, size);</span>
+<span class="fc" id="L673">    }</span>
+
+    /**
+     * This method is shorthand for {@link com.codename1.ui.FontImage#setFontIcon(com.codename1.ui.Label, com.codename1.ui.Font, char, float)}
+     *
+     * @param c    one of the constants from the font
+     * @param size the size of the icon in millimeters
+     */
+    public void setFontIcon(Font font, char c, float size) {
+<span class="nc" id="L682">        actualButton.setFontIcon(font, c, size);</span>
+<span class="nc" id="L683">    }</span>
+
+    /**
+     * Returns the material icon assigned to this component or 0 if not applicable
+     *
+     * @return the material icon
+     */
+    public char getMaterialIcon() {
+<span class="nc" id="L691">        return actualButton.getMaterialIcon();</span>
+    }
+
+    /**
+     * This method is shorthand for {@link com.codename1.ui.FontImage#setMaterialIcon(com.codename1.ui.Label, char)}
+     *
+     * @param c one of the constants from {@link com.codename1.ui.FontImage}
+     */
+    public void setMaterialIcon(char c) {
+<span class="nc" id="L700">        actualButton.setMaterialIcon(c);</span>
+<span class="nc" id="L701">    }</span>
+
+    /**
+     * Returns the font icon assigned to this component or 0 if not applicable
+     *
+     * @return the material icon
+     */
+    public char getFontIcon() {
+<span class="nc" id="L709">        return actualButton.getFontIcon();</span>
+    }
+
+    /**
+     * Returns the material icon size assigned to this component or 0/-1 if
+     * not applicable
+     *
+     * @return the material icon size
+     */
+    public float getMaterialIconSize() {
+<span class="nc" id="L719">        return actualButton.getMaterialIconSize();</span>
+    }
+
+    /**
+     * Returns the icon size assigned to this component or 0/-1 if
+     * not applicable
+     *
+     * @return the icon size
+     */
+    public float getFontIconSize() {
+<span class="nc" id="L729">        return actualButton.getFontIconSize();</span>
+    }
+
+    /**
+     * Returns the font for the icon font or null if not font set
+     *
+     * @return the material icon size
+     */
+    public Font getIconFont() {
+<span class="nc" id="L738">        return actualButton.getIconFont();</span>
+    }
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

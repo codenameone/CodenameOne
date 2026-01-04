@@ -1,0 +1,378 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TBitLevel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.util</a> &gt; <span class="el_source">TBitLevel.java</span></div><h1>TBitLevel.java</h1><pre class="source lang-java linenums">/*
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the &quot;License&quot;); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+
+package com.codename1.util;
+
+
+/**
+ * Static library that provides all the &lt;b&gt;bit level&lt;/b&gt; operations for
+ * {@link TBigInteger}. The operations are:
+ * &lt;ul type=&quot;circle&quot;&gt;
+ * &lt;li&gt;Left Shifting&lt;/li&gt;
+ * &lt;li&gt;Right Shifting&lt;/li&gt;
+ * &lt;li&gt;Bit clearing&lt;/li&gt;
+ * &lt;li&gt;Bit setting&lt;/li&gt;
+ * &lt;li&gt;Bit counting&lt;/li&gt;
+ * &lt;li&gt;Bit testing&lt;/li&gt;
+ * &lt;li&gt;Getting of the lowest bit set&lt;/li&gt;
+ * &lt;/ul&gt;
+ * All operations are provided in immutable way, and some in both mutable and
+ * immutable.
+ */
+class TBitLevel {
+
+    /**
+     * Just to denote that this class can't be instantiated.
+     */
+    private TBitLevel() {
+    }
+
+    /**
+     * @see TBigInteger#bitLength()
+     */
+    static int bitLength(TBigInteger val) {
+<span class="pc bpc" id="L48" title="1 of 2 branches missed.">        if (val.sign == 0) {</span>
+<span class="nc" id="L49">            return 0;</span>
+        }
+<span class="fc" id="L51">        int bLength = (val.numberLength &lt;&lt; 5);</span>
+<span class="fc" id="L52">        int highDigit = val.digits[val.numberLength - 1];</span>
+
+<span class="fc bfc" id="L54" title="All 2 branches covered.">        if (val.sign &lt; 0) {</span>
+<span class="fc" id="L55">            int i = val.getFirstNonzeroDigit();</span>
+            // We reduce the problem to the positive case.
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">            if (i == val.numberLength - 1) {</span>
+<span class="fc" id="L58">                highDigit--;</span>
+            }
+        }
+        // Subtracting all sign bits
+<span class="fc" id="L62">        bLength -= numberOfLeadingZeros(highDigit);</span>
+<span class="fc" id="L63">        return bLength;</span>
+    }
+
+    static int numberOfLeadingZeros(int i) {
+<span class="pc bpc" id="L67" title="1 of 2 branches missed.">        if (i == 0) {</span>
+<span class="nc" id="L68">            return 32;</span>
+        }
+
+<span class="fc" id="L71">        int n = 1;</span>
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if ((i &gt;&gt;&gt; 16) == 0) {</span>
+<span class="fc" id="L73">            n += 16;</span>
+<span class="fc" id="L74">            i &lt;&lt;= 16;</span>
+        }
+<span class="fc bfc" id="L76" title="All 2 branches covered.">        if ((i &gt;&gt;&gt; 24) == 0) {</span>
+<span class="fc" id="L77">            n += 8;</span>
+<span class="fc" id="L78">            i &lt;&lt;= 8;</span>
+        }
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if ((i &gt;&gt;&gt; 28) == 0) {</span>
+<span class="fc" id="L81">            n += 4;</span>
+<span class="fc" id="L82">            i &lt;&lt;= 4;</span>
+        }
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        if ((i &gt;&gt;&gt; 30) == 0) {</span>
+<span class="fc" id="L85">            n += 2;</span>
+<span class="fc" id="L86">            i &lt;&lt;= 2;</span>
+        }
+<span class="fc" id="L88">        n -= (i &gt;&gt;&gt; 31);</span>
+<span class="fc" id="L89">        return n;</span>
+    }
+
+    /**
+     * @see TBigInteger#bitCount()
+     */
+    static int bitCount(TBigInteger val) {
+<span class="nc" id="L96">        int bCount = 0;</span>
+
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (val.sign == 0) {</span>
+<span class="nc" id="L99">            return 0;</span>
+        }
+
+<span class="nc" id="L102">        int i = val.getFirstNonzeroDigit();</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        if (val.sign &gt; 0) {</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">            for (; i &lt; val.numberLength; i++) {</span>
+<span class="nc" id="L105">                bCount += TBigDecimal.bitCount(val.digits[i]);</span>
+            }
+        } else {// (sign &lt; 0)
+            // this digit absorbs the carry
+<span class="nc" id="L109">            bCount += TBigDecimal.bitCount(-val.digits[i]);</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">            for (i++; i &lt; val.numberLength; i++) {</span>
+<span class="nc" id="L111">                bCount += TBigDecimal.bitCount(~val.digits[i]);</span>
+            }
+            // We take the complement sum:
+<span class="nc" id="L114">            bCount = (val.numberLength &lt;&lt; 5) - bCount;</span>
+        }
+<span class="nc" id="L116">        return bCount;</span>
+    }
+
+    /**
+     * Performs a fast bit testing for positive numbers. The bit to to be tested
+     * must be in the range {@code [0, val.bitLength()-1]}
+     */
+    static boolean testBit(TBigInteger val, int n) {
+        // PRE: 0 &lt;= n &lt; val.bitLength()
+<span class="fc bfc" id="L125" title="All 2 branches covered.">        return ((val.digits[n &gt;&gt; 5] &amp; (1 &lt;&lt; (n &amp; 31))) != 0);</span>
+    }
+
+    /**
+     * Check if there are 1s in the lowest bits of this BigInteger
+     *
+     * @param numberOfBits the number of the lowest bits to check
+     * @return false if all bits are 0s, true otherwise
+     */
+    static boolean nonZeroDroppedBits(int numberOfBits, int[] digits) {
+<span class="nc" id="L135">        int intCount = numberOfBits &gt;&gt; 5;</span>
+<span class="nc" id="L136">        int bitCount = numberOfBits &amp; 31;</span>
+        int i;
+
+<span class="nc bnc" id="L139" title="All 4 branches missed.">        for (i = 0; (i &lt; intCount) &amp;&amp; (digits[i] == 0); i++) {</span>
+            // do nothing
+        }
+<span class="nc bnc" id="L142" title="All 4 branches missed.">        return ((i != intCount) || (digits[i] &lt;&lt; (32 - bitCount) != 0));</span>
+    }
+
+    /**
+     * @see TBigInteger#shiftLeft(int)
+     */
+    static TBigInteger shiftLeft(TBigInteger source, int count) {
+<span class="fc" id="L149">        int intCount = count &gt;&gt; 5;</span>
+<span class="fc" id="L150">        count &amp;= 31; // %= 32</span>
+<span class="fc bfc" id="L151" title="All 2 branches covered.">        int resLength = source.numberLength + intCount + ((count == 0) ? 0 : 1);</span>
+<span class="fc" id="L152">        int[] resDigits = new int[resLength];</span>
+
+<span class="fc" id="L154">        shiftLeft(resDigits, source.digits, intCount, count);</span>
+<span class="fc" id="L155">        TBigInteger result = new TBigInteger(source.sign, resLength, resDigits);</span>
+<span class="fc" id="L156">        result.cutOffLeadingZeroes();</span>
+<span class="fc" id="L157">        return result;</span>
+    }
+
+    /**
+     * Performs {@code val &lt;&lt;= count}.
+     */
+    // val should have enough place (and one digit more)
+    static void inplaceShiftLeft(TBigInteger val, int count) {
+<span class="nc" id="L165">        int intCount = count &gt;&gt; 5; // count of integers</span>
+<span class="nc" id="L166">        val.numberLength += intCount +</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">                (TBigDecimal.numberOfLeadingZeros(val.digits[val.numberLength - 1]) - (count &amp; 31) &gt;= 0 ? 0 : 1);</span>
+<span class="nc" id="L168">        shiftLeft(val.digits, val.digits, intCount, count &amp; 31);</span>
+<span class="nc" id="L169">        val.cutOffLeadingZeroes();</span>
+<span class="nc" id="L170">        val.unCache();</span>
+<span class="nc" id="L171">    }</span>
+
+    /**
+     * Abstractly shifts left an array of integers in little endian (i.e. shift
+     * it right). Total shift distance in bits is intCount * 32 + count
+     *
+     * @param result   the destination array
+     * @param source   the source array
+     * @param intCount the shift distance in integers
+     * @param count    an additional shift distance in bits
+     */
+    static void shiftLeft(int[] result, int[] source, int intCount, int count) {
+<span class="fc bfc" id="L183" title="All 2 branches covered.">        if (count == 0) {</span>
+<span class="fc" id="L184">            System.arraycopy(source, 0, result, intCount, result.length - intCount);</span>
+        } else {
+<span class="fc" id="L186">            int rightShiftCount = 32 - count;</span>
+
+<span class="fc" id="L188">            result[result.length - 1] = 0;</span>
+<span class="fc bfc" id="L189" title="All 2 branches covered.">            for (int i = result.length - 1; i &gt; intCount; i--) {</span>
+<span class="fc" id="L190">                result[i] |= source[i - intCount - 1] &gt;&gt;&gt; rightShiftCount;</span>
+<span class="fc" id="L191">                result[i - 1] = source[i - intCount - 1] &lt;&lt; count;</span>
+            }
+        }
+
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        for (int i = 0; i &lt; intCount; i++) {</span>
+<span class="fc" id="L196">            result[i] = 0;</span>
+        }
+<span class="fc" id="L198">    }</span>
+
+    /**
+     * Shifts the source digits left one bit, creating a value whose magnitude
+     * is doubled.
+     *
+     * @param result an array of digits that will hold the computed result when
+     *               this method returns. The size of this array is
+     *               {@code srcLen + 1}, and the format is the same as
+     *               {@link TBigInteger#digits}.
+     * @param source the array of digits to shift left, in the same format as
+     *               {@link TBigInteger#digits}.
+     * @param srcLen the length of {@code source}; may be less than
+     *               {@code source.length}
+     */
+    static void shiftLeftOneBit(int[] result, int[] source, int srcLen) {
+<span class="nc" id="L214">        int carry = 0;</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">        for (int i = 0; i &lt; srcLen; i++) {</span>
+<span class="nc" id="L216">            int val = source[i];</span>
+<span class="nc" id="L217">            result[i] = (val &lt;&lt; 1) | carry;</span>
+<span class="nc" id="L218">            carry = val &gt;&gt;&gt; 31;</span>
+        }
+<span class="nc bnc" id="L220" title="All 2 branches missed.">        if (carry != 0) {</span>
+<span class="nc" id="L221">            result[srcLen] = carry;</span>
+        }
+<span class="nc" id="L223">    }</span>
+
+    static TBigInteger shiftLeftOneBit(TBigInteger source) {
+<span class="nc" id="L226">        int srcLen = source.numberLength;</span>
+<span class="nc" id="L227">        int resLen = srcLen + 1;</span>
+<span class="nc" id="L228">        int[] resDigits = new int[resLen];</span>
+<span class="nc" id="L229">        shiftLeftOneBit(resDigits, source.digits, srcLen);</span>
+<span class="nc" id="L230">        TBigInteger result = new TBigInteger(source.sign, resLen, resDigits);</span>
+<span class="nc" id="L231">        result.cutOffLeadingZeroes();</span>
+<span class="nc" id="L232">        return result;</span>
+    }
+
+    /**
+     * @see TBigInteger#shiftRight(int)
+     */
+    static TBigInteger shiftRight(TBigInteger source, int count) {
+<span class="fc" id="L239">        int intCount = count &gt;&gt; 5; // count of integers</span>
+<span class="fc" id="L240">        count &amp;= 31; // count of remaining bits</span>
+<span class="pc bpc" id="L241" title="1 of 2 branches missed.">        if (intCount &gt;= source.numberLength) {</span>
+<span class="nc bnc" id="L242" title="All 2 branches missed.">            return ((source.sign &lt; 0) ? TBigInteger.MINUS_ONE : TBigInteger.ZERO);</span>
+        }
+        int i;
+<span class="fc" id="L245">        int resLength = source.numberLength - intCount;</span>
+<span class="fc" id="L246">        int[] resDigits = new int[resLength + 1];</span>
+
+<span class="fc" id="L248">        shiftRight(resDigits, resLength, source.digits, intCount, count);</span>
+<span class="pc bpc" id="L249" title="1 of 2 branches missed.">        if (source.sign &lt; 0) {</span>
+            // Checking if the dropped bits are zeros (the remainder equals to
+            // 0)
+<span class="nc bnc" id="L252" title="All 4 branches missed.">            for (i = 0; (i &lt; intCount) &amp;&amp; (source.digits[i] == 0); i++) {</span>
+                // do nothing
+            }
+            // If the remainder is not zero, add 1 to the result
+<span class="nc bnc" id="L256" title="All 6 branches missed.">            if ((i &lt; intCount) || ((count &gt; 0) &amp;&amp; ((source.digits[i] &lt;&lt; (32 - count)) != 0))) {</span>
+<span class="nc bnc" id="L257" title="All 4 branches missed.">                for (i = 0; (i &lt; resLength) &amp;&amp; (resDigits[i] == -1); i++) {</span>
+<span class="nc" id="L258">                    resDigits[i] = 0;</span>
+                }
+<span class="nc bnc" id="L260" title="All 2 branches missed.">                if (i == resLength) {</span>
+<span class="nc" id="L261">                    resLength++;</span>
+                }
+<span class="nc" id="L263">                resDigits[i]++;</span>
+            }
+        }
+<span class="fc" id="L266">        TBigInteger result = new TBigInteger(source.sign, resLength, resDigits);</span>
+<span class="fc" id="L267">        result.cutOffLeadingZeroes();</span>
+<span class="fc" id="L268">        return result;</span>
+    }
+
+    /**
+     * Performs {@code val &gt;&gt;= count} where {@code val} is a positive number.
+     */
+    static void inplaceShiftRight(TBigInteger val, int count) {
+<span class="nc" id="L275">        int sign = val.signum();</span>
+<span class="nc bnc" id="L276" title="All 4 branches missed.">        if (count == 0 || val.signum() == 0)</span>
+<span class="nc" id="L277">            return;</span>
+<span class="nc" id="L278">        int intCount = count &gt;&gt; 5; // count of integers</span>
+<span class="nc" id="L279">        val.numberLength -= intCount;</span>
+<span class="nc bnc" id="L280" title="All 4 branches missed.">        if (!shiftRight(val.digits, val.numberLength, val.digits, intCount, count &amp; 31) &amp;&amp; sign &lt; 0) {</span>
+            // remainder not zero: add one to the result
+            int i;
+<span class="nc bnc" id="L283" title="All 4 branches missed.">            for (i = 0; (i &lt; val.numberLength) &amp;&amp; (val.digits[i] == -1); i++) {</span>
+<span class="nc" id="L284">                val.digits[i] = 0;</span>
+            }
+<span class="nc bnc" id="L286" title="All 2 branches missed.">            if (i == val.numberLength) {</span>
+<span class="nc" id="L287">                val.numberLength++;</span>
+            }
+<span class="nc" id="L289">            val.digits[i]++;</span>
+        }
+<span class="nc" id="L291">        val.cutOffLeadingZeroes();</span>
+<span class="nc" id="L292">        val.unCache();</span>
+<span class="nc" id="L293">    }</span>
+
+    /**
+     * Shifts right an array of integers. Total shift distance in bits is
+     * intCount * 32 + count.
+     *
+     * @param result    the destination array
+     * @param resultLen the destination array's length
+     * @param source    the source array
+     * @param intCount  the number of elements to be shifted
+     * @param count     the number of bits to be shifted
+     * @return dropped bit's are all zero (i.e. remaider is zero)
+     */
+    static boolean shiftRight(int[] result, int resultLen, int[] source, int intCount, int count) {
+        int i;
+<span class="fc" id="L308">        boolean allZero = true;</span>
+<span class="pc bpc" id="L309" title="1 of 2 branches missed.">        for (i = 0; i &lt; intCount; i++) {</span>
+<span class="nc bnc" id="L310" title="All 2 branches missed.">            allZero &amp;= source[i] == 0;</span>
+        }
+<span class="pc bpc" id="L312" title="1 of 2 branches missed.">        if (count == 0) {</span>
+<span class="nc" id="L313">            System.arraycopy(source, intCount, result, 0, resultLen);</span>
+        } else {
+<span class="fc" id="L315">            int leftShiftCount = 32 - count;</span>
+<span class="pc bpc" id="L316" title="1 of 2 branches missed.">            allZero &amp;= (source[intCount] &lt;&lt; leftShiftCount) == 0;</span>
+<span class="fc bfc" id="L317" title="All 2 branches covered.">            for (int j = 0; j &lt; resultLen - 1; j++) {</span>
+<span class="fc" id="L318">                result[j] = (source[j + intCount] &gt;&gt;&gt; count) | (source[j + intCount + 1] &lt;&lt; leftShiftCount);</span>
+            }
+<span class="fc" id="L320">            result[resultLen - 1] = (source[resultLen - 1 + intCount] &gt;&gt;&gt; count);</span>
+        }
+
+<span class="fc" id="L323">        return allZero;</span>
+    }
+
+    /**
+     * Performs a flipBit on the BigInteger, returning a BigInteger with the the
+     * specified bit flipped.
+     *
+     * @param intCount  : the index of the element of the digits array where the
+     *                  operation will be performed
+     * @param bitNumber : the bit's position in the intCount element
+     */
+    static TBigInteger flipBit(TBigInteger val, int n) {
+<span class="pc bpc" id="L335" title="1 of 2 branches missed.">        int resSign = (val.sign == 0) ? 1 : val.sign;</span>
+<span class="fc" id="L336">        int intCount = n &gt;&gt; 5;</span>
+<span class="fc" id="L337">        int bitN = n &amp; 31;</span>
+<span class="fc" id="L338">        int resLength = Math.max(intCount + 1, val.numberLength) + 1;</span>
+<span class="fc" id="L339">        int[] resDigits = new int[resLength];</span>
+        int i;
+
+<span class="fc" id="L342">        int bitNumber = 1 &lt;&lt; bitN;</span>
+<span class="fc" id="L343">        System.arraycopy(val.digits, 0, resDigits, 0, val.numberLength);</span>
+
+<span class="pc bpc" id="L345" title="1 of 2 branches missed.">        if (val.sign &lt; 0) {</span>
+<span class="nc bnc" id="L346" title="All 2 branches missed.">            if (intCount &gt;= val.numberLength) {</span>
+<span class="nc" id="L347">                resDigits[intCount] = bitNumber;</span>
+            } else {
+                // val.sign&lt;0 y intCount &lt; val.numberLength
+<span class="nc" id="L350">                int firstNonZeroDigit = val.getFirstNonzeroDigit();</span>
+<span class="nc bnc" id="L351" title="All 2 branches missed.">                if (intCount &gt; firstNonZeroDigit) {</span>
+<span class="nc" id="L352">                    resDigits[intCount] ^= bitNumber;</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">                } else if (intCount &lt; firstNonZeroDigit) {</span>
+<span class="nc" id="L354">                    resDigits[intCount] = -bitNumber;</span>
+<span class="nc bnc" id="L355" title="All 2 branches missed.">                    for (i = intCount + 1; i &lt; firstNonZeroDigit; i++) {</span>
+<span class="nc" id="L356">                        resDigits[i] = -1;</span>
+                    }
+<span class="nc" id="L358">                    resDigits[i] = resDigits[i]--;</span>
+                } else {
+<span class="nc" id="L360">                    i = intCount;</span>
+<span class="nc" id="L361">                    resDigits[i] = -((-resDigits[intCount]) ^ bitNumber);</span>
+<span class="nc bnc" id="L362" title="All 2 branches missed.">                    if (resDigits[i] == 0) {</span>
+<span class="nc bnc" id="L363" title="All 2 branches missed.">                        for (i++; resDigits[i] == -1; i++) {</span>
+<span class="nc" id="L364">                            resDigits[i] = 0;</span>
+                        }
+<span class="nc" id="L366">                        resDigits[i]++;</span>
+                    }
+                }
+<span class="nc" id="L369">            }</span>
+        } else {// case where val is positive
+<span class="fc" id="L371">            resDigits[intCount] ^= bitNumber;</span>
+        }
+<span class="fc" id="L373">        TBigInteger result = new TBigInteger(resSign, resLength, resDigits);</span>
+<span class="fc" id="L374">        result.cutOffLeadingZeroes();</span>
+<span class="fc" id="L375">        return result;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>TarHeader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.io.tar</a> &gt; <span class="el_source">TarHeader.java</span></div><h1>TarHeader.java</h1><pre class="source lang-java linenums">/**
+ * Copyright 2012 Kamran Zafar
+ * &lt;p&gt;
+ * Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * &lt;p&gt;
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * &lt;p&gt;
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/**
+ * The original source has been modified by Paul Williams.
+ */
+
+package com.codename1.io.tar;
+
+/**
+ * Header
+ *
+ * &lt;pre&gt;
+ * Offset  Size     Field
+ * 0       100      File name
+ * 100     8        File mode
+ * 108     8        Owner's numeric user ID
+ * 116     8        Group's numeric user ID
+ * 124     12       File size in bytes
+ * 136     12       Last modification time in numeric Unix time format
+ * 148     8        Checksum for header block
+ * 156     1        Link indicator (file type)
+ * 157     100      Name of linked file
+ * &lt;/pre&gt;
+ *
+ *
+ * File Types
+ *
+ * &lt;pre&gt;
+ * Value        Meaning
+ * '0'          Normal file
+ * (ASCII NUL)  Normal file (now obsolete)
+ * '1'          Hard link
+ * '2'          Symbolic link
+ * '3'          Character special
+ * '4'          Block special
+ * '5'          Directory
+ * '6'          FIFO
+ * '7'          Contigous
+ * &lt;/pre&gt;
+ *
+ *
+ *
+ * Ustar header
+ *
+ * &lt;pre&gt;
+ * Offset  Size    Field
+ * 257     6       UStar indicator &quot;ustar&quot;
+ * 263     2       UStar version &quot;00&quot;
+ * 265     32      Owner user name
+ * 297     32      Owner group name
+ * 329     8       Device major number
+ * 337     8       Device minor number
+ * 345     155     Filename prefix
+ * &lt;/pre&gt;
+ */
+
+public class TarHeader {
+
+    /*
+     * Header
+     */
+    public static final int NAMELEN = 100;
+    public static final int MODELEN = 8;
+    public static final int UIDLEN = 8;
+    public static final int GIDLEN = 8;
+    public static final int SIZELEN = 12;
+    public static final int MODTIMELEN = 12;
+    public static final int CHKSUMLEN = 8;
+    public static final byte LF_OLDNORM = 0;
+
+    /*
+     * File Types
+     */
+    public static final byte LF_NORMAL = (byte) '0';
+    public static final byte LF_LINK = (byte) '1';
+    public static final byte LF_SYMLINK = (byte) '2';
+    public static final byte LF_CHR = (byte) '3';
+    public static final byte LF_BLK = (byte) '4';
+    public static final byte LF_DIR = (byte) '5';
+    public static final byte LF_FIFO = (byte) '6';
+    public static final byte LF_CONTIG = (byte) '7';
+
+    /*
+     * Ustar header
+     */
+
+    public static final int MAGICLEN = 8;
+    /**
+     * The magic tag representing a POSIX tar archive.
+     */
+    public static final String TMAGIC = &quot;ustar&quot;;
+
+    /**
+     * The magic tag representing a GNU tar archive.
+     */
+    public static final String GNU_TMAGIC = &quot;ustar  &quot;;
+
+    public static final int UNAMELEN = 32;
+    public static final int GNAMELEN = 32;
+    public static final int DEVLEN = 8;
+
+    // Header values
+    public StringBuffer name;
+    public int mode;
+    public int userId;
+    public int groupId;
+    public long size;
+    public long modTime;
+    public int checkSum;
+    public byte linkFlag;
+    public StringBuffer linkName;
+    public StringBuffer magic;
+    public StringBuffer userName;
+    public StringBuffer groupName;
+    public int devMajor;
+    public int devMinor;
+
+<span class="fc" id="L132">    public TarHeader() {</span>
+<span class="fc" id="L133">        this.magic = new StringBuffer(TarHeader.TMAGIC);</span>
+
+<span class="fc" id="L135">        this.name = new StringBuffer();</span>
+<span class="fc" id="L136">        this.linkName = new StringBuffer();</span>
+
+        //String user = System.getProperty( &quot;user.name&quot;, &quot;&quot; );
+<span class="fc" id="L139">        String user = &quot;&quot;;</span>
+
+<span class="pc bpc" id="L141" title="1 of 2 branches missed.">        if (user.length() &gt; 31)</span>
+<span class="nc" id="L142">            user = user.substring(0, 31);</span>
+
+<span class="fc" id="L144">        this.userId = 0;</span>
+<span class="fc" id="L145">        this.groupId = 0;</span>
+<span class="fc" id="L146">        this.userName = new StringBuffer(user);</span>
+<span class="fc" id="L147">        this.groupName = new StringBuffer();</span>
+<span class="fc" id="L148">    }</span>
+
+    /**
+     * Parse an entry name from a header buffer.
+     *
+     * @param name
+     * @param header
+     *            The header buffer from which to parse.
+     * @param offset
+     *            The offset into the buffer from which to parse.
+     * @param length
+     *            The number of header bytes to parse.
+     * @return The header's entry name.
+     */
+    public static StringBuffer parseName(byte[] header, int offset, int length) {
+<span class="fc" id="L163">        StringBuffer result = new StringBuffer(length);</span>
+
+<span class="fc" id="L165">        int end = offset + length;</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">        for (int i = offset; i &lt; end; ++i) {</span>
+<span class="fc bfc" id="L167" title="All 2 branches covered.">            if (header[i] == 0)</span>
+<span class="fc" id="L168">                break;</span>
+<span class="fc" id="L169">            result.append((char) header[i]);</span>
+        }
+
+<span class="fc" id="L172">        return result;</span>
+    }
+
+    /**
+     * Determine the number of bytes in an entry name.
+     *
+     * @param name
+     * @param header
+     *            The header buffer from which to parse.
+     * @param offset
+     *            The offset into the buffer from which to parse.
+     * @param length
+     *            The number of header bytes to parse.
+     * @return The number of bytes in a header's entry name.
+     */
+    public static int getNameBytes(StringBuffer name, byte[] buf, int offset, int length) {
+        int i;
+
+<span class="fc" id="L190">        int nlen = name.length();</span>
+<span class="pc bpc" id="L191" title="1 of 4 branches missed.">        for (i = 0; i &lt; length &amp;&amp; i &lt; nlen; ++i) {</span>
+<span class="fc" id="L192">            buf[offset + i] = (byte) name.charAt(i);</span>
+        }
+
+<span class="fc bfc" id="L195" title="All 2 branches covered.">        for (; i &lt; length; ++i) {</span>
+<span class="fc" id="L196">            buf[offset + i] = 0;</span>
+        }
+
+<span class="fc" id="L199">        return offset + length;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>

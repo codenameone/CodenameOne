@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>SpinnerNumberModel.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">codenameone-core-unittests</a> &gt; <a href="index.source.html" class="el_package">com.codename1.ui.spinner</a> &gt; <span class="el_source">SpinnerNumberModel.java</span></div><h1>SpinnerNumberModel.java</h1><pre class="source lang-java linenums">/*
+ * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
+ * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+ * This code is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License version 2 only, as
+ * published by the Free Software Foundation.  Oracle designates this
+ * particular file as subject to the &quot;Classpath&quot; exception as provided
+ * by Oracle in the LICENSE file that accompanied this code.
+ *
+ * This code is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+ * version 2 for more details (a copy is included in the LICENSE file that
+ * accompanied this code).
+ *
+ * You should have received a copy of the GNU General Public License version
+ * 2 along with this work; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+ *
+ * Please contact Oracle, 500 Oracle Parkway, Redwood Shores
+ * CA 94065 USA or visit www.oracle.com if you need additional information or
+ * have any questions.
+ */
+
+package com.codename1.ui.spinner;
+
+import com.codename1.ui.events.DataChangedListener;
+import com.codename1.ui.events.SelectionListener;
+import com.codename1.ui.list.ListModel;
+import com.codename1.ui.util.EventDispatcher;
+
+/**
+ * Represents a numeric model for the spinner
+ *
+ * @author Shai Almog
+ * @deprecated use Picker instead
+ */
+class SpinnerNumberModel implements ListModel {
+    boolean realValues;
+<span class="fc" id="L40">    private final EventDispatcher dataListener = new EventDispatcher();</span>
+<span class="fc" id="L41">    private final EventDispatcher selectionListener = new EventDispatcher();</span>
+    private final double min;
+    private final double max;
+    private double currentValue;
+    private final double step;
+    /**
+     * The old DateSpinner relies on behavior that was broken in this commit:
+     * https://github.com/codenameone/CodenameOne/commit/cfac9a6a1bb15027b48a9b822e2f21eb2835d38e#diff-d12531ab4b0dd8bf1233a09f3c5e2b2b5634bff3c3cd2f357ad0a001e5f19bbf
+     * This is a workaround to preserve compatibility
+     */
+<span class="fc" id="L51">    private int maxOffset = 1;</span>
+
+    private boolean setSelectedIndexReentrantLock;
+
+    /**
+     * Indicates the range of the spinner
+     *
+     * @param min          lowest value allowed
+     * @param max          maximum value allowed
+     * @param currentValue the starting value for the mode
+     * @param step         the value by which we increment the entries in the model
+     */
+<span class="fc" id="L63">    public SpinnerNumberModel(int min, int max, int currentValue, int step) {</span>
+<span class="fc" id="L64">        this.max = max;</span>
+<span class="fc" id="L65">        this.min = min;</span>
+<span class="fc" id="L66">        this.currentValue = currentValue;</span>
+<span class="fc" id="L67">        this.step = step;</span>
+<span class="fc" id="L68">    }</span>
+
+<span class="fc" id="L70">    SpinnerNumberModel(int min, int max, int currentValue, int step, int maxOffset) {</span>
+<span class="fc" id="L71">        this.max = max;</span>
+<span class="fc" id="L72">        this.min = min;</span>
+<span class="fc" id="L73">        this.currentValue = currentValue;</span>
+<span class="fc" id="L74">        this.step = step;</span>
+<span class="fc" id="L75">        this.maxOffset = maxOffset;</span>
+<span class="fc" id="L76">    }</span>
+
+    /**
+     * Indicates the range of the spinner
+     *
+     * @param min          lowest value allowed
+     * @param max          maximum value allowed
+     * @param currentValue the starting value for the mode
+     * @param step         the value by which we increment the entries in the model
+     */
+<span class="fc" id="L86">    public SpinnerNumberModel(double min, double max, double currentValue, double step) {</span>
+<span class="fc" id="L87">        this.max = max;</span>
+<span class="fc" id="L88">        this.min = min;</span>
+<span class="fc" id="L89">        this.currentValue = currentValue;</span>
+<span class="fc" id="L90">        this.step = step;</span>
+<span class="fc" id="L91">        realValues = true;</span>
+<span class="fc" id="L92">    }</span>
+
+    Object getValue() {
+<span class="fc bfc" id="L95" title="All 2 branches covered.">        if (realValues) {</span>
+<span class="fc" id="L96">            return new Double(currentValue);</span>
+        }
+<span class="fc" id="L98">        return Integer.valueOf((int) currentValue);</span>
+    }
+
+    void setValue(Object value) {
+<span class="fc" id="L102">        int oldIndex = getSelectedIndex();</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (value instanceof Integer) {</span>
+<span class="fc" id="L104">            currentValue = ((Integer) value).doubleValue();</span>
+        } else {
+<span class="fc" id="L106">            currentValue = ((Double) value).doubleValue();</span>
+        }
+<span class="fc bfc" id="L108" title="All 2 branches covered.">        if (oldIndex != getSelectedIndex()) {</span>
+<span class="fc" id="L109">            selectionListener.fireSelectionEvent(oldIndex, getSelectedIndex());</span>
+        }
+<span class="fc" id="L111">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public Object getItemAt(int index) {
+<span class="fc bfc" id="L117" title="All 2 branches covered.">        if (realValues) {</span>
+<span class="fc" id="L118">            return new Double(min + step * index);</span>
+        }
+<span class="fc" id="L120">        return Integer.valueOf((int) (min + step * index));</span>
+    }
+
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getSize() {
+<span class="fc" id="L128">        return (int) ((max - min) / step) + maxOffset;</span>
+    }
+
+
+    /**
+     * {@inheritDoc}
+     */
+    public int getSelectedIndex() {
+<span class="fc" id="L136">        return (int) ((currentValue - min) / step);</span>
+    }
+
+
+    /**
+     * {@inheritDoc}
+     */
+    public void setSelectedIndex(int index) {
+<span class="pc bpc" id="L144" title="1 of 2 branches missed.">        if (setSelectedIndexReentrantLock) {</span>
+<span class="nc" id="L145">            return;</span>
+        }
+<span class="fc" id="L147">        setSelectedIndexReentrantLock = true;</span>
+        try {
+<span class="fc" id="L149">            int oldIndex = getSelectedIndex();</span>
+<span class="fc" id="L150">            currentValue = min + index * step;</span>
+<span class="fc" id="L151">            int newIndex = getSelectedIndex();</span>
+<span class="fc bfc" id="L152" title="All 2 branches covered.">            if (oldIndex != newIndex) {</span>
+<span class="fc" id="L153">                selectionListener.fireSelectionEvent(oldIndex, newIndex);</span>
+            }
+        } finally {
+<span class="fc" id="L156">            setSelectedIndexReentrantLock = false;</span>
+        }
+<span class="fc" id="L158">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addDataChangedListener(DataChangedListener l) {
+<span class="fc" id="L164">        dataListener.addListener(l);</span>
+<span class="fc" id="L165">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void removeDataChangedListener(DataChangedListener l) {
+<span class="fc" id="L171">        dataListener.removeListener(l);</span>
+<span class="fc" id="L172">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addSelectionListener(SelectionListener l) {
+<span class="fc" id="L178">        selectionListener.addListener(l);</span>
+<span class="fc" id="L179">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void removeSelectionListener(SelectionListener l) {
+<span class="fc" id="L185">        selectionListener.removeListener(l);</span>
+<span class="fc" id="L186">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void addItem(Object item) {
+<span class="nc" id="L192">    }</span>
+
+    /**
+     * {@inheritDoc}
+     */
+    public void removeItem(int index) {
+<span class="nc" id="L198">    }</span>
+
+    /**
+     * @return the min
+     */
+    public double getMin() {
+<span class="nc" id="L204">        return min;</span>
+    }
+
+    /**
+     * @return the max
+     */
+    public double getMax() {
+<span class="nc" id="L211">        return max;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.7.202105040129</span></div></body></html>
