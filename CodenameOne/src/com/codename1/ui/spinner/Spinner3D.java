@@ -40,8 +40,6 @@ class Spinner3D extends Container implements InternalPickerWidget {
     private final Scene scene;
     private final ScrollingContainer scroller;
 
-    private final boolean gridPosDirty = true;
-
 
     /**
      * Creates a new Spinner3D with the given listModel.

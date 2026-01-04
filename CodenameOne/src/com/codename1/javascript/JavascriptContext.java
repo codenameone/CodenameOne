@@ -144,9 +144,9 @@ public class JavascriptContext {
      * Whenever the objectMap exceeds this size, cleanup will be called whenever retain()
      * is called.
      */
-    private final int objectMapThresholdSize = 500;
+    private static final int objectMapThresholdSize = 500;
     private final Random cleanupRandomizer = new Random();
-    private final double cleanupProbability = 0.1;
+    private static final double cleanupProbability = 0.1;
     private JSObject window;
 
     /**

@@ -130,8 +130,8 @@ public abstract class LookAndFeel {
     private Image fadeScrollBottom;
     private Image fadeScrollRight;
     private Image fadeScrollLeft;
-    private final int fadeScrollEdgeStartAlpha = 0x999999;
-    private final int fadeScrollEdgeEndAlpha = 0;
+    private static final int fadeScrollEdgeStartAlpha = 0x999999;
+    private static final int fadeScrollEdgeEndAlpha = 0;
     private int textFieldCursorColor;
 
     private boolean backgroundImageDetermineSize;

@@ -81,7 +81,7 @@ public class Tree extends Container {
     private final EventDispatcher leafListener = new EventDispatcher();
     private final ActionListener expansionListener = new Handler();
     private TreeModel model;
-    private final int depthIndent = 2;
+    private static final int depthIndent = 2;
     private boolean multilineMode;
 
     /**

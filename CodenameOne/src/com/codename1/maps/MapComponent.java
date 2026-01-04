@@ -82,8 +82,8 @@ public class MapComponent extends Container {
     private int zoomCenterY = 0;
     private long lastPressed = -1;
     private int tapCount = 0;
-    private final int singleTapThreshold = 200;
-    private final int doubleTapThreshold = 200;
+    private static final int singleTapThreshold = 200;
+    private static final int doubleTapThreshold = 200;
     private ArrayList<MapListener> listeners;
 
     /**

@@ -68,7 +68,7 @@ class DateSpinner3D extends Container implements InternalPickerWidget {
     private boolean monthDayYear = true;
     private boolean numericMonths = false;
 
-    private final String monthRenderingPrototype = "WWW";
+    private static final String monthRenderingPrototype = "WWW";
     private final SimpleDateFormat monthFormat = new SimpleDateFormat("MMMM");
     private final Container wrapper = new Container(BoxLayout.x());
     private final Calendar tmpCal = Calendar.getInstance();

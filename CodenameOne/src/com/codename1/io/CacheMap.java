@@ -50,7 +50,6 @@ public class CacheMap {
     private Vector storageCacheContentVec;
     private String cachePrefix = "";
     private boolean alwaysStore;
-    private final int storageKey = -1;
 
     /**
      * Default constructor

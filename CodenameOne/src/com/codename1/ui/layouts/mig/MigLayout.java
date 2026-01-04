@@ -83,7 +83,6 @@ public final class MigLayout extends Layout {
     private ArrayList<LayoutCallback> callbackList = null;
 
     private boolean dirty = true;
-    private final long lastSize = 0;
 
     /**
      * Constructor with no constraints.

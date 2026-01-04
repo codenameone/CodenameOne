@@ -62,8 +62,8 @@ public class FlipTransition extends Transition {
     private int transitionState = STATE_MOVE_AWAY;
 
     private Motion motion;
-    private final boolean firstFinished = false;
-    private final boolean started = false;
+    private static final boolean firstFinished = false;
+    private static final boolean started = false;
 
     private int bgColor = -1;
 
