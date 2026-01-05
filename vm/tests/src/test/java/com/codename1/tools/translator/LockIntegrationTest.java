@@ -148,6 +148,11 @@ class LockIntegrationTest {
                 "    private int offset;\n" +
                 "    private int count;\n" +
                 "    public String(char[] v) { value = v; count=v.length; }\n" +
+                "    public byte[] getBytes(String charsetName) {\n" +
+                "        byte[] out = new byte[count];\n" +
+                "        for (int i = 0; i < count; i++) { out[i] = (byte)value[offset + i]; }\n" +
+                "        return out;\n" +
+                "    }\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
         // Primitive wrappers
