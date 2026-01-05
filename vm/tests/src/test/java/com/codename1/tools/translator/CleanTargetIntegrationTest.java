@@ -348,6 +348,19 @@ class CleanTargetIntegrationTest {
         }
     }
 
+    static void removeTranslatorFileNatives(Path srcRoot) throws IOException {
+        String[] fileArtifacts = {
+                "java_io_File.c", "java_io_File.h",
+                "java_io_FileInputStream.c", "java_io_FileInputStream.h",
+                "java_io_FileOutputStream.c", "java_io_FileOutputStream.h",
+                "java_io_FileWriter.c", "java_io_FileWriter.h",
+                "java_io_FileStreams.c", "java_io_FileStreams.h"
+        };
+        for (String name : fileArtifacts) {
+            Files.deleteIfExists(srcRoot.resolve(name));
+        }
+    }
+
     static void writeRuntimeStubs(Path srcRoot) throws IOException {
         Path objectHeader = srcRoot.resolve("java_lang_Object.h");
         if (!Files.exists(objectHeader)) {
