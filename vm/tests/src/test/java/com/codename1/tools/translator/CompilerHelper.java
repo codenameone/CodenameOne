@@ -568,14 +568,13 @@ public class CompilerHelper {
             java.nio.file.Path buildDir = distDir.resolve("build");
             java.nio.file.Files.createDirectories(buildDir);
 
-            CleanTargetIntegrationTest.runCommand(Arrays.asList(
+            List<String> cmakeCommand = new ArrayList<>(Arrays.asList(
                     "cmake",
                     "-S", distDir.toString(),
-                    "-B", buildDir.toString(),
-                    "-DCMAKE_C_COMPILER=clang",
-                    "-DCMAKE_OBJC_COMPILER=clang",
-                    "-DCMAKE_C_FLAGS=-Wno-error=literal-range -Wno-literal-range"
-            ), distDir);
+                    "-B", buildDir.toString()
+            ));
+            cmakeCommand.addAll(CleanTargetIntegrationTest.cmakeCompilerArgs());
+            CleanTargetIntegrationTest.runCommand(cmakeCommand, distDir);
 
             CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 

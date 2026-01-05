@@ -7,6 +7,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.reflect.InvocationTargetException;
@@ -105,14 +106,13 @@ class CleanTargetIntegrationTest {
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
 
-        runCommand(Arrays.asList(
+        List<String> cmakeCommand = new java.util.ArrayList<>(Arrays.asList(
                 "cmake",
                 "-S", distDir.toString(),
-                "-B", buildDir.toString(),
-                "-DCMAKE_C_COMPILER=clang",
-                "-DCMAKE_OBJC_COMPILER=clang",
-                "-DCMAKE_C_FLAGS=-Wno-error=literal-range -Wno-literal-range"
-        ), distDir);
+                "-B", buildDir.toString()
+        ));
+        cmakeCommand.addAll(cmakeCompilerArgs());
+        runCommand(cmakeCommand, distDir);
 
         runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
@@ -192,11 +192,56 @@ class CleanTargetIntegrationTest {
 
     static void relaxLiteralRangeWarnings(Path cmakeLists) throws IOException {
         String content = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
-        String flagLine = "set(CMAKE_C_FLAGS \"${CMAKE_C_FLAGS} -Wno-error=literal-range -Wno-literal-range\")";
-        if (!content.contains(flagLine)) {
-            content = flagLine + "\n" + content;
+        String marker = "CN1_LITERAL_RANGE_FLAGS";
+        if (!content.contains(marker)) {
+            String flagBlock =
+                    "set(" + marker + " \"-Wno-error=literal-range -Wno-literal-range\")\n" +
+                    "if (CMAKE_C_COMPILER_ID MATCHES \"Clang\")\n" +
+                    "    set(CMAKE_C_FLAGS \"${CMAKE_C_FLAGS} ${" + marker + "}\")\n" +
+                    "endif\n" +
+                    "if (CMAKE_OBJC_COMPILER_ID MATCHES \"Clang\")\n" +
+                    "    set(CMAKE_OBJC_FLAGS \"${CMAKE_OBJC_FLAGS} ${" + marker + "}\")\n" +
+                    "endif\n";
+            content = content + "\n" + flagBlock;
             Files.write(cmakeLists, content.getBytes(StandardCharsets.UTF_8));
         }
+    }
+
+    static List<String> cmakeCompilerArgs() {
+        List<String> args = new java.util.ArrayList<>();
+        String cCompiler = findExecutable(Arrays.asList("clang", "cc", "gcc"));
+        if (cCompiler != null) {
+            args.add("-DCMAKE_C_COMPILER=" + cCompiler);
+        }
+        String objcCompiler = findExecutable(Arrays.asList("clang", "gcc", "cc"));
+        if (objcCompiler != null) {
+            args.add("-DCMAKE_OBJC_COMPILER=" + objcCompiler);
+        }
+        return args;
+    }
+
+    private static String findExecutable(List<String> candidates) {
+        for (String candidate : candidates) {
+            Path found = findOnPath(candidate);
+            if (found != null) {
+                return found.toString();
+            }
+        }
+        return null;
+    }
+
+    private static Path findOnPath(String executable) {
+        String path = System.getenv("PATH");
+        if (path == null) {
+            return null;
+        }
+        for (String dir : path.split(File.pathSeparator)) {
+            Path candidate = Paths.get(dir, executable);
+            if (Files.isExecutable(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     static String runCommand(List<String> command, Path workingDir) throws Exception {
