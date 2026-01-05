@@ -249,6 +249,22 @@ class CleanTargetIntegrationTest {
         }
     }
 
+    static void patchStaticGetterPrototypes(Path srcRoot) throws IOException {
+        Files.walk(srcRoot)
+                .filter(p -> p.toString().endsWith(".h"))
+                .forEach(p -> {
+                    try {
+                        String original = new String(Files.readAllBytes(p), StandardCharsets.UTF_8);
+                        String patched = original.replaceAll("(get_static_[A-Za-z0-9_]+)\\(\\);", "$1(CODENAME_ONE_THREAD_STATE);");
+                        if (!original.equals(patched)) {
+                            Files.write(p, patched.getBytes(StandardCharsets.UTF_8));
+                        }
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+    }
+
     static void writeRuntimeStubs(Path srcRoot) throws IOException {
         Path objectHeader = srcRoot.resolve("java_lang_Object.h");
         if (!Files.exists(objectHeader)) {

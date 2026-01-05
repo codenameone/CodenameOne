@@ -81,6 +81,7 @@ public class FileClassIntegrationTest {
 
         Path srcRoot = distDir.resolve("FileTestApp-src");
         CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
+        CleanTargetIntegrationTest.patchStaticGetterPrototypes(srcRoot);
 
         // Ensure java_io_File.m is included (ByteCodeTranslator should copy it)
         assertTrue(Files.exists(srcRoot.resolve("java_io_File.m")), "java_io_File.m should exist");

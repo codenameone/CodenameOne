@@ -206,7 +206,7 @@ public class CompilerHelper {
             java.nio.file.Path distDir = outputDir.resolve("dist");
             java.nio.file.Path srcRoot = distDir.resolve("ExecutorApp-src");
             CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
-            patchStaticGetterPrototypes(srcRoot);
+            CleanTargetIntegrationTest.patchStaticGetterPrototypes(srcRoot);
 
             // Write basic stubs
             java.nio.file.Path ioFileHeader = srcRoot.resolve("java_io_File.h");
@@ -614,19 +614,4 @@ public class CompilerHelper {
         compiler.run(null, null, null, args.toArray(new String[0]));
     }
 
-    private static void patchStaticGetterPrototypes(java.nio.file.Path srcRoot) throws IOException {
-        java.nio.file.Files.walk(srcRoot)
-                .filter(p -> p.toString().endsWith(".h"))
-                .forEach(p -> {
-                    try {
-                        String original = new String(java.nio.file.Files.readAllBytes(p), StandardCharsets.UTF_8);
-                        String patched = original.replaceAll("(get_static_[A-Za-z0-9_]+)\\(\\);", "$1(CODENAME_ONE_THREAD_STATE);");
-                        if (!original.equals(patched)) {
-                            java.nio.file.Files.write(p, patched.getBytes(StandardCharsets.UTF_8));
-                        }
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                });
-    }
 }
