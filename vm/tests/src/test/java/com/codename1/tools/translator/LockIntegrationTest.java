@@ -229,6 +229,9 @@ class LockIntegrationTest {
         Files.write(lang.resolve("System.java"), ("package java.lang;\n" +
                 "public final class System {\n" +
                 "    public static native long currentTimeMillis();\n" +
+                "    public static void gc() {}\n" +
+                "    public static void startGCThread() {}\n" +
+                "    public static Thread gcThreadInstance;\n" +
                 "}\n").getBytes(StandardCharsets.UTF_8));
 
         // Exceptions
