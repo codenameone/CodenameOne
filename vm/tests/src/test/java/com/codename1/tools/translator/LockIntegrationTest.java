@@ -237,6 +237,9 @@ class LockIntegrationTest {
         Files.write(lang.resolve("RuntimeException.java"), "package java.lang; public class RuntimeException extends Exception { public RuntimeException() {} public RuntimeException(String s) {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("InterruptedException.java"), "package java.lang; public class InterruptedException extends Exception { public InterruptedException() {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("NullPointerException.java"), "package java.lang; public class NullPointerException extends RuntimeException { public NullPointerException() {} }".getBytes(StandardCharsets.UTF_8));
+        Files.write(lang.resolve("ArrayIndexOutOfBoundsException.java"),
+                "package java.lang; public class ArrayIndexOutOfBoundsException extends RuntimeException { public ArrayIndexOutOfBoundsException() {} public ArrayIndexOutOfBoundsException(String s) { super(s); } }"
+                        .getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("IllegalMonitorStateException.java"), "package java.lang; public class IllegalMonitorStateException extends RuntimeException { public IllegalMonitorStateException() {} }".getBytes(StandardCharsets.UTF_8));
         Files.write(lang.resolve("IllegalArgumentException.java"), "package java.lang; public class IllegalArgumentException extends RuntimeException { public IllegalArgumentException(String s) {} }".getBytes(StandardCharsets.UTF_8));
 
