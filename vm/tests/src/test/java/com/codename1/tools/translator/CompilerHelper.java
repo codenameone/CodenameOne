@@ -387,6 +387,7 @@ public class CompilerHelper {
                 "    fflush(stderr);\n" +
                 "    exit(1);\n" +
                 "}\n" +
+                "void java_lang_Throwable_fillInStack__(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT me) { (void)threadStateData; (void)me; }\n" +
                 "\n" +
                 "void gcMarkObject(CODENAME_ONE_THREAD_STATE, JAVA_OBJECT obj, JAVA_BOOLEAN force) { (void)obj; (void)force; }\n" +
                 "// Stub instanceofFunction. Note: signature in cn1_globals.h might differ (int vs pointers) in some versions.\n" +
