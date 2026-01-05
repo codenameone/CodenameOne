@@ -87,6 +87,7 @@ public class FileClassIntegrationTest {
         assertTrue(Files.exists(srcRoot.resolve("java_io_File.m")), "java_io_File.m should exist");
 
         replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
+        CleanTargetIntegrationTest.relaxLiteralRangeWarnings(cmakeLists);
 
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
