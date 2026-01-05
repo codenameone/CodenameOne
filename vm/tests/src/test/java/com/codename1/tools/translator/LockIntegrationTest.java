@@ -254,6 +254,20 @@ class LockIntegrationTest {
         // java.io.Serializable
         Files.write(io.resolve("Serializable.java"), "package java.io; public interface Serializable {}".getBytes(StandardCharsets.UTF_8));
 
+        // java.io.File (minimal stub to force translator header generation)
+        Files.write(io.resolve("File.java"), ("package java.io;\n" +
+                "public class File {\n" +
+                "    public static final String separator = \"/\";\n" +
+                "    public static final char separatorChar = '/';\n" +
+                "    public static final String pathSeparator = \":\";\n" +
+                "    public static final char pathSeparatorChar = ':';\n" +
+                "    private final String path;\n" +
+                "    public File(String pathname) { this.path = pathname == null ? \"\" : pathname; }\n" +
+                "    public File(File parent, String child) { this(parent == null ? child : parent.getPath() + separator + child); }\n" +
+                "    public File(String parent, String child) { this(parent == null ? child : parent + separator + child); }\n" +
+                "    public String getPath() { return path; }\n" +
+                "}\n").getBytes(StandardCharsets.UTF_8));
+
         // java.util.Collection
         Files.write(util.resolve("Collection.java"), "package java.util; public interface Collection<E> {}".getBytes(StandardCharsets.UTF_8));
 
