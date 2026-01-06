@@ -23,6 +23,7 @@
 package com.codename1.charts.compat;
 
 import com.codename1.ui.geom.GeneralPath;
+import com.codename1.ui.geom.Rectangle;
 
 
 /**
@@ -31,16 +32,23 @@ import com.codename1.ui.geom.GeneralPath;
  */
 public class PathMeasure {
 
-    GeneralPath path;
-    boolean forceClosed = false;
+    private final GeneralPath path;
+    private final boolean forceClosed;
 
     public PathMeasure(GeneralPath p, boolean b) {
         path = p;
         forceClosed = b;
+        if (forceClosed && path != null) {
+            path.closePath();
+        }
     }
 
     public float getLength() {
-        return 10;
+        if (path == null) {
+            return 0;
+        }
+        Rectangle bounds = path.getBounds();
+        return (float) Math.max(bounds.getWidth(), bounds.getHeight());
     }
 
     public void getPosTan(int i, float[] coords, float[] tan) {

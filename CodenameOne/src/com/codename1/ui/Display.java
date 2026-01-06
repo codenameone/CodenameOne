@@ -421,7 +421,6 @@ public final class Display extends CN1Constants {
     private int previousKeyPressed;
     private int lastKeyPressed;
     private int lastDragOffset;
-    private final Rectangle tmpRect = new Rectangle();
     private Form eventForm;
 
     /**

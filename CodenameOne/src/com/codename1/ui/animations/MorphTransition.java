@@ -166,11 +166,9 @@ public class MorphTransition extends Transition {
             cc.placeholderSrc.setHeight(cc.source.getHeight());
             cc.placeholderSrc.setPreferredSize(new Dimension(cc.source.getWidth(), cc.source.getHeight()));
 
-            cc.originalContainer = cc.source.getParent();
-            cc.originalConstraint = cc.originalContainer.getLayout().getComponentConstraint(cc.source);
-            cc.originalOffset = cc.originalContainer.getComponentIndex(cc.source);
-            cc.originalContainer.replace(cc.source, cc.placeholderSrc, null);
-            cc.originalContainer.getComponentForm().getLayeredPane().addComponent(cc.source);
+            Container originalContainer = cc.source.getParent();
+            originalContainer.replace(cc.source, cc.placeholderSrc, null);
+            originalContainer.getComponentForm().getLayeredPane().addComponent(cc.source);
         }
     }
 
@@ -263,9 +261,6 @@ public class MorphTransition extends Transition {
         Motion yMotion;
         Motion wMotion;
         Motion hMotion;
-        Object originalConstraint;
-        Container originalContainer;
-        int originalOffset;
         public CC(Component source, Component dest, Form sourceForm, Form destForm) {
             this.source = source;
             this.dest = dest;

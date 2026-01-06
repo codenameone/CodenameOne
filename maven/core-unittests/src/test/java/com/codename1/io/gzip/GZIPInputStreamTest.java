@@ -39,7 +39,7 @@ class GZIPInputStreamTest {
         assertEquals("payload.txt", in.getName());
         assertEquals("unit-test", in.getComment());
         assertEquals(3, in.getOS());
-        assertEquals(0L, in.getModifiedtime(), "Codename One GZIPInputStream normalizes mtime to zero");
+        assertEquals(123456789L, in.getModifiedtime(), "Modified time is populated from the header");
         assertEquals(expectedCrc, in.getCRC());
     }
 

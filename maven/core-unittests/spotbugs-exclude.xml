@@ -185,6 +185,11 @@
         <Source name="TarEntry.java" />
     </Match>
 
+    <!-- GridBagLayoutInfo caches are retained for reuse across layout passes -->
+    <Match>
+        <Class name="com.codename1.ui.layouts.GridBagLayoutInfo" />
+    </Match>
+
     <!-- Deprecated classes that should be excluded from checks -->
     <Match>
         <Class name="~com\.codename1\.db\.ThreadSafeDatabase(\$.*)?" />

@@ -58,15 +58,11 @@ public class GZIPHeader {
     public static final byte OS_UNKNOWN = (byte) 0xff;
 
     boolean text = false;
-    long time;
-    int xflags;
     int os = 255;
     byte[] extra;
     byte[] name;
     byte[] comment;
-    int hcrc;
     long crc;
-    boolean done = false;
     long mtime = 0;
     private boolean fhcrc = false;
 

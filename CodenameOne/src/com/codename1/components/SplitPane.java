@@ -204,6 +204,12 @@ public class SplitPane extends Container {
         this.showDragHandle = settings.showDragHandle;
         this.showExpandCollapseButtons = settings.showExpandCollapseButtons;
         this.dividerUIID = settings.dividerUIID;
+        this.expandMaterialIcon = settings.expandMaterialIcon;
+        this.collapseMaterialIcon = settings.collapseMaterialIcon;
+        this.dragHandleMaterialIcon = settings.dragHandleMaterialIcon;
+        this.expandIcon = settings.expandIcon;
+        this.collapseIcon = settings.collapseIcon;
+        this.dragHandleIcon = settings.dragHandleIcon;
 
         divider = new Divider();
         add(this.topOrLeft).add(this.bottomOrRight).add(divider);
@@ -942,7 +948,6 @@ public class SplitPane extends Container {
         private final Button btnExpand;
         private final Label dragHandle;
         int pressedX, pressedY, draggedX, draggedY;
-        LayeredLayoutConstraint pressedPreferredConstraint;
         LayeredLayoutConstraint pressedConstraint;
         private boolean inDrag;
 
@@ -1156,7 +1161,6 @@ public class SplitPane extends Container {
             pressedX = x;
             pressedY = y;
             pressedConstraint = ((LayeredLayout) getLayout()).getOrCreateConstraint(this).copy();
-            pressedPreferredConstraint = preferredInset.copy();
             inDrag = true;
             pointerDragged(x, y);
         }

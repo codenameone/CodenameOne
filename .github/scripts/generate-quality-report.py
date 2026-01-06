@@ -806,6 +806,7 @@ def main() -> None:
             "NP_BOOLEAN_RETURN_NULL",
             "REFLC_REFLECTION_MAY_INCREASE_ACCESSIBILITY_OF_CLASS",
             "UI_INHERITANCE_UNSAFE_GETRESOURCE",
+            "URF_UNREAD_FIELD",
             "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD",
             "UW_UNCOND_WAIT",
             "SIC_INNER_SHOULD_BE_STATIC_ANON",
@@ -817,6 +818,8 @@ def main() -> None:
             if f.rule == "SA_FIELD_SELF_ASSIGNMENT" and "InfBlocks.java" in loc:
                 return True
             if f.rule == "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" and "TarEntry.java" in loc:
+                return True
+            if f.rule == "URF_UNREAD_FIELD" and "GridBagLayoutInfo" in loc:
                 return True
             return False
 

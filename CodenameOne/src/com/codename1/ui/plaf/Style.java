@@ -606,6 +606,15 @@ public class Style {
     }
 
     /**
+     * Indicates whether this style has been marked for use with renderers.
+     *
+     * @return {@code true} if {@link #markAsRendererStyle()} was invoked.
+     */
+    public boolean isRendererStyle() {
+        return renderer;
+    }
+
+    /**
      * Merges the new style with the current style without changing the elements that
      * were modified.
      *
@@ -2800,7 +2809,6 @@ public class Style {
 
     private void firePropertyChanged(String propertName) {
         roundRectCache = null;
-        nativeOSCache = null;
         if (listeners == null || suppressChangeEvents) {
             return;
         }

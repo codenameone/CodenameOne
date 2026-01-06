@@ -726,7 +726,6 @@ public class ToastBar {
         /**
          * The start time of the process this status is tracking.
          */
-        private final long startTime;
         /**
          * This UIID that should be used to style the ToastBar text while this
          * message is being displayed.
@@ -777,7 +776,6 @@ public class ToastBar {
         private boolean showProgressIndicator;
 
         private Status() {
-            startTime = System.currentTimeMillis();
         }
 
         /**

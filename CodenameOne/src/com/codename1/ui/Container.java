@@ -893,7 +893,7 @@ public class Container extends Component implements Iterable<Component> {
             }
             cmp.setParent(this);
 
-            final QueuedInsertion insertion = new QueuedInsertion(index, constraint, cmp);
+            final QueuedInsertion insertion = new QueuedInsertion(index, cmp);
             changeQueue.add(insertion);
             a.addAnimation(new ComponentAnimation() {
                 private boolean alreadyAdded;
@@ -4085,11 +4085,6 @@ public class Container extends Component implements Iterable<Component> {
      */
     private static class QueuedInsertion extends QueuedChange {
         /**
-         * The component constraint of the component that was inserted.
-         */
-        private final Object constraint;
-
-        /**
          * The index where the component should be inserted.
          */
         private final int index;
@@ -4098,13 +4093,11 @@ public class Container extends Component implements Iterable<Component> {
          * Creates a new queued insertion.
          *
          * @param index      The index where the component is inserted.
-         * @param constraint The constraint.
          * @param cmp        The component that was inserted.
          */
-        QueuedInsertion(int index, Object constraint, Component cmp) {
+        QueuedInsertion(int index, Component cmp) {
             super(TYPE_INSERT, cmp);
             this.index = index;
-            this.constraint = constraint;
         }
     }
 

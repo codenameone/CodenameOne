@@ -55,7 +55,7 @@ public class InfiniteScrollAdapter {
     private final Component ip;
     private int componentLimit = -1;
     private final InfiniteProgress progress;
-    private final Component endMarker = new EdgeMarker(true);
+    private final Component endMarker = new EdgeMarker();
 
     private InfiniteScrollAdapter() {
         progress = new InfiniteProgress();
@@ -225,10 +225,7 @@ public class InfiniteScrollAdapter {
     }
 
     class EdgeMarker extends Component {
-        private final boolean top;
-
-        public EdgeMarker(boolean top) {
-            this.top = top;
+        public EdgeMarker() {
         }
 
         public Dimension calcPreferredSize() {

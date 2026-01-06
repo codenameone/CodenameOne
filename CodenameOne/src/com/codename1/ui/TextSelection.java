@@ -186,7 +186,6 @@ public class TextSelection {
      */
     private final ActionListener pressListener = new ActionListener() {
         int startX, startY;
-        int startDragHandleX, startDragHandleY;
         final Rectangle startSelectedBounds = new Rectangle();
         boolean inSelectionDrag;
         private final int ONE_MM = CN.convertToPixels(1);
@@ -327,8 +326,6 @@ public class TextSelection {
                     if (evt.getEventType() == ActionEvent.Type.PointerPressed) {
                         startX = evt.getX();
                         startY = evt.getY();
-                        startDragHandleX = dh.getAbsoluteX();
-                        startDragHandleY = dh.getAbsoluteY();
                         startSelectedBounds.setBounds(selectedBounds);
                         inSelectionDrag = true;
                         evt.consume();
