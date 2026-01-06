@@ -156,7 +156,7 @@ public class SQLMap {
                     if (val instanceof Double) {
                         return SqlType.SQL_DOUBLE;
                     }
-                    if (gt == Date.class) {
+                    if (val instanceof Date) {
                         return SqlType.SQL_DATE;
                     }
                 }

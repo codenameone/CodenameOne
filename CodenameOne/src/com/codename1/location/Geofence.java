@@ -178,21 +178,15 @@ public class Geofence {
     private boolean eq(Object o1, Object o2) {
         if (o1 != null) {
             return o1.equals(o2);
-        } else if (o2 != null) {
-            return o2.equals(o1);
-        } else {
-            return true; // both null
         }
+        return o2 == null;
     }
 
     private boolean eq(Location l1, Location l2) {
-        if (l1 != null) {
+        if (l1 != null && l2 != null) {
             return l1.equalsLatLng(l2);
-        } else if (l2 != null) {
-            return l2.equalsLatLng(l1);
-        } else {
-            return true; // both null
         }
+        return l1 == l2; // both null
     }
 
     @Override

@@ -430,8 +430,8 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
             if (this.thumbOnImage == null) {
                 this.thumbOnImage = image;
             }
-            if (this.thumbDisabledImage == null) {
-                this.thumbDisabledImage = image;
+            if (this.thumbOffImage == null) {
+                this.thumbOffImage = image;
             }
             setShouldCalcPreferredSize(true);
         }
