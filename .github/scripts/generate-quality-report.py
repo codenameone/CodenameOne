@@ -819,6 +819,8 @@ def main() -> None:
                 return True
             if f.rule == "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" and "TarEntry.java" in loc:
                 return True
+            if f.rule == "URF_UNREAD_FIELD" and "GridBagLayoutInfo" in loc:
+                return True
             return False
 
 
