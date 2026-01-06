@@ -772,6 +772,7 @@ def main() -> None:
             "FE_TEST_IF_EQUAL_TO_NOT_A_NUMBER",
             "SA_FIELD_SELF_ASSIGNMENT",
             "UC_USELESS_CONDITION",
+            "UC_USELESS_OBJECT",
             "EC_UNRELATED_TYPES",
             "EQ_ALWAYS_FALSE",
             "SBSC_USE_STRINGBUFFER_CONCATENATION",

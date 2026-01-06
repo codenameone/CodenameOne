@@ -2172,7 +2172,7 @@ public class BrowserComponent extends Container {
                 i++;
             }
             js.append("callback.onSuccess(undefined)");
-            execute(timeout, js.toString(), callback);
+            execute(timeout, js.toString(), params, callback);
         }
 
         /**
@@ -2201,7 +2201,7 @@ public class BrowserComponent extends Container {
                 i++;
             }
             js.append("callback.onSuccess(undefined)");
-            executeAndWait(timeout, js.toString());
+            executeAndWait(timeout, js.toString(), params);
         }
 
         /**

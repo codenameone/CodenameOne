@@ -783,8 +783,6 @@ public class SQLMap {
         }
 
         public java.util.List<PropertyBusinessObject> build(PropertyBusinessObject obj, int maxElements, int page) throws IOException, InstantiationException {
-            ArrayList<Object> params = new ArrayList<Object>();
-
             SelectBuilder root = this;
             while (root.parent.property != null) {
                 root = root.parent;
@@ -816,7 +814,7 @@ public class SQLMap {
                 }
             }
 
-            return selectImpl(obj, createStatement.toString(), obj.getClass(), params.toArray(),
+            return selectImpl(obj, createStatement.toString(), obj.getClass(), paramList.toArray(),
                     null, false, maxElements, page);
         }
 

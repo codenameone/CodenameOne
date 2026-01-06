@@ -1281,11 +1281,9 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @return Self for chaining.
      */
     public ComponentSelector slideDownAndWait(final int duration) {
-        final ArrayList<Component> animatedComponents = new ArrayList<Component>();
         for (Component c : this) {
             c.setHeight(0);
             c.setVisible(true);
-            animatedComponents.add(c);
         }
         getParent().animateLayoutAndWait(duration);
 

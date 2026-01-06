@@ -586,8 +586,6 @@ public abstract class Purchase {
             callback.onSucess(true);
             return;
         }
-        List<Receipt> oldData = new ArrayList<Receipt>();
-        oldData.addAll(getReceipts());
 
         SuccessCallback<Receipt[]> onSuccess = new SuccessCallback<Receipt[]>() {
 
