@@ -191,20 +191,27 @@ class CleanTargetIntegrationTest {
     }
 
     static void relaxLiteralRangeWarnings(Path cmakeLists) throws IOException {
-        String content = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
-        String marker = "CN1_LITERAL_RANGE_FLAGS";
-        if (!content.contains(marker)) {
-            String flagBlock =
-                    "set(" + marker + " \"-Wno-error=literal-range -Wno-literal-range\")\n" +
-                    "if (CMAKE_C_COMPILER_ID MATCHES \"Clang\")\n" +
-                    "    set(CMAKE_C_FLAGS \"${CMAKE_C_FLAGS} ${" + marker + "}\")\n" +
-                    "endif\n" +
-                    "if (CMAKE_OBJC_COMPILER_ID MATCHES \"Clang\")\n" +
-                    "    set(CMAKE_OBJC_FLAGS \"${CMAKE_OBJC_FLAGS} ${" + marker + "}\")\n" +
-                    "endif\n";
-            content = content + "\n" + flagBlock;
-            Files.write(cmakeLists, content.getBytes(StandardCharsets.UTF_8));
+        final String marker = "CN1_LITERAL_RANGE_FLAGS";
+        String content = Files.readString(cmakeLists, StandardCharsets.UTF_8);
+        if (content.contains(marker)) {
+            return;
         }
+
+        String newline = System.lineSeparator();
+        StringBuilder amended = new StringBuilder(content);
+        if (!content.endsWith("\n") && !content.endsWith("\r\n")) {
+            amended.append(newline);
+        }
+
+        amended.append("set(").append(marker).append(" \"-Wno-error=literal-range -Wno-literal-range\")").append(newline)
+                .append("if (CMAKE_C_COMPILER_ID MATCHES \"Clang\")").append(newline)
+                .append("    set(CMAKE_C_FLAGS \"${CMAKE_C_FLAGS} ${").append(marker).append("}\")").append(newline)
+                .append("endif").append(newline)
+                .append("if (CMAKE_OBJC_COMPILER_ID MATCHES \"Clang\")").append(newline)
+                .append("    set(CMAKE_OBJC_FLAGS \"${CMAKE_OBJC_FLAGS} ${").append(marker).append("}\")").append(newline)
+                .append("endif").append(newline);
+
+        Files.writeString(cmakeLists, amended.toString(), StandardCharsets.UTF_8);
     }
 
     static List<String> cmakeCompilerArgs() {
