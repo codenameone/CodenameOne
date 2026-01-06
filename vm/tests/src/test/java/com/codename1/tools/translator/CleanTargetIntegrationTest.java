@@ -350,7 +350,6 @@ class CleanTargetIntegrationTest {
 
     static void removeTranslatorFileNatives(Path srcRoot) throws IOException {
         String[] fileArtifacts = {
-                "java_io_File.c", "java_io_File.h",
                 "java_io_FileInputStream.c", "java_io_FileInputStream.h",
                 "java_io_FileOutputStream.c", "java_io_FileOutputStream.h",
                 "java_io_FileWriter.c", "java_io_FileWriter.h",
