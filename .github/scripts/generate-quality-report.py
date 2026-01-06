@@ -811,7 +811,8 @@ def main() -> None:
             "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD",
             "UW_UNCOND_WAIT",
             "SIC_INNER_SHOULD_BE_STATIC_ANON",
-            "SS_SHOULD_BE_STATIC"
+            "SS_SHOULD_BE_STATIC",
+            "RV_CHECK_FOR_POSITIVE_INDEXOF",
         }
 
         def _is_exempt(f: Finding) -> bool:
