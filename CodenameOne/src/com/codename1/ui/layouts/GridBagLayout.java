@@ -22,6 +22,7 @@ import com.codename1.ui.Container;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.geom.Rectangle;
 import com.codename1.ui.plaf.Style;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1187,6 +1188,7 @@ public class GridBagLayout extends Layout {
     }
 }
 
+@SuppressFBWarnings(value = "URF_UNREAD_FIELD", justification = "Layout info caches are retained for potential reuse across layout passes")
 class GridBagLayoutInfo {
 
     int[] widths;
