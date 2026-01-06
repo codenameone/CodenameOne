@@ -203,7 +203,8 @@ class CleanTargetIntegrationTest {
             amended.append(newline);
         }
 
-        amended.append("set(").append(marker).append(" \"-Wno-error=literal-range -Wno-literal-range\")").append(newline)
+        amended.append("# CN1 literal-range warning relaxation").append(newline)
+                .append("set(").append(marker).append(" \"-Wno-error=literal-range -Wno-literal-range\")").append(newline)
                 .append("if (CMAKE_C_COMPILER_ID MATCHES \"Clang\")").append(newline)
                 .append("    set(CMAKE_C_FLAGS \"${CMAKE_C_FLAGS} ${").append(marker).append("}\")").append(newline)
                 .append("endif").append(newline)
