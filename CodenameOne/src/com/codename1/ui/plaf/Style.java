@@ -424,6 +424,7 @@ public class Style {
     byte[] marginUnit;
     Object roundRectCache;
     // used by the Android port, do not remove!
+    Object nativeOSCache;
     boolean renderer;
     /**
      * Flag to suppress change events

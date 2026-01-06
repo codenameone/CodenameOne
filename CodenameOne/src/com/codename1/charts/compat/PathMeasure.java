@@ -48,7 +48,7 @@ public class PathMeasure {
             return 0;
         }
         Rectangle bounds = path.getBounds();
-        return (float) (bounds.getWidth() + bounds.getHeight());
+        return (float) Math.max(bounds.getWidth(), bounds.getHeight());
     }
 
     public void getPosTan(int i, float[] coords, float[] tan) {
