@@ -141,7 +141,6 @@ final class Deflate {
     int pending;          // nb of bytes in the pending buffer
     int wrap = 1;
     byte data_type;       // UNKNOWN, BINARY or ASCII
-    byte method;          // STORED (for zip only) or DEFLATED
     int last_flush;       // value of flush param for previous deflate call
     int w_size;           // LZ77 window size (32K by default)
     int w_bits;           // log2(w_size)  (8..16)
@@ -1371,8 +1370,6 @@ final class Deflate {
         this.level = level;
 
         this.strategy = strategy;
-        this.method = (byte) method;
-
         return deflateReset();
     }
 

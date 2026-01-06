@@ -714,7 +714,6 @@ public class URLImage extends EncodedImage {
      * CachedImage used by {@link #createCachedImage(java.lang.String, java.lang.String, com.codename1.ui.Image, int) }
      */
     private static class CachedImage extends Image {
-        boolean fetching;
         int resizeRule;
         Object image;
         Image placeholderImage;
@@ -728,7 +727,6 @@ public class URLImage extends EncodedImage {
             this.placeholderImage = placeholder;
             Util.downloadImageToCache(url, new SuccessCallback<Image>() {
                 public void onSucess(Image downloadedImage) {
-                    fetching = false;
                     switch (resizeRule) {
                         case FLAG_RESIZE_FAIL: {
                             if (downloadedImage.getWidth() != placeholderImage.getWidth() || downloadedImage.getHeight() != placeholderImage.getHeight()) {

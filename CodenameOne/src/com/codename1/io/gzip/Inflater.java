@@ -160,6 +160,6 @@ final public class Inflater extends ZStream {
     }
 
     public boolean finished() {
-        return istate.mode == 12 /*DONE*/;
+        return finished;
     }
 }

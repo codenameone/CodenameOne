@@ -119,7 +119,7 @@ public final class PlatformDefaults {
      * <p>
      */
     public static final String VISUAL_PADDING_PROPERTY = "visualPadding";
-    static BoundSize RELATED_X = null, RELATED_Y = null, UNRELATED_X = null, UNRELATED_Y = null;
+    static BoundSize RELATED_X = null, RELATED_Y = null;
     private static int DEF_H_UNIT = UnitValue.LPX;
     private static int DEF_V_UNIT = UnitValue.LPY;
     private static InCellGapProvider GAP_PROVIDER = null;
@@ -426,9 +426,6 @@ public final class PlatformDefaults {
      */
     public static void setUnrelatedGap(UnitValue x, UnitValue y) {
         setUnitValue(new String[]{"u", "unrel", "unrelated"}, x, y);
-
-        UNRELATED_X = new BoundSize(x, x, null, "unrel:unrel");
-        UNRELATED_Y = new BoundSize(y, y, null, "unrel:unrel");
     }
 
     /**

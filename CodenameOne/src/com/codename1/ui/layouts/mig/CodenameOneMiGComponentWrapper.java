@@ -76,8 +76,6 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
     private static boolean vp = true;
     private final Component c;
     private int compType = TYPE_UNSET;
-    private final Boolean bl = null;
-
     public CodenameOneMiGComponentWrapper(Component c) {
         this.c = c;
     }

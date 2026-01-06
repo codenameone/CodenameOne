@@ -111,7 +111,6 @@ public class JavascriptContext {
      * the next JSObject.  Each JSObject has an id associated with it which
      * corresponds with its position in the Javascript lookup table.
      */
-    int objectId = 0;
     long callId = 0;
     private int callbackId = 0;
     /**

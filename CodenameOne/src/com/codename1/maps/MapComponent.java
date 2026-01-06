@@ -65,7 +65,6 @@ public class MapComponent extends Container {
     private final boolean _debugInfo = false;
     private boolean _needTiles = true;
     private int draggedx, draggedy;
-    private int pressedx, pressedy;
     private Vector _tiles;
     private Point _delta = null;
     private double latitude = Double.NaN;
@@ -329,8 +328,6 @@ public class MapComponent extends Container {
     public void pointerPressed(int x, int y) {
         super.pointerPressed(x, y);
         lastPressed = System.currentTimeMillis();
-        pressedx = x;
-        pressedy = y;
         draggedx = x;
         draggedy = y;
     }

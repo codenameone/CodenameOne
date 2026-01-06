@@ -458,8 +458,9 @@ final class Inflate {
                     } catch (Return e) {
                         return e.r;
                     }
-                    if (gheader != null)
-                        gheader.time = this.need;
+                    if (gheader != null) {
+                        gheader.setModifiedTime(this.need);
+                    }
                     if ((flags & 0x0200) != 0) {
                         checksum(4, this.need);
                     }
@@ -471,7 +472,6 @@ final class Inflate {
                         return e.r;
                     }
                     if (gheader != null) {
-                        gheader.xflags = ((int) this.need) & 0xff;
                         gheader.os = (((int) this.need) >> 8) & 0xff;
                     }
                     if ((flags & 0x0200) != 0) {
@@ -554,9 +554,6 @@ final class Inflate {
                             r = readBytes(2, r, f);
                         } catch (Return e) {
                             return e.r;
-                        }
-                        if (gheader != null) {
-                            gheader.hcrc = (int) (this.need & 0xffff);
                         }
                         if (this.need != (z.adler.getValue() & 0xffffL)) {
                             this.mode = BAD;

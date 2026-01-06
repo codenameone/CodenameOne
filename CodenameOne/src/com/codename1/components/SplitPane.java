@@ -204,6 +204,12 @@ public class SplitPane extends Container {
         this.showDragHandle = settings.showDragHandle;
         this.showExpandCollapseButtons = settings.showExpandCollapseButtons;
         this.dividerUIID = settings.dividerUIID;
+        this.expandMaterialIcon = settings.expandMaterialIcon;
+        this.collapseMaterialIcon = settings.collapseMaterialIcon;
+        this.dragHandleMaterialIcon = settings.dragHandleMaterialIcon;
+        this.expandIcon = settings.expandIcon;
+        this.collapseIcon = settings.collapseIcon;
+        this.dragHandleIcon = settings.dragHandleIcon;
 
         divider = new Divider();
         add(this.topOrLeft).add(this.bottomOrRight).add(divider);

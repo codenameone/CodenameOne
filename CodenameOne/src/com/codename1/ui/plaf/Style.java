@@ -424,7 +424,6 @@ public class Style {
     byte[] marginUnit;
     Object roundRectCache;
     // used by the Android port, do not remove!
-    Object nativeOSCache;
     boolean renderer;
     /**
      * Flag to suppress change events
@@ -603,6 +602,15 @@ public class Style {
      */
     public void markAsRendererStyle() {
         renderer = true;
+    }
+
+    /**
+     * Indicates whether this style has been marked for use with renderers.
+     *
+     * @return {@code true} if {@link #markAsRendererStyle()} was invoked.
+     */
+    public boolean isRendererStyle() {
+        return renderer;
     }
 
     /**
@@ -2800,7 +2808,6 @@ public class Style {
 
     private void firePropertyChanged(String propertName) {
         roundRectCache = null;
-        nativeOSCache = null;
         if (listeners == null || suppressChangeEvents) {
             return;
         }

@@ -253,7 +253,6 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      */
     boolean eventsEnabled = false;
     HTMLParser parser;
-    int contCount = 0; // debug for CSS
     boolean showImages = true; //true to download image, false otherwise
     Component firstFocusable; // The first focusable link on the page
     //Font

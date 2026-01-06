@@ -92,7 +92,6 @@ public final class CommonTransitions extends Transition {
     private static boolean defaultLinearMotion = false;
     private Motion motion, motion2;
     private LazyValue<Motion> lazyMotion;
-    private long startTime;
     private int slideType;
     private int speed;
     private int position;
@@ -395,7 +394,6 @@ public final class CommonTransitions extends Transition {
             return;
         }
 
-        startTime = System.currentTimeMillis();
         Component source = getSource();
         Component destination = getDestination();
         position = 0;
