@@ -70,7 +70,9 @@ public class Border {
     private static final int TITLE_MARGIN = 10;
     private static final int TITLE_SPACE = 5;
     private static Border defaultBorder = Border.createEtchedRaised(0x020202, 0xBBBBBB);
-    private static Border empty;
+    private static class EmptyBorderHolder {
+        private static final Border EMPTY = new Border();
+    }
     // variables are package protected for the benefit of the resource editor!
     int type;
     Image[] images;
@@ -113,10 +115,7 @@ public class Border {
      * @deprecated use createEmpty instead
      */
     public static Border getEmpty() {
-        if (empty == null) {
-            empty = new Border();
-        }
-        return empty;
+        return EmptyBorderHolder.EMPTY;
     }
 
     /**

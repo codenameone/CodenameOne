@@ -1445,7 +1445,7 @@ public class CSSBorder extends Border {
 
     private static class Color {
         static final int CACHE_SIZE = 100;
-        static Map<String, Color> cache;
+        static Map<String, Color> cache = new HashMap<String, Color>();
         int color;
         int alpha;
 
@@ -1498,9 +1498,6 @@ public class CSSBorder extends Border {
         }
 
         static Map<String, Color> cache() {
-            if (cache == null) {
-                cache = new HashMap<String, Color>();
-            }
             return cache;
         }
 

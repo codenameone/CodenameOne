@@ -60,7 +60,7 @@ public class Storage {
      * @param data either the name of the application e.g. on CDC platforms or
      *             a context object on other platforms
      */
-    private static void init(Object data) {
+    private static synchronized void init(Object data) {
         if (Util.getImplementation() != null) {
             Util.getImplementation().setStorageData(data);
         }

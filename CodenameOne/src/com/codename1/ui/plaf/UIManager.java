@@ -61,6 +61,9 @@ import java.util.Vector;
 public class UIManager {
 
     static UIManager instance;
+    private static class UIManagerHolder {
+        private static final UIManager INSTANCE = new UIManager();
+    }
     /**
      * This member is used by the resource editor
      */
@@ -120,7 +123,7 @@ public class UIManager {
      */
     public static UIManager getInstance() {
         if (instance == null) {
-            instance = new UIManager();
+            instance = UIManagerHolder.INSTANCE;
         }
         return instance;
     }

@@ -356,7 +356,7 @@ public class ImageDownloadService extends ConnectionRequest {
      *
      * @param listener the listener
      */
-    public static void addErrorListener(ActionListener listener) {
+    public static synchronized void addErrorListener(ActionListener listener) {
         if (onErrorListeners == null) {
             onErrorListeners = new EventDispatcher();
         }
@@ -369,7 +369,7 @@ public class ImageDownloadService extends ConnectionRequest {
      *
      * @param listener the listener
      */
-    public static void removeErrorListener(ActionListener listener) {
+    public static synchronized void removeErrorListener(ActionListener listener) {
         if (onErrorListeners == null) {
             return;
         }
