@@ -24,12 +24,9 @@ package com.codename1.components;
 
 import com.codename1.io.Log;
 import com.codename1.io.Storage;
-import com.codename1.io.Util;
 import com.codename1.ui.Display;
 import com.codename1.ui.EncodedImage;
 import com.codename1.ui.Image;
-
-import java.io.InputStream;
 
 /**
  * Asynchronous storage image that loads in the background and not during the paint
@@ -100,7 +97,6 @@ public class StorageImageAsync extends EncodedImage {
             queued = true;
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
                 public void run() {
-                    InputStream i = null;
                     try {
                         final byte[] imageDataLocal = (byte[]) Storage.getInstance().readObject(fileName);
 
@@ -116,8 +112,6 @@ public class StorageImageAsync extends EncodedImage {
                         });
                     } catch (Throwable ex) {
                         Log.e(ex);
-                    } finally {
-                        Util.cleanup(i);
                     }
                 }
             });
