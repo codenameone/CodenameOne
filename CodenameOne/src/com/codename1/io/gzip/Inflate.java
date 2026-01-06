@@ -459,10 +459,7 @@ final class Inflate {
                         return e.r;
                     }
                     if (gheader != null) {
-                        // Codename One historically normalized the mtime header to zero when
-                        // reading, so preserve that behavior instead of propagating the
-                        // timestamp from the archive.
-                        gheader.setModifiedTime(0L);
+                        gheader.setModifiedTime(this.need);
                     }
                     if ((flags & 0x0200) != 0) {
                         checksum(4, this.need);
