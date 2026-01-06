@@ -1762,7 +1762,7 @@ public class CSSBorder extends Border {
         private final ScalarUnit bottomRightY;
 
         BorderRadius(String value) {
-            if (value.indexOf("/") > 0) {
+            if (value.contains("/")) {
                 String[] parts = Util.split(value, "/");
                 String[] hVals = Util.split(parts[0].trim(), " ");
                 String[] vVals = Util.split(parts[1].trim(), " ");

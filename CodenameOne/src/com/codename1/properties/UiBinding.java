@@ -480,7 +480,7 @@ public class UiBinding {
             }
             if (source instanceof String) {
                 String s = ((String) source).toLowerCase();
-                return s.indexOf("true") > 0 || s.indexOf("yes") > 0 || s.indexOf("1") > 0;
+                return s.contains("true") || s.contains("yes") || s.contains("1");
             }
             return Util.toIntValue(source) > 0;
         }

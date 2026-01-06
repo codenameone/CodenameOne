@@ -89,9 +89,10 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     }
 
     protected void setQuery(String query) {
-        if (query.indexOf("?") > 0) {
-            String search = query.substring(query.indexOf("?") + 1);
-            query = query.substring(0, query.indexOf("?"));
+        int queryParamsIndex = query.indexOf("?");
+        if (queryParamsIndex >= 0) {
+            String search = query.substring(queryParamsIndex + 1);
+            query = query.substring(0, queryParamsIndex);
             java.util.List<String> parts = StringUtil.tokenize(search, "&");
             for (String part : parts) {
                 java.util.List<String> kv = StringUtil.tokenize(part, "=");
@@ -153,7 +154,8 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
                 }
             };
             stack.addElement(node);
-            if (connectionType.length() > 0 || getUrl().indexOf("search") > 0) {
+            String currentUrl = getUrl();
+            if (connectionType.length() > 0 || currentUrl.indexOf("search") >= 0) {
                 return;
             }
         } else {

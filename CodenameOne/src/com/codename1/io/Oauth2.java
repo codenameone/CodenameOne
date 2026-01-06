@@ -610,10 +610,16 @@ public class Oauth2 {
                 boolean success = url.indexOf("#") > -1;
                 if (success) {
                     String accessToken = url.substring(url.indexOf("#") + 1);
-                    if (accessToken.indexOf("&") > 0) {
-                        token = accessToken.substring(accessToken.indexOf("=") + 1, accessToken.indexOf("&"));
+                    int ampIndex = accessToken.indexOf("&");
+                    int equalsIndex = accessToken.indexOf("=");
+                    if (equalsIndex >= 0) {
+                        if (ampIndex >= 0 && ampIndex > equalsIndex) {
+                            token = accessToken.substring(equalsIndex + 1, ampIndex);
+                        } else {
+                            token = accessToken.substring(equalsIndex + 1);
+                        }
                     } else {
-                        token = accessToken.substring(accessToken.indexOf("=") + 1);
+                        token = accessToken;
                     }
                     if (login != null) {
                         login.dispose();
@@ -645,7 +651,8 @@ public class Oauth2 {
         String[] params = Util.split(url, "&");
         int plen = params.length;
         for (int i = 0; i < plen; i++) {
-            if (params[i].indexOf("=") > 0) {
+            int equalsIndex = params[i].indexOf("=");
+            if (equalsIndex >= 0) {
                 String[] keyVal = Util.split(params[i], "=");
                 retVal.put(keyVal[0], keyVal[1]);
             }
