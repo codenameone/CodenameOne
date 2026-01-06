@@ -192,7 +192,7 @@ class CleanTargetIntegrationTest {
 
     static void relaxLiteralRangeWarnings(Path cmakeLists) throws IOException {
         final String marker = "CN1_LITERAL_RANGE_FLAGS";
-        String content = Files.readString(cmakeLists, StandardCharsets.UTF_8);
+        String content = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
         if (content.contains(marker)) {
             return;
         }
@@ -211,7 +211,7 @@ class CleanTargetIntegrationTest {
                 .append("    set(CMAKE_OBJC_FLAGS \"${CMAKE_OBJC_FLAGS} ${").append(marker).append("}\")").append(newline)
                 .append("endif").append(newline);
 
-        Files.writeString(cmakeLists, amended.toString(), StandardCharsets.UTF_8);
+        Files.write(cmakeLists, amended.toString().getBytes(StandardCharsets.UTF_8));
     }
 
     static List<String> cmakeCompilerArgs() {
