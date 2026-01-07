@@ -46,6 +46,7 @@ public class FacebookConnect extends Login {
 
     static Class<?> implClass;
     private static FacebookConnect instance;
+    private static final Object INSTANCE_LOCK = new Object();
     private final String[] permissions = new String[]{"public_profile", "email", "user_friends"};
 
     static {
@@ -64,19 +65,21 @@ public class FacebookConnect extends Login {
      * @return the FacebookConnect instance
      */
     public static FacebookConnect getInstance() {
-        if (instance == null) {
-            if (implClass != null) {
-                try {
-                    instance = (FacebookConnect) implClass.newInstance();
-                } catch (Throwable t) {
-                    Log.e(t);
+        synchronized (INSTANCE_LOCK) {
+            if (instance == null) {
+                if (implClass != null) {
+                    try {
+                        instance = (FacebookConnect) implClass.newInstance();
+                    } catch (Throwable t) {
+                        Log.e(t);
+                        instance = new FacebookConnect();
+                    }
+                } else {
                     instance = new FacebookConnect();
                 }
-            } else {
-                instance = new FacebookConnect();
             }
+            return instance;
         }
-        return instance;
     }
 
     /**

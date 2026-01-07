@@ -48,7 +48,9 @@ class CSSParser {
      */
     private static String[] SUPPORTED_MEDIA_TYPES = {"all", "handheld"};
 
-    private static CSSParser instance;
+    private static class CSSParserHolder {
+        private static final CSSParser INSTANCE = new CSSParser();
+    }
 
     private CSSParserCallback parserCallback;
 
@@ -58,10 +60,7 @@ class CSSParser {
      * @return the Parser's instance
      */
     static CSSParser getInstance() {
-        if (instance == null) {
-            instance = new CSSParser();
-        }
-        return instance;
+        return CSSParserHolder.INSTANCE;
     }
 
     /**

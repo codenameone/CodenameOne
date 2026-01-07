@@ -60,7 +60,10 @@ import java.util.Vector;
  */
 public class UIManager {
 
-    static UIManager instance;
+    static volatile UIManager instance;
+    private static class UIManagerHolder {
+        private static final UIManager INSTANCE = new UIManager();
+    }
     /**
      * This member is used by the resource editor
      */
@@ -119,10 +122,17 @@ public class UIManager {
      * @return Instance of the ui manager
      */
     public static UIManager getInstance() {
-        if (instance == null) {
-            instance = new UIManager();
+        UIManager currentInstance = instance;
+        if (currentInstance == null) {
+            synchronized (UIManager.class) {
+                currentInstance = instance;
+                if (currentInstance == null) {
+                    currentInstance = UIManagerHolder.INSTANCE;
+                    instance = currentInstance;
+                }
+            }
         }
-        return instance;
+        return currentInstance;
     }
 
     /**

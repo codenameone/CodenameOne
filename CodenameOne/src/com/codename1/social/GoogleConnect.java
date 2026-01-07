@@ -48,6 +48,7 @@ public class GoogleConnect extends Login {
     static Class implClass;
     private static final String tokenURL = "https://www.googleapis.com/oauth2/v3/token";
     private static GoogleConnect instance;
+    private static final Object INSTANCE_LOCK = new Object();
 
     static {
         implClass = null;
@@ -65,18 +66,20 @@ public class GoogleConnect extends Login {
      * @return the GoogleConnect instance
      */
     public static GoogleConnect getInstance() {
-        if (instance == null) {
-            if (implClass != null) {
-                try {
-                    instance = (GoogleConnect) implClass.newInstance();
-                } catch (Throwable t) {
+        synchronized (INSTANCE_LOCK) {
+            if (instance == null) {
+                if (implClass != null) {
+                    try {
+                        instance = (GoogleConnect) implClass.newInstance();
+                    } catch (Throwable t) {
+                        instance = new GoogleConnect();
+                    }
+                } else {
                     instance = new GoogleConnect();
                 }
-            } else {
-                instance = new GoogleConnect();
             }
+            return instance;
         }
-        return instance;
     }
 
     @Override

@@ -44,6 +44,7 @@ import java.io.IOException;
  */
 class IndexedImage extends Image {
     static int[] lineCache;
+    private static final Object LINE_CACHE_LOCK = new Object();
     // package protected for access by the resource editor
     byte[] imageDataByte;
     int[] palette;
@@ -294,9 +295,10 @@ class IndexedImage extends Image {
      * {@inheritDoc}
      */
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
-        if (lineCache == null || lineCache.length < width * 3) {
-            lineCache = new int[width * 3];
-        }
+        synchronized (LINE_CACHE_LOCK) {
+            if (lineCache == null || lineCache.length < width * 3) {
+                lineCache = new int[width * 3];
+            }
 
         // for performance we can calculate the visible drawing area so we don't have to
         // calculate the whole array
@@ -312,15 +314,16 @@ class IndexedImage extends Image {
         }
 
 
-        for (int line = firstLine; line < lastLine; line += 3) {
-            int currentPos = line * width;
-            int rowsToDraw = Math.min(3, height - line);
-            int amount = width * rowsToDraw;
-            for (int position = 0; position < amount; position++) {
-                int i = imageDataByte[position + currentPos] & 0xff;
-                lineCache[position] = palette[i];
+            for (int line = firstLine; line < lastLine; line += 3) {
+                int currentPos = line * width;
+                int rowsToDraw = Math.min(3, height - line);
+                int amount = width * rowsToDraw;
+                for (int position = 0; position < amount; position++) {
+                    int i = imageDataByte[position + currentPos] & 0xff;
+                    lineCache[position] = palette[i];
+                }
+                g.drawRGB(lineCache, 0, x, y + line, width, rowsToDraw, true);
             }
-            g.drawRGB(lineCache, 0, x, y + line, width, rowsToDraw, true);
         }
     }
 

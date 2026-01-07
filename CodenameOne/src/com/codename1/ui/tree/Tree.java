@@ -105,14 +105,18 @@ public class Tree extends Container {
     public Tree(TreeModel model) {
         this.model = model;
         setLayout(new BoxLayout(BoxLayout.Y_AXIS));
+        initDefaultIcons();
+        buildBranch(null, 0, this);
+        setScrollableY(true);
+        setUIIDFinal("Tree");
+    }
+
+    private static synchronized void initDefaultIcons() {
         if (folder == null) {
             folder = UIManager.getInstance().getThemeImageConstant("treeFolderImage");
             openFolder = UIManager.getInstance().getThemeImageConstant("treeFolderOpenImage");
             nodeImage = UIManager.getInstance().getThemeImageConstant("treeNodeImage");
         }
-        buildBranch(null, 0, this);
-        setScrollableY(true);
-        setUIIDFinal("Tree");
     }
 
     /**

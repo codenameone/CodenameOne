@@ -95,7 +95,7 @@ public class GeofenceManager implements Iterable<Geofence> {
      */
     private static final int defaultTimeout = 10000;
     private static int MAX_ACTIVE_GEOFENCES = 19;
-    private static GeofenceManager instance;
+    private static volatile GeofenceManager instance;
     // Reference to the last bubble set.
     Geofence lastBubble;
     /**
@@ -137,10 +137,17 @@ public class GeofenceManager implements Iterable<Geofence> {
      * @return
      */
     public static GeofenceManager getInstance() {
-        if (instance == null) {
-            instance = new GeofenceManager();
+        GeofenceManager result = instance;
+        if (result == null) {
+            synchronized (GeofenceManager.class) {
+                result = instance;
+                if (result == null) {
+                    result = new GeofenceManager();
+                    instance = result;
+                }
+            }
         }
-        return instance;
+        return result;
     }
 
     private synchronized Map<String, Long> getExpiryTimes(boolean reload) {

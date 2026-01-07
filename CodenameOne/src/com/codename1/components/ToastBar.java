@@ -88,7 +88,9 @@ public class ToastBar {
      * The default timeout for info/error messages
      */
     private static int defaultMessageTimeout = 4000;
-    private static ToastBar instance;
+    private static class ToastBarHolder {
+        private static final ToastBar INSTANCE = new ToastBar();
+    }
     /**
      * Keeps track of the currently active status messages.
      */
@@ -148,11 +150,7 @@ public class ToastBar {
      * @return
      */
     public static ToastBar getInstance() {
-        if (instance == null) {
-            instance = new ToastBar();
-
-        }
-        return instance;
+        return ToastBarHolder.INSTANCE;
     }
 
     /**

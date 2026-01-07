@@ -11200,7 +11200,7 @@ public class FontImage extends Image {
      *
      * @return the font that can be used to create font image instances.
      */
-    public static Font getMaterialDesignFont() {
+    public static synchronized Font getMaterialDesignFont() {
         if (materialDesignFont == null) {
             if (Font.isTrueTypeFileSupported()) {
                 materialDesignFont = Font.createTrueTypeFont("Material Icons", "material-design-font.ttf");

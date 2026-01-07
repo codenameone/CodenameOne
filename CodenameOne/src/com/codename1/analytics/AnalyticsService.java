@@ -48,6 +48,7 @@ public class AnalyticsService {
     private static boolean failSilently = true;
     private static int timeout;
     private static int readTimeout;
+    private static final Object INSTANCE_LOCK = new Object();
     private String agent;
     private String domain;
     private ConnectionRequest lastRequest;
@@ -126,11 +127,13 @@ public class AnalyticsService {
      *               com.mycompany.myapp should become: myapp.mycompany.com)
      */
     public static void init(String agent, String domain) {
-        if (instance == null) {
-            instance = new AnalyticsService();
+        synchronized (INSTANCE_LOCK) {
+            if (instance == null) {
+                instance = new AnalyticsService();
+            }
+            instance.agent = agent;
+            instance.domain = domain;
         }
-        instance.agent = agent;
-        instance.domain = domain;
     }
 
     /**
@@ -139,7 +142,9 @@ public class AnalyticsService {
      * @param i the analytics service implementation.
      */
     public static void init(AnalyticsService i) {
-        instance = i;
+        synchronized (INSTANCE_LOCK) {
+            instance = i;
+        }
     }
 
     /**

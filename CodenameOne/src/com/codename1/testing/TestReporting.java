@@ -37,7 +37,10 @@ import java.util.Hashtable;
  * @author Shai Almog
  */
 public class TestReporting {
-    private static TestReporting instance;
+    private static class TestReportingHolder {
+        private static final TestReporting INSTANCE = new TestReporting();
+    }
+    private static volatile TestReporting instanceOverride;
     private final Hashtable<String, Boolean> testsExecuted = new Hashtable<String, Boolean>();
 
 
@@ -45,10 +48,11 @@ public class TestReporting {
      * Gets the test reporting instance
      */
     public static TestReporting getInstance() {
-        if (instance == null) {
-            instance = new TestReporting();
+        TestReporting override = instanceOverride;
+        if (override != null) {
+            return override;
         }
-        return instance;
+        return TestReportingHolder.INSTANCE;
     }
 
     /**
@@ -57,7 +61,7 @@ public class TestReporting {
      * @param i the new instance
      */
     public static void setInstance(TestReporting i) {
-        instance = i;
+        instanceOverride = i;
     }
 
     /**

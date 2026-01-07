@@ -82,9 +82,7 @@ public abstract class InputComponent extends Container {
      * Protected constructor for subclasses to override
      */
     protected InputComponent() {
-        if (guiBuilderMode == null) {
-            guiBuilderMode = Display.getInstance().getProperty("GUIBuilderDesignMode", null) != null;
-        }
+        isGuiBuilderMode();
     }
 
     // varags calls are significantly slower in java
@@ -94,6 +92,20 @@ public abstract class InputComponent extends Container {
 
     private static int max(int a, int b, int c, int d) {
         return Math.max(Math.max(Math.max(a, b), c), d);
+    }
+
+    private static boolean isGuiBuilderMode() {
+        Boolean current = guiBuilderMode;
+        if (current == null) {
+            synchronized (InputComponent.class) {
+                current = guiBuilderMode;
+                if (current == null) {
+                    current = Display.getInstance().getProperty("GUIBuilderDesignMode", null) != null;
+                    guiBuilderMode = current;
+                }
+            }
+        }
+        return current.booleanValue();
     }
 
     /**
@@ -272,7 +284,7 @@ public abstract class InputComponent extends Container {
     public abstract Component getEditor();
 
     void refreshForGuiBuilder() {
-        if (guiBuilderMode) {
+        if (isGuiBuilderMode()) {
             removeAll();
             getEditor().remove();
             if (action != null) {

@@ -156,7 +156,7 @@ public class MediaManager {
      * @param l The remote control listener to set.  null to set no listener.
      * @since 7.0
      */
-    public static void setRemoteControlListener(RemoteControlListener l) {
+    public static synchronized void setRemoteControlListener(RemoteControlListener l) {
         boolean shouldStop = remoteControlListener != null && l == null;
         if (shouldStop) {
             Display.getInstance().stopRemoteControl();

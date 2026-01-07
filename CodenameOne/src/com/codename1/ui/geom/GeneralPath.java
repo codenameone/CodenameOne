@@ -88,11 +88,11 @@ public final class GeneralPath implements Shape {
      */
     private static final int BUFFER_CAPACITY = 10;
     private static final int MAX_POOL_SIZE = 20;
-    private static ArrayList<GeneralPath> pathPool;
-    private static ArrayList<Rectangle> rectPool;
-    private static ArrayList<float[]> floatPool;
-    private static ArrayList<boolean[]> boolPool;
-    private static ArrayList<Iterator> iteratorPool;
+    private static final ArrayList<GeneralPath> pathPool = new ArrayList<GeneralPath>();
+    private static final ArrayList<Rectangle> rectPool = new ArrayList<Rectangle>();
+    private static final ArrayList<float[]> floatPool = new ArrayList<float[]>();
+    private static final ArrayList<boolean[]> boolPool = new ArrayList<boolean[]>();
+    private static final ArrayList<Iterator> iteratorPool = new ArrayList<Iterator>();
     /**
      * The space amount in points buffer for different segmenet's types
      */
@@ -102,7 +102,8 @@ public final class GeneralPath implements Shape {
             4, // QUADTO
             6, // CUBICTO
             0}; // CLOSE
-    private static Pt tmpV1, tmpV2;
+    private static final Pt tmpV1 = new Pt();
+    private static final Pt tmpV2 = new Pt();
     /**
      * The point's types buffer
      */
@@ -180,9 +181,6 @@ public final class GeneralPath implements Shape {
     }
 
     private static ArrayList<GeneralPath> pathPool() {
-        if (pathPool == null) {
-            pathPool = new ArrayList<GeneralPath>();
-        }
         return pathPool;
     }
 
@@ -190,30 +188,18 @@ public final class GeneralPath implements Shape {
     //--------------------------------------------------------------------------
 
     private static ArrayList<Rectangle> rectPool() {
-        if (rectPool == null) {
-            rectPool = new ArrayList<Rectangle>();
-        }
         return rectPool;
     }
 
     private static ArrayList<float[]> floatPool() {
-        if (floatPool == null) {
-            floatPool = new ArrayList<float[]>();
-        }
         return floatPool;
     }
 
     private static ArrayList<boolean[]> boolPool() {
-        if (boolPool == null) {
-            boolPool = new ArrayList<boolean[]>();
-        }
         return boolPool;
     }
 
     private static ArrayList<Iterator> iteratorPool() {
-        if (iteratorPool == null) {
-            iteratorPool = new ArrayList<Iterator>();
-        }
         return iteratorPool;
     }
 
@@ -354,8 +340,8 @@ public final class GeneralPath implements Shape {
 
     // 1 = convex, -1 = concave, 0 = not polygon
     private static int detectPolygonType(Pt[] p, int num_vertices) {
-        Pt v1 = tmpV1 == null ? (tmpV1 = new Pt()) : tmpV1;
-        Pt v2 = tmpV2 == null ? (tmpV2 = new Pt()) : tmpV2;
+        Pt v1 = tmpV1;
+        Pt v2 = tmpV2;
 
         double det_value;
         double cur_det_value;

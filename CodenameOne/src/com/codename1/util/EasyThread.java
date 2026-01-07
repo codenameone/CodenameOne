@@ -36,7 +36,7 @@ import java.util.List;
  * @author Shai Almog
  */
 public class EasyThread {
-    private static List<ErrorListener> globalErrorListenenrs;
+    private static final List<ErrorListener> globalErrorListenenrs = new ArrayList<ErrorListener>();
     private final Object LOCK = new Object();
     private List<ErrorListener> errorListenenrs;
     private final Thread t;
@@ -99,10 +99,9 @@ public class EasyThread {
      * @param err the error callback
      */
     public static void addGlobalErrorListener(ErrorListener err) {
-        if (globalErrorListenenrs == null) {
-            globalErrorListenenrs = new ArrayList<ErrorListener>();
+        synchronized (globalErrorListenenrs) {
+            globalErrorListenenrs.add(err);
         }
-        globalErrorListenenrs.add(err);
     }
 
     /**
@@ -113,18 +112,18 @@ public class EasyThread {
      * @param err the error callback
      */
     public static void removeGlobalErrorListener(ErrorListener err) {
-        if (globalErrorListenenrs == null) {
-            return;
+        synchronized (globalErrorListenenrs) {
+            globalErrorListenenrs.remove(err);
         }
-        List<ErrorListener> l = new ArrayList<ErrorListener>();
-        l.addAll(globalErrorListenenrs);
-        l.remove(err);
-        globalErrorListenenrs = l;
     }
 
     private void fireEvent(List<ErrorListener> lst, Object current, Throwable t) {
         if (lst != null) {
-            for (ErrorListener e : lst) {
+            List<ErrorListener> snapshot;
+            synchronized (lst) {
+                snapshot = new ArrayList<ErrorListener>(lst);
+            }
+            for (ErrorListener e : snapshot) {
                 e.onError(this, current, t);
             }
         }

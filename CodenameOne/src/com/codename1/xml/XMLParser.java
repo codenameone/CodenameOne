@@ -52,7 +52,7 @@ public class XMLParser {
      * CDATA nodes will be converted to text nodes
      */
     private static final String CDATA_STR = "DATA[";
-    private static char[] buffer;
+    private static final char[] buffer = new char[8192];
     private static int buffOffset;
     private static int buffSize = -1;
     ParserCallback parserCallback;
@@ -98,10 +98,6 @@ public class XMLParser {
 
     private static int read(Reader is) throws IOException {
         int c = -1;
-        if (buffer == null) {
-            buffer = new char[8192];
-        }
-
         if (buffSize < 0 || buffOffset >= buffSize) {
             buffSize = is.read(buffer, 0, buffer.length);
             if (buffSize < 0) {

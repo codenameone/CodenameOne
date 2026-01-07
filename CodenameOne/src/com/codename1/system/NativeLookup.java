@@ -43,7 +43,7 @@ public class NativeLookup {
      * Indicates whether stack traces should be printed when lookup fails
      */
     private static boolean verbose = true;
-    private static HashMap<Class, Class> interfaceToClassLookup;
+    private static final HashMap<Class, Class> interfaceToClassLookup = new HashMap<Class, Class>();
 
     private NativeLookup() {
     }
@@ -76,11 +76,8 @@ public class NativeLookup {
      */
     public static <T extends NativeInterface> T create(Class<T> c) {
         try {
-            if (interfaceToClassLookup != null) {
-                Class cls = interfaceToClassLookup.get(c);
-                if (cls == null) {
-                    return null;
-                }
+            Class cls = interfaceToClassLookup.get(c);
+            if (cls != null) {
                 return (T) cls.newInstance();
             }
             // special case for JavaSE native interfaces
@@ -101,9 +98,6 @@ public class NativeLookup {
      * @param cls the stub class matching said interface
      */
     public static void register(Class ni, Class cls) {
-        if (interfaceToClassLookup == null) {
-            interfaceToClassLookup = new HashMap<Class, Class>();
-        }
         interfaceToClassLookup.put(ni, cls);
     }
 }

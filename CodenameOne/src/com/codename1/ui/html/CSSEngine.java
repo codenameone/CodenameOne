@@ -137,8 +137,10 @@ class CSSEngine {
     private static final int DIRECTION_LTR = 1;
     private static final int DEFAULT_3D_BORDER_COLOR = 0x9a9a9a; // default color for outset/inset/ridge/groove
     //int count; //for debugging
-    private static CSSEngine instance; // The instance of this singleton class
-    private static Hashtable specialKeys; // A hashtable containing all recognized special key strings and their keycodes
+    private static class CSSEngineHolder {
+        private static final CSSEngine INSTANCE = new CSSEngine();
+    }
+    private static final Hashtable specialKeys = new Hashtable(); // A hashtable containing all recognized special key strings and their keycodes
     private final Hashtable matchingFonts = new Hashtable(); // A hashtable used as a cache for quick find of matching fonts
 
     /**
@@ -147,10 +149,7 @@ class CSSEngine {
      * @return The singleton instance of CSSEngine
      */
     static CSSEngine getInstance() {
-        if (instance == null) {
-            instance = new CSSEngine();
-        }
-        return instance;
+        return CSSEngineHolder.INSTANCE;
     }
 
     /**
@@ -163,9 +162,6 @@ class CSSEngine {
      * @param specialKeyCode The special key code
      */
     static void addSpecialKey(String specialKeyName, int specialKeyCode) {
-        if (specialKeys == null) {
-            specialKeys = new Hashtable();
-        }
         specialKeys.put(specialKeyName, Integer.valueOf(specialKeyCode));
     }
 

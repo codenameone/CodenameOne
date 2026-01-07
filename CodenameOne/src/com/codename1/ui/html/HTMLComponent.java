@@ -369,6 +369,18 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     private Vector containers = new Vector();
     private Motion marqueeMotion;
 
+    private static synchronized void initDefaults() {
+        if (INDENT_OL < 0) {
+            INDENT_OL = Font.getDefaultFont().stringWidth("8888. "); //Ordered list
+        }
+        if (INDENT_UL < 0) {
+            INDENT_UL = Font.getDefaultFont().charWidth('W'); //Unordered list
+        }
+        if (DEFAULT_FONT == null) {
+            DEFAULT_FONT = new HTMLFont(null, Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM));
+        }
+    }
+
     /**
      * Constructs HTMLComponent
      */
@@ -382,15 +394,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      * @param handler The HttpRequestHandler to which all requests for links will be sent
      */
     public HTMLComponent(DocumentRequestHandler handler) {
-        if (INDENT_OL < 0) {
-            INDENT_OL = Font.getDefaultFont().stringWidth("8888. "); //Ordered list
-        }
-        if (INDENT_UL < 0) {
-            INDENT_UL = Font.getDefaultFont().charWidth('W'); //Unordered list
-        }
-        if (DEFAULT_FONT == null) {
-            DEFAULT_FONT = new HTMLFont(null, Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_MEDIUM));
-        }
+        initDefaults();
 
         setLayout(new BoxLayout(BoxLayout.Y_AXIS));
         this.handler = handler;
