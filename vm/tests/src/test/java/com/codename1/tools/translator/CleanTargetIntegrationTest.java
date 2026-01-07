@@ -197,13 +197,10 @@ class CleanTargetIntegrationTest {
             return;
         }
 
-        String newline = System.lineSeparator();
-        StringBuilder amended = new StringBuilder(content);
-        if (!content.endsWith("\n") && !content.endsWith("\r\n")) {
-            amended.append(newline);
-        }
-
-        amended.append("# CN1 literal-range warning relaxation").append(newline)
+        String newline = "\n";
+        StringBuilder block = new StringBuilder();
+        block.append(newline)
+                .append("# CN1 literal-range warning relaxation").append(newline)
                 .append("set(").append(marker).append(" \"-Wno-error=literal-range -Wno-literal-range\")").append(newline)
                 .append("if (CMAKE_C_COMPILER_ID MATCHES \"Clang\")").append(newline)
                 .append("    set(CMAKE_C_FLAGS \"${CMAKE_C_FLAGS} ${").append(marker).append("}\")").append(newline)
@@ -211,6 +208,12 @@ class CleanTargetIntegrationTest {
                 .append("if (CMAKE_OBJC_COMPILER_ID MATCHES \"Clang\")").append(newline)
                 .append("    set(CMAKE_OBJC_FLAGS \"${CMAKE_OBJC_FLAGS} ${").append(marker).append("}\")").append(newline)
                 .append("endif").append(newline);
+
+        StringBuilder amended = new StringBuilder(content);
+        if (!content.endsWith("\n") && !content.endsWith("\r\n")) {
+            amended.append(newline);
+        }
+        amended.append(block);
 
         Files.write(cmakeLists, amended.toString().getBytes(StandardCharsets.UTF_8));
     }
