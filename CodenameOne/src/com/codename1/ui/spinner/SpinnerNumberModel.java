@@ -93,7 +93,7 @@ class SpinnerNumberModel implements ListModel {
 
     Object getValue() {
         if (realValues) {
-            return new Double(currentValue);
+            return Double.valueOf(currentValue);
         }
         return Integer.valueOf((int) currentValue);
     }
@@ -115,7 +115,7 @@ class SpinnerNumberModel implements ListModel {
      */
     public Object getItemAt(int index) {
         if (realValues) {
-            return new Double(min + step * index);
+            return Double.valueOf(min + step * index);
         }
         return Integer.valueOf((int) (min + step * index));
     }

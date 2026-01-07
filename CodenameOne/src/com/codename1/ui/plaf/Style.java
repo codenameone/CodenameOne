@@ -2475,8 +2475,8 @@ public class Style {
      */
     Object[] getBackgroundGradient() {
         if (backgroundGradient == null) {
-            Float c = new Float(0.5f);
-            backgroundGradient = new Object[]{Integer.valueOf(0xffffff), Integer.valueOf(0), c, c, new Float(1)};
+            Float c = Float.valueOf(0.5f);
+            backgroundGradient = new Object[]{Integer.valueOf(0xffffff), Integer.valueOf(0), c, c, Float.valueOf(1)};
         }
         return backgroundGradient;
     }
@@ -2549,7 +2549,7 @@ public class Style {
             return;
         }
         if (((Float) getBackgroundGradient()[2]).floatValue() != backgroundGradientRelativeX) {
-            getBackgroundGradient()[2] = new Float(backgroundGradientRelativeX);
+            getBackgroundGradient()[2] = Float.valueOf(backgroundGradientRelativeX);
             if (!override) {
                 modifiedFlag |= BACKGROUND_GRADIENT_MODIFIED;
             }
@@ -2572,7 +2572,7 @@ public class Style {
             return;
         }
         if (((Float) getBackgroundGradient()[3]).floatValue() != backgroundGradientRelativeY) {
-            getBackgroundGradient()[3] = new Float(backgroundGradientRelativeY);
+            getBackgroundGradient()[3] = Float.valueOf(backgroundGradientRelativeY);
             if (!override) {
                 modifiedFlag |= BACKGROUND_GRADIENT_MODIFIED;
             }
@@ -2596,7 +2596,7 @@ public class Style {
             return;
         }
         if (((Float) getBackgroundGradient()[4]).floatValue() != backgroundGradientRelativeSize) {
-            getBackgroundGradient()[4] = new Float(backgroundGradientRelativeSize);
+            getBackgroundGradient()[4] = Float.valueOf(backgroundGradientRelativeSize);
             if (!override) {
                 modifiedFlag |= BACKGROUND_GRADIENT_MODIFIED;
             }

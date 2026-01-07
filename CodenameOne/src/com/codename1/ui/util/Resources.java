@@ -1576,8 +1576,8 @@ public class Resources {
                     case 0xF6:
                         // Vertical Linear Gradient
                     case 0xF7:
-                        Float c = new Float(0.5f);
-                        theme.put(key + Style.BACKGROUND_GRADIENT, new Object[]{Integer.valueOf(input.readInt()), Integer.valueOf(input.readInt()), c, c, new Float(1)});
+                        Float c = Float.valueOf(0.5f);
+                        theme.put(key + Style.BACKGROUND_GRADIENT, new Object[]{Integer.valueOf(input.readInt()), Integer.valueOf(input.readInt()), c, c, Float.valueOf(1)});
                         break;
 
                     // Radial Gradient
@@ -1592,9 +1592,9 @@ public class Resources {
                         }
                         theme.put(key + Style.BACKGROUND_GRADIENT, new Object[]{Integer.valueOf(c1),
                                 Integer.valueOf(c2),
-                                new Float(f1),
-                                new Float(f2),
-                                new Float(radialSize)});
+                                Float.valueOf(f1),
+                                Float.valueOf(f2),
+                                Float.valueOf(radialSize)});
                         break;
                     default:
                         break;
@@ -1641,16 +1641,16 @@ public class Resources {
                     theme.put(key, new Object[]{
                             Integer.valueOf(input.readInt()),
                             Integer.valueOf(input.readInt()),
-                            new Float(input.readFloat()),
-                            new Float(input.readFloat())
+                            Float.valueOf(input.readFloat()),
+                            Float.valueOf(input.readFloat())
                     });
                 } else {
                     theme.put(key, new Object[]{
                             Integer.valueOf(input.readInt()),
                             Integer.valueOf(input.readInt()),
-                            new Float(input.readFloat()),
-                            new Float(input.readFloat()),
-                            new Float(input.readFloat())
+                            Float.valueOf(input.readFloat()),
+                            Float.valueOf(input.readFloat()),
+                            Float.valueOf(input.readFloat())
                     });
                 }
                 continue;

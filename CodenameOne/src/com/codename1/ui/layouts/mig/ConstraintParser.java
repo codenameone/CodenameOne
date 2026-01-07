@@ -898,10 +898,10 @@ public final class ConstraintParser {
                     }
 
                     if (part.equals("dock center")) {
-                        cc.getHorizontal().setGrow(new Float(100f));
-                        cc.getVertical().setGrow(new Float(100f));
-                        cc.setPushX(new Float(100f));
-                        cc.setPushY(new Float(100f));
+                        cc.getHorizontal().setGrow(Float.valueOf(100f));
+                        cc.getVertical().setGrow(Float.valueOf(100f));
+                        cc.setPushX(Float.valueOf(100f));
+                        cc.setPushY(Float.valueOf(100f));
                         continue;
                     }
                 }
@@ -1067,7 +1067,7 @@ public final class ConstraintParser {
     }
 
     private static Float parseFloat(String s, Float nullVal) {
-        return s.length() > 0 ? new Float(Float.parseFloat(s)) : nullVal;
+        return s.length() > 0 ? Float.valueOf(Float.parseFloat(s)) : nullVal;
     }
 
     /**

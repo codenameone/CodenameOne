@@ -173,7 +173,7 @@ public class Preferences {
      * @param d    a number
      */
     public static void set(String pref, double d) {
-        set(pref, new Double(d));
+        set(pref, Double.valueOf(d));
     }
 
     /**
@@ -183,7 +183,7 @@ public class Preferences {
      * @param f    a number
      */
     public static void set(String pref, float f) {
-        set(pref, new Float(f));
+        set(pref, Float.valueOf(f));
     }
 
     /**

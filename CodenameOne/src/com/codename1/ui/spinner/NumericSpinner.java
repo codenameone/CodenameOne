@@ -126,7 +126,7 @@ public class NumericSpinner extends BaseSpinner {
     public void setValue(double value) {
         this.value = value;
         if (spin != null) {
-            ((SpinnerNumberModel) spin.getModel()).setValue(new Double(value));
+            ((SpinnerNumberModel) spin.getModel()).setValue(Double.valueOf(value));
         }
     }
 
@@ -177,16 +177,16 @@ public class NumericSpinner extends BaseSpinner {
      */
     public Object getPropertyValue(String name) {
         if (name.equals("min")) {
-            return new Double(min);
+            return Double.valueOf(min);
         }
         if (name.equals("max")) {
-            return new Double(max);
+            return Double.valueOf(max);
         }
         if (name.equals("value")) {
-            return new Double(getValue());
+            return Double.valueOf(getValue());
         }
         if (name.equals("step")) {
-            return new Double(step);
+            return Double.valueOf(step);
         }
         return null;
     }

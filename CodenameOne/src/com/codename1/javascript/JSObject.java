@@ -531,7 +531,7 @@ public class JSObject {
      * @param async True if you want this call to be asynchronous.
      */
     public void setInt(String key, int value, boolean async) {
-        set(key, new Double(value), async);
+        set(key, Double.valueOf(value), async);
     }
 
     /**
@@ -552,7 +552,7 @@ public class JSObject {
      * @param async True if you want this call to be asynchronous.
      */
     public void setDouble(String key, double value, boolean async) {
-        set(key, new Double(value), async);
+        set(key, Double.valueOf(value), async);
     }
 
     /**
@@ -615,7 +615,7 @@ public class JSObject {
      * @param async True to make this call asynchronous.
      */
     public void setInt(int index, int value, boolean async) {
-        set(index, new Double(value), async);
+        set(index, Double.valueOf(value), async);
     }
 
     /**
@@ -636,7 +636,7 @@ public class JSObject {
      * @param async True to make this call asynchronous.
      */
     public void setDouble(int index, double value, boolean async) {
-        set(index, new Double(value), async);
+        set(index, Double.valueOf(value), async);
     }
 
     /**

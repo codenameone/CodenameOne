@@ -133,7 +133,7 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
 
                 Float s = isHor ? PlatformDefaults.getHorizontalScaleFactor() : PlatformDefaults.getVerticalScaleFactor();
                 if (s == null)
-                    s = new Float(1.0f);
+                    s = Float.valueOf(1.0f);
                 return s * (isHor ? getHorizontalScreenDPI() : getVerticalScreenDPI()) / (float) PlatformDefaults.getDefaultDPI();
 
             default:

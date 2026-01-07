@@ -1946,7 +1946,7 @@ public class UIManager {
                     Object[] a = new Object[5];
                     System.arraycopy(backgroundGradient, 0, a, 0, backgroundGradient.length);
                     backgroundGradient = a;
-                    backgroundGradient[4] = new Float(1);
+                    backgroundGradient[4] = Float.valueOf(1);
                 }
                 style.setBackgroundGradient(backgroundGradient);
             }

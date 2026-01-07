@@ -333,7 +333,7 @@ public final class CC {
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new ComponentConstraint().noGrid().gap().fill()</code>.
      */
     public CC shrinkX(float w) {
-        hor.setShrink(new Float(w));
+        hor.setShrink(Float.valueOf(w));
         return this;
     }
 
@@ -560,7 +560,7 @@ public final class CC {
      * @return <code>this</code> so it is possible to chain calls. E.g. <code>new ComponentConstraint().noGrid().gap().fill()</code>.
      */
     public CC shrinkY(float w) {
-        ver.setShrink(new Float(w));
+        ver.setShrink(Float.valueOf(w));
         return this;
     }
 
