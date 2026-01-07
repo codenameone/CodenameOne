@@ -76,11 +76,8 @@ public class NativeLookup {
      */
     public static <T extends NativeInterface> T create(Class<T> c) {
         try {
-            if (interfaceToClassLookup != null) {
-                Class cls = interfaceToClassLookup.get(c);
-                if (cls == null) {
-                    return null;
-                }
+            Class cls = interfaceToClassLookup.get(c);
+            if (cls != null) {
                 return (T) cls.newInstance();
             }
             // special case for JavaSE native interfaces
