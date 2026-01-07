@@ -863,11 +863,11 @@ public class UIBuilder { //implements Externalizable {
         }
 
         if (type == Double.class) {
-            return new Double(in.readDouble());
+            return Double.valueOf(in.readDouble());
         }
 
         if (type == Float.class) {
-            return new Float(in.readFloat());
+            return Float.valueOf(in.readFloat());
         }
 
         if (type == Byte.class) {

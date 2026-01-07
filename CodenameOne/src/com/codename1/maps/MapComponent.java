@@ -1107,11 +1107,11 @@ public class MapComponent extends Container {
     public Object getPropertyValue(String name) {
         if (name.equals("latitude")) {
             Coord c = _map.projection().toWGS84(_center);
-            return new Double(c.getLatitude());
+            return Double.valueOf(c.getLatitude());
         }
         if (name.equals("longitude")) {
             Coord c = _map.projection().toWGS84(_center);
-            return new Double(c.getLongitude());
+            return Double.valueOf(c.getLongitude());
         }
         if (name.equals("zoom")) {
             return Integer.valueOf(getZoomLevel());

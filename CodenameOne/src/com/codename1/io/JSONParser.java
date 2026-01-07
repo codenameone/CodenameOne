@@ -838,10 +838,10 @@ public class JSONParser implements JSONParseCallback {
      */
     public void numericToken(double tok) {
         if (isStackHash()) {
-            getStackHash().put(currentKey, new Double(tok));
+            getStackHash().put(currentKey, Double.valueOf(tok));
             currentKey = null;
         } else {
-            getStackVec().add(new Double(tok));
+            getStackVec().add(Double.valueOf(tok));
         }
     }
 

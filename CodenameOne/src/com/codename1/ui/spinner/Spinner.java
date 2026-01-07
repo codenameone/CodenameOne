@@ -206,7 +206,7 @@ class Spinner extends List {
                 return super.getListCellRendererComponent(list, value, index, isSelected);
             }
         });
-        s.setRenderingPrototype(new Double(max * 10));
+        s.setRenderingPrototype(Double.valueOf(max * 10));
         return s;
     }
 
@@ -531,7 +531,7 @@ class Spinner extends List {
                                 val < ((SpinnerNumberModel) getModel()).getMin()) {
                             return;
                         }
-                        setValue(new Double(val));
+                        setValue(Double.valueOf(val));
                     } else {
                         int val = Integer.parseInt(t);
                         if (val > ((SpinnerNumberModel) getModel()).getMax() ||

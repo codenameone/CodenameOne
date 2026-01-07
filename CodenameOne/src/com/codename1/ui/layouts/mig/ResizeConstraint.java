@@ -39,7 +39,7 @@ package com.codename1.ui.layouts.mig;
  * grow compared to other entities.
  */
 final class ResizeConstraint {
-    static final Float WEIGHT_100 = new Float(100);
+    static final Float WEIGHT_100 = Float.valueOf(100);
 
     /**
      * How flexilble the entity should be, relative to other entities, when it comes to growing. <code>null</code> or
