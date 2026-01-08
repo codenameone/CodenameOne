@@ -2,11 +2,13 @@ package com.codename1.ui.table;
 
 import com.codename1.junit.FormTest;
 import com.codename1.junit.UITestBase;
+import com.codename1.ui.CN;
 import com.codename1.ui.Component;
+import com.codename1.ui.Form;
+import com.codename1.ui.Label;
 import com.codename1.ui.TextArea;
 
 import java.util.Comparator;
-import java.util.Date;
 import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -88,5 +90,30 @@ class TableTest extends UITestBase {
         TableLayout tl = (TableLayout) table.getLayout();
         // Row 0 is header if includeHeader is true (default).
         return tl.getComponentAt(0, 0);
+    }
+
+    /**
+     * Test for a size regression bug in table layout discussed here: https://www.reddit.com/r/cn1/comments/1q6pmek/android_screen_out_of_ranges/
+     */
+    @FormTest
+    void testTableLayoutDefaultSizing() {
+        Form f = CN.getCurrentForm();
+        TableLayout tl = new TableLayout(3, 2);
+        f.setLayout(tl);
+        f.setScrollable(false);
+        f.getContentPane().getAllStyles().setPadding(0, 0, 0, 0);
+        for(int iter = 0 ; iter < 6 ; iter++) {
+            Label l = new Label("T: " + iter);
+            l.getAllStyles().setMargin(0, 0, 0, 0);
+            f.addComponent(tl.createConstraint()
+                            .hp(33)
+                            .wp(50), l);
+        }
+        f.revalidate();
+
+        for(Component cmp : f.getContentPane()) {
+            assertTrue(cmp.getHeight() >= f.getContentPane().getHeight() / 100 * 32, "Height should be close to 33 percent");
+            assertTrue(cmp.getWidth() >= f.getContentPane().getWidth() / 2 - 1, "Width should be 50%");
+        }
     }
 }
