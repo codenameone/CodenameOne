@@ -1729,30 +1729,6 @@ public class UIManager {
         }
     }
 
-    private String fromFloatArray(float[] arr) {
-        StringBuilder sb = new StringBuilder();
-        int len = arr.length;
-        boolean first = true;
-        for (int i = 0; i < len; i++) {
-            if (first) first = false;
-            else sb.append(",");
-            sb.append(arr[i]);
-        }
-        return sb.toString();
-    }
-
-    private String fromByteArray(byte[] arr) {
-        StringBuilder sb = new StringBuilder();
-        int len = arr.length;
-        boolean first = true;
-        for (int i = 0; i < len; i++) {
-            if (first) first = false;
-            else sb.append(",");
-            sb.append(arr[i]);
-        }
-        return sb.toString();
-    }
-
     /**
      * Creates a style by providing style strings in a specific format. This method allows for the use of inline styles
      * to override the styles in {@link com.codename1.ui.Component}
