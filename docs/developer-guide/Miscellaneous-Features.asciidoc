@@ -96,6 +96,32 @@ Display.getInstance().sendMessage(new String[] {"someone@gmail.com"}, "Subject o
 
 NOTE: Some features such as attachments etc. don't work correctly in the simulator but should work on iOS/Android
 
+=== Larger Text Accessibility
+
+Codename One can adapt to the operating system’s larger text accessibility setting. The https://www.codenameone.com/javadoc/com/codename1/ui/Display.html[Display] APIs expose two signals: `isLargerTextEnabled()` indicates whether the user has enabled larger text, and `getLargerTextScale()` returns the scale factor that should be applied to fonts.
+
+If you want the theme system to automatically scale its fonts when larger text is enabled, enable the https://www.codenameone.com/javadoc/com/codename1/ui/plaf/UIManager.html[UIManager] setting:
+
+[source,java]
+----
+UIManager.getInstance().setUseLargerTextScale(true);
+----
+
+You can also enable this behavior in the theme by setting the `useLargerTextScaleBool` theme constant to `true`.
+
+If you need to apply the scale manually for custom fonts or layout calculations, read the values directly:
+
+[source,java]
+----
+Display display = Display.getInstance();
+if (display.isLargerTextEnabled()) {
+    float scale = display.getLargerTextScale();
+    Font base = UIManager.getInstance().getLookAndFeel().getDefaultStyle().getFont();
+    Font scaled = base.derive(base.getHeight() * scale, base.getStyle());
+    someComponent.getUnselectedStyle().setFont(scaled);
+}
+----
+
 === Contacts API
 
 The contacts API provides us with the means to query the phone’s address book, delete elements from it and create new entries into it. To get the platform specific list of contacts you can use
