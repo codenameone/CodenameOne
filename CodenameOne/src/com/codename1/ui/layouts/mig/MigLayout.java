@@ -597,22 +597,6 @@ public final class MigLayout extends Layout {
      *
      * @param parent The parent who's window to possibly adjust the size for.
      */
-    private int constrain(ContainerWrapper parent, int winSize, int prefSize, BoundSize constrain) {
-        if (constrain == null) {
-            return winSize;
-        }
-
-        int retSize = winSize;
-        UnitValue wUV = constrain.getPreferred();
-        if (wUV != null) {
-            retSize = wUV.getPixels(prefSize, parent, parent);
-        }
-
-        retSize = constrain.constrain(retSize, prefSize, parent);
-
-        return constrain.getGapPush() ? Math.max(winSize, retSize) : retSize;
-    }
-
     public Dimension minimumLayoutSize(Container parent) {
         return getSizeImpl(parent, LayoutUtil.MIN);
     }
