@@ -12,16 +12,13 @@ import com.codename1.util.Base64;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 
-final class Cn1ssDeviceRunnerHelper {
-    private static final int CHUNK_SIZE_ANDROID = 500;
-    private static final int CHUNK_SIZE_DEFAULT = 900;
-    private static final int DELAY_ANDROID = 20;
-    private static final int MAX_PREVIEW_BYTES = 20 * 1024;
-    private static final String PREVIEW_CHANNEL = "PREVIEW";
-    private static final int[] PREVIEW_QUALITIES = new int[] {60, 50, 40, 35, 30, 25, 20, 18, 16, 14, 12, 10, 8, 6, 5, 4, 3, 2, 1};
-
-    private Cn1ssDeviceRunnerHelper() {
-    }
+interface Cn1ssDeviceRunnerHelper {
+    int CHUNK_SIZE_ANDROID = 500;
+    int CHUNK_SIZE_DEFAULT = 900;
+    int DELAY_ANDROID = 20;
+    int MAX_PREVIEW_BYTES = 20 * 1024;
+    String PREVIEW_CHANNEL = "PREVIEW";
+    int[] PREVIEW_QUALITIES = new int[] {60, 50, 40, 35, 30, 25, 20, 18, 16, 14, 12, 10, 8, 6, 5, 4, 3, 2, 1};
 
     static void runOnEdtSync(Runnable runnable) {
         Display display = Display.getInstance();
@@ -88,7 +85,7 @@ final class Cn1ssDeviceRunnerHelper {
         }
     }
 
-    private static byte[] encodePreview(ImageIO io, Image screenshot, String safeName) throws IOException {
+    static byte[] encodePreview(ImageIO io, Image screenshot, String safeName) throws IOException {
         byte[] chosenPreview = null;
         int chosenQuality = 0;
         int smallestBytes = Integer.MAX_VALUE;
@@ -117,7 +114,7 @@ final class Cn1ssDeviceRunnerHelper {
         return chosenPreview;
     }
 
-    private static void emitChannel(byte[] bytes, String safeName, String channel) {
+    static void emitChannel(byte[] bytes, String safeName, String channel) {
         String prefix = channel != null && channel.length() > 0 ? "CN1SS" + channel : "CN1SS";
         if (bytes == null || bytes.length == 0) {
             println(prefix + ":END:" + safeName);
@@ -165,7 +162,7 @@ final class Cn1ssDeviceRunnerHelper {
         return sanitized.toString();
     }
 
-    private static boolean isSafeChar(char ch) {
+    static boolean isSafeChar(char ch) {
         if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')) {
             return true;
         }
@@ -175,7 +172,7 @@ final class Cn1ssDeviceRunnerHelper {
         return ch == '_' || ch == '.' || ch == '-';
     }
 
-    private static String zeroPad(int value, int width) {
+    static String zeroPad(int value, int width) {
         String text = Integer.toString(value);
         if (text.length() >= width) {
             return text;
@@ -188,7 +185,7 @@ final class Cn1ssDeviceRunnerHelper {
         return builder.toString();
     }
 
-    private static void println(String line) {
+    static void println(String line) {
         System.out.println(line);
     }
 }

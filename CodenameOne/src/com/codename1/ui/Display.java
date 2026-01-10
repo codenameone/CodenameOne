@@ -749,6 +749,27 @@ public final class Display extends CN1Constants {
     }
 
     /**
+     * Returns true if the user has selected larger type fonts in the system settings.
+     *
+     * @return true when the platform indicates a larger text preference.
+     * @since 7.1
+     */
+    public boolean isLargerTextEnabled() {
+        return impl.isLargerTextEnabled();
+    }
+
+    /**
+     * Returns a scale factor representing how much larger system fonts should be.
+     * A value of {@code 1.0} indicates the default system font size.
+     *
+     * @return scale factor for larger system fonts.
+     * @since 7.1
+     */
+    public float getLargerTextScale() {
+        return impl.getLargerTextScale();
+    }
+
+    /**
      * Checks if async stack traces are enabled.  If enabled, the stack trace
      * at the point of {@link #callSerially(java.lang.Runnable) } calls will
      * be recorded, and logged in the case that there is an uncaught exception.
