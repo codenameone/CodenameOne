@@ -90,6 +90,7 @@ public class BytecodeMethod implements SignatureSet {
     private boolean staticMethod;
     private boolean privateMethod;
     private boolean nativeMethod;
+    private boolean abstractMethod;
     private List<String> dependentClasses = new ArrayList<String>();
     //private List<String> exportedClasses = new ArrayList<String>();
     private List<Instruction> instructions = new ArrayList<Instruction>();
@@ -270,6 +271,7 @@ public class BytecodeMethod implements SignatureSet {
         staticMethod = (access & Opcodes.ACC_STATIC) == Opcodes.ACC_STATIC;
         finalMethod = (access & Opcodes.ACC_FINAL) == Opcodes.ACC_FINAL;
         synchronizedMethod = (access & Opcodes.ACC_SYNCHRONIZED) == Opcodes.ACC_SYNCHRONIZED;
+        abstractMethod = (access & Opcodes.ACC_ABSTRACT) == Opcodes.ACC_ABSTRACT;
         int pos = desc.lastIndexOf(')');
         if (!staticMethod) {
             if (!dependentClasses.contains("java_lang_NullPointerException")) {
@@ -1242,6 +1244,10 @@ public class BytecodeMethod implements SignatureSet {
     
     public boolean isNative() {
         return nativeMethod;
+    }
+
+    public boolean isAbstract() {
+        return abstractMethod;
     }
     
     public String getVariableNameForTypeIndex(int index, char type) {

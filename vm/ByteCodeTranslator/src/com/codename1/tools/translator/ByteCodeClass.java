@@ -943,8 +943,10 @@ public class ByteCodeClass {
                 if(m.getMethodName().equals("__CLINIT__")) {
                     m.appendMethodC(b);
                     clInitMethod = clsName + "_" + m.getMethodName() + "__";
-                } else {
+                } else if (m.isAbstract()) {
                     m.appendInterfaceMethodC(b);
+                } else {
+                    m.appendMethodC(b);
                 }
             }
         } else {
@@ -1006,6 +1008,12 @@ public class ByteCodeClass {
                 BytecodeMethod bm = virtualMethodList.get(iter);
 
                 if(bm.getClsName().equals(clsName) && !bm.isVirtualOverriden()) {
+                    b.append("    vtable[");
+                    b.append(iter);
+                    b.append("] = &");
+                    bm.appendFunctionPointer(b);
+                    b.append(";\n");
+                } else if (isDefaultInterfaceMethod(bm, allClasses)) {
                     b.append("    vtable[");
                     b.append(iter);
                     b.append("] = &");
@@ -1155,6 +1163,11 @@ public class ByteCodeClass {
             return baseClassObject.doesImplement(interfaceObj);
         }
         return false;
+    }
+
+    private boolean isDefaultInterfaceMethod(BytecodeMethod method, List<ByteCodeClass> allClasses) {
+        ByteCodeClass owner = findClass(method.getClsName(), allClasses);
+        return owner != null && owner.isInterface && !method.isAbstract();
     }
     
     private void appendSuperStub(StringBuilder b, List<BytecodeMethod> bm, ByteCodeClass base) {

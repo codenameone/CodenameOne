@@ -14,6 +14,7 @@ import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -98,6 +99,36 @@ class ParserTest {
         assertTrue(cls.isIsInterface(), "Annotations should be treated as interfaces");
         assertTrue(readPrivateBoolean(cls, "isAnnotation"));
         assertFalse(readPrivateBoolean(cls, "isSynthetic"));
+    }
+
+    @Test
+    void translatesDefaultInterfaceMethodImplementations() throws Exception {
+        Parser.cleanup();
+
+        Path interfaceFile = createGreeterInterfaceWithDefaultMethod();
+        Path implFile = createGreeterImplementation();
+
+        Parser.parse(interfaceFile.toFile());
+        Parser.parse(implFile.toFile());
+
+        ByteCodeClass greeter = Parser.getClassObject("com_example_Greeter");
+        BytecodeMethod greet = findMethod(greeter, "greet");
+        assertFalse(greet.isAbstract(), "Default method should not be marked abstract");
+
+        ByteCodeClass impl = Parser.getClassObject("com_example_GreeterImpl");
+        greeter.setBaseInterfacesObject(Collections.emptyList());
+        impl.setBaseInterfacesObject(Collections.singletonList(greeter));
+        greeter.updateAllDependencies();
+        impl.updateAllDependencies();
+
+        List<ByteCodeClass> classes = Arrays.asList(greeter, impl);
+        String interfaceCode = greeter.generateCCode(classes);
+        assertFalse(interfaceCode.contains("virtual_com_example_Greeter_greet"),
+                "Default interface method should generate an implementation, not a virtual stub");
+
+        String implCode = impl.generateCCode(classes);
+        assertTrue(implCode.contains("&com_example_Greeter_greet___R_java_lang_String"),
+                "Implementing class should point vtable slot to the interface default method implementation");
     }
 
     private ByteCodeField findField(ByteCodeClass cls, String name) {
@@ -269,6 +300,51 @@ class ParserTest {
                     new String[]{"java/lang/annotation/Annotation"}
             );
             cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_ABSTRACT, "value", "()Ljava/lang/String;", null, null).visitEnd();
+            cw.visitEnd();
+        });
+    }
+
+    private Path createGreeterInterfaceWithDefaultMethod() throws Exception {
+        return writeClass("com/example/Greeter", cw -> {
+            cw.visit(
+                    Opcodes.V1_8,
+                    Opcodes.ACC_PUBLIC | Opcodes.ACC_ABSTRACT | Opcodes.ACC_INTERFACE,
+                    "com/example/Greeter",
+                    null,
+                    "java/lang/Object",
+                    null
+            );
+
+            MethodVisitor greet = cw.visitMethod(Opcodes.ACC_PUBLIC, "greet", "()Ljava/lang/String;", null, null);
+            greet.visitCode();
+            greet.visitLdcInsn("hello");
+            greet.visitInsn(Opcodes.ARETURN);
+            greet.visitMaxs(1, 1);
+            greet.visitEnd();
+
+            cw.visitEnd();
+        });
+    }
+
+    private Path createGreeterImplementation() throws Exception {
+        return writeClass("com/example/GreeterImpl", cw -> {
+            cw.visit(
+                    Opcodes.V1_8,
+                    Opcodes.ACC_PUBLIC | Opcodes.ACC_SUPER,
+                    "com/example/GreeterImpl",
+                    null,
+                    "java/lang/Object",
+                    new String[]{"com/example/Greeter"}
+            );
+
+            MethodVisitor init = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+            init.visitCode();
+            init.visitVarInsn(Opcodes.ALOAD, 0);
+            init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+            init.visitInsn(Opcodes.RETURN);
+            init.visitMaxs(1, 1);
+            init.visitEnd();
+
             cw.visitEnd();
         });
     }
