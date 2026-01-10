@@ -8680,6 +8680,28 @@ public abstract class CodenameOneImplementation {
     }
 
     /**
+     * Returns true if the user has selected larger type fonts in the system settings.
+     * Default implementation returns false.
+     *
+     * @return true when the platform indicates a larger text preference.
+     * @since 7.1
+     */
+    public boolean isLargerTextEnabled() {
+        return false;
+    }
+
+    /**
+     * Returns a scale factor representing how much larger system fonts should be.
+     * A value of {@code 1.0} indicates the default system font size.
+     *
+     * @return scale factor for larger system fonts.
+     * @since 7.1
+     */
+    public float getLargerTextScale() {
+        return 1.0f;
+    }
+
+    /**
      * Returns the stack trace from the exception on the given
      * thread. This API isn't supported on all platforms and may
      * return a blank string when unavailable.

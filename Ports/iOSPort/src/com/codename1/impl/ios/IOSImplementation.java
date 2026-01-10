@@ -1214,6 +1214,16 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         return null;
     }
+
+    @Override
+    public boolean isLargerTextEnabled() {
+        return nativeInstance.isLargerTextEnabled();
+    }
+
+    @Override
+    public float getLargerTextScale() {
+        return nativeInstance.getLargerTextScale();
+    }
     
 
     public void flushGraphics() {
@@ -9503,6 +9513,5 @@ public class IOSImplementation extends CodenameOneImplementation {
         IOSNative.announceForAccessibility(text);
     }
 }
-
 
 

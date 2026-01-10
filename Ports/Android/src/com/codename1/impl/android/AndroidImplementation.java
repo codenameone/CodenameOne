@@ -1267,6 +1267,26 @@ public class AndroidImplementation extends CodenameOneImplementation implements 
         }
     }
 
+    @Override
+    public boolean isLargerTextEnabled() {
+        return getLargerTextScale() > 1.0f;
+    }
+
+    @Override
+    public float getLargerTextScale() {
+        try {
+            Configuration configuration;
+            if (getActivity() != null) {
+                configuration = getActivity().getResources().getConfiguration();
+            } else {
+                configuration = getContext().getResources().getConfiguration();
+            }
+            return configuration.fontScale;
+        } catch (Throwable t) {
+            return 1.0f;
+        }
+    }
+
     
     private boolean hasActionBar() {
         return android.os.Build.VERSION.SDK_INT >= 11;
