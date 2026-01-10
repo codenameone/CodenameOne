@@ -637,12 +637,6 @@ public class TextSelection {
         return false;
     }
 
-    private boolean shouldCoverToEndOfLine(Span span, Rectangle bounds) {
-        int spy = span.getBounds().getY();
-        int sph = span.getBounds().getHeight();
-        return spy + 2 * sph / 3 > bounds.getY() && spy + sph <= bounds.getY() + bounds.getHeight();
-    }
-
     private void updateSnappedSelectedBounds() {
         snappedSelectedBounds.setBounds(selectedBounds.getX(), selectedBounds.getY(), selectedBounds.getWidth(), selectedBounds.getHeight());
         for (Span span : selectedSpans) {

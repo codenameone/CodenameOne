@@ -1634,30 +1634,6 @@ public class UIManager {
         return parseCache;
     }
 
-    private String fromFloatArray(float[] arr) {
-        StringBuilder sb = new StringBuilder();
-        int len = arr.length;
-        boolean first = true;
-        for (int i = 0; i < len; i++) {
-            if (first) first = false;
-            else sb.append(",");
-            sb.append(arr[i]);
-        }
-        return sb.toString();
-    }
-
-    private String fromByteArray(byte[] arr) {
-        StringBuilder sb = new StringBuilder();
-        int len = arr.length;
-        boolean first = true;
-        for (int i = 0; i < len; i++) {
-            if (first) first = false;
-            else sb.append(",");
-            sb.append(arr[i]);
-        }
-        return sb.toString();
-    }
-
     /**
      * Creates a style by providing style strings in a specific format. This method allows for the use of inline styles
      * to override the styles in {@link com.codename1.ui.Component}
@@ -2120,13 +2096,6 @@ public class UIManager {
         return response;
     }
 
-    private String[][] getInputMode(String prefix, String val, Hashtable resourceBundle) {
-        if (resourceBundle.containsKey(prefix + val)) {
-            return tokenizeMultiArray((String) resourceBundle.get(prefix + val), '|', '\n');
-        }
-        return null;
-    }
-
     private String[] toStringArray(Vector v) {
         String[] arr = new String[v.size()];
         int alen = arr.length;
@@ -2134,17 +2103,6 @@ public class UIManager {
             arr[iter] = (String) v.elementAt(iter);
         }
         return arr;
-    }
-
-    private String[][] tokenizeMultiArray(String s, char separator, char lineBreak) {
-        Vector lines = StringUtil.tokenizeString(s, lineBreak);
-        int lineCount = lines.size();
-        String[][] result = new String[lineCount][];
-        for (int iter = 0; iter < lineCount; iter++) {
-            String currentString = (String) lines.elementAt(iter);
-            result[iter] = toStringArray(StringUtil.tokenizeString(currentString, separator));
-        }
-        return result;
     }
 
     /**

@@ -815,6 +815,7 @@ def main() -> None:
             "UW_UNCOND_WAIT",
             "SIC_INNER_SHOULD_BE_STATIC_ANON",
             "SS_SHOULD_BE_STATIC",
+            "UPM_UNCALLED_PRIVATE_METHOD",
             "RV_CHECK_FOR_POSITIVE_INDEXOF",
         }
 

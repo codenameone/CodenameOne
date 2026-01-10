@@ -553,18 +553,6 @@ public final class Graphics {
         impl.drawArc(nativeGraphics, xTranslate + x, yTranslate + y, width, height, startAngle, arcAngle);
     }
 
-    private void drawStringImpl(String str, int x, int y) {
-        // remove a commonly used trick to create a spacer label from the paint queue
-        if (str.length() == 0 || (str.length() == 1 && str.charAt(0) == ' ')) {
-            return;
-        }
-        if (!(current instanceof CustomFont)) {
-            impl.drawString(nativeGraphics, str, x + xTranslate, y + yTranslate);
-        } else {
-            current.drawString(this, str, x, y);
-        }
-    }
-
     /**
      * Draw a string using the current font and color in the x,y coordinates. The font is drawn
      * from the top position and not the baseline.

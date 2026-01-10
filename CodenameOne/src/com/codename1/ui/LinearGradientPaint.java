@@ -85,18 +85,6 @@ public class LinearGradientPaint extends MultipleGradientPaint {
         this.endY = endY;
     }
 
-    private static double findAngle(double x1, double y1, double x2, double y2) {
-        return MathUtil.atan((y2 - y1) / (x2 - x1));
-    }
-
-    private static double scaleX(double theta, double x) {
-        return x / Math.cos(theta);
-    }
-
-    private static double scaleY(double theta, double y) {
-        return y / Math.sin(theta);
-    }
-
     /**
      * Paints linear gradient in the given bounds.
      *
