@@ -128,6 +128,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
     private boolean trueTypeSupported = true;
     private static TestCodenameOneImplementation instance;
     private String executeURL;
+    private boolean largerTextEnabled;
+    private float largerTextScale = 1f;
 
     private boolean autoProcessConnections = true;
     private Map<String, String> properties = new HashMap<>();
@@ -1091,6 +1093,8 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
         softkeyCount = 2;
         thirdSoftButton = false;
         mutableImagesFast = true;
+        largerTextEnabled = false;
+        largerTextScale = 1f;
     }
 
     public List<Object> getCleanupCalls() {
@@ -2220,6 +2224,24 @@ public class TestCodenameOneImplementation extends CodenameOneImplementation {
 
     public void setNativeFontSchemeSupported(boolean nativeFontSchemeSupported) {
         this.nativeFontSchemeSupported = nativeFontSchemeSupported;
+    }
+
+    public void setLargerTextEnabled(boolean largerTextEnabled) {
+        this.largerTextEnabled = largerTextEnabled;
+    }
+
+    public void setLargerTextScale(float largerTextScale) {
+        this.largerTextScale = largerTextScale;
+    }
+
+    @Override
+    public boolean isLargerTextEnabled() {
+        return largerTextEnabled;
+    }
+
+    @Override
+    public float getLargerTextScale() {
+        return largerTextScale;
     }
 
     @Override

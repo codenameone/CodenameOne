@@ -79,6 +79,7 @@ public class UIManager {
     private final HashMap<String, Object> themeConstants = new HashMap<String, Object>();
     private Style defaultStyle = new Style();
     private Style defaultSelectedStyle = new Style();
+    private boolean useLargerTextScale;
     /**
      * Useful for caching theme images so they are not loaded twice in case
      * an image reference is used it two places in the theme (e.g. same background
@@ -143,6 +144,26 @@ public class UIManager {
      */
     public static UIManager createInstance() {
         return new UIManager();
+    }
+
+    /**
+     * Enables or disables scaling fonts when larger text is enabled on the device.
+     * This can also be enabled via the {@code useLargerTextScaleBool} theme constant.
+     *
+     * @param useLargerTextScale true to apply {@link Display#getLargerTextScale()} when
+     *                           {@link Display#isLargerTextEnabled()} is true.
+     */
+    public void setUseLargerTextScale(boolean useLargerTextScale) {
+        this.useLargerTextScale = useLargerTextScale;
+    }
+
+    /**
+     * Checks if larger text scaling is enabled.
+     *
+     * @return true if larger text scaling should be applied.
+     */
+    public boolean isUseLargerTextScale() {
+        return useLargerTextScale;
     }
 
     private static Image parseImage(String value) throws IOException {
@@ -1571,6 +1592,8 @@ public class UIManager {
             this.themeProps.put(key, themeProps.get(key));
         }
 
+        updateLargerTextScaleSettingFromTheme();
+
         if (!this.themeProps.containsKey("PickerButtonBar.derive")) {
             // For the button bar (with Cancel and Done) of the Picker interaction dialog in lightweight mode
             if (this.themeProps.containsKey("PickerButtonBarNative.derive")) {
@@ -1596,6 +1619,8 @@ public class UIManager {
             }
         }
 
+        applyLargerTextScaleToThemeFonts();
+
         // necessary to clear up the style so we don't get resedue from the previous UI
         defaultStyle = new Style();
 
@@ -1603,6 +1628,7 @@ public class UIManager {
         defaultStyle = createStyle("", "", false);
         defaultSelectedStyle = new Style(defaultStyle);
         defaultSelectedStyle = createStyle("", "sel#", true);
+        applyLargerTextScaleToDefaultStyles();
 
         String overlayThemes = (String) themeProps.get("@OverlayThemes");
         if (overlayThemes != null) {
@@ -1632,6 +1658,75 @@ public class UIManager {
             parseCache = new HashMap<String, String>();
         }
         return parseCache;
+    }
+
+    private void updateLargerTextScaleSettingFromTheme() {
+        Boolean useScale = isThemeConstant("useLargerTextScaleBool");
+        if (useScale != null) {
+            useLargerTextScale = useScale.booleanValue();
+        }
+    }
+
+    private float getEffectiveLargerTextScale() {
+        if (!useLargerTextScale) {
+            return 1f;
+        }
+        Display display = Display.getInstance();
+        if (!display.isLargerTextEnabled()) {
+            return 1f;
+        }
+        return display.getLargerTextScale();
+    }
+
+    private Font scaleFontForLargerText(Font font, float scale) {
+        if (font == null || !font.isTTFNativeFont() || scale <= 1f) {
+            return font;
+        }
+        float baseSize = font.getPixelSize();
+        if (baseSize <= 0) {
+            baseSize = font.getHeight();
+        }
+        if (baseSize <= 0) {
+            return font;
+        }
+        try {
+            return font.derive(baseSize * scale, font.getStyle());
+        } catch (Exception ex) {
+            Log.e(ex);
+            return font;
+        }
+    }
+
+    private void applyLargerTextScaleToThemeFonts() {
+        float scale = getEffectiveLargerTextScale();
+        if (scale <= 1f) {
+            return;
+        }
+        for (Map.Entry<String, Object> entry : themeProps.entrySet()) {
+            if (!entry.getKey().endsWith(Style.FONT)) {
+                continue;
+            }
+            Object value = entry.getValue();
+            if (value instanceof Font) {
+                Font scaled = scaleFontForLargerText((Font) value, scale);
+                if (scaled != value) {
+                    entry.setValue(scaled);
+                }
+            }
+        }
+    }
+
+    private void applyLargerTextScaleToDefaultStyles() {
+        float scale = getEffectiveLargerTextScale();
+        if (scale <= 1f) {
+            return;
+        }
+        if (!themeProps.containsKey(Style.FONT)) {
+            defaultStyle.setFont(scaleFontForLargerText(defaultStyle.getFont(), scale));
+        }
+        if (!themeProps.containsKey("sel#" + Style.FONT)) {
+            defaultSelectedStyle.setFont(scaleFontForLargerText(defaultSelectedStyle.getFont(), scale));
+        }
     }
 
     private String fromFloatArray(float[] arr) {
