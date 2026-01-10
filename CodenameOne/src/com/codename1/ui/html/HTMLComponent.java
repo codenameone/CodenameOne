@@ -72,7 +72,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      * If false, then the width is flexible, but every word will be rendered as a separate label.
      * Note that if false, RTL texts will display in
      */
-    static final boolean FIXED_WIDTH = false;
+    static boolean FIXED_WIDTH = false;
 //    long startTime;
 //    String msg="";
 //    long textTime;
