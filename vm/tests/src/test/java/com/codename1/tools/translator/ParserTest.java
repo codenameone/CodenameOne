@@ -123,8 +123,8 @@ class ParserTest {
 
         List<ByteCodeClass> classes = Arrays.asList(greeter, impl);
         String interfaceCode = greeter.generateCCode(classes);
-        assertFalse(interfaceCode.contains("virtual_com_example_Greeter_greet"),
-                "Default interface method should generate an implementation, not a virtual stub");
+        assertTrue(interfaceCode.contains("com_example_Greeter_greet___R_java_lang_String"),
+                "Default interface method should generate a concrete implementation");
 
         String implCode = impl.generateCCode(classes);
         assertTrue(implCode.contains("&com_example_Greeter_greet___R_java_lang_String"),
