@@ -574,29 +574,6 @@ public class Style {
         return s;
     }
 
-    private static boolean equals(float[] a, float[] a2) {
-        if (a == a2) {
-            return true;
-        }
-
-        if (a == null || a2 == null) {
-            return false;
-        }
-
-        int length = a.length;
-        if (a2.length != length) {
-            return false;
-        }
-
-        for (int i = 0; i < length; i++) {
-            if (a[i] != a2[i]) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
     /**
      * Disables native OS optimizations that might collide with cell renderers which do things like sharing style
      * objects

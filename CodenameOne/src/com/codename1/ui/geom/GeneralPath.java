@@ -3220,7 +3220,6 @@ public final class GeneralPath implements Shape {
         GeneralPath p;
 
         Transform transform;
-        private final float[] buf = new float[2];
 
         /**
          * Constructs a new GeneralPath.Iterator for given general path
