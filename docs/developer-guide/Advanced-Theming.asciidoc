@@ -193,6 +193,9 @@ SoftKey, Touch, Bar, Title, Right, Native
 |textUiid
 |Overrides the text component UIID for `SpanLabel`, `SpanButton`, `MultiButton`, and `SpanMultiButton` instances when provided as a theme constant.
 
+|useLargerTextScaleBool
+|When `true`, UIManager applies the larger text accessibility scale from `Display.getLargerTextScale()` when `Display.isLargerTextEnabled()` is enabled.
+
 |dialogTransitionOutImage
 |Default transition https://www.codenameone.com/javadoc/com/codename1/ui/Image.html[Image] for dialog, causes a https://www.codenameone.com/javadoc/com/codename1/ui/animations/Timeline.html[Timeline] transition effect
 
