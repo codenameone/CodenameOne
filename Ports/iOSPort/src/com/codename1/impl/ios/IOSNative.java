@@ -139,6 +139,9 @@ public final class IOSNative {
     native void execute(String url);
 
     native void flashBacklight(int duration);
+    
+    native boolean isLargerTextEnabled();
+    native float getLargerTextScale();
 
     // SJH Nov. 17, 2015 : Removing native isMinimized() method because it conflicted with
     // tracking on the java side.  It caused the app to still be minimized inside start()

@@ -4119,6 +4119,29 @@ JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isDarkModeDetectionSupported___R_b
     }
 }
 
+JAVA_BOOLEAN com_codename1_impl_ios_IOSNative_isLargerTextEnabled___R_boolean(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    if (@available(iOS 7.0, *)) {
+        CGFloat baseSize = [UIFont systemFontSize];
+        UIFont *preferred = [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
+        return preferred.pointSize > (baseSize + 0.5f);
+    } else {
+        return JAVA_FALSE;
+    }
+}
+
+JAVA_FLOAT com_codename1_impl_ios_IOSNative_getLargerTextScale___R_float(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject) {
+    if (@available(iOS 7.0, *)) {
+        CGFloat baseSize = [UIFont systemFontSize];
+        UIFont *preferred = [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
+        if (baseSize <= 0.0f) {
+            return 1.0f;
+        }
+        return (JAVA_FLOAT)(preferred.pointSize / baseSize);
+    } else {
+        return 1.0f;
+    }
+}
+
 #ifdef INCLUDE_LOCATION_USAGE
 CLLocationManager* com_codename1_impl_ios_IOSNative_createCLLocation = nil;
 #endif
