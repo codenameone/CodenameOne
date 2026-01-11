@@ -259,9 +259,9 @@ def parse_spotbugs() -> Tuple[Optional[AnalysisReport], bool, Optional[str]]:
                 severity = "Low"
             severities[severity] += 1
             message = _clean_message(
-                bug.findtext("ShortMessage")
+                bug.attrib.get("message")
                 or bug.findtext("LongMessage")
-                or bug.attrib.get("message")
+                or bug.findtext("ShortMessage")
             )
             bug_type = bug.attrib.get("type")
             source_line = bug.find(".//SourceLine[@primary='true']")
@@ -269,10 +269,14 @@ def parse_spotbugs() -> Tuple[Optional[AnalysisReport], bool, Optional[str]]:
                 source_line = bug.find(".//SourceLine")
             if source_line is not None:
                 source_path = source_line.attrib.get("sourcepath")
-                line = source_line.attrib.get("start") or source_line.attrib.get("end")
+                line = (
+                    bug.attrib.get("lineNumber")
+                    or source_line.attrib.get("start")
+                    or source_line.attrib.get("end")
+                )
             else:
                 source_path = None
-                line = None
+                line = bug.attrib.get("lineNumber")
             path_rel = _relative_path(source_path) if source_path else None
             if path_rel:
                 location = path_rel
