@@ -341,42 +341,6 @@ public class URLImage extends EncodedImage {
         return CN.isSimulator() || !CN.getPlatformName().equals("ios");
     }
 
-    private void loadImageFromStorageURLToStorage(final String targetKey) {
-        imageLoader.run(new Runnable() {
-            public void run() {
-                try {
-                    if (!Objects.equals(url, targetKey)) {
-                        InputStream input = Storage.getInstance().createInputStream(url);
-                        OutputStream output = Storage.getInstance().createOutputStream(targetKey);
-                        Util.copy(input, output);
-                    }
-                    runAndWait(new Runnable() {
-                        public void run() {
-                            try {
-                                Image value = Image.createImage(Storage.getInstance().createInputStream(targetKey));
-                                DownloadCompleted onComplete = new DownloadCompleted();
-                                onComplete.setSourceImage(value);
-                                onComplete.actionPerformed(new ActionEvent(value));
-                            } catch (Exception ex) {
-                                if (exceptionHandler != null) {
-                                    exceptionHandler.onError(URLImage.this, ex);
-                                } else {
-                                    Log.e(new RuntimeException(ex.toString()));
-                                }
-                            }
-                        }
-                    });
-                } catch (Exception t) {
-                    if (exceptionHandler != null) {
-                        exceptionHandler.onError(URLImage.this, t);
-                    } else {
-                        Log.e(new RuntimeException(t.toString()));
-                    }
-                }
-            }
-        });
-    }
-
     private void loadImageFromLocalUrl(final String targetKey, final boolean useFileSystemStorage) {
         imageLoader.run(new Runnable() {
             public void run() {

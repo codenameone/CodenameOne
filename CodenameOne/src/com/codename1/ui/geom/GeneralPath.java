@@ -3220,7 +3220,6 @@ public final class GeneralPath implements Shape {
         GeneralPath p;
 
         Transform transform;
-        private final float[] buf = new float[2];
 
         /**
          * Constructs a new GeneralPath.Iterator for given general path
@@ -3247,25 +3246,6 @@ public final class GeneralPath implements Shape {
 
         public void next() {
             typeIndex++;
-        }
-
-        private void transformSegmentInPlace() {
-            if (isDone()) {
-                // awt.4B=Iterator out of bounds
-                throw new IndexOutOfBoundsException("Path done"); //$NON-NLS-1$
-            }
-            if (transform == null) {
-                return;
-            }
-            int type = p.types[typeIndex];
-            int count = GeneralPath.pointShift[type];
-            for (int i = 0; i < count; i += 2) {
-                buf[0] = p.points[pointIndex + i];
-                buf[1] = p.points[pointIndex + i + 1];
-                transform.transformPoint(buf, buf);
-                p.points[pointIndex + i] = buf[0];
-                p.points[pointIndex + i + 1] = buf[1];
-            }
         }
 
         public int currentSegment(double[] coords) {

@@ -2476,16 +2476,6 @@ public final class Display extends CN1Constants {
         return dragOccured;
     }
 
-    private int[] pointerEvent(int off, int[] event) {
-        int[] peX = new int[(event.length - 1) / 2];
-        int offset = 0;
-        for (int iter = off; iter < (event.length - 1); iter += 2) {
-            peX[offset] = event[iter];
-            offset++;
-        }
-        return peX;
-    }
-
     /**
      * Returns true for a case where the EDT has nothing at all to do
      */

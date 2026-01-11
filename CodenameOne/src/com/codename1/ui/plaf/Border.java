@@ -1293,16 +1293,6 @@ public class Border {
         }
     }
 
-    private void setClipScaled(Graphics g, int x, int y, int w, int h) {
-        if (g.getScaleX() < 1) {
-            w = (int) (((float) w) / g.getScaleX());
-        }
-        if (g.getScaleY() < 1) {
-            h = (int) (((float) h) / g.getScaleY());
-        }
-        g.setClip(x, y, w, h);
-    }
-
     private void paintBorderBackground(Graphics g, final int xParameter, final int yParameter,
                                        final int widthParameter, final int heightParameter, Component c) {
         int originalColor = g.getColor();

@@ -440,62 +440,6 @@ public final class MigLayout extends Layout {
      * @param parentW The parent to set debug for.
      * @param b       <code>true</code> means debug is turned on.
      */
-    private void setDebug(final ComponentWrapper parentW, boolean b) {
-        /*if (b && (debugTimer == null || debugTimer.getDelay() != getDebugMillis())) {
-         if (debugTimer != null)
-         debugTimer.stop();
-
-         ContainerWrapper pCW = parentW.getParent();
-         final Component parent = pCW != null ? (Component) pCW.getComponent() : null;
-
-         debugTimer = new Timer(getDebugMillis(), new MyDebugRepaintListener());
-
-         if (parent != null) {
-         SwingUtilities.invokeLater(new Runnable() {
-         public void run() {
-         Container p = parent.getParent();
-         if (p != null) {
-         if (p instanceof JComponent) {
-         ((JComponent) p).revalidate();
-         } else {
-         parent.invalidate();
-         p.validate();
-         }
-         }
-         }
-         });
-         }
-
-         debugTimer.setInitialDelay(100);
-         debugTimer.start();
-
-         } else if (!b && debugTimer != null) {
-         debugTimer.stop();
-         debugTimer = null;
-         }*/
-    }
-
-    /**
-     * Returns the current debugging state.
-     *
-     * @return The current debugging state.
-     */
-    private boolean getDebug() {
-        return false;//debugTimer != null;
-    }
-
-    /**
-     * Returns the debug millis. Combines the value from
-     * {@link net.miginfocom.layout.LC#getDebugMillis()} and
-     * {@link net.miginfocom.layout.LayoutUtil#getGlobalDebugMillis()}
-     *
-     * @return The combined value.
-     */
-    private int getDebugMillis() {
-        int globalDebugMillis = LayoutUtil.getGlobalDebugMillis();
-        return globalDebugMillis > 0 ? globalDebugMillis : lc.getDebugMillis();
-    }
-
     /**
      * Check if something has changed and if so recreate it to the cached
      * objects.
@@ -555,8 +499,6 @@ public final class MigLayout extends Layout {
          }*/
 
         ContainerWrapper par = checkParent(parent);
-
-        setDebug(par, getDebugMillis() > 0);
 
         if (grid == null) {
             grid = new Grid(par, lc, rowSpecs, colSpecs, ccMap, callbackList);
@@ -623,10 +565,10 @@ public final class MigLayout extends Layout {
                 parent.getHeight() - i.getVerticalMargins()
         };
 
-        if (grid.layout(b, lc.getAlignX(), lc.getAlignY(), getDebug())) {
+        if (grid.layout(b, lc.getAlignX(), lc.getAlignY(), false)) {
             grid = null;
             checkCache(parent);
-            grid.layout(b, lc.getAlignX(), lc.getAlignY(), getDebug());
+            grid.layout(b, lc.getAlignX(), lc.getAlignY(), false);
         }
 
         /*long newSize = grid.getHeight()[1] + (((long) grid.getWidth()[1]) << 32);
@@ -655,89 +597,6 @@ public final class MigLayout extends Layout {
      *
      * @param parent The parent who's window to possibly adjust the size for.
      */
-    private void adjustWindowSize(ContainerWrapper parent) {
-        /*BoundSize wBounds = lc.getPackWidth();
-         BoundSize hBounds = lc.getPackHeight();
-
-         if (wBounds == BoundSize.NULL_SIZE && hBounds == BoundSize.NULL_SIZE)
-         return;
-
-         Container packable = getPackable((Component) parent.getComponent());
-
-         if (packable != null) {
-
-         Component pc = (Component) parent.getComponent();
-
-         Container c = pc instanceof Container ? (Container) pc : pc.getParent();
-         for (; c != null; c = c.getParent()) {
-         Layout layout = c.getLayout();
-         if (layout instanceof BoxLayout || layout instanceof OverlayLayout)
-         ((LayoutManager2) layout).invalidateLayout(c);
-         }
-
-         Dimension prefSize = packable.getPreferredSize();
-         int targW = constrain(checkParent(packable), packable.getWidth(), prefSize.width, wBounds);
-         int targH = constrain(checkParent(packable), packable.getHeight(), prefSize.height, hBounds);
-
-         Point p = packable.isShowing() ? packable.getLocationOnScreen() : packable.getLocation();
-
-         int x = Math.round(p.x - ((targW - packable.getWidth()) * (1 - lc.getPackWidthAlign())));
-         int y = Math.round(p.y - ((targH - packable.getHeight()) * (1 - lc.getPackHeightAlign())));
-
-         if (packable instanceof JPopupMenu) {
-         JPopupMenu popupMenu = (JPopupMenu) packable;
-         popupMenu.setVisible(false);
-         popupMenu.setPopupSize(targW, targH);
-         Component invoker = popupMenu.getInvoker();
-         Point popPoint = new Point(x, y);
-         SwingUtilities.convertPointFromScreen(popPoint, invoker);
-         ((JPopupMenu) packable).show(invoker, popPoint.x, popPoint.y);
-
-         packable.setPreferredSize(null); // Reset preferred size so we don't read it again.
-
-         } else {
-         packable.setBounds(x, y, targW, targH);
-         }
-         }*/
-    }
-
-    /**
-     * Returns a high level window or popup to pack, if any.
-     *
-     * @return May be null.
-     */
-    private Container getPackable(Component comp) {
-        /*JPopupMenu popup = findType(JPopupMenu.class, comp);
-         if (popup != null) { // Lightweight/HeavyWeight popup must be handled separately
-         Container popupComp = popup;
-         while (popupComp != null) {
-         if (popupComp.getClass().getName().contains("HeavyWeightWindow"))
-         return popupComp; // Return the heavyweight window for normal processing
-         popupComp = popupComp.getParent();
-         }
-         return popup; // Return the JPopup.
-         }
-
-         return findType(Window.class, comp);*/
-        return null;
-    }
-
-    private int constrain(ContainerWrapper parent, int winSize, int prefSize, BoundSize constrain) {
-        if (constrain == null) {
-            return winSize;
-        }
-
-        int retSize = winSize;
-        UnitValue wUV = constrain.getPreferred();
-        if (wUV != null) {
-            retSize = wUV.getPixels(prefSize, parent, parent);
-        }
-
-        retSize = constrain.constrain(retSize, prefSize, parent);
-
-        return constrain.getGapPush() ? Math.max(winSize, retSize) : retSize;
-    }
-
     public Dimension minimumLayoutSize(Container parent) {
         return getSizeImpl(parent, LayoutUtil.MIN);
     }

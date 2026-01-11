@@ -203,10 +203,6 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
         return Display.getInstance().getDisplayWidth();
     }
 
-    private boolean isMaxSet(Component c) {
-        return false;
-    }
-
     public final ContainerWrapper getParent() {
         Container p = c.getParent();
         return p != null ? new CodenameOneMiGContainerWrapper(p) : null;
@@ -344,4 +340,3 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
         return c instanceof TextArea || (Boolean.TRUE.equals(c.getClientProperty("migLayout.dynamicAspectRatio"))) ? LayoutUtil.HORIZONTAL : -1;
     }
 }
-

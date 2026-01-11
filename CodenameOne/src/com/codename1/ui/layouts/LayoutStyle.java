@@ -281,25 +281,6 @@ public class LayoutStyle {
         return 0;
     }
 
-    private int getInset(Component c, int position) {
-        int insetLeft = c.getStyle().getMarginLeftNoRTL();
-        int insetTop = c.getStyle().getMarginTop();
-        int insetRight = c.getStyle().getMarginRightNoRTL();
-        int insetBottom = c.getStyle().getMarginBottom();
-        switch (position) {
-            case GroupLayout.NORTH:
-                return insetTop;
-            case GroupLayout.SOUTH:
-                return insetBottom;
-            case GroupLayout.EAST:
-                return insetRight;
-            case GroupLayout.WEST:
-                return insetLeft;
-            default:
-                throw new IllegalArgumentException("Illegal argument position: " + position);
-        }
-    }
-
     // Fix component alignment to work with labels etc when doing bidi
     /*private boolean isLeftAligned(Label button, int position) {
         if (position == GroupLayout.WEST) {

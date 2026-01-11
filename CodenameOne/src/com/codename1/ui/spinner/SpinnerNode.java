@@ -177,10 +177,6 @@ class SpinnerNode extends Node {
         return 360.0 / numSides;
     }
 
-    private double getFlatVisibleHeight() {
-        return renderer.getPreferredH() * numSides / 2;
-    }
-
     public int getSelectedIndex() {
         return (int) (flatScrollPos / calcFlatListHeight() * listModel.getSize());
     }

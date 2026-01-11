@@ -267,16 +267,6 @@ public class LayeredLayout extends Layout {
         return cmp.getPreferredH() + s.getVerticalMargins();
     }
 
-    private static int getInnerHeight(Component cmp) {
-        Style s = cmp.getStyle();
-        return cmp.getHeight() - s.getPaddingTop() - s.getPaddingBottom();
-    }
-
-    private static int getInnerPreferredH(Component cmp) {
-        Style s = cmp.getStyle();
-        return cmp.getPreferredH() - s.getPaddingTop() - s.getPaddingBottom();
-    }
-
     private static int getOuterWidth(Component cmp) {
         Style s = cmp.getStyle();
         return cmp.getWidth() + s.getHorizontalMargins();
