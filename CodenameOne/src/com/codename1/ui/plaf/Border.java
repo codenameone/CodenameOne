@@ -1302,110 +1302,10 @@ public class Border {
         int height = heightParameter;
         switch (type) {
             case TYPE_ROUNDED_PRESSED:
-                x++;
-                y++;
-                width -= 2;
-                height -= 2;
+                paintRoundedBorder(g, c, width - 2, height - 2, x + 1, y + 1);
+                break;
             case TYPE_ROUNDED:
-                // Removing this due to issue 301, not sure regarding this...
-                //width--;
-                //height--;
-                // rounded is also responsible for drawing the background
-                Style s = c.getStyle();
-                if ((s.getBgImage() != null && s.getBackgroundType() == Style.BACKGROUND_IMAGE_SCALED) ||
-                        s.getBackgroundType() > 1) {
-                    Object w = s.roundRectCache;
-                    Image i = null;
-                    if (w != null) {
-                        i = (Image) Display.getInstance().extractHardRef(w);
-                    }
-                    if (i != null && i.getWidth() == width && i.getHeight() == height) {
-                        g.drawImage(i, x, y);
-                    } else {
-                        // we need to draw a background image!
-                        i = ImageFactory.createImage(c, width, height, 0);
-                        Graphics imageG = i.getGraphics();
-                        imageG.setColor(0);
-                        imageG.fillRoundRect(0, 0, width, height, arcWidth, arcHeight);
-                        int[] rgb = i.getRGBCached();
-                        int transColor = rgb[0];
-                        int[] imageRGB;
-                        if (s.getBackgroundType() == Style.BACKGROUND_IMAGE_SCALED) {
-                            imageRGB = s.getBgImage().scaled(width, height).getRGBCached();
-                        } else {
-                            Image bgPaint = ImageFactory.createImage(c, width, height, 0);
-                            Painter p = s.getBgPainter();
-
-                            // might occur during temporary conditions in the theme switching
-                            if (p == null) {
-                                return;
-                            }
-                            p.paint(bgPaint.getGraphics(), new Rectangle(0, 0, width, height));
-                            imageRGB = bgPaint.getRGB();
-                        }
-                        int rlen = rgb.length;
-                        for (int iter = 0; iter < rlen; iter++) {
-                            if (rgb[iter] == transColor) {
-                                imageRGB[iter] = 0;
-                            }
-                        }
-                        i = Image.createImage(imageRGB, width, height);
-                        s.roundRectCache = Display.getInstance().createSoftWeakRef(i);
-                        g.drawImage(i, x, y);
-                    }
-                } else {
-                    int foreground = g.getColor();
-                    g.setColor(s.getBgColor());
-
-                    // Its opaque much easier job!
-                    if (s.getBgTransparency() == ((byte) 0xff)) {
-                        g.fillRoundRect(x, y, width, height, arcWidth, arcHeight);
-                    } else {
-                        if (g.isAlphaSupported()) {
-                            int alpha = g.getAlpha();
-                            g.setAlpha(s.getBgTransparency() & 0xff);
-                            g.fillRoundRect(x, y, width, height, arcWidth, arcHeight);
-                            g.setAlpha(alpha);
-                        } else {
-                            // if its transparent we don't need to do anything, if its
-                            // translucent... well....
-                            if (s.getBgTransparency() != 0) {
-                                Image i = ImageFactory.createImage(c, width, height, 0);
-                                int[] imageRgb;
-                                if (g.getColor() != 0xffffff) {
-                                    Graphics imageG = i.getGraphics();
-                                    imageG.setColor(g.getColor());
-                                    imageG.fillRoundRect(0, 0, width, height, arcWidth, arcHeight);
-                                    imageRgb = i.getRGBCached();
-                                } else {
-                                    // background color is white we need to remove a different color
-                                    // black is the only other "reliable" color on the device
-                                    Graphics imageG = i.getGraphics();
-                                    imageG.setColor(0);
-                                    imageG.fillRect(0, 0, width, height);
-                                    imageG.setColor(g.getColor());
-                                    imageG.fillRoundRect(0, 0, width, height, arcWidth, arcHeight);
-                                    imageRgb = i.getRGBCached();
-                                }
-                                int removeColor = imageRgb[0];
-                                int size = width * height;
-                                int alphaInt = ((s.getBgTransparency() & 0xff) << 24) & 0xff000000;
-                                for (int iter = 0; iter < size; iter++) {
-                                    if (removeColor == imageRgb[iter]) {
-                                        imageRgb[iter] = 0;
-                                        continue;
-                                    }
-                                    if ((imageRgb[iter] & 0xff000000) != 0) {
-                                        imageRgb[iter] = (imageRgb[iter] & 0xffffff) | alphaInt;
-                                    }
-                                }
-                                g.drawImage(new RGBImage(imageRgb, width, height), x, y);
-                            }
-                        }
-                    }
-
-                    g.setColor(foreground);
-                }
+                paintRoundedBorder(g, c, width, height, x, y);
                 break;
             case TYPE_IMAGE: {
                 Image topLeft = images[4];
@@ -1551,6 +1451,106 @@ public class Border {
             }
         }
         g.setColor(originalColor);
+    }
+
+    private boolean paintRoundedBorder(Graphics g, Component c, int width, int height, int x, int y) {
+        // rounded is also responsible for drawing the background
+        Style s = c.getStyle();
+        if ((s.getBgImage() != null && s.getBackgroundType() == Style.BACKGROUND_IMAGE_SCALED) ||
+                s.getBackgroundType() > 1) {
+            Object w = s.roundRectCache;
+            Image i = null;
+            if (w != null) {
+                i = (Image) Display.getInstance().extractHardRef(w);
+            }
+            if (i != null && i.getWidth() == width && i.getHeight() == height) {
+                g.drawImage(i, x, y);
+            } else {
+                // we need to draw a background image!
+                i = ImageFactory.createImage(c, width, height, 0);
+                Graphics imageG = i.getGraphics();
+                imageG.setColor(0);
+                imageG.fillRoundRect(0, 0, width, height, arcWidth, arcHeight);
+                int[] rgb = i.getRGBCached();
+                int transColor = rgb[0];
+                int[] imageRGB;
+                if (s.getBackgroundType() == Style.BACKGROUND_IMAGE_SCALED) {
+                    imageRGB = s.getBgImage().scaled(width, height).getRGBCached();
+                } else {
+                    Image bgPaint = ImageFactory.createImage(c, width, height, 0);
+                    Painter p = s.getBgPainter();
+
+                    // might occur during temporary conditions in the theme switching
+                    if (p == null) {
+                        return true;
+                    }
+                    p.paint(bgPaint.getGraphics(), new Rectangle(0, 0, width, height));
+                    imageRGB = bgPaint.getRGB();
+                }
+                int rlen = rgb.length;
+                for (int iter = 0; iter < rlen; iter++) {
+                    if (rgb[iter] == transColor) {
+                        imageRGB[iter] = 0;
+                    }
+                }
+                i = Image.createImage(imageRGB, width, height);
+                s.roundRectCache = Display.getInstance().createSoftWeakRef(i);
+                g.drawImage(i, x, y);
+            }
+        } else {
+            int foreground = g.getColor();
+            g.setColor(s.getBgColor());
+
+            // Its opaque much easier job!
+            if (s.getBgTransparency() == ((byte) 0xff)) {
+                g.fillRoundRect(x, y, width, height, arcWidth, arcHeight);
+            } else {
+                if (g.isAlphaSupported()) {
+                    int alpha = g.getAlpha();
+                    g.setAlpha(s.getBgTransparency() & 0xff);
+                    g.fillRoundRect(x, y, width, height, arcWidth, arcHeight);
+                    g.setAlpha(alpha);
+                } else {
+                    // if its transparent we don't need to do anything, if its
+                    // translucent... well....
+                    if (s.getBgTransparency() != 0) {
+                        Image i = ImageFactory.createImage(c, width, height, 0);
+                        int[] imageRgb;
+                        if (g.getColor() != 0xffffff) {
+                            Graphics imageG = i.getGraphics();
+                            imageG.setColor(g.getColor());
+                            imageG.fillRoundRect(0, 0, width, height, arcWidth, arcHeight);
+                            imageRgb = i.getRGBCached();
+                        } else {
+                            // background color is white we need to remove a different color
+                            // black is the only other "reliable" color on the device
+                            Graphics imageG = i.getGraphics();
+                            imageG.setColor(0);
+                            imageG.fillRect(0, 0, width, height);
+                            imageG.setColor(g.getColor());
+                            imageG.fillRoundRect(0, 0, width, height, arcWidth, arcHeight);
+                            imageRgb = i.getRGBCached();
+                        }
+                        int removeColor = imageRgb[0];
+                        int size = width * height;
+                        int alphaInt = ((s.getBgTransparency() & 0xff) << 24) & 0xff000000;
+                        for (int iter = 0; iter < size; iter++) {
+                            if (removeColor == imageRgb[iter]) {
+                                imageRgb[iter] = 0;
+                                continue;
+                            }
+                            if ((imageRgb[iter] & 0xff000000) != 0) {
+                                imageRgb[iter] = (imageRgb[iter] & 0xffffff) | alphaInt;
+                            }
+                        }
+                        g.drawImage(new RGBImage(imageRgb, width, height), x, y);
+                    }
+                }
+            }
+
+            g.setColor(foreground);
+        }
+        return false;
     }
 
     /**
@@ -1708,17 +1708,10 @@ public class Border {
                 }
                 break;
             case TYPE_ROUNDED_PRESSED:
-                x++;
-                y++;
-                width -= 2;
-                height -= 2;
+                borderTypeRounded(g, x + 1, y + 1, width - 2, height - 2);
+                break;
             case TYPE_ROUNDED:
-                width--;
-                height--;
-
-                if (outline) {
-                    g.drawRoundRect(x, y, width, height, arcWidth, arcHeight);
-                }
+                borderTypeRounded(g, x, y, width, height);
                 break;
             case TYPE_ETCHED_LOWERED:
             case TYPE_ETCHED_RAISED:
@@ -1875,6 +1868,15 @@ public class Border {
                 break;
         }
         g.setColor(originalColor);
+    }
+
+    private void borderTypeRounded(Graphics g, int x, int y, int width, int height) {
+        width--;
+        height--;
+
+        if (outline) {
+            g.drawRoundRect(x, y, width, height, arcWidth, arcHeight);
+        }
     }
 
     /**

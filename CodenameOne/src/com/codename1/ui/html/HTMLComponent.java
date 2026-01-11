@@ -2921,13 +2921,10 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     if (headerFont != null) {
                         font = headerFont;
                     }
-                    // No break here intentionally
+                    curAlign = tagP(align, child);
+                    break;
                 case HTMLElement.TAG_P:
-                    curAlign = getHorizAlign(child.getAttributeById(HTMLElement.ATTR_ALIGN), align, true);
-                    adjustAlignment(align, curAlign);
-                    newLineIfNotEmpty(curAlign);
-                    newLineIfLastWasNotEmpty(curAlign);
-                    pushContainer(child);
+                    curAlign = tagP(align, child);
                     break;
                 case HTMLElement.TAG_DIV:
                 case HTMLElement.TAG_CENTER: // CENTER is practically DIV align=CENTER
@@ -3067,6 +3064,8 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                 case HTMLElement.TAG_PRE:
                     preTagCount++;
                     pushContainer(child);
+                    processTagFontOp(child, oldFont);
+                    break;
                 case HTMLElement.TAG_EM:
                 case HTMLElement.TAG_STRONG:
                 case HTMLElement.TAG_DFN:
@@ -3076,10 +3075,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                 case HTMLElement.TAG_VAR:
                 case HTMLElement.TAG_CITE:
                 case HTMLElement.TAG_TT:
-                    font = (HTMLFont) fonts.get(child.getTagName());
-                    if (font == null) {
-                        font = oldFont;
-                    }
+                    processTagFontOp(child, oldFont);
                     break;
 
                 case HTMLElement.TAG_B:
@@ -3266,11 +3262,10 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                 case HTMLElement.TAG_H5:
                 case HTMLElement.TAG_H6:
                     font = oldFont;
+                    curAlign = processTagP(align);
+                    break;
                 case HTMLElement.TAG_P:
-                    curAlign = align; //Restore previous alignment
-                    newLineIfNotEmpty(curAlign);
-                    popContainer();
-                    newLine(curAlign);
+                    curAlign = processTagP(align);
                     break;
                 case HTMLElement.TAG_DIV:
                 case HTMLElement.TAG_CENTER:
@@ -3356,8 +3351,13 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                 case HTMLElement.TAG_PRE:
                     preTagCount--;
                     popContainer();
+                    textColor = oldFontColor;
+                    font = oldFont;
+                    break;
                 case HTMLElement.TAG_FONT:
                     textColor = oldFontColor;
+                    font = oldFont;
+                    break;
                 case HTMLElement.TAG_EM:
                 case HTMLElement.TAG_STRONG:
                 case HTMLElement.TAG_DFN:
@@ -3586,6 +3586,32 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             }
 
         }
+    }
+
+    private int processTagP(int align) {
+        int curAlign;
+        curAlign = align; //Restore previous alignment
+        newLineIfNotEmpty(curAlign);
+        popContainer();
+        newLine(curAlign);
+        return curAlign;
+    }
+
+    private void processTagFontOp(HTMLElement child, HTMLFont oldFont) {
+        font = (HTMLFont) fonts.get(child.getTagName());
+        if (font == null) {
+            font = oldFont;
+        }
+    }
+
+    private int tagP(int align, HTMLElement child) {
+        int curAlign;
+        curAlign = getHorizAlign(child.getAttributeById(HTMLElement.ATTR_ALIGN), align, true);
+        adjustAlignment(align, curAlign);
+        newLineIfNotEmpty(curAlign);
+        newLineIfLastWasNotEmpty(curAlign);
+        pushContainer(child);
+        return curAlign;
     }
 
     /**

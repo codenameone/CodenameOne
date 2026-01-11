@@ -1099,13 +1099,10 @@ public class List<T> extends Component implements ActionSource {
                     y = recalcOffset(y, totalHeight, listHeight, height + itemGap);
                     break;
                 case FIXED_TRAIL:
-                    y = listHeight - (height + itemGap + selectedDiff);
+                    y = fixedLead(index, listHeight - (height + itemGap + selectedDiff), selection, height, selectedDiff, totalHeight, listHeight);
+                    break;
                 case FIXED_LEAD:
-                    y += (index - selection) * (height + itemGap);
-                    if (index - selection > 0) {
-                        y += selectedDiff;
-                    }
-                    y = recalcOffset(y, totalHeight, listHeight, height + itemGap);
+                    y = fixedLead(index, y, selection, height, selectedDiff, totalHeight, listHeight);
                     break;
                 default:
                     y = index * (height + itemGap);
@@ -1142,16 +1139,11 @@ public class List<T> extends Component implements ActionSource {
                     x = recalcOffset(x, totalWidth, listWidth, width + itemGap);
                     break;
                 case FIXED_TRAIL:
-                    x = listWidth - (width + itemGap + selectedDiff);
+                    x = fixedLead(index, listWidth - (width + itemGap + selectedDiff),
+                            selection, width, selectedDiff, rtl, listWidth, totalWidth);
+                    break;
                 case FIXED_LEAD:
-                    x += (index - selection) * (width + itemGap);
-                    if (index - selection > 0) {
-                        x += selectedDiff;
-                    }
-                    if (rtl) {
-                        x = listWidth - x - width;
-                    }
-                    x = recalcOffset(x, totalWidth, listWidth, width + itemGap);
+                    x = fixedLead(index, x, selection, width, selectedDiff, rtl, listWidth, totalWidth);
                     break;
                 default:
                     x = index * (width + itemGap);
@@ -1175,6 +1167,27 @@ public class List<T> extends Component implements ActionSource {
                 d.setWidth(d.getWidth() + selectedDiff);
             }
         }
+    }
+
+    private int fixedLead(int index, int x, int selection, int width, int selectedDiff, boolean rtl, int listWidth, int totalWidth) {
+        x += (index - selection) * (width + itemGap);
+        if (index - selection > 0) {
+            x += selectedDiff;
+        }
+        if (rtl) {
+            x = listWidth - x - width;
+        }
+        x = recalcOffset(x, totalWidth, listWidth, width + itemGap);
+        return x;
+    }
+
+    private int fixedLead(int index, int y, int selection, int height, int selectedDiff, int totalHeight, int listHeight) {
+        y += (index - selection) * (height + itemGap);
+        if (index - selection > 0) {
+            y += selectedDiff;
+        }
+        y = recalcOffset(y, totalHeight, listHeight, height + itemGap);
+        return y;
     }
 
     /**

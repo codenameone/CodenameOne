@@ -859,13 +859,15 @@ public class RoundRectBorder extends Border {
             switch (arrowDirection) {
                 case CN.TOP:
                     y = ah;
-                    // intentional fall through to the next statement...
+                    heightF -= ah;
+                    break;
                 case CN.BOTTOM:
                     heightF -= ah;
                     break;
                 case CN.LEFT:
                     x = ah;
-                    // intentional fall through to the next statement...
+                    widthF -= ah;
+                    break;
                 case CN.RIGHT:
                     widthF -= ah;
                     break;
