@@ -69,7 +69,6 @@ final class CodenameOneMiGContainerWrapper extends CodenameOneMiGComponentWrappe
     }
 
     public void paintDebugCell(int x, int y, int width, int height) {
-        Component c = (Component) getComponent();
         // TODO: this can probably be done using glasspane
 		/*Graphics2D g = (Graphics2D) c.getGraphics();
 		if (g == null)
