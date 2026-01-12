@@ -2370,9 +2370,6 @@ public class CSSBorder extends Border {
                     }
                 }
 
-                if (radialGradient != null) {
-
-                }
             }
         }
 

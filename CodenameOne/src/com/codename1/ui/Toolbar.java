@@ -1311,9 +1311,6 @@ public class Toolbar extends Container {
                                 // evt.consume();
                             } else {
                                 if (sidemenuDialog.isShowing()) {
-                                    if (!isComponentInOnTopSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {
-                                        // evt.consume();
-                                    }
                                     permanentSideMenuContainer.pointerReleased(evt.getX(), evt.getY());
                                 }
                             }
@@ -1330,9 +1327,6 @@ public class Toolbar extends Container {
                                 // evt.consume();
                             } else {
                                 if (rightSidemenuDialog.isShowing()) {
-                                    if (!isComponentInOnTopRightSidemenu(parent.getComponentAt(evt.getX(), evt.getY()))) {
-                                        // evt.consume();
-                                    }
                                     permanentRightSideMenuContainer.pointerReleased(evt.getX(), evt.getY());
                                 }
                             }

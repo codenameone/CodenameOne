@@ -70,9 +70,6 @@ class LeadUtil {
         // If a container is draggable or scrollable, then lead components make things too complicated
         // as routing events to a lead component may cause scrolling or dragging to 
         // work incorrectly.
-        if (cmp.isDraggable() || cmp.scrollableXFlag() || cmp.scrollableYFlag()) {
-            //return cmp;
-        }
         if (cmp.hasLead) {
             Component out = cmp.getLeadComponent();
             if (out != null) {

@@ -118,7 +118,6 @@ final public class Deflater extends ZStream {
             bits += 16;
         } else if (wrapperType == JZlib.W_ANY) {
             return Z_STREAM_ERROR;
-        } else if (wrapperType == JZlib.W_ZLIB) {
         }
         return init(level, bits, memlevel);
     }

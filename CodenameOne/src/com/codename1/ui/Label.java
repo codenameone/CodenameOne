@@ -1477,9 +1477,6 @@ public class Label extends Component implements IconHolder, TextHolder {
                     }
 
                     Span result = span.getIntersection(bounds, true);
-                    if (bounds.getY() < getY()) {
-
-                    }
                     Spans out = sel.newSpans();
                     out.add(result);
                     return out;

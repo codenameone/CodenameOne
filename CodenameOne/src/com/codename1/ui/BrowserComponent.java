@@ -607,13 +607,7 @@ public class BrowserComponent extends Container {
             });
             return;
         }
-        if (!Display.impl.installMessageListener(internal)) {
-            //if (messageCallback != null) {
-            //    removeJSCallback(messageCallback);
-            //    messageCallback = null;
-            //}
-
-        }
+        Display.impl.installMessageListener(internal);
     }
 
     /**

@@ -97,8 +97,6 @@ public class TwitterRESTService extends ConnectionRequest {
                 JSONParser p = new JSONParser();
                 Hashtable h = p.parse(com.codename1.io.Util.getReader(input));
                 authToken = (String) h.get("access_token");
-                if (authToken == null) {
-                }
             }
         };
         auth.setPost(true);

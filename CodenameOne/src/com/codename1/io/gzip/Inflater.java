@@ -106,7 +106,6 @@ final public class Inflater extends ZStream {
             w += 16;
         } else if (wrapperType == JZlib.W_ANY) {
             w |= Inflate.INFLATE_ANY;
-        } else if (wrapperType == JZlib.W_ZLIB) {
         }
         return init(w, nowrap);
     }
