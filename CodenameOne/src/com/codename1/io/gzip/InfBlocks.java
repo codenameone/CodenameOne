@@ -106,8 +106,6 @@ final class InfBlocks {
     }
 
     void reset() {
-        if (mode == BTREE || mode == DTREE) {
-        }
         if (mode == CODES) {
             codes.free(z);
         }

@@ -778,6 +778,7 @@ def main() -> None:
             "SA_FIELD_SELF_ASSIGNMENT",
             "UC_USELESS_CONDITION",
             "UC_USELESS_OBJECT",
+            "UCF_USELESS_CONTROL_FLOW",
             "EC_UNRELATED_TYPES",
             "EQ_ALWAYS_FALSE",
             "SBSC_USE_STRINGBUFFER_CONCATENATION",

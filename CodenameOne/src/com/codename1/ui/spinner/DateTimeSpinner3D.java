@@ -215,9 +215,6 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
      */
     public void setMarkToday(boolean markToday) {
         this.markToday = markToday;
-        if (date != null) {
-            //((DateTimeRenderer)date.getRenderer()).setMarkToday(markToday, today.getTime() + off);
-        }
     }
 
     /**
@@ -232,15 +229,6 @@ class DateTimeSpinner3D extends Container implements InternalPickerWidget {
      */
     public void setIncludeYear(boolean includeYear) {
         this.includeYear = includeYear;
-        if (date != null) {
-            if (includeYear) {
-                //((DateTimeRenderer)date.getRenderer()).setType(Spinner.DATE_FORMAT_DOW_MON_DD_YY);
-                //date.setRenderingPrototype("XXX XXX 99 9999");
-            } else {
-                //((DateTimeRenderer)date.getRenderer()).setType(Spinner.DATE_FORMAT_DOW_MON_DD);
-                //date.setRenderingPrototype("XXX XXX 99");
-            }
-        }
     }
 
     /**

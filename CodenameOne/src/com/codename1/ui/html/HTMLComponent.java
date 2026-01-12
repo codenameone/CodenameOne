@@ -3754,7 +3754,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             } else if ((alignment.equals("center")) || (alignment.equals("middle"))) {
                 return Component.CENTER;
             } else if (alignment.equals("justify")) {
-                return ((allowJustify) && (FIXED_WIDTH)) ? JUSTIFY : Component.CENTER;
+                return Component.CENTER;
             }
         }
 

@@ -115,7 +115,6 @@ public class ZStream {
             w += 16;
         } else if (wrapperType == JZlib.W_ANY) {
             w |= Inflate.INFLATE_ANY;
-        } else if (wrapperType == JZlib.W_ZLIB) {
         }
         return inflateInit(w, nowrap);
     }
@@ -181,7 +180,6 @@ public class ZStream {
             bits += 16;
         } else if (wrapperType == JZlib.W_ANY) {
             return Z_STREAM_ERROR;
-        } else if (wrapperType == JZlib.W_ZLIB) {
         }
         return this.deflateInit(level, bits, memlevel);
     }
@@ -230,15 +228,6 @@ public class ZStream {
 
         if (len > avail_out) len = avail_out;
         if (len == 0) return;
-
-        if (dstate.pending_buf.length <= dstate.pending_out ||
-                next_out.length <= next_out_index ||
-                dstate.pending_buf.length < (dstate.pending_out + len) ||
-                next_out.length < (next_out_index + len)) {
-            //System.out.println(dstate.pending_buf.length+", "+dstate.pending_out+
-            //		 ", "+next_out.length+", "+next_out_index+", "+len);
-            //System.out.println("avail_out="+avail_out);
-        }
 
         System.arraycopy(dstate.pending_buf, dstate.pending_out,
                 next_out, next_out_index, len);

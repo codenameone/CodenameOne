@@ -1448,9 +1448,6 @@ public class TextField extends TextArea {
                 originalClearCommand = null;
             }
             fireActionEvent();
-        } else {
-            if (handlesInput()) {
-            }
         }
     }
 
