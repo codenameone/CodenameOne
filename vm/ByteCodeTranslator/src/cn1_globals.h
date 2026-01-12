@@ -3,6 +3,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+
+#define CN1_GLOBALS_IMPLEMENTED 1
 #include "cn1_class_method_index.h"
 #include <pthread.h>
 #include <setjmp.h>
