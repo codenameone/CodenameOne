@@ -27,11 +27,19 @@
 #import <dlfcn.h>
 #import <sys/sysctl.h>
 #import <mach-o/dyld.h>
+#import <unistd.h>
+#import <stdlib.h>
 
 void cn1DetectJailbreakBypassesAndExit() {
 #if (TARGET_IPHONE_SIMULATOR)
     return;
 #endif
+    // Detect common dynamic library injection used by Frida/Objection and similar tools
+    if (getenv("DYLD_INSERT_LIBRARIES") != NULL) {
+        NSLog(@"DYLD_INSERT_LIBRARIES detected.");
+        exit(0);
+    }
+
     // List of known libraries used by bypass tools like Liberty Lite and Substrate
     NSArray *bypassLibraries = @[
         @"LibertyLite.dylib",
@@ -60,10 +68,11 @@ void cn1DetectJailbreakBypassesAndExit() {
     // Additional check for file access to system areas (indicates potential bypass)
     NSArray *restrictedPaths = @[
         @"/Applications/Cydia.app",
+        @"/Library/MobileSubstrate/MobileSubstrate.dylib",
         @"/usr/sbin/sshd",
         @"/bin/bash",
         @"/etc/apt",
-        @"/Library/MobileSubstrate/MobileSubstrate.dylib"
+        @"/private/var/lib/apt/"
     ];
     
     NSFileManager *fileManager = [NSFileManager defaultManager];
@@ -78,8 +87,9 @@ void cn1DetectJailbreakBypassesAndExit() {
     // Check if we can write to a restricted area (bypasses may allow this)
     NSString *testPath = @"/private/jailbreakTest.txt";
     NSError *error;
-    [@"Test" writeToFile:testPath atomically:YES encoding:NSUTF8StringEncoding error:&error];
-    if (!error) {
+    BOOL wroteFile = [@"Test" writeToFile:testPath atomically:YES encoding:NSUTF8StringEncoding error:&error];
+    if (wroteFile && !error) {
+        [fileManager removeItemAtPath:testPath error:nil];
         // Able to write to restricted area, exit the app
         NSLog(@"Write access to restricted area detected.");
         exit(0);  // Exit the app if write access to restricted areas is detected
