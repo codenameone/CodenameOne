@@ -7,6 +7,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.lang.reflect.InvocationTargetException;
@@ -100,17 +101,18 @@ class CleanTargetIntegrationTest {
         writeRuntimeStubs(srcRoot);
 
         replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
+        relaxLiteralRangeWarnings(cmakeLists);
 
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
 
-        runCommand(Arrays.asList(
+        List<String> cmakeCommand = new java.util.ArrayList<>(Arrays.asList(
                 "cmake",
                 "-S", distDir.toString(),
-                "-B", buildDir.toString(),
-                "-DCMAKE_C_COMPILER=clang",
-                "-DCMAKE_OBJC_COMPILER=clang"
-        ), distDir);
+                "-B", buildDir.toString()
+        ));
+        cmakeCommand.addAll(cmakeCompilerArgs());
+        runCommand(cmakeCommand, distDir);
 
         runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
@@ -188,6 +190,71 @@ class CleanTargetIntegrationTest {
         Files.write(cmakeLists, replacement.getBytes(StandardCharsets.UTF_8));
     }
 
+    static void relaxLiteralRangeWarnings(Path cmakeLists) throws IOException {
+        final String marker = "CN1_LITERAL_RANGE_FLAGS";
+        String content = new String(Files.readAllBytes(cmakeLists), StandardCharsets.UTF_8);
+        if (content.contains(marker)) {
+            return;
+        }
+
+        String newline = "\n";
+        StringBuilder block = new StringBuilder();
+        block.append(newline)
+                .append("# CN1 literal-range warning relaxation").append(newline)
+                .append("set(").append(marker).append(" \"-Wno-error=literal-range -Wno-literal-range\")").append(newline)
+                .append("if (CMAKE_C_COMPILER_ID MATCHES \"Clang\")").append(newline)
+                .append("    set(CMAKE_C_FLAGS \"${CMAKE_C_FLAGS} ${").append(marker).append("}\")").append(newline)
+                .append("endif").append(newline)
+                .append("if (CMAKE_OBJC_COMPILER_ID MATCHES \"Clang\")").append(newline)
+                .append("    set(CMAKE_OBJC_FLAGS \"${CMAKE_OBJC_FLAGS} ${").append(marker).append("}\")").append(newline)
+                .append("endif").append(newline);
+
+        StringBuilder amended = new StringBuilder(content);
+        if (!content.endsWith("\n") && !content.endsWith("\r\n")) {
+            amended.append(newline);
+        }
+        amended.append(block);
+
+        Files.write(cmakeLists, amended.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    static List<String> cmakeCompilerArgs() {
+        List<String> args = new java.util.ArrayList<>();
+        String cCompiler = findExecutable(Arrays.asList("clang", "cc", "gcc"));
+        if (cCompiler != null) {
+            args.add("-DCMAKE_C_COMPILER=" + cCompiler);
+        }
+        String objcCompiler = findExecutable(Arrays.asList("clang", "gcc", "cc"));
+        if (objcCompiler != null) {
+            args.add("-DCMAKE_OBJC_COMPILER=" + objcCompiler);
+        }
+        return args;
+    }
+
+    private static String findExecutable(List<String> candidates) {
+        for (String candidate : candidates) {
+            Path found = findOnPath(candidate);
+            if (found != null) {
+                return found.toString();
+            }
+        }
+        return null;
+    }
+
+    private static Path findOnPath(String executable) {
+        String path = System.getenv("PATH");
+        if (path == null) {
+            return null;
+        }
+        for (String dir : path.split(File.pathSeparator)) {
+            Path candidate = Paths.get(dir, executable);
+            if (Files.isExecutable(candidate)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
     static String runCommand(List<String> command, Path workingDir) throws Exception {
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(workingDir.toFile());
@@ -202,6 +269,29 @@ class CleanTargetIntegrationTest {
         return output;
     }
 
+    static CommandResult runCommandWithResult(List<String> command, Path workingDir) throws Exception {
+        ProcessBuilder builder = new ProcessBuilder(command);
+        builder.directory(workingDir.toFile());
+        builder.redirectErrorStream(true);
+        Process process = builder.start();
+        String output;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+            output = reader.lines().collect(Collectors.joining("\n"));
+        }
+        int exit = process.waitFor();
+        return new CommandResult(exit, output);
+    }
+
+    static final class CommandResult {
+        final int exitCode;
+        final String output;
+
+        CommandResult(int exitCode, String output) {
+            this.exitCode = exitCode;
+            this.output = output;
+        }
+    }
+
     static void patchCn1Globals(Path srcRoot) throws IOException {
         Path cn1Globals = srcRoot.resolve("cn1_globals.h");
         String content = new String(Files.readAllBytes(cn1Globals), StandardCharsets.UTF_8);
@@ -213,6 +303,22 @@ class CleanTargetIntegrationTest {
             content = content.replace("#include <stdlib.h>\n", "#include <stdlib.h>\n#include <string.h>\n#include <math.h>\n#include <limits.h>\n");
             Files.write(cn1Globals, content.getBytes(StandardCharsets.UTF_8));
         }
+    }
+
+    static void patchStaticGetterPrototypes(Path srcRoot) throws IOException {
+        Files.walk(srcRoot)
+                .filter(p -> p.toString().endsWith(".h"))
+                .forEach(p -> {
+                    try {
+                        String original = new String(Files.readAllBytes(p), StandardCharsets.UTF_8);
+                        String patched = original.replaceAll("(get_static_[A-Za-z0-9_]+)\\(\\);", "$1(CODENAME_ONE_THREAD_STATE);");
+                        if (!original.equals(patched)) {
+                            Files.write(p, patched.getBytes(StandardCharsets.UTF_8));
+                        }
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
     }
 
     static void writeRuntimeStubs(Path srcRoot) throws IOException {

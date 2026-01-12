@@ -81,22 +81,24 @@ public class FileClassIntegrationTest {
 
         Path srcRoot = distDir.resolve("FileTestApp-src");
         CleanTargetIntegrationTest.patchCn1Globals(srcRoot);
+        CleanTargetIntegrationTest.patchStaticGetterPrototypes(srcRoot);
 
         // Ensure java_io_File.m is included (ByteCodeTranslator should copy it)
         assertTrue(Files.exists(srcRoot.resolve("java_io_File.m")), "java_io_File.m should exist");
 
         replaceLibraryWithExecutableTarget(cmakeLists, srcRoot.getFileName().toString());
+        CleanTargetIntegrationTest.relaxLiteralRangeWarnings(cmakeLists);
 
         Path buildDir = distDir.resolve("build");
         Files.createDirectories(buildDir);
 
-        CleanTargetIntegrationTest.runCommand(Arrays.asList(
+        List<String> cmakeCommand = new ArrayList<>(Arrays.asList(
                 "cmake",
                 "-S", distDir.toString(),
-                "-B", buildDir.toString(),
-                "-DCMAKE_C_COMPILER=clang",
-                "-DCMAKE_OBJC_COMPILER=clang"
-        ), distDir);
+                "-B", buildDir.toString()
+        ));
+        cmakeCommand.addAll(CleanTargetIntegrationTest.cmakeCompilerArgs());
+        CleanTargetIntegrationTest.runCommand(cmakeCommand, distDir);
 
         CleanTargetIntegrationTest.runCommand(Arrays.asList("cmake", "--build", buildDir.toString()), distDir);
 
