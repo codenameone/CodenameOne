@@ -2871,8 +2871,8 @@ public abstract class CodenameOneImplementation {
         int centerX = (int) (width * (1 - relativeX));
         int centerY = (int) (height * (1 - relativeY));
         int size = (int) (Math.min(width, height) * relativeSize);
-        int x2 = (int) (width / 2 - (size * relativeX));
-        int y2 = (int) (height / 2 - (size * relativeY));
+        int x2 = (int) (width * 0.5f - (size * relativeX));
+        int y2 = (int) (height * 0.5f - (size * relativeY));
         boolean aa = isAntiAliased(graphics);
         setAntiAliased(graphics, false);
 

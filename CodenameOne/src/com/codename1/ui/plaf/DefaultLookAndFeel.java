@@ -1311,8 +1311,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             stateIconSize = stateIcon.getWidth(); //square image width == height
             preserveSpaceForState = stateIconSize + gap;
             stateIconYPosition = cmpY + topPadding
-                    + (cmpHeight - topPadding
-                    - bottomPadding) / 2 - stateIconSize / 2;
+                    + (int) ((cmpHeight - topPadding
+                    - bottomPadding) / 2f - stateIconSize / 2f);
             int tX = cmpX;
             if (((Button) l).isOppositeSide()) {
                 if (rtl) {

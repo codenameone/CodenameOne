@@ -503,8 +503,8 @@ public class ChartComponent extends Component {
                     if (dx == 0) dx = 1;
                     if (dy == 0) dy = 1;
 
-                    double zoomX = zoomDistStartX / dx;
-                    double zoomY = zoomDistStartY / dy;
+                    double zoomX = (double) zoomDistStartX / dx;
+                    double zoomY = (double) zoomDistStartY / dy;
 
 
                     BBox newBounds = zoomStartBBox.scaleScreenCoords((float) zoomX, (float) zoomY);

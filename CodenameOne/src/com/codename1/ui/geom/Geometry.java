@@ -227,7 +227,7 @@ class Geometry {
          * @return The coefficient
          */
         public double cx(int j) {
-            return factorial(n()) / factorial(n() - j) * sumFactorX(j, j);
+            return (double) factorial(n()) / factorial(n() - j) * sumFactorX(j, j);
         }
 
         /**
@@ -253,7 +253,7 @@ class Geometry {
          * @return
          */
         public double cy(int j) {
-            return factorial(n()) / factorial(n() - j) * sumFactorY(j, j);
+            return (double) factorial(n()) / factorial(n() - j) * sumFactorY(j, j);
         }
 
         /**

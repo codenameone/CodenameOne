@@ -355,7 +355,8 @@ public class StyleParser {
             case Style.UNIT_TYPE_DIPS:
                 return (float) v.getValue();
             case Style.UNIT_TYPE_SCREEN_PERCENTAGE:
-                return (int) Math.round(Display.getInstance().getDisplayWidth() * v.getValue() / 100.0) / Display.getInstance().convertToPixels(1f);
+                return (float) Math.round(Display.getInstance().getDisplayWidth() * v.getValue() / 100.0)
+                        / Display.getInstance().convertToPixels(1f);
         }
         return 0;
     }
