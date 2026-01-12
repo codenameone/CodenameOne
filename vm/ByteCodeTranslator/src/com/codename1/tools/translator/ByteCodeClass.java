@@ -426,6 +426,20 @@ public class ByteCodeClass {
         }
         return false;
     }
+
+    private boolean isInterfaceInHierarchy(String className) {
+        if (clsName.equals(className)) {
+            return true;
+        }
+        if (baseInterfacesObject != null) {
+            for (ByteCodeClass bc : baseInterfacesObject) {
+                if (bc.isInterfaceInHierarchy(className)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
     
     public static void addArrayType(String type, int dimenstions) {
         String arr = dimenstions + "_" + type;
@@ -1614,7 +1628,7 @@ public class ByteCodeClass {
                         bm.setForceVirtual(true);
                     }
                 } else {
-                    if(replace) {
+                    if(replace || (isInterface && isInterfaceInHierarchy(virtualMethods.get(offset).getClsName()))) {
                         virtualMethods.set(offset, bm);
                         if(isInterface) {
                             bm.setForceVirtual(true);

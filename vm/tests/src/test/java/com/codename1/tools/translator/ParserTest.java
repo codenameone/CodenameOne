@@ -131,6 +131,40 @@ class ParserTest {
                 "Implementing class should point vtable slot to the interface default method implementation");
     }
 
+    @Test
+    void translatesDefaultInterfaceMethodOverridesWithSuperCalls() throws Exception {
+        Parser.cleanup();
+
+        Path baseInterfaceFile = createBaseGreeterInterface();
+        Path derivedInterfaceFile = createDerivedGreeterInterface();
+        Path implFile = createDerivedGreeterImplementation();
+
+        Parser.parse(baseInterfaceFile.toFile());
+        Parser.parse(derivedInterfaceFile.toFile());
+        Parser.parse(implFile.toFile());
+
+        ByteCodeClass base = Parser.getClassObject("com_example_BaseGreeter");
+        ByteCodeClass derived = Parser.getClassObject("com_example_DerivedGreeter");
+        ByteCodeClass impl = Parser.getClassObject("com_example_DerivedGreeterImpl");
+
+        base.setBaseInterfacesObject(Collections.emptyList());
+        derived.setBaseInterfacesObject(Collections.singletonList(base));
+        impl.setBaseInterfacesObject(Collections.singletonList(derived));
+
+        base.updateAllDependencies();
+        derived.updateAllDependencies();
+        impl.updateAllDependencies();
+
+        List<ByteCodeClass> classes = Arrays.asList(base, derived, impl);
+        String derivedCode = derived.generateCCode(classes);
+        assertTrue(derivedCode.contains("com_example_BaseGreeter_greet___R_java_lang_String"),
+                "Derived default method should invoke base interface default method");
+
+        String implCode = impl.generateCCode(classes);
+        assertTrue(implCode.contains("&com_example_DerivedGreeter_greet___R_java_lang_String"),
+                "Implementing class should point vtable slot to the derived interface default method implementation");
+    }
+
     private ByteCodeField findField(ByteCodeClass cls, String name) {
         return cls.getFields()
                 .stream()
@@ -335,6 +369,74 @@ class ParserTest {
                     null,
                     "java/lang/Object",
                     new String[]{"com/example/Greeter"}
+            );
+
+            MethodVisitor init = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+            init.visitCode();
+            init.visitVarInsn(Opcodes.ALOAD, 0);
+            init.visitMethodInsn(Opcodes.INVOKESPECIAL, "java/lang/Object", "<init>", "()V", false);
+            init.visitInsn(Opcodes.RETURN);
+            init.visitMaxs(1, 1);
+            init.visitEnd();
+
+            cw.visitEnd();
+        });
+    }
+
+    private Path createBaseGreeterInterface() throws Exception {
+        return writeClass("com/example/BaseGreeter", cw -> {
+            cw.visit(
+                    Opcodes.V1_8,
+                    Opcodes.ACC_PUBLIC | Opcodes.ACC_ABSTRACT | Opcodes.ACC_INTERFACE,
+                    "com/example/BaseGreeter",
+                    null,
+                    "java/lang/Object",
+                    null
+            );
+
+            MethodVisitor greet = cw.visitMethod(Opcodes.ACC_PUBLIC, "greet", "()Ljava/lang/String;", null, null);
+            greet.visitCode();
+            greet.visitLdcInsn("base");
+            greet.visitInsn(Opcodes.ARETURN);
+            greet.visitMaxs(1, 1);
+            greet.visitEnd();
+
+            cw.visitEnd();
+        });
+    }
+
+    private Path createDerivedGreeterInterface() throws Exception {
+        return writeClass("com/example/DerivedGreeter", cw -> {
+            cw.visit(
+                    Opcodes.V1_8,
+                    Opcodes.ACC_PUBLIC | Opcodes.ACC_ABSTRACT | Opcodes.ACC_INTERFACE,
+                    "com/example/DerivedGreeter",
+                    null,
+                    "java/lang/Object",
+                    new String[]{"com/example/BaseGreeter"}
+            );
+
+            MethodVisitor greet = cw.visitMethod(Opcodes.ACC_PUBLIC, "greet", "()Ljava/lang/String;", null, null);
+            greet.visitCode();
+            greet.visitVarInsn(Opcodes.ALOAD, 0);
+            greet.visitMethodInsn(Opcodes.INVOKESPECIAL, "com/example/BaseGreeter", "greet", "()Ljava/lang/String;", true);
+            greet.visitInsn(Opcodes.ARETURN);
+            greet.visitMaxs(1, 1);
+            greet.visitEnd();
+
+            cw.visitEnd();
+        });
+    }
+
+    private Path createDerivedGreeterImplementation() throws Exception {
+        return writeClass("com/example/DerivedGreeterImpl", cw -> {
+            cw.visit(
+                    Opcodes.V1_8,
+                    Opcodes.ACC_PUBLIC | Opcodes.ACC_SUPER,
+                    "com/example/DerivedGreeterImpl",
+                    null,
+                    "java/lang/Object",
+                    new String[]{"com/example/DerivedGreeter"}
             );
 
             MethodVisitor init = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
