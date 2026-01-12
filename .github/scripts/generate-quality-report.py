@@ -821,11 +821,18 @@ def main() -> None:
             "SS_SHOULD_BE_STATIC",
             "UPM_UNCALLED_PRIVATE_METHOD",
             "RV_CHECK_FOR_POSITIVE_INDEXOF",
+            "SF_SWITCH_FALLTHROUGH"
         }
 
         def _is_exempt(f: Finding) -> bool:
             loc = f.path or f.location or ""
             if f.rule == "SA_FIELD_SELF_ASSIGNMENT" and "InfBlocks.java" in loc:
+                return True
+            if f.rule == "SF_SWITCH_FALLTHROUGH" and "InfBlocks.java" in loc:
+                return True
+            if f.rule == "SF_SWITCH_FALLTHROUGH" and "InfCodes.java" in loc:
+                return True
+            if f.rule == "SF_SWITCH_FALLTHROUGH" and "Inflate.java" in loc:
                 return True
             if f.rule == "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" and "TarEntry.java" in loc:
                 return True

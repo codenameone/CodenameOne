@@ -512,19 +512,21 @@ public class CSSBorder extends Border {
         double ty = y;
         x = y = 0;
         if (arrow != null) {
-            int arrowHeightPixels = CN.convertToPixels(arrow.size);
+            int arrowSizePixels = CN.convertToPixels(arrow.size);
             switch (arrow.direction) {
                 case CN.TOP:
-                    y = arrowHeightPixels;
-                    // intentional fall through to the next statement...
+                    y = arrowSizePixels;
+                    height -= arrowSizePixels;
+                    break;
                 case CN.BOTTOM:
-                    height -= arrowHeightPixels;
+                    height -= arrowSizePixels;
                     break;
                 case CN.LEFT:
-                    x = arrowHeightPixels;
-                    // intentional fall through to the next statement...
+                    x = arrowSizePixels;
+                    width -= arrowSizePixels;
+                    break;
                 case CN.RIGHT:
-                    width -= arrowHeightPixels;
+                    width -= arrowSizePixels;
                     break;
                 default:
                     break;

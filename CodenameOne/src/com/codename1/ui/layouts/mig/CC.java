@@ -232,14 +232,13 @@ public final class CC {
      * @since 3.7.2
      */
     public CC growPrio(int... widthHeight) {
-        switch (widthHeight.length) {
-            default:
-                throw new IllegalArgumentException("Illegal argument count: " + widthHeight.length);
-            case 2:
-                growPrioY(widthHeight[1]);
-            case 1:
-                growPrioX(widthHeight[0]);
+        if(widthHeight.length == 0 || widthHeight.length > 2) {
+            throw new IllegalArgumentException("Illegal argument count: " + widthHeight.length);
         }
+        if(widthHeight.length == 2) {
+            growPrioY(widthHeight[1]);
+        }
+        growPrioX(widthHeight[0]);
         return this;
     }
 
@@ -279,14 +278,13 @@ public final class CC {
      * @since 3.7.2
      */
     public CC grow(float... widthHeight) {
-        switch (widthHeight.length) {
-            default:
-                throw new IllegalArgumentException("Illegal argument count: " + widthHeight.length);
-            case 2:
-                growY(Float.valueOf(widthHeight[1]));
-            case 1:
-                growX(widthHeight[0]);
+        if(widthHeight.length == 0 || widthHeight.length > 2) {
+            throw new IllegalArgumentException("Illegal argument count: " + widthHeight.length);
         }
+        if(widthHeight.length == 2) {
+            growY(widthHeight[1]);
+        }
+        growX(widthHeight[0]);
         return this;
     }
 
@@ -313,14 +311,13 @@ public final class CC {
      * @since 3.7.2
      */
     public CC shrinkPrio(int... widthHeight) {
-        switch (widthHeight.length) {
-            default:
-                throw new IllegalArgumentException("Illegal argument count: " + widthHeight.length);
-            case 2:
-                shrinkPrioY(widthHeight[1]);
-            case 1:
-                shrinkPrioX(widthHeight[0]);
+        if(widthHeight.length == 0 || widthHeight.length > 2) {
+            throw new IllegalArgumentException("Illegal argument count: " + widthHeight.length);
         }
+        if(widthHeight.length == 2) {
+            shrinkPrioY(widthHeight[1]);
+        }
+        shrinkPrioX(widthHeight[0]);
         return this;
     }
 
@@ -347,14 +344,13 @@ public final class CC {
      * @since 3.7.2
      */
     public CC shrink(float... widthHeight) {
-        switch (widthHeight.length) {
-            default:
-                throw new IllegalArgumentException("Illegal argument count: " + widthHeight.length);
-            case 2:
-                shrinkY(widthHeight[1]);
-            case 1:
-                shrinkX(widthHeight[0]);
+        if(widthHeight.length == 0 || widthHeight.length > 2) {
+            throw new IllegalArgumentException("Illegal argument count: " + widthHeight.length);
         }
+        if(widthHeight.length == 2) {
+            shrinkY(widthHeight[1]);
+        }
+        shrinkX(widthHeight[0]);
         return this;
     }
 
@@ -381,14 +377,13 @@ public final class CC {
      * @since 3.7.2
      */
     public CC endGroup(String... xy) {
-        switch (xy.length) {
-            default:
-                throw new IllegalArgumentException("Illegal argument count: " + xy.length);
-            case 2:
-                endGroupY(xy[1]);
-            case 1:
-                endGroupX(xy[0]);
+        if(xy.length > 2 || xy.length == 0) {
+            throw new IllegalArgumentException("Illegal argument count: " + xy.length);
         }
+        if(xy.length == 2) {
+            endGroupY(xy[1]);
+        }
+        endGroupX(xy[0]);
         return this;
     }
 
@@ -415,14 +410,13 @@ public final class CC {
      * @since 3.7.2
      */
     public CC sizeGroup(String... xy) {
-        switch (xy.length) {
-            default:
-                throw new IllegalArgumentException("Illegal argument count: " + xy.length);
-            case 2:
-                sizeGroupY(xy[1]);
-            case 1:
-                sizeGroupX(xy[0]);
+        if(xy.length > 2 || xy.length == 0) {
+            throw new IllegalArgumentException("Illegal argument count: " + xy.length);
         }
+        if(xy.length == 2) {
+            sizeGroupY(xy[1]);
+        }
+        sizeGroupX(xy[0]);
         return this;
     }
 
@@ -609,6 +603,58 @@ public final class CC {
         return this;
     }
 
+    interface CellCall {
+        void cell(CC parent, int val);
+        void gap(CC parent, String s);
+    }
+
+    private static final CellCall[] INVOKERS = new CellCall[]{
+            new CellCall() {
+                @Override
+                public void cell(CC parent, int val) {
+                    parent.setCellX(val);
+                }
+
+                @Override
+                public void gap(CC parent, String s) {
+                    parent.gapLeft(s);
+                }
+            },
+            new CellCall() {
+                @Override
+                public void cell(CC parent, int val) {
+                    parent.setCellY(val);
+                }
+
+                @Override
+                public void gap(CC parent, String s) {
+                    parent.gapRight(s);
+                }
+            },
+            new CellCall() {
+                @Override
+                public void cell(CC parent, int val) {
+                    parent.setSpanX(val);
+                }
+
+                @Override
+                public void gap(CC parent, String s) {
+                    parent.gapTop(s);
+                }
+            },
+            new CellCall() {
+                @Override
+                public void cell(CC parent, int val) {
+                    parent.setSpanY(val);
+                }
+
+                @Override
+                public void gap(CC parent, String s) {
+                    parent.gapBottom(s);
+                }
+            }
+    };
+
     /**
      * Set the cell(s) that the component should occupy in the grid. Same functionality as {@link #setCellX(int col)} and
      * {@link #setCellY(int row)} together with {@link #setSpanX(int width)} and {@link #setSpanY(int height)}. This method
@@ -625,17 +671,11 @@ public final class CC {
      * @since 3.7.2. Replacing cell(int, int) and cell(int, int, int, int)
      */
     public CC cell(int... colRowWidthHeight) {
-        switch (colRowWidthHeight.length) {
-            default:
-                throw new IllegalArgumentException("Illegal argument count: " + colRowWidthHeight.length);
-            case 4:
-                setSpanY(colRowWidthHeight[3]);
-            case 3:
-                setSpanX(colRowWidthHeight[2]);
-            case 2:
-                setCellY(colRowWidthHeight[1]);
-            case 1:
-                setCellX(colRowWidthHeight[0]);
+        if(colRowWidthHeight.length > INVOKERS.length) {
+            throw new IllegalArgumentException("Illegal argument count: " + colRowWidthHeight.length);
+        }
+        for(int iter = 0 ; iter < colRowWidthHeight.length ; iter++) {
+            INVOKERS[iter].cell(this, colRowWidthHeight[iter]);
         }
         return this;
     }
@@ -677,17 +717,11 @@ public final class CC {
      * @since 3.7.2
      */
     public CC gap(String... args) {
-        switch (args.length) {
-            default:
-                throw new IllegalArgumentException("Illegal argument count: " + args.length);
-            case 4:
-                gapBottom(args[3]);
-            case 3:
-                gapTop(args[2]);
-            case 2:
-                gapRight(args[1]);
-            case 1:
-                gapLeft(args[0]);
+        if(INVOKERS.length < args.length) {
+            throw new IllegalArgumentException("Illegal argument count: " + args.length);
+        }
+        for(int iter = 0 ; iter < args.length ; iter++) {
+            INVOKERS[iter].gap(this, args[iter]);
         }
         return this;
     }

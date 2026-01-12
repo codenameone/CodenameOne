@@ -501,61 +501,12 @@ public class RECompiler {
 
                             // Word boundaries and backrefs not allowed in a character class!
                             syntaxError("Bad character class");
+                            last = escapeClass(definingRange, range, include, CHAR_INVALID);
+                            break;
 
                         case ESC_CLASS:
 
-                            // Classes can't be an endpoint of a range
-                            if (definingRange) {
-                                syntaxError("Bad character class");
-                            }
-
-                            // Handle specific type of class (some are ok)
-                            switch (pattern.charAt(idx - 1)) {
-                                case RE.E_NSPACE:
-                                    range.include(Character.MIN_VALUE, 7, include);   // [Min - \b )
-                                    range.include((char) 11, include);                // ( \n - \f )
-                                    range.include(14, 31, include);                   // ( \r - ' ')
-                                    range.include(33, Character.MAX_VALUE, include);  // (' ' - Max]
-                                    break;
-
-                                case RE.E_NALNUM:
-                                    range.include(Character.MIN_VALUE, '/', include); // [Min - '0')
-                                    range.include(':', '@', include);                 // ('9' - 'A')
-                                    range.include('[', '^', include);                 // ('Z' - '_')
-                                    range.include('`', include);                      // ('_' - 'a')
-                                    range.include('{', Character.MAX_VALUE, include); // ('z' - Max]
-                                    break;
-
-                                case RE.E_NDIGIT:
-                                    range.include(Character.MIN_VALUE, '/', include); // [Min - '0')
-                                    range.include(':', Character.MAX_VALUE, include); // ('9' - Max]
-                                    break;
-
-                                case RE.E_SPACE:
-                                    range.include('\t', include);
-                                    range.include('\r', include);
-                                    range.include('\f', include);
-                                    range.include('\n', include);
-                                    range.include('\b', include);
-                                    range.include(' ', include);
-                                    break;
-
-                                case RE.E_ALNUM:
-                                    range.include('a', 'z', include);
-                                    range.include('A', 'Z', include);
-                                    range.include('_', include);
-
-                                    // Fall through!
-
-                                case RE.E_DIGIT:
-                                    range.include('0', '9', include);
-                                    break;
-                                default:
-                                    break;
-                            }
-
-                            // Make last char invalid (can't be a range start)
-                            last = CHAR_INVALID;
+                            last = escapeClass(definingRange, range, include, CHAR_INVALID);
                             break;
 
                         default:
@@ -628,6 +579,64 @@ public class RECompiler {
             emit((char) range.maxRange[i]);
         }
         return ret;
+    }
+
+    private char escapeClass(boolean definingRange, RERange range, boolean include, char CHAR_INVALID) {
+        char last;
+        // Classes can't be an endpoint of a range
+        if (definingRange) {
+            syntaxError("Bad character class");
+        }
+
+        // Handle specific type of class (some are ok)
+        switch (pattern.charAt(idx - 1)) {
+            case RE.E_NSPACE:
+                range.include(Character.MIN_VALUE, 7, include);   // [Min - \b )
+                range.include((char) 11, include);                // ( \n - \f )
+                range.include(14, 31, include);                   // ( \r - ' ')
+                range.include(33, Character.MAX_VALUE, include);  // (' ' - Max]
+                break;
+
+            case RE.E_NALNUM:
+                range.include(Character.MIN_VALUE, '/', include); // [Min - '0')
+                range.include(':', '@', include);                 // ('9' - 'A')
+                range.include('[', '^', include);                 // ('Z' - '_')
+                range.include('`', include);                      // ('_' - 'a')
+                range.include('{', Character.MAX_VALUE, include); // ('z' - Max]
+                break;
+
+            case RE.E_NDIGIT:
+                range.include(Character.MIN_VALUE, '/', include); // [Min - '0')
+                range.include(':', Character.MAX_VALUE, include); // ('9' - Max]
+                break;
+
+            case RE.E_SPACE:
+                range.include('\t', include);
+                range.include('\r', include);
+                range.include('\f', include);
+                range.include('\n', include);
+                range.include('\b', include);
+                range.include(' ', include);
+                break;
+
+            case RE.E_ALNUM:
+                range.include('a', 'z', include);
+                range.include('A', 'Z', include);
+                range.include('_', include);
+
+                range.include('0', '9', include);
+                break;
+
+            case RE.E_DIGIT:
+                range.include('0', '9', include);
+                break;
+            default:
+                break;
+        }
+
+        // Make last char invalid (can't be a range start)
+        last = CHAR_INVALID;
+        return last;
     }
 
     /**
@@ -762,22 +771,22 @@ public class RECompiler {
                 return expr(flags);
 
             case ')':
-                syntaxError("Unexpected close paren");
+                throw new RESyntaxException("Unexpected close paren");
 
             case '|':
-                internalError();
+                throw new Error("Internal error!");
 
             case ']':
-                syntaxError("Mismatched class");
+                throw new RESyntaxException("Mismatched class");
 
             case 0:
-                syntaxError("Unexpected end of input");
+                throw new RESyntaxException("Unexpected end of input");
 
             case '?':
             case '+':
             case '{':
             case '*':
-                syntaxError("Missing operand to closure");
+                throw new RESyntaxException("Missing operand to closure");
 
             case '\\': {
                 // Don't forget, escape() advances the input stream!
@@ -849,26 +858,21 @@ public class RECompiler {
 
                 // The current node can be null
                 flags[0] |= NODE_NULLABLE;
-
-                // Drop through
+                // Eat closure character
+                idx++;
+                curlyBraces(ret, terminalFlags);
+                break;
 
             case '+':
 
                 // Eat closure character
                 idx++;
-
-                // Drop through
+                curlyBraces(ret, terminalFlags);
+                break;
 
             case '{':
 
-                // Don't allow blantant stupidity
-                int opcode = instruction[ret /* + RE.offsetOpcode */];
-                if (opcode == RE.OP_BOL || opcode == RE.OP_EOL) {
-                    syntaxError("Bad closure operand");
-                }
-                if ((terminalFlags[0] & NODE_NULLABLE) != 0) {
-                    syntaxError("Closure operand can't be nullable");
-                }
+                curlyBraces(ret, terminalFlags);
                 break;
             default:
                 break;
@@ -992,6 +996,17 @@ public class RECompiler {
         }
 
         return ret;
+    }
+
+    private void curlyBraces(int ret, int[] terminalFlags) {
+        // Don't allow blantant stupidity
+        int opcode = instruction[ret /* + RE.offsetOpcode */];
+        if (opcode == RE.OP_BOL || opcode == RE.OP_EOL) {
+            syntaxError("Bad closure operand");
+        }
+        if ((terminalFlags[0] & NODE_NULLABLE) != 0) {
+            syntaxError("Closure operand can't be nullable");
+        }
     }
 
     /**
