@@ -5525,14 +5525,37 @@ public class IOSImplementation extends CodenameOneImplementation {
         }
         
         public boolean equals(Object o) {
-            NativeFont f = (NativeFont)o;
-            if(name != null) {
-                return f.name != null && f.name.equals(name) && f.weight == weight && f.height == height;
+            if (this == o) {
+                return true;
             }
-            return f.name == null && f.style == style && f.face == face && f.size == size;
+            if (!(o instanceof NativeFont)) {
+                return false;
+            }
+            NativeFont f = (NativeFont)o;
+            if (name != null || f.name != null) {
+                return name != null && name.equals(f.name) && f.weight == weight && f.height == height;
+            }
+            if (weight != 0 || height != 0 || f.weight != 0 || f.height != 0) {
+                return f.style == style && f.face == face && f.weight == weight && f.height == height;
+            }
+            return f.style == style && f.face == face && f.size == size;
         }
         
         public int hashCode() {
+            int result;
+            if (name != null) {
+                result = name.hashCode();
+                result = 31 * result + weight;
+                result = 31 * result + Float.floatToIntBits(height);
+                return result;
+            }
+            if (weight != 0 || height != 0) {
+                result = style;
+                result = 31 * result + face;
+                result = 31 * result + weight;
+                result = 31 * result + Float.floatToIntBits(height);
+                return result;
+            }
             return style | face | size;
         }
 
@@ -9513,5 +9536,4 @@ public class IOSImplementation extends CodenameOneImplementation {
         IOSNative.announceForAccessibility(text);
     }
 }
-
 
