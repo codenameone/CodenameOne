@@ -3966,7 +3966,10 @@ public abstract class CodenameOneImplementation {
      *                        common constants in this class or be a user/implementation defined sound
      */
     public void playBuiltinSound(String soundIdentifier) {
-        playUserSound(soundIdentifier);
+        boolean played = playUserSound(soundIdentifier);
+        if (!played) {
+            return;
+        }
     }
 
     /**

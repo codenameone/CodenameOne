@@ -126,11 +126,20 @@ public class Validator {
      * Default constructor
      */
     public Validator() {
-        if (defaultValidationFailedEmblem == null) {
-            // initialize the default emblem
-            defaultValidationFailedEmblem = FontImage.createMaterial(FontImage.MATERIAL_CANCEL, "InvalidEmblem", 3);
-            validationFailedEmblem = defaultValidationFailedEmblem;
+        validationFailedEmblem = initDefaultValidationFailedEmblem();
+    }
+
+    private static Image initDefaultValidationFailedEmblem() {
+        if (defaultValidationFailedEmblem != null) {
+            return defaultValidationFailedEmblem;
         }
+        synchronized (Validator.class) {
+            if (defaultValidationFailedEmblem == null) {
+                // initialize the default emblem
+                defaultValidationFailedEmblem = FontImage.createMaterial(FontImage.MATERIAL_CANCEL, "InvalidEmblem", 3);
+            }
+        }
+        return defaultValidationFailedEmblem;
     }
 
     /**
@@ -549,10 +558,9 @@ public class Validator {
                                     float height = cmp.getHeight();
                                     xpos += Math.round(width * validationEmblemPositionX);
                                     ypos += Math.round(height * validationEmblemPositionY);
-                                    if (message != null) {
-                                        message.showPopupDialog(new Rectangle(xpos, ypos, validationFailedEmblem.getWidth(),
-                                                validationFailedEmblem.getHeight()));
-                                    }
+                                    InteractionDialog dialog = message;
+                                    dialog.showPopupDialog(new Rectangle(xpos, ypos, validationFailedEmblem.getWidth(),
+                                            validationFailedEmblem.getHeight()));
                                 } else {
                                     message.showPopupDialog(cmp);
                                 }

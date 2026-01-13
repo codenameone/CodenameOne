@@ -318,13 +318,18 @@ public class CSSBorder extends Border {
     }
 
     private static Map<String, Byte> styleMap() {
-        if (styleMap == null) {
-            styleMap = new HashMap<String, Byte>();
-            styleMap.put("none", STYLE_NONE);
-            styleMap.put("hidden", STYLE_HIDDEN);
-            styleMap.put("dotted", STYLE_DOTTED);
-            styleMap.put("dashed", STYLE_DASHED);
-            styleMap.put("solid", STYLE_SOLID);
+        if (styleMap != null) {
+            return styleMap;
+        }
+        synchronized (CSSBorder.class) {
+            if (styleMap == null) {
+                styleMap = new HashMap<String, Byte>();
+                styleMap.put("none", STYLE_NONE);
+                styleMap.put("hidden", STYLE_HIDDEN);
+                styleMap.put("dotted", STYLE_DOTTED);
+                styleMap.put("dashed", STYLE_DASHED);
+                styleMap.put("solid", STYLE_SOLID);
+            }
         }
         return styleMap;
     }

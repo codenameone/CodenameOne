@@ -83,9 +83,14 @@ public class Transform {
     }
 
     public static Transform IDENTITY() {
-        if (_IDENTITY == null) {
-            _IDENTITY = new ImmutableTransform(Display.impl.makeTransformIdentity());
-            _IDENTITY.type = TYPE_IDENTITY;
+        if (_IDENTITY != null) {
+            return _IDENTITY;
+        }
+        synchronized (Transform.class) {
+            if (_IDENTITY == null) {
+                _IDENTITY = new ImmutableTransform(Display.impl.makeTransformIdentity());
+                _IDENTITY.type = TYPE_IDENTITY;
+            }
         }
         return _IDENTITY;
     }

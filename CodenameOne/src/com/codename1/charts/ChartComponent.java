@@ -679,7 +679,7 @@ public class ChartComponent extends Component {
      */
     public boolean isPanEnabled() {
         if (chart instanceof XYChart) {
-            ((XYChart) chart).getRenderer().isPanEnabled();
+            return ((XYChart) chart).getRenderer().isPanEnabled();
         }
         return panEnabled;
     }
@@ -767,7 +767,7 @@ public class ChartComponent extends Component {
      */
     public boolean isZoomEnabled() {
         if (chart instanceof XYChart) {
-            ((XYChart) chart).getRenderer().isZoomEnabled();
+            return ((XYChart) chart).getRenderer().isZoomEnabled();
         }
         return zoomEnabled;
     }
