@@ -486,7 +486,7 @@ public class ChartComponent extends Component {
                 double[] panLimits = xyChart.getRenderer().getPanLimits();
 
                 if (zoomStart == null) {
-                    zoomStart = new Point((x[0] + x[1]) / 2, (y[0] + y[1]) / 2);
+                    zoomStart = new Point((x[0] + x[1]) / 2f, (y[0] + y[1]) / 2f);
 
                     zoomDistStartX = Math.abs(x[0] - x[1]);
                     zoomDistStartY = Math.abs(y[0] - y[1]);

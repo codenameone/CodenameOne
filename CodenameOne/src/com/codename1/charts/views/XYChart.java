@@ -146,7 +146,7 @@ public abstract class XYChart extends AbstractChart {
         if (mScale < 1) {
             mTranslate *= -1;
         }
-        mCenter = new Point((x + width) / 2, (y + height) / 2);
+        mCenter = new Point((x + width) / 2f, (y + height) / 2f);
         if (rotate) {
             transform(canvas, angle, false);
         }
