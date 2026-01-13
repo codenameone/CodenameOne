@@ -286,7 +286,7 @@ jobs:
           EOF
           # Suppress doclint noise on modern JDKs (e.g., Java 25) while keeping output consistent.
           # Patch java.base with CLDC11 stubs to avoid module conflicts for java.* packages.
-          find build/tempJavaSources ../Ports/CLDC11/src -name "*.java" | /usr/bin/xargs javadoc --allow-script-in-comments --patch-module java.base=../Ports/CLDC11/src/java --release 8 --no-module-directories -exclude com.codename1.impl -Xdoclint:none -quiet -protected -d dist/javadoc -windowtitle "Codename One API" || true
+          find build/tempJavaSources ../Ports/CLDC11/src -name "*.java" | /usr/bin/xargs javadoc --allow-script-in-comments --patch-module java.base=../Ports/CLDC11/src/java --release 8 -exclude com.codename1.impl -Xdoclint:none -quiet -protected -d dist/javadoc -windowtitle "Codename One API" || true
           cd dist/javadoc
           zip -r ../../javadocs.zip *
           cd ..
