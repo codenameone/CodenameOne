@@ -297,6 +297,13 @@ jobs:
           echo "JAVA_HOME=${JAVA_HOME_8}" >> $GITHUB_ENV
           echo "${JAVA_HOME_8}/bin" >> $GITHUB_PATH
 
+      - name: Upload JavaDocs artifact
+        if: matrix.java-version == 8
+        uses: actions/upload-artifact@v4
+        with:
+          name: CodenameOne-javadocs
+          path: CodenameOne/javadocs.zip
+
       - name: Build iOS Port
         run: |
           ANT_OPTS_ARGS=""
