@@ -167,7 +167,7 @@ public class AnalyticsService {
      */
     public static void sendCrashReport(Throwable t, String message, boolean fatal) {
         // https://developers.google.com/analytics/devguides/collection/protocol/v1/devguide#exception
-        ConnectionRequest req = GetGARequest();
+        ConnectionRequest req = getGaRequest();
         req.addArgument("t", "exception");
         System.out.println(message);
         req.addArgument("exd", message.substring(0, Math.min(message.length(), 150) - 1));
@@ -180,7 +180,7 @@ public class AnalyticsService {
         NetworkManager.getInstance().addToQueue(req);
     }
 
-    private static ConnectionRequest GetGARequest() {
+    private static ConnectionRequest getGaRequest() {
         ConnectionRequest req = new ConnectionRequest();
         req.setUrl("https://www.google-analytics.com/collect");
         req.setPost(true);
@@ -246,7 +246,7 @@ public class AnalyticsService {
         }
         if (appsMode) {
             // https://developers.google.com/analytics/devguides/collection/protocol/v1/devguide#apptracking
-            final ConnectionRequest req = GetGARequest();
+            final ConnectionRequest req = getGaRequest();
             req.addArgument("t", "appview");
             req.addArgument("an", Display.getInstance().getProperty("AppName", "Codename One App"));
             String version = Display.getInstance().getProperty("AppVersion", "1.0");

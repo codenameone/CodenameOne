@@ -230,7 +230,7 @@ public class GridBagLayout extends Layout {
         }
     }*/
 
-    protected void ArrangeGrid(Container parent) {
+    protected void arrangeGrid(Container parent) {
         ParentInfo info = lastParentInfo = getParentInfo(parent);
         if (getComponentsNumber(parent) == 0) {
             return;
@@ -253,14 +253,6 @@ public class GridBagLayout extends Layout {
         return cons;
     }
 
-    protected void adjustForGravity(GridBagConstraints constraints, Rectangle r) {
-        AdjustForGravity(constraints, r);
-    }
-
-    protected void arrangeGrid(Container parent) {
-        ArrangeGrid(parent);
-    }
-
     /*protected GridBagLayoutInfo getLayoutInfo(Container parent, int sizeflag) {
         return GetLayoutInfo(parent, sizeflag);
     }
@@ -274,7 +266,7 @@ public class GridBagLayout extends Layout {
         }
     }*/
 
-    protected void AdjustForGravity(GridBagConstraints constraints, Rectangle r) {
+    protected void adjustForGravity(GridBagConstraints constraints, Rectangle r) {
         /*try {
             //                ((GridBagConstraints) constraints).verify();
         } catch (IllegalArgumentException e) {

@@ -2984,7 +2984,7 @@ public final class GeneralPath implements Shape {
         public static class QuadCurve {
 
             double ax, ay, bx, by;
-            double Ax, Ay, Bx, By;
+            double axCoeff, ayCoeff, bxCoeff, byCoeff;
 
             public QuadCurve(double x1, double y1, double cx, double cy, double x2, double y2) {
                 ax = x2 - x1;
@@ -2992,11 +2992,11 @@ public final class GeneralPath implements Shape {
                 bx = cx - x1;
                 by = cy - y1;
 
-                Bx = bx + bx;   // Bx = 2.0 * bx
-                Ax = ax - Bx;   // Ax = ax - 2.0 * bx
+                bxCoeff = bx + bx;   // Bx = 2.0 * bx
+                axCoeff = ax - bxCoeff;   // Ax = ax - 2.0 * bx
 
-                By = by + by;   // By = 2.0 * by
-                Ay = ay - By;   // Ay = ay - 2.0 * by
+                byCoeff = by + by;   // By = 2.0 * by
+                ayCoeff = ay - byCoeff;   // Ay = ay - 2.0 * by
             }
 
             int cross(double[] res, int rc, double py1, double py2) {
@@ -3024,10 +3024,10 @@ public final class GeneralPath implements Shape {
                         continue;
                     }
                     // CURVE-INSIDE
-                    double ry = t * (t * Ay + By);
+                    double ry = t * (t * ayCoeff + byCoeff);
                     // ry = t * t * Ay + t * By
                     if (ry > py2) {
-                        double rxt = t * Ax + bx;
+                        double rxt = t * axCoeff + bx;
                         // rxt = 2.0 * t * Ax + Bx = 2.0 * t * Ax + 2.0 * bx
                         if (rxt > -DELTA && rxt < DELTA) {
                             continue;
@@ -3040,17 +3040,17 @@ public final class GeneralPath implements Shape {
             }
 
             int solvePoint(double[] res, double px) {
-                double[] eqn = {-px, Bx, Ax};
+                double[] eqn = {-px, bxCoeff, axCoeff};
                 return solveQuad(eqn, res);
             }
 
             int solveExtrem(double[] res) {
                 int rc = 0;
-                if (!isZero(Ax)) {
-                    res[rc++] = -Bx / (Ax + Ax);
+                if (!isZero(axCoeff)) {
+                    res[rc++] = -bxCoeff / (axCoeff + axCoeff);
                 }
-                if (!isZero(Ay)) {
-                    res[rc++] = -By / (Ay + Ay);
+                if (!isZero(ayCoeff)) {
+                    res[rc++] = -byCoeff / (ayCoeff + ayCoeff);
                 }
                 return rc;
             }
@@ -3059,11 +3059,11 @@ public final class GeneralPath implements Shape {
                 for (int i = 0; i < rc; i++) {
                     double t = res[i];
                     if (t > -DELTA && t < 1 + DELTA) {
-                        double rx = t * (t * Ax + Bx);
+                        double rx = t * (t * axCoeff + bxCoeff);
                         if (minX <= rx && rx <= maxX) {
                             bound[bc++] = t;
                             bound[bc++] = rx;
-                            bound[bc++] = t * (t * Ay + By);
+                            bound[bc++] = t * (t * ayCoeff + byCoeff);
                             bound[bc++] = id;
                             if (changeId) {
                                 id++;
@@ -3082,8 +3082,8 @@ public final class GeneralPath implements Shape {
         public static class CubicCurve {
 
             double ax, ay, bx, by, cx, cy;
-            double Ax, Ay, Bx, By, Cx, Cy;
-            double Ax3, Bx2;
+            double axCoeff, ayCoeff, bxCoeff, byCoeff, cxCoeff, cyCoeff;
+            double axCoeff3, bxCoeff2;
 
             public CubicCurve(double x1, double y1, double cx1, double cy1, double cx2, double cy2, double x2, double y2) {
                 ax = x2 - x1;
@@ -3093,16 +3093,16 @@ public final class GeneralPath implements Shape {
                 cx = cx2 - x1;
                 cy = cy2 - y1;
 
-                Cx = bx + bx + bx;           // Cx = 3.0 * bx
-                Bx = cx + cx + cx - Cx - Cx; // Bx = 3.0 * cx - 6.0 * bx
-                Ax = ax - Bx - Cx;           // Ax = ax - 3.0 * cx + 3.0 * bx
+                cxCoeff = bx + bx + bx;           // Cx = 3.0 * bx
+                bxCoeff = cx + cx + cx - cxCoeff - cxCoeff; // Bx = 3.0 * cx - 6.0 * bx
+                axCoeff = ax - bxCoeff - cxCoeff;           // Ax = ax - 3.0 * cx + 3.0 * bx
 
-                Cy = by + by + by;           // Cy = 3.0 * by
-                By = cy + cy + cy - Cy - Cy; // By = 3.0 * cy - 6.0 * by
-                Ay = ay - By - Cy;           // Ay = ay - 3.0 * cy + 3.0 * by
+                cyCoeff = by + by + by;           // Cy = 3.0 * by
+                byCoeff = cy + cy + cy - cyCoeff - cyCoeff; // By = 3.0 * cy - 6.0 * by
+                ayCoeff = ay - byCoeff - cyCoeff;           // Ay = ay - 3.0 * cy + 3.0 * by
 
-                Ax3 = Ax + Ax + Ax;
-                Bx2 = Bx + Bx;
+                axCoeff3 = axCoeff + axCoeff + axCoeff;
+                bxCoeff2 = bxCoeff + bxCoeff;
             }
 
             int cross(double[] res, int rc, double py1, double py2) {
@@ -3129,13 +3129,13 @@ public final class GeneralPath implements Shape {
                         continue;
                     }
                     // CURVE-INSIDE
-                    double ry = t * (t * (t * Ay + By) + Cy);
+                    double ry = t * (t * (t * ayCoeff + byCoeff) + cyCoeff);
                     // ry = t * t * t * Ay + t * t * By + t * Cy
                     if (ry > py2) {
-                        double rxt = t * (t * Ax3 + Bx2) + Cx;
+                        double rxt = t * (t * axCoeff3 + bxCoeff2) + cxCoeff;
                         // rxt = 3.0 * t * t * Ax + 2.0 * t * Bx + Cx
                         if (rxt > -DELTA && rxt < DELTA) {
-                            rxt = t * (Ax3 + Ax3) + Bx2;
+                            rxt = t * (axCoeff3 + axCoeff3) + bxCoeff2;
                             // rxt = 6.0 * t * Ax + 2.0 * Bx
                             if (rxt < -DELTA || rxt > DELTA) {
                                 // Inflection point
@@ -3151,17 +3151,17 @@ public final class GeneralPath implements Shape {
             }
 
             int solvePoint(double[] res, double px) {
-                double[] eqn = {-px, Cx, Bx, Ax};
+                double[] eqn = {-px, cxCoeff, bxCoeff, axCoeff};
                 return solveCubic(eqn, res);
             }
 
             int solveExtremX(double[] res) {
-                double[] eqn = {Cx, Bx2, Ax3};
+                double[] eqn = {cxCoeff, bxCoeff2, axCoeff3};
                 return solveQuad(eqn, res);
             }
 
             int solveExtremY(double[] res) {
-                double[] eqn = {Cy, By + By, Ay + Ay + Ay};
+                double[] eqn = {cyCoeff, byCoeff + byCoeff, ayCoeff + ayCoeff + ayCoeff};
                 return solveQuad(eqn, res);
             }
 
@@ -3169,11 +3169,11 @@ public final class GeneralPath implements Shape {
                 for (int i = 0; i < rc; i++) {
                     double t = res[i];
                     if (t > -DELTA && t < 1 + DELTA) {
-                        double rx = t * (t * (t * Ax + Bx) + Cx);
+                        double rx = t * (t * (t * axCoeff + bxCoeff) + cxCoeff);
                         if (minX <= rx && rx <= maxX) {
                             bound[bc++] = t;
                             bound[bc++] = rx;
-                            bound[bc++] = t * (t * (t * Ay + By) + Cy);
+                            bound[bc++] = t * (t * (t * ayCoeff + byCoeff) + cyCoeff);
                             bound[bc++] = id;
                             if (changeId) {
                                 id++;

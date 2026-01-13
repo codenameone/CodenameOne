@@ -811,6 +811,8 @@ def main() -> None:
             "EQ_COMPARETO_USE_OBJECT_EQUALS",
             "MS_EXPOSE_REP",
             "NM_CONFUSING",
+            "NM_FIELD_NAMING_CONVENTION",
+            "NM_METHOD_NAMING_CONVENTION",
             "NO_NOTIFY_NOT_NOTIFYALL",
             "NP_LOAD_OF_KNOWN_NULL_VALUE",
             "NP_BOOLEAN_RETURN_NULL",

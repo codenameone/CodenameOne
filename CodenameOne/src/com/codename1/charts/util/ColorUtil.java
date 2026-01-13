@@ -129,7 +129,7 @@ public class ColorUtil {
             this.green = (argb >>> 8) & 0xff;
             this.blue = (argb & 0xff);
 
-            this.argb = ToARGB(this);
+            this.argb = toArgb(this);
         }
 
 
@@ -144,10 +144,10 @@ public class ColorUtil {
             this.green = (g & 0xff);
             this.blue = (b & 0xff);
 
-            this.argb = ToARGB(this);
+            this.argb = toArgb(this);
         }
 
-        private static int ToARGB(IColor c) { // PMD Fix: UnnecessaryModifier removed redundant final
+        private static int toArgb(IColor c) { // PMD Fix: UnnecessaryModifier removed redundant final
             return ((c.alpha << 24) |
                     (c.red << 16) |
                     (c.green << 8) |
