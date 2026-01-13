@@ -270,9 +270,23 @@ jobs:
           mkdir -p dist/javadoc
           # Skip JavaDocSourceEmbed due to gist access issues in CI
           cp -r src/* build/tempJavaSources/
+          # Provide a minimal ImplementationFactory stub for Javadoc type resolution on JDK 25.
+          cat > build/tempJavaSources/com/codename1/impl/ImplementationFactory.java <<'EOF'
+          package com.codename1.impl;
+
+          public class ImplementationFactory {
+              public static ImplementationFactory getInstance() {
+                  return null;
+              }
+
+              public Object createImplementation() {
+                  return null;
+              }
+          }
+          EOF
           # Suppress doclint noise on modern JDKs (e.g., Java 25) while keeping output consistent.
           # Patch java.base with CLDC11 stubs to avoid module conflicts for java.* packages.
-          { find build/tempJavaSources ../Ports/CLDC11/src -name "*.java"; echo ../Ports/JavaSE/src/com/codename1/impl/ImplementationFactory.java; } | /usr/bin/xargs javadoc --allow-script-in-comments --patch-module java.base=../Ports/CLDC11/src/java -exclude com.codename1.impl -Xdoclint:none -quiet -protected -d dist/javadoc -windowtitle "Codename One API" || true
+          find build/tempJavaSources ../Ports/CLDC11/src -name "*.java" | /usr/bin/xargs javadoc --allow-script-in-comments --patch-module java.base=../Ports/CLDC11/src/java -exclude com.codename1.impl -Xdoclint:none -quiet -protected -d dist/javadoc -windowtitle "Codename One API" || true
           cd dist/javadoc
           zip -r ../../javadocs.zip *
           cd ..
