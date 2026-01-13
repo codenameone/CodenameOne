@@ -326,7 +326,7 @@ public abstract class FullScreenAdService {
                                 LOCK.wait(100);
                             }
                         }
-                    } catch (Exception err) {
+                    } catch (InterruptedException err) {
                         err.printStackTrace();
                     }
                 }

@@ -658,10 +658,15 @@ public class RequestBuilder {
         CN.addToQueueAndWait(request);
         Map response = ((Connection) request).json;
         try {
-            PropertyBusinessObject pb = (PropertyBusinessObject) type.newInstance();
-            pb.getPropertyIndex().populateFromMap(response);
+            PropertyBusinessObject pb = createBusinessObject(type, response);
             return new Response(request.getResponseCode(), pb, request.getResponseErrorMessage());
-        } catch (Exception err) {
+        } catch (InstantiationException err) {
+            Log.e(err);
+            throw new RuntimeException(err.toString());
+        } catch (IllegalAccessException err) {
+            Log.e(err);
+            throw new RuntimeException(err.toString());
+        } catch (RuntimeException err) {
             Log.e(err);
             throw new RuntimeException(err.toString());
         }
@@ -718,14 +723,15 @@ public class RequestBuilder {
             if (lst == null) {
                 return null;
             }
-            List<PropertyBusinessObject> result = new ArrayList<PropertyBusinessObject>();
-            for (Map m : lst) {
-                PropertyBusinessObject pb = (PropertyBusinessObject) type.newInstance();
-                pb.getPropertyIndex().populateFromMap(m);
-                result.add(pb);
-            }
+            List<PropertyBusinessObject> result = buildBusinessObjectList(type, lst);
             return new Response(request.getResponseCode(), result, request.getResponseErrorMessage());
-        } catch (Exception err) {
+        } catch (InstantiationException err) {
+            Log.e(err);
+            throw new RuntimeException(err.toString());
+        } catch (IllegalAccessException err) {
+            Log.e(err);
+            throw new RuntimeException(err.toString());
+        } catch (RuntimeException err) {
             Log.e(err);
             throw new RuntimeException(err.toString());
         }
@@ -815,6 +821,20 @@ public class RequestBuilder {
         return req;
     }
 
+    private static PropertyBusinessObject createBusinessObject(Class type, Map response) throws InstantiationException, IllegalAccessException {
+        PropertyBusinessObject pb = (PropertyBusinessObject) type.newInstance();
+        pb.getPropertyIndex().populateFromMap(response);
+        return pb;
+    }
+
+    private static List<PropertyBusinessObject> buildBusinessObjectList(Class type, List<Map> lst) throws InstantiationException, IllegalAccessException {
+        List<PropertyBusinessObject> result = new ArrayList<PropertyBusinessObject>();
+        for (Map m : lst) {
+            result.add(createBusinessObject(type, m));
+        }
+        return result;
+    }
+
     private static class FetchAsPropertyListActionListener implements ActionListener<NetworkEvent> {
         private final Connection request;
         private final String root;
@@ -843,15 +863,16 @@ public class RequestBuilder {
                 return;
             }
             try {
-                List<PropertyBusinessObject> result = new ArrayList<PropertyBusinessObject>();
-                for (Map m : lst) {
-                    PropertyBusinessObject pb = (PropertyBusinessObject) type.newInstance();
-                    pb.getPropertyIndex().populateFromMap(m);
-                    result.add(pb);
-                }
+                List<PropertyBusinessObject> result = buildBusinessObjectList(type, lst);
                 res = new Response(evt.getResponseCode(), result, evt.getMessage());
                 callback.completed(res);
-            } catch (Exception err) {
+            } catch (InstantiationException err) {
+                Log.e(err);
+                throw new RuntimeException(err.toString());
+            } catch (IllegalAccessException err) {
+                Log.e(err);
+                throw new RuntimeException(err.toString());
+            } catch (RuntimeException err) {
                 Log.e(err);
                 throw new RuntimeException(err.toString());
             }
@@ -932,11 +953,16 @@ public class RequestBuilder {
             Response res = null;
             Map response = (Map) evt.getMetaData();
             try {
-                PropertyBusinessObject pb = (PropertyBusinessObject) type.newInstance();
-                pb.getPropertyIndex().populateFromMap(response);
+                PropertyBusinessObject pb = createBusinessObject(type, response);
                 res = new Response(evt.getResponseCode(), pb, evt.getMessage());
                 callback.completed(res);
-            } catch (Exception err) {
+            } catch (InstantiationException err) {
+                Log.e(err);
+                throw new RuntimeException(err.toString());
+            } catch (IllegalAccessException err) {
+                Log.e(err);
+                throw new RuntimeException(err.toString());
+            } catch (RuntimeException err) {
                 Log.e(err);
                 throw new RuntimeException(err.toString());
             }

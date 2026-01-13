@@ -2445,7 +2445,9 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                                 // Note: The 'circle' SHAPE in AREA tag is implemented as a rectangle to avoid complication of circle pixel collision
                                 error = false;
                             }
-                        } catch (Exception e) { // Can be number format exception or index out of bounds
+                        } catch (NumberFormatException e) { // Can be number format exception or index out of bounds
+                            // do nothing - error will stay true
+                        } catch (IndexOutOfBoundsException e) {
                             // do nothing - error will stay true
                         }
                         if (error) {

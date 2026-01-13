@@ -238,7 +238,13 @@ public class InstantUI {
                 cnt.add(b.getLabel()).
                         add(cmp);
                 allBindings.add(uib.bind(b, cmp));
-            } catch (Exception err) {
+            } catch (InstantiationException err) {
+                Log.e(err);
+                throw new RuntimeException("Custom property instant UI failed for " + b.getName() + " " + err);
+            } catch (IllegalAccessException err) {
+                Log.e(err);
+                throw new RuntimeException("Custom property instant UI failed for " + b.getName() + " " + err);
+            } catch (RuntimeException err) {
                 Log.e(err);
                 throw new RuntimeException("Custom property instant UI failed for " + b.getName() + " " + err);
             }

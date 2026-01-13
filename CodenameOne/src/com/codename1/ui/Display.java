@@ -1201,7 +1201,7 @@ public final class Display extends CN1Constants {
                 paintTransitionAnimation();
                 return;
             }
-        } catch (Exception ignor) {
+        } catch (RuntimeException ignor) {
             Log.e(ignor);
         }
         long currentTime = System.currentTimeMillis();
