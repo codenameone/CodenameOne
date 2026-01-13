@@ -291,6 +291,12 @@ jobs:
           zip -r ../../javadocs.zip *
           cd ..
 
+      - name: Restore Java 8 after JavaDocs
+        if: matrix.java-version == 8
+        run: |
+          echo "JAVA_HOME=${JAVA_HOME_8}" >> $GITHUB_ENV
+          echo "${JAVA_HOME_8}/bin" >> $GITHUB_PATH
+
       - name: Build iOS Port
         run: |
           ANT_OPTS_ARGS=""
