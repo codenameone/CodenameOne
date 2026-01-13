@@ -253,6 +253,13 @@ jobs:
         if: matrix.java-version == 8
         run: ant -noinput -buildfile CodenameOne/build.xml weeklyLibUpdate
 
+      - name: Set up Java 25 for JavaDocs
+        if: matrix.java-version == 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
       - name: Build JavaDocs
         if: matrix.java-version == 8
         run: |
@@ -263,7 +270,8 @@ jobs:
           mkdir -p dist/javadoc
           # Skip JavaDocSourceEmbed due to gist access issues in CI
           cp -r src/* build/tempJavaSources/
-          find build/tempJavaSources ../Ports/CLDC11/src -name "*.java" | /usr/bin/grep -v /impl/ | /usr/bin/xargs javadoc --allow-script-in-comments -protected -d dist/javadoc -windowtitle "Codename One API" || true
+          # Suppress doclint noise on modern JDKs (e.g., Java 25) while keeping output consistent.
+          find build/tempJavaSources ../Ports/CLDC11/src -name "*.java" | /usr/bin/grep -v /impl/ | /usr/bin/xargs javadoc --allow-script-in-comments -Xdoclint:none -quiet -protected -d dist/javadoc -windowtitle "Codename One API" || true
           cd dist/javadoc
           zip -r ../../javadocs.zip *
           cd ..
@@ -339,4 +347,3 @@ jobs:
           name: JavaSE.jar
           path: Ports/JavaSE/dist/JavaSE.jar
   
-
