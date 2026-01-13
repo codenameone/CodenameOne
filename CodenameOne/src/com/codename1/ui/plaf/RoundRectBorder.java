@@ -883,8 +883,8 @@ public class RoundRectBorder extends Border {
             }
             widthF -= strokePx;
             heightF -= strokePx;
-            x += strokePx / 2;
-            y += strokePx / 2;
+            x += strokePx / 2f;
+            y += strokePx / 2f;
 
             if (strokePx % 2 == 1) {
                 x += 0.5f;

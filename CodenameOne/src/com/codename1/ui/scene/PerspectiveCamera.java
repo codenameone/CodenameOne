@@ -71,16 +71,16 @@ public class PerspectiveCamera extends Camera {
         float xfactor = -displayW / bottomRight[0];
         float yfactor = -displayH / bottomRight[1];
 
-        currTransform.translate((float) dw / 2, y + h / 2, zNear);
+        currTransform.translate((float) dw / 2, y + h * 0.5f, zNear);
         currTransform.scale(xfactor, yfactor, 1f);
 
         //currTransform.translate((float)dw/2/xfactor, (y+h/2)/yfactor, 0);
 
         currTransform.concatenate(perspectiveT);
         float zState = 0f;
-        float cameraZ = -zNear - w / 2 * zState;
+        float cameraZ = -zNear - w * 0.5f * zState;
         float cameraX = (float) -dw / 2;//-x-w/2;
-        float cameraY = -y - h / 2;
+        float cameraY = -y - h * 0.5f;
         currTransform.translate(cameraX, cameraY, cameraZ);
 
         //if ( transitionState == STATE_FLIP){

@@ -142,11 +142,11 @@ public abstract class XYChart extends AbstractChart {
         int angle = or.getAngle();
         boolean rotate = angle == 90;
         mScale = (float) (height) / width;
-        mTranslate = Math.abs(width - height) / 2;
+        mTranslate = Math.abs(width - height) / 2f;
         if (mScale < 1) {
             mTranslate *= -1;
         }
-        mCenter = new Point((x + width) / 2, (y + height) / 2);
+        mCenter = new Point((x + width) / 2f, (y + height) / 2f);
         if (rotate) {
             transform(canvas, angle, false);
         }

@@ -245,13 +245,13 @@ public class FlipTransition extends Transition {
 
 
             currTransform.scale(xfactor, yfactor, 0f);
-            currTransform.translate((x + w / 2) / xfactor, (y + h / 2) / yfactor, 0);
+            currTransform.translate((x + w * 0.5f) / xfactor, (y + h * 0.5f) / yfactor, 0);
 
             currTransform.concatenate(perspectiveT);
 
-            float cameraZ = -zNear - w / 2 * zState;
-            float cameraX = -x - w / 2;
-            float cameraY = -y - h / 2;
+            float cameraZ = -zNear - w * 0.5f * zState;
+            float cameraX = -x - w * 0.5f;
+            float cameraY = -y - h * 0.5f;
             currTransform.translate(cameraX, cameraY, cameraZ);
 
             if (transitionState == STATE_FLIP) {

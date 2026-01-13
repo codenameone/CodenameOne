@@ -156,7 +156,7 @@ public class CommonProgressAnimations {
      * @since 7.0
      */
     public static class CircleProgress extends ProgressAnimation {
-        int stepSize = (int) Math.round(360 / Display.getInstance().getFrameRate() / 1.5);
+        int stepSize = (int) Math.round(360.0 / Display.getInstance().getFrameRate() / 1.5);
         int step = 0;
 
         /**

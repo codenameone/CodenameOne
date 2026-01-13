@@ -1311,8 +1311,8 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             stateIconSize = stateIcon.getWidth(); //square image width == height
             preserveSpaceForState = stateIconSize + gap;
             stateIconYPosition = cmpY + topPadding
-                    + (cmpHeight - topPadding
-                    - bottomPadding) / 2 - stateIconSize / 2;
+                    + (int) ((cmpHeight - topPadding
+                    - bottomPadding) / 2f - stateIconSize / 2f);
             int tX = cmpX;
             if (((Button) l).isOppositeSide()) {
                 if (rtl) {
@@ -1538,7 +1538,7 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
             }
             if (badgeFont == null) {
                 if (Font.isNativeFontSchemeSupported()) {
-                    badgeFont = Font.createTrueTypeFont(Font.NATIVE_MAIN_LIGHT).derive(fontHeight / 2, 0);
+                    badgeFont = Font.createTrueTypeFont(Font.NATIVE_MAIN_LIGHT).derive(fontHeight / 2f, 0);
                 } else {
                     badgeFont = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL);
                 }

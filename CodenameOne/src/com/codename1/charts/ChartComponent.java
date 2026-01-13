@@ -486,7 +486,7 @@ public class ChartComponent extends Component {
                 double[] panLimits = xyChart.getRenderer().getPanLimits();
 
                 if (zoomStart == null) {
-                    zoomStart = new Point((x[0] + x[1]) / 2, (y[0] + y[1]) / 2);
+                    zoomStart = new Point((x[0] + x[1]) / 2f, (y[0] + y[1]) / 2f);
 
                     zoomDistStartX = Math.abs(x[0] - x[1]);
                     zoomDistStartY = Math.abs(y[0] - y[1]);
@@ -503,8 +503,8 @@ public class ChartComponent extends Component {
                     if (dx == 0) dx = 1;
                     if (dy == 0) dy = 1;
 
-                    double zoomX = zoomDistStartX / dx;
-                    double zoomY = zoomDistStartY / dy;
+                    double zoomX = (double) zoomDistStartX / dx;
+                    double zoomY = (double) zoomDistStartY / dy;
 
 
                     BBox newBounds = zoomStartBBox.scaleScreenCoords((float) zoomX, (float) zoomY);
@@ -571,19 +571,19 @@ public class ChartComponent extends Component {
                 }
             } else {
                 if (zoomStart == null) {
-                    zoomStart = new Point((x[0] + x[1]) / 2, (y[0] + y[1]) / 2);
+                    zoomStart = new Point((x[0] + x[1]) / 2f, (y[0] + y[1]) / 2f);
                     zoomTransformStart = Transform.makeIdentity();
                     if (transform != null) {
                         zoomTransformStart.concatenate(transform);
                     }
-                    int dx = Math.abs(x[0] - x[1]) / 2;
-                    int dy = Math.abs(y[0] - y[1]) / 2;
+                    double dx = Math.abs(x[0] - x[1]) / 2f;
+                    double dy = Math.abs(y[0] - y[1]) / 2f;
                     zoomDistStart = Math.sqrt(dx * dx + dy * dy);
 
 
                 } else {
-                    int dx = Math.abs(x[0] - x[1]) / 2;
-                    int dy = Math.abs(y[0] - y[1]) / 2;
+                    double dx = Math.abs(x[0] - x[1]) / 2f;
+                    double dy = Math.abs(y[0] - y[1]) / 2f;
                     double zoomDist = Math.sqrt(dx * dx + dy * dy);
                     if (zoomDist == 0) {
                         zoomDist = 1;
