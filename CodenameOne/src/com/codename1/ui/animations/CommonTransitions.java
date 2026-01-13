@@ -499,13 +499,18 @@ public final class CommonTransitions extends Transition {
 
         if (transitionType == TYPE_TIMELINE) {
             hideInterformContainers();
-            Graphics g = buffer.getGraphics();
+            Image timelineBuffer = buffer;
+            if (timelineBuffer == null) {
+                timelineBuffer = createMutableImage(w, h);
+                buffer = timelineBuffer;
+            }
+            Graphics g = timelineBuffer.getGraphics();
             g.translate(-source.getAbsoluteX(), -source.getAbsoluteY());
 
-            g.setClip(0, 0, buffer.getWidth() + source.getAbsoluteX(), buffer.getHeight() + source.getAbsoluteY());
+            g.setClip(0, 0, timelineBuffer.getWidth() + source.getAbsoluteX(), timelineBuffer.getHeight() + source.getAbsoluteY());
 
-            if (timeline != null && buffer != null && (timeline.getWidth() != buffer.getWidth() || timeline.getHeight() != buffer.getHeight())) {
-                timeline = timeline.scaled(buffer.getWidth(), buffer.getHeight());
+            if (timeline != null && (timeline.getWidth() != timelineBuffer.getWidth() || timeline.getHeight() != timelineBuffer.getHeight())) {
+                timeline = timeline.scaled(timelineBuffer.getWidth(), timelineBuffer.getHeight());
             }
 
             if (timeline instanceof Timeline) {
@@ -876,10 +881,13 @@ public final class CommonTransitions extends Transition {
     }
 
     private Motion getComponentShiftMotion(Component c, boolean incoming) {
+        if (c == null) {
+            return null;
+        }
         Motion m = (Motion) c.getClientProperty("$shm");
         if (m == null) {
             Component dest = getDestination();
-            if (dest == null || c == null) {
+            if (dest == null) {
                 return m;
             }
             int travelDestination = dest.getWidth() - c.getWidth() - c.getAbsoluteX();

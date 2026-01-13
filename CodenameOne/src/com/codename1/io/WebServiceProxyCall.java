@@ -563,11 +563,14 @@ public class WebServiceProxyCall {
         @Override
         protected void buildRequestBody(OutputStream os) throws IOException {
             DataOutputStream dos = new DataOutputStream(os);
-            dos.writeUTF(def.name);
+            WSDefinition localDef = def;
+            dos.writeUTF(localDef.name);
+            if (localDef.arguments == null) {
+                return;
+            }
             int alen = arguments.length;
             for (int iter = 0; iter < alen; iter++) {
-                if (def == null || def.arguments == null) continue;
-                switch (def.arguments[iter]) {
+                switch (localDef.arguments[iter]) {
                     case TYPE_BYTE:
                         dos.writeByte(((Byte) arguments[iter]).byteValue());
                         break;

@@ -807,40 +807,44 @@ public class StyleParser {
     }
 
     private static Map<String, Integer> bgTypes() {
-        if (bgTypes == null) {
-            bgTypes = new HashMap<String, Integer>();
-            Object[] types = new Object[]{
-                    "image_aligned_bottom", (int) Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM,
-                    "image_aligned_top", (int) Style.BACKGROUND_IMAGE_ALIGNED_TOP,
-                    "image_aligned_bottom_right", (int) Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT,
-                    "image_aligned_bottom_left", (int) Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT,
-                    "image_aligned_top_right", (int) Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT,
-                    "image_aligned_top_left", (int) Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT,
-                    "image_aligned_left", (int) Style.BACKGROUND_IMAGE_ALIGNED_LEFT,
-                    "image_aligned_right", (int) Style.BACKGROUND_IMAGE_ALIGNED_RIGHT,
-                    "image_aligned_center", (int) Style.BACKGROUND_IMAGE_ALIGNED_CENTER,
-                    "image_scaled", (int) Style.BACKGROUND_IMAGE_SCALED,
-                    "image_scaled_fill", (int) Style.BACKGROUND_IMAGE_SCALED_FILL,
-                    "image_scaled_fit", (int) Style.BACKGROUND_IMAGE_SCALED_FIT,
-                    "image_tile_both", (int) Style.BACKGROUND_IMAGE_TILE_BOTH,
-                    "image_tile_horizontal", (int) Style.BACKGROUND_IMAGE_TILE_HORIZONTAL,
-                    "image_tile_vertical", (int) Style.BACKGROUND_IMAGE_TILE_VERTICAL,
-                    "image_tile_horizontal_align_bottom", (int) Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM,
-                    "image_tile_horizontal_align_top", (int) Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP,
-                    "image_tile_horizontal_align_center", (int) Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER,
-                    "image_tile_vertical_align_left", (int) Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT,
-                    "image_tile_vertical_align_right", (int) Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT,
-                    "image_tile_vertical_align_center", (int) Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER,
-                    "gradient_radial", (int) Style.BACKGROUND_GRADIENT_RADIAL,
-                    "gradient_linear_horizontal", (int) Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
-                    "gradient_linear_vertical", (int) Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL,
-                    "none", (int) Style.BACKGROUND_NONE
-            };
-            int len = types.length;
-            for (int i = 0; i < len; i += 2) {
-                bgTypes.put((String) types[i], (Integer) types[i + 1]);
+        if (bgTypes != null) {
+            return bgTypes;
+        }
+        synchronized (StyleParser.class) {
+            if (bgTypes == null) {
+                bgTypes = new HashMap<String, Integer>();
+                Object[] types = new Object[]{
+                        "image_aligned_bottom", (int) Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM,
+                        "image_aligned_top", (int) Style.BACKGROUND_IMAGE_ALIGNED_TOP,
+                        "image_aligned_bottom_right", (int) Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_RIGHT,
+                        "image_aligned_bottom_left", (int) Style.BACKGROUND_IMAGE_ALIGNED_BOTTOM_LEFT,
+                        "image_aligned_top_right", (int) Style.BACKGROUND_IMAGE_ALIGNED_TOP_RIGHT,
+                        "image_aligned_top_left", (int) Style.BACKGROUND_IMAGE_ALIGNED_TOP_LEFT,
+                        "image_aligned_left", (int) Style.BACKGROUND_IMAGE_ALIGNED_LEFT,
+                        "image_aligned_right", (int) Style.BACKGROUND_IMAGE_ALIGNED_RIGHT,
+                        "image_aligned_center", (int) Style.BACKGROUND_IMAGE_ALIGNED_CENTER,
+                        "image_scaled", (int) Style.BACKGROUND_IMAGE_SCALED,
+                        "image_scaled_fill", (int) Style.BACKGROUND_IMAGE_SCALED_FILL,
+                        "image_scaled_fit", (int) Style.BACKGROUND_IMAGE_SCALED_FIT,
+                        "image_tile_both", (int) Style.BACKGROUND_IMAGE_TILE_BOTH,
+                        "image_tile_horizontal", (int) Style.BACKGROUND_IMAGE_TILE_HORIZONTAL,
+                        "image_tile_vertical", (int) Style.BACKGROUND_IMAGE_TILE_VERTICAL,
+                        "image_tile_horizontal_align_bottom", (int) Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_BOTTOM,
+                        "image_tile_horizontal_align_top", (int) Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_TOP,
+                        "image_tile_horizontal_align_center", (int) Style.BACKGROUND_IMAGE_TILE_HORIZONTAL_ALIGN_CENTER,
+                        "image_tile_vertical_align_left", (int) Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_LEFT,
+                        "image_tile_vertical_align_right", (int) Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_RIGHT,
+                        "image_tile_vertical_align_center", (int) Style.BACKGROUND_IMAGE_TILE_VERTICAL_ALIGN_CENTER,
+                        "gradient_radial", (int) Style.BACKGROUND_GRADIENT_RADIAL,
+                        "gradient_linear_horizontal", (int) Style.BACKGROUND_GRADIENT_LINEAR_HORIZONTAL,
+                        "gradient_linear_vertical", (int) Style.BACKGROUND_GRADIENT_LINEAR_VERTICAL,
+                        "none", (int) Style.BACKGROUND_NONE
+                };
+                int len = types.length;
+                for (int i = 0; i < len; i += 2) {
+                    bgTypes.put((String) types[i], (Integer) types[i + 1]);
+                }
             }
-
         }
         return bgTypes;
     }

@@ -297,7 +297,13 @@ public class TextField extends TextArea {
     }
 
     private static void initInputModes() {
-        if (inputModes == null) {
+        if (inputModes != null) {
+            return;
+        }
+        synchronized (TextField.class) {
+            if (inputModes != null) {
+                return;
+            }
             firstUppercaseInputMode.addElement("Abc");
             inputModes = new Hashtable();
             Hashtable upcase = new Hashtable();
