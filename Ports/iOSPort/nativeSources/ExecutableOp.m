@@ -27,6 +27,7 @@
 #import <mach/mach_host.h>
 
 
+#ifndef CN1_USE_METAL
 extern void logGlErrorAt(const char *f, int l) {
     GLenum err = glGetError();
     if(err != GL_NO_ERROR) {
@@ -46,6 +47,11 @@ extern void logGlErrorAt(const char *f, int l) {
         }
     }
 }
+#else
+extern void logGlErrorAt(const char *f, int l) {
+    // No-op for Metal builds - use Metal validation layers instead
+}
+#endif
 
 @implementation ExecutableOp
 static BOOL blockDrawing = NO;
@@ -119,5 +125,43 @@ static BOOL blockDrawing = NO;
 -(NSString*)getName {
     return nil;
 }
+
+#ifdef CN1_USE_METAL
+// Metal helper method implementations
+#import "METALView.h"
+#import "CN1METALTransform.h"
+
+-(id<MTLDevice>)device {
+    METALView *metalView = [[CodenameOne_GLViewController instance] metalView];
+    return metalView.device;
+}
+
+-(id<MTLRenderCommandEncoder>)makeRenderCommandEncoder {
+    METALView *metalView = [[CodenameOne_GLViewController instance] metalView];
+    return [metalView makeRenderCommandEncoder];
+}
+
+-(void)applyClip:(id<MTLRenderCommandEncoder>)encoder {
+    // TODO: Implement clipping via scissor rectangle or stencil buffer
+    // For now, no clipping is applied
+    // This will be implemented when ClipRect ExecutableOp is done
+}
+
+-(simd_float4x4)getMVPMatrix {
+    simd_float4x4 mvp = CN1_Metal_GetMVPMatrix();
+    return mvp;
+}
+
+-(simd_float4)colorToFloat4:(int)color alpha:(int)alpha {
+    float alph = ((float)alpha) / 255.0;
+    return simd_make_float4(
+        ((float)((color >> 16) & 0xff)) / 255.0 * alph,
+        ((float)((color >> 8) & 0xff)) / 255.0 * alph,
+        ((float)(color & 0xff)) / 255.0 * alph,
+        alph
+    );
+}
+
+#endif
 
 @end

@@ -25,6 +25,13 @@
 #import "DrawStringTextureCache.h"
 #include "xmlvm.h"
 
+#ifdef CN1_USE_METAL
+#import <Metal/Metal.h>
+#import <simd/simd.h>
+#import "CN1METALTransform.h"
+#import "DrawStringMetalTextureCache.h"
+#endif
+
 extern float scaleValue;
 #ifdef USE_ES2
 extern GLKMatrix4 CN1modelViewMatrix;
@@ -127,7 +134,187 @@ static GLuint getOGLProgram(){
     return self;
 }
 
-#ifdef USE_ES2
+#ifdef CN1_USE_METAL
+-(void)execute {
+    // Metal rendering path
+    id<MTLRenderCommandEncoder> encoder = [self makeRenderCommandEncoder];
+    if (!encoder) {
+        NSLog(@"DrawString: No encoder available!");
+        return;
+    }
+
+    // Get pipeline state (same as DrawImage - uses textured shader)
+    static id<MTLRenderPipelineState> pipelineState = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        id<MTLDevice> device = [self device];
+        id<MTLLibrary> library = [device newDefaultLibrary];
+
+        MTLRenderPipelineDescriptor *pipelineDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
+        pipelineDescriptor.vertexFunction = [library newFunctionWithName:@"textured_vertex"];
+        pipelineDescriptor.fragmentFunction = [library newFunctionWithName:@"textured_fragment"];
+        pipelineDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+
+        // Configure vertex descriptor for textured shader
+        MTLVertexDescriptor *vertexDescriptor = [[MTLVertexDescriptor alloc] init];
+        // Position attribute (float2) at attribute 0
+        vertexDescriptor.attributes[0].format = MTLVertexFormatFloat2;
+        vertexDescriptor.attributes[0].offset = 0;
+        vertexDescriptor.attributes[0].bufferIndex = 0;
+        // TexCoord attribute (float2) at attribute 1
+        vertexDescriptor.attributes[1].format = MTLVertexFormatFloat2;
+        vertexDescriptor.attributes[1].offset = sizeof(float) * 2;
+        vertexDescriptor.attributes[1].bufferIndex = 0;
+        // Layout for buffer 0 (interleaved position + texCoord)
+        vertexDescriptor.layouts[0].stride = sizeof(float) * 4;
+        vertexDescriptor.layouts[0].stepRate = 1;
+        vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
+        pipelineDescriptor.vertexDescriptor = vertexDescriptor;
+
+        // Enable blending for alpha
+        pipelineDescriptor.colorAttachments[0].blendingEnabled = YES;
+        pipelineDescriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
+        pipelineDescriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
+        pipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOne;
+        pipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
+        pipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+        pipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+
+        NSError *error = nil;
+        pipelineState = [device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:&error];
+        if (error) {
+            NSLog(@"Error creating DrawString pipeline state: %@", error);
+        }
+#ifndef CN1_USE_ARC
+        [pipelineDescriptor release];
+#endif
+    });
+
+    if (!pipelineState) {
+        NSLog(@"DrawString: Pipeline state is nil!");
+        return;
+    }
+
+    [encoder setRenderPipelineState:pipelineState];
+
+    // Check cache first
+    DrawStringMetalTextureCache *cachedTex = [DrawStringMetalTextureCache checkCache:str f:font c:color a:255];
+    id<MTLTexture> texture = nil;
+    int w = -1;
+
+    if (cachedTex != nil) {
+        texture = [cachedTex texture];
+        w = [cachedTex stringWidth];
+    } else {
+        // Calculate text dimensions
+        w = (int)[str sizeWithAttributes:@{NSFontAttributeName: font}].width;
+        int h = (int)ceil([font lineHeight] + 1.0 * scaleValue);
+        int p2w = nextPowerOf2(w);
+        int p2h = nextPowerOf2(h);
+
+        // Create text texture - same as ES2 version
+        CGColorSpaceRef colorSpace = CGColorSpaceCreateDeviceRGB();
+        void* imageData = malloc(p2h * p2w * 4);
+        CGContextRef context = CGBitmapContextCreate(imageData, p2w, p2h, 8, 4 * p2w, colorSpace, kCGImageAlphaPremultipliedLast);
+        // Note: ES2 version has flip commented out, so we don't flip either
+        CGColorSpaceRelease(colorSpace);
+        CGContextClearRect(context, CGRectMake(0, 0, p2w, p2h));
+
+        UIGraphicsPushContext(context);
+        UIColor *textColor = UIColorFromRGB(color, 255);
+        [str drawAtPoint:CGPointZero withAttributes:@{
+            NSFontAttributeName: font,
+            NSForegroundColorAttributeName: textColor
+        }];
+        UIGraphicsPopContext();
+
+        // Create Metal texture
+        MTLTextureDescriptor *textureDescriptor = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatRGBA8Unorm
+                                                                                                      width:p2w
+                                                                                                     height:p2h
+                                                                                                  mipmapped:NO];
+        textureDescriptor.usage = MTLTextureUsageShaderRead;
+
+        texture = [[self device] newTextureWithDescriptor:textureDescriptor];
+        MTLRegion region = MTLRegionMake2D(0, 0, p2w, p2h);
+        [texture replaceRegion:region mipmapLevel:0 withBytes:imageData bytesPerRow:4 * p2w];
+
+        CGContextRelease(context);
+        free(imageData);
+
+        // Cache the texture for future use
+        [DrawStringMetalTextureCache cache:str f:font t:texture c:color a:255];
+    }
+
+    // Calculate height for vertex positioning
+    int h = (int)ceil([font lineHeight] + 1.0 * scaleValue);
+    int p2w = nextPowerOf2(w);
+    int p2h = nextPowerOf2(h);
+
+    // Create vertex data (position + texCoord interleaved)
+    typedef struct {
+        float position[2];
+        float texCoord[2];
+    } Vertex;
+
+    // Match ES2 texture coordinates exactly
+    GLfloat nY = 1.0;
+    GLfloat wX = 0;
+    GLfloat sY = 1.0 - (GLfloat)h / (GLfloat)p2h;
+    GLfloat eX = (GLfloat)w / (GLfloat)p2w;
+
+    Vertex vertices[] = {
+        {{(float)x,     (float)y},     {wX, nY}}, // Top-left
+        {{(float)(x+w), (float)y},     {eX, nY}}, // Top-right
+        {{(float)x,     (float)(y+h)}, {wX, sY}}, // Bottom-left
+        {{(float)(x+w), (float)(y+h)}, {eX, sY}}  // Bottom-right
+    };
+
+    // Set vertex buffer
+    [encoder setVertexBytes:vertices length:sizeof(vertices) atIndex:0];
+
+    // Set uniforms (MVP matrix + color)
+    typedef struct {
+        simd_float4x4 mvpMatrix;
+        simd_float4 color;
+    } Uniforms;
+
+    Uniforms uniforms;
+    uniforms.mvpMatrix = [self getMVPMatrix];
+
+    // The text color is already in the texture, we just need alpha modulation
+    // Use white (1,1,1) to preserve texture color, with alpha for transparency
+    float alphaFloat = ((float)alpha) / 255.0f;
+    uniforms.color = simd_make_float4(1.0f, 1.0f, 1.0f, alphaFloat);
+
+    [encoder setVertexBytes:&uniforms length:sizeof(uniforms) atIndex:1];
+
+    // Set texture
+    [encoder setFragmentTexture:texture atIndex:0];
+
+    // Create sampler state
+    static id<MTLSamplerState> samplerState = nil;
+    static dispatch_once_t samplerOnce;
+    dispatch_once(&samplerOnce, ^{
+        MTLSamplerDescriptor *samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
+        samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
+        samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
+        samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToEdge;
+        samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToEdge;
+        samplerState = [[self device] newSamplerStateWithDescriptor:samplerDescriptor];
+#ifndef CN1_USE_ARC
+        [samplerDescriptor release];
+#endif
+    });
+
+    [encoder setFragmentSamplerState:samplerState atIndex:0];
+
+    // Draw rectangle as triangle strip
+    [encoder drawPrimitives:MTLPrimitiveTypeTriangleStrip vertexStart:0 vertexCount:4];
+    // NSLog(@"DrawString draw command issued for '%@'", str);
+}
+
+#elif USE_ES2
 -(void)execute {
     glUseProgram(getOGLProgram());
     GLuint textureName = 0;

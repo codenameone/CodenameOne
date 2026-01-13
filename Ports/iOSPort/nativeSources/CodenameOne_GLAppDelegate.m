@@ -339,7 +339,11 @@ static BOOL cn1IsHiddenInBackground = NO;
 - (void)applicationDidEnterBackground:(UIApplication *)application
 {
  #ifdef CN1_BLOCK_SCREENSHOTS_ON_ENTER_BACKGROUND
+#ifdef CN1_USE_METAL
+    [[CodenameOne_GLViewController instance] metalView].hidden = YES;
+#else
     [[CodenameOne_GLViewController instance] eaglView].hidden = YES;
+#endif
     cn1IsHiddenInBackground = YES;
 #endif
     if(editingComponent != nil) {
@@ -365,7 +369,11 @@ static BOOL cn1IsHiddenInBackground = NO;
 
 - (void)applicationWillEnterForeground:(UIApplication *)application
 {   if (cn1IsHiddenInBackground) {
+#ifdef CN1_USE_METAL
+          [[CodenameOne_GLViewController instance] metalView].hidden = NO;
+#else
           [[CodenameOne_GLViewController instance] eaglView].hidden = NO;
+#endif
     }
     
     /*

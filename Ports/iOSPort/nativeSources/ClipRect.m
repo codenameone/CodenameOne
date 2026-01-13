@@ -23,6 +23,9 @@
 #import "ClipRect.h"
 #import "CodenameOne_GLViewController.h"
 #import "FillRect.h"
+#ifdef CN1_USE_METAL
+#import <Metal/Metal.h>
+#endif
 #ifdef USE_ES2
 #import "DrawTextureAlphaMask.h"
 #import "FillPolygon.h"
@@ -92,7 +95,94 @@ static CGRect drawingRect;
 }
 
 -(void)execute {
-#ifdef USE_ES2
+#ifdef CN1_USE_METAL
+    // Metal implementation using scissor rectangle
+    // For polygon/texture clipping, we'd need stencil buffer - not implemented yet
+    if (texture != 0 || numPoints > 0) {
+        NSLog(@"ClipRect: Polygon/texture clipping not yet implemented in Metal");
+        return;
+    }
+
+    // In Metal, don't clamp clips to drawingRect - allow full screen clipping
+    // The Java layer sends proper background fills, and clamping causes issues
+    // with partial repaints and buffer synchronization
+    clipIsTexture = NO;
+
+    if(width > 0 && height > 0) {
+        [super clipBlock:NO];
+        int scale = scaleValue;
+        int displayHeight = [CodenameOne_GLViewController instance].view.bounds.size.height * scale;
+
+        // Check if this is full screen - if so, disable scissor
+        if(width == [CodenameOne_GLViewController instance].view.bounds.size.width * scale && height == displayHeight) {
+            MTLScissorRect fullScreenRect = {0, 0, 0, 0};
+            [[CodenameOne_GLViewController instance] setScissorRect:fullScreenRect enabled:NO];
+            return;
+        }
+
+        // Set scissor rectangle for Metal
+        clipX = x;
+        clipW = width;
+        if (clipX < 0) {
+            clipX = 0;
+            clipW = width;
+        }
+
+        clipY = y;
+        clipH = height;
+        if (clipY < 0) {
+            clipY = 0;
+            clipH = height;
+        }
+
+        [ClipRect updateClipToScale];
+
+        // Note: Input coordinates appear to already be in physical pixels (pre-scaled)
+        // Just clamp to drawable bounds for safety (Metal requires this)
+        CGSize drawableSize = [[[CodenameOne_GLViewController instance] metalView] drawableSize];
+        int drawableW = (int)drawableSize.width;
+        int drawableH = (int)drawableSize.height;
+
+        int finalX = clipX;
+        int finalY = clipY;
+        int finalW = clipW;
+        int finalH = clipH;
+
+        if (finalX < 0) {
+            finalW += finalX;
+            finalX = 0;
+        }
+        if (finalY < 0) {
+            finalH += finalY;
+            finalY = 0;
+        }
+        if (finalX + finalW > drawableW) {
+            finalW = drawableW - finalX;
+        }
+        if (finalY + finalH > drawableH) {
+            finalH = drawableH - finalY;
+        }
+        if (finalW < 0) finalW = 0;
+        if (finalH < 0) finalH = 0;
+        if (finalX >= drawableW || finalY >= drawableH || finalW == 0 || finalH == 0) {
+            // Scissor is completely outside drawable - block drawing
+            [super clipBlock:YES];
+            return;
+        }
+
+        // Apply scissor to Metal encoder
+        MTLScissorRect scissor = {finalX, finalY, finalW, finalH};
+
+        // Match ES2 behavior: only apply scissor when no transform is active
+        if (currentScaleX == 1 && currentScaleY == 1) {
+            [[CodenameOne_GLViewController instance] setScissorRect:scissor enabled:YES];
+        }
+
+        clipApplied = YES;
+    } else {
+        [super clipBlock:YES];
+    }
+#elif defined(USE_ES2)
     if ( texture != 0 || numPoints > 0 ){
         clipX = x; clipY=y; clipW=width; clipH=height;
         glClearStencil(0x0);
@@ -131,8 +221,9 @@ static CGRect drawingRect;
         return;
     }
 
-    
+
 #endif
+#ifndef CN1_USE_METAL
     clipIsTexture = NO;
     int x2 = x + width;
     int y2 = y + height;
@@ -210,11 +301,13 @@ static CGRect drawingRect;
 #endif
         clipApplied = NO;
     }
+#endif  // #ifndef CN1_USE_METAL
 
 }
 
 
 +(void)updateClipToScale {
+#ifndef CN1_USE_METAL
     if ( clipIsTexture ){
         return;
     }
@@ -224,7 +317,7 @@ static CGRect drawingRect;
         //CN1Log(@"Updating clip to scale");
         glScissor(clipX, displayHeight - clipY - clipH, clipW, clipH);
     }
-
+#endif
 }
 
 #ifndef CN1_USE_ARC

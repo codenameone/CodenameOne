@@ -20,13 +20,56 @@
  * Please contact Codename One through http://www.codenameone.com/ if you
  * need additional information or have any questions.
  */
+//#define CN1_USE_METAL
+
+#ifndef CN1_USE_METAL
 #define USE_ES2 1
+#endif
+
 enum CN1GLenum {
     CN1_GL_ALPHA_TEXTURE,
     CN1_GL_VERTEX_COLORS
 };
 
-#ifdef USE_ES2
+#ifdef CN1_USE_METAL
+// Metal compatibility layer
+// These macros are no-ops for Metal since it uses a different rendering model
+// Transform operations are handled by CN1METALTransform instead
+#import "CN1METALTransform.h"
+
+#define _glMatrixMode(foo) ((void)0)
+#define _glLoadIdentity() CN1_Metal_LoadIdentity()
+#define _glOrthof(p1,p2,p3,p4,p5,p6) ((void)0)
+#define _glDisable(foo) ((void)0)
+#define _glEnable(foo) ((void)0)
+#define _glScalef(xScale,yScale,zScale) CN1_Metal_Scale(xScale,yScale,zScale)
+#define _glTranslatef(x,y,z) CN1_Metal_Translate(x,y,z)
+#define _glColor4f(r,g,b,a) ((void)0)
+#define _glEnableClientState(s) ((void)0)
+#define _glDisableClientState(s) ((void)0)
+#define _glTexCoordPointer(size,type,stride,pointer) ((void)0)
+#define _glVertexPointer(size,type,stride,pointer) ((void)0)
+#define _glDrawArrays(mode,first,count) ((void)0)
+#define _glRotatef(angle,x,y,z) CN1_Metal_Rotate(angle,x,y,z)
+#define _glEnableCN1State(state) ((void)0)
+#define _glDisableCN1State(state) ((void)0)
+#define _glAlphaMaskTexCoordPointer(size,type,stride,pointer) ((void)0)
+
+// Define GL constants as no-ops for Metal
+#define GL_TEXTURE_2D 0
+#define GL_BLEND 0
+#define GL_ONE_MINUS_SRC_ALPHA 0
+#define GL_SRC_ALPHA 0
+#define GL_MODELVIEW 0
+#define GL_PROJECTION 0
+#define GL_VERTEX_ARRAY 0
+#define GL_TEXTURE_COORD_ARRAY 0
+#define GL_TRIANGLES 0
+#define GL_TRIANGLE_FAN 0
+#define GL_TRIANGLE_STRIP 0
+#define GL_NO_ERROR 0
+
+#elif USE_ES2
 #import <GLKit/GLKit.h>
 #import <OpenGLES/ES2/gl.h>
 #import "ExecutableOp.h"

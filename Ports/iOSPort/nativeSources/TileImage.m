@@ -140,7 +140,204 @@ GLfloat* createVertexArray(int x, int y, int imageWidth, int imageHeight) {
 #endif
     return self;
 }
-#ifdef USE_ES2
+#ifdef CN1_USE_METAL
+-(void)execute {
+    if (width <= 0 || height <= 0) {
+        return;
+    }
+
+    int imageWidth = (int)[[img getImage] size].width;
+    int imageHeight = (int)[[img getImage] size].height;
+
+    if (imageWidth <= 0 || imageHeight <= 0) {
+        return;
+    }
+
+
+    // Get Metal encoder
+    id<MTLRenderCommandEncoder> encoder = [self makeRenderCommandEncoder];
+    if (!encoder) {
+        NSLog(@"TileImage: No encoder available!");
+        return;
+    }
+
+    // Get or create pipeline state
+    static id<MTLRenderPipelineState> pipelineState = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        id<MTLDevice> device = [self device];
+        id<MTLLibrary> library = [device newDefaultLibrary];
+
+        MTLRenderPipelineDescriptor *pipelineDescriptor = [[MTLRenderPipelineDescriptor alloc] init];
+        pipelineDescriptor.vertexFunction = [library newFunctionWithName:@"textured_vertex"];
+        pipelineDescriptor.fragmentFunction = [library newFunctionWithName:@"textured_fragment"];
+        pipelineDescriptor.colorAttachments[0].pixelFormat = MTLPixelFormatBGRA8Unorm;
+
+        // Configure vertex descriptor
+        MTLVertexDescriptor *vertexDescriptor = [[MTLVertexDescriptor alloc] init];
+        // Position attribute (float2)
+        vertexDescriptor.attributes[0].format = MTLVertexFormatFloat2;
+        vertexDescriptor.attributes[0].offset = 0;
+        vertexDescriptor.attributes[0].bufferIndex = 0;
+        // Texture coordinate attribute (float2)
+        vertexDescriptor.attributes[1].format = MTLVertexFormatFloat2;
+        vertexDescriptor.attributes[1].offset = sizeof(float) * 2;
+        vertexDescriptor.attributes[1].bufferIndex = 0;
+        // Layout for buffer 0
+        vertexDescriptor.layouts[0].stride = sizeof(float) * 4; // 2 for position + 2 for texcoord
+        vertexDescriptor.layouts[0].stepRate = 1;
+        vertexDescriptor.layouts[0].stepFunction = MTLVertexStepFunctionPerVertex;
+        pipelineDescriptor.vertexDescriptor = vertexDescriptor;
+
+        // Enable blending for alpha
+        pipelineDescriptor.colorAttachments[0].blendingEnabled = YES;
+        pipelineDescriptor.colorAttachments[0].rgbBlendOperation = MTLBlendOperationAdd;
+        pipelineDescriptor.colorAttachments[0].alphaBlendOperation = MTLBlendOperationAdd;
+        pipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = MTLBlendFactorOne;
+        pipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = MTLBlendFactorOne;
+        pipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+        pipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = MTLBlendFactorOneMinusSourceAlpha;
+
+        NSError *error = nil;
+        pipelineState = [device newRenderPipelineStateWithDescriptor:pipelineDescriptor error:&error];
+        if (error) {
+            NSLog(@"Error creating TileImage pipeline state: %@", error);
+        }
+#ifndef CN1_USE_ARC
+        [pipelineDescriptor release];
+#endif
+    });
+
+    [encoder setRenderPipelineState:pipelineState];
+
+    // Get texture from GLUIImage
+    id<MTLTexture> metalTexture = [img getMetalTextureWithDevice:[self device]];
+    if (!metalTexture) {
+        NSLog(@"TileImage: Failed to get Metal texture!");
+        return;
+    }
+    [encoder setFragmentTexture:metalTexture atIndex:0];
+
+    // Create sampler state
+    static id<MTLSamplerState> samplerState = nil;
+    static dispatch_once_t samplerOnce;
+    dispatch_once(&samplerOnce, ^{
+        MTLSamplerDescriptor *samplerDescriptor = [[MTLSamplerDescriptor alloc] init];
+        samplerDescriptor.minFilter = MTLSamplerMinMagFilterLinear;
+        samplerDescriptor.magFilter = MTLSamplerMinMagFilterLinear;
+        samplerDescriptor.sAddressMode = MTLSamplerAddressModeClampToEdge;
+        samplerDescriptor.tAddressMode = MTLSamplerAddressModeClampToEdge;
+        samplerState = [[self device] newSamplerStateWithDescriptor:samplerDescriptor];
+#ifndef CN1_USE_ARC
+        [samplerDescriptor release];
+#endif
+    });
+    [encoder setFragmentSamplerState:samplerState atIndex:0];
+
+    // Calculate tiling similar to ES2 version
+    int p2w = nextPowerOf2(imageWidth);
+    int p2h = nextPowerOf2(imageHeight);
+
+    GLfloat wRatio = (GLfloat)imageWidth / (GLfloat)p2w;
+    GLfloat hRatio = (GLfloat)imageHeight / (GLfloat)p2h;
+
+    // Inset texture coordinates by 0.5 pixels to avoid sampling at exact edge
+    GLfloat insetX = 0.5f / (GLfloat)p2w;
+    GLfloat insetY = 0.5f / (GLfloat)p2h;
+
+    // Use OpenGL-style texture coordinates (textures are flipped during creation to match)
+    GLfloat t0Y = 1.0 - hRatio + insetY;
+    GLfloat t0X = 0 + insetX;
+    GLfloat t1Y = 1 - insetY;
+    GLfloat t1X = wRatio - insetX;
+
+    int numTiles = ceil((float)width / (float)imageWidth) * ceil((float)height / (float)imageHeight);
+
+    // Create vertex array with position and texture coordinates interleaved
+    // Each tile needs 6 vertices (2 triangles) with 4 floats each (2 pos + 2 texcoord)
+    GLfloat* vertices = malloc(24 * numTiles * sizeof(GLfloat)); // 6 vertices * 4 floats per vertex
+
+    int vertexOffset = 0;
+    for (int xPos = 0; xPos < width; xPos += imageWidth) {
+        for (int yPos = 0; yPos < height; yPos += imageHeight) {
+            // Match ES2 implementation - exact tile boundaries with no overlap
+            GLfloat vx0 = (GLfloat)(x + xPos);
+            GLfloat vy0 = (GLfloat)(y + yPos);
+            GLfloat vx1 = vx0 + (GLfloat)imageWidth;
+            GLfloat vy1 = vy0 + (GLfloat)imageHeight;
+
+            GLfloat tx0 = t0X;
+            GLfloat ty0 = t0Y;
+            GLfloat tx1 = t1X;
+            GLfloat ty1 = t1Y;
+
+            // Adjust for edges that exceed the target area
+            if (xPos + imageWidth > width) {
+                vx1 = (GLfloat)(x + width);
+                tx1 = (GLfloat)(width - xPos) / (GLfloat)p2w;
+            }
+            if (yPos + imageHeight > height) {
+                // For the last tile, use exact boundary
+                vy1 = (GLfloat)(y + height);
+                ty0 = 1.0 - (GLfloat)(height - yPos) / (GLfloat)p2h;
+            }
+
+            // First triangle: top-left, top-right, bottom-left
+            // Using OpenGL-style texture coordinates (V=1 at top, V=0 at bottom)
+            vertices[vertexOffset++] = vx0; vertices[vertexOffset++] = vy0;
+            vertices[vertexOffset++] = tx0; vertices[vertexOffset++] = ty1;
+
+            vertices[vertexOffset++] = vx1; vertices[vertexOffset++] = vy0;
+            vertices[vertexOffset++] = tx1; vertices[vertexOffset++] = ty1;
+
+            vertices[vertexOffset++] = vx0; vertices[vertexOffset++] = vy1;
+            vertices[vertexOffset++] = tx0; vertices[vertexOffset++] = ty0;
+
+            // Second triangle: bottom-left, top-right, bottom-right
+            vertices[vertexOffset++] = vx0; vertices[vertexOffset++] = vy1;
+            vertices[vertexOffset++] = tx0; vertices[vertexOffset++] = ty0;
+
+            vertices[vertexOffset++] = vx1; vertices[vertexOffset++] = vy0;
+            vertices[vertexOffset++] = tx1; vertices[vertexOffset++] = ty1;
+
+            vertices[vertexOffset++] = vx1; vertices[vertexOffset++] = vy1;
+            vertices[vertexOffset++] = tx1; vertices[vertexOffset++] = ty0;
+        }
+    }
+
+    // Set vertex buffer
+    // Metal has a 4KB limit for setVertexBytes, so use a buffer for larger data
+    size_t vertexDataSize = vertexOffset * sizeof(GLfloat);
+    if (vertexDataSize <= 4096) {
+        [encoder setVertexBytes:vertices length:vertexDataSize atIndex:0];
+    } else {
+        id<MTLBuffer> vertexBuffer = [[self device] newBufferWithBytes:vertices
+                                                                 length:vertexDataSize
+                                                                options:MTLResourceStorageModeShared];
+        [encoder setVertexBuffer:vertexBuffer offset:0 atIndex:0];
+    }
+
+    // Set uniforms (MVP matrix + color modulation)
+    typedef struct {
+        simd_float4x4 mvpMatrix;
+        simd_float4 colorModulate;
+    } Uniforms;
+
+    Uniforms uniforms;
+    uniforms.mvpMatrix = [self getMVPMatrix];
+    float alphaNorm = ((float)alpha) / 255.0f;
+    // Preserve texture color, only apply alpha transparency
+    uniforms.colorModulate = simd_make_float4(1.0f, 1.0f, 1.0f, alphaNorm);
+
+    [encoder setVertexBytes:&uniforms length:sizeof(uniforms) atIndex:1];
+    [encoder setFragmentBytes:&uniforms.colorModulate length:sizeof(simd_float4) atIndex:0];
+
+    // Draw all tiles in one call
+    [encoder drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:6 * numTiles];
+
+    free(vertices);
+}
+#elif USE_ES2
 -(void)execute {
     if (width <= 0 || height <= 0) {
         return;
