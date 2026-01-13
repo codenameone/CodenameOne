@@ -138,7 +138,6 @@ public class BrowserComponent extends Container {
     private Vector<BrowserNavigationCallback> browserNavigationCallbacks;
     private Hashtable<Integer, SuccessCallback<JSRef>> returnValueCallbacks;
     private int nextReturnValueCallbackId = 0;
-    private JSONParser returnValueParser;
     private final Container placeholder = new Container();
     private final LinkedList<Runnable> onReady = new LinkedList<Runnable>();
     private String tmpUrl;

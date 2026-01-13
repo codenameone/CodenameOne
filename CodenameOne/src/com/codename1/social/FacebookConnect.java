@@ -49,10 +49,6 @@ public class FacebookConnect extends Login {
     private static final Object INSTANCE_LOCK = new Object();
     private final String[] permissions = new String[]{"public_profile", "email", "user_friends"};
 
-    static {
-        implClass = null;
-    }
-
     FacebookConnect() {
         setOauth2URL("https://www.facebook.com/dialog/oauth");
     }
@@ -80,6 +76,10 @@ public class FacebookConnect extends Login {
             }
             return instance;
         }
+    }
+
+    static void setImplClass(Class<?> implClass) {
+        FacebookConnect.implClass = implClass;
     }
 
     /**

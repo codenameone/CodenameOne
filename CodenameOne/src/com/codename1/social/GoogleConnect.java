@@ -45,14 +45,11 @@ import java.util.Hashtable;
  */
 public class GoogleConnect extends Login {
 
-    static Class implClass;
+    static Class<?> implClass;
     private static final String tokenURL = "https://www.googleapis.com/oauth2/v3/token";
     private static GoogleConnect instance;
     private static final Object INSTANCE_LOCK = new Object();
 
-    static {
-        implClass = null;
-    }
 
     GoogleConnect() {
         setOauth2URL("https://accounts.google.com/o/oauth2/auth");
@@ -80,6 +77,10 @@ public class GoogleConnect extends Login {
             }
             return instance;
         }
+    }
+
+    static void setImplClass(Class<?> implClass) {
+        GoogleConnect.implClass = implClass;
     }
 
     @Override

@@ -380,8 +380,4 @@ public class BarChart extends XYChart {
         DEFAULT, STACKED, HEAPED
     }
 
-    private static class Point {
-        int seriesIndex;
-        float yval;
-    }
 }

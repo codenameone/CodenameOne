@@ -40,7 +40,6 @@ public class Command implements ActionListener<ActionEvent> {
     private boolean disposesDialog = true;
     private Image icon;
     private char materialIcon;
-    private char fontIcon;
     private Font iconFont;
     private Image pressedIcon;
     private Image rolloverIcon;

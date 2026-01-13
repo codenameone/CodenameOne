@@ -107,7 +107,6 @@ public class Picker extends Button {
      */
     private boolean useLightweightPopup;
     private Runnable stopEditingCallback;
-    private Label focusedOverlay;
     private boolean suppressPaint;
 
     /**

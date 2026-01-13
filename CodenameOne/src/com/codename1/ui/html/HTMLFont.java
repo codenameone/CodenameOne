@@ -76,7 +76,6 @@ class HTMLFont {
     int style;
     boolean bold;
     boolean italic;
-    String tagFont;
     private final HTMLFont[] counterpartFonts = new HTMLFont[4];
 
     /**

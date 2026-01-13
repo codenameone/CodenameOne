@@ -36,9 +36,6 @@ import com.codename1.ui.geom.Rectangle2D;
  * @deprecated
  */
 public class Paint { // PMD Fix: UnusedPrivateField removed redundant antiAlias flag
-
-
-    static Graphics g;
     private Font typeface = Font.createSystemFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL);
     private int strokeCap = Cap.BUTT;
     private int strokeJoin = Join.BEVEL;

@@ -2112,7 +2112,7 @@ public class CSSBorder extends Border {
     private static class BackgroundImage {
         LinearGradient linearGradient;
         RadialGradient radialGradient;
-        byte verticalPositionType, horizontalPositionType, verticalSizeType, horizontalSizeType;
+        byte verticalPositionType, horizontalPositionType, verticalSizeType;
         ScalarUnit verticalPosition;
         ScalarUnit horizontalPosition;
         ScalarUnit verticalSize;

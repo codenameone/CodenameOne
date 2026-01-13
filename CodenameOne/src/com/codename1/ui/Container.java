@@ -4254,7 +4254,6 @@ public class Container extends Component implements Iterable<Component> {
         boolean dontRevalidate;
         private final long startTime;
         private int duration;
-        private Transition t;
         private final Container thisContainer;
         private boolean finished = false;
         private final Motion[][] motions;
