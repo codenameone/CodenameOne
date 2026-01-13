@@ -821,13 +821,13 @@ public class RequestBuilder {
         return req;
     }
 
-    private PropertyBusinessObject createBusinessObject(Class type, Map response) throws InstantiationException, IllegalAccessException {
+    private static PropertyBusinessObject createBusinessObject(Class type, Map response) throws InstantiationException, IllegalAccessException {
         PropertyBusinessObject pb = (PropertyBusinessObject) type.newInstance();
         pb.getPropertyIndex().populateFromMap(response);
         return pb;
     }
 
-    private List<PropertyBusinessObject> buildBusinessObjectList(Class type, List<Map> lst) throws InstantiationException, IllegalAccessException {
+    private static List<PropertyBusinessObject> buildBusinessObjectList(Class type, List<Map> lst) throws InstantiationException, IllegalAccessException {
         List<PropertyBusinessObject> result = new ArrayList<PropertyBusinessObject>();
         for (Map m : lst) {
             result.add(createBusinessObject(type, m));
