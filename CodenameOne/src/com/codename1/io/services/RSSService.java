@@ -208,7 +208,6 @@ public class RSSService extends ConnectionRequest implements ParserCallback {
         XMLParser p = new XMLParser() {
             private String lastTag;
             private Hashtable current;
-            private String url;
 
             protected boolean startTag(String tag) {
                 if ("item".equalsIgnoreCase(tag) || "entry".equalsIgnoreCase(tag)) {

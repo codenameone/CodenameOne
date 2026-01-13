@@ -821,6 +821,8 @@ def main() -> None:
             "UI_INHERITANCE_UNSAFE_GETRESOURCE",
             "URF_UNREAD_FIELD",
             "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD",
+            "UUF_UNUSED_FIELD",
+            "UWF_NULL_FIELD",
             "UW_UNCOND_WAIT",
             "SIC_INNER_SHOULD_BE_STATIC_ANON",
             "SS_SHOULD_BE_STATIC",

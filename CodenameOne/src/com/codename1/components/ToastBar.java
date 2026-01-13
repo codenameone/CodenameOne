@@ -270,8 +270,6 @@ public class ToastBar {
         };
         NetworkManager.getInstance().addErrorListener(errorListener);
         progListener[0] = new ActionListener<NetworkEvent>() {
-            private int soFar;
-
             public void actionPerformed(NetworkEvent evt) {
                 switch (evt.getProgressType()) {
                     case NetworkEvent.PROGRESS_TYPE_INITIALIZING:

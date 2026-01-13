@@ -457,6 +457,14 @@ public class Style {
     private long modifiedFlag;
     private EventDispatcher listeners;
 
+    Object getNativeOSCache() {
+        return nativeOSCache;
+    }
+
+    void setNativeOSCache(Object nativeOSCache) {
+        this.nativeOSCache = nativeOSCache;
+    }
+
     /**
      * Each component when it draw itself uses this Object
      * to determine in what colors it should use.
