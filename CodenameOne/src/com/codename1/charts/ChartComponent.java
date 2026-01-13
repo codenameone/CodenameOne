@@ -571,19 +571,19 @@ public class ChartComponent extends Component {
                 }
             } else {
                 if (zoomStart == null) {
-                    zoomStart = new Point((x[0] + x[1]) / 2, (y[0] + y[1]) / 2);
+                    zoomStart = new Point((x[0] + x[1]) / 2f, (y[0] + y[1]) / 2f);
                     zoomTransformStart = Transform.makeIdentity();
                     if (transform != null) {
                         zoomTransformStart.concatenate(transform);
                     }
-                    int dx = Math.abs(x[0] - x[1]) / 2;
-                    int dy = Math.abs(y[0] - y[1]) / 2;
+                    double dx = Math.abs(x[0] - x[1]) / 2f;
+                    double dy = Math.abs(y[0] - y[1]) / 2f;
                     zoomDistStart = Math.sqrt(dx * dx + dy * dy);
 
 
                 } else {
-                    int dx = Math.abs(x[0] - x[1]) / 2;
-                    int dy = Math.abs(y[0] - y[1]) / 2;
+                    double dx = Math.abs(x[0] - x[1]) / 2f;
+                    double dy = Math.abs(y[0] - y[1]) / 2f;
                     double zoomDist = Math.sqrt(dx * dx + dy * dy);
                     if (zoomDist == 0) {
                         zoomDist = 1;
