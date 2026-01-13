@@ -271,7 +271,8 @@ jobs:
           # Skip JavaDocSourceEmbed due to gist access issues in CI
           cp -r src/* build/tempJavaSources/
           # Suppress doclint noise on modern JDKs (e.g., Java 25) while keeping output consistent.
-          find build/tempJavaSources ../Ports/CLDC11/src -name "*.java" | /usr/bin/grep -v /impl/ | /usr/bin/xargs javadoc --allow-script-in-comments -Xdoclint:none -quiet -protected -d dist/javadoc -windowtitle "Codename One API" || true
+          # Patch java.base with CLDC11 stubs to avoid module conflicts for java.* packages.
+          find build/tempJavaSources ../Ports/CLDC11/src -name "*.java" | /usr/bin/grep -v /impl/ | /usr/bin/xargs javadoc --allow-script-in-comments --patch-module java.base=../Ports/CLDC11/src/java -Xdoclint:none -quiet -protected -d dist/javadoc -windowtitle "Codename One API" || true
           cd dist/javadoc
           zip -r ../../javadocs.zip *
           cd ..
