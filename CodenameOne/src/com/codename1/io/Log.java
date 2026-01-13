@@ -518,11 +518,17 @@ public class Log {
             } else {
                 return Util.getWriter(FileSystemStorage.getInstance().openOutputStream(getFileURL()));
             }
-        } catch (Exception err) {
-            setFileWriteEnabled(false);
-            // currently return a "dummy" writer so we won't fail on device
-            return Util.getWriter(new ByteArrayOutputStream());
+        } catch (IOException err) {
+            return fallbackWriterAfterError();
+        } catch (RuntimeException err) {
+            return fallbackWriterAfterError();
         }
+    }
+
+    private Writer fallbackWriterAfterError() {
+        setFileWriteEnabled(false);
+        // currently return a "dummy" writer so we won't fail on device
+        return Util.getWriter(new ByteArrayOutputStream());
     }
 
     private Writer getWriter() throws IOException {

@@ -431,17 +431,17 @@ public class JSONParser implements JSONParseCallback {
                     }
                 }
             }
-        } catch (Exception err) {
-            Log.e(err);
-            Log.p("Exception during JSON parsing at row: " + row + " column: " + column + " buffer: " + currentToken);
-            /*System.out.println();
-            int current = i.read();
-            while(current >= 0) {
-            System.out.print((char)current);
-            current = i.read();
-            }*/
-            i.close();
+        } catch (IOException err) {
+            handleParsingException(i, err, row, column, currentToken);
+        } catch (RuntimeException err) {
+            handleParsingException(i, err, row, column, currentToken);
         }
+    }
+
+    private static void handleParsingException(Reader i, Exception err, int row, int column, StringBuilder currentToken) throws IOException {
+        Log.e(err);
+        Log.p("Exception during JSON parsing at row: " + row + " column: " + column + " buffer: " + currentToken);
+        i.close();
     }
 
     /**

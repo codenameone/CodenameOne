@@ -173,7 +173,13 @@ public class Socket {
                             sc.connectionError(Util.getImplementation().getSocketErrorCode(connection), Util.getImplementation().getSocketErrorMessage(connection));
                         }
                     }
-                } catch (Exception err) {
+                } catch (InstantiationException err) {
+                    // instansiating the class has caused a problem
+                    Log.e(err);
+                } catch (IllegalAccessException err) {
+                    // instansiating the class has caused a problem
+                    Log.e(err);
+                } catch (RuntimeException err) {
                     // instansiating the class has caused a problem
                     Log.e(err);
                 }

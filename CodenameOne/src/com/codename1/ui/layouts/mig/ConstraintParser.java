@@ -933,13 +933,12 @@ public final class ConstraintParser {
 
                 throw new IllegalArgumentException("Unknown keyword.");
 
-            } catch (Exception ex) {
+            } catch (RuntimeException ex) {
                 Log.e(ex);
                 throw new IllegalArgumentException("Error parsing Constraint: '" + part + "'");
             }
         }
 
-//		cc = (CC) serializeTest(cc);
         return cc;
     }
 
