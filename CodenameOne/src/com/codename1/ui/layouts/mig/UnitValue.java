@@ -36,7 +36,9 @@ package com.codename1.ui.layouts.mig;
 import com.codename1.util.MathUtil;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Objects;
 
 public final class UnitValue {
     /**
@@ -618,6 +620,32 @@ public final class UnitValue {
     }
 
     public int hashCode() {
-        return (int) (value * 12345) + (oper >>> 5) + unit >>> 17;
+        int result = 17;
+        result = 31 * result + Float.floatToIntBits(value);
+        result = 31 * result + unit;
+        result = 31 * result + oper;
+        result = 31 * result + (isHor ? 1 : 0);
+        result = 31 * result + (unitStr != null ? unitStr.hashCode() : 0);
+        result = 31 * result + (linkId != null ? linkId.hashCode() : 0);
+        result = 31 * result + Arrays.hashCode(subUnits);
+        return result;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (!(obj instanceof UnitValue)) {
+            return false;
+        }
+        UnitValue other = (UnitValue) obj;
+        return Float.compare(value, other.value) == 0
+                && unit == other.unit
+                && oper == other.oper
+                && isHor == other.isHor
+                && Objects.equals(unitStr, other.unitStr)
+                && Objects.equals(linkId, other.linkId)
+                && Arrays.equals(subUnits, other.subUnits);
     }
 }

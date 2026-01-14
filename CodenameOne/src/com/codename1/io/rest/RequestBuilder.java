@@ -48,6 +48,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * This class is used to build, invoke the http request and to get the http
@@ -249,8 +250,8 @@ public class RequestBuilder {
      */
     public RequestBuilder header(String key, String value) {
         checkFetched();
-        // .toString() is used to trigger an NPE early for null headers
-        headers.put(key.toString(), value.toString());
+        headers.put(Objects.requireNonNull(key, "Header key cannot be null"),
+                Objects.requireNonNull(value, "Header value cannot be null"));
         return this;
     }
 

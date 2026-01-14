@@ -112,8 +112,9 @@ public class RadarChart extends RoundChart {
             paint.setColor(ColorUtil.GRAY);
             float thisRad = (float) Math.toRadians(90 - currentAngle);
             float nextRad = (float) Math.toRadians(90 - (currentAngle + angle));
-            for (double level = 0; level <= 1d; level += decCoef) { // PMD Fix: DontUseFloatTypeForLoopIndices switched to double
-                float levelFactor = (float) level;
+            int levelSteps = (int) Math.round(1d / decCoef);
+            for (int level = 0; level <= levelSteps; level++) {
+                float levelFactor = (float) (level * decCoef);
                 float thisX = (float) (centerX - Math.sin(thisRad) * radius * levelFactor);
                 float thisY = (float) (centerY - Math.cos(thisRad) * radius * levelFactor);
                 float nextX = (float) (centerX - Math.sin(nextRad) * radius * levelFactor);

@@ -55,6 +55,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Enumeration;
+import java.util.NoSuchElementException;
 
 /**
  * Maps the properties that are in a class/object and provides access to them so tools such as ORM
@@ -198,9 +199,10 @@ public class PropertyIndex implements Iterable<PropertyBase> {
             }
 
             public PropertyBase next() {
-                int i = off;
-                off++;
-                return properties[i];
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                return properties[off++];
             }
         };
     }
