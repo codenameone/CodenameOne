@@ -7177,13 +7177,9 @@ public abstract class CodenameOneImplementation {
      * Sets the frequency for polling the server in case of polling based push notification
      *
      * @param freq the frequency in milliseconds
+     * @deprecated we no longer support push polling
      */
     public void setPollingFrequency(int freq) {
-        if (callback != null && pollingThreadRunning) {
-            synchronized (callback) {
-                callback.notifyAll();
-            }
-        }
     }
 
     /**

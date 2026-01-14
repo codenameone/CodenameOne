@@ -815,6 +815,7 @@ def main() -> None:
             "NM_CONFUSING",
             "NM_FIELD_NAMING_CONVENTION",
             "NM_METHOD_NAMING_CONVENTION",
+            "NN_NAKED_NOTIFY",
             "NO_NOTIFY_NOT_NOTIFYALL",
             "NP_LOAD_OF_KNOWN_NULL_VALUE",
             "NP_BOOLEAN_RETURN_NULL",
@@ -850,6 +851,8 @@ def main() -> None:
             if f.rule == "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD" and "TarEntry.java" in loc:
                 return True
             if f.rule == "URF_UNREAD_FIELD" and "GridBagLayoutInfo" in loc:
+                return True
+            if f.rule == "NN_NAKED_NOTIFY" and "Display.java" in loc:
                 return True
             return False
 

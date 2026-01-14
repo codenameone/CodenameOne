@@ -154,8 +154,8 @@ public class WebBrowser extends Container {
                         if (callback != null) {
                             callback.streamReady(input, docInfo);
                         } else {
-                            response[0] = input;
                             synchronized (LOCK) {
+                                response[0] = input;
                                 LOCK.notifyAll();
                             }
                         }

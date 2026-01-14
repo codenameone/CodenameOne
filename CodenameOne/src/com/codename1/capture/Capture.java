@@ -257,8 +257,8 @@ public class Capture {
             } else {
                 url = (String) evt.getSource();
             }
-            completed = true;
             synchronized (this) {
+                completed = true;
                 this.notifyAll();
             }
         }
