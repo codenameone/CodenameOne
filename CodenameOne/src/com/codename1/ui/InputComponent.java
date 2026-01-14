@@ -91,17 +91,12 @@ public abstract class InputComponent extends Container {
     }
 
     private static boolean isGuiBuilderMode() {
-        Boolean current = guiBuilderMode;
-        if (current == null) {
-            synchronized (InputComponent.class) {
-                current = guiBuilderMode;
-                if (current == null) {
-                    current = Display.getInstance().getProperty("GUIBuilderDesignMode", null) != null;
-                    guiBuilderMode = current;
-                }
+        synchronized (InputComponent.class) {
+            if (guiBuilderMode == null) {
+                guiBuilderMode = Display.getInstance().getProperty("GUIBuilderDesignMode", null) != null;
             }
+            return guiBuilderMode.booleanValue();
         }
-        return current.booleanValue();
     }
 
     /**

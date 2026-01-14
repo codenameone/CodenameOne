@@ -676,7 +676,7 @@ public class Slider extends Label implements ActionSource {
     }
 
     private void fireActionEventImpl() {
-        actionListeners.fireActionEvent(new SliderActionEvent());
+        actionListeners.fireActionEvent(new SliderActionEvent(this));
     }
 
     /**
@@ -804,12 +804,12 @@ public class Slider extends Label implements ActionSource {
         return editable && !vertical;
     }
 
-    private class SliderActionEvent extends ActionEvent {
+    private static class SliderActionEvent extends ActionEvent {
         private final int value;
 
-        private SliderActionEvent() {
-            super(Slider.this, ActionEvent.Type.PointerPressed);
-            this.value = Slider.this.actionEventValue;
+        private SliderActionEvent(Slider source) {
+            super(source, ActionEvent.Type.PointerPressed);
+            this.value = source.actionEventValue;
         }
     }
 }

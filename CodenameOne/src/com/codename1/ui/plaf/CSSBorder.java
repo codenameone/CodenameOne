@@ -158,7 +158,7 @@ public class CSSBorder extends Border {
     public static final byte UNIT_EM = 4;
     private static final Map<String, Decorator> decorators = new HashMap<String, Decorator>();
     private static Context context;
-    private static Map<String, Byte> styleMap;
+    private static final Map<String, Byte> STYLE_MAP = createStyleMap();
 
     static {
         decorators.put("background-color", new Decorator() {
@@ -318,26 +318,22 @@ public class CSSBorder extends Border {
     }
 
     private static Map<String, Byte> styleMap() {
-        if (styleMap != null) {
-            return styleMap;
-        }
-        synchronized (CSSBorder.class) {
-            if (styleMap == null) {
-                styleMap = new HashMap<String, Byte>();
-                styleMap.put("none", STYLE_NONE);
-                styleMap.put("hidden", STYLE_HIDDEN);
-                styleMap.put("dotted", STYLE_DOTTED);
-                styleMap.put("dashed", STYLE_DASHED);
-                styleMap.put("solid", STYLE_SOLID);
-            }
-        }
-        return styleMap;
+        return STYLE_MAP;
+    }
+
+    private static Map<String, Byte> createStyleMap() {
+        Map<String, Byte> map = new HashMap<String, Byte>();
+        map.put("none", STYLE_NONE);
+        map.put("hidden", STYLE_HIDDEN);
+        map.put("dotted", STYLE_DOTTED);
+        map.put("dashed", STYLE_DASHED);
+        map.put("solid", STYLE_SOLID);
+        return map;
     }
 
     private static byte getBorderStyle(String style) {
         style = style.trim();
-        styleMap();
-        Byte b = styleMap.get(style);
+        Byte b = styleMap().get(style);
         if (b == null) {
             throw new IllegalArgumentException("Unsupported border style " + style);
 

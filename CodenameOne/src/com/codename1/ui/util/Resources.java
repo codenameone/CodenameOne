@@ -489,8 +489,6 @@ public class Resources {
                     setResource(id, magic, loadFont(this.input, id, false));
                     continue;
                 case MAGIC_DATA:
-                    setResource(id, magic, createData());
-                    continue;
                 case MAGIC_UI:
                     setResource(id, magic, createData());
                     continue;

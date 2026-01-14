@@ -99,9 +99,6 @@ public abstract class SeriesTransition implements Animation {
     protected void initTransition() {
         finished = false;
         switch (getEasing()) {
-            case EASING_LINEAR:
-                motion = Motion.createLinearMotion(0, 100, getDuration());
-                break;
             case EASING_IN:
                 motion = Motion.createEaseInMotion(0, 100, getDuration());
                 break;

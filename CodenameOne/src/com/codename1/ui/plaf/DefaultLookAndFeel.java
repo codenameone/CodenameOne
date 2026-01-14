@@ -1607,12 +1607,10 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
     private void drawLabelImageValign(Graphics g, Label l, Image icon, int x, int y, int fontHeight, int iconHeight) {
         int iconStringHGap = (fontHeight - iconHeight) / 2;
         //int strWidth = drawLabelString(g, l, text, x, y, textSpaceX, textSpaceW);
+        int drawY = y + iconStringHGap;
         switch (l.getVerticalAlignment()) {
-            case Component.TOP:
-                g.drawImage(icon, x, y + iconStringHGap);
-                break;
             case Component.BOTTOM:
-                g.drawImage(icon, x, y + fontHeight - iconHeight);
+                drawY = y + fontHeight - iconHeight;
                 break;
             case Component.BASELINE:
                 Font iconFont = l.getIconStyleComponent().getStyle().getFont();
@@ -1623,14 +1621,12 @@ public class DefaultLookAndFeel extends LookAndFeel implements FocusListener {
                 if (textFont == null) {
                     textFont = Font.getDefaultFont();
                 }
-                iconStringHGap = textFont.getAscent() - iconFont.getAscent();
-                g.drawImage(icon, x, y + iconStringHGap);
+                drawY = y + textFont.getAscent() - iconFont.getAscent();
                 break;
             default:
-                g.drawImage(icon, x, y + iconStringHGap);
                 break;
-
         }
+        g.drawImage(icon, x, drawY);
     }
 
     /**

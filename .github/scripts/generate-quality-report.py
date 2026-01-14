@@ -805,6 +805,8 @@ def main() -> None:
             "DM_BOOLEAN_CTOR",
             "DM_FP_NUMBER_CTOR",
             "DM_EXIT",
+            "DC_DOUBLECHECK",
+            "DB_DUPLICATE_SWITCH_CLAUSES",
             "EI_EXPOSE_REP", 
             "EI_EXPOSE_REP2",
             "EI_EXPOSE_STATIC_REP2",
@@ -831,7 +833,8 @@ def main() -> None:
             "SS_SHOULD_BE_STATIC",
             "UPM_UNCALLED_PRIVATE_METHOD",
             "RV_CHECK_FOR_POSITIVE_INDEXOF",
-            "SF_SWITCH_FALLTHROUGH"
+            "SF_SWITCH_FALLTHROUGH",
+            "SIC_INNER_SHOULD_BE_STATIC_NEEDS_THIS"
         }
 
         def _is_exempt(f: Finding) -> bool:

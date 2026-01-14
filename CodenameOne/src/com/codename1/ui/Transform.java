@@ -54,7 +54,9 @@ public class Transform {
      * Constant for transform type.  Transform is a scale transform only.
      */
     public static final int TYPE_SCALE = 2;
-    private static Transform _IDENTITY;
+    private static class IdentityHolder {
+        private static final Transform IDENTITY = createIdentity();
+    }
     /**
      * Reference to the native transform.  This should only be used by the implementation.
      */
@@ -83,16 +85,13 @@ public class Transform {
     }
 
     public static Transform IDENTITY() {
-        if (_IDENTITY != null) {
-            return _IDENTITY;
-        }
-        synchronized (Transform.class) {
-            if (_IDENTITY == null) {
-                _IDENTITY = new ImmutableTransform(Display.impl.makeTransformIdentity());
-                _IDENTITY.type = TYPE_IDENTITY;
-            }
-        }
-        return _IDENTITY;
+        return IdentityHolder.IDENTITY;
+    }
+
+    private static Transform createIdentity() {
+        Transform identity = new ImmutableTransform(Display.impl.makeTransformIdentity());
+        identity.type = TYPE_IDENTITY;
+        return identity;
     }
 
     /**
