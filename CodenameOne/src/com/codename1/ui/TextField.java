@@ -296,36 +296,31 @@ public class TextField extends TextArea {
         return create(text, 20);
     }
 
-    private static void initInputModes() {
+    private static synchronized void initInputModes() {
         if (inputModes != null) {
             return;
         }
-        synchronized (TextField.class) {
-            if (inputModes != null) {
-                return;
-            }
-            firstUppercaseInputMode.addElement("Abc");
-            inputModes = new Hashtable();
-            Hashtable upcase = new Hashtable();
-            int dlen = DEFAULT_KEY_CODES.length;
-            for (int iter = 0; iter < dlen; iter++) {
-                upcase.put(Integer.valueOf('0' + iter), DEFAULT_KEY_CODES[iter]);
-            }
-
-            inputModes.put("ABC", upcase);
-
-            Hashtable lowcase = new Hashtable();
-            for (int iter = 0; iter < dlen; iter++) {
-                lowcase.put(Integer.valueOf('0' + iter), DEFAULT_KEY_CODES[iter].toLowerCase());
-            }
-            inputModes.put("abc", lowcase);
-
-            Hashtable numbers = new Hashtable();
-            for (int iter = 0; iter < 10; iter++) {
-                numbers.put(Integer.valueOf('0' + iter), "" + iter);
-            }
-            inputModes.put("123", numbers);
+        firstUppercaseInputMode.addElement("Abc");
+        inputModes = new Hashtable();
+        Hashtable upcase = new Hashtable();
+        int dlen = DEFAULT_KEY_CODES.length;
+        for (int iter = 0; iter < dlen; iter++) {
+            upcase.put(Integer.valueOf('0' + iter), DEFAULT_KEY_CODES[iter]);
         }
+
+        inputModes.put("ABC", upcase);
+
+        Hashtable lowcase = new Hashtable();
+        for (int iter = 0; iter < dlen; iter++) {
+            lowcase.put(Integer.valueOf('0' + iter), DEFAULT_KEY_CODES[iter].toLowerCase());
+        }
+        inputModes.put("abc", lowcase);
+
+        Hashtable numbers = new Hashtable();
+        for (int iter = 0; iter < 10; iter++) {
+            numbers.put(Integer.valueOf('0' + iter), "" + iter);
+        }
+        inputModes.put("123", numbers);
     }
 
     /**

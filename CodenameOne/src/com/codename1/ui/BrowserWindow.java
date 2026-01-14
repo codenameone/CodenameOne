@@ -63,7 +63,7 @@ public class BrowserWindow {
     public BrowserWindow(String startURL) {
         nativeWindow = createNativeWindow(startURL);
         if (nativeWindow == null) {
-            form = new BrowserForm();
+            form = new BrowserForm(this);
             webview.setURL(startURL);
 
         }
@@ -213,7 +213,8 @@ public class BrowserWindow {
      * A fallback form implementation that contains a browser for platforms that don't
      * implement their own browser window.
      */
-    private class BrowserForm extends Form {
+    private static class BrowserForm extends Form {
+        private final BrowserWindow owner;
 
         /**
          * Listeners to be notified when the browser is closed.
@@ -228,10 +229,11 @@ public class BrowserWindow {
          */
         private boolean closed;
 
-        BrowserForm() {
+        BrowserForm(BrowserWindow owner) {
+            this.owner = owner;
             setLayout(new BorderLayout());
-            webview = new BrowserComponent();
-            add(BorderLayout.CENTER, webview);
+            owner.webview = new BrowserComponent();
+            add(BorderLayout.CENTER, owner.webview);
             backForm = Display.getInstance().getCurrent();
             Toolbar tb = new Toolbar();
             setToolbar(tb);

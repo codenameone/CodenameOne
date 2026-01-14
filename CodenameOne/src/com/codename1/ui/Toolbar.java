@@ -593,7 +593,7 @@ public class Toolbar extends Container {
      * @param callback gets the search string callbacks
      */
     public void showSearchBar(final ActionListener<ActionEvent> callback) {
-        SearchBar s = new CallbackSearchBar(callback);
+        SearchBar s = new CallbackSearchBar(this, callback);
         Form f = Toolbar.this.getComponentForm();
         setHidden(true);
         f.removeComponentFromForm(Toolbar.this);
@@ -2768,11 +2768,11 @@ public class Toolbar extends Container {
     }
 
 
-    private class CallbackSearchBar extends SearchBar {
+    private static class CallbackSearchBar extends SearchBar {
         private final ActionListener<ActionEvent> callback;
 
-        public CallbackSearchBar(ActionListener<ActionEvent> callback) {
-            super(Toolbar.this, Toolbar.this.searchIconSize);
+        public CallbackSearchBar(Toolbar owner, ActionListener<ActionEvent> callback) {
+            super(owner, owner.searchIconSize);
             this.callback = callback;
         }
 

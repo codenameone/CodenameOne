@@ -144,7 +144,7 @@ public class MorphTransition extends Transition {
             if (sourceCmp == null || destCmp == null) {
                 continue;
             }
-            CC cc = new CC(sourceCmp, destCmp, sourceForm, destForm);
+            CC cc = new CC(sourceCmp, destCmp, duration);
             fromToComponents[index] = cc;
             index++;
             cc.placeholderDest = new Label();
@@ -252,7 +252,7 @@ public class MorphTransition extends Transition {
         }
     }
 
-    class CC {
+    static class CC {
         Component source;
         Component dest;
         Label placeholderSrc;
@@ -261,7 +261,7 @@ public class MorphTransition extends Transition {
         Motion yMotion;
         Motion wMotion;
         Motion hMotion;
-        public CC(Component source, Component dest, Form sourceForm, Form destForm) {
+        public CC(Component source, Component dest, int duration) {
             this.source = source;
             this.dest = dest;
             xMotion = Motion.createEaseInOutMotion(positionRelativeToScreen(source, false), positionRelativeToScreen(dest, false), duration);

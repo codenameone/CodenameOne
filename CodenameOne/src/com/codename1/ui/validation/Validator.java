@@ -130,16 +130,13 @@ public class Validator {
     }
 
     private static Image initDefaultValidationFailedEmblem() {
-        if (defaultValidationFailedEmblem != null) {
-            return defaultValidationFailedEmblem;
-        }
         synchronized (Validator.class) {
             if (defaultValidationFailedEmblem == null) {
                 // initialize the default emblem
                 defaultValidationFailedEmblem = FontImage.createMaterial(FontImage.MATERIAL_CANCEL, "InvalidEmblem", 3);
             }
+            return defaultValidationFailedEmblem;
         }
-        return defaultValidationFailedEmblem;
     }
 
     /**
