@@ -886,7 +886,7 @@ public class RoundRectBorder extends Border {
             x += strokePx / 2f;
             y += strokePx / 2f;
 
-            if (strokePx % 2 == 1) {
+            if ((strokePx & 1) != 0) {
                 x += 0.5f;
                 y += 0.5f;
             }

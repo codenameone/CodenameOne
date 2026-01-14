@@ -269,9 +269,9 @@ public class MultipartRequest extends ConnectionRequest {
                 length += key.length();
                 if (ignoreEncoding.contains(key)) {
                     try {
-                        length += value.toString().getBytes("UTF-8").length;
+                        length += ((String) value).getBytes("UTF-8").length;
                     } catch (UnsupportedEncodingException ex) {
-                        length += StringUtil.getBytes(value.toString()).length;
+                        length += StringUtil.getBytes((String) value).length;
                     }
                 } else {
                     if (base64Binaries) {
@@ -287,9 +287,9 @@ public class MultipartRequest extends ConnectionRequest {
                         length += key.length();
                         if (ignoreEncoding.contains(key)) {
                             try {
-                                length += s.toString().getBytes("UTF-8").length;
+                                length += s.getBytes("UTF-8").length;
                             } catch (UnsupportedEncodingException ex) {
-                                length += StringUtil.getBytes(value.toString()).length;
+                                length += StringUtil.getBytes(s).length;
                             }
                         } else {
                             if (base64Binaries) {

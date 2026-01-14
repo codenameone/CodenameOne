@@ -969,7 +969,7 @@ public final class ConstraintParser {
             String[] insS = toTrimmedTokens(s, ' ');
             UnitValue[] ins = new UnitValue[4];
             for (int j = 0; j < 4; j++) {
-                UnitValue insSz = parseUnitValue(insS[j < insS.length ? j : insS.length - 1], UnitValue.ZERO, j % 2 == 1);
+                UnitValue insSz = parseUnitValue(insS[j < insS.length ? j : insS.length - 1], UnitValue.ZERO, (j & 1) != 0);
                 ins[j] = insSz != null ? insSz : PlatformDefaults.getPanelInsets(j);
             }
             return ins;

@@ -188,16 +188,6 @@ public class Rectangle implements Shape {
         tx2 -= tx1;
         ty2 -= ty1;
 
-        // tx2,ty2 will never overflow (they will never be
-        // larger than the smallest of the two source w,h)
-        // they might underflow, though...
-        if (tx2 < Integer.MIN_VALUE) {
-            tx2 = Integer.MIN_VALUE;
-        }
-        if (ty2 < Integer.MIN_VALUE) {
-            ty2 = Integer.MIN_VALUE;
-        }
-
         dest.x = tx1;
         dest.y = ty1;
         dest.size.setWidth(tx2);
@@ -422,16 +412,6 @@ public class Rectangle implements Shape {
         }
         tx2 -= tx1;
         ty2 -= ty1;
-        // tx2,ty2 will never overflow (they will never be
-        // larger than the smallest of the two source w,h)
-        // they might underflow, though...
-        if (tx2 < Integer.MIN_VALUE) {
-            tx2 = Integer.MIN_VALUE;
-        }
-        if (ty2 < Integer.MIN_VALUE) {
-            ty2 = Integer.MIN_VALUE;
-        }
-
         return new Rectangle(tx1, ty1, tx2, ty2);
     }
 
@@ -462,15 +442,6 @@ public class Rectangle implements Shape {
         }
         tx2 -= tx1;
         ty2 -= ty1;
-        // tx2,ty2 will never overflow (they will never be
-        // larger than the smallest of the two source w,h)
-        // they might underflow, though...
-        if (tx2 < Integer.MIN_VALUE) {
-            tx2 = Integer.MIN_VALUE;
-        }
-        if (ty2 < Integer.MIN_VALUE) {
-            ty2 = Integer.MIN_VALUE;
-        }
         tx2 = Math.max(0, tx2);
         ty2 = Math.max(0, ty2);
         output.setBounds(tx1, ty1, tx2, ty2);

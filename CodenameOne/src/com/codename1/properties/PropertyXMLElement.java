@@ -29,6 +29,8 @@ import com.codename1.xml.Element;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.Vector;
 
 /**
@@ -295,7 +297,21 @@ class PropertyXMLElement extends Element {
 
     @Override
     public int hashCode() {
-        return parent.hashCode();
+        return Objects.hash(parent, parentElement, index);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (!(obj instanceof PropertyXMLElement)) {
+            return false;
+        }
+        PropertyXMLElement other = (PropertyXMLElement) obj;
+        return index == other.index
+                && Objects.equals(parent, other.parent)
+                && Objects.equals(parentElement, other.parentElement);
     }
 
     @Override
@@ -330,8 +346,10 @@ class PropertyXMLElement extends Element {
 
             @Override
             public Element next() {
-                offset++;
-                return getChildAt(index);
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                return getChildAt(offset++);
             }
 
             @Override

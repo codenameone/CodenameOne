@@ -52,9 +52,10 @@ public class PieSegment {
         double cAngle = angle % 360;
         double startAngle = mStartAngle;
         double stopAngle = mEndAngle;
-        while (stopAngle > 360) {
-            startAngle -= 360;
-            stopAngle -= 360;
+        if (stopAngle > 360) {
+            int rotations = (int) Math.floor(stopAngle / 360d);
+            startAngle -= 360 * rotations;
+            stopAngle -= 360 * rotations;
         }
         return cAngle >= startAngle && cAngle <= stopAngle;
     }
