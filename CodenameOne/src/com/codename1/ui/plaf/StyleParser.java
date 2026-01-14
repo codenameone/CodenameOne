@@ -925,7 +925,7 @@ public class StyleParser {
      */
     public static List<String> getSupportedBackgroundTypes() {
         ArrayList<String> out = new ArrayList<String>();
-        out.addAll(bgTypes.keySet());
+        out.addAll(BG_TYPES.keySet());
         return out;
     }
 
@@ -1439,7 +1439,7 @@ public class StyleParser {
          * @return Self for chaining.
          */
         public StyleInfo setBgType(Integer i) {
-            setBgType(flip(bgTypes).get(i));
+            setBgType(flip(bgTypes()).get(i));
             return this;
         }
 
