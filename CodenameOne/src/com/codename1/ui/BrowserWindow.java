@@ -214,7 +214,6 @@ public class BrowserWindow {
      * implement their own browser window.
      */
     private static class BrowserForm extends Form {
-        private final BrowserWindow owner;
 
         /**
          * Listeners to be notified when the browser is closed.
@@ -230,7 +229,6 @@ public class BrowserWindow {
         private boolean closed;
 
         BrowserForm(BrowserWindow owner) {
-            this.owner = owner;
             setLayout(new BorderLayout());
             owner.webview = new BrowserComponent();
             add(BorderLayout.CENTER, owner.webview);
