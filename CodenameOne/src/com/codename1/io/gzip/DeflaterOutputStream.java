@@ -84,7 +84,7 @@ public class DeflaterOutputStream extends FilterOutputStream {
     public void write(byte[] b, int off, int len) throws IOException {
         if (deflater.finished()) {
             throw new IOException("finished");
-        } else if (off < 0 | len < 0 | off + len > b.length) {
+        } else if (off < 0 || len < 0 || off + len > b.length) {
             throw new IndexOutOfBoundsException();
         } else if (len == 0) {
         } else {

@@ -239,8 +239,11 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     }
 
     public void keyValue(String key, String value) {
+        if (key == null) {
+            return;
+        }
         //make sure value is not null to prevent NPE
-        if (key != null && value == null) {
+        if (value == null) {
             value = "";
         }
         getCurrent().put(key, value);

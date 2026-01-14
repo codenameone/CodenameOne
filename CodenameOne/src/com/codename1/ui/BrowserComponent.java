@@ -1601,7 +1601,7 @@ public class BrowserComponent extends Container {
      * @return true if debug mode was activated
      */
     public boolean isDebugMode() {
-        return getClientProperty("BrowserComponent.firebug") == Boolean.TRUE;
+        return Boolean.TRUE.equals(getClientProperty("BrowserComponent.firebug"));
     }
 
     /**
