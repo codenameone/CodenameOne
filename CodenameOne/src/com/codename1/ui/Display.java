@@ -506,9 +506,8 @@ public final class Display extends CN1Constants {
      * Notice that minimize (being a Codename One method) MUST be invoked before invoking this method!
      */
     public static void deinitialize() {
-
-        INSTANCE.codenameOneRunning = false;
         synchronized (lock) {
+            INSTANCE.codenameOneRunning = false;
             lock.notifyAll();
         }
     }
@@ -4684,6 +4683,7 @@ public final class Display extends CN1Constants {
      * Sets the frequency for polling the server in case of polling based push notification
      *
      * @param freq the frequency in milliseconds
+     * @deprecated we no longer support push polling
      */
     public void setPollingFrequency(int freq) {
         impl.setPollingFrequency(freq);

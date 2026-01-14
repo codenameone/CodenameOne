@@ -106,8 +106,8 @@ class RunnableWrapper implements Runnable {
             switch (type) {
                 case 0:
                     internal.run();
-                    done = true;
                     synchronized (Display.lock) {
+                        done = true;
                         Display.lock.notifyAll();
                     }
                     break;

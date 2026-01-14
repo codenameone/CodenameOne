@@ -152,6 +152,15 @@
         <Bug pattern="SF_SWITCH_FALLTHROUGH" />
     </Match>
 
+    <!--
+    This rule is a bit broad for the complex threading logic in Display.
+    Ideally, this code should be rewritten, but it's battle tested and deep.
+    -->
+    <Match>
+        <Class name="~com\.codename1\.ui\.Display.*" />
+        <Bug pattern="NN_NAKED_NOTIFY" />
+    </Match>
+
     <!-- Excluding since the class explicitly compares interned strings -->
     <Match>
         <Class name="~com\.codename1\.io\.ConnectionRequest.*" />

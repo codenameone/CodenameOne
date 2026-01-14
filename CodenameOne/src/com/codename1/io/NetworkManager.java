@@ -330,8 +330,8 @@ public class NetworkManager {
                 }
             }
         }
-        networkThreads = null;
         synchronized (LOCK) {
+            networkThreads = null;
             LOCK.notifyAll();
         }
 
@@ -970,10 +970,10 @@ public class NetworkManager {
                     if (!runCurrentRequest(currentRequest)) {
                         continue;
                     }
-                    currentRequest = null;
 
                     // wakeup threads waiting for the completion of this network operation
                     synchronized (LOCK) {
+                        currentRequest = null;
                         LOCK.notifyAll();
                     }
                 } else {
