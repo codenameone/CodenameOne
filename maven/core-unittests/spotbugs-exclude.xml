@@ -97,6 +97,14 @@
     </Match>
 
     <!--
+    FilterProxyListModel intentionally negates compareTo for descending order.
+    -->
+    <Match>
+        <Class name="com.codename1.ui.list.FilterProxyListModel" />
+        <Bug pattern="RV_NEGATING_RESULT_OF_COMPARETO" />
+    </Match>
+
+    <!--
     We don't have many public fields. In fact, we have one.
     But since we're an API we can't remove it.
     -->
