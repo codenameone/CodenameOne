@@ -3966,10 +3966,7 @@ public abstract class CodenameOneImplementation {
      *                        common constants in this class or be a user/implementation defined sound
      */
     public void playBuiltinSound(String soundIdentifier) {
-        boolean played = playUserSound(soundIdentifier);
-        if (!played) {
-            return;
-        }
+        playUserSound(soundIdentifier);
     }
 
     /**
@@ -3977,11 +3974,11 @@ public abstract class CodenameOneImplementation {
      *
      * @param soundIdentifier the sound identifier which can match one of the
      *                        common constants in this class or be a user/implementation defined sound
-     * @return true if a user sound exists and was sent to playback
      */
-    protected boolean playUserSound(String soundIdentifier) {
-        Object sound = builtinSounds.get(soundIdentifier);
-        return sound != null;
+    protected void playUserSound(String soundIdentifier) {
+        // TODO: Reintroduce builitin sound support
+        //Object sound = builtinSounds.get(soundIdentifier);
+        //return sound != null;
         //playAudio(sound);
     }
 

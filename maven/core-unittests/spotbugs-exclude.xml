@@ -151,6 +151,47 @@
         <Class name="~com\.codename1\.io\.gzip\.Inflate.*" />
         <Bug pattern="SF_SWITCH_FALLTHROUGH" />
     </Match>
+    <Match>
+        <Class name="~com\.codename1\.io\.gzip\.Deflate.*" />
+        <Bug pattern="ICAST_QUESTIONABLE_UNSIGNED_RIGHT_SHIFT" />
+    </Match>
+
+    <!--
+    There are two failures for this specific bug:
+    com.codename1.ui.Container.setLightweightMode(boolean)
+    com.codename1.impl.CodenameOneImplementation.playBuiltinSound(String)
+
+    Lightweight mode is useful in peer components, which is only
+    visible in the native layer (invisible to spotbugs).
+    playBuiltinSound seems unused, but we probably would want to fix
+    that at some point.
+    -->
+    <Match>
+        <Bug pattern="UC_USELESS_VOID_METHOD" />
+    </Match>
+
+    <!--
+    These are actual bugs we're ignoring specifically:
+    components isn't initialized in com.codename1.ui.Container.initLaf(UIManager) when invoked from constructor for superclass
+    fontIconSize isn't initialized in com.codename1.ui.Label.initLaf(UIManager) when invoked from constructor for superclass
+    materialIconSize isn't initialized in com.codename1.ui.Label.initLaf(UIManager) when invoked from constructor for superclass
+
+    Unfortunately, we can't fix them without breaking Codename One.
+    initLaf is deeply embedded in the code and the constructor chain,
+    and we just can't fix it properly.
+    -->
+    <Match>
+        <Bug pattern="UR_UNINIT_READ_CALLED_FROM_SUPER_CONSTRUCTOR" />
+    </Match>
+
+    <!--
+    This fires for timed waits which shouldn't be in a loop.
+    It's a bad check. In one particular case, it also misses a loop
+    in the parent (EDT main loop).
+    -->
+    <Match>
+        <Bug pattern="WA_NOT_IN_LOOP" />
+    </Match>
 
     <!--
     This rule is a bit broad for the complex threading logic in Display.

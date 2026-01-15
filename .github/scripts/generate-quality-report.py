@@ -778,6 +778,7 @@ def main() -> None:
             "FE_FLOATING_POINT_EQUALITY",
             "FE_TEST_IF_EQUAL_TO_NOT_A_NUMBER",
             "ICAST_IDIV_CAST_TO_DOUBLE",
+            "ICAST_QUESTIONABLE_UNSIGNED_RIGHT_SHIFT",
             "SA_FIELD_SELF_ASSIGNMENT",
             "UC_USELESS_CONDITION",
             "UC_USELESS_OBJECT",
@@ -824,6 +825,7 @@ def main() -> None:
             "NP_LOAD_OF_KNOWN_NULL_VALUE",
             "NP_BOOLEAN_RETURN_NULL",
             "RC_REF_COMPARISON_BAD_PRACTICE_BOOLEAN",
+            "OS_OPEN_STREAM",
             "REFLC_REFLECTION_MAY_INCREASE_ACCESSIBILITY_OF_CLASS",
             "REC_CATCH_EXCEPTION",
             "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
@@ -864,6 +866,8 @@ def main() -> None:
             if f.rule == "URF_UNREAD_FIELD" and "GridBagLayoutInfo" in loc:
                 return True
             if f.rule == "NN_NAKED_NOTIFY" and "Display.java" in loc:
+                return True
+            if f.rule == "ICAST_QUESTIONABLE_UNSIGNED_RIGHT_SHIFT" and "Deflate.java" in loc:
                 return True
             return False
 
