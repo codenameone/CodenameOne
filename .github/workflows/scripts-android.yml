@@ -144,7 +144,7 @@ jobs:
           api-level: 31
           arch: x86_64
           target: google_apis
-          disk-size: 2048M
+          disk-size: 8192M
           script: ./scripts/run-android-instrumentation-tests.sh "${{ steps.build-android-app.outputs.gradle_project_dir }}"
       - name: Upload emulator screenshot
         if: always() && matrix.id == 'default'
