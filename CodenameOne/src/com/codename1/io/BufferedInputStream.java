@@ -388,7 +388,8 @@ public class BufferedInputStream extends InputStream {
             }
         }
         if (sleepDuration > 0) {
-            Util.sleep(sleepDuration);
+            int sleepMs = sleepDuration > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) sleepDuration;
+            Util.sleep(sleepMs);
         }
     }
 
