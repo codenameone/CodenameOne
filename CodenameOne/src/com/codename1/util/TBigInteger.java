@@ -924,7 +924,7 @@ class TBigInteger {
             return hashCode;
         }
         for (int i = 0; i < digits.length; i++) {
-            hashCode = (hashCode * 33 + (digits[i] & 0xffffffff));
+            hashCode = (hashCode * 33 + digits[i]);
         }
         hashCode = hashCode * sign;
         return hashCode;

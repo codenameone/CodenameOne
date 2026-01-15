@@ -563,7 +563,17 @@ public class Image implements ActionSource {
 
             // Skip other markers.
             try {
-                is.skip(length);
+                long remaining = length;
+                while (remaining > 0) {
+                    long skipped = is.skip(remaining);
+                    if (skipped > 0) {
+                        remaining -= skipped;
+                    } else if (read(is, buf, 1)) {
+                        remaining--;
+                    } else {
+                        return 0;
+                    }
+                }
             } catch (IOException ex) {
                 return 0;
             }

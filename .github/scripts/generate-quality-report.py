@@ -834,11 +834,18 @@ def main() -> None:
             "DM_STRING_TOSTRING",
             "HE_HASHCODE_USE_OBJECT_EQUALS",
             "IM_BAD_CHECK_FOR_ODD",
+            "IM_AVERAGE_COMPUTATION_COULD_OVERFLOW",
+            "INT_VACUOUS_BIT_OPERATION",
+            "ICAST_INT_2_LONG_AS_INSTANT",
+            "ICAST_INT_CAST_TO_FLOAT_PASSED_TO_ROUND",
             "IT_NO_SUCH_ELEMENT",
             "FL_FLOATS_AS_LOOP_COUNTERS",
             "UI_INHERITANCE_UNSAFE_GETRESOURCE",
+            "IS2_INCONSISTENT_SYNC",
+            "RR_NOT_CHECKED",
             "URF_UNREAD_FIELD",
             "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD",
+            "UR_UNINIT_READ",
             "UUF_UNUSED_FIELD",
             "UWF_NULL_FIELD",
             "UW_UNCOND_WAIT",
@@ -846,9 +853,15 @@ def main() -> None:
             "SIC_INNER_SHOULD_BE_STATIC_ANON",
             "SS_SHOULD_BE_STATIC",
             "UPM_UNCALLED_PRIVATE_METHOD",
+            "RV_RETURN_VALUE_IGNORED_INFERRED",
             "RV_CHECK_FOR_POSITIVE_INDEXOF",
             "SF_SWITCH_FALLTHROUGH",
-            "SIC_INNER_SHOULD_BE_STATIC_NEEDS_THIS"
+            "SIC_INNER_SHOULD_BE_STATIC_NEEDS_THIS",
+            "SA_FIELD_DOUBLE_ASSIGNMENT",
+            "SA_FIELD_SELF_COMPARISON",
+            "SR_NOT_CHECKED",
+            "SWL_SLEEP_WITH_LOCK_HELD",
+            "UC_USELESS_CONDITION_TYPE"
         }
 
         def _is_exempt(f: Finding) -> bool:

@@ -378,14 +378,18 @@ public class BufferedInputStream extends InputStream {
         return cnt;
     }
 
-    private synchronized void yieldTime() {
+    private void yieldTime() {
         long time = System.currentTimeMillis();
-        if (time - elapsedSinceLastYield > 300) {
-            try {
-                Thread.sleep(yield);
-            } catch (InterruptedException ex) {
+        long sleepDuration = 0;
+        synchronized (this) {
+            if (time - elapsedSinceLastYield > 300) {
+                elapsedSinceLastYield = time;
+                sleepDuration = yield;
             }
-            elapsedSinceLastYield = time;
+        }
+        if (sleepDuration > 0) {
+            int sleepMs = sleepDuration > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) sleepDuration;
+            Util.sleep(sleepMs);
         }
     }
 
@@ -637,18 +641,14 @@ public class BufferedInputStream extends InputStream {
         if (connection != null) {
             Util.getImplementation().cleanup(connection);
         }
-        byte[] buffer;
-        while ((buffer = buf) != null) {
-            if (buf == buffer) { //bufUpdater.compareAndSet(this, buffer, null)) {
-                buf = null;
-                InputStream input = in;
-                in = null;
-                if (input != null) {
-                    input.close();
-                }
-                return;
+        byte[] buffer = buf;
+        if (buffer != null) {
+            buf = null;
+            InputStream input = in;
+            in = null;
+            if (input != null) {
+                input.close();
             }
-            // Else retry in case a new buf was CASed in fill()
         }
     }
 

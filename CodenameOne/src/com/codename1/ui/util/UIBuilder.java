@@ -926,7 +926,7 @@ public class UIBuilder { //implements Externalizable {
         if (type == Date.class) {
             boolean b = in.readBoolean();
             if (b) {
-                return new Date(in.readInt());
+                return new Date(in.readLong());
             }
         }
 

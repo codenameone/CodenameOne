@@ -22,7 +22,6 @@
  */
 package com.codename1.ui;
 
-import com.codename1.ui.ComponentSelector.Filter;
 import com.codename1.ui.geom.Dimension;
 import com.codename1.ui.layouts.BorderLayout;
 
@@ -71,28 +70,16 @@ public class InterFormContainer extends Container {
         final Map<Component, InterFormContainer> set1 = new HashMap<Component, InterFormContainer>();
         final Map<Component, InterFormContainer> set2 = new HashMap<Component, InterFormContainer>();
         final Map<InterFormContainer, InterFormContainer> out = new HashMap<InterFormContainer, InterFormContainer>();
-        ComponentSelector.select("*", root1).filter(new Filter() {
-            @Override
-            public boolean filter(Component c) {
-                if (c.getClass() == InterFormContainer.class) {
-                    set1.put(((InterFormContainer) c).content, (InterFormContainer) c);
-                    return true;
-                }
-                return false;
+        for (Component c : ComponentSelector.select("*", root1)) {
+            if (c.getClass() == InterFormContainer.class) {
+                set1.put(((InterFormContainer) c).content, (InterFormContainer) c);
             }
-
-        });
-        ComponentSelector.select("*", root2).filter(new Filter() {
-            @Override
-            public boolean filter(Component c) {
-                if (c.getClass() == InterFormContainer.class) {
-                    set2.put(((InterFormContainer) c).content, (InterFormContainer) c);
-                    return true;
-                }
-                return false;
+        }
+        for (Component c : ComponentSelector.select("*", root2)) {
+            if (c.getClass() == InterFormContainer.class) {
+                set2.put(((InterFormContainer) c).content, (InterFormContainer) c);
             }
-
-        });
+        }
 
         for (Map.Entry<Component, InterFormContainer> entry : set1.entrySet()) {
             Component c = entry.getKey();
