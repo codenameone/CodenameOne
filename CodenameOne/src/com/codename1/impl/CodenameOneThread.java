@@ -23,6 +23,7 @@
 package com.codename1.impl;
 
 import com.codename1.io.Log;
+import com.codename1.io.Util;
 import com.codename1.ui.Display;
 
 import java.io.DataInputStream;
@@ -133,6 +134,8 @@ public class CodenameOneThread extends Thread {
      * Prints the stack trace matching the given stack
      */
     public String getStack(Throwable t) {
+        InputStream inp = null;
+        DataInputStream di = null;
         try {
             StringBuilder b = new StringBuilder();
             int size;
@@ -145,11 +148,11 @@ public class CodenameOneThread extends Thread {
             }
             String[] stk = new String[size];
 
-            InputStream inp = Display.getInstance().getResourceAsStream(getClass(), "/methodData.dat");
+            inp = Display.getInstance().getResourceAsStream(getClass(), "/methodData.dat");
             if (inp == null) {
                 return t.toString();
             }
-            DataInputStream di = new DataInputStream(inp);
+            di = new DataInputStream(inp);
             int totalAmount = di.readInt();
             String lastClass = "";
             for (int x = 0; x < totalAmount; x++) {
@@ -172,6 +175,9 @@ public class CodenameOneThread extends Thread {
             return b.toString();
         } catch (IOException ex) {
             ex.printStackTrace();
+        } finally {
+            Util.cleanup(di);
+            Util.cleanup(inp);
         }
         return "Failed in stack generation for " + t;
     }

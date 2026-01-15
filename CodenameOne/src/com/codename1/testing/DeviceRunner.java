@@ -23,6 +23,7 @@
 package com.codename1.testing;
 
 import com.codename1.io.Log;
+import com.codename1.io.Util;
 import com.codename1.ui.CN;
 import com.codename1.ui.Display;
 
@@ -48,8 +49,10 @@ public abstract class DeviceRunner {
         failedTests = 0;
         passedTests = 0;
         Log.p("-----STARTING TESTS-----");
+        InputStream is = null;
+        DataInputStream di = null;
         try {
-            InputStream is = DeviceRunner.class.getResourceAsStream("/tests.dat");
+            is = DeviceRunner.class.getResourceAsStream("/tests.dat");
 
             if (is == null) {
                 is = Display.getInstance().getResourceAsStream(null, "/tests.dat");
@@ -60,7 +63,7 @@ public abstract class DeviceRunner {
                 System.exit(2);
                 return;
             }
-            DataInputStream di = new DataInputStream(is);
+            di = new DataInputStream(is);
             int version = di.readInt();
             if (version > VERSION) {
                 Log.p("Tests were built with a new version of Codename One and can't be executed with this runner");
@@ -72,13 +75,16 @@ public abstract class DeviceRunner {
             for (int iter = 0; iter < tests.length; iter++) {
                 tests[iter] = di.readUTF();
             }
-            di.close();
+            Util.cleanup(di);
 
-            for (int iter = 0; iter < tests.length; iter++) {
-                runTest(tests[iter]);
+            for (String test : tests) {
+                runTest(test);
             }
         } catch (IOException err) {
             TestReporting.getInstance().logException(err);
+        } finally {
+            Util.cleanup(is);
+            Util.cleanup(di);
         }
         TestReporting.getInstance().testExecutionFinished(getClass().getName());
         if (failedTests > 0) {
