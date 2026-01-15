@@ -1901,7 +1901,6 @@ public class UIManager {
                     style = new Style(getComponentStyle(baseStyle));
                 }
             } else {
-                baseStyle = null;
                 if (selected) {
                     style = new Style(defaultSelectedStyle);
                 } else {

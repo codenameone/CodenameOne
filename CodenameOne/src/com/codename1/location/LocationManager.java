@@ -52,6 +52,7 @@ public abstract class LocationManager {
     public static final int OUT_OF_SERVICE = 1;
     public static final int TEMPORARILY_UNAVAILABLE = 2;
     private static LocationListener listener;
+    private static final Object LISTENER_LOCK = new Object();
     private LocationRequest request;
     private static Class backgroundlistener;
     private int status = TEMPORARILY_UNAVAILABLE;
@@ -198,7 +199,7 @@ public abstract class LocationManager {
      *          from getting updates
      */
     public void setLocationListener(final LocationListener l) {
-        synchronized (this) {
+        synchronized (LISTENER_LOCK) {
             if (listener != null) {
                 clearListener();
                 request = null;
@@ -243,7 +244,7 @@ public abstract class LocationManager {
      *                         try to create an instance and invoke the locationUpdated method
      */
     public void setBackgroundLocationListener(Class locationListener) {
-        synchronized (this) {
+        synchronized (LISTENER_LOCK) {
             if (backgroundlistener != null) {
                 clearBackgroundListener();
             }

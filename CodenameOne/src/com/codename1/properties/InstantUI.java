@@ -81,7 +81,7 @@ public class InstantUI {
      * @return true if the property was excluded from the GUI
      */
     public boolean isExcludedProperty(PropertyBase exclude) {
-        return exclude.getClientProperty("cn1$excludeFromUI") == Boolean.TRUE;
+        return Boolean.TRUE.equals(exclude.getClientProperty("cn1$excludeFromUI"));
     }
 
     /**

@@ -463,13 +463,13 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      * @param font    The actual Codename One font object
      */
     public static void addFont(String fontKey, Font font) {
-        if (fontKey != null) {
-            fontKey = fontKey.toLowerCase();
-        } else {
+        if (fontKey == null) {
             if (font.getCharset() != null) {
                 throw new IllegalArgumentException("Font key must be non-null for bitmap fonts");
             }
+            throw new IllegalArgumentException("Font key must be non-null");
         }
+        fontKey = fontKey.toLowerCase();
         fonts.put(fontKey, new HTMLFont(fontKey, font));
     }
 

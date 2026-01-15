@@ -763,6 +763,7 @@ def main() -> None:
     if spotbugs:
         forbidden_rules = {
             "NP_ALWAYS_NULL",
+            "NP_NULL_PARAM_DEREF",
             "RCN_REDUNDANT_NULLCHECK_OF_NONNULL_VALUE",
             "RCN_REDUNDANT_NULLCHECK_OF_NULL_VALUE",
             "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR",
@@ -772,6 +773,7 @@ def main() -> None:
             "IA_AMBIGUOUS_INVOCATION_OF_INHERITED_OR_OUTER_METHOD",
             "LI_LAZY_INIT_STATIC",
             "RpC_REPEATED_CONDITIONAL_TEST",
+            "NS_NON_SHORT_CIRCUIT",
             "ES_COMPARING_PARAMETER_STRING_WITH_EQ",
             "FE_FLOATING_POINT_EQUALITY",
             "FE_TEST_IF_EQUAL_TO_NOT_A_NUMBER",
@@ -787,7 +789,9 @@ def main() -> None:
             "EQ_DOESNT_OVERRIDE_EQUALS",
             "CO_COMPARETO_INCORRECT_FLOATING",
             "DL_SYNCHRONIZATION_ON_SHARED_CONSTANT",
+            "SSD_DO_NOT_USE_INSTANCE_LOCK_ON_SHARED_STATIC_DATA",
             "DLS_DEAD_LOCAL_STORE",
+            "DLS_DEAD_LOCAL_STORE_OF_NULL",
             "DM_NUMBER_CTOR",
             "DMI_INVOKING_TOSTRING_ON_ARRAY",
             "EC_NULL_ARG",
@@ -819,6 +823,7 @@ def main() -> None:
             "NO_NOTIFY_NOT_NOTIFYALL",
             "NP_LOAD_OF_KNOWN_NULL_VALUE",
             "NP_BOOLEAN_RETURN_NULL",
+            "RC_REF_COMPARISON_BAD_PRACTICE_BOOLEAN",
             "REFLC_REFLECTION_MAY_INCREASE_ACCESSIBILITY_OF_CLASS",
             "REC_CATCH_EXCEPTION",
             "RCN_REDUNDANT_NULLCHECK_WOULD_HAVE_BEEN_A_NPE",
