@@ -30,7 +30,7 @@ import com.codename1.ui.Display;
  *
  * @author Steve Hannah
  */
-public class PushContent {
+public final class PushContent {
     private static final String PROP_PREFIX = "com.codename1.push.prop.";
 
     private final String title;

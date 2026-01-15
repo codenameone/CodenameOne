@@ -82,7 +82,7 @@ import java.util.Map;
  *
  * @author shannah
  */
-public class GeofenceManager implements Iterable<Geofence> {
+public final class GeofenceManager implements Iterable<Geofence> {
     //private GeoStreamerAsyncDataSource dataSource;
     private static final String STORAGE_KEY = "$AsyncGeoStreamer.geofences$";
     private static final String ACTIVE_FENCES_KEY = "$AsyncGeoStreamer.activegeofences$";

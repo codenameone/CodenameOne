@@ -38,7 +38,7 @@ import java.io.InputStream;
  *
  * @author Shai Almog
  */
-public class CachedDataService extends ConnectionRequest {
+public final class CachedDataService extends ConnectionRequest {
     private final CachedData data = new CachedData();
     private boolean responseProcessed;
 

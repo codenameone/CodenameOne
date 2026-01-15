@@ -92,7 +92,7 @@ import java.util.Vector;
  *
  * @author Eric Coolman (2012-03 - derivative work from original Sun source).
  */
-public class Result {
+public final class Result {
 
     public static final String JSON = "json";
     public static final String XML = "xml";

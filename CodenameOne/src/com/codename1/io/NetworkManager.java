@@ -55,7 +55,7 @@ import java.util.Vector;
  *
  * @author Shai Almog
  */
-public class NetworkManager {
+public final class NetworkManager {
     /**
      * Indicates an unknown access point type
      */

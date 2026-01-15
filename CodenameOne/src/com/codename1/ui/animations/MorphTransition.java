@@ -40,7 +40,7 @@ import java.util.Map;
  *
  * @author Shai Almog
  */
-public class MorphTransition extends Transition {
+public final class MorphTransition extends Transition {
     private int duration;
     private final HashMap<String, String> fromTo = new HashMap<String, String>();
     private CC[] fromToComponents;

@@ -28,7 +28,7 @@ package com.codename1.util;
  * In addition to this, some <i><b>Inplace</b></i> (mutable) methods are
  * provided.
  */
-class TElementary {
+final class TElementary {
 
     /**
      * Just to denote that this class can't be instantiated

@@ -29,7 +29,7 @@ import com.codename1.ui.Display;
  *
  * @author shannah
  */
-public class CallbackDispatcher<T> implements Runnable {
+public final class CallbackDispatcher<T> implements Runnable {
     private SuccessCallback<T> success;
     private FailureCallback<T> failure;
     private T arg;

@@ -21,7 +21,7 @@ package com.codename1.util;
  * Static library that provides {@link TBigInteger} base conversion from/to any
  * integer represented in an {@link java.lang.String} Object.
  */
-class TConversion {
+final class TConversion {
 
     /**
      * Holds the maximal exponent for each radix, so that radix<sup>digitFitInInt[radix]</sup>

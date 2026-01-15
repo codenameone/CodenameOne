@@ -36,7 +36,7 @@ import java.io.InputStream;
  *
  * @author Shai Almog
  */
-public class StorageImage extends EncodedImage {
+public final class StorageImage extends EncodedImage {
     private final String fileName;
     private final boolean keep;
     private byte[] data;

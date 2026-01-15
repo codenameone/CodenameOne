@@ -32,7 +32,7 @@ import com.codename1.io.Preferences;
  *
  * @author Shai Almog
  */
-public class PreferencesObject {
+public final class PreferencesObject {
     private PropertyBusinessObject bo;
     private String prefix;
     private boolean bound;

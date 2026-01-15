@@ -34,7 +34,7 @@ import com.codename1.ui.Image;
  *
  * @author Shai Almog
  */
-public class StorageImageAsync extends EncodedImage {
+public final class StorageImageAsync extends EncodedImage {
     private static final Object LOCK = new Object();
     private final String fileName;
     private boolean changePending;

@@ -45,7 +45,7 @@ import com.codename1.ui.geom.Rectangle;
  *
  * @author Shai Almog
  */
-public class RoundBorder extends Border {
+public final class RoundBorder extends Border {
     private static final String CACHE_KEY = "cn1$$-rbcache";
     // these allow us to have more than one border per component in cache which is important for selected/unselected/pressed values
     private static int instanceCounter;

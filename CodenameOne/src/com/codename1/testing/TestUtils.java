@@ -49,7 +49,7 @@ import java.util.ArrayList;
  *
  * @author Shai Almog
  */
-public class TestUtils {
+public final class TestUtils {
     private static boolean verbose;
 
     private TestUtils() {

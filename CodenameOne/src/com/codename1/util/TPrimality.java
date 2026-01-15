@@ -23,7 +23,7 @@ import java.util.Random;
 /**
  * Provides primality probabilistic methods.
  */
-class TPrimality {
+final class TPrimality {
 
     /**
      * All prime numbers with bit length lesser than 10 bits.

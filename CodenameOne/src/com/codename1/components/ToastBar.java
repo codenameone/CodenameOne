@@ -82,7 +82,7 @@ import static com.codename1.ui.ComponentSelector.$;
  *
  * @author shannah
  */
-public class ToastBar {
+public final class ToastBar {
 
     /**
      * The default timeout for info/error messages

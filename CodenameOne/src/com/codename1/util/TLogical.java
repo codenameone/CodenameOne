@@ -28,7 +28,7 @@ package com.codename1.util;
  * <li>xor</li>
  * </ul>
  */
-class TLogical {
+final class TLogical {
 
     /**
      * Just to denote that this class can't be instantiated.

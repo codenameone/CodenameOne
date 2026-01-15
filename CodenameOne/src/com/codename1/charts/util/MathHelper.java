@@ -26,7 +26,7 @@ import java.util.List;
 /**
  * Utility class for math operations.
  */
-public class MathHelper {
+public final class MathHelper {
     /** A value that is used a null value. */
     public static final double NULL_VALUE = -Double.MAX_VALUE + 1;
     /**

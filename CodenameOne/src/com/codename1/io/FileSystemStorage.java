@@ -47,7 +47,7 @@ import java.util.TimerTask;
  *
  * @author Shai Almog
  */
-public class FileSystemStorage {
+public final class FileSystemStorage {
     /**
      * Represents the type for the get root type method, this type generally represents the main
      * phone memory

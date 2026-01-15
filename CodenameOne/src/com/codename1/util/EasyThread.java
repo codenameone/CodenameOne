@@ -35,7 +35,7 @@ import java.util.List;
  *
  * @author Shai Almog
  */
-public class EasyThread {
+public final class EasyThread {
     private static final List<ErrorListener> globalErrorListenenrs = new ArrayList<ErrorListener>();
     private final Object LOCK = new Object();
     private List<ErrorListener> errorListenenrs;

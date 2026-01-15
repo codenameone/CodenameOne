@@ -32,7 +32,7 @@ import com.codename1.ui.EncodedImage;
  *
  * @author Shai Almog
  */
-public class ReplaceableImage extends EncodedImage {
+public final class ReplaceableImage extends EncodedImage {
     private boolean replaced;
     private byte[] data;
     private final boolean opaque;

@@ -36,7 +36,7 @@ import com.codename1.ui.animations.Motion;
  *
  * @author Shai Almog
  */
-public class Effects {
+public final class Effects {
     private Effects() {
     }
 

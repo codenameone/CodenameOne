@@ -35,7 +35,7 @@ import java.io.OutputStream;
  *
  * @author Shai Almog
  */
-public class Socket {
+public final class Socket {
     private Socket() {
     }
 

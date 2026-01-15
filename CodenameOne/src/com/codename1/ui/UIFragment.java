@@ -181,7 +181,7 @@ import static com.codename1.ui.ComponentSelector.$;
  * @author shannah
  * @since 7.0
  */
-public class UIFragment {
+public final class UIFragment {
 
 
     // The root element of this template

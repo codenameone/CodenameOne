@@ -43,7 +43,7 @@ import java.util.TimerTask;
  *
  * @author Shai Almog
  */
-public class DefaultCrashReporter implements CrashReport {
+public final class DefaultCrashReporter implements CrashReport {
     private static String errorText = "The application encountered an error, do you wish to report it?";
     private static String sendButtonText = "Send";
     private static String dontSendButtonText = "Don't Send";
