@@ -97,6 +97,9 @@
                     <failOnViolation>false</failOnViolation>
                     <printFailingErrors>false</printFailingErrors>
                     <targetJdk>1.8</targetJdk>
+                    <rulesets>
+                        <ruleset>${project.basedir}/pmd.xml</ruleset>
+                    </rulesets>
                 </configuration>
                 <executions>
                     <execution>
