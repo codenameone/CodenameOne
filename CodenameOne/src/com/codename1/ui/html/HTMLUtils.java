@@ -187,7 +187,7 @@ public class HTMLUtils {
                             ((c >= '0') && (c <= '9')) ||
                             (c == '-') || (c == '.') || (c == '_') || (c == '~')) {
                 encodedStr += c;
-            } else if ((c >= 0x80) && (c <= 0xffff)) { // UTF encoding - See http://en.wikipedia.org/wiki/UTF-8
+            } else if (c >= 0x80) { // UTF encoding - See http://en.wikipedia.org/wiki/UTF-8
                 int firstLiteral = c / 256;
                 int secLiteral = c % 256;
                 if (c <= 0x07ff) { // 2 literals unicode

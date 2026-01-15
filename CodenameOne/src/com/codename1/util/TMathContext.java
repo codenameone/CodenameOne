@@ -137,6 +137,7 @@ final class TMathContext {
         int i; // Index of charVal
         int j; // Index of chRoundingMode
         int digit; // It will contain the digit parsed
+        this.precision = 0;
 
         if ((charVal.length < 27) || (charVal.length > 45)) {
             throw new IllegalArgumentException("bad string format");

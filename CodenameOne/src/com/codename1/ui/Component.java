@@ -6312,7 +6312,7 @@ public class Component implements Animation, StyleListener, Editable {
             }
         } else {
             unSelectedStyle = null;
-            unSelectedStyle = getUnselectedStyle();
+            getUnselectedStyle();
             selectedStyle = null;
             disabledStyle = null;
             pressedStyle = null;

@@ -57,6 +57,7 @@ import java.io.Reader;
 import java.io.Writer;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
 import java.util.Enumeration;
@@ -2013,8 +2014,14 @@ public class Util {
      */
     public static String guessMimeType(InputStream in) throws IOException {
         byte[] header = new byte[11];
-        in.read(header, 0, 11);
-        return guessMimeType(header);
+        int bytesRead = in.read(header, 0, header.length);
+        if (bytesRead <= 0) {
+            return "application/octet-stream";
+        }
+        if (bytesRead == header.length) {
+            return guessMimeType(header);
+        }
+        return guessMimeType(Arrays.copyOf(header, bytesRead));
     }
 
     /**

@@ -198,7 +198,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
         int destHigh = high;
         low += off;
         high += off;
-        int mid = (low + high) / 2;
+        int mid = low + ((high - low) / 2);
         mergeSort(dest, src, low, mid, -off, ascending);
         mergeSort(dest, src, mid, high, -off, ascending);
 

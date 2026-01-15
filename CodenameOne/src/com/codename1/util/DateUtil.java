@@ -447,7 +447,7 @@ public class DateUtil {
             return "Just now";
         } //Minutes
         else {
-            int minutes = Math.round(time_elapsed / 60);
+            int minutes = (int) Math.round(time_elapsed / 60.0d);
 
             if (minutes <= 60) {
                 if (minutes == 1) {
@@ -457,7 +457,7 @@ public class DateUtil {
                 }
             } //Hours
             else {
-                int hours = Math.round(time_elapsed / 3600);
+                int hours = (int) Math.round(time_elapsed / 3600.0d);
                 if (hours <= 24) {
                     if (hours == 1) {
                         return "An hour ago";
@@ -466,7 +466,7 @@ public class DateUtil {
                     }
                 } //Days
                 else {
-                    int days = Math.round(time_elapsed / 86400);
+                    int days = (int) Math.round(time_elapsed / 86400.0d);
                     if (days <= 7) {
                         if (days == 1) {
                             return "Yesterday";
@@ -475,7 +475,7 @@ public class DateUtil {
                         }
                     } //Weeks
                     else {
-                        int weeks = Math.round(time_elapsed / 604800);
+                        int weeks = (int) Math.round(time_elapsed / 604800.0d);
                         if (weeks <= 4.3) {
                             if (weeks == 1) {
                                 return "A week ago";
@@ -484,7 +484,7 @@ public class DateUtil {
                             }
                         } //Months
                         else {
-                            int months = Math.round(time_elapsed / 2600640);
+                            int months = (int) Math.round(time_elapsed / 2600640.0d);
                             if (months <= 12) {
                                 if (months == 1) {
                                     return "A month ago";
@@ -493,7 +493,7 @@ public class DateUtil {
                                 }
                             } //Years
                             else {
-                                int years = Math.round(time_elapsed / 31207680);
+                                int years = (int) Math.round(time_elapsed / 31207680.0d);
                                 if (years == 1) {
                                     return "1 year ago";
                                 } else {

@@ -44,6 +44,13 @@
     </Match>
 
     <!--
+    Some API interfaces are intentionally redundant for compatibility.
+    -->
+    <Match>
+        <Bug pattern="RI_REDUNDANT_INTERFACES"/>
+    </Match>
+
+    <!--
     This fails on writing to a static field from a non-static method.
     This is a bad practice in general because it could indicate a state
     that changes across threads. However, in our case, we have many such
@@ -80,6 +87,13 @@
     </Match>
     <Match>
         <Bug pattern="EI_EXPOSE_STATIC_REP2"/>
+    </Match>
+
+    <!--
+    Some APIs rely on volatile array references for performance/compatibility.
+    -->
+    <Match>
+        <Bug pattern="VO_VOLATILE_REFERENCE_TO_ARRAY"/>
     </Match>
 
     <!--
