@@ -100,11 +100,11 @@ public class InflaterInputStream extends FilterInputStream {
         int n = 0;
         inflater.setOutput(b, off, len);
         while (!eof) {
-            if (inflater.avail_in == 0)
+            if (inflater.availIn == 0)
                 fill();
             int err = inflater.inflate(JZlib.Z_NO_FLUSH);
-            n += inflater.next_out_index - off;
-            off = inflater.next_out_index;
+            n += inflater.nextOutIndex - off;
+            off = inflater.nextOutIndex;
             switch (err) {
                 case JZlib.Z_DATA_ERROR:
                     throw new IOException(inflater.msg);
@@ -116,7 +116,7 @@ public class InflaterInputStream extends FilterInputStream {
                     break;
                 default:
             }
-            if (inflater.avail_out == 0)
+            if (inflater.availOut == 0)
                 break;
         }
         return n;
@@ -208,11 +208,11 @@ public class InflaterInputStream extends FilterInputStream {
     }
 
     public byte[] getAvailIn() {
-        if (inflater.avail_in <= 0)
+        if (inflater.availIn <= 0)
             return null;
-        byte[] tmp = new byte[inflater.avail_in];
-        System.arraycopy(inflater.next_in, inflater.next_in_index,
-                tmp, 0, inflater.avail_in);
+        byte[] tmp = new byte[inflater.availIn];
+        System.arraycopy(inflater.nextIn, inflater.nextInIndex,
+                tmp, 0, inflater.availIn);
         return tmp;
     }
 

@@ -64,22 +64,22 @@ public class ZStream {
     static final private int Z_BUF_ERROR = -5;
     static final private int Z_VERSION_ERROR = -6;
 
-    public byte[] next_in;     // next input byte
-    public int next_in_index;
-    public int avail_in;       // number of bytes available at next_in
-    public long total_in;      // total nb of input bytes read so far
+    public byte[] nextIn;     // next input byte
+    public int nextInIndex;
+    public int availIn;       // number of bytes available at next_in
+    public long totalIn;      // total nb of input bytes read so far
 
-    public byte[] next_out;    // next output byte should be put there
-    public int next_out_index;
-    public int avail_out;      // remaining free space at next_out
-    public long total_out;     // total nb of bytes output so far
+    public byte[] nextOut;    // next output byte should be put there
+    public int nextOutIndex;
+    public int availOut;      // remaining free space at next_out
+    public long totalOut;     // total nb of bytes output so far
 
     public String msg;
 
     Deflate dstate;
     Inflate istate;
 
-    int data_type; // best guess about the data type: ascii or binary
+    int dataType; // best guess about the data type: ascii or binary
 
     Checksum adler;
 
@@ -223,22 +223,22 @@ public class ZStream {
     // through this function so some applications may wish to modify it
     // to avoid allocating a large strm->next_out buffer and copying into it.
     // (See also read_buf()).
-    void flush_pending() {
+    void flushPending() {
         int len = dstate.pending;
 
-        if (len > avail_out) len = avail_out;
+        if (len > availOut) len = availOut;
         if (len == 0) return;
 
-        System.arraycopy(dstate.pending_buf, dstate.pending_out,
-                next_out, next_out_index, len);
+        System.arraycopy(dstate.pendingBuf, dstate.pendingOut,
+                nextOut, nextOutIndex, len);
 
-        next_out_index += len;
-        dstate.pending_out += len;
-        total_out += len;
-        avail_out -= len;
+        nextOutIndex += len;
+        dstate.pendingOut += len;
+        totalOut += len;
+        availOut -= len;
         dstate.pending -= len;
         if (dstate.pending == 0) {
-            dstate.pending_out = 0;
+            dstate.pendingOut = 0;
         }
     }
 
@@ -248,19 +248,19 @@ public class ZStream {
     // allocating a large strm->next_in buffer and copying from it.
     // (See also flush_pending()).
     int read_buf(byte[] buf, int start, int size) {
-        int len = avail_in;
+        int len = availIn;
 
         if (len > size) len = size;
         if (len == 0) return 0;
 
-        avail_in -= len;
+        availIn -= len;
 
         if (dstate.wrap != 0) {
-            adler.update(next_in, next_in_index, len);
+            adler.update(nextIn, nextInIndex, len);
         }
-        System.arraycopy(next_in, next_in_index, buf, start, len);
-        next_in_index += len;
-        total_in += len;
+        System.arraycopy(nextIn, nextInIndex, buf, start, len);
+        nextInIndex += len;
+        totalIn += len;
         return len;
     }
 
@@ -269,8 +269,8 @@ public class ZStream {
     }
 
     public void free() {
-        next_in = null;
-        next_out = null;
+        nextIn = null;
+        nextOut = null;
         msg = null;
     }
 
@@ -279,9 +279,9 @@ public class ZStream {
     }
 
     public void setOutput(byte[] buf, int off, int len) {
-        next_out = buf;
-        next_out_index = off;
-        avail_out = len;
+        nextOut = buf;
+        nextOutIndex = off;
+        availOut = len;
     }
 
     public void setInput(byte[] buf) {
@@ -293,77 +293,77 @@ public class ZStream {
     }
 
     public void setInput(byte[] buf, int off, int len, boolean append) {
-        if (len <= 0 && append && next_in != null) return;
+        if (len <= 0 && append && nextIn != null) return;
 
-        if (avail_in > 0 && append) {
-            byte[] tmp = new byte[avail_in + len];
-            System.arraycopy(next_in, next_in_index, tmp, 0, avail_in);
-            System.arraycopy(buf, off, tmp, avail_in, len);
-            next_in = tmp;
-            next_in_index = 0;
-            avail_in += len;
+        if (availIn > 0 && append) {
+            byte[] tmp = new byte[availIn + len];
+            System.arraycopy(nextIn, nextInIndex, tmp, 0, availIn);
+            System.arraycopy(buf, off, tmp, availIn, len);
+            nextIn = tmp;
+            nextInIndex = 0;
+            availIn += len;
         } else {
-            next_in = buf;
-            next_in_index = off;
-            avail_in = len;
+            nextIn = buf;
+            nextInIndex = off;
+            availIn = len;
         }
     }
 
     public byte[] getNextIn() {
-        return next_in;
+        return nextIn;
     }
 
     public void setNextIn(byte[] next_in) {
-        this.next_in = next_in;
+        this.nextIn = next_in;
     }
 
     public int getNextInIndex() {
-        return next_in_index;
+        return nextInIndex;
     }
 
     public void setNextInIndex(int next_in_index) {
-        this.next_in_index = next_in_index;
+        this.nextInIndex = next_in_index;
     }
 
     public int getAvailIn() {
-        return avail_in;
+        return availIn;
     }
 
     public void setAvailIn(int avail_in) {
-        this.avail_in = avail_in;
+        this.availIn = avail_in;
     }
 
     public byte[] getNextOut() {
-        return next_out;
+        return nextOut;
     }
 
     public void setNextOut(byte[] next_out) {
-        this.next_out = next_out;
+        this.nextOut = next_out;
     }
 
     public int getNextOutIndex() {
-        return next_out_index;
+        return nextOutIndex;
     }
 
     public void setNextOutIndex(int next_out_index) {
-        this.next_out_index = next_out_index;
+        this.nextOutIndex = next_out_index;
     }
 
     public int getAvailOut() {
-        return avail_out;
+        return availOut;
 
     }
 
     public void setAvailOut(int avail_out) {
-        this.avail_out = avail_out;
+        this.availOut = avail_out;
     }
 
     public long getTotalOut() {
-        return total_out;
+        return totalOut;
     }
 
     public long getTotalIn() {
-        return total_in;
+        return totalIn;
     }
 
     public String getMessage() {
