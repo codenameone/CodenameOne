@@ -158,6 +158,14 @@ int editComponentPadTop, editComponentPadLeft;
 BOOL firstTime = YES;
 BOOL retinaBug;
 float scaleValue = 1;
+
+static void updateDisplayMetricsFromView(UIView *view) {
+    if (view == nil) {
+        return;
+    }
+    displayWidth = (int)(view.bounds.size.width * scaleValue);
+    displayHeight = (int)(view.bounds.size.height * scaleValue);
+}
 BOOL forceSlideUpField;
 
 
@@ -1435,10 +1443,6 @@ void* Java_com_codename1_impl_ios_IOSImplementation_createSystemFontImpl
  * Signature: ()I
  */
 int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl() {
-    //if(displayWidth <= 0) {
-    displayWidth = [CodenameOne_GLViewController instance].view.bounds.size.width * scaleValue;
-    //}
-    //CN1Log(@"Display width %i", displayWidth);
     return displayWidth;
 }
 
@@ -1450,10 +1454,6 @@ int Java_com_codename1_impl_ios_IOSImplementation_getDisplayWidthImpl() {
 int
 Java_com_codename1_impl_ios_IOSImplementation_getDisplayHeightImpl() {
     //GET_DIPLAY_HEIGHT_MARKER
-    
-    //if(displayHeight <= 0) {
-    displayHeight = [CodenameOne_GLViewController instance].view.bounds.size.height * scaleValue;
-    //}
     return displayHeight;
 }
 
@@ -1895,6 +1895,7 @@ static CodenameOne_GLViewController *sharedSingleton;
     [self.view addSubview:self.adView];
     [self.adView loadAd];
     [super viewDidLoad];
+    updateDisplayMetricsFromView(self.view);
     //replaceViewDidLoad
     [self initGoogleConnect];
 }
@@ -1906,6 +1907,7 @@ static CodenameOne_GLViewController *sharedSingleton;
 #else
 - (void)viewDidLoad {
     [super viewDidLoad];
+    updateDisplayMetricsFromView(self.view);
     //replaceViewDidLoad
     [self initGoogleConnect];
 }
@@ -1995,8 +1997,8 @@ bool lockDrawing;
     // details, so it is possible that the size change event still needs to be sent
     // even if the display width already matches the value we're given here.
     [[self eaglView] updateFrameBufferSize:(int)self.view.bounds.size.width h:(int)self.view.bounds.size.height];
+    updateDisplayMetricsFromView(self.view);
     displayWidth = currentWidth;
-    displayHeight = (int)self.view.bounds.size.height * scaleValue;
     screenSizeChanged(displayWidth, displayHeight);
     //}
     
@@ -4029,5 +4031,3 @@ UIPopoverController* popoverControllerInstance;
 
 
 @end
-
-
