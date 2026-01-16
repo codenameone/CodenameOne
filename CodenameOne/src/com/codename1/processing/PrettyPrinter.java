@@ -52,7 +52,7 @@ import java.util.Map;
  *
  * @author Eric Coolman (2012-03 - derivative work from original Sun source).
  */
-class PrettyPrinter {
+final class PrettyPrinter {
     Map<?, ?> myHashMap;
 
     private PrettyPrinter(Map<?, ?> h) {

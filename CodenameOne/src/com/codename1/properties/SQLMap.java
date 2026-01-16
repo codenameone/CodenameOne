@@ -42,7 +42,7 @@ import java.util.List;
  *
  * @author Shai Almog
  */
-public class SQLMap {
+public final class SQLMap {
     private boolean verbose = true;
     private Database db;
 

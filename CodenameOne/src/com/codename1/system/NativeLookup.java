@@ -38,7 +38,7 @@ import java.util.HashMap;
  *
  * @author Shai Almog
  */
-public class NativeLookup {
+public final class NativeLookup {
     /**
      * Indicates whether stack traces should be printed when lookup fails
      */

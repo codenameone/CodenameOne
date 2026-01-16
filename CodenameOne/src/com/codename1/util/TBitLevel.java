@@ -33,7 +33,7 @@ package com.codename1.util;
  * All operations are provided in immutable way, and some in both mutable and
  * immutable.
  */
-class TBitLevel {
+final class TBitLevel {
 
     /**
      * Just to denote that this class can't be instantiated.

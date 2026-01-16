@@ -41,7 +41,7 @@ import java.io.InputStream;
  *
  * @author Shai Almog
  */
-public class FileEncodedImageAsync extends EncodedImage {
+public final class FileEncodedImageAsync extends EncodedImage {
     private static final Object LOCK = new Object();
     private final String fileName;
     private boolean changePending;

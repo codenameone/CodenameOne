@@ -70,7 +70,7 @@ import java.util.Map;
  *
  * @author Shai Almog
  */
-public class URLImage extends EncodedImage {
+public final class URLImage extends EncodedImage {
 
     /**
      * Flag used by {@link #createCachedImage(java.lang.String, java.lang.String, com.codename1.ui.Image, int) }.

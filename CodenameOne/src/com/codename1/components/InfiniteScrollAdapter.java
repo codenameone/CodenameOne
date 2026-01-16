@@ -49,7 +49,7 @@ import com.codename1.ui.layouts.FlowLayout;
  *
  * @author Shai Almog
  */
-public class InfiniteScrollAdapter {
+public final class InfiniteScrollAdapter {
     private Container infiniteContainer;
     private Runnable fetchMore;
     private final Component ip;

@@ -20,7 +20,7 @@ package com.codename1.util;
 /**
  * Static library that provides all multiplication of {@link TBigInteger} methods.
  */
-class TMultiplication {
+final class TMultiplication {
 
     /**
      * Break point in digits (number of {@code int} elements)

@@ -31,7 +31,7 @@ import java.util.Hashtable;
  * @author Ofir Leitner
  * @deprecated the HTML package is no longer used or maintained and may be removed in a future revision
  */
-public class HTMLUtils {
+public final class HTMLUtils {
 
     /**
      * The char entities strings supported in XML. When a char entity is found these will be compared against first.

@@ -53,7 +53,7 @@ import java.util.Vector;
  *
  * @author Chen Fishbein
  */
-public class FaceBookAccess {
+public final class FaceBookAccess {
 
     private static final String TEMP_STORAGE = "FaceBookAccesstmp";
     private static String clientId = "132970916828080";

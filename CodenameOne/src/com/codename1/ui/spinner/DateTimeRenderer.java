@@ -38,7 +38,7 @@ import java.util.Map;
  * @author Shai Almog
  * @deprecated use Picker instead
  */
-class DateTimeRenderer extends SpinnerRenderer<Object> {
+final class DateTimeRenderer extends SpinnerRenderer<Object> {
     static final String[] MONTHS = {
             "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
     };

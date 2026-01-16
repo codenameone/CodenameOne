@@ -39,7 +39,7 @@ import com.codename1.ui.plaf.Style;
  *
  * @author Shai Almog
  */
-public class ClearableTextField extends Container {
+public final class ClearableTextField extends Container {
     private ClearableTextField() {
         super(new BorderLayout());
     }

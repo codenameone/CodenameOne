@@ -37,7 +37,7 @@ import java.util.Vector;
  *
  * @author Ofir Leitner
  */
-class HTMLInputFormat {
+final class HTMLInputFormat {
 
     /**
      * The allowed literals in an input format defintion

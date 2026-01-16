@@ -895,6 +895,18 @@ def main() -> None:
                 print(f"  - {v.rule}: {v.location} - {v.message}")
             exit(1)
 
+    pmd = parse_pmd()
+    if pmd:
+        forbidden_pmd_rules = {
+            "ClassWithOnlyPrivateConstructorsShouldBeFinal",
+        }
+        violations = [f for f in pmd.findings if f.rule in forbidden_pmd_rules]
+        if violations:
+            print("\n❌ Build failed due to forbidden PMD violations:")
+            for v in violations:
+                print(f"  - {v.rule}: {v.location} - {v.message}")
+            exit(1)
+
 
 if __name__ == "__main__":
     main()

@@ -74,7 +74,7 @@ import com.codename1.ui.util.ImageIO;
  *
  * @author Shai Almog
  */
-public class FontImage extends Image {
+public final class FontImage extends Image {
     /**
      * Material design icon font character code see
      * https://www.material.io/resources/icons/ for full list
