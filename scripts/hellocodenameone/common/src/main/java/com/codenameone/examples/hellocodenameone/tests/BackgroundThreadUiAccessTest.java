@@ -10,7 +10,7 @@ public class BackgroundThreadUiAccessTest extends BaseTest {
             try {
                 Display display = Display.getInstance();
                 int width = display.getDisplayWidth();
-                int pixels = display.convertToPixels(10.0f, true);
+                int pixels = display.convertToPixels(10, true);
                 UIManager manager = UIManager.getInstance();
                 if (width <= 0 || pixels <= 0 || manager == null) {
                     fail("Unexpected display metrics: width=" + width + " pixels=" + pixels);
