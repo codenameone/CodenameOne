@@ -151,30 +151,30 @@ public class GZIPHeader {
             xfl |= 2;
         }
 
-        d.put_short((short) 0x8b1f);  // ID1 ID2
-        d.put_byte((byte) 8);         // CM(Compression Method)
-        d.put_byte((byte) flag);
-        d.put_byte((byte) mtime);
-        d.put_byte((byte) (mtime >> 8));
-        d.put_byte((byte) (mtime >> 16));
-        d.put_byte((byte) (mtime >> 24));
-        d.put_byte((byte) xfl);
-        d.put_byte((byte) os);
+        d.putShort((short) 0x8b1f);  // ID1 ID2
+        d.putByte((byte) 8);         // CM(Compression Method)
+        d.putByte((byte) flag);
+        d.putByte((byte) mtime);
+        d.putByte((byte) (mtime >> 8));
+        d.putByte((byte) (mtime >> 16));
+        d.putByte((byte) (mtime >> 24));
+        d.putByte((byte) xfl);
+        d.putByte((byte) os);
 
         if (extra != null) {
-            d.put_byte((byte) extra.length);
-            d.put_byte((byte) (extra.length >> 8));
-            d.put_byte(extra, 0, extra.length);
+            d.putByte((byte) extra.length);
+            d.putByte((byte) (extra.length >> 8));
+            d.putByte(extra, 0, extra.length);
         }
 
         if (name != null) {
-            d.put_byte(name, 0, name.length);
-            d.put_byte((byte) 0);
+            d.putByte(name, 0, name.length);
+            d.putByte((byte) 0);
         }
 
         if (comment != null) {
-            d.put_byte(comment, 0, comment.length);
-            d.put_byte((byte) 0);
+            d.putByte(comment, 0, comment.length);
+            d.putByte((byte) 0);
         }
     }
 

@@ -87,8 +87,8 @@ public class GZIPInputStream extends InflaterInputStream {
             if (n > 0) {
                 inflater.setInput(b, 0, n, false);
                 //inflater.next_in_index = n;
-                inflater.next_in_index = 0;
-                inflater.avail_in = n;
+                inflater.nextInIndex = 0;
+                inflater.availIn = n;
             }
             throw new IOException("no input");
         }
@@ -97,7 +97,7 @@ public class GZIPInputStream extends InflaterInputStream {
 
         byte[] b1 = new byte[1];
         do {
-            if (inflater.avail_in <= 0) {
+            if (inflater.availIn <= 0) {
                 int i = in.read(b1);
                 if (i <= 0)
                     throw new IOException("no input");
@@ -107,19 +107,19 @@ public class GZIPInputStream extends InflaterInputStream {
             int err = inflater.inflate(JZlib.Z_NO_FLUSH);
 
             if (err != 0/*Z_OK*/) {
-                int len = 2048 - inflater.next_in.length;
+                int len = 2048 - inflater.nextIn.length;
                 if (len > 0) {
                     byte[] tmp = new byte[len];
                     n = fill(tmp);
                     if (n > 0) {
-                        inflater.avail_in += inflater.next_in_index;
-                        inflater.next_in_index = 0;
+                        inflater.availIn += inflater.nextInIndex;
+                        inflater.nextInIndex = 0;
                         inflater.setInput(tmp, 0, n, true);
                     }
                 }
                 //inflater.next_in_index = inflater.next_in.length;
-                inflater.avail_in += inflater.next_in_index;
-                inflater.next_in_index = 0;
+                inflater.availIn += inflater.nextInIndex;
+                inflater.nextInIndex = 0;
                 throw new IOException(inflater.msg);
             }
         }

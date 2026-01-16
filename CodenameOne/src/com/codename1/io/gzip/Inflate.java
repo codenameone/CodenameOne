@@ -110,7 +110,7 @@ final class Inflate {
     int inflateReset() {
         if (z == null) return Z_STREAM_ERROR;
 
-        z.total_in = z.total_out = 0;
+        z.totalIn = z.totalOut = 0;
         z.msg = null;
         this.mode = HEAD;
         this.need_bytes = -1;
@@ -171,7 +171,7 @@ final class Inflate {
         int r;
         int b;
 
-        if (z == null || z.next_in == null) {
+        if (z == null || z.nextIn == null) {
             if (f == Z_FINISH && this.mode == HEAD)
                 return Z_OK;
             return Z_STREAM_ERROR;
@@ -224,9 +224,9 @@ final class Inflate {
                             (((this.method << 8) + b) % 31) != 0) &&
                             (this.method & 0xf) != Z_DEFLATED) {
                         if (wrap == 4) {
-                            z.next_in_index -= 2;
-                            z.avail_in += 2;
-                            z.total_in -= 2;
+                            z.nextInIndex -= 2;
+                            z.availIn += 2;
+                            z.totalIn -= 2;
                             wrap = 0;
                             this.mode = BLOCKS;
                             break;
@@ -273,36 +273,36 @@ final class Inflate {
                     this.mode = DICT4;
                 case DICT4:
 
-                    if (z.avail_in == 0) return r;
-                    z.avail_in--;
-                    z.total_in++;
-                    this.need = ((long) (z.next_in[z.next_in_index++] & 0xff) << 24) & 0xff000000L;
+                    if (z.availIn == 0) return r;
+                    z.availIn--;
+                    z.totalIn++;
+                    this.need = ((long) (z.nextIn[z.nextInIndex++] & 0xff) << 24) & 0xff000000L;
                     this.mode = DICT3;
                 case DICT3:
 
-                    if (z.avail_in == 0) return r;
+                    if (z.availIn == 0) return r;
                     r = f;
 
-                    z.avail_in--;
-                    z.total_in++;
-                    this.need += ((z.next_in[z.next_in_index++] & 0xff) << 16) & 0xff0000L;
+                    z.availIn--;
+                    z.totalIn++;
+                    this.need += ((z.nextIn[z.nextInIndex++] & 0xff) << 16) & 0xff0000L;
                     this.mode = DICT2;
                 case DICT2:
 
-                    if (z.avail_in == 0) return r;
+                    if (z.availIn == 0) return r;
                     r = f;
 
-                    z.avail_in--;
-                    z.total_in++;
-                    this.need += ((z.next_in[z.next_in_index++] & 0xff) << 8) & 0xff00L;
+                    z.availIn--;
+                    z.totalIn++;
+                    this.need += ((z.nextIn[z.nextInIndex++] & 0xff) << 8) & 0xff00L;
                     this.mode = DICT1;
                 case DICT1:
 
-                    if (z.avail_in == 0) return r;
+                    if (z.availIn == 0) return r;
 
-                    z.avail_in--;
-                    z.total_in++;
-                    this.need += (z.next_in[z.next_in_index++] & 0xffL);
+                    z.availIn--;
+                    z.totalIn++;
+                    this.need += (z.nextIn[z.nextInIndex++] & 0xffL);
                     z.adler.reset(this.need);
                     this.mode = DICT0;
                     return Z_NEED_DICT;
@@ -336,39 +336,39 @@ final class Inflate {
                     this.mode = CHECK4;
                 case CHECK4:
 
-                    if (z.avail_in == 0) return r;
+                    if (z.availIn == 0) return r;
                     r = f;
 
-                    z.avail_in--;
-                    z.total_in++;
-                    this.need = ((long) (z.next_in[z.next_in_index++] & 0xff) << 24) & 0xff000000L;
+                    z.availIn--;
+                    z.totalIn++;
+                    this.need = ((long) (z.nextIn[z.nextInIndex++] & 0xff) << 24) & 0xff000000L;
                     this.mode = CHECK3;
                 case CHECK3:
 
-                    if (z.avail_in == 0) return r;
+                    if (z.availIn == 0) return r;
                     r = f;
 
-                    z.avail_in--;
-                    z.total_in++;
-                    this.need += ((z.next_in[z.next_in_index++] & 0xff) << 16) & 0xff0000L;
+                    z.availIn--;
+                    z.totalIn++;
+                    this.need += ((z.nextIn[z.nextInIndex++] & 0xff) << 16) & 0xff0000L;
                     this.mode = CHECK2;
                 case CHECK2:
 
-                    if (z.avail_in == 0) return r;
+                    if (z.availIn == 0) return r;
                     r = f;
 
-                    z.avail_in--;
-                    z.total_in++;
-                    this.need += ((z.next_in[z.next_in_index++] & 0xff) << 8) & 0xff00L;
+                    z.availIn--;
+                    z.totalIn++;
+                    this.need += ((z.nextIn[z.nextInIndex++] & 0xff) << 8) & 0xff00L;
                     this.mode = CHECK1;
                 case CHECK1:
 
-                    if (z.avail_in == 0) return r;
+                    if (z.availIn == 0) return r;
                     r = f;
 
-                    z.avail_in--;
-                    z.total_in++;
-                    this.need += (z.next_in[z.next_in_index++] & 0xffL);
+                    z.availIn--;
+                    z.totalIn++;
+                    this.need += (z.nextIn[z.nextInIndex++] & 0xffL);
 
                     if (flags != 0) {  // gzip
                         this.need = ((this.need & 0xff000000) >> 24 |
@@ -405,7 +405,7 @@ final class Inflate {
                             break;
                         }
 
-                        if (this.need != (z.total_out & 0xffffffffL)) {
+                        if (this.need != (z.totalOut & 0xffffffffL)) {
                             z.msg = "incorrect length check";
                             this.mode = BAD;
                             break;
@@ -615,15 +615,15 @@ final class Inflate {
             this.mode = BAD;
             this.marker = 0;
         }
-        if ((n = z.avail_in) == 0)
+        if ((n = z.availIn) == 0)
             return Z_BUF_ERROR;
 
-        p = z.next_in_index;
+        p = z.nextInIndex;
         // search
         while (n != 0 && this.marker < 4) {
-            if (z.next_in[p] == mark[this.marker]) {
+            if (z.nextIn[p] == mark[this.marker]) {
                 this.marker++;
-            } else if (z.next_in[p] != 0) {
+            } else if (z.nextIn[p] != 0) {
                 this.marker = 0;
             } else {
                 this.marker = 4 - this.marker;
@@ -633,19 +633,19 @@ final class Inflate {
         }
 
         // restore
-        z.total_in += p - z.next_in_index;
-        z.next_in_index = p;
-        z.avail_in = n;
+        z.totalIn += p - z.nextInIndex;
+        z.nextInIndex = p;
+        z.availIn = n;
 
         // return no joy or set up to restart on a new block
         if (this.marker != 4) {
             return Z_DATA_ERROR;
         }
-        r = z.total_in;
-        w = z.total_out;
+        r = z.totalIn;
+        w = z.totalOut;
         inflateReset();
-        z.total_in = r;
-        z.total_out = w;
+        z.totalIn = r;
+        z.totalOut = w;
         this.mode = BLOCKS;
 
         return Z_OK;
@@ -669,14 +669,14 @@ final class Inflate {
             this.need = 0;
         }
         while (need_bytes > 0) {
-            if (z.avail_in == 0) {
+            if (z.availIn == 0) {
                 throw new Return(r);
             }
             r = f;
-            z.avail_in--;
-            z.total_in++;
+            z.availIn--;
+            z.totalIn++;
             this.need = this.need |
-                    ((long) (z.next_in[z.next_in_index++] & 0xff) << ((n - need_bytes) * 8));
+                    ((long) (z.nextIn[z.nextInIndex++] & 0xff) << ((n - need_bytes) * 8));
             need_bytes--;
         }
         if (n == 2) {
@@ -694,16 +694,16 @@ final class Inflate {
         }
         int b = 0;
         do {
-            if (z.avail_in == 0) {
+            if (z.availIn == 0) {
                 throw new Return(r);
             }
             r = f;
-            z.avail_in--;
-            z.total_in++;
-            b = z.next_in[z.next_in_index];
-            if (b != 0) tmp_string.write(z.next_in, z.next_in_index, 1);
-            z.adler.update(z.next_in, z.next_in_index, 1);
-            z.next_in_index++;
+            z.availIn--;
+            z.totalIn++;
+            b = z.nextIn[z.nextInIndex];
+            if (b != 0) tmp_string.write(z.nextIn, z.nextInIndex, 1);
+            z.adler.update(z.nextIn, z.nextInIndex, 1);
+            z.nextInIndex++;
         } while (b != 0);
         return r;
     }
@@ -713,15 +713,15 @@ final class Inflate {
             tmp_string = new java.io.ByteArrayOutputStream();
         }
         while (this.need > 0) {
-            if (z.avail_in == 0) {
+            if (z.availIn == 0) {
                 throw new Return(r);
             }
             r = f;
-            z.avail_in--;
-            z.total_in++;
-            tmp_string.write(z.next_in, z.next_in_index, 1);
-            z.adler.update(z.next_in, z.next_in_index, 1);
-            z.next_in_index++;
+            z.availIn--;
+            z.totalIn++;
+            tmp_string.write(z.nextIn, z.nextInIndex, 1);
+            z.adler.update(z.nextIn, z.nextInIndex, 1);
+            z.nextInIndex++;
             this.need--;
         }
         return r;

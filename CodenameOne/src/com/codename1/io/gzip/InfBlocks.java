@@ -129,8 +129,8 @@ final class InfBlocks {
 
         // copy input/output information to locals (UPDATE macro restores)
         {
-            p = z.next_in_index;
-            n = z.avail_in;
+            p = z.nextInIndex;
+            n = z.availIn;
             b = bitb;
             k = bitk;
         }
@@ -150,14 +150,14 @@ final class InfBlocks {
                         } else {
                             bitb = b;
                             bitk = k;
-                            z.avail_in = n;
-                            z.total_in += p - z.next_in_index;
-                            z.next_in_index = p;
+                            z.availIn = n;
+                            z.totalIn += p - z.nextInIndex;
+                            z.nextInIndex = p;
                             write = q;
                             return inflate_flush(r);
                         }
                         n--;
-                        b |= (z.next_in[p++] & 0xff) << k;
+                        b |= (z.nextIn[p++] & 0xff) << k;
                         k += 8;
                     }
                     t = b & 7;
@@ -209,9 +209,9 @@ final class InfBlocks {
 
                         bitb = b;
                         bitk = k;
-                        z.avail_in = n;
-                        z.total_in += p - z.next_in_index;
-                        z.next_in_index = p;
+                        z.availIn = n;
+                        z.totalIn += p - z.nextInIndex;
+                        z.nextInIndex = p;
                         write = q;
                         return inflate_flush(r);
                     }
@@ -224,14 +224,14 @@ final class InfBlocks {
                         } else {
                             bitb = b;
                             bitk = k;
-                            z.avail_in = n;
-                            z.total_in += p - z.next_in_index;
-                            z.next_in_index = p;
+                            z.availIn = n;
+                            z.totalIn += p - z.nextInIndex;
+                            z.nextInIndex = p;
                             write = q;
                             return inflate_flush(r);
                         }
                         n--;
-                        b |= (z.next_in[p++] & 0xff) << k;
+                        b |= (z.nextIn[p++] & 0xff) << k;
                         k += 8;
                     }
 
@@ -242,9 +242,9 @@ final class InfBlocks {
 
                         bitb = b;
                         bitk = k;
-                        z.avail_in = n;
-                        z.total_in += p - z.next_in_index;
-                        z.next_in_index = p;
+                        z.availIn = n;
+                        z.totalIn += p - z.nextInIndex;
+                        z.nextInIndex = p;
                         write = q;
                         return inflate_flush(r);
                     }
@@ -256,9 +256,9 @@ final class InfBlocks {
                     if (n == 0) {
                         bitb = b;
                         bitk = k;
-                        z.avail_in = n;
-                        z.total_in += p - z.next_in_index;
-                        z.next_in_index = p;
+                        z.availIn = n;
+                        z.totalIn += p - z.nextInIndex;
+                        z.nextInIndex = p;
                         write = q;
                         return inflate_flush(r);
                     }
@@ -280,9 +280,9 @@ final class InfBlocks {
                             if (m == 0) {
                                 bitb = b;
                                 bitk = k;
-                                z.avail_in = n;
-                                z.total_in += p - z.next_in_index;
-                                z.next_in_index = p;
+                                z.availIn = n;
+                                z.totalIn += p - z.nextInIndex;
+                                z.nextInIndex = p;
                                 write = q;
                                 return inflate_flush(r);
                             }
@@ -293,7 +293,7 @@ final class InfBlocks {
                     t = left;
                     if (t > n) t = n;
                     if (t > m) t = m;
-                    System.arraycopy(z.next_in, p, window, q, t);
+                    System.arraycopy(z.nextIn, p, window, q, t);
                     p += t;
                     n -= t;
                     q += t;
@@ -310,14 +310,14 @@ final class InfBlocks {
                         } else {
                             bitb = b;
                             bitk = k;
-                            z.avail_in = n;
-                            z.total_in += p - z.next_in_index;
-                            z.next_in_index = p;
+                            z.availIn = n;
+                            z.totalIn += p - z.nextInIndex;
+                            z.nextInIndex = p;
                             write = q;
                             return inflate_flush(r);
                         }
                         n--;
-                        b |= (z.next_in[p++] & 0xff) << k;
+                        b |= (z.nextIn[p++] & 0xff) << k;
                         k += 8;
                     }
 
@@ -329,9 +329,9 @@ final class InfBlocks {
 
                         bitb = b;
                         bitk = k;
-                        z.avail_in = n;
-                        z.total_in += p - z.next_in_index;
-                        z.next_in_index = p;
+                        z.availIn = n;
+                        z.totalIn += p - z.nextInIndex;
+                        z.nextInIndex = p;
                         write = q;
                         return inflate_flush(r);
                     }
@@ -359,14 +359,14 @@ final class InfBlocks {
                             } else {
                                 bitb = b;
                                 bitk = k;
-                                z.avail_in = n;
-                                z.total_in += p - z.next_in_index;
-                                z.next_in_index = p;
+                                z.availIn = n;
+                                z.totalIn += p - z.nextInIndex;
+                                z.nextInIndex = p;
                                 write = q;
                                 return inflate_flush(r);
                             }
                             n--;
-                            b |= (z.next_in[p++] & 0xff) << k;
+                            b |= (z.nextIn[p++] & 0xff) << k;
                             k += 8;
                         }
 
@@ -393,9 +393,9 @@ final class InfBlocks {
 
                         bitb = b;
                         bitk = k;
-                        z.avail_in = n;
-                        z.total_in += p - z.next_in_index;
-                        z.next_in_index = p;
+                        z.availIn = n;
+                        z.totalIn += p - z.nextInIndex;
+                        z.nextInIndex = p;
                         write = q;
                         return inflate_flush(r);
                     }
@@ -420,14 +420,14 @@ final class InfBlocks {
                             } else {
                                 bitb = b;
                                 bitk = k;
-                                z.avail_in = n;
-                                z.total_in += p - z.next_in_index;
-                                z.next_in_index = p;
+                                z.availIn = n;
+                                z.totalIn += p - z.nextInIndex;
+                                z.nextInIndex = p;
                                 write = q;
                                 return inflate_flush(r);
                             }
                             n--;
-                            b |= (z.next_in[p++] & 0xff) << k;
+                            b |= (z.nextIn[p++] & 0xff) << k;
                             k += 8;
                         }
 
@@ -448,14 +448,14 @@ final class InfBlocks {
                                 } else {
                                     bitb = b;
                                     bitk = k;
-                                    z.avail_in = n;
-                                    z.total_in += p - z.next_in_index;
-                                    z.next_in_index = p;
+                                    z.availIn = n;
+                                    z.totalIn += p - z.nextInIndex;
+                                    z.nextInIndex = p;
                                     write = q;
                                     return inflate_flush(r);
                                 }
                                 n--;
-                                b |= (z.next_in[p++] & 0xff) << k;
+                                b |= (z.nextIn[p++] & 0xff) << k;
                                 k += 8;
                             }
 
@@ -478,9 +478,9 @@ final class InfBlocks {
 
                                 bitb = b;
                                 bitk = k;
-                                z.avail_in = n;
-                                z.total_in += p - z.next_in_index;
-                                z.next_in_index = p;
+                                z.availIn = n;
+                                z.totalIn += p - z.nextInIndex;
+                                z.nextInIndex = p;
                                 write = q;
                                 return inflate_flush(r);
                             }
@@ -511,9 +511,9 @@ final class InfBlocks {
 
                         bitb = b;
                         bitk = k;
-                        z.avail_in = n;
-                        z.total_in += p - z.next_in_index;
-                        z.next_in_index = p;
+                        z.availIn = n;
+                        z.totalIn += p - z.nextInIndex;
+                        z.nextInIndex = p;
                         write = q;
                         return inflate_flush(r);
                     }
@@ -523,9 +523,9 @@ final class InfBlocks {
                 case CODES:
                     bitb = b;
                     bitk = k;
-                    z.avail_in = n;
-                    z.total_in += p - z.next_in_index;
-                    z.next_in_index = p;
+                    z.availIn = n;
+                    z.totalIn += p - z.nextInIndex;
+                    z.nextInIndex = p;
                     write = q;
 
                     if ((r = codes.proc(r)) != Z_STREAM_END) {
@@ -534,8 +534,8 @@ final class InfBlocks {
                     r = Z_OK;
                     codes.free(z);
 
-                    p = z.next_in_index;
-                    n = z.avail_in;
+                    p = z.nextInIndex;
+                    n = z.availIn;
                     b = bitb;
                     k = bitk;
                     q = write;
@@ -553,9 +553,9 @@ final class InfBlocks {
                     if (read != write) {
                         bitb = b;
                         bitk = k;
-                        z.avail_in = n;
-                        z.total_in += p - z.next_in_index;
-                        z.next_in_index = p;
+                        z.availIn = n;
+                        z.totalIn += p - z.nextInIndex;
+                        z.nextInIndex = p;
                         return inflate_flush(r);
                     }
                     mode = DONE;
@@ -564,9 +564,9 @@ final class InfBlocks {
 
                     bitb = b;
                     bitk = k;
-                    z.avail_in = n;
-                    z.total_in += p - z.next_in_index;
-                    z.next_in_index = p;
+                    z.availIn = n;
+                    z.totalIn += p - z.nextInIndex;
+                    z.nextInIndex = p;
                     write = q;
                     return inflate_flush(r);
                 case BAD:
@@ -574,9 +574,9 @@ final class InfBlocks {
 
                     bitb = b;
                     bitk = k;
-                    z.avail_in = n;
-                    z.total_in += p - z.next_in_index;
-                    z.next_in_index = p;
+                    z.availIn = n;
+                    z.totalIn += p - z.nextInIndex;
+                    z.nextInIndex = p;
                     write = q;
                     return inflate_flush(r);
 
@@ -585,9 +585,9 @@ final class InfBlocks {
 
                     bitb = b;
                     bitk = k;
-                    z.avail_in = n;
-                    z.total_in += p - z.next_in_index;
-                    z.next_in_index = p;
+                    z.availIn = n;
+                    z.totalIn += p - z.nextInIndex;
+                    z.nextInIndex = p;
                     write = q;
                     return inflate_flush(r);
             }
@@ -619,17 +619,17 @@ final class InfBlocks {
         int q;
 
         // local copies of source and destination pointers
-        p = z.next_out_index;
+        p = z.nextOutIndex;
         q = read;
 
         // compute number of bytes to copy as far as end of window
         n = (q <= write ? write : end) - q;
-        if (n > z.avail_out) n = z.avail_out;
+        if (n > z.availOut) n = z.availOut;
         if (n != 0 && r == Z_BUF_ERROR) r = Z_OK;
 
         // update counters
-        z.avail_out -= n;
-        z.total_out += n;
+        z.availOut -= n;
+        z.totalOut += n;
 
         // update check information
         if (check && n > 0) {
@@ -637,7 +637,7 @@ final class InfBlocks {
         }
 
         // copy as far as end of window
-        System.arraycopy(window, q, z.next_out, p, n);
+        System.arraycopy(window, q, z.nextOut, p, n);
         p += n;
         q += n;
 
@@ -650,12 +650,12 @@ final class InfBlocks {
 
             // compute bytes to copy
             n = write - q;
-            if (n > z.avail_out) n = z.avail_out;
+            if (n > z.availOut) n = z.availOut;
             if (n != 0 && r == Z_BUF_ERROR) r = Z_OK;
 
             // update counters
-            z.avail_out -= n;
-            z.total_out += n;
+            z.availOut -= n;
+            z.totalOut += n;
 
             // update check information
             if (check && n > 0) {
@@ -663,13 +663,13 @@ final class InfBlocks {
             }
 
             // copy
-            System.arraycopy(window, q, z.next_out, p, n);
+            System.arraycopy(window, q, z.nextOut, p, n);
             p += n;
             q += n;
         }
 
         // update pointers
-        z.next_out_index = p;
+        z.nextOutIndex = p;
         read = q;
 
         // done

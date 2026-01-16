@@ -1516,9 +1516,9 @@ public abstract class CodenameOneImplementation {
      * said color value.
      *
      * @param graphics the graphics context
-     * @param RGB      the RGB value for the color.
+     * @param rgb      the RGB value for the color.
      */
-    public abstract void setColor(Object graphics, int RGB);
+    public abstract void setColor(Object graphics, int rgb);
 
     /**
      * Alpha value from 0-255 can be ignored for some operations
