@@ -3,7 +3,6 @@ package com.codenameone.examples.hellocodenameone.tests;
 import com.codename1.ui.CN;
 
 public class BytecodeTranslatorRegressionTest extends BaseTest {
-    @FunctionalInterface
     private interface Mapper {
         String apply(String input);
 
