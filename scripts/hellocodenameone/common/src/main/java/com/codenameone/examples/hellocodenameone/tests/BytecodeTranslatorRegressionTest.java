@@ -10,9 +10,21 @@ public class BytecodeTranslatorRegressionTest extends BaseTest {
             return "<" + input + ">";
         }
 
+        default Mapper andThen(Mapper next) {
+            return value -> next.apply(this.apply(value));
+        }
+
         static String suffix(String input, String suffix) {
             return input + suffix;
         }
+    }
+
+    private interface Factory {
+        Prefixer create(String prefix);
+    }
+
+    private interface Combiner {
+        String combine(String left, String right);
     }
 
     private static final class Prefixer {
@@ -32,19 +44,30 @@ public class BytecodeTranslatorRegressionTest extends BaseTest {
         Thread worker = new Thread(() -> {
             try {
                 String[] inputs = {"alpha", "beta", "gamma"};
-                Prefixer prefixer = new Prefixer("pre-");
+                Factory factory = Prefixer::new;
+                Prefixer prefixer = factory.create("pre-");
+                Prefixer otherPrefixer = factory.create("other-");
                 Mapper upper = String::toUpperCase;
                 Mapper prefixed = prefixer::applyPrefix;
+                Mapper otherPrefixed = otherPrefixer::applyPrefix;
+                Mapper reversed = new Mapper() {
+                    @Override
+                    public String apply(String input) {
+                        return new StringBuilder(input).reverse().toString();
+                    }
+                };
+                Mapper pipeline = upper.andThen(reversed).andThen(otherPrefixed);
+                Combiner combiner = BytecodeTranslatorRegressionTest::join;
                 String suffix = "-suffix";
                 StringBuilder builder = new StringBuilder();
                 for (int i = 0; i < 250; i++) {
                     for (String input : inputs) {
-                        builder.append(combine(input, upper, prefixed, suffix));
+                        builder.append(combine(input, prefixed, pipeline, suffix, combiner));
                         builder.append('|');
                     }
                 }
-                String sample = combine("alpha", upper, prefixed, suffix);
-                String expected = "<ALPHA>-suffix|<pre-alpha>-suffix";
+                String sample = combine("alpha", prefixed, pipeline, suffix, combiner);
+                String expected = "<pre-alpha>-suffix|<other-AHPLA>-suffix";
                 if (!expected.equals(sample)) {
                     fail("Unexpected output: " + sample);
                     return;
@@ -67,9 +90,13 @@ public class BytecodeTranslatorRegressionTest extends BaseTest {
         return false;
     }
 
-    private static String combine(String input, Mapper first, Mapper second, String suffix) {
+    private static String combine(String input, Mapper first, Mapper second, String suffix, Combiner combiner) {
         String left = Mapper.suffix(first.decorate(first.apply(input)), suffix);
         String right = Mapper.suffix(second.decorate(second.apply(input)), suffix);
+        return combiner.combine(left, right);
+    }
+
+    private static String join(String left, String right) {
         return left + "|" + right;
     }
 }
