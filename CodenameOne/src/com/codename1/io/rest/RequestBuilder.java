@@ -23,6 +23,7 @@
  */
 package com.codename1.io.rest;
 
+import com.codename1.compat.java.util.Objects;
 import com.codename1.io.ConnectionRequest;
 import com.codename1.io.Data;
 import com.codename1.io.JSONParser;
@@ -48,7 +49,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * This class is used to build, invoke the http request and to get the http

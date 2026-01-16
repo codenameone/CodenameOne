@@ -23,6 +23,7 @@
 
 package com.codename1.properties;
 
+import com.codename1.compat.java.util.Objects;
 import com.codename1.io.Util;
 import com.codename1.xml.Element;
 
@@ -30,7 +31,6 @@ import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.Vector;
 
 /**

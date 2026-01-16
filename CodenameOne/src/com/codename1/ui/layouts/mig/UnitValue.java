@@ -33,12 +33,12 @@ package com.codename1.ui.layouts.mig;
  *         Date: 2006-sep-08
  */
 
+import com.codename1.compat.java.util.Objects;
 import com.codename1.util.MathUtil;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Objects;
 
 public final class UnitValue {
     /**
