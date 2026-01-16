@@ -70,6 +70,7 @@ public final class Cn1ssDeviceRunner extends DeviceRunner {
             new MediaPlaybackScreenshotTest(),
             new OrientationLockScreenshotTest(),
             new InPlaceEditViewTest(),
+            new BytecodeTranslatorRegressionTest(),
             new AccessibilityTest()));
 
     public static void addTest(BaseTest test) {
