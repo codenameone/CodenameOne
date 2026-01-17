@@ -84,7 +84,16 @@ public class Transform {
 
     }
 
+    /**
+     * @deprecated Use {@link #identity()}.
+     */
+    @Deprecated
+    @SuppressWarnings("PMD.MethodNamingConventions")
     public static Transform IDENTITY() {
+        return identity();
+    }
+
+    public static Transform identity() {
         return IdentityHolder.IDENTITY;
     }
 

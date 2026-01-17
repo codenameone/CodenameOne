@@ -534,7 +534,7 @@ public final class Result {
      */
     public String getAsString(final String path)
             throws IllegalArgumentException {
-        Object o = _internalGet(path);
+        Object o = internalGet(path);
         if (o instanceof StructuredContent) {
             return ((StructuredContent) o).getText();
         }
@@ -551,7 +551,7 @@ public final class Result {
      */
     public Object get(final String path)
             throws IllegalArgumentException {
-        Object o = _internalGet(path);
+        Object o = internalGet(path);
         if (o instanceof StructuredContent) {
             return ((StructuredContent) o).getNativeRoot();
         }
@@ -566,8 +566,8 @@ public final class Result {
      * @return a StructuredContent node, a String, or null
      * @throws IllegalArgumentException
      */
-    private Object _internalGet(final String path) throws IllegalArgumentException {
-        List v = _internalGetAsArray(path);
+    private Object internalGet(final String path) throws IllegalArgumentException {
+        List v = internalGetAsArray(path);
         if (v == null || v.size() == 0) {
             return null;
         }
@@ -619,7 +619,7 @@ public final class Result {
      */
     public int getSizeOfArray(final String path)
             throws IllegalArgumentException {
-        final List array = _internalGetAsArray(path);
+        final List array = internalGetAsArray(path);
         return array == null ? 0 : array.size();
     }
 
@@ -668,16 +668,16 @@ public final class Result {
      */
     public String[] getAsStringArray(final String path)
             throws IllegalArgumentException {
-        final List jarr = _internalGetAsArray(path);
+        final List jarr = internalGetAsArray(path);
         final String[] arr = new String[jarr == null ? 0 : jarr.size()];
         int alen = arr.length;
         for (int i = 0; i < alen; i++) {
-            arr[i] = _getText(jarr.get(i));
+            arr[i] = getTextInternal(jarr.get(i));
         }
         return arr;
     }
 
-    private String _getText(Object o) {
+    private String getTextInternal(Object o) {
         if (o instanceof StructuredContent) {
             return ((StructuredContent) o).getText();
         }
@@ -730,11 +730,11 @@ public final class Result {
      */
     public int[] getAsIntegerArray(final String path)
             throws IllegalArgumentException {
-        final List jarr = _internalGetAsArray(path);
+        final List jarr = internalGetAsArray(path);
         final int[] arr = new int[jarr == null ? 0 : jarr.size()];
         int alen = arr.length;
         for (int i = 0; i < alen; i++) {
-            String s = _getText(jarr.get(i));
+            String s = getTextInternal(jarr.get(i));
             if (s.indexOf('.') > -1) {
                 arr[i] = (int) Double.parseDouble(s);
             } else {
@@ -760,11 +760,11 @@ public final class Result {
      */
     public long[] getAsLongArray(final String path)
             throws IllegalArgumentException {
-        final List jarr = _internalGetAsArray(path);
+        final List jarr = internalGetAsArray(path);
         final long[] arr = new long[jarr == null ? 0 : jarr.size()];
         int alen = arr.length;
         for (int i = 0; i < alen; i++) {
-            String s = _getText(jarr.get(i));
+            String s = getTextInternal(jarr.get(i));
             if (s.indexOf('.') > -1) {
                 arr[i] = (long) Double.parseDouble(s);
             } else {
@@ -790,11 +790,11 @@ public final class Result {
      */
     public double[] getAsDoubleArray(final String path)
             throws IllegalArgumentException {
-        final List jarr = _internalGetAsArray(path);
+        final List jarr = internalGetAsArray(path);
         final double[] arr = new double[jarr == null ? 0 : jarr.size()];
         int alen = arr.length;
         for (int i = 0; i < alen; i++) {
-            String s = _getText(jarr.get(i));
+            String s = getTextInternal(jarr.get(i));
             arr[i] = Double.parseDouble(s);
         }
         return arr;
@@ -814,11 +814,11 @@ public final class Result {
      */
     public boolean[] getAsBooleanArray(final String path)
             throws IllegalArgumentException {
-        final List jarr = _internalGetAsArray(path);
+        final List jarr = internalGetAsArray(path);
         final boolean[] arr = new boolean[jarr == null ? 0 : jarr.size()];
         int alen = arr.length;
         for (int i = 0; i < alen; i++) {
-            String s = _getText(jarr.get(i));
+            String s = getTextInternal(jarr.get(i));
             boolean b = false;
             if ("true".equals(s)) {
                 b = true;
@@ -845,11 +845,11 @@ public final class Result {
      */
     public short[] getAsShortArray(final String path)
             throws IllegalArgumentException {
-        final List jarr = _internalGetAsArray(path);
+        final List jarr = internalGetAsArray(path);
         final short[] arr = new short[jarr == null ? 0 : jarr.size()];
         int alen = arr.length;
         for (int i = 0; i < alen; i++) {
-            String s = _getText(jarr.get(i));
+            String s = getTextInternal(jarr.get(i));
             if (s.indexOf('.') > -1) {
                 arr[i] = (short) Double.parseDouble(s);
             } else {
@@ -874,11 +874,11 @@ public final class Result {
      */
     public float[] getAsFloatArray(final String path)
             throws IllegalArgumentException {
-        final List jarr = _internalGetAsArray(path);
+        final List jarr = internalGetAsArray(path);
         final float[] arr = new float[jarr == null ? 0 : jarr.size()];
         int alen = arr.length;
         for (int i = 0; i < alen; i++) {
-            String s = _getText(jarr.get(i));
+            String s = getTextInternal(jarr.get(i));
             arr[i] = Float.parseFloat(s);
         }
         return arr;
@@ -899,11 +899,11 @@ public final class Result {
      */
     public byte[] getAsByteArray(final String path)
             throws IllegalArgumentException {
-        final List jarr = _internalGetAsArray(path);
+        final List jarr = internalGetAsArray(path);
         final byte[] arr = new byte[jarr == null ? 0 : jarr.size()];
         int alen = arr.length;
         for (int i = 0; i < alen; i++) {
-            String s = _getText(jarr.get(i));
+            String s = getTextInternal(jarr.get(i));
             if (s.indexOf('.') > -1) {
                 arr[i] = (byte) Double.parseDouble(s);
             } else {
@@ -952,7 +952,7 @@ public final class Result {
      *                                  traversing into an array without using subscripts.
      */
     public List getAsArray(final String path) throws IllegalArgumentException {
-        List array = _internalGetAsArray(path);
+        List array = internalGetAsArray(path);
         for (int i = 0; i < array.size(); i++) {
             array.set(i, ((StructuredContent) array.get(i)).getNativeRoot());
         }
@@ -967,7 +967,7 @@ public final class Result {
      * @return
      * @throws IllegalArgumentException
      */
-    private List _internalGetAsArray(final String path)
+    private List internalGetAsArray(final String path)
             throws IllegalArgumentException {
         final List tokens = new ResultTokenizer(path).tokenize(namespaceAliases);
         if (tokens.isEmpty()) {

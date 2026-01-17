@@ -84,7 +84,7 @@ class IndexEvaluator extends AbstractEvaluator {
      * @param rvalue   index value
      * @return an array of matching elements.
      */
-    private List _getByPositionLess(List elements, int rvalue) {
+    private List getByPositionLess(List elements, int rvalue) {
         if (rvalue > elements.size()) {
             return elements;
         }
@@ -117,7 +117,7 @@ class IndexEvaluator extends AbstractEvaluator {
      * @param rvalue   index value
      * @return an array of matching elements.
      */
-    private List _getByPositionGreater(List elements, int rvalue) {
+    private List getByPositionGreater(List elements, int rvalue) {
         if (rvalue >= elements.size()) {
             return null;
         }
@@ -154,7 +154,7 @@ class IndexEvaluator extends AbstractEvaluator {
      * @param rvalue   index value
      * @return an array of matching elements.
      */
-    private StructuredContent _getByLast(List elements, String expr) throws IllegalArgumentException {
+    private StructuredContent getByLast(List elements, String expr) throws IllegalArgumentException {
         int index = expr.indexOf("-");
         if (index == -1) {
             throw new IllegalArgumentException("Could not handle expression: " + expr);
@@ -183,7 +183,7 @@ class IndexEvaluator extends AbstractEvaluator {
             }
             return elements.get(elements.size() - 1);
         } else if (expr.indexOf(FUNC_LAST) != -1) {
-            return _getByLast(elements, expr);
+            return getByLast(elements, expr);
         } else if (expr.equals(FUNC_POSITION)) {
             return elements;
         }
@@ -196,7 +196,7 @@ class IndexEvaluator extends AbstractEvaluator {
     protected Object evaluateLeftLessRight(List elements, String lvalue,
                                            String rvalue) {
         if (FUNC_POSITION.equals(lvalue)) {
-            return _getByPositionLess(elements, Integer.parseInt(rvalue));
+            return getByPositionLess(elements, Integer.parseInt(rvalue));
         }
         return null;
     }
@@ -207,7 +207,7 @@ class IndexEvaluator extends AbstractEvaluator {
     protected Object evaluateLeftGreaterRight(List elements, String lvalue,
                                               String rvalue) {
         if (FUNC_POSITION.equals(lvalue)) {
-            return _getByPositionGreater(elements, Integer.parseInt(rvalue));
+            return getByPositionGreater(elements, Integer.parseInt(rvalue));
         }
         return null;
     }

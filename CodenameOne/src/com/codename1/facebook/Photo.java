@@ -65,8 +65,20 @@ public class Photo extends FBObject {
      * Get created_time
      *
      * @return created_time
+     * @deprecated Use {@link #getCreatedTime()}.
      */
+    @Deprecated
+    @SuppressWarnings("PMD.MethodNamingConventions")
     public String getCreated_time() {
+        return getCreatedTime();
+    }
+
+    /**
+     * Get created time.
+     *
+     * @return created time
+     */
+    public String getCreatedTime() {
         return created_time;
     }
 
@@ -137,8 +149,20 @@ public class Photo extends FBObject {
      * Get updated_time
      *
      * @return updated_time
+     * @deprecated Use {@link #getUpdatedTime()}.
      */
+    @Deprecated
+    @SuppressWarnings("PMD.MethodNamingConventions")
     public String getUpdated_time() {
+        return getUpdatedTime();
+    }
+
+    /**
+     * Get updated time.
+     *
+     * @return updated time
+     */
+    public String getUpdatedTime() {
         return updated_time;
     }
 

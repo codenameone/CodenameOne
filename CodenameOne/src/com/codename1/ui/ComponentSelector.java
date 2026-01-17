@@ -388,9 +388,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      *
      * @param cmps Components to be includd in the set.
      * @return ComponentSelector with specified components.
+     * @deprecated Use {@link #select(Component...)}.
      */
+    @Deprecated
+    @SuppressWarnings("PMD.MethodNamingConventions")
     public static ComponentSelector $(Component... cmps) {
-        return new ComponentSelector(cmps);
+        return select(cmps);
     }
 
     /**
@@ -400,7 +403,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @return
      */
     public static ComponentSelector select(Component... cmps) {
-        return $(cmps);
+        return new ComponentSelector(cmps);
     }
 
     /**
@@ -408,8 +411,21 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      *
      * @param e The event whose source component is added to the set.
      * @return A ComponentSelector with a single component - the source of the event.
+     * @deprecated Use {@link #select(ActionEvent)}.
      */
+    @Deprecated
+    @SuppressWarnings("PMD.MethodNamingConventions")
     public static ComponentSelector $(ActionEvent e) {
+        return select(e);
+    }
+
+    /**
+     * Alias of {@link #$(com.codename1.ui.events.ActionEvent) }
+     *
+     * @param e
+     * @return
+     */
+    public static ComponentSelector select(ActionEvent e) {
         Object src = e.getSource();
         if (src == null) {
             return new ComponentSelector();
@@ -420,24 +436,16 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     }
 
     /**
-     * Alias of {@link #$(com.codename1.ui.events.ActionEvent) }
-     *
-     * @param e
-     * @return
-     */
-    public static ComponentSelector select(ActionEvent e) {
-        return $(e);
-    }
-
-    /**
      * Wraps {@link Display#callSerially(java.lang.Runnable) }
      *
      * @param r
      * @return Empty ComponentSelector.
+     * @deprecated Use {@link #select(Runnable)}.
      */
+    @Deprecated
+    @SuppressWarnings("PMD.MethodNamingConventions")
     public static ComponentSelector $(Runnable r) {
-        Display.getInstance().callSerially(r);
-        return new ComponentSelector();
+        return select(r);
     }
 
     /**
@@ -447,7 +455,8 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @return
      */
     public static ComponentSelector select(Runnable r) {
-        return $(r);
+        Display.getInstance().callSerially(r);
+        return new ComponentSelector();
     }
 
     /**
@@ -455,9 +464,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      *
      * @param cmps The components to include in the set.
      * @return ComponentSelector with provided components.
+     * @deprecated Use {@link #select(Set)}.
      */
+    @Deprecated
+    @SuppressWarnings("PMD.MethodNamingConventions")
     public static ComponentSelector $(Set<Component> cmps) {
-        return new ComponentSelector(cmps);
+        return select(cmps);
     }
 
     /**
@@ -467,7 +479,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @return
      */
     public static ComponentSelector select(Set<Component> cmps) {
-        return $(cmps);
+        return new ComponentSelector(cmps);
     }
 
     /**
@@ -477,9 +489,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @param selector A selector string that defines which components to include in the
      *                 set.
      * @return ComponentSelector with matching components.
+     * @deprecated Use {@link #select(String)}.
      */
+    @Deprecated
+    @SuppressWarnings("PMD.MethodNamingConventions")
     public static ComponentSelector $(String selector) {
-        return new ComponentSelector(selector);
+        return select(selector);
     }
 
     /**
@@ -489,7 +504,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @return
      */
     public static ComponentSelector select(String selector) {
-        return $(selector);
+        return new ComponentSelector(selector);
     }
 
     /**
@@ -499,9 +514,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @param selector Selector string to define which components will be included in the set.
      * @param roots    Roots for the selector to search.  Only components within the roots' subtrees will be included in the set.
      * @return ComponentSelector with matching components.
+     * @deprecated Use {@link #select(String, Component...)}.
      */
+    @Deprecated
+    @SuppressWarnings("PMD.MethodNamingConventions")
     public static ComponentSelector $(String selector, Component... roots) {
-        return new ComponentSelector(selector, roots);
+        return select(selector, roots);
     }
 
     /**
@@ -512,7 +530,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @return
      */
     public static ComponentSelector select(String selector, Component... roots) {
-        return $(selector, roots);
+        return new ComponentSelector(selector, roots);
     }
 
     /**
@@ -522,9 +540,12 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @param selector Selector string to define which components will be included in the set.
      * @param roots    Roots for the selector to search.  Only components within the roots' subtrees will be included in the set.
      * @return ComponentSelector with matching components.
+     * @deprecated Use {@link #select(String, Collection)}.
      */
+    @Deprecated
+    @SuppressWarnings("PMD.MethodNamingConventions")
     public static ComponentSelector $(String selector, Collection<Component> roots) {
-        return new ComponentSelector(selector, roots);
+        return select(selector, roots);
     }
 
     /**
@@ -535,7 +556,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @return
      */
     public static ComponentSelector select(String selector, Collection<Component> roots) {
-        return $(selector, roots);
+        return new ComponentSelector(selector, roots);
     }
 
     private static int dip2px(float dips) {

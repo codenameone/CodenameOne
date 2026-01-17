@@ -103,7 +103,7 @@ class XMLContent implements StructuredContent {
      * @param array
      * @return
      */
-    private List _asStructuredContentArray(List array) {
+    private List asStructuredContentArray(List array) {
         List children;
         if (array instanceof Vector) {
             children = new Vector();
@@ -120,7 +120,7 @@ class XMLContent implements StructuredContent {
      * @see com.codename1.processing.StructuredContent#getChildren(java.lang.String)
      */
     public List getChildren(String name) {
-        return _asStructuredContentArray(root.getChildrenByTagName(name));
+        return asStructuredContentArray(root.getChildrenByTagName(name));
     }
 
     /* (non-Javadoc)
@@ -135,7 +135,7 @@ class XMLContent implements StructuredContent {
      * @see com.codename1.processing.StructuredContent#getDescendants(java.lang.String)
      */
     public List getDescendants(String name) {
-        return _asStructuredContentArray(root.getDescendantsByTagName(name));
+        return asStructuredContentArray(root.getDescendantsByTagName(name));
     }
 
     /* (non-Javadoc)

@@ -83,14 +83,36 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
     /**
      * @deprecated Java 1.4 is not supported anymore
      */
+    @Deprecated
+    @SuppressWarnings("PMD.MethodNamingConventions")
     public static boolean isMaxSizeSetOn1_4() {
+        return isMaxSizeSetOn14();
+    }
+
+    /**
+     * Java 1.4 is not supported anymore.
+     *
+     * @return whether max size was set for legacy mode
+     */
+    public static boolean isMaxSizeSetOn14() {
         return maxSet;
     }
 
     /**
      * @deprecated Java 1.4 is not supported anymore
      */
+    @Deprecated
+    @SuppressWarnings("PMD.MethodNamingConventions")
     public static void setMaxSizeSetOn1_4(boolean b) {
+        setMaxSizeSetOn14(b);
+    }
+
+    /**
+     * Java 1.4 is not supported anymore.
+     *
+     * @param b whether max size was set for legacy mode
+     */
+    public static void setMaxSizeSetOn14(boolean b) {
         maxSet = b;
     }
 

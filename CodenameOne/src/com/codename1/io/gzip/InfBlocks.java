@@ -154,7 +154,7 @@ final class InfBlocks {
                             z.totalIn += p - z.nextInIndex;
                             z.nextInIndex = p;
                             write = q;
-                            return inflate_flush(r);
+                            return inflateFlush(r);
                         }
                         n--;
                         b |= (z.nextIn[p++] & 0xff) << k;
@@ -178,7 +178,7 @@ final class InfBlocks {
                         mode = LENS;                  // get length of stored block
                         break;
                         case 1:                         // fixed
-                            InfTree.inflate_trees_fixed(bl, bd, tl, td, z);
+                            InfTree.inflateTreesFixed(bl, bd, tl, td, z);
                             codes.init(bl[0], bd[0], tl[0], 0, td[0], 0);
 
                         {
@@ -213,7 +213,7 @@ final class InfBlocks {
                         z.totalIn += p - z.nextInIndex;
                         z.nextInIndex = p;
                         write = q;
-                        return inflate_flush(r);
+                        return inflateFlush(r);
                     }
                     break;
                 case LENS:
@@ -228,7 +228,7 @@ final class InfBlocks {
                             z.totalIn += p - z.nextInIndex;
                             z.nextInIndex = p;
                             write = q;
-                            return inflate_flush(r);
+                            return inflateFlush(r);
                         }
                         n--;
                         b |= (z.nextIn[p++] & 0xff) << k;
@@ -246,7 +246,7 @@ final class InfBlocks {
                         z.totalIn += p - z.nextInIndex;
                         z.nextInIndex = p;
                         write = q;
-                        return inflate_flush(r);
+                        return inflateFlush(r);
                     }
                     left = (b & 0xffff);
                     b = k = 0;                       // dump bits
@@ -260,7 +260,7 @@ final class InfBlocks {
                         z.totalIn += p - z.nextInIndex;
                         z.nextInIndex = p;
                         write = q;
-                        return inflate_flush(r);
+                        return inflateFlush(r);
                     }
 
                     if (m == 0) {
@@ -270,7 +270,7 @@ final class InfBlocks {
                         }
                         if (m == 0) {
                             write = q;
-                            r = inflate_flush(r);
+                            r = inflateFlush(r);
                             q = write;
                             m = q < read ? read - q - 1 : end - q;
                             if (q == end && read != 0) {
@@ -284,7 +284,7 @@ final class InfBlocks {
                                 z.totalIn += p - z.nextInIndex;
                                 z.nextInIndex = p;
                                 write = q;
-                                return inflate_flush(r);
+                                return inflateFlush(r);
                             }
                         }
                     }
@@ -314,7 +314,7 @@ final class InfBlocks {
                             z.totalIn += p - z.nextInIndex;
                             z.nextInIndex = p;
                             write = q;
-                            return inflate_flush(r);
+                            return inflateFlush(r);
                         }
                         n--;
                         b |= (z.nextIn[p++] & 0xff) << k;
@@ -333,7 +333,7 @@ final class InfBlocks {
                         z.totalIn += p - z.nextInIndex;
                         z.nextInIndex = p;
                         write = q;
-                        return inflate_flush(r);
+                        return inflateFlush(r);
                     }
                     t = 258 + (t & 0x1f) + ((t >> 5) & 0x1f);
                     if (blens == null || blens.length < t) {
@@ -363,7 +363,7 @@ final class InfBlocks {
                                 z.totalIn += p - z.nextInIndex;
                                 z.nextInIndex = p;
                                 write = q;
-                                return inflate_flush(r);
+                                return inflateFlush(r);
                             }
                             n--;
                             b |= (z.nextIn[p++] & 0xff) << k;
@@ -383,7 +383,7 @@ final class InfBlocks {
                     }
 
                     bb[0] = 7;
-                    t = inftree.inflate_trees_bits(blens, bb, tb, hufts, z);
+                    t = inftree.inflateTreesBits(blens, bb, tb, hufts, z);
                     if (t != Z_OK) {
                         r = t;
                         if (r == Z_DATA_ERROR) {
@@ -397,7 +397,7 @@ final class InfBlocks {
                         z.totalIn += p - z.nextInIndex;
                         z.nextInIndex = p;
                         write = q;
-                        return inflate_flush(r);
+                        return inflateFlush(r);
                     }
 
                     index = 0;
@@ -424,7 +424,7 @@ final class InfBlocks {
                                 z.totalIn += p - z.nextInIndex;
                                 z.nextInIndex = p;
                                 write = q;
-                                return inflate_flush(r);
+                                return inflateFlush(r);
                             }
                             n--;
                             b |= (z.nextIn[p++] & 0xff) << k;
@@ -452,7 +452,7 @@ final class InfBlocks {
                                     z.totalIn += p - z.nextInIndex;
                                     z.nextInIndex = p;
                                     write = q;
-                                    return inflate_flush(r);
+                                    return inflateFlush(r);
                                 }
                                 n--;
                                 b |= (z.nextIn[p++] & 0xff) << k;
@@ -482,7 +482,7 @@ final class InfBlocks {
                                 z.totalIn += p - z.nextInIndex;
                                 z.nextInIndex = p;
                                 write = q;
-                                return inflate_flush(r);
+                                return inflateFlush(r);
                             }
 
                             c = c == 16 ? blens[i - 1] : 0;
@@ -498,7 +498,7 @@ final class InfBlocks {
                 {
                     bl[0] = 9;         // must be <= 9 for lookahead assumptions
                     bd[0] = 6;         // must be <= 9 for lookahead assumptions
-                    t = inftree.inflate_trees_dynamic(257 + (t & 0x1f),
+                    t = inftree.inflateTreesDynamic(257 + (t & 0x1f),
                             1 + ((t >> 5) & 0x1f),
                             blens, bl, bd, tli, tdi, hufts, z);
 
@@ -515,7 +515,7 @@ final class InfBlocks {
                         z.totalIn += p - z.nextInIndex;
                         z.nextInIndex = p;
                         write = q;
-                        return inflate_flush(r);
+                        return inflateFlush(r);
                     }
                     codes.init(bl[0], bd[0], hufts, tli[0], hufts, tdi[0]);
                 }
@@ -529,7 +529,7 @@ final class InfBlocks {
                     write = q;
 
                     if ((r = codes.proc(r)) != Z_STREAM_END) {
-                        return inflate_flush(r);
+                        return inflateFlush(r);
                     }
                     r = Z_OK;
                     codes.free(z);
@@ -548,7 +548,7 @@ final class InfBlocks {
                     mode = DRY;
                 case DRY:
                     write = q;
-                    r = inflate_flush(r);
+                    r = inflateFlush(r);
                     q = write;
                     if (read != write) {
                         bitb = b;
@@ -556,7 +556,7 @@ final class InfBlocks {
                         z.availIn = n;
                         z.totalIn += p - z.nextInIndex;
                         z.nextInIndex = p;
-                        return inflate_flush(r);
+                        return inflateFlush(r);
                     }
                     mode = DONE;
                 case DONE:
@@ -568,7 +568,7 @@ final class InfBlocks {
                     z.totalIn += p - z.nextInIndex;
                     z.nextInIndex = p;
                     write = q;
-                    return inflate_flush(r);
+                    return inflateFlush(r);
                 case BAD:
                     r = Z_DATA_ERROR;
 
@@ -578,7 +578,7 @@ final class InfBlocks {
                     z.totalIn += p - z.nextInIndex;
                     z.nextInIndex = p;
                     write = q;
-                    return inflate_flush(r);
+                    return inflateFlush(r);
 
                 default:
                     r = Z_STREAM_ERROR;
@@ -589,7 +589,7 @@ final class InfBlocks {
                     z.totalIn += p - z.nextInIndex;
                     z.nextInIndex = p;
                     write = q;
-                    return inflate_flush(r);
+                    return inflateFlush(r);
             }
         }
     }
@@ -601,19 +601,19 @@ final class InfBlocks {
         //ZFREE(z, s);
     }
 
-    void set_dictionary(byte[] d, int start, int n) {
+    void setDictionary(byte[] d, int start, int n) {
         System.arraycopy(d, start, window, 0, n);
         read = write = n;
     }
 
     // Returns true if inflate is currently at the end of a block generated
     // by Z_SYNC_FLUSH or Z_FULL_FLUSH.
-    int sync_point() {
+    int syncPoint() {
         return mode == LENS ? 1 : 0;
     }
 
     // copy as much as possible from the sliding window to the output area
-    int inflate_flush(int r) {
+    int inflateFlush(int r) {
         int n;
         int p;
         int q;

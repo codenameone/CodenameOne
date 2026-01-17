@@ -73,7 +73,7 @@ public abstract class MathUtil {
     private static final long HI_MASK = 0xffffffff00000000L,
             LO_MASK = 0x00000000ffffffffL;
     private static final int HI_SHIFT = 32;
-    /* __ieee754_exp(x)
+    /* __ieee754Exp(x)
      * Returns the exponential of x.
      *
      * Method
@@ -144,7 +144,7 @@ public abstract class MathUtil {
                     -6.93147180369123816490e-01}, /* 0xbfe62e42, 0xfee00000 */
             ln2LO = new double[]{1.90821492927058770002e-10, /* 0x3dea39ef, 0x35793c76 */
                     -1.90821492927058770002e-10}; /* 0xbdea39ef, 0x35793c76 */
-    /* __ieee754_log(x)
+    /* __ieee754Log(x)
      * Return the logrithm of x
      *
      * Method :
@@ -203,7 +203,7 @@ public abstract class MathUtil {
             Lg5 = 1.818357216161805012e-01, /* 3FC74664 96CB03DE */
             Lg6 = 1.531383769920937332e-01, /* 3FC39A09 D078C69F */
             Lg7 = 1.479819860511658591e-01;  /* 3FC2F112 DF3E5244 */
-    /* __ieee754_pow(x,y) return x**y
+    /* __ieee754Pow(x,y) return x**y
      *
      *          n
      * Method:  Let x =  2   * (1+f)
@@ -318,7 +318,7 @@ public abstract class MathUtil {
      * This in turn uses ieee7854_exp(double).
      */
     public static final double exp(double a) {
-        return ieee754_exp(a);
+        return ieee754Exp(a);
     }
 
     /**
@@ -326,7 +326,7 @@ public abstract class MathUtil {
      * This in turn uses ieee7854_log(double).
      */
     public static final double log(double a) {
-        return ieee754_log(a);
+        return ieee754Log(a);
     }
 
     /**
@@ -334,7 +334,7 @@ public abstract class MathUtil {
      * This in turn uses ieee7854_log(double)/ieee7854_log(10.0).
      */
     public static final double log10(double a) {
-        return ieee754_log(a) / log10;
+        return ieee754Log(a) / log10;
     }
 
     /**
@@ -343,28 +343,28 @@ public abstract class MathUtil {
      * This in turn uses ieee7854_log(double).
      */
     public static final double pow(double a, double b) {
-        return ieee754_pow(a, b);
+        return ieee754Pow(a, b);
     }
 
     /**
      * Return the arcsine of a.
      */
     public static final double asin(double a) {
-        return ieee754_asin(a);
+        return ieee754Asin(a);
     }
 
     /**
      * Return the arccosine of a.
      */
     public static final double acos(double a) {
-        return ieee754_acos(a);
+        return ieee754Acos(a);
     }
 
     /**
      * Return the arctangent of a, call it b, where a = tan(b).
      */
     public static final double atan(double a) {
-        return ieee754_atan(a);
+        return ieee754Atan(a);
     }
 
     /**
@@ -376,10 +376,10 @@ public abstract class MathUtil {
      * This in turn uses ieee7854_arctan2(double).
      */
     public static final double atan2(double b, double a) {
-        return ieee754_atan2(a, b);
+        return ieee754Atan2(a, b);
     }
 
-    private static final double ieee754_exp(double x) {
+    private static final double ieee754Exp(double x) {
         double y, c, t;
         double hi = 0, lo = 0;
         int k = 0;
@@ -446,7 +446,7 @@ public abstract class MathUtil {
         }
     }
 
-    private static double ieee754_log(double x) {
+    private static double ieee754Log(double x) {
         double hfsq, f, s, z, r, w, t1, t2, dk;
         int k, hx, lx, i, j;
         long xl = Double.doubleToLongBits(x);
@@ -519,7 +519,7 @@ public abstract class MathUtil {
         }
     }
 
-    private static double ieee754_pow(double x, double y) {
+    private static double ieee754Pow(double x, double y) {
         double z, ax, zH, zL, pH, pL;
         double y1, t1, t2, r, s, t, u, v, w;
         //int i0,i1;
@@ -787,7 +787,7 @@ public abstract class MathUtil {
         return s * z;
     }
 
-    /* __ieee754_acos(x)
+    /* __ieee754Acos(x)
      * Method :
      *  acos(x)  = pi/2 - asin(x)
      *  acos(-x) = pi/2 + asin(x)
@@ -810,7 +810,7 @@ public abstract class MathUtil {
      *
      * Function needed: sqrt
      */
-    private static double ieee754_acos(double x) {
+    private static double ieee754Acos(double x) {
         double z, p, q, r, w, s, c, df;
         int hx, ix;
         hx = (int) (Double.doubleToLongBits(x) >>> HI_SHIFT);
@@ -857,7 +857,7 @@ public abstract class MathUtil {
         }
     }
 
-    /* __ieee754_asin(x)
+    /* __ieee754Asin(x)
      * Method :
      *  Since  asin(x) = x + x^3/6 + x^5*3/40 + x^7*15/336 + ...
      *  we approximate asin(x) on [0,0.5] by
@@ -886,7 +886,7 @@ public abstract class MathUtil {
      *  if |x|>1, return NaN with invalid signal.
      *
      */
-    private static double ieee754_asin(double x) {
+    private static double ieee754Asin(double x) {
         double t, w, p, q, c, r, s;
         int hx, ix;
         hx = (int) (Double.doubleToLongBits(x) >>> HI_SHIFT);
@@ -933,7 +933,7 @@ public abstract class MathUtil {
         }
     }
 
-    private static double ieee754_atan(double x) {
+    private static double ieee754Atan(double x) {
         double w, s1, s2, z;
         int ix, hx, id;
 
@@ -989,7 +989,7 @@ public abstract class MathUtil {
         }
     }
 
-    /* __ieee754_atan2(y,x)
+    /* __ieee754Atan2(y,x)
      * Method :
      *  1. Reduce y to positive by atan2(y,x)=-atan2(-y,x).
      *  2. Reduce x to positive by (if x and y are unexceptional):
@@ -1015,7 +1015,7 @@ public abstract class MathUtil {
      * compiler will convert from decimal to binary accurately enough
      * to produce the hexadecimal values shown.
      */
-    private static double ieee754_atan2(double x, double y) {
+    private static double ieee754Atan2(double x, double y) {
         double z;
         int k, m;
         int hx, hy, ix, iy;
@@ -1035,7 +1035,7 @@ public abstract class MathUtil {
             return x + y;
         }
         if ((hx - 0x3ff00000 | lx) == 0) {
-            return ieee754_atan(y);   /* x=1.0 */
+            return ieee754Atan(y);   /* x=1.0 */
         }
         m = ((hy >> 31) & 1) | ((hx >> 30) & 2);  /* 2*sign(x)+sign(y) */
 
@@ -1094,7 +1094,7 @@ public abstract class MathUtil {
         } else if (hx < 0 && k < -60) {
             z = 0.0;   /* |y|/x < -2**60 */
         } else {
-            z = ieee754_atan(Math.abs(y / x));   /* safe to do y/x */
+            z = ieee754Atan(Math.abs(y / x));   /* safe to do y/x */
         }
         switch (m) {
             case 0:
