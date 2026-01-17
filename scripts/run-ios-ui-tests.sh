@@ -487,11 +487,10 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
     INSTALL_END=$(date +%s)
 
     LAUNCH_START=$(date +%s)
-    if ! xcrun simctl launch \
-      --env MTC_ENABLE=1 \
-      --env MTC_CRASH_ON_REPORT=1 \
-      --env DYLD_INSERT_LIBRARIES=/usr/lib/libMainThreadChecker.dylib \
-      "$SIM_DEVICE_ID" \
+    if ! SIMCTL_CHILD_MTC_ENABLE=1 \
+      SIMCTL_CHILD_MTC_CRASH_ON_REPORT=1 \
+      SIMCTL_CHILD_DYLD_INSERT_LIBRARIES=/usr/lib/libMainThreadChecker.dylib \
+      xcrun simctl launch "$SIM_DEVICE_ID" \
       "$BUNDLE_IDENTIFIER" >"$LAUNCH_LOG" 2>&1; then
       ri_log "FATAL: simctl launch failed"
       ri_log "simctl launch output (tail):"
@@ -507,11 +506,10 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
     INSTALL_END=$(date +%s)
 
     LAUNCH_START=$(date +%s)
-    if ! xcrun simctl launch \
-      --env MTC_ENABLE=1 \
-      --env MTC_CRASH_ON_REPORT=1 \
-      --env DYLD_INSERT_LIBRARIES=/usr/lib/libMainThreadChecker.dylib \
-      booted \
+    if ! SIMCTL_CHILD_MTC_ENABLE=1 \
+      SIMCTL_CHILD_MTC_CRASH_ON_REPORT=1 \
+      SIMCTL_CHILD_DYLD_INSERT_LIBRARIES=/usr/lib/libMainThreadChecker.dylib \
+      xcrun simctl launch booted \
       "$BUNDLE_IDENTIFIER" >"$LAUNCH_LOG" 2>&1; then
       ri_log "FATAL: simctl launch failed"
       ri_log "simctl launch output (tail):"
