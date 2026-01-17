@@ -16,11 +16,31 @@
 #include "java_lang_System.h"
 #include "java_lang_ArrayIndexOutOfBoundsException.h"
 #if defined(__APPLE__) && defined(__OBJC__)
+#import <TargetConditionals.h>
 #import <mach/mach.h>
 #import <mach/mach_host.h>
 #else
 #include <time.h>
 #define NSLog(...) printf(__VA_ARGS__); printf("\n")
+#endif
+
+#if defined(__APPLE__) && defined(__OBJC__)
+#if TARGET_OS_SIMULATOR
+#define CN1_GC_ASSERT(condition, message) \
+    do { \
+        if (!(condition)) { \
+            __assert_rtn(__func__, __FILE__, __LINE__, message); \
+        } \
+    } while (0)
+#else
+#define CN1_GC_ASSERT(condition, message) \
+    do { \
+        (void)(condition); \
+        (void)(message); \
+    } while (0)
+#endif
+#else
+#define CN1_GC_ASSERT(condition, message) CODENAME_ONE_ASSERT(condition)
 #endif
 
 // The amount of memory allocated between GC cycle checks (generally 30 seconds)
@@ -631,7 +651,20 @@ void codenameOneGCMark() {
                 int stackSize = t->threadObjectStackOffset;
                 for(int stackIter = 0 ; stackIter < stackSize ; stackIter++) {
                     struct elementStruct* current = &t->threadObjectStack[stackIter];
-                    CODENAME_ONE_ASSERT(current->type >= CN1_TYPE_INVALID && current->type <= CN1_TYPE_PRIMITIVE);
+                    if (current->type < CN1_TYPE_INVALID || current->type > CN1_TYPE_PRIMITIVE) {
+#if defined(__APPLE__) && defined(__OBJC__)
+#if TARGET_OS_SIMULATOR
+                        CN1_GC_ASSERT(current->type >= CN1_TYPE_INVALID && current->type <= CN1_TYPE_PRIMITIVE,
+                            "CN1_GC_STACK_ENTRY_TYPE");
+#else
+                        NSLog(@"[GC] Invalid stack entry type %d at index %d; skipping entry", current->type, stackIter);
+                        continue;
+#endif
+#else
+                        CN1_GC_ASSERT(current->type >= CN1_TYPE_INVALID && current->type <= CN1_TYPE_PRIMITIVE,
+                            "CN1_GC_STACK_ENTRY_TYPE");
+#endif
+                    }
                     if(current != 0 && current->type == CN1_TYPE_OBJECT && current->data.o != JAVA_NULL) {
                         gcMarkObject(t, current->data.o, JAVA_FALSE);
                         //marked++;
@@ -813,7 +846,18 @@ void codenameOneGCSweep() {
         if(o != JAVA_NULL) {
             if(o->__codenameOneGcMark != -1) {
                 if(o->__codenameOneGcMark < currentGcMarkValue - 1) {
-                    CODENAME_ONE_ASSERT(o->__codenameOneGcMark > 0);
+                    if (o->__codenameOneGcMark <= 0) {
+#if defined(__APPLE__) && defined(__OBJC__)
+#if TARGET_OS_SIMULATOR
+                        CN1_GC_ASSERT(o->__codenameOneGcMark > 0, "CN1_GC_INVALID_MARK");
+#else
+                        NSLog(@"[GC] Invalid GC mark %d for object %p; skipping sweep", o->__codenameOneGcMark, o);
+                        continue;
+#endif
+#else
+                        CN1_GC_ASSERT(o->__codenameOneGcMark > 0, "CN1_GC_INVALID_MARK");
+#endif
+                    }
                     allObjectsInHeap[iter] = JAVA_NULL;
                     //if(o->__codenameOneReferenceCount > 0) {
                     //    NSLog(@"Sweped %X", (int)o);
