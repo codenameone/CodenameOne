@@ -21,6 +21,8 @@
  * need additional information or have any questions.
  */
 #import "CodenameOne_GLAppDelegate.h"
+#import <TargetConditionals.h>
+#include <stdlib.h>
 #import "CN1JailbreakDetector.h"
 #include "xmlvm.h"
 #import "EAGLView.h"
@@ -116,6 +118,11 @@ static void installSignalHandlers() {
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+#ifdef CN1_IOS_SIMULATOR_FATAL_WARNINGS
+#if TARGET_OS_SIMULATOR
+    setenv("MTC_CRASH_ON_REPORT", "1", 1);
+#endif
+#endif
 #ifdef CN1_DETECT_JAILBREAK
     cn1DetectJailbreakBypassesAndExit();
 #endif

@@ -358,6 +358,7 @@ if ! xcodebuild \
   -destination "$SIM_DESTINATION" \
   -destination-timeout 120 \
   -derivedDataPath "$DERIVED_DATA_DIR" \
+  GCC_PREPROCESSOR_DEFINITIONS='$(inherited) CN1_IOS_SIMULATOR_FATAL_WARNINGS=1' \
   build | tee "$BUILD_LOG"; then
   ri_log "STAGE:XCODE_BUILD_FAILED -> See $BUILD_LOG"
   exit 10
@@ -659,4 +660,3 @@ cp -f "$BUILD_LOG" "$ARTIFACTS_DIR/xcodebuild-build.log" 2>/dev/null || true
 cp -f "$TEST_LOG" "$ARTIFACTS_DIR/device-runner.log" 2>/dev/null || true
 
 exit $comment_rc
-
