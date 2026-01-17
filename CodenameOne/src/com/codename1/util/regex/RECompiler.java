@@ -469,8 +469,8 @@ public class RECompiler {
         int ret = node(RE.OP_ANYOF, 0);
 
         // Parse class declaration
-        char CHAR_INVALID = Character.MAX_VALUE;
-        char last = CHAR_INVALID;
+        char charInvalid = Character.MAX_VALUE;
+        char last = charInvalid;
         char simpleChar;
         boolean include = true;
         boolean definingRange = false;
@@ -501,12 +501,12 @@ public class RECompiler {
 
                             // Word boundaries and backrefs not allowed in a character class!
                             syntaxError("Bad character class");
-                            last = escapeClass(definingRange, range, include, CHAR_INVALID);
+                            last = escapeClass(definingRange, range, include, charInvalid);
                             break;
 
                         case ESC_CLASS:
 
-                            last = escapeClass(definingRange, range, include, CHAR_INVALID);
+                            last = escapeClass(definingRange, range, include, charInvalid);
                             break;
 
                         default:
@@ -527,7 +527,7 @@ public class RECompiler {
                     definingRange = true;
 
                     // If no last character, start of range is 0
-                    rangeStart = (last == CHAR_INVALID ? 0 : last);
+                    rangeStart = (last == charInvalid ? 0 : last);
 
                     // Premature end of range. define up to Character.MAX_VALUE
                     if ((idx + 1) < len && pattern.charAt(++idx) == ']') {
@@ -553,7 +553,7 @@ public class RECompiler {
                 range.include(rangeStart, rangeEnd, include);
 
                 // We are done defining the range
-                last = CHAR_INVALID;
+                last = charInvalid;
                 definingRange = false;
             } else {
                 // If simple character and not start of range, include it
@@ -581,14 +581,14 @@ public class RECompiler {
         return ret;
     }
 
-    private char escapeClass(boolean definingRange, RERange range, boolean include, char CHAR_INVALID) {
+    private char escapeClass(boolean definingRange, RERange range, boolean include, char charInvalid) {
         char last;
         // Classes can't be an endpoint of a range
         if (definingRange) {
             syntaxError("Bad character class");
         }
 
-        // Handle specific type of class (some are ok)
+        // Handle a specific type of class (some are ok)
         switch (pattern.charAt(idx - 1)) {
             case RE.E_NSPACE:
                 range.include(Character.MIN_VALUE, 7, include);   // [Min - \b )
@@ -635,7 +635,7 @@ public class RECompiler {
         }
 
         // Make last char invalid (can't be a range start)
-        last = CHAR_INVALID;
+        last = charInvalid;
         return last;
     }
 

@@ -200,14 +200,14 @@ public class JavascriptContext {
      * @param id The ID of the javascript object.
      */
     void release(int id) {
-        String ID_KEY = JSObject.ID_KEY;
-        String PROP_REFCOUNT = JSObject.PROP_REFCOUNT;
+        String idKey = JSObject.ID_KEY;
+        String propRefcount = JSObject.PROP_REFCOUNT;
         String lt = jsLookupTable;
         String p = lt + "[" + id + "]";
         String js = "var id = " + id + "; " +
-                "if (typeof(id) != 'undefined' && typeof(" + lt + "[id]) != 'undefined' && " + lt + "[id]." + ID_KEY + "==id){" +
-                p + "." + PROP_REFCOUNT + "--;" +
-                "if (" + p + "." + PROP_REFCOUNT + "<=0){" +
+                "if (typeof(id) != 'undefined' && typeof(" + lt + "[id]) != 'undefined' && " + lt + "[id]." + idKey + "==id){" +
+                p + "." + propRefcount + "--;" +
+                "if (" + p + "." + propRefcount + "<=0){" +
                 "delete " + lt + "[id];" +
                 "}" +
                 "}";

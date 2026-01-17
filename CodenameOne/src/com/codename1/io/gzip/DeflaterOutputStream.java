@@ -64,7 +64,7 @@ public class DeflaterOutputStream extends FilterOutputStream {
     public DeflaterOutputStream(OutputStream out,
                                 Deflater deflater,
                                 int size,
-                                boolean close_out) throws IOException {
+                                boolean closeOut) throws IOException {
         super(out);
         if (out == null || deflater == null) {
             throw new NullPointerException();
@@ -73,7 +73,7 @@ public class DeflaterOutputStream extends FilterOutputStream {
         }
         this.deflater = deflater;
         buffer = new byte[size];
-        this.close_out = close_out;
+        this.close_out = closeOut;
     }
 
     public void write(int b) throws IOException {

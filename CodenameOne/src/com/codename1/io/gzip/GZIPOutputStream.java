@@ -44,18 +44,18 @@ public class GZIPOutputStream extends DeflaterOutputStream {
 
     public GZIPOutputStream(OutputStream out,
                             int size,
-                            boolean close_out) throws IOException {
+                            boolean closeOut) throws IOException {
         this(out,
                 new Deflater(JZlib.Z_DEFAULT_COMPRESSION, 15 + 16),
-                size, close_out);
+                size, closeOut);
         mydeflater = true;
     }
 
     public GZIPOutputStream(OutputStream out,
                             Deflater deflater,
                             int size,
-                            boolean close_out) throws IOException {
-        super(out, deflater, size, close_out);
+                            boolean closeOut) throws IOException {
+        super(out, deflater, size, closeOut);
     }
 
 

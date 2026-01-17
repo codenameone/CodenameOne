@@ -128,13 +128,13 @@ public final class AnimationManager {
      * @param an the animation to perform
      */
     public void addAnimationAndBlock(final ComponentAnimation an) {
-        final Object LOCK = new Object();
-        an.setNotifyLock(LOCK);
+        final Object lock = new Object();
+        an.setNotifyLock(lock);
         addAnimation(an);
         Display.getInstance().invokeAndBlock(new Runnable() {
             public void run() {
                 while (an.isInProgress() && anims.contains(an)) {
-                    Util.wait(LOCK, 50);
+                    Util.wait(lock, 50);
                 }
             }
         });

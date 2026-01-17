@@ -228,11 +228,11 @@ final class TPrimality {
         // PRE: n >= 0, t >= 0
         TBigInteger x; // x := UNIFORM{2...n-1}
         TBigInteger y; // y := x^(q * 2^j) mod n
-        TBigInteger n_minus_1 = n.subtract(TBigInteger.ONE); // n-1
-        int bitLength = n_minus_1.bitLength(); // ~ log2(n-1)
+        TBigInteger nMinus1 = n.subtract(TBigInteger.ONE); // n-1
+        int bitLength = nMinus1.bitLength(); // ~ log2(n-1)
         // (q,k) such that: n-1 = q * 2^k and q is odd
-        int k = n_minus_1.getLowestSetBit();
-        TBigInteger q = n_minus_1.shiftRight(k);
+        int k = nMinus1.getLowestSetBit();
+        TBigInteger q = nMinus1.shiftRight(k);
         Random rnd = new Random();
 
         for (int i = 0; i < t; i++) {
@@ -249,11 +249,11 @@ final class TPrimality {
                 } while ((x.compareTo(n) >= TBigInteger.EQUALS) || (x.sign == 0) || x.isOne());
             }
             y = x.modPow(q, n);
-            if (y.isOne() || y.equals(n_minus_1)) {
+            if (y.isOne() || y.equals(nMinus1)) {
                 continue;
             }
             for (int j = 1; j < k; j++) {
-                if (y.equals(n_minus_1)) {
+                if (y.equals(nMinus1)) {
                     continue;
                 }
                 y = y.multiply(y).mod(n);
@@ -261,7 +261,7 @@ final class TPrimality {
                     return false;
                 }
             }
-            if (!y.equals(n_minus_1)) {
+            if (!y.equals(nMinus1)) {
                 return false;
             }
         }

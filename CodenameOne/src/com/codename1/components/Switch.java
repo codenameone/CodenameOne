@@ -865,9 +865,9 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     }
 
     private void animateTo(final boolean value, final int deltaStart, final int deltaEnd, final int maxMoveDist) {
-        int anim_duration = (int) Math.abs((deltaEnd - deltaStart) / (double) maxMoveDist * 100.0);
-        final Motion current = Motion.createEaseInOutMotion(deltaStart, deltaEnd, anim_duration);
-        if (anim_duration > 0) {
+        int animDuration = (int) Math.abs((deltaEnd - deltaStart) / (double) maxMoveDist * 100.0);
+        final Motion current = Motion.createEaseInOutMotion(deltaStart, deltaEnd, animDuration);
+        if (animDuration > 0) {
             current.start();
             deltaX = deltaStart;
             getComponentForm().registerAnimated(new Animation() {

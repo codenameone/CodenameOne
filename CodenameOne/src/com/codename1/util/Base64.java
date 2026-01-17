@@ -72,9 +72,9 @@ public class Base64 {
             }
         }
         // index in the output array
-        int out_index = 0;
+        int outIndex = 0;
         // index in the input array
-        int in_index = 0;
+        int inIndex = 0;
         // holds the value of the input character
         int bits = 0;
         // holds the value of the input quantum
@@ -113,26 +113,26 @@ public class Base64 {
             }
             // append the value to the quantum
             quantum = (quantum << 6) | (byte) bits;
-            if (in_index % 4 == 3) {
+            if (inIndex % 4 == 3) {
                 // 4 characters were read, so make the output:
-                out[out_index++] = (byte) ((quantum & 0x00FF0000) >> 16);
-                out[out_index++] = (byte) ((quantum & 0x0000FF00) >> 8);
-                out[out_index++] = (byte) (quantum & 0x000000FF);
+                out[outIndex++] = (byte) ((quantum & 0x00FF0000) >> 16);
+                out[outIndex++] = (byte) ((quantum & 0x0000FF00) >> 8);
+                out[outIndex++] = (byte) (quantum & 0x000000FF);
             }
-            in_index++;
+            inIndex++;
         }
         if (pad > 0) {
             // adjust the quantum value according to the padding
             quantum = quantum << (6 * pad);
             // make output
-            out[out_index++] = (byte) ((quantum & 0x00FF0000) >> 16);
+            out[outIndex++] = (byte) ((quantum & 0x00FF0000) >> 16);
             if (pad == 1) {
-                out[out_index++] = (byte) ((quantum & 0x0000FF00) >> 8);
+                out[outIndex++] = (byte) ((quantum & 0x0000FF00) >> 8);
             }
         }
         // create the resulting array
-        byte[] result = new byte[out_index];
-        System.arraycopy(out, 0, result, 0, out_index);
+        byte[] result = new byte[outIndex];
+        System.arraycopy(out, 0, result, 0, outIndex);
         return result;
     }
 

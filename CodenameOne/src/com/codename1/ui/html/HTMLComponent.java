@@ -1397,9 +1397,9 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      * @return the closest font the HTMLComponent could find or null if none found.
      */
     HTMLFont getClosestHTMLFont(String family, int size, int style, int weight) {
-        final int FACTOR_FONT_FAMILY = 30;
-        final int FACTOR_FONT_SIZE = 5;
-        final int FACTOR_FONT_STYLE = 10;
+        final int factorFontFamily = 30;
+        final int factorFontSize = 5;
+        final int factorFontStyle = 10;
         HTMLFont bestFit = null;
         int bestFitDistance = 10000;
         Enumeration e = fonts.elements();
@@ -1414,21 +1414,21 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     if (MATCH_SAME_FONT_FAMILY_ONLY) {
                         continue;
                     }
-                    curFontDistance += FACTOR_FONT_FAMILY;
+                    curFontDistance += factorFontFamily;
                 }
             }
             if (size > 0) {
-                curFontDistance += Math.abs(size - hFont.getSizeInPixels()) * FACTOR_FONT_SIZE;
+                curFontDistance += Math.abs(size - hFont.getSizeInPixels()) * factorFontSize;
             }
 
             if (weight >= 0) {
                 if ((weight & Font.STYLE_BOLD) != (hFont.getStyle() & Font.STYLE_BOLD)) {
-                    curFontDistance += FACTOR_FONT_STYLE;
+                    curFontDistance += factorFontStyle;
                 }
             }
             if (style >= 0) {
                 if ((style & Font.STYLE_ITALIC) != (hFont.getStyle() & Font.STYLE_ITALIC)) {
-                    curFontDistance += FACTOR_FONT_STYLE;
+                    curFontDistance += factorFontStyle;
                 }
             }
             if (curFontDistance < bestFitDistance) {

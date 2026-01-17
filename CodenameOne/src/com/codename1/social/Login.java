@@ -396,8 +396,8 @@ public abstract class Login {
      *
      * @param redirectURI
      */
-    public void setRedirectURI(String URI) {
-        redirectURI = URI;
+    public void setRedirectURI(String redirectURI) {
+        this.redirectURI = redirectURI;
     }
 
     /**

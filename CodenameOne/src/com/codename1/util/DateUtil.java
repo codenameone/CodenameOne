@@ -437,17 +437,16 @@ public class DateUtil {
         if (date == null) {
             return "N/A";
         }
-        long time_ago = date.getTime() / 1000L;
+        long timeAgo = date.getTime() / 1000L;
 
-        long cur_time = new Date().getTime() / 1000L;
-        long time_elapsed = cur_time - time_ago;
-        long seconds = time_elapsed;
+        long curTime = new Date().getTime() / 1000L;
+        long seconds = curTime - timeAgo;
         // Seconds
         if (seconds <= 60) {
             return "Just now";
         } //Minutes
         else {
-            int minutes = (int) Math.round(time_elapsed / 60.0d);
+            int minutes = (int) Math.round(seconds / 60.0d);
 
             if (minutes <= 60) {
                 if (minutes == 1) {
@@ -457,7 +456,7 @@ public class DateUtil {
                 }
             } //Hours
             else {
-                int hours = (int) Math.round(time_elapsed / 3600.0d);
+                int hours = (int) Math.round(seconds / 3600.0d);
                 if (hours <= 24) {
                     if (hours == 1) {
                         return "An hour ago";
@@ -466,7 +465,7 @@ public class DateUtil {
                     }
                 } //Days
                 else {
-                    int days = (int) Math.round(time_elapsed / 86400.0d);
+                    int days = (int) Math.round(seconds / 86400.0d);
                     if (days <= 7) {
                         if (days == 1) {
                             return "Yesterday";
@@ -475,7 +474,7 @@ public class DateUtil {
                         }
                     } //Weeks
                     else {
-                        int weeks = (int) Math.round(time_elapsed / 604800.0d);
+                        int weeks = (int) Math.round(seconds / 604800.0d);
                         if (weeks <= 4.3) {
                             if (weeks == 1) {
                                 return "A week ago";
@@ -484,7 +483,7 @@ public class DateUtil {
                             }
                         } //Months
                         else {
-                            int months = (int) Math.round(time_elapsed / 2600640.0d);
+                            int months = (int) Math.round(seconds / 2600640.0d);
                             if (months <= 12) {
                                 if (months == 1) {
                                     return "A month ago";
@@ -493,7 +492,7 @@ public class DateUtil {
                                 }
                             } //Years
                             else {
-                                int years = (int) Math.round(time_elapsed / 31207680.0d);
+                                int years = (int) Math.round(seconds / 31207680.0d);
                                 if (years == 1) {
                                     return "1 year ago";
                                 } else {
