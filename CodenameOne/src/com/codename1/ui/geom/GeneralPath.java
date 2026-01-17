@@ -1719,13 +1719,13 @@ public final class GeneralPath implements Shape {
             } else {
                 p.moveTo(_tmp1.x, _tmp1.y);
             }
-            _addToPath(p, startAngle, sweepAngle);
+            addToPath(p, startAngle, sweepAngle);
             if (!join && Math.abs(Math.abs(sweepAngle) - Math.PI * 2) < 0.001) {
                 p.closePath();
             }
         }
 
-        private void _addToPath(GeneralPath p, double startAngle, double sweepAngle) {
+        private void addToPath(GeneralPath p, double startAngle, double sweepAngle) {
             //double _2pi = Math.PI*2;
             double absSweepAngle = Math.abs(sweepAngle);
             if (absSweepAngle < 0.0001) {
@@ -1739,8 +1739,8 @@ public final class GeneralPath implements Shape {
                 if (sweepAngle < 0) {
                     diff = -diff;
                 }
-                _addToPath(p, startAngle, diff);
-                _addToPath(p, startAngle + diff, sweepAngle - diff);
+                addToPath(p, startAngle, diff);
+                addToPath(p, startAngle + diff, sweepAngle - diff);
             } else {
                 getPointAtAngle(startAngle + sweepAngle, _tmp1);
                 //System.out.println("Line to "+_tmp1.x+", "+_tmp1.y);

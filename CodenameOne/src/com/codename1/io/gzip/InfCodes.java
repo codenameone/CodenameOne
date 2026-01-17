@@ -137,7 +137,7 @@ final class InfCodes {
                         z.totalIn += p - z.nextInIndex;
                         z.nextInIndex = p;
                         s.write = q;
-                        r = inflate_fast(lbits, dbits,
+                        r = inflateFast(lbits, dbits,
                                 ltree, ltree_index,
                                 dtree, dtree_index,
                                 s, z);
@@ -172,7 +172,7 @@ final class InfCodes {
                             z.totalIn += p - z.nextInIndex;
                             z.nextInIndex = p;
                             s.write = q;
-                            return s.inflate_flush(r);
+                            return s.inflateFlush(r);
                         }
                         n--;
                         b |= (z.nextIn[p++] & 0xff) << k;
@@ -216,7 +216,7 @@ final class InfCodes {
                     z.totalIn += p - z.nextInIndex;
                     z.nextInIndex = p;
                     s.write = q;
-                    return s.inflate_flush(r);
+                    return s.inflateFlush(r);
 
                 case LENEXT:        // i: getting length extra (have base)
                     j = get;
@@ -231,7 +231,7 @@ final class InfCodes {
                             z.totalIn += p - z.nextInIndex;
                             z.nextInIndex = p;
                             s.write = q;
-                            return s.inflate_flush(r);
+                            return s.inflateFlush(r);
                         }
                         n--;
                         b |= (z.nextIn[p++] & 0xff) << k;
@@ -260,7 +260,7 @@ final class InfCodes {
                             z.totalIn += p - z.nextInIndex;
                             z.nextInIndex = p;
                             s.write = q;
-                            return s.inflate_flush(r);
+                            return s.inflateFlush(r);
                         }
                         n--;
                         b |= (z.nextIn[p++] & 0xff) << k;
@@ -294,7 +294,7 @@ final class InfCodes {
                     z.totalIn += p - z.nextInIndex;
                     z.nextInIndex = p;
                     s.write = q;
-                    return s.inflate_flush(r);
+                    return s.inflateFlush(r);
 
                 case DISTEXT:       // i: getting distance extra
                     j = get;
@@ -309,7 +309,7 @@ final class InfCodes {
                             z.totalIn += p - z.nextInIndex;
                             z.nextInIndex = p;
                             s.write = q;
-                            return s.inflate_flush(r);
+                            return s.inflateFlush(r);
                         }
                         n--;
                         b |= (z.nextIn[p++] & 0xff) << k;
@@ -336,7 +336,7 @@ final class InfCodes {
                             }
                             if (m == 0) {
                                 s.write = q;
-                                r = s.inflate_flush(r);
+                                r = s.inflateFlush(r);
                                 q = s.write;
                                 m = q < s.read ? s.read - q - 1 : s.end - q;
 
@@ -352,7 +352,7 @@ final class InfCodes {
                                     z.totalIn += p - z.nextInIndex;
                                     z.nextInIndex = p;
                                     s.write = q;
-                                    return s.inflate_flush(r);
+                                    return s.inflateFlush(r);
                                 }
                             }
                         }
@@ -374,7 +374,7 @@ final class InfCodes {
                         }
                         if (m == 0) {
                             s.write = q;
-                            r = s.inflate_flush(r);
+                            r = s.inflateFlush(r);
                             q = s.write;
                             m = q < s.read ? s.read - q - 1 : s.end - q;
 
@@ -389,7 +389,7 @@ final class InfCodes {
                                 z.totalIn += p - z.nextInIndex;
                                 z.nextInIndex = p;
                                 s.write = q;
-                                return s.inflate_flush(r);
+                                return s.inflateFlush(r);
                             }
                         }
                     }
@@ -408,7 +408,7 @@ final class InfCodes {
                     }
 
                     s.write = q;
-                    r = s.inflate_flush(r);
+                    r = s.inflateFlush(r);
                     q = s.write;
                     if (s.read != s.write) {
                         s.bitb = b;
@@ -417,7 +417,7 @@ final class InfCodes {
                         z.totalIn += p - z.nextInIndex;
                         z.nextInIndex = p;
                         s.write = q;
-                        return s.inflate_flush(r);
+                        return s.inflateFlush(r);
                     }
                     mode = END;
                 case END:
@@ -428,7 +428,7 @@ final class InfCodes {
                     z.totalIn += p - z.nextInIndex;
                     z.nextInIndex = p;
                     s.write = q;
-                    return s.inflate_flush(r);
+                    return s.inflateFlush(r);
 
                 case BADCODE:       // x: got error
 
@@ -440,7 +440,7 @@ final class InfCodes {
                     z.totalIn += p - z.nextInIndex;
                     z.nextInIndex = p;
                     s.write = q;
-                    return s.inflate_flush(r);
+                    return s.inflateFlush(r);
 
                 default:
                     r = Z_STREAM_ERROR;
@@ -451,7 +451,7 @@ final class InfCodes {
                     z.totalIn += p - z.nextInIndex;
                     z.nextInIndex = p;
                     s.write = q;
-                    return s.inflate_flush(r);
+                    return s.inflateFlush(r);
             }
         }
     }
@@ -465,7 +465,7 @@ final class InfCodes {
     // at least ten.  The ten bytes are six bytes for the longest length/
     // distance pair plus four bytes for overloading the bit buffer.
 
-    int inflate_fast(int bl, int bd,
+    int inflateFast(int bl, int bd,
                      int[] tl, int tlIndex,
                      int[] td, int tdIndex,
                      InfBlocks s, ZStream z) {

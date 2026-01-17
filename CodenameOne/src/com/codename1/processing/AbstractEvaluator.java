@@ -88,7 +88,7 @@ abstract class AbstractEvaluator implements Evaluator {
      * @param element the element to apply predicate against.
      */
     public Object evaluate(StructuredContent element) {
-        return _evaluate(element);
+        return evaluateInternal(element);
     }
 
     /**
@@ -97,7 +97,7 @@ abstract class AbstractEvaluator implements Evaluator {
      * @param elements an array of elements to apply predicate against.
      */
     public Object evaluate(List elements) {
-        return _evaluate(elements);
+        return evaluateInternal(elements);
     }
 
     /**
@@ -108,30 +108,30 @@ abstract class AbstractEvaluator implements Evaluator {
      * @param element source element, either a List or StructuredContent
      * @return either a List or StructuredContent
      * @throws ResultException
-     * @see {@link #_evaluate(Object, int)}
-     * @see #_evaluateSingle(Object)
+     * @see {@link #evaluateInternal(Object, int)}
+     * @see #evaluateSingleInternal(Object)
      */
-    private Object _evaluate(Object element) {
+    private Object evaluateInternal(Object element) {
         if (element == null) {
             return null;
         }
         int index = expr.indexOf("=");
         if (index != -1) {
-            return _evaluate(element, index);
+            return evaluateInternal(element, index);
         }
         index = expr.indexOf(">");
         if (index != -1) {
-            return _evaluate(element, index);
+            return evaluateInternal(element, index);
         }
         index = expr.indexOf("<");
         if (index != -1) {
-            return _evaluate(element, index);
+            return evaluateInternal(element, index);
         }
         index = expr.indexOf("%");
         if (index != -1) {
-            return _evaluate(element, index);
+            return evaluateInternal(element, index);
         }
-        return _evaluateSingle(element);
+        return evaluateSingleInternal(element);
 
     }
 
@@ -143,23 +143,23 @@ abstract class AbstractEvaluator implements Evaluator {
      * @param element either a List or a StructuredContent object
      * @param index   pointer to the comparator within the predicate expression
      * @return either a List or a StructuredContent object
-     * @see #_evaluateLeftEqualsRight(Object, String, String)
-     * @see #_evaluateLeftGreaterRight(Object, String, String)
-     * @see #_evaluateLeftLessRight(Object, String, String)
+     * @see #evaluateLeftEqualsRightInternal(Object, String, String)
+     * @see #evaluateLeftGreaterRightInternal(Object, String, String)
+     * @see #evaluateLeftLessRightInternal(Object, String, String)
      */
-    private Object _evaluate(Object element, int index) {
+    private Object evaluateInternal(Object element, int index) {
         String lvalue = expr.substring(0, index).trim();
         String rvalue = expr.substring(index + 1).trim();
         char comparator = expr.charAt(index);
         switch (comparator) {
             case '=':
-                return _evaluateLeftEqualsRight(element, lvalue, rvalue);
+                return evaluateLeftEqualsRightInternal(element, lvalue, rvalue);
             case '>':
-                return _evaluateLeftGreaterRight(element, lvalue, rvalue);
+                return evaluateLeftGreaterRightInternal(element, lvalue, rvalue);
             case '<':
-                return _evaluateLeftLessRight(element, lvalue, rvalue);
+                return evaluateLeftLessRightInternal(element, lvalue, rvalue);
             case '%':
-                return _evaluateLeftContainsRight(element, lvalue, rvalue);
+                return evaluateLeftContainsRightInternal(element, lvalue, rvalue);
         }
         return null;
     }
@@ -175,7 +175,7 @@ abstract class AbstractEvaluator implements Evaluator {
      * @see #evaluateLeftLessRight(StructuredContent, String, String)
      * @see #evaluateLeftLessRight(List, String, String)
      */
-    private Object _evaluateLeftLessRight(Object element, String lvalue,
+    private Object evaluateLeftLessRightInternal(Object element, String lvalue,
                                           String rvalue) {
         if (element instanceof List) {
             return evaluateLeftLessRight((List) element, lvalue, rvalue);
@@ -196,7 +196,7 @@ abstract class AbstractEvaluator implements Evaluator {
      * @see #evaluateLeftGreaterRight(StructuredContent, String, String)
      * @see #evaluateLeftGreaterRight(List, String, String)
      */
-    private Object _evaluateLeftGreaterRight(Object element, String lvalue,
+    private Object evaluateLeftGreaterRightInternal(Object element, String lvalue,
                                              String rvalue) {
         if (element instanceof List) {
             return evaluateLeftGreaterRight((List) element, lvalue, rvalue);
@@ -217,7 +217,7 @@ abstract class AbstractEvaluator implements Evaluator {
      * @see #evaluateLeftEqualsRight(List, String, String)
      * @see #evaluateLeftEqualsRight(StructuredContent, String, String)
      */
-    private Object _evaluateLeftEqualsRight(Object element, String lvalue,
+    private Object evaluateLeftEqualsRightInternal(Object element, String lvalue,
                                             String rvalue) {
         if (element instanceof List) {
             return evaluateLeftEqualsRight((List) element, lvalue, rvalue);
@@ -238,7 +238,7 @@ abstract class AbstractEvaluator implements Evaluator {
      * @see #evaluateLeftContainsRight(List, String, String)
      * @see #evaluateLeftContainsRight(StructuredContent, String, String)
      */
-    private Object _evaluateLeftContainsRight(Object element, String lvalue,
+    private Object evaluateLeftContainsRightInternal(Object element, String lvalue,
                                               String rvalue) {
         if (element instanceof List) {
             return evaluateLeftContainsRight((List) element, lvalue, rvalue);
@@ -259,7 +259,7 @@ abstract class AbstractEvaluator implements Evaluator {
      * @see #evaluateSingle(StructuredContent, String)
      * @see #evaluateSingle(List, String)
      */
-    private Object _evaluateSingle(Object element) {
+    private Object evaluateSingleInternal(Object element) {
         if (element instanceof List) {
             return evaluateSingle((List) element, expr);
         } else {

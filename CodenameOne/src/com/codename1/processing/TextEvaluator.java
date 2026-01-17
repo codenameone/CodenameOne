@@ -56,7 +56,7 @@ class TextEvaluator extends AbstractEvaluator {
         super(expr);
     }
 
-    private String[] _getLeftValue(StructuredContent element, String lvalue) {
+    private String[] getLeftValue(StructuredContent element, String lvalue) {
         String[] v;
         if (FUNC_TEXT.equals(lvalue)) {
             v = new String[]{element.getText()};
@@ -79,7 +79,7 @@ class TextEvaluator extends AbstractEvaluator {
      */
     protected Object evaluateLeftLessRight(StructuredContent element,
                                            String lvalue, String rvalue) {
-        String[] v = _getLeftValue(element, lvalue);
+        String[] v = getLeftValue(element, lvalue);
         int vlen = v.length;
         for (int i = 0; i < vlen; i++) {
             if (isNumeric(rvalue) && isNumeric(v[i])) {
@@ -108,7 +108,7 @@ class TextEvaluator extends AbstractEvaluator {
      */
     protected Object evaluateLeftGreaterRight(StructuredContent element,
                                               String lvalue, String rvalue) {
-        String[] v = _getLeftValue(element, lvalue);
+        String[] v = getLeftValue(element, lvalue);
         int vlen = v.length;
         for (int i = 0; i < vlen; i++) {
             if (isNumeric(rvalue) && isNumeric(v[i])) {
@@ -137,7 +137,7 @@ class TextEvaluator extends AbstractEvaluator {
      */
     protected Object evaluateLeftEqualsRight(StructuredContent element,
                                              String lvalue, String rvalue) {
-        String[] v = _getLeftValue(element, lvalue);
+        String[] v = getLeftValue(element, lvalue);
         int vlen = v.length;
         for (int i = 0; i < vlen; i++) {
             if (isNumeric(rvalue) && isNumeric(v[i])) {

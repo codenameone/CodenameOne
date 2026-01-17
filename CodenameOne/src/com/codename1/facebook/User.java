@@ -68,15 +68,35 @@ public class User extends FBObject {
 
     /**
      * @return the first_name
+     * @deprecated Use {@link #getFirstName()}.
      */
+    @Deprecated
+    @SuppressWarnings("PMD.MethodNamingConventions")
     public String getFirst_name() {
+        return getFirstName();
+    }
+
+    /**
+     * @return the first name
+     */
+    public String getFirstName() {
         return first_name;
     }
 
     /**
      * @return the last_name
+     * @deprecated Use {@link #getLastName()}.
      */
+    @Deprecated
+    @SuppressWarnings("PMD.MethodNamingConventions")
     public String getLast_name() {
+        return getLastName();
+    }
+
+    /**
+     * @return the last name
+     */
+    public String getLastName() {
         return last_name;
     }
 
@@ -138,8 +158,18 @@ public class User extends FBObject {
 
     /**
      * @return the relationship_status
+     * @deprecated Use {@link #getRelationshipStatus()}.
      */
+    @Deprecated
+    @SuppressWarnings("PMD.MethodNamingConventions")
     public String getRelationship_status() {
+        return getRelationshipStatus();
+    }
+
+    /**
+     * @return the relationship status
+     */
+    public String getRelationshipStatus() {
         return relationship_status;
     }
 
@@ -152,8 +182,18 @@ public class User extends FBObject {
 
     /**
      * @return the last_updated
+     * @deprecated Use {@link #getLastUpdated()}.
      */
+    @Deprecated
+    @SuppressWarnings("PMD.MethodNamingConventions")
     public String getLast_updated() {
+        return getLastUpdated();
+    }
+
+    /**
+     * @return the last updated
+     */
+    public String getLastUpdated() {
         return last_updated;
     }
 

@@ -74,11 +74,29 @@ final public class JZlib {
         return version;
     }
 
+    /**
+     * @deprecated Use {@link #adler32Combine(long, long, long)}.
+     */
+    @Deprecated
+    @SuppressWarnings("PMD.MethodNamingConventions")
     public static long adler32_combine(long adler1, long adler2, long len2) {
+        return adler32Combine(adler1, adler2, len2);
+    }
+
+    public static long adler32Combine(long adler1, long adler2, long len2) {
         return Adler32.combine(adler1, adler2, len2);
     }
 
+    /**
+     * @deprecated Use {@link #crc32Combine(long, long, long)}.
+     */
+    @Deprecated
+    @SuppressWarnings("PMD.MethodNamingConventions")
     public static long crc32_combine(long crc1, long crc2, long len2) {
+        return crc32Combine(crc1, crc2, len2);
+    }
+
+    public static long crc32Combine(long crc1, long crc2, long len2) {
         return CRC32.combine(crc1, crc2, len2);
     }
 

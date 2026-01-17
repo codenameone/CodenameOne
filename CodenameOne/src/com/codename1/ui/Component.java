@@ -2427,7 +2427,7 @@ public class Component implements Animation, StyleListener, Editable {
      * styled to have elevation.
      */
     Container findSurface() {
-        return _findSurface();
+        return findSurfaceInternal();
     }
 
     /**
@@ -3975,13 +3975,13 @@ public class Component implements Animation, StyleListener, Editable {
         repaint(this);
     }
 
-    private Container _findSurface() {
+    private Container findSurfaceInternal() {
         Container parent = getParent();
         if (parent == null) return null;
         if (parent.isSurface()) {
             return parent;
         }
-        return ((Component) parent)._findSurface();
+        return ((Component) parent).findSurfaceInternal();
     }
 
     /**

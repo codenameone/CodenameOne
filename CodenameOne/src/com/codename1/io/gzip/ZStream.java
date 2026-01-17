@@ -222,7 +222,7 @@ public class ZStream {
     // Flush as much pending output as possible. All deflate() output goes
     // through this function so some applications may wish to modify it
     // to avoid allocating a large strm->next_out buffer and copying into it.
-    // (See also read_buf()).
+    // (See also readBuf()).
     void flushPending() {
         int len = dstate.pending;
 
@@ -247,7 +247,7 @@ public class ZStream {
     // this function so some applications may wish to modify it to avoid
     // allocating a large strm->next_in buffer and copying from it.
     // (See also flush_pending()).
-    int read_buf(byte[] buf, int start, int size) {
+    int readBuf(byte[] buf, int start, int size) {
         int len = availIn;
 
         if (len > size) len = size;

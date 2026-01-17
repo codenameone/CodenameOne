@@ -596,7 +596,7 @@ final class Inflate {
             index = dictLength - length;
         }
         if (this.blocks != null) {
-            this.blocks.set_dictionary(dictionary, index, length);
+            this.blocks.setDictionary(dictionary, index, length);
         }
         this.mode = BLOCKS;
         return Z_OK;
@@ -660,7 +660,7 @@ final class Inflate {
     int inflateSyncPoint() {
         if (z == null || this.blocks == null)
             return Z_STREAM_ERROR;
-        return this.blocks.sync_point();
+        return this.blocks.syncPoint();
     }
 
     private int readBytes(int n, int r, int f) throws Return {

@@ -211,13 +211,13 @@ final class InfTree {
     static final private int Z_BUF_ERROR = -5;
     static final private int Z_VERSION_ERROR = -6;
     int[] hn = null;  // hufts used in space
-    int[] v = null;   // work area for huft_build
+    int[] v = null;   // work area for huftBuild
     int[] c = null;   // bit length count table
     int[] r = null;   // table entry for structure assignment
     int[] u = null;   // table stack
     int[] x = null;   // bit offsets, then code stack
 
-    static int inflate_trees_fixed(int[] bl,  //literal desired/actual bit depth
+    static int inflateTreesFixed(int[] bl,  //literal desired/actual bit depth
                                    int[] bd,  //distance desired/actual bit depth
                                    int[][] tl,//literal/length tree result
                                    int[][] td,//distance tree result
@@ -230,7 +230,7 @@ final class InfTree {
         return Z_OK;
     }
 
-    private int huft_build(int[] b, // code lengths in bits (all assumed <= BMAX)
+    private int huftBuild(int[] b, // code lengths in bits (all assumed <= BMAX)
                            int bindex,
                            int n,   // number of codes (assumed <= 288)
                            int s,   // number of simple-valued codes (0..s-1)
@@ -422,7 +422,7 @@ final class InfTree {
         return y != 0 && g != 1 ? Z_BUF_ERROR : Z_OK;
     }
 
-    int inflate_trees_bits(int[] c,  // 19 code lengths
+    int inflateTreesBits(int[] c,  // 19 code lengths
                            int[] bb, // bits tree desired/actual depth
                            int[] tb, // bits tree result
                            int[] hp, // space for trees
@@ -431,7 +431,7 @@ final class InfTree {
         int result;
         initWorkArea(19);
         hn[0] = 0;
-        result = huft_build(c, 0, 19, 19, null, null, tb, bb, hp, hn, v);
+        result = huftBuild(c, 0, 19, 19, null, null, tb, bb, hp, hn, v);
 
         if (result == Z_DATA_ERROR) {
             z.msg = "oversubscribed dynamic bit lengths tree";
@@ -442,7 +442,7 @@ final class InfTree {
         return result;
     }
 
-    int inflate_trees_dynamic(int nl,   // number of literal/length codes
+    int inflateTreesDynamic(int nl,   // number of literal/length codes
                               int nd,   // number of distance codes
                               int[] c,  // that many (total) code lengths
                               int[] bl, // literal desired/actual bit depth
@@ -457,7 +457,7 @@ final class InfTree {
         // build literal/length tree
         initWorkArea(288);
         hn[0] = 0;
-        result = huft_build(c, 0, nl, 257, cplens, cplext, tl, bl, hp, hn, v);
+        result = huftBuild(c, 0, nl, 257, cplens, cplext, tl, bl, hp, hn, v);
         if (result != Z_OK || bl[0] == 0) {
             if (result == Z_DATA_ERROR) {
                 z.msg = "oversubscribed literal/length tree";
@@ -470,7 +470,7 @@ final class InfTree {
 
         // build distance tree
         initWorkArea(288);
-        result = huft_build(c, nl, nd, 0, cpdist, cpdext, td, bd, hp, hn, v);
+        result = huftBuild(c, nl, nd, 0, cpdist, cpdext, td, bd, hp, hn, v);
 
         if (result != Z_OK || (bd[0] == 0 && nl > 257)) {
             if (result == Z_DATA_ERROR) {

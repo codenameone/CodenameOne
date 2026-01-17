@@ -53,7 +53,7 @@ class ContainsEvaluator extends AbstractEvaluator {
         super(expr);
     }
 
-    private String[] _getLeftValue(StructuredContent element, String lvalue) {
+    private String[] getLeftValue(StructuredContent element, String lvalue) {
         String[] v;
         // getChild() is a bit of a hack here because the content object
         // calls getParent()
@@ -72,7 +72,7 @@ class ContainsEvaluator extends AbstractEvaluator {
      * java.lang.String)
      */
     protected Object evaluateLeftContainsRight(StructuredContent element, String lvalue, String rvalue) {
-        String[] lvalues = _getLeftValue(element, lvalue);
+        String[] lvalues = getLeftValue(element, lvalue);
         // if the rvalue is wrapped with "()", the caller explicitly expects the lvalue to be an array of values,
         // otherwise try to do a "string contains" match first if there's only one lvalue
         if (rvalue.indexOf("(") == -1 && lvalues.length == 1) {

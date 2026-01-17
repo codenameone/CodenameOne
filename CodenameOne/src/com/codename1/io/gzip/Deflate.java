@@ -964,7 +964,7 @@ final class Deflate {
             // Otherwise, window_size == 2*WSIZE so more >= 2.
             // If there was sliding, more >= WSIZE. So in all cases, more >= 2.
 
-            n = strm.read_buf(window, strStart + lookahead, more);
+            n = strm.readBuf(window, strStart + lookahead, more);
             lookahead += n;
 
             // Initialize the hash value now that we have some input:

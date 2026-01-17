@@ -900,7 +900,8 @@ def main() -> None:
         forbidden_pmd_rules = {
             "ClassWithOnlyPrivateConstructorsShouldBeFinal",
             "FormalParameterNamingConventions",
-            "LocalVariableNamingConventions"
+            "LocalVariableNamingConventions",
+            "MethodNamingConventions",
         }
         violations = [f for f in pmd.findings if f.rule in forbidden_pmd_rules]
         if violations:
