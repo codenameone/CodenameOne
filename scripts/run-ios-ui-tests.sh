@@ -478,6 +478,7 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
 
   ri_log "Installing simulator app bundle"
   INSTALL_START=$(date +%s)
+  LAUNCH_LOG="$ARTIFACTS_DIR/simctl-launch.log"
   if [ -n "$SIM_DEVICE_ID" ]; then
     if ! xcrun simctl install "$SIM_DEVICE_ID" "$APP_BUNDLE_PATH"; then
       ri_log "FATAL: simctl install failed"
@@ -491,8 +492,10 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
       --env MTC_CRASH_ON_REPORT=1 \
       --env DYLD_INSERT_LIBRARIES=/usr/lib/libMainThreadChecker.dylib \
       "$SIM_DEVICE_ID" \
-      "$BUNDLE_IDENTIFIER" >/dev/null 2>&1; then
+      "$BUNDLE_IDENTIFIER" >"$LAUNCH_LOG" 2>&1; then
       ri_log "FATAL: simctl launch failed"
+      ri_log "simctl launch output (tail):"
+      tail -n 200 "$LAUNCH_LOG" 2>/dev/null || true
       exit 11
     fi
     LAUNCH_END=$(date +%s)
@@ -509,8 +512,10 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
       --env MTC_CRASH_ON_REPORT=1 \
       --env DYLD_INSERT_LIBRARIES=/usr/lib/libMainThreadChecker.dylib \
       booted \
-      "$BUNDLE_IDENTIFIER" >/dev/null 2>&1; then
+      "$BUNDLE_IDENTIFIER" >"$LAUNCH_LOG" 2>&1; then
       ri_log "FATAL: simctl launch failed"
+      ri_log "simctl launch output (tail):"
+      tail -n 200 "$LAUNCH_LOG" 2>/dev/null || true
       exit 11
     fi
     LAUNCH_END=$(date +%s)
