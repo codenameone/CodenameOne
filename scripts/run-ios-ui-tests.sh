@@ -486,7 +486,12 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
     INSTALL_END=$(date +%s)
 
     LAUNCH_START=$(date +%s)
-    if ! xcrun simctl launch "$SIM_DEVICE_ID" "$BUNDLE_IDENTIFIER" >/dev/null 2>&1; then
+    if ! xcrun simctl launch \
+      --env MTC_ENABLE=1 \
+      --env MTC_CRASH_ON_REPORT=1 \
+      --env DYLD_INSERT_LIBRARIES=/usr/lib/libMainThreadChecker.dylib \
+      "$SIM_DEVICE_ID" \
+      "$BUNDLE_IDENTIFIER" >/dev/null 2>&1; then
       ri_log "FATAL: simctl launch failed"
       exit 11
     fi
@@ -499,7 +504,12 @@ APP_PROCESS_NAME="${WRAPPER_NAME%.app}"
     INSTALL_END=$(date +%s)
 
     LAUNCH_START=$(date +%s)
-    if ! xcrun simctl launch booted "$BUNDLE_IDENTIFIER" >/dev/null 2>&1; then
+    if ! xcrun simctl launch \
+      --env MTC_ENABLE=1 \
+      --env MTC_CRASH_ON_REPORT=1 \
+      --env DYLD_INSERT_LIBRARIES=/usr/lib/libMainThreadChecker.dylib \
+      booted \
+      "$BUNDLE_IDENTIFIER" >/dev/null 2>&1; then
       ri_log "FATAL: simctl launch failed"
       exit 11
     fi
