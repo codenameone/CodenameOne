@@ -91,15 +91,15 @@ final class InfCodes {
     }
 
     void init(int bl, int bd,
-              int[] tl, int tl_index,
-              int[] td, int td_index) {
+              int[] tl, int tlIndex,
+              int[] td, int tdIndex) {
         mode = START;
         lbits = (byte) bl;
         dbits = (byte) bd;
         ltree = tl;
-        ltree_index = tl_index;
+        ltree_index = tlIndex;
         dtree = td;
-        dtree_index = td_index;
+        dtree_index = tdIndex;
         tree = null;
     }
 
@@ -466,12 +466,12 @@ final class InfCodes {
     // distance pair plus four bytes for overloading the bit buffer.
 
     int inflate_fast(int bl, int bd,
-                     int[] tl, int tl_index,
-                     int[] td, int td_index,
+                     int[] tl, int tlIndex,
+                     int[] td, int tdIndex,
                      InfBlocks s, ZStream z) {
         int t;                // temporary pointer
         int[] tp;             // temporary pointer
-        int tp_index;         // temporary pointer
+        int tpIndex;         // temporary pointer
         int e;                // extra bits or operation
         int b;                // bit buffer
         int k;                // bits in bit buffer
@@ -485,7 +485,7 @@ final class InfCodes {
         int d;                // distance back to copy from
         int r;                // copy source pointer
 
-        int tp_index_t_3;     // (tp_index+t)*3
+        int tpIndexT3;     // (tpIndex+t)*3
 
         // load input, output, bit values
         p = z.nextInIndex;
@@ -510,24 +510,24 @@ final class InfCodes {
 
             t = b & ml;
             tp = tl;
-            tp_index = tl_index;
-            tp_index_t_3 = (tp_index + t) * 3;
-            if ((e = tp[tp_index_t_3]) == 0) {
-                b >>= (tp[tp_index_t_3 + 1]);
-                k -= (tp[tp_index_t_3 + 1]);
+            tpIndex = tlIndex;
+            tpIndexT3 = (tpIndex + t) * 3;
+            if ((e = tp[tpIndexT3]) == 0) {
+                b >>= (tp[tpIndexT3 + 1]);
+                k -= (tp[tpIndexT3 + 1]);
 
-                s.window[q++] = (byte) tp[tp_index_t_3 + 2];
+                s.window[q++] = (byte) tp[tpIndexT3 + 2];
                 m--;
                 continue;
             }
             do {
 
-                b >>= (tp[tp_index_t_3 + 1]);
-                k -= (tp[tp_index_t_3 + 1]);
+                b >>= (tp[tpIndexT3 + 1]);
+                k -= (tp[tpIndexT3 + 1]);
 
                 if ((e & 16) != 0) {
                     e &= 15;
-                    c = tp[tp_index_t_3 + 2] + (b & inflate_mask[e]);
+                    c = tp[tpIndexT3 + 2] + (b & inflate_mask[e]);
 
                     b >>= e;
                     k -= e;
@@ -541,14 +541,14 @@ final class InfCodes {
 
                     t = b & md;
                     tp = td;
-                    tp_index = td_index;
-                    tp_index_t_3 = (tp_index + t) * 3;
-                    e = tp[tp_index_t_3];
+                    tpIndex = tdIndex;
+                    tpIndexT3 = (tpIndex + t) * 3;
+                    e = tp[tpIndexT3];
 
                     do {
 
-                        b >>= (tp[tp_index_t_3 + 1]);
-                        k -= (tp[tp_index_t_3 + 1]);
+                        b >>= (tp[tpIndexT3 + 1]);
+                        k -= (tp[tpIndexT3 + 1]);
 
                         if ((e & 16) != 0) {
                             // get extra bits to add to distance base
@@ -559,7 +559,7 @@ final class InfCodes {
                                 k += 8;
                             }
 
-                            d = tp[tp_index_t_3 + 2] + (b & inflate_mask[e]);
+                            d = tp[tpIndexT3 + 2] + (b & inflate_mask[e]);
 
                             b >>= (e);
                             k -= (e);
@@ -617,10 +617,10 @@ final class InfCodes {
                             }
                             break;
                         } else if ((e & 64) == 0) {
-                            t += tp[tp_index_t_3 + 2];
+                            t += tp[tpIndexT3 + 2];
                             t += (b & inflate_mask[e]);
-                            tp_index_t_3 = (tp_index + t) * 3;
-                            e = tp[tp_index_t_3];
+                            tpIndexT3 = (tpIndex + t) * 3;
+                            e = tp[tpIndexT3];
                         } else {
                             z.msg = "invalid distance code";
 
@@ -645,15 +645,15 @@ final class InfCodes {
                 }
 
                 if ((e & 64) == 0) {
-                    t += tp[tp_index_t_3 + 2];
+                    t += tp[tpIndexT3 + 2];
                     t += (b & inflate_mask[e]);
-                    tp_index_t_3 = (tp_index + t) * 3;
-                    if ((e = tp[tp_index_t_3]) == 0) {
+                    tpIndexT3 = (tpIndex + t) * 3;
+                    if ((e = tp[tpIndexT3]) == 0) {
 
-                        b >>= (tp[tp_index_t_3 + 1]);
-                        k -= (tp[tp_index_t_3 + 1]);
+                        b >>= (tp[tpIndexT3 + 1]);
+                        k -= (tp[tpIndexT3 + 1]);
 
-                        s.window[q++] = (byte) tp[tp_index_t_3 + 2];
+                        s.window[q++] = (byte) tp[tpIndexT3 + 2];
                         m--;
                         break;
                     }

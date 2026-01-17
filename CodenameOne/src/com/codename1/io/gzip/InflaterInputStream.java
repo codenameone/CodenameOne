@@ -64,7 +64,7 @@ public class InflaterInputStream extends FilterInputStream {
 
     public InflaterInputStream(InputStream in,
                                Inflater inflater,
-                               int size, boolean close_in) throws IOException {
+                               int size, boolean closeIn) throws IOException {
         super(in);
         if (in == null || inflater == null) {
             throw new NullPointerException();
@@ -73,7 +73,7 @@ public class InflaterInputStream extends FilterInputStream {
         }
         this.inflater = inflater;
         buf = new byte[size];
-        this.close_in = close_in;
+        this.close_in = closeIn;
     }
 
     public int read() throws IOException {

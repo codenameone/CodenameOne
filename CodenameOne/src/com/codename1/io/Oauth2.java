@@ -371,15 +371,15 @@ public class Oauth2 {
     }
 
     private String buildURL() {
-        StringBuilder URL = new StringBuilder(oauth2URL + "?client_id=" + Util.encodeUrl(clientId)
+        StringBuilder url = new StringBuilder(oauth2URL + "?client_id=" + Util.encodeUrl(clientId)
                 + "&redirect_uri=" + Util.encodeUrl(redirectURI));
         if (scope != null) {
-            URL.append("&scope=").append(Util.encodeUrl(scope));
+            url.append("&scope=").append(Util.encodeUrl(scope));
         }
         if (clientSecret != null) {
-            URL.append("&response_type=code");
+            url.append("&response_type=code");
         } else {
-            URL.append("&response_type=token");
+            url.append("&response_type=token");
         }
 
         if (additionalParams != null) {
@@ -387,15 +387,15 @@ public class Oauth2 {
             while (e.hasMoreElements()) {
                 String key = (String) e.nextElement();
                 String val = additionalParams.get(key).toString();
-                URL.append("&").append(Util.encodeUrl(key)).append("=").append(Util.encodeUrl(val));
+                url.append("&").append(Util.encodeUrl(key)).append("=").append(Util.encodeUrl(val));
             }
         }
-        return URL.toString();
+        return url.toString();
     }
 
     private Component createLoginComponent(final ActionListener<ActionEvent> al, final Form frm, final Form backToForm, final Dialog progress) {
 
-        String URL = buildURL();
+        String localUrl = buildURL();
 
         DocumentInfo.setDefaultEncoding(DocumentInfo.ENCODING_UTF8);
         final WebBrowser[] web = new WebBrowser[1];
@@ -409,7 +409,7 @@ public class Oauth2 {
             public void onStart(String url) {
             }
         };
-        web[0].setURL(URL);
+        web[0].setURL(localUrl);
 
         return web[0];
     }

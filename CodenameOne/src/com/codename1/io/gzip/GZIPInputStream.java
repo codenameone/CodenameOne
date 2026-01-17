@@ -40,16 +40,16 @@ public class GZIPInputStream extends InflaterInputStream {
 
     public GZIPInputStream(InputStream in,
                            int size,
-                           boolean close_in) throws IOException {
-        this(in, new Inflater(15 + 16), size, close_in);
+                           boolean closeIn) throws IOException {
+        this(in, new Inflater(15 + 16), size, closeIn);
         myinflater = true;
     }
 
     public GZIPInputStream(InputStream in,
                            Inflater inflater,
                            int size,
-                           boolean close_in) throws IOException {
-        super(in, inflater, size, close_in);
+                           boolean closeIn) throws IOException {
+        super(in, inflater, size, closeIn);
     }
 
     public long getModifiedtime() {

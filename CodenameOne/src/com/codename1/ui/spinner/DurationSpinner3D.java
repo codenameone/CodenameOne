@@ -44,6 +44,10 @@ class DurationSpinner3D extends Container implements InternalPickerWidget {
     public static final int FIELD_MINUTE = 8;
     public static final int FIELD_SECOND = 16;
     public static final int FIELD_MILLISECOND = 32;
+    private static final long MINUTE = 60000L;
+    private static final long SECOND = 1000L;
+    private static final long HOUR = 1000L * 60L * 60L;
+    private static final long DAY = 1000L * 60L * 60L * 24L;
     private final boolean includeDays, includeHours, includeMinutes, includeSeconds, includeMilliseconds;
     private final int minuteStep;
     private Spinner3D days, hours, minutes, seconds, milliseconds;
@@ -123,26 +127,22 @@ class DurationSpinner3D extends Container implements InternalPickerWidget {
     public Object getValue() {
         long l = 0L;
         if (days != null) {
-            long DAY = (1000L * 60L * 60L * 24L);
             long numDays = ((Integer) days.getValue()).intValue();
             l += DAY * numDays;
         }
 
         if (hours != null) {
-            long HOUR = (1000L * 60L * 60L);
             long numHours = ((Integer) hours.getValue()).intValue();
             l += HOUR * numHours;
         }
 
         if (minutes != null) {
-            long MINUTE = (1000L * 60L);
             long numMinutes = ((Integer) minutes.getValue()).intValue();
 
             l += MINUTE * numMinutes;
         }
 
         if (seconds != null) {
-            long SECOND = (1000L);
             long numSeconds = ((Integer) seconds.getValue()).intValue();
             l += SECOND * numSeconds;
         }
@@ -157,28 +157,24 @@ class DurationSpinner3D extends Container implements InternalPickerWidget {
     public void setValue(Object value) {
         long l = (Long) value;
         if (days != null) {
-            long DAY = (1000L * 60L * 60L * 24L);
             long numDays = l / DAY;
             days.setValue((int) numDays);
             l -= DAY * numDays;
         }
 
         if (hours != null) {
-            long HOUR = (1000L * 60L * 60L);
             long numHours = l / HOUR;
             hours.setValue((int) numHours);
             l -= HOUR * numHours;
         }
 
         if (minutes != null) {
-            long MINUTE = (1000L * 60L);
             long numMinutes = l / MINUTE;
             minutes.setValue((int) numMinutes);
             l -= MINUTE * numMinutes;
         }
 
         if (seconds != null) {
-            long SECOND = (1000L);
             long numSeconds = l / SECOND;
             seconds.setValue((int) numSeconds);
             l -= SECOND * numSeconds;

@@ -43,15 +43,15 @@ public class AffineTransform {
     /**
      * Creates new affine transform as a copy of the given transform.
      *
-     * @param Tx Transform to copy.
+     * @param atx Transform to copy.
      */
-    public AffineTransform(AffineTransform Tx) {
-        m00 = Tx.m00;
-        m10 = Tx.m10;
-        m01 = Tx.m01;
-        m11 = Tx.m11;
-        m02 = Tx.m02;
-        m12 = Tx.m12;
+    public AffineTransform(AffineTransform atx) {
+        m00 = atx.m00;
+        m10 = atx.m10;
+        m01 = atx.m01;
+        m11 = atx.m11;
+        m02 = atx.m02;
+        m12 = atx.m12;
         check();
 
     }
@@ -158,9 +158,9 @@ public class AffineTransform {
      * @return
      */
     public static AffineTransform getRotateInstance(double theta) {
-        AffineTransform Tx = new AffineTransform();
-        Tx.setToRotation(theta);
-        return Tx;
+        AffineTransform atx = new AffineTransform();
+        atx.setToRotation(theta);
+        return atx;
     }
 
     /**
@@ -174,9 +174,9 @@ public class AffineTransform {
     public static AffineTransform getRotateInstance(double theta,
                                                     double anchorx,
                                                     double anchory) {
-        AffineTransform Tx = new AffineTransform();
-        Tx.setToRotation(theta, anchorx, anchory);
-        return Tx;
+        AffineTransform atx = new AffineTransform();
+        atx.setToRotation(theta, anchorx, anchory);
+        return atx;
     }
 
     private void check() {

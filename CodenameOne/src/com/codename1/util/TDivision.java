@@ -788,7 +788,7 @@ class TDivision {
     private static void monReduction(int[] res, TBigInteger modulus, int n2) {
 
         /* res + m*modulus_digits */
-        int[] modulus_digits = modulus.digits;
+        int[] modulusDigits = modulus.digits;
         int modulusLen = modulus.numberLength;
         long outerCarry = 0;
 
@@ -796,7 +796,7 @@ class TDivision {
             long innnerCarry = 0;
             int m = (int) TMultiplication.unsignedMultAddAdd(res[i], n2, 0, 0);
             for (int j = 0; j < modulusLen; j++) {
-                innnerCarry = TMultiplication.unsignedMultAddAdd(m, modulus_digits[j], res[i + j], (int) innnerCarry);
+                innnerCarry = TMultiplication.unsignedMultAddAdd(m, modulusDigits[j], res[i + j], (int) innnerCarry);
                 res[i + j] = (int) innnerCarry;
                 innnerCarry >>>= 32;
             }
