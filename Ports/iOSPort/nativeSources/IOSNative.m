@@ -51,6 +51,8 @@
 #import <CoreLocation/CoreLocation.h>
 #import <MobileCoreServices/UTCoreTypes.h>
 #import <Foundation/Foundation.h>
+#import <TargetConditionals.h>
+#include <stdlib.h>
 #import <MessageUI/MFMailComposeViewController.h>
 #import <AddressBookUI/AddressBookUI.h>
 #import <MessageUI/MFMessageComposeViewController.h>
@@ -336,6 +338,15 @@ NSString* fixFilePath(NSString* ns) {
 
 bool galleryPopover = NO;
 
+static void cn1_enable_simulator_fatal_warnings() {
+#ifdef CN1_IOS_SIMULATOR_FATAL_WARNINGS
+#if TARGET_OS_SIMULATOR
+    setenv("MTC_ENABLE", "1", 1);
+    setenv("MTC_CRASH_ON_REPORT", "1", 1);
+#endif
+#endif
+}
+
 #ifndef NEW_CODENAME_ONE_VM
 JAVA_OBJECT utf8String = NULL;
 
@@ -360,6 +371,7 @@ const char* stringToUTF8(JAVA_OBJECT str) {
 void com_codename1_impl_ios_IOSNative_initVM__(CN1_THREAD_STATE_MULTI_ARG JAVA_OBJECT instanceObject)
 {
     POOL_BEGIN();
+    cn1_enable_simulator_fatal_warnings();
     int retVal = UIApplicationMain(0, nil, nil, @"CodenameOne_GLAppDelegate");
     POOL_END();
 }
