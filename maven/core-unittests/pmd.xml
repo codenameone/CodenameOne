@@ -6,5 +6,6 @@
     <description>PMD rules for core unit tests.</description>
     <rule ref="rulesets/java/quickstart.xml">
         <exclude name="UselessParentheses"/>
+        <exclude name="ReturnEmptyCollectionRatherThanNull"/>
     </rule>
 </ruleset>
