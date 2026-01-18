@@ -154,6 +154,7 @@ public class ColorUtil {
                     (c.blue & 0xff));
         }
 
+        @Override
         public IColor clone() {
             //try {
             //    return (IColor)super.clone();
@@ -163,10 +164,12 @@ public class ColorUtil {
             //}
         }
 
+        @Override
         public int hashCode() {
             return this.argb;
         }
 
+        @Override
         public boolean equals(Object that) {
             if (this == that)
                 return true;
@@ -178,6 +181,7 @@ public class ColorUtil {
                 return false;
         }
 
+        @Override
         public String toString() {
             return "{Red:" + this.red + " Green:" + this.green + " Blue:" + this.blue + " Alpha:" + this.alpha + "}";
         }

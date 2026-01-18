@@ -684,6 +684,7 @@ public class Dialog extends Form {
     /**
      * Disabling ad padding for dialogs
      */
+    @Override
     void initAdPadding(Display d) {
     }
 
@@ -721,6 +722,7 @@ public class Dialog extends Form {
      *
      * @param previousForm the previous form
      */
+    @Override
     public void setPreviousForm(Form previousForm) {
         super.setPreviousForm(previousForm);
     }
@@ -733,6 +735,7 @@ public class Dialog extends Form {
     protected final void initGlobalToolbar() {
     }
 
+    @Override
     public Container getContentPane() {
         return dialogContentPane;
     }
@@ -740,6 +743,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Layout getLayout() {
         return dialogContentPane.getLayout();
     }
@@ -747,6 +751,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public final void setLayout(Layout layout) {
         dialogContentPane.setLayout(layout);
     }
@@ -754,6 +759,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String getTitle() {
         return dialogTitle.getText();
     }
@@ -761,6 +767,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public final void setTitle(String title) {
         dialogTitle.setText(title);
     }
@@ -768,6 +775,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public final void addComponent(Component cmp) {
         dialogContentPane.addComponent(cmp);
     }
@@ -775,6 +783,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addComponent(Object constraints, Component cmp) {
         dialogContentPane.addComponent(constraints, cmp);
     }
@@ -782,6 +791,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addComponent(int index, Object constraints, Component cmp) {
         dialogContentPane.addComponent(index, constraints, cmp);
     }
@@ -789,6 +799,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addComponent(int index, Component cmp) {
         dialogContentPane.addComponent(index, cmp);
     }
@@ -796,6 +807,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void removeAll() {
         dialogContentPane.removeAll();
     }
@@ -803,6 +815,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void removeComponent(Component cmp) {
         dialogContentPane.removeComponent(cmp);
     }
@@ -810,6 +823,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Label getTitleComponent() {
         return dialogTitle;
     }
@@ -817,6 +831,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setTitleComponent(Label title) {
         super.getContentPane().removeComponent(dialogTitle);
         dialogTitle = title;
@@ -826,10 +841,12 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Style getTitleStyle() {
         return dialogTitle.getStyle();
     }
 
+    @Override
     void updateIcsIconCommandBehavior() {
         // don't set the app icon to the dialog title
     }
@@ -847,6 +864,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setTitleComponent(Label title, Transition t) {
         super.getContentPane().replace(dialogTitle, title, t);
         dialogTitle = title;
@@ -894,6 +912,7 @@ public class Dialog extends Form {
      *
      * @param uim the UIManager instance
      */
+    @Override
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
         setTransitionOutAnimator(uim.getLookAndFeel().getDefaultDialogTransitionOut());
@@ -1020,6 +1039,7 @@ public class Dialog extends Form {
     /**
      * Disable title bar status for iOS 7 which breaks dialogs
      */
+    @Override
     void initTitleBarStatus() {
     }
 
@@ -1037,6 +1057,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     void sizeChangedInternal(int w, int h) {
         if (disposeOnRotation) {
             disposedDueToRotation = true;
@@ -1132,6 +1153,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyReleased(int keyCode) {
         if (commandsAsButtons) {
             if (MenuBar.isLSK(keyCode)) {
@@ -1153,12 +1175,14 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void onShow() {
         if (dialogType > 0) {
             Display.getInstance().playDialogSound(dialogType);
         }
     }
 
+    @Override
     void onShowCompletedImpl() {
         pressedOutOfBounds = false;
         disposedDueToRotation = false;
@@ -1175,6 +1199,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void showBack() {
         showImpl(true);
     }
@@ -1182,6 +1207,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setScrollable(boolean scrollable) {
         getContentPane().setScrollable(scrollable);
     }
@@ -1190,6 +1216,7 @@ public class Dialog extends Form {
      * The default version of show modal shows the dialog occupying the center portion
      * of the screen.
      */
+    @Override
     public void show() {
         showImpl(false);
     }
@@ -1241,6 +1268,7 @@ public class Dialog extends Form {
         }
     }
 
+    @Override
     void showModal(int top, int bottom, int left, int right, boolean includeTitle, boolean modal, boolean reverse) {
         if (Display.isInitialized() && Display.getInstance().isMinimized()) {
             Log.p("Modal dialogs cannot be displayed on a minimized app");
@@ -1612,6 +1640,7 @@ public class Dialog extends Form {
      * Closes the current form and returns to the previous form, releasing the
      * EDT in the process
      */
+    @Override
     public void dispose() {
         if (isDisposed()) {
             return;
@@ -1642,6 +1671,7 @@ public class Dialog extends Form {
      *
      * @param cmd the action command
      */
+    @Override
     protected void actionCommand(Command cmd) {
         // this is important... In a case of nested dialogs based on commands/events a command might be
         // blocked by a different dialog, so when that dialog is disposed (as a result of a command) going
@@ -1666,6 +1696,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean animate() {
         isTimedOut();
         return false;
@@ -1684,6 +1715,7 @@ public class Dialog extends Form {
     /**
      * Indicates that this is a menu preventing getCurrent() from ever returning this class
      */
+    @Override
     boolean isMenu() {
         return menu;
     }
@@ -1707,6 +1739,7 @@ public class Dialog extends Form {
     /**
      * Allows us to indicate disposed state for dialogs
      */
+    @Override
     boolean isDisposed() {
         return disposed || isTimedOut();
     }
@@ -1785,6 +1818,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerReleased(int x, int y) {
         super.pointerReleased(x, y);
         if (disposeWhenPointerOutOfBounds &&
@@ -1799,6 +1833,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerPressed(int x, int y) {
         super.pointerPressed(x, y);
         pressedOutOfBounds = !getTitleComponent().containsOrOwns(x, y) &&
@@ -1842,6 +1877,7 @@ public class Dialog extends Form {
     /**
      * {@inheritDoc}
      */
+    @Override
     void repaint(Component cmp) {
         if (getParent() != null) {
             super.repaint(cmp);
@@ -2015,6 +2051,7 @@ public class Dialog extends Form {
      * In case of a blur effect we need to do something different...
      * {@inheritDoc}
      */
+    @Override
     void initDialogBgPainter(Painter p, Form previousForm) {
         if (getBlurBackgroundRadius() > 0 && Display.impl.isGaussianBlurSupported()) {
             Image img = Image.createImage(previousForm.getWidth(), previousForm.getHeight());

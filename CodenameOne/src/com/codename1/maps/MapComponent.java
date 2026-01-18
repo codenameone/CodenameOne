@@ -174,6 +174,7 @@ public class MapComponent extends Container {
 
             out.addActionListener(new ActionListener() {
 
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     zoomOut();
                     repaint();
@@ -185,6 +186,7 @@ public class MapComponent extends Container {
             in.setUIID("MapZoomIn");
             in.addActionListener(new ActionListener() {
 
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     zoomIn();
                     repaint();
@@ -218,6 +220,7 @@ public class MapComponent extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paintBackground(Graphics g) {
         super.paintBackground(g);
         if (Display.getInstance().areMutableImagesFast()) {
@@ -269,6 +272,7 @@ public class MapComponent extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void laidOut() {
         super.laidOut();
         /*if (buffer != null) {
@@ -283,6 +287,7 @@ public class MapComponent extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected boolean shouldBlockSideSwipe() {
         return true;
     }
@@ -290,6 +295,7 @@ public class MapComponent extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Dimension calcPreferredSize() {
         return new Dimension(Display.getInstance().getDisplayWidth(), Display.getInstance().getDisplayHeight());
     }
@@ -297,6 +303,7 @@ public class MapComponent extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void focusGained() {
         setHandlesInput(true);
     }
@@ -304,6 +311,7 @@ public class MapComponent extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerDragged(int x, int y) {
         super.pointerDragged(x, y);
         if (oldDistance == -1) {
@@ -325,6 +333,7 @@ public class MapComponent extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerPressed(int x, int y) {
         super.pointerPressed(x, y);
         lastPressed = System.currentTimeMillis();
@@ -391,6 +400,7 @@ public class MapComponent extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerReleased(int x, int y) {
         super.pointerReleased(x, y);
 
@@ -402,6 +412,7 @@ public class MapComponent extends Container {
             final int currTapCount = tapCount;
             UITimer timer = new UITimer(new Runnable() {
 
+                @Override
                 public void run() {
                     if (currTapCount == tapCount) {
                         pointerTapped(tapX, tapY, tapCount);
@@ -535,6 +546,7 @@ public class MapComponent extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyPressed(int keyCode) {
         int oldZoom = _zoom;
         Coord oldCenter = _center;
@@ -613,6 +625,7 @@ public class MapComponent extends Container {
                     }
                     tile.setsTileReadyListener(new ActionListener() {
 
+                        @Override
                         public void actionPerformed(ActionEvent evt) {
                             refreshLayers = true;
                             repaint();
@@ -1090,6 +1103,7 @@ public class MapComponent extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"latitude", "longitude", "zoom"};
     }
@@ -1097,6 +1111,7 @@ public class MapComponent extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Double.class, Double.class, Integer.class};
     }
@@ -1104,6 +1119,7 @@ public class MapComponent extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if ("latitude".equals(name)) {
             Coord c = _map.projection().toWGS84(_center);
@@ -1122,6 +1138,7 @@ public class MapComponent extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if ("latitude".equals(name)) {
             setLatitude(((Double) value).doubleValue());

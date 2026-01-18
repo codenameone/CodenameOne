@@ -199,6 +199,7 @@ public class Photo extends FBObject {
      *
      * @param props an hashtable to copy from
      */
+    @Override
     public void copy(Hashtable props) {
         super.copy(props);
         init(props);
@@ -248,6 +249,7 @@ public class Photo extends FBObject {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -261,6 +263,7 @@ public class Photo extends FBObject {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         return super.hashCode();
     }

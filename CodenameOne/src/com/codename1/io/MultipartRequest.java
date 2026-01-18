@@ -137,6 +137,7 @@ public class MultipartRequest extends ConnectionRequest {
         setContentType("multipart/form-data; boundary=" + boundary);
     }
 
+    @Override
     protected void initConnection(Object connection) {
         contentLength = calculateContentLength();
         addRequestHeader("Content-Length", Long.toString(contentLength));
@@ -205,6 +206,7 @@ public class MultipartRequest extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addArgumentNoEncoding(String key, String value) {
         args.put(key, value);
         if (!filenames.containsKey(key)) {
@@ -233,6 +235,7 @@ public class MultipartRequest extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addArgument(String name, String[] value) {
         args.put(name, value);
     }
@@ -240,6 +243,7 @@ public class MultipartRequest extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addArgument(String name, String value) {
         args.put(name, value);
         if (!filenames.containsKey(name)) {
@@ -319,6 +323,7 @@ public class MultipartRequest extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void buildRequestBody(OutputStream os) throws IOException {
         Writer writer = null;
         writer = new OutputStreamWriter(os, "UTF-8");
@@ -451,6 +456,7 @@ public class MultipartRequest extends ConnectionRequest {
     /* (non-Javadoc)
      * @see com.codename1.io.ConnectionRequest#getContentLength()
      */
+    @Override
     public int getContentLength() {
         return (int) contentLength;
     }
@@ -458,6 +464,7 @@ public class MultipartRequest extends ConnectionRequest {
     /* (non-Javadoc)
      * @see com.codename1.io.ConnectionRequest#onRedirect(java.lang.String)
      */
+    @Override
     public boolean onRedirect(String url) {
         return manualRedirect;
     }
@@ -502,6 +509,7 @@ public class MultipartRequest extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -528,6 +536,7 @@ public class MultipartRequest extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         int result = super.hashCode();
         result = 31 * result + (boundary != null ? boundary.hashCode() : 0);

@@ -437,6 +437,7 @@ public class Accordion extends Container {
             arrow.setIcon(closeIcon);
             arrow.addActionListener(new ActionListener() {
 
+                @Override
                 public void actionPerformed(ActionEvent evt) {
 
                     //toggle the current

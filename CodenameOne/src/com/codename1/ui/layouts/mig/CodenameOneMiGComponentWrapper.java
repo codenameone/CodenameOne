@@ -124,6 +124,7 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
         vp = b;
     }
 
+    @Override
     public final int getBaseline(int width, int height) {
         int baseLine = c.getBaseline(width < 0 ? c.getWidth() : width, height < 0 ? c.getHeight() : height);
         if (baseLine != -1) {
@@ -133,10 +134,12 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
         return baseLine;
     }
 
+    @Override
     public final Object getComponent() {
         return c;
     }
 
+    @Override
     public final float getPixelUnitFactor(boolean isHor) {
         switch (PlatformDefaults.getLogicalPixelBase()) {
             case PlatformDefaults.BASE_FONT_SIZE:
@@ -163,46 +166,57 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
         }
     }
 
+    @Override
     public final int getX() {
         return c.getX();
     }
 
+    @Override
     public final int getY() {
         return c.getY();
     }
 
+    @Override
     public final int getHeight() {
         return c.getHeight();
     }
 
+    @Override
     public final int getWidth() {
         return c.getWidth();
     }
 
+    @Override
     public final int getScreenLocationX() {
         return 0;
     }
 
+    @Override
     public final int getScreenLocationY() {
         return 0;
     }
 
+    @Override
     public final int getMinimumHeight(int sz) {
         return c.getPreferredH();
     }
 
+    @Override
     public final int getMinimumWidth(int sz) {
         return c.getPreferredW();
     }
 
+    @Override
     public final int getPreferredHeight(int sz) {
         return c.getPreferredH();
     }
 
+    @Override
     public final int getPreferredWidth(int sz) {
         return c.getPreferredW();
     }
 
+    @Override
     public final int getMaximumHeight(int sz) {
         Container p = c.getParent();
         if (p != null) {
@@ -214,6 +228,7 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
         return Display.getInstance().getDisplayHeight();
     }
 
+    @Override
     public final int getMaximumWidth(int sz) {
         Container p = c.getParent();
         if (p != null) {
@@ -225,35 +240,43 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
         return Display.getInstance().getDisplayWidth();
     }
 
+    @Override
     public final ContainerWrapper getParent() {
         Container p = c.getParent();
         return p != null ? new CodenameOneMiGContainerWrapper(p) : null;
     }
 
+    @Override
     public final int getHorizontalScreenDPI() {
         return PlatformDefaults.getDefaultDPI();
     }
 
+    @Override
     public final int getVerticalScreenDPI() {
         return PlatformDefaults.getDefaultDPI();
     }
 
+    @Override
     public final int getScreenWidth() {
         return Display.getInstance().getDisplayWidth();
     }
 
+    @Override
     public final int getScreenHeight() {
         return Display.getInstance().getDisplayHeight();
     }
 
+    @Override
     public final boolean hasBaseline() {
         return true;
     }
 
+    @Override
     public final String getLinkId() {
         return c.getName();
     }
 
+    @Override
     public final void setBounds(int x, int y, int width, int height) {
         c.setX(x);
         c.setY(y);
@@ -261,10 +284,12 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
         c.setHeight(height);
     }
 
+    @Override
     public boolean isVisible() {
         return c.isVisible();
     }
 
+    @Override
     public final int[] getVisualPadding() {
         // TOOD, optimize this
         int[] padding = new int[]{c.getStyle().getMarginTop(), c.getStyle().getMarginLeftNoRTL(),
@@ -272,6 +297,7 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
         return padding;
     }
 
+    @Override
     public final void paintDebugOutline(boolean showVisualPadding) {
 		/*if (c.isShowing() == false)
 			return;
@@ -293,6 +319,7 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
 		}*/
     }
 
+    @Override
     public int getComponentType(boolean disregardScrollPane) {
         if (compType == TYPE_UNSET)
             compType = checkType(disregardScrollPane);
@@ -300,6 +327,7 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
         return compType;
     }
 
+    @Override
     public int getLayoutHashCode() {
         Dimension d = c.getPreferredSize();
         int hash = (d.getWidth() << 10) + (d.getHeight() << 15);
@@ -347,10 +375,12 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
         return TYPE_UNKNOWN;
     }
 
+    @Override
     public final int hashCode() {
         return getComponent().hashCode();
     }
 
+    @Override
     public final boolean equals(Object o) {
         if (!(o instanceof ComponentWrapper))
             return false;
@@ -358,6 +388,7 @@ class CodenameOneMiGComponentWrapper implements ComponentWrapper {
         return c.equals(((ComponentWrapper) o).getComponent());
     }
 
+    @Override
     public int getContentBias() {
         return c instanceof TextArea || (Boolean.TRUE.equals(c.getClientProperty("migLayout.dynamicAspectRatio"))) ? LayoutUtil.HORIZONTAL : -1;
     }

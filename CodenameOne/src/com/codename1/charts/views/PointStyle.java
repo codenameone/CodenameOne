@@ -83,6 +83,7 @@ public enum PointStyle {
      *
      * @return the point shape name
      */
+    @Override
     public String toString() {
         return getName();
     }

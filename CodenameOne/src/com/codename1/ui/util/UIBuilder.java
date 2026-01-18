@@ -2803,6 +2803,7 @@ public class UIBuilder { //implements Externalizable {
             Display.getInstance().callSerially(this);
         }
 
+        @Override
         public void run() {
             if (currentAction != null) {
                 if (Display.getInstance().isEdt()) {
@@ -2830,6 +2831,7 @@ public class UIBuilder { //implements Externalizable {
             }
         }
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
             Command cmd = evt.getCommand();
             if (cmd == null) {
@@ -2931,6 +2933,7 @@ class LazyValueC implements LazyValue<Form> {
         this.parent = parent;
     }
 
+    @Override
     public Form get(Object... args) {
         String n = parent.getPreviousFormName(f);
         final Form f = parent.createForm((Form) parent.createContainer(parent.fetchResourceFile(), n));
@@ -2939,6 +2942,7 @@ class LazyValueC implements LazyValue<Form> {
             parent.setBackCommand(f, backCommand);
         }
         f.addShowListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 parent.postShow(f);
             }

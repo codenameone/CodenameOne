@@ -48,6 +48,7 @@ public abstract class AbstractLayer implements Layer {
      *
      * @return the name of this Layer
      */
+    @Override
     public String getName() {
         return name;
     }
@@ -66,6 +67,7 @@ public abstract class AbstractLayer implements Layer {
      *
      * @return the Layer bounding box
      */
+    @Override
     public abstract BoundingBox boundingBox();
 
 }

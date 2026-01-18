@@ -147,6 +147,7 @@ public class BigInteger {
         return out;
     }
 
+    @Override
     public boolean equals(Object val) {
         if (val == this)
             return true;
@@ -161,6 +162,7 @@ public class BigInteger {
         return new BigInteger(peer.gcd(val.peer));
     }
 
+    @Override
     public int hashCode() {
         return peer.hashCode();
     }
@@ -271,6 +273,7 @@ public class BigInteger {
         return new BigInteger(peer.flipBit(n));
     }
 
+    @Override
     public String toString() {
         return peer.toString();
     }

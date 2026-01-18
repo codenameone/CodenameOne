@@ -56,6 +56,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
      */
     public static void install(final TextField search, final List l) {
         search.addDataChangedListener(new DataChangedListener() {
+            @Override
             public void dataChanged(int type, int index) {
                 FilterProxyListModel f;
                 if (l.getModel() instanceof FilterProxyListModel) {
@@ -81,6 +82,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
      */
     public static void install(final TextField search, final ContainerList l) {
         search.addDataChangedListener(new DataChangedListener() {
+            @Override
             public void dataChanged(int type, int index) {
                 FilterProxyListModel f;
                 if (l.getModel() instanceof FilterProxyListModel) {
@@ -289,6 +291,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
     /**
      * {@inheritDoc}
      */
+    @Override
     public T getItemAt(int index) {
         return underlying.getItemAt(getFilterOffset(index));
     }
@@ -296,6 +299,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getSize() {
         if (filter == null) {
             return underlying.getSize();
@@ -306,6 +310,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getSelectedIndex() {
         return Math.max(0, getUnderlyingOffset(underlying.getSelectedIndex()));
     }
@@ -313,6 +318,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setSelectedIndex(int index) {
         if (index < 0) {
             underlying.setSelectedIndex(index);
@@ -324,6 +330,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addDataChangedListener(DataChangedListener l) {
         listeners.add(l);
     }
@@ -331,6 +338,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
     /**
      * {@inheritDoc}
      */
+    @Override
     public void removeDataChangedListener(DataChangedListener l) {
         listeners.remove(l);
     }
@@ -338,6 +346,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addSelectionListener(SelectionListener l) {
         underlying.addSelectionListener(l);
     }
@@ -345,6 +354,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
     /**
      * {@inheritDoc}
      */
+    @Override
     public void removeSelectionListener(SelectionListener l) {
         underlying.removeSelectionListener(l);
     }
@@ -352,6 +362,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addItem(T item) {
         underlying.addItem(item);
     }
@@ -359,6 +370,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
     /**
      * {@inheritDoc}
      */
+    @Override
     public void removeItem(int index) {
         underlying.removeItem(getFilterOffset(index));
     }
@@ -366,6 +378,7 @@ public class FilterProxyListModel<T> implements ListModel<T>, DataChangedListene
     /**
      * {@inheritDoc}
      */
+    @Override
     public void dataChanged(int type, int index) {
         if (index > -1) {
             index = getUnderlyingOffset(index);

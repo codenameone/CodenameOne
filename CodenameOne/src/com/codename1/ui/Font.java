@@ -594,6 +594,7 @@ public class Font extends CN {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -620,6 +621,7 @@ public class Font extends CN {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         if (ttf && font != null) {
             return font.hashCode();

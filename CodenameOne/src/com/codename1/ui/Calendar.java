@@ -156,6 +156,7 @@ public class Calendar extends Container implements ActionSource {
             ActionListener progress = new ActionListener() {
                 private boolean lock = false;
 
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     if (lock) {
                         return;
@@ -424,6 +425,7 @@ public class Calendar extends Container implements ActionSource {
      *
      * @param l listener to add
      */
+    @Override
     public void addActionListener(ActionListener l) {
         mv.addActionListener(l);
     }
@@ -433,6 +435,7 @@ public class Calendar extends Container implements ActionSource {
      *
      * @param l listener to remove
      */
+    @Override
     public void removeActionListener(ActionListener l) {
         mv.removeActionListener(l);
     }
@@ -1224,6 +1227,7 @@ public class Calendar extends Container implements ActionSource {
             dataChangedListeners.removeListener(l);
         }
 
+        @Override
         protected void fireActionEvent() {
             componentChanged();
             super.fireActionEvent();
@@ -1234,6 +1238,7 @@ public class Calendar extends Container implements ActionSource {
             monthChangedListeners.fireActionEvent(new ActionEvent(Calendar.this, ActionEvent.Type.Calendar));
         }
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
             Object src = evt.getSource();
             if (src instanceof ComboBox) {

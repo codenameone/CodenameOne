@@ -37,14 +37,17 @@ class CacheProviderProxy extends MapProvider {
         _cache = new WeakHashMap();
     }
 
+    @Override
     public int maxZoomLevel() {
         return provider.maxZoomLevel();
     }
 
+    @Override
     public Coord scale(int zoomLevel) {
         return provider.scale(zoomLevel);
     }
 
+    @Override
     public Tile tileFor(BoundingBox bbox) {
         Tile tile = get(bbox);
         if (tile == null) {
@@ -53,10 +56,12 @@ class CacheProviderProxy extends MapProvider {
         return tile;
     }
 
+    @Override
     public BoundingBox bboxFor(Coord position, int zoomLevel) {
         return provider.bboxFor(position, zoomLevel);
     }
 
+    @Override
     public String attribution() {
         return provider.attribution();
     }
@@ -90,6 +95,7 @@ class CacheProviderProxy extends MapProvider {
             this.tile = tile;
         }
 
+        @Override
         public boolean paint(Graphics g) {
             return tile.paint(g);
         }

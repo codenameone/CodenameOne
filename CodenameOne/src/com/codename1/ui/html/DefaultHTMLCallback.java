@@ -43,6 +43,7 @@ public class DefaultHTMLCallback implements HTMLCallback {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public void titleUpdated(HTMLComponent htmlC, String title) {
         // do nothing
     }
@@ -50,6 +51,7 @@ public class DefaultHTMLCallback implements HTMLCallback {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public boolean parsingError(int errorId, String tag, String attribute, String value, String description) {
         Log.p(description);
         return true; // Signals the parser to continue parsing despite of the error (if it is a recoverable error)
@@ -58,6 +60,7 @@ public class DefaultHTMLCallback implements HTMLCallback {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public void pageStatusChanged(HTMLComponent htmlC, int status, String url) {
         // do nothing
     }
@@ -65,6 +68,7 @@ public class DefaultHTMLCallback implements HTMLCallback {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public String fieldSubmitted(HTMLComponent htmlC, TextArea ta, String actionURL, String id, String value, int type, String errorMsg) {
         return value; // Returns the same value
     }
@@ -72,6 +76,7 @@ public class DefaultHTMLCallback implements HTMLCallback {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public String getAutoComplete(HTMLComponent htmlC, String actionURL, String id) {
         return null; // i.e. no auto complete value was found
     }
@@ -79,6 +84,7 @@ public class DefaultHTMLCallback implements HTMLCallback {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public int getLinkProperties(HTMLComponent htmlC, String url) {
         return LINK_REGULAR; // Regular link - not visited and not forbidden
     }
@@ -86,6 +92,7 @@ public class DefaultHTMLCallback implements HTMLCallback {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public boolean linkClicked(HTMLComponent htmlC, String url) {
         return true;
     }
@@ -93,6 +100,7 @@ public class DefaultHTMLCallback implements HTMLCallback {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public void actionPerformed(ActionEvent evt, HTMLComponent htmlC, HTMLElement element) {
         // do nothing
     }
@@ -100,6 +108,7 @@ public class DefaultHTMLCallback implements HTMLCallback {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public void focusGained(Component cmp, HTMLComponent htmlC, HTMLElement element) {
         // do nothing
     }
@@ -107,6 +116,7 @@ public class DefaultHTMLCallback implements HTMLCallback {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public void focusLost(Component cmp, HTMLComponent htmlC, HTMLElement element) {
         // do nothing
     }
@@ -114,6 +124,7 @@ public class DefaultHTMLCallback implements HTMLCallback {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public void selectionChanged(int oldSelected, int newSelected, HTMLComponent htmlC, List list, HTMLElement element) {
         // do nothing
     }
@@ -121,6 +132,7 @@ public class DefaultHTMLCallback implements HTMLCallback {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public void dataChanged(int type, int index, HTMLComponent htmlC, TextField textField, HTMLElement element) {
         // do nothing
     }

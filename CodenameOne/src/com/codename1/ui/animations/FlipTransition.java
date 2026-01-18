@@ -338,6 +338,7 @@ public class FlipTransition extends Transition {
         g.setClip(cx, cy, cw, ch);
     }
 
+    @Override
     public void cleanup() {
         sourceBuffer = null;
         destBuffer = null;

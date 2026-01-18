@@ -96,6 +96,7 @@ public abstract class InfiniteContainer extends Container {
         createInfiniteScroll();
         addPullToRefresh(new Runnable() {
 
+            @Override
             public void run() {
                 refresh();
             }
@@ -114,6 +115,7 @@ public abstract class InfiniteContainer extends Container {
         }
         if (isAsync()) {
             Display.getInstance().invokeAndBlock(new Runnable() {
+                @Override
                 public void run() {
                     refreshImpl();
                 }
@@ -142,6 +144,7 @@ public abstract class InfiniteContainer extends Container {
         if (!Display.getInstance().isEdt()) {
             Display.getInstance().callSerially(new Runnable() {
 
+                @Override
                 public void run() {
                     removeAll();
                     InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, shouldContinue(cmps));
@@ -177,6 +180,7 @@ public abstract class InfiniteContainer extends Container {
         final Component[] cmps = components;
         if (!Display.getInstance().isEdt()) {
             Display.getInstance().callSerially(new Runnable() {
+                @Override
                 public void run() {
                     InfiniteScrollAdapter.addMoreComponents(InfiniteContainer.this, cmps, shouldContinue(cmps));
                     requestingResults = false;
@@ -191,9 +195,11 @@ public abstract class InfiniteContainer extends Container {
     private void createInfiniteScroll() {
         adapter = InfiniteScrollAdapter.createInfiniteScroll(this, new Runnable() {
 
+            @Override
             public void run() {
                 if (isAsync()) {
                     Display.getInstance().scheduleBackgroundTask(new Runnable() {
+                        @Override
                         public void run() {
                             fetchMore();
                         }

@@ -70,21 +70,25 @@ class HeavyButton extends Button {
         }
     }
 
+    @Override
     public void setWidth(int w) {
         super.setWidth(w);
         updateHeavyBounds();
     }
 
+    @Override
     public void setHeight(int h) {
         super.setHeight(h);
         updateHeavyBounds();
     }
 
+    @Override
     public void setX(int x) {
         super.setX(x);
         updateHeavyBounds();
     }
 
+    @Override
     public void setY(int y) {
         super.setY(y);
         updateHeavyBounds();

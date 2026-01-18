@@ -161,14 +161,17 @@ public class Log {
 
         // request the device id from the server
         com.codename1.io.ConnectionRequest r = new com.codename1.io.ConnectionRequest() {
+            @Override
             protected void readResponse(java.io.InputStream input) throws java.io.IOException {
                 com.codename1.io.Preferences.set("UDeviceKey__$", Util.readToString(input));
             }
 
+            @Override
             protected void handleErrorResponseCode(int code, String message) {
                 Log.p("Error in sending log to server: " + code + " " + message);
             }
 
+            @Override
             protected void handleException(Exception err) {
                 err.printStackTrace();
             }
@@ -365,6 +368,7 @@ public class Log {
             f.setScrollable(false);
             final Form current = Display.getInstance().getCurrent();
             Command back = new Command("Back") {
+                @Override
                 public void actionPerformed(ActionEvent ev) {
                     current.show();
                 }
@@ -399,6 +403,7 @@ public class Log {
             return;
         }
         Display.getInstance().addEdtErrorHandler(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 if (consumeError) {
                     evt.consume();
@@ -604,6 +609,7 @@ public class Log {
      */
     public void trackFileSystem() {
         Util.getImplementation().setLogListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 String s = (String) evt.getSource();
                 // don't log the creation of the log itself

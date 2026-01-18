@@ -34,6 +34,7 @@ public abstract class ShareService extends Command {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void actionPerformed(ActionEvent evt) {
         if (image != null) {
             share(message, image, mimeType);

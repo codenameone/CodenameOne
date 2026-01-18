@@ -266,6 +266,7 @@ public final class NetworkManager {
         // we need to implement a timeout thread of our own for this case...
         if (!Util.getImplementation().isTimeoutSupported()) {
             Util.getImplementation().startThread("Timeout Thread", new Runnable() {
+                @Override
                 public void run() {
                     // detect timeout violations by polling
                     while (running) {
@@ -390,6 +391,7 @@ public final class NetworkManager {
         class WaitingClass implements ActionListener<NetworkEvent> {
 
 
+            @Override
             public void actionPerformed(NetworkEvent e) {
                 if (e.getError() != null) {
 
@@ -434,6 +436,7 @@ public final class NetworkManager {
             private final boolean edt = CN.isEdt();
             private boolean finishedWaiting;
 
+            @Override
             public void run() {
                 if (edt) {
                     while (!finishedWaiting) {
@@ -454,6 +457,7 @@ public final class NetworkManager {
                 }
             }
 
+            @Override
             public void actionPerformed(NetworkEvent e) {
                 if (e.getError() != null) {
                     finishedWaiting = true;
@@ -505,6 +509,7 @@ public final class NetworkManager {
     public void killAndWait(final ConnectionRequest request) {
         request.kill();
         class KillWaitingClass implements Runnable {
+            @Override
             public void run() {
                 for (int iter = 0; iter < threadCount; iter++) {
                     if (networkThreads[iter].currentRequest == request) {
@@ -926,6 +931,7 @@ public final class NetworkManager {
                     // network request completed
                     final ConnectionRequest finalReq = currentRequest;
                     Display.getInstance().callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             Dialog dlg = finalReq.getDisposeOnCompletion();
                             if (dlg != null) {
@@ -938,6 +944,7 @@ public final class NetworkManager {
             return true;
         }
 
+        @Override
         public void run() {
             threadInstance = Thread.currentThread();
             while (running && !stopped) {
@@ -998,14 +1005,17 @@ public final class NetworkManager {
         private Vector aps = null;
         private int currentAP;
 
+        @Override
         protected void handleErrorResponseCode(int code, String message) {
             retryWithDifferentAPN();
         }
 
+        @Override
         protected void handleException(Exception err) {
             retryWithDifferentAPN();
         }
 
+        @Override
         protected void readResponse(InputStream input) throws IOException {
             String s = Util.readToString(input);
             if (!"hi".equals(s)) {
@@ -1060,6 +1070,7 @@ public final class NetworkManager {
             addToQueue(r);
         }
 
+        @Override
         public boolean equals(Object o) {
             return this == o;
         }

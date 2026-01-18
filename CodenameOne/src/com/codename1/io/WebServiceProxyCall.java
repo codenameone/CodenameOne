@@ -275,6 +275,7 @@ public class WebServiceProxyCall {
         /**
          * {@inheritDoc}
          */
+        @Override
         public boolean equals(Object o) {
             if (this == o) {
                 return true;
@@ -319,6 +320,7 @@ public class WebServiceProxyCall {
         /**
          * {@inheritDoc}
          */
+        @Override
         public int hashCode() {
             int result = super.hashCode();
             result = 31 * result + (def != null ? def.hashCode() : 0);

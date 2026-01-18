@@ -65,6 +65,7 @@ public class LineChart extends XYChart {
      * @param dataset the series dataset
      * @param renderer the series renderer
      */
+    @Override
     protected void setDatasetRenderer(XYMultipleSeriesDataset dataset,
                                       XYMultipleSeriesRenderer renderer) {
         super.setDatasetRenderer(dataset, renderer);
@@ -321,6 +322,7 @@ public class LineChart extends XYChart {
      * @param seriesIndex the series index
      * @return the legend shape width
      */
+    @Override
     public int getLegendShapeWidth(int seriesIndex) {
         return SHAPE_WIDTH;
     }
@@ -335,6 +337,7 @@ public class LineChart extends XYChart {
      * @param seriesIndex the series index
      * @param paint the paint to be used for drawing
      */
+    @Override
     public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
                                 int seriesIndex, Paint paint) {
         canvas.drawLine(x, y, x + SHAPE_WIDTH, y, paint);
@@ -348,6 +351,7 @@ public class LineChart extends XYChart {
      *
      * @param renderer the series renderer
      */
+    @Override
     public boolean isRenderPoints(SimpleSeriesRenderer renderer) {
         return renderer instanceof XYSeriesRenderer &&
                 ((XYSeriesRenderer) renderer).getPointStyle() != PointStyle.POINT;
@@ -358,6 +362,7 @@ public class LineChart extends XYChart {
      *
      * @return the data points scatter chart
      */
+    @Override
     public ScatterChart getPointsChart() {
         return pointsChart;
     }
@@ -367,6 +372,7 @@ public class LineChart extends XYChart {
      *
      * @return the chart type
      */
+    @Override
     public String getChartType() {
         return TYPE;
     }

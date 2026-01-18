@@ -185,6 +185,7 @@ public class Tabs extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void initLaf(UIManager manager) {
         super.initLaf(manager);
         int tabPlace = manager.getThemeConstant("tabPlacementInt", -1);
@@ -211,6 +212,7 @@ public class Tabs extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     void initComponentImpl() {
         super.initComponentImpl();
         Form frm = getComponentForm();
@@ -230,6 +232,7 @@ public class Tabs extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
         originalTabsContainerSelected = null;
@@ -239,6 +242,7 @@ public class Tabs extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void deinitialize() {
         Form form = this.getComponentForm();
         if (form != null) {
@@ -252,6 +256,7 @@ public class Tabs extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void initComponent() {
         super.initComponent();
         Form form = this.getComponentForm();
@@ -265,6 +270,7 @@ public class Tabs extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean animate() {
         boolean b = super.animate();
         if (slideToDestMotion != null) {
@@ -313,6 +319,7 @@ public class Tabs extends Container {
         return b;
     }
 
+    @Override
     void deregisterAnimatedInternal() {
         if (slideToDestMotion == null || (slideToDestMotion.isFinished())) {
             Form f = getComponentForm();
@@ -595,6 +602,7 @@ public class Tabs extends Container {
         b.addFocusListener(focusListener);
 
         bindTabActionListener(b, new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
 
                 if (selectedTab != null) {
@@ -930,6 +938,7 @@ public class Tabs extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         String className = getClass().getName();
         className = className.substring(className.lastIndexOf('.') + 1);
@@ -1338,6 +1347,7 @@ public class Tabs extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"titles", "icons", "selectedIcons"};
     }
@@ -1345,6 +1355,7 @@ public class Tabs extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{com.codename1.impl.CodenameOneImplementation.getStringArrayClass(),
                 com.codename1.impl.CodenameOneImplementation.getImageArrayClass(),
@@ -1354,6 +1365,7 @@ public class Tabs extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String[]", "Image[]", "Image[]"};
     }
@@ -1361,6 +1373,7 @@ public class Tabs extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if ("titles".equals(name)) {
             String[] t = new String[getTabCount()];
@@ -1389,6 +1402,7 @@ public class Tabs extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if ("titles".equals(name)) {
             String[] t = (String[]) value;
@@ -1422,6 +1436,7 @@ public class Tabs extends Container {
 
     class TabsLayout extends Layout {
 
+        @Override
         public void layoutContainer(Container parent) {
             final int size = parent.getComponentCount();
 
@@ -1459,6 +1474,7 @@ public class Tabs extends Container {
 
         }
 
+        @Override
         public Dimension getPreferredSize(Container parent) {
             // fill
             Dimension dim = new Dimension(0, 0);
@@ -1478,6 +1494,7 @@ public class Tabs extends Container {
 
     class TabFocusListener implements FocusListener {
 
+        @Override
         public void focusGained(Component cmp) {
             if (focusListeners != null) {
                 focusListeners.fireFocus(cmp);
@@ -1497,6 +1514,7 @@ public class Tabs extends Container {
         }
 
 
+        @Override
         public void focusLost(Component cmp) {
             if (focusListeners != null) {
                 focusListeners.fireFocus(cmp);
@@ -1523,6 +1541,7 @@ public class Tabs extends Container {
         }
 
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
 
             if (getComponentCount() == 0 || !swipeActivated || slideToDestMotion != null) {

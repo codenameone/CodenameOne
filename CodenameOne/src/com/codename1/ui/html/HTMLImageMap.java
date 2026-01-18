@@ -47,6 +47,7 @@ class HTMLImageMap extends Button implements ActionListener {
     }
 
 
+    @Override
     public void actionPerformed(ActionEvent evt) {
         if (mapData != null) {
             int x = evt.getX();

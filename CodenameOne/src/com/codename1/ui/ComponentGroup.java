@@ -95,6 +95,7 @@ public class ComponentGroup extends Container {
         }
     }
 
+    @Override
     void insertComponentAt(int index, Object con, Component cmp) {
         super.insertComponentAt(index, con, cmp);
         updateUIIDs();
@@ -103,6 +104,7 @@ public class ComponentGroup extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
         boolean ignoreGroup = getUIManager().isThemeConstant(groupFlag, false);
@@ -119,6 +121,7 @@ public class ComponentGroup extends Container {
         }
     }
 
+    @Override
     void removeComponentImpl(Component cmp) {
         super.removeComponentImpl(cmp);
 
@@ -239,6 +242,7 @@ public class ComponentGroup extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"elementUIID", "displayName", "horizontal", "groupFlag", "forceGroup"};
     }
@@ -246,6 +250,7 @@ public class ComponentGroup extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{String.class, String.class, Boolean.class, String.class, Boolean.class};
     }
@@ -253,6 +258,7 @@ public class ComponentGroup extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if ("elementUIID".equals(name)) {
             return getElementUIID();
@@ -275,6 +281,7 @@ public class ComponentGroup extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if ("elementUIID".equals(name)) {
             setElementUIID((String) value);

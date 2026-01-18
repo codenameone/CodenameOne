@@ -84,6 +84,7 @@ public final class MorphTransition extends Transition {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Transition copy(boolean reverse) {
         MorphTransition m = create(duration);
         if (reverse) {
@@ -124,6 +125,7 @@ public final class MorphTransition extends Transition {
     /**
      * {@inheritDoc}
      */
+    @Override
     public final void initTransition() {
         animationMotion = Motion.createEaseInOutMotion(0, 255, duration);
         animationMotion.start();
@@ -175,6 +177,7 @@ public final class MorphTransition extends Transition {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean animate() {
         if (!finished) {
             // animate one last time
@@ -231,6 +234,7 @@ public final class MorphTransition extends Transition {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g) {
         int oldAlpha = g.getAlpha();
         int alpha = 0;

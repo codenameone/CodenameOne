@@ -828,6 +828,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         final InputStreamReader isReader = isr;
 
         Display.getInstance().startThread(new Runnable() {
+            @Override
             public void run() {
                 HTMLElement doc = parser.parseHTML(isReader);
                 documentReady(null, doc);
@@ -1031,6 +1032,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         } else {
             Display.getInstance().startThread(new Runnable() {
 
+                @Override
                 public void run() {
                     setPageStatus(HTMLCallback.STATUS_REQUESTED);
                     InputStream is = handler.resourceRequested(docInfo);
@@ -1046,6 +1048,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      * @param is      The InputStream of the document
      * @param docInfo The document info
      */
+    @Override
     public void streamReady(InputStream is, DocumentInfo docInfo) {
         InputStreamReader isr = null;
         try {
@@ -1195,6 +1198,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         if ((!cancelled) || (cancelledCaught)) {
             Display.getInstance().callSerially(new Runnable() {
 
+                @Override
                 public void run() {
 
                     if (threadQueue.getCSSCount() == -1) {
@@ -1231,6 +1235,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     void cssCompleted() {
         Display.getInstance().callSerially(new Runnable() {
 
+            @Override
             public void run() {
                 displayPage();
             }
@@ -1318,6 +1323,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         }
     }
 
+    @Override
     public boolean animate() {
         boolean result = super.animate();
         if (marqueeMotion == null) {
@@ -1376,6 +1382,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
                     htmlCallback.pageStatusChanged(this, status, pageURL);
                 } else {
                     Display.getInstance().callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             htmlCallback.pageStatusChanged(HTMLComponent.this, status, pageURL);
                         }
@@ -1778,6 +1785,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
 
         if (htmlCallback != null) {
             Display.getInstance().callSerially(new Runnable() {
+                @Override
                 public void run() {
                     htmlCallback.titleUpdated(HTMLComponent.this, title);
                 }
@@ -2236,6 +2244,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
      * Overrides initComponent to add the key listeners to the access keys when the component is first added to the form/displayed
      * This is useful when the component is added only after the page was read
      */
+    @Override
     protected void initComponent() {
         super.initComponent();
         for (Enumeration e = accessKeys.keys(); e.hasMoreElements(); ) {
@@ -2247,6 +2256,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     /**
      * If the component is taken off for any reason, makes sure access keys are not active
      */
+    @Override
     protected void deinitialize() {
         super.deinitialize();
         for (Enumeration e = accessKeys.keys(); e.hasMoreElements(); ) {
@@ -3860,6 +3870,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public void layoutContainer() {
         if ((FIXED_WIDTH) && (displayWidth != 0) && (Display.getInstance().getDisplayWidth() != displayWidth)) {
             Display.getInstance().startThread(new Runnable() {
@@ -3875,6 +3886,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public void actionPerformed(ActionEvent evt) {
         if (getComponentForm().getFocused() instanceof TextField) {
             return;
@@ -3905,6 +3917,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"url", "body", "pageUIID"};
     }
@@ -3912,6 +3925,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{String.class, String.class, String.class};
     }
@@ -3919,6 +3933,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if ("url".equals(name)) {
             return pageURL;
@@ -3939,6 +3954,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if ("url".equals(name)) {
             setPage((String) value);
@@ -4045,6 +4061,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             this.htmlC = htmlC;
         }
 
+        @Override
         public void run() {
             try {
                 Thread.sleep(seconds * 1000L);
@@ -4088,6 +4105,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         /**
          * {{@inheritDoc}}
          */
+        @Override
         public void pointerReleased(int x, int y) {
             triggerAction();
             super.pointerReleased(x, y);
@@ -4190,6 +4208,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             return ROMAN_NUMERALS_TENS[index / 10] + ROMAN_NUMERALS_ONES[index % 10] + ". ";
         }
 
+        @Override
         public void setStyleType(int type) {
             if (type != -1) {
                 listType = type - 4;
@@ -4201,6 +4220,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             }
         }
 
+        @Override
         public void setImage(String imageUrl) {
             // do nothing, has no meaning for ordered lists
         }
@@ -4251,6 +4271,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             setFocusable(false);
         }
 
+        @Override
         public void setStyleType(int type) {
             if (type != -1) {
                 level = type;
@@ -4259,6 +4280,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             }
         }
 
+        @Override
         public void setImage(String imageUrl) {
             if (imageUrl != null) {
                 //setText(" "); // Due to a Codename One bug Labels with an icon only and no text can be cut
@@ -4269,6 +4291,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         /**
          * {{@inheritDoc}}
          */
+        @Override
         public void paint(Graphics g) {
             if (getIcon() != null) {
                 super.paint(g);
@@ -4289,6 +4312,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         /**
          * {{@inheritDoc}}
          */
+        @Override
         protected Dimension calcPreferredSize() {
             if (getIcon() != null) {
                 return super.calcPreferredSize();
@@ -4313,6 +4337,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
         /**
          * {{@inheritDoc}}
          */
+        @Override
         protected List createPopupList() {
             List l = new MultiComboBox(getModel(), false);
             l.setSmoothScrolling(isSmoothScrolling());
@@ -4333,6 +4358,7 @@ public class HTMLComponent extends Container implements ActionListener, IOCallba
             this.newInputField = newInputField;
         }
 
+        @Override
         public void run() {
             inputField.getParent().replace(inputField, newInputField, null); // Applying the constraints may return a new instance that has to be replaced in the form
         }

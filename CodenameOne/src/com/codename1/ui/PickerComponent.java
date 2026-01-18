@@ -164,6 +164,7 @@ public class PickerComponent extends InputComponent {
      * Overridden for covariant return type
      * {@inheritDoc}
      */
+    @Override
     public PickerComponent onTopMode(boolean onTopMode) {
         super.onTopMode(onTopMode);
         return this;
@@ -173,6 +174,7 @@ public class PickerComponent extends InputComponent {
      * Overridden for covariant return type
      * {@inheritDoc}
      */
+    @Override
     public PickerComponent errorMessage(String errorMessage) {
         super.errorMessage(errorMessage);
         return this;
@@ -183,6 +185,7 @@ public class PickerComponent extends InputComponent {
      * {@inheritDoc}
      * }
      */
+    @Override
     public PickerComponent label(String text) {
         super.label(text);
         return this;

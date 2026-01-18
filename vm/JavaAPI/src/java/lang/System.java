@@ -160,13 +160,8 @@ public final class System {
     /**
      * Returns the same hashcode for the given object as would be returned by the default method hashCode(), whether or not the given object's class overrides hashCode(). The hashcode for the null reference is zero.
      */
-    public static int identityHashCode(java.lang.Object x){
-        if(x == null) {
-            return 0;
-        }
-        return x.hashCode(); 
-    }
-    
+    public static native int identityHashCode(java.lang.Object x);
+
     public static long nanoTime() {
         throw new UnsupportedOperationException("System.nanoTime() not supported on this platform");
     }

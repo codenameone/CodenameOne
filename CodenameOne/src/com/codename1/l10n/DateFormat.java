@@ -288,6 +288,7 @@ public class DateFormat extends Format {
      *
      * @see java.lang.Object#clone()
      */
+    @Override
     public Object clone() {
         return new DateFormat(dateStyle, timeStyle);
     }

@@ -697,6 +697,7 @@ public class Element implements Iterable<Element> {
      *
      * @return a printable string representing this element
      */
+    @Override
     public String toString() {
         return toString("");
     }
@@ -764,6 +765,7 @@ public class Element implements Iterable<Element> {
      *
      * @return the children iterator
      */
+    @Override
     public Iterator<Element> iterator() {
         return children.iterator();
     }

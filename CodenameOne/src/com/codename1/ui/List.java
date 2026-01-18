@@ -294,6 +294,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
         setSmoothScrolling(uim.getLookAndFeel().isDefaultSmoothScrolling());
@@ -306,6 +307,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     void initComponentImpl() {
         dataChanged(0, 0);
         // lazily bind listeners to prevent a memory leak in cases where models
@@ -321,6 +323,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void laidOut() {
         super.laidOut();
         if (isScrollable() && isInitialized() && scrollToSelected) {
@@ -334,6 +337,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     void deinitializeImpl() {
         super.deinitializeImpl();
 
@@ -367,6 +371,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getSideGap() {
         // isScrollableY() in the base method is very expensive since it triggers getScrollDimension before the layout is complete!
         if (isScrollVisible() && orientation != HORIZONTAL) {
@@ -378,6 +383,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isScrollableY() {
         return (getScrollDimension().getHeight() > getHeight() || isAlwaysTensile()) && getHeight() > 0 && (fixedSelection < FIXED_NONE_BOUNDRY) &&
                 orientation != HORIZONTAL;
@@ -386,6 +392,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isScrollableX() {
         return (getScrollDimension().getWidth() > getWidth()) && (fixedSelection < FIXED_NONE_BOUNDRY) &&
                 orientation == HORIZONTAL;
@@ -479,6 +486,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Rectangle getVisibleBounds() {
         Rectangle pos = new Rectangle();
         Dimension rendererSize = getElementSize(false, true);
@@ -493,6 +501,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected int getDragRegionStatus(int x, int y) {
         if (!isScrollable()) {
             return DRAG_REGION_NOT_DRAGGABLE;
@@ -596,6 +605,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setShouldCalcPreferredSize(boolean shouldCalcPreferredSize) {
         super.setShouldCalcPreferredSize(shouldCalcPreferredSize);
         elemSize = null;
@@ -815,6 +825,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void refreshTheme(boolean merge) {
         ListCellRenderer r = getRenderer();
         if (renderingPrototype != null) {
@@ -855,6 +866,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setHandlesInput(boolean b) {
         Form f = getComponentForm();
         if (f != null) {
@@ -873,6 +885,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void fireClicked() {
         boolean h = handlesInput();
         setHandlesInput(!h);
@@ -885,6 +898,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected boolean isSelectableInteraction() {
         return true;
     }
@@ -892,6 +906,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyReleased(int keyCode) {
         // other events are in keyReleased to prevent the next event from reaching the next form
         int gameAction = Display.getInstance().getGameAction(keyCode);
@@ -921,6 +936,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyPressed(int keyCode) {
         // scrolling events are in keyPressed to provide immediate feedback
         if (!handlesInput()) {
@@ -1216,6 +1232,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g) {
         getUIManager().getLookAndFeel().drawList(g, this);
 
@@ -1508,6 +1525,7 @@ public class List<T> extends Component implements ActionSource {
      *
      * @param l the action listener to be added
      */
+    @Override
     public void addActionListener(ActionListener l) {
         dispatcher.addListener(l);
     }
@@ -1536,6 +1554,7 @@ public class List<T> extends Component implements ActionSource {
      *
      * @param l the action listener to be removed
      */
+    @Override
     public void removeActionListener(ActionListener l) {
         dispatcher.removeListener(l);
     }
@@ -1543,6 +1562,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void fireActionEvent() {
         fireActionEvent(new ActionEvent(eventSource, ActionEvent.Type.Other));
     }
@@ -1604,6 +1624,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     void focusGainedInternal() {
         super.focusGainedInternal();
         if (inputOnFocus) {
@@ -1614,6 +1635,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     void focusLostInternal() {
         super.focusLostInternal();
     }
@@ -1747,6 +1769,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void longPointerPress(int x, int y) {
         if (!isEnabled()) {
             return;
@@ -1763,6 +1786,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerPressed(int x, int y) {
         if (!isEnabled()) {
             return;
@@ -1801,12 +1825,14 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerHover(int[] x, int[] y) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerDragged(int x, int y) {
         pointerDraggedImpl(x, y);
     }
@@ -1859,6 +1885,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Rectangle getSelectedRect() {
         Style style = getStyle();
         Rectangle pos = new Rectangle();
@@ -1961,6 +1988,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerHoverReleased(int[] x, int[] y) {
     }
 
@@ -2033,6 +2061,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerReleased(int x, int y) {
         pointerReleasedImpl(x, y, false, false);
     }
@@ -2040,6 +2069,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Dimension calcPreferredSize() {
         if (shouldShowHint()) {
             Label l = getHintLabelImpl();
@@ -2092,6 +2122,7 @@ public class List<T> extends Component implements ActionSource {
         this.fixedSelection = fixedSelection;
     }
 
+    @Override
     void deregisterAnimatedInternal() {
         if (animationPosition == 0) {
             super.deregisterAnimatedInternal();
@@ -2101,6 +2132,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean animate() {
         // parent is performing the animation we shouldn't do anything in this case
         // this is the scrolling animation which we don't want to interfear with
@@ -2200,6 +2232,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected boolean isTactileTouch(int x, int y) {
         // provide touch feedback only when pressing an entry in the list and not for the entire list
         if (isTactileTouch()) {
@@ -2223,6 +2256,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected int getGridPosY() {
         int gridSize = getElementSize(false, true).getHeight() + itemGap;
         int scroll = getScrollY();
@@ -2244,6 +2278,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected int getGridPosX() {
         int gridSize = getElementSize(false, true).getWidth() + itemGap;
         int scroll = getScrollX();
@@ -2253,6 +2288,7 @@ public class List<T> extends Component implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected String paramString() {
         String elemSizeStr = "element size = ";
         if (elemSize != null) {
@@ -2270,6 +2306,7 @@ public class List<T> extends Component implements ActionSource {
      *
      * @return the hint text or null
      */
+    @Override
     public String getHint() {
         return super.getHint();
     }
@@ -2289,6 +2326,7 @@ public class List<T> extends Component implements ActionSource {
      *
      * @return the hint icon
      */
+    @Override
     public Image getHintIcon() {
         return super.getHintIcon();
     }
@@ -2310,28 +2348,34 @@ public class List<T> extends Component implements ActionSource {
      * @param hint the hint text to display
      * @param icon the hint icon to display
      */
+    @Override
     public void setHint(String hint, Image icon) {
         super.setHint(hint, icon);
     }
 
+    @Override
     Label getHintLabelImpl() {
         return hintLabel;
     }
 
+    @Override
     void setHintLabelImpl(Label hintLabel) {
         this.hintLabel = hintLabel;
     }
 
+    @Override
     boolean shouldShowHint() {
         return getModel().getSize() == 0;
     }
 
     private class Listeners implements DataChangedListener, SelectionListener {
 
+        @Override
         public void dataChanged(int status, int index) {
             List.this.dataChanged(status, index);
         }
 
+        @Override
         public void selectionChanged(int oldSelected, int newSelected) {
             repaint();
             List.this.listSelectionChanged(oldSelected, newSelected);

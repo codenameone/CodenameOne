@@ -164,6 +164,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     private int pressX, pressY;
     private int deltaX, deltaY; //pressX - currentdragX
     private final ActionListener pointerPressed = new ActionListener() {
+        @Override
         public void actionPerformed(ActionEvent evt) {
             Form f = getComponentForm();
             if (f != null) {
@@ -178,6 +179,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         }
     };
     private final ActionListener pointerDragged = new ActionListener() {
+        @Override
         public void actionPerformed(ActionEvent evt) {
 
             dragged = true;
@@ -200,6 +202,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
             return System.currentTimeMillis() - dragStartTime < 60 && Math.abs(deltaX) < tapThreshold;
         }
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
             if (animationLock) {
                 return;
@@ -596,6 +599,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Dimension calcPreferredSize() {
         return new Dimension(
                 getStyle().getHorizontalPadding() + Math.max(getCurrentThumbImage().getWidth(), Math.max(getCurrentTrackOnImage().getWidth(), getCurrentTrackOffImage().getWidth())),
@@ -606,6 +610,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void resetFocusable() {
         setFocusable(true);
     }
@@ -655,6 +660,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     /**
      * {@inheritDoc}
      */
+    @Override
     protected boolean isStickyDrag() {
         return true;
     }
@@ -665,6 +671,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
      *
      * @param l implementation of the action listener interface
      */
+    @Override
     public void addActionListener(ActionListener l) {
         dispatcher.addListener(l);
     }
@@ -674,6 +681,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
      *
      * @param l implementation of the action listener interface
      */
+    @Override
     public void removeActionListener(ActionListener l) {
         dispatcher.removeListener(l);
     }
@@ -706,6 +714,8 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
         return dispatcher.getListenerCollection();
     }
 
+    // PMD stupidly thinks this method overrides a package private method
+    @SuppressWarnings("PMD.MissingOverride")
     void fireActionEvent() {
         dispatcher.fireActionEvent(new ActionEvent(this, ActionEvent.Type.PointerPressed));
         Display d = Display.getInstance();
@@ -721,6 +731,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g) {
 
         Image cthumbImage = getCurrentThumbImage();
@@ -847,6 +858,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void initComponent() {
         super.initComponent();
         addPointerPressedListener(pointerPressed);
@@ -857,6 +869,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void deinitialize() {
         removePointerPressedListener(pointerPressed);
         removePointerDraggedListener(pointerDragged);
@@ -871,6 +884,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
             current.start();
             deltaX = deltaStart;
             getComponentForm().registerAnimated(new Animation() {
+                @Override
                 public boolean animate() {
                     deltaX = current.getValue();
                     dragged = true;
@@ -888,6 +902,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
                     return false;
                 }
 
+                @Override
                 public void paint(Graphics g) {
                 }
             });
@@ -972,6 +987,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{
                 "value",};
@@ -983,6 +999,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
      *
      * @return the component state or null for undefined state.
      */
+    @Override
     public Object getComponentState() {
         if (value) {
             return Boolean.TRUE;
@@ -996,6 +1013,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
      *
      * @param state the non-null state
      */
+    @Override
     public void setComponentState(Object state) {
         System.out.println("Setting component state " + state);
         value = ((Boolean) state).booleanValue();
@@ -1004,6 +1022,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{
                 Boolean.class,};
@@ -1012,6 +1031,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if ("value".equals(name)) {
             if (value) {
@@ -1025,6 +1045,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if ("value".equals(name)) {
             setValue(((Boolean) value).booleanValue());

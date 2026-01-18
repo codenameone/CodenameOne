@@ -216,6 +216,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void initLaf(UIManager uim) {
         if (uim == getUIManager() && isInitialized()) {
             return;
@@ -236,6 +237,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public UIManager getUIManager() {
         if (uiManager != null) {
             return uiManager;
@@ -273,6 +275,7 @@ public class Container extends Component implements Iterable<Component> {
         newParent.components.add(this);
 
         final Runnable r = new Runnable() {
+            @Override
             public void run() {
                 if (parentLayout != null) {
                     parentLayout.removeLayoutComponent(Container.this);
@@ -331,6 +334,7 @@ public class Container extends Component implements Iterable<Component> {
      * @see Component#paintShadows(Graphics, int, int)
      * @since 8.0
      */
+    @Override
     void setSurface(boolean surface) {
         if (surface != this.surface) {
             this.surface = surface;
@@ -446,6 +450,7 @@ public class Container extends Component implements Iterable<Component> {
         return add(constraint, new Label(img));
     }
 
+    @Override
     void focusGainedInternal() {
         super.focusGainedInternal();
         if (leadComponent != null) {
@@ -453,6 +458,7 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
+    @Override
     void focusLostInternal() {
         super.focusLostInternal();
         if (leadComponent != null) {
@@ -465,6 +471,7 @@ public class Container extends Component implements Iterable<Component> {
      *
      * @return the lead component
      */
+    @Override
     public Component getLeadComponent() {
 
         if (leadComponent != null) {
@@ -540,6 +547,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyPressed(int k) {
         if (leadComponent != null) {
             leadComponent.keyPressed(k);
@@ -550,6 +558,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyReleased(int k) {
         if (leadComponent != null) {
             leadComponent.keyReleased(k);
@@ -678,6 +687,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setShouldCalcPreferredSize(boolean shouldCalcPreferredSize) {
         // minor optimization preventing repeated invokations to setShouldCalcPreferredSize
         if (shouldCalcPreferredSize && this.shouldLayout && this.shouldCalcPreferredSize && !isInitialized()) {
@@ -1139,6 +1149,7 @@ public class Container extends Component implements Iterable<Component> {
         return (c == this) || isParentOf(c);
     }
 
+    @Override
     void onParentPositionChange() {
         int cmpCount = getComponentCount();
         for (int iter = 0; iter < cmpCount; iter++) {
@@ -1233,6 +1244,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     void initComponentImpl() {
         if (!isInitialized()) {
             super.initComponentImpl();
@@ -1254,6 +1266,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isEnabled() {
         // Normally a container shouldn't be a lead component but this happens
         // in the GUI builder and this block can cause an infinite recursion
@@ -1272,6 +1285,7 @@ public class Container extends Component implements Iterable<Component> {
      *
      * @param enabled
      */
+    @Override
     public void setEnabled(boolean enabled) {
         super.setEnabled(enabled);
         int count = getComponentCount();
@@ -1384,6 +1398,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * remove this component and it's children from the painting queue
      */
+    @Override
     protected void cancelRepaints() {
         super.cancelRepaints();
         for (int i = 0; i < getComponentCount(); i++) {
@@ -1395,6 +1410,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * Cleansup the initialization flags in the hierachy
      */
+    @Override
     void deinitializeImpl() {
         super.deinitializeImpl();
         int componentCount = components.size();
@@ -1601,6 +1617,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void clearClientProperties() {
         super.clearClientProperties();
         int c = getComponentCount();
@@ -2034,6 +2051,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g) {
         // Q: Why two flags for enableLayoutOnPaint?
         // A: enableLayoutOnPaint is managed internally, and it enabled/renabled
@@ -2119,6 +2137,7 @@ public class Container extends Component implements Iterable<Component> {
     protected void paintGlass(Graphics g) {
     }
 
+    @Override
     void paintGlassImpl(Graphics g) {
         super.paintGlassImpl(g);
         paintGlass(g);
@@ -2998,6 +3017,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerPressed(int x, int y) {
         Component leadParent = LeadUtil.leadParentImpl(this);
         leadParent.clearDrag();
@@ -3024,6 +3044,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Dimension calcPreferredSize() {
         calcPreferredSizeDepth++;
         boolean restoreBounds = false;
@@ -3064,6 +3085,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected String paramString() {
         String className = layout.getClass().getName();
         String layoutStr = className.substring(className.lastIndexOf('.') + 1);
@@ -3096,6 +3118,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
         int componentCount = components.size();
@@ -3105,10 +3128,12 @@ public class Container extends Component implements Iterable<Component> {
         }
     }
 
+    @Override
     boolean scrollableXFlag() {
         return scrollableX;
     }
 
+    @Override
     boolean scrollableYFlag() {
         return scrollableY;
     }
@@ -3116,6 +3141,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isScrollableX() {
         return scrollableX && (getScrollDimension().getWidth() + getStyle().getHorizontalPadding() > getWidth());
     }
@@ -3136,6 +3162,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isScrollableY() {
         Form f = getComponentForm();
         int v = 0;
@@ -3161,6 +3188,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getSideGap() {
         // isScrollableY() in the base method is very expensive since it triggers getScrollDimension before the layout is complete!
         if (scrollSize == null) {
@@ -3176,6 +3204,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getBottomGap() {
         // isScrollableY() in the base method is very expensive since it triggers getScrollDimension before the layout is complete!
         if (scrollableX && isScrollVisible()) {
@@ -3199,6 +3228,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setCellRenderer(boolean cellRenderer) {
         if (isCellRenderer() != cellRenderer) {
             super.setCellRenderer(cellRenderer);
@@ -3277,6 +3307,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void dragInitiated() {
         super.dragInitiated();
         if (leadComponent != null) {
@@ -3287,6 +3318,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void fireClicked() {
         if (leadComponent != null) {
             leadComponent.fireClicked();
@@ -3298,6 +3330,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected boolean isSelectableInteraction() {
         if (leadComponent != null) {
             return leadComponent.isSelectableInteraction();
@@ -3309,6 +3342,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * This is a callback method for the peer component class
      */
+    @Override
     void setLightweightMode(boolean l) {
         int size = getComponentCount();
         for (int iter = 0; iter < size; iter++) {
@@ -3319,6 +3353,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected int getGridPosY() {
         int scroll = getScrollY();
         int size = getComponentCount();
@@ -3347,6 +3382,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paintComponentBackground(Graphics g) {
         if (isFlatten()) {
             super.paintBackgrounds(g);
@@ -3371,6 +3407,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected int getGridPosX() {
         int scroll = getScrollX();
         int size = getComponentCount();
@@ -3590,6 +3627,7 @@ public class Container extends Component implements Iterable<Component> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void drop(Component dragged, int x, int y) {
         int i = getComponentIndex(dragged);
         if (i > -1) {
@@ -4042,6 +4080,7 @@ public class Container extends Component implements Iterable<Component> {
      *
      * @return the iterator of the components
      */
+    @Override
     public Iterator<Component> iterator() {
         return components.iterator();
     }
@@ -4184,10 +4223,12 @@ public class Container extends Component implements Iterable<Component> {
             this.parent = thisContainer.getComponentForm();
         }
 
+        @Override
         public boolean isInProgress() {
             return inProgress;
         }
 
+        @Override
         public void updateState() {
             if (destroyed) {
                 return;

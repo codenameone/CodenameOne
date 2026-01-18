@@ -86,12 +86,15 @@ public class VServAds extends FullScreenAdService {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected ConnectionRequest createAdRequest() {
         ConnectionRequest con = new ConnectionRequest() {
+            @Override
             protected void handleErrorResponseCode(int code, String message) {
                 failed = true;
             }
 
+            @Override
             protected void handleException(Exception err) {
                 failed = true;
                 Log.e(err);
@@ -108,6 +111,7 @@ public class VServAds extends FullScreenAdService {
                 return (String) v;
             }
 
+            @Override
             protected void readResponse(InputStream input) throws IOException {
                 JSONParser parser = new JSONParser();
                 Hashtable h = parser.parse(new InputStreamReader(input, "UTF-8"));
@@ -158,6 +162,7 @@ public class VServAds extends FullScreenAdService {
         return con;
     }
 
+    @Override
     protected boolean hasPendingAd() {
         return imageURL != null;
     }
@@ -165,6 +170,7 @@ public class VServAds extends FullScreenAdService {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void clearPendingAd() {
         imageURL = null;
         renderNotify = null;
@@ -174,6 +180,7 @@ public class VServAds extends FullScreenAdService {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Component getPendingAd() {
         if (imageURL == null) {
             return null;
@@ -188,6 +195,7 @@ public class VServAds extends FullScreenAdService {
         if ("image".equalsIgnoreCase(contentType)) {
             Button adComponent = new Button() {
 
+                @Override
                 public void setIcon(Image icon) {
                     if (icon != null && isScaleMode()) {
                         icon = icon.scaledWidth(Display.getInstance().getDisplayWidth());
@@ -212,8 +220,10 @@ public class VServAds extends FullScreenAdService {
             if (wb.getInternal() instanceof BrowserComponent) {
                 BrowserComponent bc = (BrowserComponent) wb.getInternal();
                 bc.setBrowserNavigationCallback(new BrowserNavigationCallback() {
+                    @Override
                     public boolean shouldNavigate(final String url) {
                         unlock(new ActionListener() {
+                            @Override
                             public void actionPerformed(ActionEvent evt) {
                                 Display.getInstance().execute(url);
                             }
@@ -230,6 +240,7 @@ public class VServAds extends FullScreenAdService {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected String getAdDestination() {
         if (actionNotify != null && actionNotify.length() > 0) {
             ConnectionRequest c = new ConnectionRequest();
@@ -244,6 +255,7 @@ public class VServAds extends FullScreenAdService {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected boolean failed() {
         return failed;
     }
@@ -322,6 +334,7 @@ public class VServAds extends FullScreenAdService {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isAllowSkipping() {
         return true;
     }

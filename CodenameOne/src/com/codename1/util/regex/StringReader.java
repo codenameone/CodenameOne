@@ -32,6 +32,7 @@ public class StringReader extends Reader {
         this.str = str;
     }
 
+    @Override
     public int read() {
         if (pointer >= str.length()) {
             return -1;
@@ -39,6 +40,7 @@ public class StringReader extends Reader {
         return str.charAt(pointer++);
     }
 
+    @Override
     public int read(char[] cbuf, int off, int len) {
         if (pointer >= str.length()) {
             return -1;
@@ -51,6 +53,7 @@ public class StringReader extends Reader {
         return read;
     }
 
+    @Override
     public void close() {
     }
 
@@ -67,6 +70,7 @@ public class StringReader extends Reader {
         return result;
     }
 
+    @Override
     public boolean ready() {
         return pointer < str.length();
     }

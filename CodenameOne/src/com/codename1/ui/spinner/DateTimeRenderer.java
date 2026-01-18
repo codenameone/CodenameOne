@@ -106,6 +106,7 @@ final class DateTimeRenderer extends SpinnerRenderer<Object> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
         if (value instanceof String) {
             // rendering prototype

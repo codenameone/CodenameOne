@@ -178,6 +178,7 @@ public class GZIPHeader {
         }
     }
 
+    @Override
     public Object clone() {
         GZIPHeader gheader = new GZIPHeader();
         byte[] tmp;

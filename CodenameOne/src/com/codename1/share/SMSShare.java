@@ -71,6 +71,7 @@ public class SMSShare extends ShareService {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void share(final String toShare) {
         final Form currentForm = Display.getInstance().getCurrent();
         final Form contactsForm = new Form("Contacts");
@@ -80,10 +81,12 @@ public class SMSShare extends ShareService {
         contactsForm.show();
         Display.getInstance().startThread(new Runnable() {
 
+            @Override
             public void run() {
                 String[] ids = ContactsManager.getAllContacts();
                 if (ids == null || ids.length == 0) {
                     Display.getInstance().callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             Dialog.show("Failed to Share", "No Contacts Found", "Ok", null);
                             currentForm.showBack();
@@ -96,10 +99,12 @@ public class SMSShare extends ShareService {
                 contacts.setRenderer(createListRenderer());
                 Display.getInstance().callSerially(new Runnable() {
 
+                    @Override
                     public void run() {
 
                         contacts.addActionListener(new ActionListener() {
 
+                            @Override
                             public void actionPerformed(ActionEvent evt) {
                                 final ShareForm[] f = new ShareForm[1];
                                 final Hashtable contact = (Hashtable) contacts.getSelectedItem();
@@ -107,6 +112,7 @@ public class SMSShare extends ShareService {
                                 f[0] = new ShareForm(contactsForm, "Send SMS", (String) contact.get("phone"), toShare,
                                         new ActionListener() {
 
+                                            @Override
                                             public void actionPerformed(ActionEvent evt) {
                                                 try {
                                                     Display.getInstance().sendSMS(f[0].getTo(), f[0].getMessage());
@@ -124,6 +130,7 @@ public class SMSShare extends ShareService {
                         contactsForm.addComponent(BorderLayout.CENTER, contacts);
                         Command back = new Command("Back") {
 
+                            @Override
                             public void actionPerformed(ActionEvent evt) {
                                 currentForm.showBack();
                             }
@@ -156,6 +163,7 @@ public class SMSShare extends ShareService {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean canShareImage() {
         return false;
     }

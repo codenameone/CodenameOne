@@ -49,6 +49,7 @@ public final class CharacterArrayCharacterIterator implements CharacterIterator 
     /**
      * @return a substring
      */
+    @Override
     public String substring(int beginIndex, int endIndex) {
         if (endIndex > len) {
             throw new IndexOutOfBoundsException("endIndex=" + endIndex
@@ -64,6 +65,7 @@ public final class CharacterArrayCharacterIterator implements CharacterIterator 
     /**
      * @return a substring
      */
+    @Override
     public String substring(int beginIndex) {
         return substring(beginIndex, len);
     }
@@ -71,6 +73,7 @@ public final class CharacterArrayCharacterIterator implements CharacterIterator 
     /**
      * @return a character at the specified position.
      */
+    @Override
     public char charAt(int pos) {
         return src[off + pos];
     }
@@ -78,6 +81,7 @@ public final class CharacterArrayCharacterIterator implements CharacterIterator 
     /**
      * @return <tt>true</tt> iff if the specified index is after the end of the character stream
      */
+    @Override
     public boolean isEnd(int pos) {
         return (pos >= len);
     }

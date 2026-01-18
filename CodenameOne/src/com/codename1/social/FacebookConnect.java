@@ -108,6 +108,7 @@ public class FacebookConnect extends Login {
     /**
      * Logs out the current user from facebook
      */
+    @Override
     public void doLogout() {
         super.doLogout();
         if (!isNativeLoginSupported()) {
@@ -120,6 +121,7 @@ public class FacebookConnect extends Login {
      *
      * @return the token
      */
+    @Override
     public AccessToken getAccessToken() {
         AccessToken t = super.getAccessToken();
         if (t != null) {

@@ -23,6 +23,7 @@ public class RangeStackedBarChart extends RangeBarChart {
         super(Type.STACKED);
     }
 
+    @Override
     public String getChartType() {
         return TYPE;
     }

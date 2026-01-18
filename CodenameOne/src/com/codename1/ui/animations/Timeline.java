@@ -81,6 +81,7 @@ public final class Timeline extends Image implements Animation, Painter {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void lock() {
         if (animations != null) {
             int alen = animations.length;
@@ -93,6 +94,7 @@ public final class Timeline extends Image implements Animation, Painter {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void unlock() {
         if (animations != null) {
             int alen = animations.length;
@@ -105,6 +107,7 @@ public final class Timeline extends Image implements Animation, Painter {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int[] getRGB() {
         Image i = Image.createImage(getWidth(), getHeight());
         paint(i.getGraphics(), new Rectangle(0, 0, getWidth(), getHeight()));
@@ -114,6 +117,7 @@ public final class Timeline extends Image implements Animation, Painter {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int[] getRGBCached() {
         return getRGB();
     }
@@ -156,6 +160,7 @@ public final class Timeline extends Image implements Animation, Painter {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isAnimation() {
         return true;
     }
@@ -163,6 +168,7 @@ public final class Timeline extends Image implements Animation, Painter {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean animate() {
         if (!pause) {
             if (currentTime < 0) {
@@ -191,6 +197,7 @@ public final class Timeline extends Image implements Animation, Painter {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g) {
         paint(g, null);
     }
@@ -198,6 +205,7 @@ public final class Timeline extends Image implements Animation, Painter {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g, Rectangle rect) {
         float scaleX = 1;
         float scaleY = 1;
@@ -249,6 +257,7 @@ public final class Timeline extends Image implements Animation, Painter {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
         g.translate(x, y);
         if (scaledTo != null) {
@@ -264,6 +273,7 @@ public final class Timeline extends Image implements Animation, Painter {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y, int w, int h) {
         g.translate(x, y);
         float scaleX = ((float) w) / ((float) size.getWidth());
@@ -275,6 +285,7 @@ public final class Timeline extends Image implements Animation, Painter {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getWidth() {
         if (scaledTo != null) {
             return scaledTo.getWidth();
@@ -285,6 +296,7 @@ public final class Timeline extends Image implements Animation, Painter {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getHeight() {
         if (scaledTo != null) {
             return scaledTo.getHeight();
@@ -295,6 +307,7 @@ public final class Timeline extends Image implements Animation, Painter {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Image scaled(int width, int height) {
         Timeline t = new Timeline();
         t.animationDelay = animationDelay;

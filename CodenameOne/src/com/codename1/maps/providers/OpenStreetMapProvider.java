@@ -39,6 +39,7 @@ public class OpenStreetMapProvider extends TiledProvider {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String attribution() {
         return "(c) OpenStreetMap (and) contributors, CC-BY-SA";
     }
@@ -46,6 +47,7 @@ public class OpenStreetMapProvider extends TiledProvider {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int maxZoomLevel() {
         return 18;
     }

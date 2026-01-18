@@ -57,6 +57,7 @@ public class ProxyHttpTile extends Tile {
 
         ImageDownloadService.createImageToStorage(url, new ActionListener() {
 
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 NetworkEvent ne = (NetworkEvent) evt;
 
@@ -75,6 +76,7 @@ public class ProxyHttpTile extends Tile {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean paint(Graphics g) {
         if (_tile == null) {
             return false;

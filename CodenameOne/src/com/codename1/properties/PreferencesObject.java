@@ -154,6 +154,7 @@ public final class PreferencesObject {
             this.pb = pb;
         }
 
+        @Override
         public void propertyChanged(PropertyBase p) {
             if (type == String.class || type == null) {
                 Preferences.set(n, (String) pb.get());

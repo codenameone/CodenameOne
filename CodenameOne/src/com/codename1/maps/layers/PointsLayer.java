@@ -79,6 +79,7 @@ public class PointsLayer extends AbstractLayer implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g, Tile tile) {
         int length = points.size();
         g.setColor(0);
@@ -130,6 +131,7 @@ public class PointsLayer extends AbstractLayer implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public BoundingBox boundingBox() {
         return BoundingBox.create(points);
     }
@@ -140,6 +142,7 @@ public class PointsLayer extends AbstractLayer implements ActionSource {
      *
      * @param l implementation of the action listener interface
      */
+    @Override
     public void addActionListener(ActionListener l) {
         dispatcher.addListener(l);
     }
@@ -149,6 +152,7 @@ public class PointsLayer extends AbstractLayer implements ActionSource {
      *
      * @param l implementation of the action listener interface
      */
+    @Override
     public void removeActionListener(ActionListener l) {
         dispatcher.removeListener(l);
     }

@@ -742,6 +742,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
      *
      * @return if pan is enabled
      */
+    @Override
     public boolean isPanEnabled() {
         return isPanXEnabled() || isPanYEnabled();
     }
@@ -789,6 +790,7 @@ public class XYMultipleSeriesRenderer extends DefaultRenderer {
      *
      * @return if zoom is enabled
      */
+    @Override
     public boolean isZoomEnabled() {
         return isZoomXEnabled() || isZoomYEnabled();
     }

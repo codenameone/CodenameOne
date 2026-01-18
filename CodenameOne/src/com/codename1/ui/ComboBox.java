@@ -213,6 +213,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setUIID(String uiid) {
         super.setUIID(uiid);
         ListCellRenderer r = getRenderer();
@@ -234,6 +235,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getBaseline(int width, int height) {
         Component selected;
         if (getRenderingPrototype() != null) {
@@ -249,12 +251,14 @@ public class ComboBox<T> extends List<T> implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void laidOut() {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public Rectangle getSelectedRect() {
         // the implemenation from list doesn't make sense here, restore the component implementation
         return new Rectangle(getAbsoluteX(), getAbsoluteY(), getBounds().getSize());
@@ -263,6 +267,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Rectangle getVisibleBounds() {
         return getBounds();
     }
@@ -270,6 +275,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setSelectedIndex(int selection) {
         super.setSelectedIndex(selection, false);
     }
@@ -277,6 +283,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setSelectedIndex(int selection, boolean scroll) {
         super.setSelectedIndex(selection, false);
     }
@@ -284,12 +291,14 @@ public class ComboBox<T> extends List<T> implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerHover(int[] x, int[] y) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerHoverReleased(int[] x, int[] y) {
     }
 
@@ -302,6 +311,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
     protected Dialog createPopupDialog(List<T> l) {
         Dialog popupDialog = new Dialog(getUIID() + "Popup", getUIID() + "PopupTitle") {
 
+            @Override
             void sizeChangedInternal(int w, int h) {
                 //if only height changed it's the virtual keyboard, no need to
                 //resize the popup just resize the parent form
@@ -456,6 +466,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void fireClicked() {
         List<T> l = createPopupList();
         l.dispatcher = dispatcher;
@@ -508,6 +519,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyReleased(int keyCode) {
         // other events are in keyReleased to prevent the next event from reaching the next form
         int gameAction = Display.getInstance().getGameAction(keyCode);
@@ -521,24 +533,28 @@ public class ComboBox<T> extends List<T> implements ActionSource {
     /**
      * Prevent the combo box from losing selection in some use cases
      */
+    @Override
     void selectElement(int selectedIndex) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerPressed(int x, int y) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerDragged(int x, int y) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerReleased(int x, int y) {
         if (isEnabled() && !Display.impl.isScrollWheeling()) {
             fireClicked();
@@ -548,6 +564,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g) {
         getUIManager().getLookAndFeel().drawComboBox(g, this);
     }
@@ -555,6 +572,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Dimension calcPreferredSize() {
         return getUIManager().getLookAndFeel().getComboBoxPreferredSize(this);
     }
@@ -562,6 +580,7 @@ public class ComboBox<T> extends List<T> implements ActionSource {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getOrientation() {
         return COMBO;
     }

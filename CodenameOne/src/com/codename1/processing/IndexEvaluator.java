@@ -170,6 +170,7 @@ class IndexEvaluator extends AbstractEvaluator {
     /* (non-Javadoc)
      * @see com.codename1.path.impl.AbstractEvaluator#evaluateSingle(java.util.List, java.lang.String)
      */
+    @Override
     protected Object evaluateSingle(List elements, String expr) {
         if (isNumeric(expr)) {
             int dim = Integer.parseInt(expr);
@@ -193,6 +194,7 @@ class IndexEvaluator extends AbstractEvaluator {
     /* (non-Javadoc)
      * @see com.codename1.path.impl.AbstractEvaluator#evaluateLeftLessRight(java.util.List, java.lang.String, java.lang.String)
      */
+    @Override
     protected Object evaluateLeftLessRight(List elements, String lvalue,
                                            String rvalue) {
         if (FUNC_POSITION.equals(lvalue)) {
@@ -204,6 +206,7 @@ class IndexEvaluator extends AbstractEvaluator {
     /* (non-Javadoc)
      * @see com.codename1.path.impl.AbstractEvaluator#evaluateLeftGreaterRight(java.util.List, java.lang.String, java.lang.String)
      */
+    @Override
     protected Object evaluateLeftGreaterRight(List elements, String lvalue,
                                               String rvalue) {
         if (FUNC_POSITION.equals(lvalue)) {

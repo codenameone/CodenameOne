@@ -72,6 +72,7 @@ public final class Socket {
             throw new IllegalArgumentException("Port should be provided separately");
         }
         Display.getInstance().startThread(new Runnable() {
+            @Override
             public void run() {
                 Object connection = Util.getImplementation().connectSocket(host, port, sc.getConnectTimeout());
                 if (connection != null) {
@@ -104,6 +105,7 @@ public final class Socket {
         }
         final Object[] connection = new Object[1];
         Display.getInstance().startThread(new Runnable() {
+            @Override
             public void run() {
                 connection[0] = Util.getImplementation().connectSocket(host, port, sc.getConnectTimeout());
                 if (connection[0] != null) {
@@ -123,6 +125,7 @@ public final class Socket {
             }
         }, "Connection to " + host).start();
         return new Close() {
+            @Override
             public void close() throws IOException {
                 while (connection[0] == null) {
                     try {
@@ -154,6 +157,7 @@ public final class Socket {
         class Listener implements StopListening, Runnable {
             private boolean stopped;
 
+            @Override
             public void run() {
                 try {
                     while (!stopped) {
@@ -162,6 +166,7 @@ public final class Socket {
                         if (connection != null) {
                             sc.setConnected(true);
                             Display.getInstance().startThread(new Runnable() {
+                                @Override
                                 public void run() {
                                     sc.input = new SocketInputStream(connection, sc);
                                     sc.output = new SocketOutputStream(connection, sc);
@@ -185,6 +190,7 @@ public final class Socket {
                 }
             }
 
+            @Override
             public void stop() {
                 stopped = true;
             }
@@ -358,6 +364,8 @@ public final class Socket {
             return b[0] & 0xff;
         }
 
+        // PMD thinks we need to override finalize. Ugh.
+        @SuppressWarnings("PMD.MissingOverride")
         protected void finalize() throws Throwable {
             try {
                 close();
@@ -421,6 +429,8 @@ public final class Socket {
             handleSocketError();
         }
 
+        // PMD thinks we need to override finalize. Ugh.
+        @SuppressWarnings("PMD.MissingOverride")
         protected void finalize() throws Throwable {
             try {
                 close();

@@ -227,6 +227,7 @@ class IndexedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Image subImage(int x, int y, int width, int height, boolean processAlpha) {
         byte[] arr = new byte[width * height];
         int alen = arr.length;
@@ -243,6 +244,7 @@ class IndexedImage extends Image {
     /**
      * Unsupported in the current version, this method will be implemented in a future release
      */
+    @Override
     public Image rotate(int degrees) {
         throw new RuntimeException("The rotate method is not supported by indexed images at the moment");
     }
@@ -250,6 +252,7 @@ class IndexedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Image modifyAlpha(byte alpha) {
         int[] newPalette = new int[palette.length];
         System.arraycopy(palette, 0, newPalette, 0, palette.length);
@@ -266,6 +269,7 @@ class IndexedImage extends Image {
     /**
      * This method is unsupported in this image type
      */
+    @Override
     public Graphics getGraphics() {
         throw new RuntimeException("Indexed image objects are immutable");
     }
@@ -273,6 +277,7 @@ class IndexedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     void getRGB(int[] rgbData,
                 int offset,
                 int x,
@@ -294,6 +299,7 @@ class IndexedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void drawImage(Graphics g, Object nativeGraphics, int x, int y) {
         synchronized (LINE_CACHE_LOCK) {
             if (lineCache == null || lineCache.length < width * 3) {
@@ -330,6 +336,7 @@ class IndexedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getWidth() {
         return width;
     }
@@ -337,6 +344,7 @@ class IndexedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getHeight() {
         return height;
     }
@@ -344,6 +352,7 @@ class IndexedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void scale(int width, int height) {
         IndexedImage p = (IndexedImage) scaled(width, height);
         this.imageDataByte = p.imageDataByte;
@@ -354,6 +363,7 @@ class IndexedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Image scaled(int width, int height) {
         int srcWidth = getWidth();
         int srcHeight = getHeight();
@@ -409,6 +419,7 @@ class IndexedImage extends Image {
     /**
      * {@inheritDoc}
      */
+    @Override
     int[] getRGBImpl() {
         int rlen = width * height;
         int[] rgb = new int[rlen];

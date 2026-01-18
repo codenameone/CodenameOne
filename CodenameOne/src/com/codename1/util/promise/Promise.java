@@ -78,9 +78,11 @@ public class Promise<T> {
     @Async.Schedule
     public Promise(ExecutorFunction executor) {
         resolve = new Functor<T, Object>() {
+            @Override
             public Object call(final T o) {
                 if (!CN.isEdt()) {
                     CN.callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             resolve.call(o);
                         }
@@ -95,9 +97,11 @@ public class Promise<T> {
             }
         };
         reject = new Functor<Throwable, Object>() {
+            @Override
             public Object call(final Throwable o) {
                 if (!CN.isEdt()) {
                     CN.callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             reject.call(o);
                         }
@@ -127,6 +131,7 @@ public class Promise<T> {
     public static Promise all(final Promise... promises) {
 
         return new Promise(new ExecutorFunction() {
+            @Override
             public void call(final Functor resolve, final Functor reject) {
                 final int[] complete = new int[1];
                 final int len = promises.length;
@@ -136,6 +141,7 @@ public class Promise<T> {
                         final int index = i;
                         final Promise p = promises[i];
                         p.then(new Functor() {
+                            @Override
                             public Object call(Object res) {
 
                                 results[index] = res;
@@ -146,6 +152,7 @@ public class Promise<T> {
                                 return null;
                             }
                         }).except(new Functor() {
+                            @Override
                             public Object call(Object error) {
                                 reject.call(error);
                                 return null;
@@ -182,6 +189,7 @@ public class Promise<T> {
      */
     public static Promise allSettled(final Promise... promises) {
         return new Promise(new ExecutorFunction() {
+            @Override
             public void call(final Functor resolve, Functor reject) {
                 final int[] complete = new int[1];
                 final int len = promises.length;
@@ -189,6 +197,7 @@ public class Promise<T> {
                     for (int i = 0; i < len; i++) {
                         Promise p = promises[i];
                         p.always(new Functor() {
+                            @Override
                             public Object call(Object res) {
                                 complete[0]++;
                                 if (complete[0] == len) {
@@ -208,6 +217,7 @@ public class Promise<T> {
 
     public static <V> Promise<V> resolve(final V value) {
         return new Promise<V>(new ExecutorFunction() {
+            @Override
             public void call(Functor resolutionFunc, Functor rejectionFunc) {
                 resolutionFunc.call(value);
             }
@@ -216,6 +226,7 @@ public class Promise<T> {
 
     public static Promise reject(final Throwable err) {
         return new Promise(new ExecutorFunction() {
+            @Override
             public void call(Functor resolve, Functor reject) {
                 reject(err);
             }
@@ -224,8 +235,10 @@ public class Promise<T> {
 
     public static <V> Promise<V> promisify(final AsyncResource<V> res) {
         return new Promise<V>(new ExecutorFunction() {
+            @Override
             public void call(final Functor resolutionFunc, final Functor rejectionFunc) {
                 res.onResult(new AsyncResult<V>() {
+                    @Override
                     public void onReady(V r, Throwable err) {
                         if (err != null) {
                             rejectionFunc.call(err);
@@ -251,6 +264,7 @@ public class Promise<T> {
     private void processThens(final Object o, final boolean resolved) {
         if (!CN.isEdt()) {
             CN.callSerially(new Runnable() {
+                @Override
                 public void run() {
                     Promise.this.processThens(o, resolved);
                 }
@@ -298,11 +312,13 @@ public class Promise<T> {
      */
     public Promise ready(final SuccessCallback<T> resolutionFunc, final SuccessCallback<Throwable> rejectionFunc) {
         return then(resolutionFunc == null ? null : new Functor<T, Object>() {
+            @Override
             public Object call(T o) {
                 resolutionFunc.onSucess(o);
                 return null;
             }
         }, rejectionFunc == null ? null : new Functor<Throwable, Object>() {
+            @Override
             public Object call(Throwable o) {
                 rejectionFunc.onSucess(o);
                 return null;
@@ -379,6 +395,7 @@ public class Promise<T> {
     public Promise then(Functor<T, ?> resolutionFunc, Functor<Throwable, ?> rejectionFunc) {
         if (resolutionFunc == null) {
             resolutionFunc = new Functor<T, Object>() {
+                @Override
                 public Object call(T o) {
                     return o;
                 }
@@ -386,6 +403,7 @@ public class Promise<T> {
         }
         if (rejectionFunc == null) {
             rejectionFunc = new Functor<Throwable, Object>() {
+                @Override
                 public Object call(Throwable o) {
                     throw (RuntimeException) o;
                 }
@@ -462,6 +480,7 @@ public class Promise<T> {
         final Object[] out = new Object[1];
         final Throwable[] ex = new Throwable[1];
         this.onSuccess(new SuccessCallback<T>() {
+            @Override
             public void onSucess(T res) {
                 synchronized (complete) {
                     out[0] = res;
@@ -470,6 +489,7 @@ public class Promise<T> {
                 }
             }
         }).onFail(new SuccessCallback() {
+            @Override
             public void onSucess(Object res) {
                 synchronized (complete) {
                     ex[0] = (Throwable) res;
@@ -482,6 +502,7 @@ public class Promise<T> {
 
         while (!complete[0]) {
             invokeAndBlock(new Runnable() {
+                @Override
                 public void run() {
                     synchronized (complete) {
                         Util.wait(complete, 500);
@@ -498,11 +519,13 @@ public class Promise<T> {
     public AsyncResource<T> asAsyncResource() {
         final AsyncResource<T> out = new AsyncResource<T>();
         this.onSuccess(new SuccessCallback<T>() {
+            @Override
             public void onSucess(T res) {
                 out.complete(res);
             }
         });
         this.onFail(new SuccessCallback<Throwable>() {
+            @Override
             public void onSucess(Throwable err) {
                 out.error(err);
             }

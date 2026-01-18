@@ -406,6 +406,7 @@ public class Oauth2 {
                 handleURL(url, this, al, frm, backToForm, progress);
             }
 
+            @Override
             public void onStart(String url) {
             }
         };
@@ -515,6 +516,7 @@ public class Oauth2 {
                 class TokenRequest extends ConnectionRequest {
                     boolean callbackCalled;
 
+                    @Override
                     protected void readResponse(InputStream input) throws IOException {
                         byte[] tok = Util.readInputStream(input);
                         String t = StringUtil.newString(tok);
@@ -531,6 +533,7 @@ public class Oauth2 {
                         }
                     }
 
+                    @Override
                     protected void handleException(Exception err) {
                         if (backToForm != null && !callbackCalled) {
                             backToForm.showBack();
@@ -559,6 +562,7 @@ public class Oauth2 {
                         return result;
                     }
 
+                    @Override
                     protected void postResponse() {
 
                         if (backToParent && backToForm != null && !callbackCalled) {
@@ -670,6 +674,7 @@ public class Oauth2 {
             this.out = out;
         }
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
             if (out.isDone()) {
                 return;
@@ -711,6 +716,7 @@ public class Oauth2 {
             return result;
         }
 
+        @Override
         public void actionPerformed(ActionEvent ev) {
             if (Display.getInstance().getCurrent() == progress) {
                 progress.dispose();
@@ -728,6 +734,7 @@ public class Oauth2 {
             this.al = al;
         }
 
+        @Override
         public void actionPerformed(NetworkEvent evt) {
             String url = (String) evt.getSource();
             if (url.startsWith(redirectURI)) {

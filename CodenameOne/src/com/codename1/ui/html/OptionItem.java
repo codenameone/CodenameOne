@@ -47,6 +47,7 @@ class OptionItem {
         return value;
     }
 
+    @Override
     public String toString() {
         return text;
     }

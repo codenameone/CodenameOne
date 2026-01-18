@@ -113,6 +113,7 @@ public class AutoCompleteTextField extends TextField {
         popup.setUIID("AutoCompletePopup");
         setConstraint(TextArea.NON_PREDICTIVE);
         addCloseListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent e) {
                 if (popup.isVisible()) {
                     popup.setVisible(false);
@@ -312,6 +313,7 @@ public class AutoCompleteTextField extends TextField {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyPressed(int k) {
         if (popup != null && popup.getParent() != null && popup.getComponentCount() > 0) {
             int game = Display.getInstance().getGameAction(k);
@@ -326,6 +328,7 @@ public class AutoCompleteTextField extends TextField {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyReleased(int k) {
         if (popup != null && popup.getParent() != null && popup.getComponentCount() > 0) {
             int game = Display.getInstance().getGameAction(k);
@@ -401,6 +404,7 @@ public class AutoCompleteTextField extends TextField {
         l.setUIID("AutoCompleteList");
         l.addActionListener(new ActionListener() {
 
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 if (shouldShowPopup()) {
                     pickedText = (String) l.getSelectedItem();
@@ -544,6 +548,7 @@ public class AutoCompleteTextField extends TextField {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"completion"};
     }
@@ -551,6 +556,7 @@ public class AutoCompleteTextField extends TextField {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{com.codename1.impl.CodenameOneImplementation.getStringArrayClass()};
     }
@@ -558,6 +564,7 @@ public class AutoCompleteTextField extends TextField {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"String[]"};
     }
@@ -565,6 +572,7 @@ public class AutoCompleteTextField extends TextField {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if ("completion".equals(name)) {
             return getCompletion();
@@ -598,6 +606,7 @@ public class AutoCompleteTextField extends TextField {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if ("completion".equals(name)) {
             filter = new FilterProxyListModel<String>(new DefaultListModel<String>((String[]) value));
@@ -625,6 +634,7 @@ public class AutoCompleteTextField extends TextField {
     }
 
     class FormPointerPressListener implements ActionListener {
+        @Override
         public void actionPerformed(ActionEvent evt) {
             pressInBounds = false;
             final Form f = getComponentForm();
@@ -648,6 +658,7 @@ public class AutoCompleteTextField extends TextField {
 
     class FormPointerListener implements ActionListener {
 
+        @Override
         public void actionPerformed(final ActionEvent evt) {
             final Form f = getComponentForm();
             Container layered = f.getLayeredPane(AutoCompleteTextField.this.getClass(), true);
@@ -696,6 +707,7 @@ public class AutoCompleteTextField extends TextField {
                 dontCalcSize = true;
                 Display.getInstance().callSerially(new Runnable() {
 
+                    @Override
                     public void run() {
                         pointerReleased(evt.getX(), evt.getY());
                     }

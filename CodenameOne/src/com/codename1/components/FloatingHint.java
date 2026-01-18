@@ -89,10 +89,12 @@ public class FloatingHint extends Container {
             hintLabel.setVisible(false);
         }
         FocusListener fl = new FocusListener() {
+            @Override
             public void focusGained(Component cmp) {
                 focusGainedImpl();
             }
 
+            @Override
             public void focusLost(Component cmp) {
                 focusLostImpl();
             }
@@ -179,6 +181,7 @@ public class FloatingHint extends Container {
             this.tf = tf;
         }
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
             tf.startEditingAsync();
         }

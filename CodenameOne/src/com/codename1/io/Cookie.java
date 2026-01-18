@@ -162,6 +162,7 @@ public class Cookie implements Externalizable {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getVersion() {
         return 1;
     }
@@ -169,6 +170,7 @@ public class Cookie implements Externalizable {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void externalize(DataOutputStream out) throws IOException {
         out.writeUTF(name);
         if (value != null) {
@@ -189,6 +191,7 @@ public class Cookie implements Externalizable {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void internalize(int version, DataInputStream in) throws IOException {
         name = in.readUTF();
         if (in.readBoolean()) {
@@ -203,6 +206,7 @@ public class Cookie implements Externalizable {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String getObjectId() {
         return "Cookie";
     }
@@ -210,6 +214,7 @@ public class Cookie implements Externalizable {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         return "name = " + name + " value = " + value + " domain = " + domain + "expires = " + expires + " secure = " + secure + " path = " + path;
     }

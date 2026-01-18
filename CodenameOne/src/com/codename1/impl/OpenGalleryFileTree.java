@@ -28,6 +28,7 @@ class OpenGalleryFileTree extends FileTree {
         this.d = d;
     }
 
+    @Override
     protected Button createNodeComponent(final Object node, int depth) {
         if (node == null || !getModel().isLeaf(node)) {
             return super.createNodeComponent(node, depth);
@@ -40,6 +41,7 @@ class OpenGalleryFileTree extends FileTree {
         final Button b = super.createNodeComponent(node, depth);
         b.addActionListener(new ActionListener() {
 
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 response.actionPerformed(new ActionEvent(node, ActionEvent.Type.Other));
                 d.dispose();
@@ -67,6 +69,7 @@ class OpenGalleryFileTree extends FileTree {
             this.b = b;
         }
 
+        @Override
         public void run() {
             byte[] data = (byte[]) thumbs.get(node);
             if (data == null) {

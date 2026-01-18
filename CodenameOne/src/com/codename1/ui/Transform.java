@@ -522,6 +522,7 @@ public class Transform {
         inverseDirty = true;
     }
 
+    @Override
     public String toString() {
         getNativeTransform();
         return "" + nativeTransform;

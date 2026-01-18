@@ -829,6 +829,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
             ComponentAnimation anim = ComponentAnimation.compoundAnimation(animations.toArray(new ComponentAnimation[animations.size()]));
 
             mgr.addAnimation(anim, new Runnable() {
+                @Override
                 public void run() {
                     if (callback != null) {
                         callback.onSucess(ComponentSelector.this);
@@ -907,6 +908,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         if (mgr != null) {
             mgr.addAnimation(ComponentAnimation.compoundAnimation(animations1.toArray(new ComponentAnimation[animations1.size()])), new Runnable() {
 
+                @Override
                 public void run() {
                     AnimationManager mgr = null;
                     for (final Component c : animatingComponents) {
@@ -937,8 +939,10 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
                     }
                     final AnimationManager fmgr = mgr;
                     $(new Runnable() {
+                        @Override
                         public void run() {
                             fmgr.addAnimation(ComponentAnimation.compoundAnimation(animations2.toArray(new ComponentAnimation[animations2.size()])), new Runnable() {
+                                @Override
                                 public void run() {
                                     if (callback != null) {
                                         callback.onSucess(ComponentSelector.this);
@@ -1156,6 +1160,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         if (mgr != null) {
             mgr.addAnimation(ComponentAnimation.compoundAnimation(animations.toArray(new ComponentAnimation[animations.size()])), new Runnable() {
 
+                @Override
                 public void run() {
                     for (final Component c : animatingComponents) {
                         //c.setHidden(true);
@@ -1222,6 +1227,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         }
         getParent().animateUnlayout(duration, 255, new SuccessCallback<ComponentSelector>() {
 
+            @Override
             public void onSucess(ComponentSelector value) {
                 for (Component c : animatedComponents) {
                     c.setVisible(false);
@@ -1615,6 +1621,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      *
      * @return
      */
+    @Override
     public Iterator<Component> iterator() {
         return resultsImpl().iterator();
     }
@@ -1927,6 +1934,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      *
      * @return
      */
+    @Override
     public int size() {
         return resultsImpl().size();
     }
@@ -1934,6 +1942,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     /**
      * @return True if there were no results.
      */
+    @Override
     public boolean isEmpty() {
         return resultsImpl().isEmpty();
     }
@@ -1944,6 +1953,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @param o
      * @return
      */
+    @Override
     public boolean contains(Object o) {
         return resultsImpl().contains(o);
     }
@@ -1953,6 +1963,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      *
      * @return
      */
+    @Override
     public Object[] toArray() {
         return resultsImpl().toArray();
     }
@@ -1964,6 +1975,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @param a
      * @return
      */
+    @Override
     public <T> T[] toArray(T[] a) {
         return resultsImpl().toArray(a);
     }
@@ -1974,6 +1986,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @param e
      * @return True on success
      */
+    @Override
     public boolean add(Component e) {
         setDirty();
         return resultsImpl().add(e);
@@ -2077,6 +2090,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @param o
      * @return Self for chaining.
      */
+    @Override
     public boolean remove(Object o) {
         setDirty();
         return resultsImpl().remove(o);
@@ -2101,6 +2115,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @param c
      * @return
      */
+    @Override
     public boolean containsAll(Collection<?> c) {
         return resultsImpl().containsAll(c);
     }
@@ -2111,6 +2126,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @param c
      * @return
      */
+    @Override
     public boolean addAll(Collection<? extends Component> c) {
         setDirty();
         return resultsImpl().addAll(c);
@@ -2170,6 +2186,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @param c
      * @return
      */
+    @Override
     public boolean retainAll(Collection<?> c) {
         setDirty();
         return resultsImpl().retainAll(c);
@@ -2193,6 +2210,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
      * @param c
      * @return
      */
+    @Override
     public boolean removeAll(Collection<?> c) {
         setDirty();
         return resultsImpl().removeAll(c);
@@ -2213,6 +2231,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
     /**
      * Clears the result set.
      */
+    @Override
     public void clear() {
         setDirty();
         resultsImpl().clear();
@@ -3539,6 +3558,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         AnimationManager mgr = getAnimationManager();
         if (animations.size() > 0 && mgr != null) {
             mgr.addAnimation(ComponentAnimation.compoundAnimation(animations.toArray(new ComponentAnimation[animations.size()])), new Runnable() {
+                @Override
                 public void run() {
                     if (callback != null) {
                         callback.onSucess(ComponentSelector.this);
@@ -3599,6 +3619,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         AnimationManager mgr = getAnimationManager();
         if (animations.size() > 0 && mgr != null) {
             mgr.addAnimation(ComponentAnimation.compoundAnimation(animations.toArray(new ComponentAnimation[animations.size()])), new Runnable() {
+                @Override
                 public void run() {
                     if (callback != null) {
                         callback.onSucess(ComponentSelector.this);
@@ -3660,6 +3681,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         if (animations.size() > 0 && mgr != null) {
             mgr.addAnimation(ComponentAnimation.compoundAnimation(animations.toArray(new ComponentAnimation[animations.size()])), new Runnable() {
 
+                @Override
                 public void run() {
                     if (callback != null) {
                         callback.onSucess(ComponentSelector.this);
@@ -3699,6 +3721,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         if (animations.size() > 0 && mgr != null) {
             mgr.addAnimation(ComponentAnimation.compoundAnimation(animations.toArray(new ComponentAnimation[animations.size()])), new Runnable() {
 
+                @Override
                 public void run() {
                     if (callback != null) {
                         callback.onSucess(ComponentSelector.this);
@@ -3760,6 +3783,7 @@ public class ComponentSelector implements Iterable<Component>, Set<Component> {
         AnimationManager mgr = getAnimationManager();
         if (animations.size() > 0 && mgr != null) {
             mgr.addAnimation(ComponentAnimation.compoundAnimation(animations.toArray(new ComponentAnimation[animations.size()])), new Runnable() {
+                @Override
                 public void run() {
                     if (callback != null) {
                         callback.onSucess(ComponentSelector.this);

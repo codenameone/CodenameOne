@@ -981,6 +981,10 @@ public class BytecodeMethod implements SignatureSet {
     }
     
     public void appendInterfaceMethodC(StringBuilder b) {
+        appendInterfaceMethodC(b, clsName);
+    }
+
+    public void appendInterfaceMethodC(StringBuilder b, String clsName) {
         appendCMethodPrefix(b, "", clsName);
         b.append(" {\n");
         if(!returnType.isVoid()) {

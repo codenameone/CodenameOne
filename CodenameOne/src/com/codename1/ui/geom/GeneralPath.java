@@ -472,6 +472,7 @@ public final class GeneralPath implements Shape {
         System.arraycopy(points, 0, out, 0, Math.min(points.length, out.length));
     }
 
+    @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("[General Path: ");
@@ -1131,6 +1132,7 @@ public final class GeneralPath implements Shape {
      *
      * @return 4-element array of the form {@code [x, y, width, height]}.
      */
+    @Override
     public float[] getBounds2D() {
         float[] out = new float[4];
         getBounds2D(out);
@@ -1176,6 +1178,7 @@ public final class GeneralPath implements Shape {
      *
      * @return The bounding box of the path.
      */
+    @Override
     public Rectangle getBounds() {
         // NOTE (SJH20180614): If the path contains bezier curves,  may be larger than drawn bounds.
         // See note in getBounds(Rectangle) for more details.
@@ -1241,6 +1244,7 @@ public final class GeneralPath implements Shape {
      *
      * @return True if this path forms a rectangle.  False otherwise.
      */
+    @Override
     public boolean isRectangle() {
         // NOTE (SJH20180614): This is used extensively in clipping.   We can probably
         // do this more efficiently without needing to call getBounds()
@@ -1323,6 +1327,7 @@ public final class GeneralPath implements Shape {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public PathIterator getPathIterator() {
         return new Iterator(this);
     }
@@ -1330,6 +1335,7 @@ public final class GeneralPath implements Shape {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public PathIterator getPathIterator(Transform m) {
         Iterator out = (Iterator) getPathIterator();
         out.transform = m;
@@ -1512,6 +1518,7 @@ public final class GeneralPath implements Shape {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public Shape intersection(Rectangle rect) {
         Shape out = ShapeUtil.intersection(rect, this);
         if (out == null) {
@@ -1547,6 +1554,7 @@ public final class GeneralPath implements Shape {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public boolean contains(int x, int y) {
         return contains((float) x, (float) y);
     }
@@ -3236,18 +3244,22 @@ public final class GeneralPath implements Shape {
             pointIndex = 0;
         }
 
+        @Override
         public int getWindingRule() {
             return p.getWindingRule();
         }
 
+        @Override
         public boolean isDone() {
             return typeIndex >= p.typeSize;
         }
 
+        @Override
         public void next() {
             typeIndex++;
         }
 
+        @Override
         public int currentSegment(double[] coords) {
             float[] fcoords = createFloatArrayFromPool(6);
             try {
@@ -3264,6 +3276,7 @@ public final class GeneralPath implements Shape {
             }
         }
 
+        @Override
         public int currentSegment(float[] coords) {
             if (isDone()) {
                 // awt.4B=Iterator out of bounds

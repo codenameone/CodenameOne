@@ -48,6 +48,7 @@ class SpinnerNode extends Node {
     private static final int numSides = 14;
     private final Label renderer = new Label("Testing", "Spinner3DRow");
     private final DataChangedListener listChangedListener = new DataChangedListener() {
+        @Override
         public void dataChanged(int type, int index) {
             rebuildChildren();
         }
@@ -55,6 +56,7 @@ class SpinnerNode extends Node {
     private int selectedIndex = -1;
     private List<SelectionListener> selectionListeners;
     private final SelectionListener selectionListener = new SelectionListener() {
+        @Override
         public void selectionChanged(int oldSelected, int newSelected) {
             if (newSelected < 0 && listModel != null) {
                 newSelected = listModel.getSelectedIndex();
@@ -372,6 +374,7 @@ class SpinnerNode extends Node {
         }
     }
 
+    @Override
     public void render(Graphics g) {
         g.setColor(overlayStyle.getBgColor());
         int alpha = g.getAlpha();
@@ -441,6 +444,7 @@ class SpinnerNode extends Node {
     }
 
     private static class SpinnerNodePainter implements NodePainter {
+        @Override
         public void paint(Graphics g, Rectangle bounds, Node node) {
             Style style = node.getStyle();
             g.setColor(style.getBgColor());

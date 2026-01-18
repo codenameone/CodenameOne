@@ -158,6 +158,7 @@ public class PainterChain implements Painter {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g, Rectangle rect) {
         int clen = chain.length;
         for (int iter = 0; iter < clen; iter++) {
