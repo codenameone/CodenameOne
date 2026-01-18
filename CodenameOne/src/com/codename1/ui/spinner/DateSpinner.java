@@ -61,11 +61,13 @@ public class DateSpinner extends BaseSpinner {
         currentYear = c.get(Calendar.YEAR);
     }
 
+    @Override
     void initSpinner() {
         if (month == null) {
             day = Spinner.create(1, 32, currentDay, 1);
             month = Spinner.create(1, 13, currentMonth, 1);
             SpinnerRenderer<Object> render = new SpinnerRenderer<Object>() {
+                @Override
                 public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
                     if (value != null && value instanceof Integer) {
                         // round the number in the spinner to two digits
@@ -245,6 +247,7 @@ public class DateSpinner extends BaseSpinner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"startYear", "endYear", "currentYear", "currentDay", "currentMonth", "monthDayYear", "numericMonths"};
     }
@@ -252,6 +255,7 @@ public class DateSpinner extends BaseSpinner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class};
     }
@@ -259,6 +263,7 @@ public class DateSpinner extends BaseSpinner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if (name.equals("startYear")) {
             return Integer.valueOf(startYear);
@@ -287,6 +292,7 @@ public class DateSpinner extends BaseSpinner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if (name.equals("startYear")) {
             setStartYear(Integer.parseInt(value.toString()));

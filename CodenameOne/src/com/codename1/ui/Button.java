@@ -312,6 +312,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     private ActionListener<? extends ActionEvent> bindListener() {
         if (bindListener == null) {
             bindListener = new ActionListener<ActionEvent>() {
+                @Override
                 public void actionPerformed(ActionEvent e) {
                     if (e.getSource() instanceof Button) {
                         Button b = (Button) e.getSource();
@@ -354,6 +355,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void resetFocusable() {
         setFocusable(true);
     }
@@ -361,6 +363,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /**
      * {@inheritDoc}
      */
+    @Override
     void focusGainedInternal() {
         super.focusGainedInternal();
         if (state != STATE_PRESSED) {
@@ -372,6 +375,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /**
      * {@inheritDoc}
      */
+    @Override
     void focusLostInternal() {
         super.focusLostInternal();
         if (state != STATE_DEFAULT) {
@@ -400,6 +404,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /**
      * Set the button in released and unfocused state
      */
+    @Override
     public void setReleased() {
         setState(Button.STATE_DEFAULT);
         repaint();
@@ -506,6 +511,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
         repaint();
     }
 
+    @Override
     void checkAnimation() {
         super.checkAnimation();
         if ((pressedIcon != null && pressedIcon.isAnimation()) ||
@@ -529,6 +535,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
      * @see #removeStateChangeListener(com.codename1.ui.events.ActionListener)
      * @since 7.0
      */
+    @Override
     public void addStateChangeListener(ActionListener<ComponentStateChangeEvent> l) {
         if (stateChangeListeners == null) {
             stateChangeListeners = new EventDispatcher();
@@ -545,6 +552,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
      * @see #setState(int)
      * @since 7.0
      */
+    @Override
     public void removeStateChangeListener(ActionListener<ComponentStateChangeEvent> l) {
         if (stateChangeListeners != null) {
             stateChangeListeners.removeListener(l);
@@ -562,6 +570,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
      *
      * @param l implementation of the action listener interface
      */
+    @Override
     public void addActionListener(ActionListener<ActionEvent> l) {
         dispatcher.addListener(l);
     }
@@ -571,6 +580,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
      *
      * @param l implementation of the action listener interface
      */
+    @Override
     public void removeActionListener(ActionListener<ActionEvent> l) {
         dispatcher.removeListener(l);
     }
@@ -708,6 +718,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyPressed(int keyCode) {
         if (Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE) {
             pressedX = -1;
@@ -719,6 +730,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyReleased(int keyCode) {
         if (Display.getInstance().getGameAction(keyCode) == Display.GAME_FIRE) {
             released();
@@ -728,12 +740,14 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyRepeated(int keyCode) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void fireClicked() {
         pressed();
         released();
@@ -742,6 +756,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /**
      * {@inheritDoc}
      */
+    @Override
     protected boolean isSelectableInteraction() {
         return true;
     }
@@ -749,6 +764,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerHover(int[] x, int[] y) {
         if (!Display.getInstance().isDesktop()) {
             requestFocus();
@@ -758,6 +774,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerHoverReleased(int[] x, int[] y) {
         if (!Display.getInstance().isDesktop()) {
             requestFocus();
@@ -767,6 +784,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerPressed(int x, int y) {
         Component leadParent = LeadUtil.leadParentImpl(this);
         leadParent.clearDrag();
@@ -787,6 +805,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerReleased(int x, int y) {
         if (pointerReleasedListeners != null && pointerReleasedListeners.hasListeners()) {
             ActionEvent ev = new ActionEvent(this, ActionEvent.Type.PointerReleased, x, y);
@@ -813,6 +832,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void dragInitiated() {
         if (Display.getInstance().shouldRenderSelection(this)) {
             if (state != STATE_ROLLOVER) {
@@ -868,6 +888,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Dimension calcPreferredSize() {
         return getUIManager().getLookAndFeel().getButtonPreferredSize(this);
     }
@@ -875,10 +896,12 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Border getBorder() {
         return getStyle().getBorder();
     }
 
+    @Override
     boolean isPressedStyle() {
         // if a toggle button has focus we should draw the selected state not the pressed state
         // however if shouldRenderSelection is false the selected state won't be painted so
@@ -944,6 +967,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
      *
      * @deprecated use the Style alignment instead
      */
+    @Override
     public void setAlignment(int align) {
         super.setAlignment(align);
         getPressedStyle().setAlignment(align);
@@ -995,6 +1019,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean animate() {
         boolean a = super.animate();
         if (!isEnabled() && disabledIcon != null) {
@@ -1029,6 +1054,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
      *
      * @return the releaseRadius
      */
+    @Override
     public int getReleaseRadius() {
         return releaseRadius;
     }
@@ -1039,6 +1065,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
      *
      * @param releaseRadius the releaseRadius to set
      */
+    @Override
     public void setReleaseRadius(int releaseRadius) {
         this.releaseRadius = releaseRadius;
     }
@@ -1050,6 +1077,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
      *
      * @return true if it's an auto released Button.
      */
+    @Override
     public boolean isAutoRelease() {
         return autoRelease;
     }
@@ -1058,6 +1086,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
      * Sets the auto released mode of this button, by default it's not an auto
      * released Button
      */
+    @Override
     public void setAutoRelease(boolean autoRelease) {
         this.autoRelease = autoRelease;
     }

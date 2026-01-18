@@ -63,6 +63,7 @@ public class GridBagLayout extends Layout {
     }
 
 
+    @Override
     public void addLayoutComponent(Object constraints, Component comp, Container c) {
         GridBagConstraints cons;
         if (constraints != null) {
@@ -89,6 +90,7 @@ public class GridBagLayout extends Layout {
         updateParentInfo(parent, consClone);
     }
 
+    @Override
     public void removeLayoutComponent(Component comp) {
         Container parent = comp.getParent();
         if (parent != null) {
@@ -97,6 +99,7 @@ public class GridBagLayout extends Layout {
         comptable.remove(comp);
     }
 
+    @Override
     public Object getComponentConstraint(Component comp) {
         GridBagConstraints cons = comptable.get(comp);
         if (cons == null) {
@@ -136,6 +139,7 @@ public class GridBagLayout extends Layout {
         getParentInfo(target).valid = false;
     }
 
+    @Override
     public Dimension getPreferredSize(Container parent) {
         Style s = parent.getStyle();
         ParentInfo info = lastParentInfo = getParentInfo(parent);
@@ -156,6 +160,7 @@ public class GridBagLayout extends Layout {
         //return addInsets(grid.preferredSize(), parent);
     }
 
+    @Override
     public void layoutContainer(Container parent) {
         ParentInfo info = lastParentInfo = getParentInfo(parent);
         if (getComponentsNumber(parent) == 0) {

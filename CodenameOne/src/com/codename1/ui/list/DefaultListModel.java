@@ -104,6 +104,7 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public T getItemAt(int index) {
         if (index < getSize() && index >= 0) {
             return (T) items.get(index);
@@ -114,6 +115,7 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getSize() {
         return items.size();
     }
@@ -121,6 +123,7 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getSelectedIndex() {
         if (isMultiSelectionMode()) {
             int[] selected = getSelectedIndices();
@@ -136,6 +139,7 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setSelectedIndex(int index) {
         if (isMultiSelectionMode()) {
             setSelectedIndices(index);
@@ -152,6 +156,7 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addItem(T item) {
         items.add(item);
         fireDataChangedEvent(DataChangedListener.ADDED, items.size() - 1);
@@ -184,6 +189,7 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void removeItem(int index) {
         if (index < getSize() && index >= 0) {
             items.remove(index);
@@ -206,6 +212,7 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addDataChangedListener(DataChangedListener l) {
         dataListener.addListener(l);
     }
@@ -213,6 +220,7 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void removeDataChangedListener(DataChangedListener l) {
         dataListener.removeListener(l);
     }
@@ -230,6 +238,7 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addSelectionListener(SelectionListener l) {
         selectionListener.addListener(l);
     }
@@ -237,6 +246,7 @@ public class DefaultListModel<T> implements MultipleSelectionListModel<T> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void removeSelectionListener(SelectionListener l) {
         selectionListener.removeListener(l);
     }

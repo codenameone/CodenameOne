@@ -295,6 +295,7 @@ public class SimpleDateFormat extends DateFormat {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -318,6 +319,7 @@ public class SimpleDateFormat extends DateFormat {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         int result = super.hashCode();
         result = 31 * result + (pattern != null ? pattern.hashCode() : 0);

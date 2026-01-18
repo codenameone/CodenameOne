@@ -554,6 +554,7 @@ public final class MigLayout extends Layout {
         return cacheParentW;
     }
 
+    @Override
     public void layoutContainer(final Container parent) {
         checkCache(parent);
 
@@ -639,6 +640,7 @@ public final class MigLayout extends Layout {
         return lc != null && lc.getAlignY() != null ? lc.getAlignY().getPixels(1, checkParent(parent), null) : 0;
     }
 
+    @Override
     public void addLayoutComponent(Object value, Component comp, Container c) {
         addLayoutComponent(comp, value);
     }
@@ -647,14 +649,17 @@ public final class MigLayout extends Layout {
         setComponentConstraintsImpl(comp, constraints, true);
     }
 
+    @Override
     public boolean isConstraintTracking() {
         return true;
     }
 
+    @Override
     public Object getComponentConstraint(Component comp) {
         return scrConstrMap.get(comp);
     }
 
+    @Override
     public void removeLayoutComponent(Component comp) {
         scrConstrMap.remove(comp);
         ccMap.remove(new CodenameOneMiGComponentWrapper(comp));
@@ -681,6 +686,7 @@ public final class MigLayout extends Layout {
      debugTimer = null;
      }
      }*/
+    @Override
     public Dimension getPreferredSize(Container parent) {
         return preferredLayoutSize(parent);
     }

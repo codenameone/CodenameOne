@@ -184,6 +184,7 @@ class HTMLTableModel implements TableModel {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public int getRowCount() {
         return rows.size();
     }
@@ -191,6 +192,7 @@ class HTMLTableModel implements TableModel {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public int getColumnCount() {
         return maxColumn;
     }
@@ -198,6 +200,7 @@ class HTMLTableModel implements TableModel {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public String getColumnName(int i) {
         return "";
     }
@@ -205,6 +208,7 @@ class HTMLTableModel implements TableModel {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public boolean isCellEditable(int row, int column) {
         return false;
     }
@@ -212,6 +216,7 @@ class HTMLTableModel implements TableModel {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public Object getValueAt(int row, int column) {
         if (row >= rows.size()) {
             return null;
@@ -226,6 +231,7 @@ class HTMLTableModel implements TableModel {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public void setValueAt(int row, int column, Object o) {
         Vector columns = (Vector) rows.elementAt(row);
         columns.removeElementAt(column);
@@ -236,6 +242,7 @@ class HTMLTableModel implements TableModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addDataChangeListener(DataChangedListener d) {
         dispatcher.addListener(d);
     }
@@ -243,6 +250,7 @@ class HTMLTableModel implements TableModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void removeDataChangeListener(DataChangedListener d) {
         dispatcher.removeListener(d);
     }

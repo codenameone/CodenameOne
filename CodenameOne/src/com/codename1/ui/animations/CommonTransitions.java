@@ -388,6 +388,7 @@ public final class CommonTransitions extends Transition {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void initTransition() {
         firstFinished = false;
         if (transitionType == TYPE_EMPTY) {
@@ -667,6 +668,7 @@ public final class CommonTransitions extends Transition {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean animate() {
         if (timeline != null) {
             boolean val = timeline.animate();
@@ -708,6 +710,7 @@ public final class CommonTransitions extends Transition {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g) {
         try {
             switch (transitionType) {
@@ -994,6 +997,7 @@ public final class CommonTransitions extends Transition {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void cleanup() {
         if (transitionType == TYPE_SLIDE_AND_FADE) {
             Component c = getSource();
@@ -1253,6 +1257,7 @@ public final class CommonTransitions extends Transition {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Transition copy(boolean reverse) {
         CommonTransitions retVal = null;
         switch (transitionType) {

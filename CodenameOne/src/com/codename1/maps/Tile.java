@@ -230,6 +230,7 @@ public class Tile {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         return getClass().getName() + " dimension: " + dimension + " bbox: " + bbox;
     }

@@ -209,6 +209,7 @@ public class GridLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void layoutContainer(Container parent) {
         Style s = parent.getStyle();
         int width = parent.getLayoutWidth() - parent.getSideGap() - s.getHorizontalPadding();
@@ -283,6 +284,7 @@ public class GridLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Dimension getPreferredSize(Container parent) {
         int width = 0;
         int height = 0;
@@ -330,6 +332,7 @@ public class GridLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         return "GridLayout";
     }
@@ -351,6 +354,7 @@ public class GridLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         return super.equals(o) && ((GridLayout) o).getRows() == getRows() &&
                 ((GridLayout) o).getColumns() == getColumns() && ((GridLayout) o).autoFit == autoFit;
@@ -402,6 +406,7 @@ public class GridLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean obscuresPotential(Container parent) {
         return parent.getComponentCount() == portraitRows * portraitColumns || autoFit;
     }

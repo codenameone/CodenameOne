@@ -26,6 +26,7 @@ class CaptureAudioActionListener implements ActionListener<ActionEvent> {
         switch (cmp.getState()) {
             case Accepted:
                 CN.getCurrentForm().getAnimationManager().flushAnimation(new Runnable() {
+                    @Override
                     public void run() {
                         sheet.back();
                         sheet.addCloseListener(new ActionListener<ActionEvent>() {
@@ -47,6 +48,7 @@ class CaptureAudioActionListener implements ActionListener<ActionEvent> {
                     FileSystemStorage.getInstance().delete(builder.getPath());
                 }
                 CN.getCurrentForm().getAnimationManager().flushAnimation(new Runnable() {
+                    @Override
                     public void run() {
                         sheet.back();
                         sheet.addCloseListener(new ActionListener() {

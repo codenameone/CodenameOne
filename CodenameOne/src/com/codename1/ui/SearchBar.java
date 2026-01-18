@@ -63,6 +63,7 @@ class SearchBar extends Toolbar {
 
         search.addDataChangedListener(new DataChangedListener() {
 
+            @Override
             public void dataChanged(int type, int index) {
                 onSearch(search.getText());
             }
@@ -85,10 +86,12 @@ class SearchBar extends Toolbar {
             public void actionPerformed(ActionEvent evt) {
                 search.stopEditing();
                 Display.getInstance().callSerially(new Runnable() {
+                    @Override
                     public void run() {
                         onSearch("");
                         final Form f = (Form) SearchBar.this.getParent();
                         f.getAnimationManager().flushAnimation(new Runnable() {
+                            @Override
                             public void run() {
                                 f.removeComponentFromForm(SearchBar.this);
                                 f.setToolbar(parent);

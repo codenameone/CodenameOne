@@ -258,6 +258,7 @@ public class BarChart extends XYChart {
      * @param seriesIndex the index of the series currently being drawn
      * @param startIndex the start index of the rendering points
      */
+    @Override
     protected void drawChartValuesText(Canvas canvas, XYSeries series, XYSeriesRenderer renderer,
                                        Paint paint, List<Float> points, int seriesIndex, int startIndex) {
         int seriesNr = mDataset.getSeriesCount();
@@ -288,6 +289,7 @@ public class BarChart extends XYChart {
      * @param seriesIndex the series index
      * @return the legend shape width
      */
+    @Override
     public int getLegendShapeWidth(int seriesIndex) {
         return SHAPE_WIDTH;
     }
@@ -302,6 +304,7 @@ public class BarChart extends XYChart {
      * @param seriesIndex the series index
      * @param paint the paint to be used for drawing
      */
+    @Override
     public void drawLegendShape(Canvas canvas, SimpleSeriesRenderer renderer, float x, float y,
                                 int seriesIndex, Paint paint) {
         float halfShapeWidth = SHAPE_WIDTH / 2;
@@ -351,6 +354,7 @@ public class BarChart extends XYChart {
      *
      * @return if null values should be rendered
      */
+    @Override
     protected boolean isRenderNullValues() {
         return true;
     }
@@ -360,6 +364,7 @@ public class BarChart extends XYChart {
      *
      * @return the default axis minimum
      */
+    @Override
     public double getDefaultMinimum() {
         return 0;
     }
@@ -369,6 +374,7 @@ public class BarChart extends XYChart {
      *
      * @return the chart type
      */
+    @Override
     public String getChartType() {
         return TYPE;
     }

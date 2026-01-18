@@ -147,6 +147,7 @@ public class SideMenuBar extends MenuBar {
         final SideMenuBar b = (SideMenuBar) f.getClientProperty("cn1$sideMenuParent");
         if (b != null && !b.transitionRunning) {
             b.parent.addShowListener(new ActionListener() {
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     b.parent.removeShowListener(this);
                     callback.run();
@@ -161,6 +162,7 @@ public class SideMenuBar extends MenuBar {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void initMenuBar(Form parent) {
         if (parent.getClientProperty("Menu") != null) {
             return;
@@ -243,6 +245,7 @@ public class SideMenuBar extends MenuBar {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void installMenuBar() {
         if (parent == null) {
             return;
@@ -257,6 +260,7 @@ public class SideMenuBar extends MenuBar {
         openButton = createOpenButton();
         openButton.addActionListener(new ActionListener() {
 
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 openMenu(null);
             }
@@ -268,6 +272,7 @@ public class SideMenuBar extends MenuBar {
 
         if (uim.isThemeConstant("sideMenuFoldedSwipeBool", true) && parent.getClientProperty("sideMenuFoldedSwipeListeners") == null) {
             pointerDragged = new ActionListener() {
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     if (sideSwipePotential && hasSideMenus[0]) {
                         final int x = evt.getX();
@@ -329,6 +334,7 @@ public class SideMenuBar extends MenuBar {
             };
             parent.addPointerDraggedListener(pointerDragged);
             pointerPressed = new ActionListener() {
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     rightSideSwipePotential = false;
                     topSwipePotential = false;
@@ -378,6 +384,7 @@ public class SideMenuBar extends MenuBar {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected int getDragRegionStatus(int x, int y) {
         if (getUIManager().isThemeConstant("sideMenuFoldedSwipeBool", true)) {
             if (parent instanceof Dialog || getCommandCount() == 0) {
@@ -540,6 +547,7 @@ public class SideMenuBar extends MenuBar {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addCommand(Command cmd) {
         if (cmd.getClientProperty("TitleCommand") != null) {
             if (cmd.getClientProperty("Left") != null) {
@@ -568,6 +576,7 @@ public class SideMenuBar extends MenuBar {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setBackCommand(Command backCommand) {
         super.setBackCommand(backCommand);
         if (parent instanceof Dialog) {
@@ -584,6 +593,7 @@ public class SideMenuBar extends MenuBar {
         }
     }
 
+    @Override
     public int getCommandBehavior() {
         return Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION;
     }
@@ -591,6 +601,7 @@ public class SideMenuBar extends MenuBar {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void addCommand(Command cmd, int index) {
         if (cmd.getClientProperty("TitleCommand") != null) {
             if (cmd.getClientProperty("Left") != null) {
@@ -643,6 +654,7 @@ public class SideMenuBar extends MenuBar {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void removeCommand(Command cmd) {
         super.removeCommand(cmd);
         if (parent instanceof Dialog) {
@@ -668,6 +680,7 @@ public class SideMenuBar extends MenuBar {
         installLeftCommands();
     }
 
+    @Override
     public void keyReleased(int keyCode) {
         if (keyCode == leftSK) {
             if (getCommandCount() == 0) {
@@ -838,6 +851,7 @@ public class SideMenuBar extends MenuBar {
                 b.setUIID("Title");
                 parent.setTitleComponent(b);
                 b.addActionListener(new ActionListener() {
+                    @Override
                     public void actionPerformed(ActionEvent evt) {
                         openMenu(COMMAND_PLACEMENT_VALUE_TOP);
                     }
@@ -864,6 +878,7 @@ public class SideMenuBar extends MenuBar {
             }
             rightSideButton.addActionListener(new ActionListener() {
 
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     openMenu(COMMAND_PLACEMENT_VALUE_RIGHT);
                 }
@@ -906,6 +921,7 @@ public class SideMenuBar extends MenuBar {
             m.setGlassPane(new Painter() {
                 Image img = image;
 
+                @Override
                 public void paint(Graphics g, Rectangle rect) {
                     if (img == null) {
                         // will happen for areMutableImagesFast returning false on iOS and Windows Phone
@@ -1121,6 +1137,7 @@ public class SideMenuBar extends MenuBar {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Button createTouchCommandButton(final Command c) {
 
         SideMenuBar.CommandWrapper wrapper = new SideMenuBar.CommandWrapper(c);
@@ -1145,10 +1162,12 @@ public class SideMenuBar extends MenuBar {
             private boolean pressedInRightPanel;
             private boolean manualMotionLock;
 
+            @Override
             protected boolean shouldSendPointerReleaseToOtherForm() {
                 return true;
             }
 
+            @Override
             void actionCommandImpl(Command cmd, ActionEvent ev) {
                 if (cmd instanceof SideMenuBar.CommandWrapper) {
                     cmd = ((SideMenuBar.CommandWrapper) cmd).cmd;
@@ -1159,9 +1178,11 @@ public class SideMenuBar extends MenuBar {
 
                 Display.getInstance().scheduleBackgroundTask(new Runnable() {
 
+                    @Override
                     public void run() {
                         Display.getInstance().invokeAndBlock(new Runnable() {
 
+                            @Override
                             public void run() {
                                 while (Display.getInstance().getCurrent() != parent) {
                                     try {
@@ -1176,6 +1197,7 @@ public class SideMenuBar extends MenuBar {
 
                         Display.getInstance().callSerially(new Runnable() {
 
+                            @Override
                             public void run() {
                                 parent.actionCommandImpl(c, e);
                             }
@@ -1185,6 +1207,7 @@ public class SideMenuBar extends MenuBar {
 
             }
 
+            @Override
             protected void sizeChanged(int w, int h) {
                 Style formStyle = getStyle();
                 int width = w - (formStyle.getHorizontalMargins());
@@ -1198,6 +1221,7 @@ public class SideMenuBar extends MenuBar {
                 super.sizeChanged(w, h);
             }
 
+            @Override
             public void pointerPressed(int x, int y) {
                 if (manualMotionLock) {
                     return;
@@ -1208,6 +1232,7 @@ public class SideMenuBar extends MenuBar {
                 }
             }
 
+            @Override
             public void pointerDragged(int[] x, int[] y) {
                 if (manualMotionLock) {
                     return;
@@ -1225,6 +1250,7 @@ public class SideMenuBar extends MenuBar {
                 super.pointerDragged(x, y);
             }
 
+            @Override
             public void pointerReleased(int x, int y) {
                 if (manualMotionLock) {
                     return;
@@ -1240,6 +1266,7 @@ public class SideMenuBar extends MenuBar {
                         final Motion motion = Motion.createEaseInOutMotion(draggedX, rightPanel.getWidth(), 200);
                         motion.start();
                         registerAnimated(new Animation() {
+                            @Override
                             public boolean animate() {
                                 draggedX = motion.getValue();
                                 if (motion.isFinished()) {
@@ -1250,6 +1277,7 @@ public class SideMenuBar extends MenuBar {
                                 return true;
                             }
 
+                            @Override
                             public void paint(Graphics g) {
                                 repaint();
                             }
@@ -1261,6 +1289,7 @@ public class SideMenuBar extends MenuBar {
                         final Motion motion = Motion.createEaseInOutMotion(draggedX, Display.getInstance().getDisplayWidth() - rightPanel.getWidth(), 200);
                         motion.start();
                         registerAnimated(new Animation() {
+                            @Override
                             public boolean animate() {
                                 draggedX = motion.getValue();
                                 if (motion.isFinished()) {
@@ -1271,6 +1300,7 @@ public class SideMenuBar extends MenuBar {
                                 return true;
                             }
 
+                            @Override
                             public void paint(Graphics g) {
                                 repaint();
                             }
@@ -1294,6 +1324,7 @@ public class SideMenuBar extends MenuBar {
                     topSwipePotential = false;
                     registerAnimated(new Animation() {
 
+                        @Override
                         public boolean animate() {
                             draggedX = motion.getValue();
                             if (motion.isFinished()) {
@@ -1302,6 +1333,7 @@ public class SideMenuBar extends MenuBar {
                             return true;
                         }
 
+                        @Override
                         public void paint(Graphics g) {
                             repaint();
                             if (draggedX == motion.getDestinationValue() && motion.isFinished()) {
@@ -1310,6 +1342,7 @@ public class SideMenuBar extends MenuBar {
                                 deregisterAnimated(this);
                                 Display.getInstance().callSerially(new Runnable() {
 
+                                    @Override
                                     public void run() {
                                         clean();
                                     }
@@ -1321,6 +1354,7 @@ public class SideMenuBar extends MenuBar {
                 }
             }
 
+            @Override
             public void keyReleased(int keyCode) {
                 if (keyCode == leftSK) {
                     if (transitionRunning) {
@@ -1341,6 +1375,7 @@ public class SideMenuBar extends MenuBar {
         m.setTransitionOutAnimator(CommonTransitions.createEmpty());
         m.setBackCommand(new Command("") {
 
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 if (transitionRunning) {
                     return;
@@ -1353,12 +1388,15 @@ public class SideMenuBar extends MenuBar {
             rightPanel = new Container(new BorderLayout());
         } else {
             rightPanel = new Container(new BorderLayout()) {
+                @Override
                 public void paintBackground(Graphics g) {
                 }
 
+                @Override
                 public void paintBackgrounds(Graphics g) {
                 }
 
+                @Override
                 public void paint(Graphics g) {
                     Component c = (Component) rightPanel.getClientProperty("$parent");
 
@@ -1479,6 +1517,7 @@ public class SideMenuBar extends MenuBar {
                 button.setPreferredH(Display.getInstance().getDisplayHeight() / 10);
                 m.addComponent(BorderLayout.SOUTH, button);
                 button.addActionListener(new ActionListener() {
+                    @Override
                     public void actionPerformed(ActionEvent evt) {
                         closeMenu();
                     }
@@ -1523,6 +1562,7 @@ public class SideMenuBar extends MenuBar {
      *
      * @return Form Object
      */
+    @Override
     public Form getParentForm() {
         return parent;
     }
@@ -1546,6 +1586,7 @@ public class SideMenuBar extends MenuBar {
             this.placement = placement;
         }
 
+        @Override
         public void initTransition() {
             super.initTransition();
             if (COMMAND_PLACEMENT_VALUE_TOP.equals(placement)) {
@@ -1631,6 +1672,7 @@ public class SideMenuBar extends MenuBar {
             motion.start();
         }
 
+        @Override
         public boolean animate() {
             if (motion != null) {
                 position = motion.getValue();
@@ -1641,11 +1683,13 @@ public class SideMenuBar extends MenuBar {
             return false;
         }
 
+        @Override
         public void cleanup() {
             transitionRunning = false;
             clean();
         }
 
+        @Override
         public void paint(Graphics g) {
             if (Display.getInstance().areMutableImagesFast()) {
                 // workaround for Android issue where the VKB breaks on screen size change
@@ -1741,18 +1785,22 @@ public class SideMenuBar extends MenuBar {
             this.cmd = cmd;
         }
 
+        @Override
         public Object getClientProperty(String key) {
             return this.cmd.getClientProperty(key);
         }
 
+        @Override
         public void putClientProperty(String key, Object value) {
             this.cmd.putClientProperty(key, value);
         }
 
+        @Override
         public boolean isEnabled() {
             return cmd.isEnabled();
         }
 
+        @Override
         public void setEnabled(boolean b) {
             cmd.setEnabled(b);
         }
@@ -1770,6 +1818,7 @@ public class SideMenuBar extends MenuBar {
         /**
          * {@inheritDoc}
          */
+        @Override
         public boolean equals(Object o) {
             if (this == o) {
                 return true;
@@ -1793,12 +1842,14 @@ public class SideMenuBar extends MenuBar {
         /**
          * {@inheritDoc}
          */
+        @Override
         public int hashCode() {
             int result = super.hashCode();
             result = 31 * result + (cmd != null ? cmd.hashCode() : 0);
             return result;
         }
 
+        @Override
         public void actionPerformed(final ActionEvent evt) {
             if (Toolbar.isOnTopSideMenu() && (Toolbar.isGlobalToolbar() || Display.getInstance().getCommandBehavior() != Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION)) {
                 Display.getInstance().getCurrent().getToolbar().closeSideMenu();
@@ -1830,6 +1881,7 @@ public class SideMenuBar extends MenuBar {
                 parent.addShowListener(this);
             }
 
+            @Override
             public void run() {
                 if (Display.getInstance().isEdt()) {
                     ActionEvent e = new ActionEvent(cmd, ActionEvent.Type.Command);
@@ -1843,6 +1895,7 @@ public class SideMenuBar extends MenuBar {
                             nextForm.setTransitionInAnimator(CommonTransitions.createEmpty());
                             nextForm.addShowListener(new ActionListener() {
 
+                                @Override
                                 public void actionPerformed(ActionEvent evt) {
                                     parent.setTransitionOutAnimator(out);
                                     nextForm.setTransitionInAnimator(in);
@@ -1869,6 +1922,7 @@ public class SideMenuBar extends MenuBar {
                 Display.getInstance().callSerially(this);
             }
 
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 synchronized (LOCK) {
                     LOCK.notifyAll();

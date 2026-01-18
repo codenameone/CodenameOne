@@ -87,6 +87,7 @@ abstract class AbstractEvaluator implements Evaluator {
      *
      * @param element the element to apply predicate against.
      */
+    @Override
     public Object evaluate(StructuredContent element) {
         return evaluateInternal(element);
     }
@@ -96,6 +97,7 @@ abstract class AbstractEvaluator implements Evaluator {
      *
      * @param elements an array of elements to apply predicate against.
      */
+    @Override
     public Object evaluate(List elements) {
         return evaluateInternal(elements);
     }

@@ -91,6 +91,7 @@ public class GoogleMapsProvider extends TiledProvider {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int maxZoomLevel() {
         return 18;
     }
@@ -98,6 +99,7 @@ public class GoogleMapsProvider extends TiledProvider {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String attribution() {
         return "Google";
     }
@@ -105,6 +107,7 @@ public class GoogleMapsProvider extends TiledProvider {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Tile tileFor(BoundingBox bbox) {
         StringBuilder sb = new StringBuilder(_url);
         Coord ne = bbox.getNorthEast();

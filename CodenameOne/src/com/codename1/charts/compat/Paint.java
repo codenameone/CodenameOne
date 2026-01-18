@@ -227,6 +227,7 @@ public class Paint { // PMD Fix: UnusedPrivateField removed redundant antiAlias 
         }
     }
 
+    @Override
     public String toString() {
         return "Paint[ color:" + color + ", align:" + align + ", textSize:" + textSize + ", style:" + style + ", strokeWidth:" + strokeWidth + ",, strokeMiter:" + strokeMiter + ", strokeJoin:" + strokeJoin + " strokeCap:" + strokeCap + "]";
     }

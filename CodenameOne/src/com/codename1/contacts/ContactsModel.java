@@ -61,6 +61,7 @@ public class ContactsModel extends DefaultListModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getItemAt(final int index) {
         final String id = (String) super.getItemAt(index);
         Hashtable contact = (Hashtable) contactsCache.get(id);
@@ -68,11 +69,13 @@ public class ContactsModel extends DefaultListModel {
             Hashtable cnt = getContactAsHashtable(null);
             contactsCache.put(id, cnt);
             Display.getInstance().scheduleBackgroundTask(new Runnable() {
+                @Override
                 public void run() {
                     Contact c = ContactsManager.getContactById(id);
                     Hashtable contact = getContactAsHashtable(c);
                     contactsCache.put(id, contact);
                     Display.getInstance().callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             setItem(index, id);
                         }
@@ -87,6 +90,7 @@ public class ContactsModel extends DefaultListModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addItem(Object item) {
         if (item instanceof String) {
             super.addItem(item);
@@ -104,6 +108,7 @@ public class ContactsModel extends DefaultListModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void removeItem(int index) {
         String id = (String) super.getItemAt(index);
         super.removeItem(index);

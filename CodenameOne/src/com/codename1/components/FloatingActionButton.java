@@ -432,6 +432,7 @@ public class FloatingActionButton extends Button {
             this.con = con;
         }
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
             for (Component c : con) {
                 c.setY(con.getHeight());
@@ -448,6 +449,7 @@ public class FloatingActionButton extends Button {
             this.next = next;
         }
 
+        @Override
         public void actionPerformed(ActionEvent evt) {
             next.pressed();
             next.released();

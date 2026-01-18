@@ -130,6 +130,7 @@ public abstract class Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         return o != null && o.getClass() == getClass();
     }
@@ -137,6 +138,7 @@ public abstract class Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         return getClass().getName().hashCode();
     }

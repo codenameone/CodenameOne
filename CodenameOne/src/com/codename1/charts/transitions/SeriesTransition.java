@@ -131,6 +131,7 @@ public abstract class SeriesTransition implements Animation {
      */
     protected abstract void update(int progress);
 
+    @Override
     public boolean animate() {
         if (finished) {
             cleanup();
@@ -143,6 +144,7 @@ public abstract class SeriesTransition implements Animation {
         return true;
     }
 
+    @Override
     public void paint(Graphics g) {
         getChart().repaint();
     }

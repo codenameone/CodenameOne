@@ -514,6 +514,7 @@ public class EventDispatcher {
          * Do not invoke this method it handles the dispatching internally and serves
          * as an implementation detail
          */
+        @Override
         public final void run() {
             // We might not be running during a suspend/resume cycle
             if (Display.isInitialized() && !Display.getInstance().isEdt()) {

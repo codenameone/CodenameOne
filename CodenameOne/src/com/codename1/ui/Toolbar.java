@@ -1125,6 +1125,7 @@ public class Toolbar extends Container {
             final Form parent = getComponentForm();
             if (!isPointerPressedListenerAdded) {
                 parent.addPointerPressedListener(new ActionListener() {
+                    @Override
                     public void actionPerformed(ActionEvent evt) {
                         if (Display.getInstance().getImplementation().isScrollWheeling()) {
                             return;
@@ -1245,6 +1246,7 @@ public class Toolbar extends Container {
             isPointerPressedListenerAdded = true;
             if (!isPointerDraggedListenerAdded) {
                 parent.addPointerDraggedListener(new ActionListener() {
+                    @Override
                     public void actionPerformed(ActionEvent evt) {
                         Form f = getComponentForm();
                         if (f == null || Display.getInstance().getImplementation().isScrollWheeling() || !enableSideMenuSwipe || f.findCurrentlyEditingComponent() != null || f.isEditing()) {
@@ -1286,6 +1288,7 @@ public class Toolbar extends Container {
             isPointerDraggedListenerAdded = true;
             if (!isPointerReleasedListenerAdded) {
                 parent.addPointerReleasedListener(new ActionListener() {
+                    @Override
                     public void actionPerformed(ActionEvent evt) {
                         parent.putClientProperty("cn1$sidemenuCharged", Boolean.FALSE);
                         if (Display.getInstance().getImplementation().isScrollWheeling()) {
@@ -1358,6 +1361,7 @@ public class Toolbar extends Container {
                     Image i = parent.getUIManager().getThemeImageConstant("sideMenuImage");
                     if (i != null) {
                         Command cmd = addCommandToLeftBar("", i, new ActionListener() {
+                            @Override
                             public void actionPerformed(ActionEvent evt) {
                                 if (sidemenuDialog.isShowing()) {
                                     closeSideMenu();
@@ -1372,6 +1376,7 @@ public class Toolbar extends Container {
                         }
                     } else {
                         leftSideMenuCommand = addMaterialCommandToLeftBar("", FontImage.MATERIAL_MENU, size, new ActionListener() {
+                            @Override
                             public void actionPerformed(ActionEvent evt) {
                                 if (sidemenuDialog.isShowing()) {
                                     closeSideMenu();
@@ -1404,6 +1409,7 @@ public class Toolbar extends Container {
                     Image i = parent.getUIManager().getThemeImageConstant("rightSideMenuImage");
                     if (i != null) {
                         Command cmd = addCommandToRightBar("", i, new ActionListener() {
+                            @Override
                             public void actionPerformed(ActionEvent evt) {
                                 if (rightSidemenuDialog.isShowing()) {
                                     closeRightSideMenu();
@@ -1418,6 +1424,7 @@ public class Toolbar extends Container {
                         }
                     } else {
                         rightSideMenuCommand = addMaterialCommandToRightBar("", FontImage.MATERIAL_MENU, size, new ActionListener() {
+                            @Override
                             public void actionPerformed(ActionEvent evt) {
                                 if (rightSidemenuDialog.isShowing()) {
                                     closeRightSideMenu();
@@ -2283,6 +2290,7 @@ public class Toolbar extends Container {
         hideShowMotion.start();
     }
 
+    @Override
     public boolean animate() {
         if (hideShowMotion != null) {
             Form f = getComponentForm();
@@ -2320,6 +2328,7 @@ public class Toolbar extends Container {
                 initVars(actualPane);
                 scrollListener = new ScrollListener() {
 
+                    @Override
                     public void scrollChanged(int scrollX, int scrollY, int oldscrollX, int oldscrollY) {
                         if (entered || contentPane.isTensileMotionInProgress()) return;
 
@@ -2364,6 +2373,7 @@ public class Toolbar extends Container {
                 contentPane.addScrollListener(scrollListener);
                 releasedListener = new ActionListener() {
 
+                    @Override
                     public void actionPerformed(ActionEvent evt) {
                         if (getY() + getHeight() / 2 > 0) {
                             if (!showing && lastNonZeroScrollDiff < 0) {
@@ -2602,6 +2612,7 @@ public class Toolbar extends Container {
             initTitleBarStatus();
             Display.getInstance().callSerially(new Runnable() {
 
+                @Override
                 public void run() {
                     if (scrollOff) {
                         bindScrollListener(true);
@@ -2637,6 +2648,7 @@ public class Toolbar extends Container {
                 }
                 menuButton = sideMenu.createTouchCommandButton(new Command("", i) {
 
+                    @Override
                     public void actionPerformed(ActionEvent ev) {
                         sideMenu.showMenu();
                     }

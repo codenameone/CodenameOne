@@ -46,6 +46,7 @@ public class CachedData implements Externalizable {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getVersion() {
         return 1;
     }
@@ -53,6 +54,7 @@ public class CachedData implements Externalizable {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void externalize(DataOutputStream out) throws IOException {
         Util.writeUTF(url, out);
         Util.writeUTF(etag, out);
@@ -64,6 +66,7 @@ public class CachedData implements Externalizable {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void internalize(int version, DataInputStream in) throws IOException {
         url = Util.readUTF(in);
         etag = Util.readUTF(in);
@@ -72,6 +75,7 @@ public class CachedData implements Externalizable {
         in.readFully(data);
     }
 
+    @Override
     public String getObjectId() {
         return "CachedData";
     }

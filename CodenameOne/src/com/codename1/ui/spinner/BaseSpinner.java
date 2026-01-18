@@ -51,6 +51,7 @@ public abstract class BaseSpinner extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Dimension calcPreferredSize() {
         if (!isInitialized()) {
             initSpinner();
@@ -66,6 +67,7 @@ public abstract class BaseSpinner extends Container {
     /**
      * Default constructor
      */
+    @Override
     protected void initComponent() {
         super.initComponent();
         initSpinner();
@@ -78,6 +80,7 @@ public abstract class BaseSpinner extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setUIID(String id) {
         super.setUIID(id);
     }
@@ -85,6 +88,7 @@ public abstract class BaseSpinner extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
         overlayStyle = getUIManager().getComponentStyle("SpinnerOverlay");
@@ -100,6 +104,7 @@ public abstract class BaseSpinner extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void paintGlass(Graphics g) {
         super.paintGlass(g);
         paintOverlay(g);
@@ -127,6 +132,7 @@ public abstract class BaseSpinner extends Container {
             super(" ");
         }
 
+        @Override
         public void repaint() {
             getParent().repaint();
         }

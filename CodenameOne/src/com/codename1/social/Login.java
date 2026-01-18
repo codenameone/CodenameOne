@@ -180,6 +180,7 @@ public abstract class Login {
             Oauth2 auth = createOauth2();
             auth.showAuthentication(new ActionListener() {
 
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     //success
                     if (evt.getSource() instanceof AccessToken) {
@@ -340,6 +341,7 @@ public abstract class Login {
             doLogin();
             Display.getInstance().invokeAndBlock(new Runnable() {
 
+                @Override
                 public void run() {
                     while (!callbackEnabled) {
                         Util.sleep(100);
@@ -454,6 +456,7 @@ public abstract class Login {
 
     class LoginCallBackProxy extends LoginCallback {
 
+        @Override
         public void loginSuccessful() {
             //store the access token upon login success for future use
             Preferences.set(Login.this.getClass().getName() + "Token", getAccessToken().getToken());
@@ -466,6 +469,7 @@ public abstract class Login {
                     final LoginCallback cb = loginCallbacksSingleUse.remove(0);
                     if (!CN.isEdt()) {
                         CN.callSerially(new Runnable() {
+                            @Override
                             public void run() {
                                 cb.loginSuccessful();
                             }
@@ -480,6 +484,7 @@ public abstract class Login {
             validateErr = null;
         }
 
+        @Override
         public void loginFailed(final String errorMessage) {
             if (callbackEnabled) {
                 if (loginCallback != null) {
@@ -489,6 +494,7 @@ public abstract class Login {
                     final LoginCallback cb = loginCallbacksSingleUse.remove(0);
                     if (!CN.isEdt()) {
                         CN.callSerially(new Runnable() {
+                            @Override
                             public void run() {
                                 cb.loginFailed(errorMessage);
                             }

@@ -196,6 +196,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
      *
      * @param al the action listener
      */
+    @Override
     public void addActionListener(ActionListener al) {
         emblem.addActionListener(al);
     }
@@ -205,6 +206,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
      *
      * @param al the action listener
      */
+    @Override
     public void removeActionListener(ActionListener al) {
         emblem.removeActionListener(al);
     }
@@ -254,6 +256,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
      *
      * @param l
      */
+    @Override
     public void addPointerReleasedListener(ActionListener l) {
         emblem.addPointerReleasedListener(l);
     }
@@ -263,6 +266,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
      *
      * @param l
      */
+    @Override
     public void removePointerReleasedListener(ActionListener l) {
         emblem.removePointerReleasedListener(l);
     }
@@ -733,6 +737,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
      *
      * @return the image instance
      */
+    @Override
     public Image getIcon() {
         return icon.getIcon();
     }
@@ -742,6 +747,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
      *
      * @param i the icon
      */
+    @Override
     public void setIcon(Image i) {
         icon.setIcon(i);
         updateGap();
@@ -843,6 +849,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
      *
      * @return the UIID
      */
+    @Override
     public String getIconUIID() {
         return icon.getUIID();
     }
@@ -852,6 +859,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
      *
      * @param t UIID to set
      */
+    @Override
     public void setIconUIID(String t) {
         icon.setUIID(t);
         updateGap();
@@ -896,6 +904,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{
                 "line1", "line2", "line3", "line4", "name1", "name2", "name3", "name4",
@@ -909,6 +918,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{
                 String.class,// line1
@@ -944,6 +954,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if (name.equals("line1")) {
             return getTextLine1();
@@ -1065,6 +1076,7 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if (name.equals("line1")) {
             setTextLine1((String) value);

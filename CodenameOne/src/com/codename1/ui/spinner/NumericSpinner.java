@@ -47,6 +47,7 @@ public class NumericSpinner extends BaseSpinner {
     /**
      * Default constructor
      */
+    @Override
     void initSpinner() {
         if (spin == null) {
             spin = createSpinner();
@@ -154,6 +155,7 @@ public class NumericSpinner extends BaseSpinner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"min", "max", "value", "step"};
     }
@@ -161,6 +163,7 @@ public class NumericSpinner extends BaseSpinner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Double.class, Double.class, Double.class, Double.class};
     }
@@ -168,6 +171,7 @@ public class NumericSpinner extends BaseSpinner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"double", "double", "double", "double", "double"};
     }
@@ -175,6 +179,7 @@ public class NumericSpinner extends BaseSpinner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if (name.equals("min")) {
             return Double.valueOf(min);
@@ -194,6 +199,7 @@ public class NumericSpinner extends BaseSpinner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if (name.equals("min")) {
             setMin(Double.parseDouble(value.toString()));

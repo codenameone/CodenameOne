@@ -185,6 +185,7 @@ public class CodenameOneThread extends Thread {
     /**
      * Catches exception
      */
+    @Override
     public void run() {
         try {
             r.run();

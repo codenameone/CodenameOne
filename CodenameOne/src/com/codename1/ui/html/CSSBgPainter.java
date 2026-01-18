@@ -131,6 +131,7 @@ class CSSBgPainter implements Painter {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g, Rectangle rect) {
         Style s = parent.getStyle();
         int x = rect.getX();

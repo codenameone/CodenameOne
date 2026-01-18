@@ -105,6 +105,7 @@ public final class FileEncodedImage extends EncodedImage {
     /**
      * {@inheritDoc}
      */
+    @Override
     public byte[] getImageData() {
         if (data != null) {
             return data;

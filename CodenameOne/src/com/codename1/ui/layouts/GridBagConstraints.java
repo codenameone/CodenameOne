@@ -94,6 +94,7 @@ public class GridBagConstraints {
         ipady = 0;
     }
 
+    @Override
     public Object clone() {
         return new GridBagConstraints(gridx, gridy, gridwidth, gridheight,
                 weightx, weighty, anchor, fill, insets, ipadx, ipady);

@@ -219,6 +219,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      * Reference bug https://github.com/codenameone/CodenameOne/issues/2472
      */
     private final ActionListener formPressListener = new ActionListener() {
+        @Override
         public void actionPerformed(ActionEvent evt) {
             Form f = getComponentForm();
             if (f != null) {
@@ -509,6 +510,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void initLaf(UIManager uim) {
         super.initLaf(uim);
         setSelectCommandText(uim.localize("edit", "Edit"));
@@ -541,6 +543,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setWidth(int width) {
         if (width != getWidth()) {
             rowStrings = null;
@@ -556,6 +559,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      *
      * @return the text in the text area
      */
+    @Override
     public String getText() {
         return text;
     }
@@ -565,6 +569,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      *
      * @param t new value for the text area
      */
+    @Override
     public void setText(String t) {
         String old = this.text;
         if (!Objects.equals(t, old)) {
@@ -645,6 +650,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      *
      * @return true if this area is editable
      */
+    @Override
     public boolean isEditable() {
         return editable;
     }
@@ -692,6 +698,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyPressed(int keyCode) {
         super.keyPressed(keyCode);
         setSuppressActionEvent(false);
@@ -732,6 +739,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void fireClicked() {
         onClick();
     }
@@ -739,6 +747,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected boolean isSelectableInteraction() {
         return editable;
     }
@@ -758,6 +767,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyReleased(int keyCode) {
         int action = com.codename1.ui.Display.getInstance().getGameAction(keyCode);
         if (isEditable()) {
@@ -778,10 +788,12 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isScrollableY() {
         return isFocusable() && getScrollDimension().getHeight() > getHeight();
     }
 
+    @Override
     void deinitializeImpl() {
         super.deinitializeImpl();
         Display.getInstance().stopEditing(this);
@@ -812,6 +824,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerHover(int[] x, int[] y) {
         if (!Display.getInstance().isDesktop()) {
             requestFocus();
@@ -821,6 +834,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerHoverReleased(int[] x, int[] y) {
         if (!Display.getInstance().isDesktop()) {
             requestFocus();
@@ -834,6 +848,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerReleased(int x, int y) {
         // prevent a drag operation from going into edit mode
         if (isDragActivated()) {
@@ -864,6 +879,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     void focusGainedInternal() {
         setSuppressActionEvent(false);
         super.focusGainedInternal();
@@ -874,6 +890,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     void focusLostInternal() {
         super.focusLostInternal();
         setHandlesInput(false);
@@ -937,6 +954,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         this.rows = rows;
     }
 
+    @Override
     void initComponentImpl() {
         getRowStrings();
         super.initComponentImpl();
@@ -1307,6 +1325,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g) {
 
         if (Display.getInstance().isNativeEditorVisible(this)) {
@@ -1320,6 +1339,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         paintHint(g);
     }
 
+    @Override
     void paintHint(Graphics g) {
         if (Display.getInstance().isNativeEditorVisible(this) && Display.impl.nativeEditorPaintsHint()) {
             return;
@@ -1330,6 +1350,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Dimension calcPreferredSize() {
         if (shouldShowHint()) {
             Label l = getHintLabelImpl();
@@ -1345,6 +1366,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Dimension calcScrollSize() {
         return getUIManager().getLookAndFeel().getTextAreaSize(this, false);
     }
@@ -1356,6 +1378,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      *
      * @param a actionListener
      */
+    @Override
     public void addActionListener(ActionListener a) {
         if (actionListeners == null) {
             actionListeners = new EventDispatcher();
@@ -1368,6 +1391,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      *
      * @param a actionListener
      */
+    @Override
     public void removeActionListener(ActionListener a) {
         if (actionListeners == null) {
             return;
@@ -1404,6 +1428,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * Notifies listeners of a change to the text area
      */
+    @Override
     void fireActionEvent() {
         if (suppressActionEvent) {
             return;
@@ -1465,6 +1490,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     void onEditComplete(String text) {
         if (!Display.getInstance().getImplementation().isAsyncEditMode()) {
             setText(text);
@@ -1696,6 +1722,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      *
      * @return the hint text or null
      */
+    @Override
     public String getHint() {
         return super.getHint();
     }
@@ -1715,6 +1742,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      *
      * @return the hint icon
      */
+    @Override
     public Image getHintIcon() {
         return super.getHintIcon();
     }
@@ -1736,6 +1764,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      * @param hint the hint text to display
      * @param icon the hint icon to display
      */
+    @Override
     public void setHint(String hint, Image icon) {
         super.setHint(hint, icon);
     }
@@ -1749,14 +1778,17 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         return getHintLabelImpl();
     }
 
+    @Override
     Label getHintLabelImpl() {
         return hintLabel;
     }
 
+    @Override
     void setHintLabelImpl(Label hintLabel) {
         this.hintLabel = hintLabel;
     }
 
+    @Override
     boolean shouldShowHint() {
         return getText().equals("");
     }
@@ -1812,6 +1844,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getBindablePropertyNames() {
         return new String[]{"text"};
     }
@@ -1819,6 +1852,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getBindablePropertyTypes() {
         return new Class[]{String.class};
     }
@@ -1827,6 +1861,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      * {@inheritDoc}
      * @deprecated uses the deprecated BindTarget interface
      */
+    @Override
     public void bindProperty(String prop, BindTarget target) {
         if (prop.equals("text")) {
             if (bindListeners == null) {
@@ -1842,6 +1877,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      * {@inheritDoc}
      * @deprecated uses the deprecated BindTarget interface
      */
+    @Override
     public void unbindProperty(String prop, BindTarget target) {
         if (prop.equals("text")) {
             if (bindListeners == null) {
@@ -1859,6 +1895,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getBoundPropertyValue(String prop) {
         if (prop.equals("text")) {
             return getText();
@@ -1869,6 +1906,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setBoundPropertyValue(String prop, Object value) {
         if (prop.equals("text")) {
             if (value == null) {
@@ -1987,6 +2025,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                         ((TextArea) c).stopEditing();
                         final TextArea ta = (TextArea) c;
                         UITimer.timer(30, false, new Runnable() {
+                            @Override
                             public void run() {
                                 ta.repaint();
                                 //registerAsInputDevice();
@@ -1998,6 +2037,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                 }
             }
             Display.getInstance().callSerially(new Runnable() {
+                @Override
                 public void run() {
                     //registerAsInputDevice();
                     Display.getInstance().editString(TextArea.this, maxSize, constraint, text);
@@ -2140,6 +2180,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
             if (!Display.getInstance().isEdt()) {
                 Display.getInstance().callSerially(new Runnable() {
 
+                    @Override
                     public void run() {
                         fireDoneEvent(keyEvent);
                     }
@@ -2176,6 +2217,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      *
      * @return true if editing
      */
+    @Override
     protected boolean shouldRenderComponentSelection() {
         return isEditing() || super.shouldRenderComponentSelection();
     }
@@ -2229,6 +2271,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         if (textSelectionSupport == null) {
             textSelectionSupport = new TextSelection.TextSelectionSupport() {
 
+                @Override
                 public TextSelection.Spans getTextSelectionForBounds(TextSelection sel, Rectangle bounds) {
                     span = calculateTextSelectionSpan(sel);
                     if (span == null) {
@@ -2243,16 +2286,19 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                 }
 
 
+                @Override
                 public boolean isTextSelectionEnabled(TextSelection sel) {
                     return (!isEditable() && textSelectionEnabled) || (isEditable() && !isEnabled());
                 }
 
 
+                @Override
                 public boolean isTextSelectionTriggerEnabled(TextSelection sel) {
                     return (!isEditable() && textSelectionEnabled) || (isEditable() && !isEnabled());
                 }
 
 
+                @Override
                 public TextSelection.Span triggerSelectionAt(TextSelection sel, int x, int y) {
                     span = getUIManager().getLookAndFeel().calculateTextAreaSpan(sel, TextArea.this);
                     if (span.isEmpty()) {
@@ -2293,6 +2339,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
                 }
 
 
+                @Override
                 public String getTextForSpan(TextSelection sel, TextSelection.Span span) {
                     int offset = span.getStartPos();
                     offset = Math.max(0, offset);
@@ -2318,6 +2365,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
         }
 
 
+        @Override
         public void close() throws Exception {
             if (!enabled) {
                 return;

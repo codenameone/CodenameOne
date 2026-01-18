@@ -133,6 +133,7 @@ public class CheckBox extends Button {
      *
      * @return true if the checkbox is selected
      */
+    @Override
     public boolean isSelected() {
         return selected;
     }
@@ -154,6 +155,7 @@ public class CheckBox extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void released(int x, int y) {
         setSelected(!isSelected());
         super.released(x, y);
@@ -177,6 +179,7 @@ public class CheckBox extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g) {
         if (isToggle()) {
             getUIManager().getLookAndFeel().drawButton(g, this);
@@ -188,6 +191,7 @@ public class CheckBox extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Dimension calcPreferredSize() {
         return getUIManager().getLookAndFeel().getCheckBoxPreferredSize(this);
     }
@@ -195,10 +199,12 @@ public class CheckBox extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected String paramString() {
         return super.paramString() + ", selected = " + selected;
     }
 
+    @Override
     void initComponentImpl() {
         super.initComponentImpl();
     }
@@ -213,11 +219,13 @@ public class CheckBox extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void refreshTheme(boolean merge) {
         super.refreshTheme(merge);
         updateSide();
     }
 
+    @Override
     int getAvaliableSpaceForText() {
         if (isToggle()) {
             return super.getAvaliableSpaceForText();
@@ -238,6 +246,7 @@ public class CheckBox extends Button {
      *
      * @return the oppositeSide
      */
+    @Override
     public boolean isOppositeSide() {
         return oppositeSide;
     }
@@ -254,6 +263,7 @@ public class CheckBox extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getBindablePropertyNames() {
         return new String[]{"selected"};
     }
@@ -261,6 +271,7 @@ public class CheckBox extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getBindablePropertyTypes() {
         return new Class[]{Boolean.class};
     }
@@ -269,6 +280,7 @@ public class CheckBox extends Button {
      * {@inheritDoc}
      * @deprecated uses the deprecated BindTarget interface
      */
+    @Override
     public void bindProperty(String prop, BindTarget target) {
         if (prop.equals("selected")) {
             if (bindListeners == null) {
@@ -284,6 +296,7 @@ public class CheckBox extends Button {
      * {@inheritDoc}
      * @deprecated uses the deprecated BindTarget interface
      */
+    @Override
     public void unbindProperty(String prop, BindTarget target) {
         if (prop.equals("selected")) {
             if (bindListeners == null) {
@@ -301,6 +314,7 @@ public class CheckBox extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getBoundPropertyValue(String prop) {
         if (prop.equals("selected")) {
             if (isSelected()) {
@@ -314,6 +328,7 @@ public class CheckBox extends Button {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setBoundPropertyValue(String prop, Object value) {
         if (prop.equals("selected")) {
             setSelected(value != null && ((Boolean) value).booleanValue());

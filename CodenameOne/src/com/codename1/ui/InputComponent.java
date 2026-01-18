@@ -510,6 +510,7 @@ public abstract class InputComponent extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if (name.equals("label")) {
             return lbl.getText();
@@ -520,6 +521,7 @@ public abstract class InputComponent extends Container {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if (name.equals("label")) {
             label((String) value);

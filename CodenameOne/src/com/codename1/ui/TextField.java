@@ -481,6 +481,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isEnableInputScroll() {
         return enableInputScroll;
     }
@@ -544,6 +545,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isPendingCommit() {
         return pendingCommit;
     }
@@ -574,6 +576,7 @@ public class TextField extends TextArea {
      *
      * @deprecated this is a method for use only on old J2ME devices and is ignored everywhere else
      */
+    @Override
     public String getInputMode() {
         return inputMode;
     }
@@ -602,6 +605,7 @@ public class TextField extends TextArea {
         return keyCode == defaultChangeInputModeKey;
     }
 
+    @Override
     boolean showLightweightVKB() {
         return true;
     }
@@ -609,6 +613,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getInputModeOrder() {
         return inputModeOrder;
     }
@@ -699,6 +704,7 @@ public class TextField extends TextArea {
     /**
      * Blocks the text area from opening the native text box editing on touchscreen click
      */
+    @Override
     void onClick() {
         if (useNativeTextInput && Display.getInstance().isNativeInputSupported()) {
             super.onClick();
@@ -852,6 +858,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getCursorPosition() {
         String txt = getText();
         if (txt == null || txt.length() == 0) {
@@ -896,6 +903,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getCursorY() {
         return cursorY;
     }
@@ -903,6 +911,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int getCursorX() {
         return cursorX;
     }
@@ -910,6 +919,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setText(String text) {
         super.setText(text);
         if (text != null) {
@@ -965,6 +975,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void longKeyPress(int keyCode) {
         if (isClearKey(keyCode)) {
             setText("");
@@ -974,6 +985,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isQwertyInput() {
         if (!qwertyInitialized) {
             qwertyInitialized = true;
@@ -1204,6 +1216,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyReleased(int keyCode) {
         if (useNativeTextInput && Display.getInstance().isNativeInputSupported()) {
             super.keyReleased(keyCode);
@@ -1256,6 +1269,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void deinitialize() {
         Form f = getComponentForm();
         if (f != null) {
@@ -1280,6 +1294,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setEditable(boolean b) {
         super.setEditable(b);
         if (!b && handlesInput()) {
@@ -1298,6 +1313,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyRepeated(int keyCode) {
         if (useNativeTextInput && Display.getInstance().isNativeInputSupported()) {
             super.keyRepeated(keyCode);
@@ -1312,6 +1328,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyPressed(int keyCode) {
         setSuppressActionEvent(false);
         if (useNativeTextInput && Display.getInstance().isNativeInputSupported()) {
@@ -1414,6 +1431,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected boolean isSelectableInteraction() {
         return true;
     }
@@ -1421,6 +1439,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void fireClicked() {
         if (useNativeTextInput && Display.getInstance().isNativeInputSupported()) {
             super.fireClicked();
@@ -1480,6 +1499,7 @@ public class TextField extends TextArea {
         }
     }
 
+    @Override
     void focusLostInternal() {
         // we don't call super to avoid the text area blocking the scrolling
         stopComponentLableTicker();
@@ -1517,6 +1537,7 @@ public class TextField extends TextArea {
 
     }
 
+    @Override
     void focusGainedInternal() {
         setSuppressActionEvent(false);
         startComponentLableTicker();
@@ -1577,6 +1598,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g) {
 
         //the native input will show the string.
@@ -1600,6 +1622,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Dimension calcPreferredSize() {
         if (isSingleLineTextArea()) {
             return getUIManager().getLookAndFeel().getTextFieldPreferredSize(this);
@@ -1611,6 +1634,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     void initComponentImpl() {
         super.initComponentImpl();
         boolean rtl = isRTL();
@@ -1664,6 +1688,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean animate() {
         boolean ani = super.animate();
 
@@ -1705,6 +1730,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerReleased(int x, int y) {
         if (useNativeTextInput && Display.getInstance().isNativeInputSupported()) {
             super.pointerReleased(x, y);
@@ -1763,6 +1789,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     void onEditComplete(String text) {
         super.onEditComplete(text);
         setCursorPosition(text.length());
@@ -1831,6 +1858,7 @@ public class TextField extends TextArea {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void setAlignment(int align) {
         if (align == Component.CENTER) {
             throw new IllegalArgumentException("CENTER alignment is not supported in TextField.");
@@ -1852,6 +1880,7 @@ public class TextField extends TextArea {
             super(title, id);
         }
 
+        @Override
         public void actionPerformed(ActionEvent ev) {
             ev.consume();
             switch (getId()) {

@@ -41,6 +41,7 @@ public class TimeSeries extends XYSeries {
         super.add(x.getTime(), y);
     }
 
+    @Override
     protected double getPadding(double x) {
         return 1;
     }

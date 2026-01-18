@@ -274,6 +274,7 @@ public class TableLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void layoutContainer(Container parent) {
         try {
             verticalSpanningExists = false;
@@ -648,6 +649,7 @@ public class TableLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Dimension getPreferredSize(Container parent) {
         Style s = parent.getStyle();
         int w = s.getPaddingLeftNoRTL() + s.getPaddingRightNoRTL();
@@ -721,6 +723,7 @@ public class TableLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void addLayoutComponent(Object value, Component comp, Container c) {
         Constraint con = null;
         if (!(value instanceof Constraint)) {
@@ -869,6 +872,7 @@ public class TableLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void removeLayoutComponent(Component comp) {
         // reflow the table
         Vector comps = new Vector();
@@ -901,6 +905,7 @@ public class TableLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getComponentConstraint(Component comp) {
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < columns; c++) {
@@ -960,6 +965,7 @@ public class TableLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         return "TableLayout";
     }
@@ -967,6 +973,7 @@ public class TableLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         return super.equals(o) && ((TableLayout) o).getRows() == getRows() && ((TableLayout) o).getColumns() == getColumns();
     }
@@ -979,6 +986,7 @@ public class TableLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isConstraintTracking() {
         return true;
     }
@@ -1075,6 +1083,7 @@ public class TableLayout extends Layout {
         /**
          * {@inheritDoc}
          */
+        @Override
         public String toString() {
             return "row: " + row + " column: " + column + " width: " + width + " height: " + height + " hspan: " +
                     spanHorizontal + " vspan: " + spanVertical + " align " + align + " valign " + valign;

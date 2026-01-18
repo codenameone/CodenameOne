@@ -127,6 +127,7 @@ public class PeerComponent extends Component {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean animate() {
         return false;
     }
@@ -134,6 +135,7 @@ public class PeerComponent extends Component {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Dimension calcPreferredSize() {
         return super.calcPreferredSize();
     }
@@ -141,6 +143,7 @@ public class PeerComponent extends Component {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected Dimension calcScrollSize() {
         return super.calcScrollSize();
     }
@@ -148,6 +151,7 @@ public class PeerComponent extends Component {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void deinitialize() {
         Form.activePeerCount--;
         super.deinitialize();
@@ -156,12 +160,14 @@ public class PeerComponent extends Component {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void fireClicked() {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void focusGained() {
         super.focusGained();
     }
@@ -169,6 +175,7 @@ public class PeerComponent extends Component {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void focusLost() {
         super.focusLost();
     }
@@ -176,6 +183,7 @@ public class PeerComponent extends Component {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean handlesInput() {
         return super.handlesInput();
     }
@@ -183,6 +191,7 @@ public class PeerComponent extends Component {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void initComponent() {
         Form.activePeerCount++;
         super.initComponent();
@@ -191,24 +200,28 @@ public class PeerComponent extends Component {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyPressed(int keyCode) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyReleased(int keyCode) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyRepeated(int keyCode) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paint(Graphics g) {
         onPositionSizeChangeImpl();
         if (shouldRenderPeerImage() && getWidth() > 0 && getHeight() > 0) {
@@ -244,6 +257,7 @@ public class PeerComponent extends Component {
     /**
      * {@inheritDoc}
      */
+    @Override
     void onParentPositionChange() {
         onPositionSizeChangeImpl();
     }
@@ -251,84 +265,98 @@ public class PeerComponent extends Component {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void paintBackground(Graphics g) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void paintBackgrounds(Graphics g) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void paintBorder(Graphics g) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void paintScrollbarX(Graphics g) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void paintScrollbarY(Graphics g) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void paintScrollbars(Graphics g) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerDragged(int[] x, int[] y) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerDragged(int x, int y) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerHover(int[] x, int[] y) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerHoverReleased(int[] x, int[] y) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerPressed(int[] x, int[] y) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerPressed(int x, int y) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerReleased(int[] x, int[] y) {
     }
 
     /**
      * {@inheritDoc}
      */
+    @Override
     public void pointerReleased(int x, int y) {
     }
 
@@ -355,6 +383,7 @@ public class PeerComponent extends Component {
      *
      * @param l true to enable lightweight mode, false to disable it
      */
+    @Override
     protected void setLightweightMode(boolean l) {
     }
 }

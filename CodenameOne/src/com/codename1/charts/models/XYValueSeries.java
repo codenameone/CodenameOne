@@ -82,6 +82,7 @@ public class XYValueSeries extends XYSeries {
      * @param x the value for the X axis
      * @param y the value for the Y axis
      */
+    @Override
     public void add(double x, double y) {
         add(x, y, 0d);
     }
@@ -91,6 +92,7 @@ public class XYValueSeries extends XYSeries {
      *
      * @param index the index in the series of the value to remove
      */
+    @Override
     public void remove(int index) {
         super.remove(index);
         double removedValue = mValue.remove(index);
@@ -102,6 +104,7 @@ public class XYValueSeries extends XYSeries {
     /**
      * Removes all the values from the series.
      */
+    @Override
     public  void clear() {
         super.clear();
         mValue.clear();

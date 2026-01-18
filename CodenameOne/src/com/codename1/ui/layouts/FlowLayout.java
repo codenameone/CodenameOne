@@ -294,6 +294,7 @@ public class FlowLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void layoutContainer(Container parent) {
         Style s = parent.getStyle();
         boolean rtl = parent.isRTL();
@@ -512,6 +513,7 @@ public class FlowLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Dimension getPreferredSize(Container parent) {
         int parentWidth = parent.getWidth();
 
@@ -549,6 +551,7 @@ public class FlowLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         return "FlowLayout";
     }
@@ -631,6 +634,7 @@ public class FlowLayout extends Layout {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         return super.equals(o) && ((FlowLayout) o).orientation == orientation &&
                 ((FlowLayout) o).valign == valign &&

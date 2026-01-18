@@ -171,6 +171,7 @@ public class Post extends FBObject {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         return "type = " + type + " post = " + message;
     }
@@ -180,6 +181,7 @@ public class Post extends FBObject {
      *
      * @param props an hashtable to copy from
      */
+    @Override
     public void copy(Hashtable props) {
         super.copy(props);
         init(props);
@@ -229,6 +231,7 @@ public class Post extends FBObject {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -242,6 +245,7 @@ public class Post extends FBObject {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         return super.hashCode();
     }

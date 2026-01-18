@@ -257,6 +257,7 @@ public final class ToastBar {
         s.show();
         final ActionListener[] progListener = new ActionListener[1];
         final ActionListener<NetworkEvent> errorListener = new ActionListener<NetworkEvent>() {
+            @Override
             public void actionPerformed(NetworkEvent evt) {
                 s.clear();
                 NetworkManager.getInstance().removeErrorListener(this);
@@ -270,6 +271,7 @@ public final class ToastBar {
         };
         NetworkManager.getInstance().addErrorListener(errorListener);
         progListener[0] = new ActionListener<NetworkEvent>() {
+            @Override
             public void actionPerformed(NetworkEvent evt) {
                 switch (evt.getProgressType()) {
                     case NetworkEvent.PROGRESS_TYPE_INITIALIZING:
@@ -554,6 +556,7 @@ public final class ToastBar {
                 if (pendingUpdateStatus) {
                     pendingUpdateStatus = false;
                     Display.getInstance().callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             updateStatus();
                         }
@@ -707,6 +710,7 @@ public final class ToastBar {
             this.layered = layered;
         }
 
+        @Override
         public void run() {
             parent.removeComponent(layered);
             parent.addComponent(layered);
@@ -795,6 +799,7 @@ public final class ToastBar {
                     @Override
                     public void run() {
                         Display.getInstance().callSerially(new Runnable() {
+                            @Override
                             public void run() {
                                 timer = null;
                                 Status.this.clear();
@@ -846,6 +851,7 @@ public final class ToastBar {
                 @Override
                 public void run() {
                     Display.getInstance().callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             if (showTimer != null) {
                                 showTimer = null;
@@ -1040,6 +1046,7 @@ public final class ToastBar {
             progressBar.setVisible(false);
 
             leadButton.addActionListener(new ActionListener() {
+                @Override
                 public void actionPerformed(ActionEvent evt) {
                     if (currentlyShowing != null && !currentlyShowing.showProgressIndicator) {
                         currentlyShowing.clear();

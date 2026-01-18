@@ -301,6 +301,7 @@ public final class Result {
      *
      * @see Object#hashCode()
      */
+    @Override
     public int hashCode() {
         return root.hashCode();
     }
@@ -310,6 +311,7 @@ public final class Result {
      *
      * @see Object#equals(Object)
      */
+    @Override
     public boolean equals(final Object other) {
         if (other instanceof Result) {
             return root.equals(((Result) other).root);
@@ -323,6 +325,7 @@ public final class Result {
      *
      * @return a structured content document as a string
      */
+    @Override
     public String toString() {
         return root.toString();
     }

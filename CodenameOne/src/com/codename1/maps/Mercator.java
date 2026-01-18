@@ -71,6 +71,7 @@ public class Mercator extends Projection {
      * @param wgs84 coordinate to project
      * @return projected Mercator Coord
      */
+    @Override
     public Coord fromWGS84(Coord wgs84) {
         if (wgs84.isProjected()) {
             return wgs84;
@@ -84,6 +85,7 @@ public class Mercator extends Projection {
      * @param wgs84 projected Coord
      * @return unprojected Latitude, Longitude
      */
+    @Override
     public Coord toWGS84(Coord projection) {
         if (!projection.isProjected()) {
             return projection;

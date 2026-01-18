@@ -62,6 +62,7 @@ public class ThreadSafeDatabase extends Database {
     @Override
     public void beginTransaction() throws IOException {
         invokeWithException(new RunnableWithIOException() {
+            @Override
             public void run() throws IOException {
                 underlying.beginTransaction();
             }
@@ -70,6 +71,7 @@ public class ThreadSafeDatabase extends Database {
 
     private void invokeWithException(final RunnableWithIOException r) throws IOException {
         IOException err = et.run(new RunnableWithResultSync<IOException>() {
+            @Override
             public IOException run() {
                 try {
                     r.run();
@@ -86,6 +88,7 @@ public class ThreadSafeDatabase extends Database {
 
     private Object invokeWithException(final RunnableWithResponseOrIOException r) throws IOException {
         Object ret = et.run(new RunnableWithResultSync<Object>() {
+            @Override
             public Object run() {
                 try {
                     return r.run();
@@ -103,6 +106,7 @@ public class ThreadSafeDatabase extends Database {
     @Override
     public void commitTransaction() throws IOException {
         invokeWithException(new RunnableWithIOException() {
+            @Override
             public void run() throws IOException {
                 underlying.commitTransaction();
             }
@@ -112,6 +116,7 @@ public class ThreadSafeDatabase extends Database {
     @Override
     public void rollbackTransaction() throws IOException {
         invokeWithException(new RunnableWithIOException() {
+            @Override
             public void run() throws IOException {
                 underlying.rollbackTransaction();
             }
@@ -122,6 +127,7 @@ public class ThreadSafeDatabase extends Database {
     public void close() {
         // close should NEVER throw an exception...
         et.run(new Runnable() {
+            @Override
             public void run() {
                 try {
                     underlying.close();
@@ -136,6 +142,7 @@ public class ThreadSafeDatabase extends Database {
     @Override
     public void execute(final String sql) throws IOException {
         invokeWithException(new RunnableWithIOException() {
+            @Override
             public void run() throws IOException {
                 underlying.execute(sql);
             }
@@ -145,6 +152,7 @@ public class ThreadSafeDatabase extends Database {
     @Override
     public void execute(final String sql, final String[] params) throws IOException {
         invokeWithException(new RunnableWithIOException() {
+            @Override
             public void run() throws IOException {
                 underlying.execute(sql, params);
             }
@@ -155,6 +163,7 @@ public class ThreadSafeDatabase extends Database {
     public Cursor executeQuery(final String sql, final String[] params) throws IOException {
         final Cursor[] curs = new Cursor[1];
         invokeWithException(new RunnableWithIOException() {
+            @Override
             public void run() throws IOException {
                 curs[0] = underlying.executeQuery(sql, params);
             }
@@ -166,6 +175,7 @@ public class ThreadSafeDatabase extends Database {
     public Cursor executeQuery(final String sql) throws IOException {
         final Cursor[] curs = new Cursor[1];
         invokeWithException(new RunnableWithIOException() {
+            @Override
             public void run() throws IOException {
                 curs[0] = underlying.executeQuery(sql);
             }
@@ -177,6 +187,7 @@ public class ThreadSafeDatabase extends Database {
     public Cursor executeQuery(final String sql, final Object... params) throws IOException {
         final Cursor[] curs = new Cursor[1];
         invokeWithException(new RunnableWithIOException() {
+            @Override
             public void run() throws IOException {
                 curs[0] = underlying.executeQuery(sql, params);
             }
@@ -187,6 +198,7 @@ public class ThreadSafeDatabase extends Database {
     @Override
     public void execute(final String sql, final Object... params) throws IOException {
         invokeWithException(new RunnableWithIOException() {
+            @Override
             public void run() throws IOException {
                 underlying.execute(sql, params);
             }
@@ -210,56 +222,70 @@ public class ThreadSafeDatabase extends Database {
             this.underlyingRow = underlyingRow;
         }
 
+        @Override
         public byte[] getBlob(final int index) throws IOException {
             return (byte[]) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
                 public Object run() throws IOException {
                     return underlyingRow.getBlob(index);
                 }
             });
         }
 
+        @Override
         public double getDouble(final int index) throws IOException {
             return (Double) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
                 public Object run() throws IOException {
                     return underlyingRow.getDouble(index);
                 }
             });
         }
 
+        @Override
         public float getFloat(final int index) throws IOException {
             return (Float) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
                 public Object run() throws IOException {
                     return underlyingRow.getFloat(index);
                 }
             });
         }
 
+        @Override
         public int getInteger(final int index) throws IOException {
             return (Integer) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
                 public Object run() throws IOException {
                     return underlyingRow.getInteger(index);
                 }
             });
         }
 
+        @Override
         public long getLong(final int index) throws IOException {
             return (Long) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
                 public Object run() throws IOException {
                     return underlyingRow.getLong(index);
                 }
             });
         }
 
+        @Override
         public short getShort(final int index) throws IOException {
             return (Short) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
                 public Object run() throws IOException {
                     return underlyingRow.getShort(index);
                 }
             });
         }
 
+        @Override
         public String getString(final int index) throws IOException {
             return (String) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
                 public Object run() throws IOException {
                     return underlyingRow.getString(index);
                 }
@@ -267,8 +293,10 @@ public class ThreadSafeDatabase extends Database {
         }
 
 
+        @Override
         public boolean wasNull() throws IOException {
             return (Boolean) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
                 public Object run() throws IOException {
                     return Database.wasNull(underlyingRow);
                 }
@@ -282,92 +310,111 @@ public class ThreadSafeDatabase extends Database {
         public CursorWrapper(Cursor underlyingCursor) {
             this.underlyingCursor = underlyingCursor;
         }
-
-        protected void finalize() {
-        }
-
+        
+        @Override
         public boolean first() throws IOException {
             return (Boolean) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
                 public Object run() throws IOException {
                     return underlyingCursor.first();
                 }
             });
         }
 
+        @Override
         public boolean last() throws IOException {
             return (Boolean) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
                 public Object run() throws IOException {
                     return underlyingCursor.last();
                 }
             });
         }
 
+        @Override
         public boolean next() throws IOException {
             return (Boolean) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
                 public Object run() throws IOException {
                     return underlyingCursor.next();
                 }
             });
         }
 
+        @Override
         public boolean prev() throws IOException {
             return (Boolean) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
                 public Object run() throws IOException {
                     return underlyingCursor.prev();
                 }
             });
         }
 
+        @Override
         public int getColumnIndex(final String columnName) throws IOException {
             return (Integer) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
                 public Object run() throws IOException {
                     return underlyingCursor.getColumnIndex(columnName);
                 }
             });
         }
 
+        @Override
         public String getColumnName(final int columnIndex) throws IOException {
             return (String) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
                 public Object run() throws IOException {
                     return underlyingCursor.getColumnName(columnIndex);
                 }
             });
         }
 
+        @Override
         public int getColumnCount() throws IOException {
             return (Integer) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
                 public Object run() throws IOException {
                     return underlyingCursor.getColumnCount();
                 }
             });
         }
 
+        @Override
         public int getPosition() throws IOException {
             return (Integer) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
                 public Object run() throws IOException {
                     return underlyingCursor.getPosition();
                 }
             });
         }
 
+        @Override
         public boolean position(final int row) throws IOException {
             return (Boolean) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
                 public Object run() throws IOException {
                     return underlyingCursor.position(row);
                 }
             });
         }
 
+        @Override
         public void close() throws IOException {
             invokeWithException(new RunnableWithIOException() {
+                @Override
                 public void run() throws IOException {
                     underlyingCursor.close();
                 }
             });
         }
 
+        @Override
         public Row getRow() throws IOException {
             return new RowWrapper((Row) invokeWithException(new RunnableWithResponseOrIOException() {
+                @Override
                 public Object run() throws IOException {
                     return underlyingCursor.getRow();
                 }

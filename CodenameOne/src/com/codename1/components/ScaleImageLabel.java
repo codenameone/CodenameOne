@@ -139,6 +139,7 @@ public class ScaleImageLabel extends Label {
      *
      * @return the bg image
      */
+    @Override
     public Image getIcon() {
         return getUnselectedStyle().getBgImage();
     }
@@ -148,6 +149,7 @@ public class ScaleImageLabel extends Label {
      *
      * @param i the image
      */
+    @Override
     public void setIcon(Image i) {
         setShouldCalcPreferredSize(true);
         getAllStyles().setBgImage(i);
@@ -189,6 +191,7 @@ public class ScaleImageLabel extends Label {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"backgroundType"};
     }
@@ -196,6 +199,7 @@ public class ScaleImageLabel extends Label {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Byte.class};
     }
@@ -203,6 +207,7 @@ public class ScaleImageLabel extends Label {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyTypeNames() {
         return new String[]{"Byte"};
     }
@@ -210,6 +215,7 @@ public class ScaleImageLabel extends Label {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if (name.equals("backgroundType")) {
             return getBackgroundType();
@@ -220,6 +226,7 @@ public class ScaleImageLabel extends Label {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if (name.equals("backgroundType")) {
             setBackgroundType(((Byte) value).byteValue());

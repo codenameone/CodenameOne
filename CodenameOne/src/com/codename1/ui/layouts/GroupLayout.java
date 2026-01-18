@@ -383,6 +383,7 @@ public class GroupLayout extends Layout {
      *
      * @return textual description of this GroupLayout
      **/
+    @Override
     public String toString() {
         if (springsChanged) {
             registerComponents(horizontalGroup, HORIZONTAL);
@@ -804,6 +805,7 @@ public class GroupLayout extends Layout {
      * @param component the component to be removed
      * @see Container#removeComponent
      */
+    @Override
     public void removeLayoutComponent(Component component) {
         ComponentInfo info = (ComponentInfo) componentInfos.remove(component);
         if (info != null) {
@@ -874,6 +876,7 @@ public class GroupLayout extends Layout {
      *                                  this layout are not in both a horizontal and vertical group
      * @see Container#getPreferredSize
      */
+    @Override
     public Dimension getPreferredSize(Container parent) {
         checkParent(parent);
         prepare(PREF_SIZE);
@@ -888,6 +891,7 @@ public class GroupLayout extends Layout {
      * @throws IllegalStateException if any of the components added to
      *                               this layout are not in both a horizontal and vertical group
      */
+    @Override
     public void layoutContainer(Container parent) {
         // Step 1: Prepare for layout.
         prepare(SPECIFIC_SIZE);
@@ -1140,6 +1144,7 @@ public class GroupLayout extends Layout {
             return delta - ((SpringDelta) o).delta;
         }
 
+        @Override
         public String toString() {
             return super.toString() + "[index=" + index + ", delta=" +
                     delta + "]";
@@ -1163,6 +1168,7 @@ public class GroupLayout extends Layout {
             return spring.getComponent().toString();
         }
 
+        @Override
         public String toString() {
             return "[" + toString(source) + "-" + toString(target) + "]";
         }
@@ -1428,6 +1434,7 @@ public class GroupLayout extends Layout {
         // Spring methods
         //
 
+        @Override
         void setSize(int axis, int origin, int size) {
             super.setSize(axis, origin, size);
             if (size == UNSET) {
@@ -1446,14 +1453,17 @@ public class GroupLayout extends Layout {
          */
         abstract void setValidSize(int axis, int origin, int size);
 
+        @Override
         int calculateMinimumSize(int axis) {
             return calculateSize(axis, MIN_SIZE);
         }
 
+        @Override
         int calculatePreferredSize(int axis) {
             return calculateSize(axis, PREF_SIZE);
         }
 
+        @Override
         int calculateMaximumSize(int axis) {
             return calculateSize(axis, MAX_SIZE);
         }
@@ -1578,6 +1588,7 @@ public class GroupLayout extends Layout {
             unset();
         }
 
+        @Override
         boolean willHaveZeroSize(boolean treatAutopaddingAsZeroSized) {
             for (int i = springs.size() - 1; i >= 0; i--) {
                 Spring spring = (Spring) springs.get(i);
@@ -1880,10 +1891,12 @@ public class GroupLayout extends Layout {
                     new ContainerAutopaddingSpring(pref, max));
         }
 
+        @Override
         int operator(int a, int b) {
             return constrain(a) + constrain(b);
         }
 
+        @Override
         void setValidSize(int axis, int origin, int size) {
             int pref = getPreferredSize(axis);
             if (size == pref) {
@@ -2027,6 +2040,7 @@ public class GroupLayout extends Layout {
             return index;
         }
 
+        @Override
         void insertAutopadding(int axis, ArrayList leadingPadding,
                                ArrayList trailingPadding, ArrayList leading, ArrayList trailing,
                                boolean insert) {
@@ -2125,6 +2139,7 @@ public class GroupLayout extends Layout {
             }
         }
 
+        @Override
         int getBaseline() {
             if (baselineSpring != null) {
                 int baseline = baselineSpring.getBaseline();
@@ -2143,6 +2158,7 @@ public class GroupLayout extends Layout {
             return -1;
         }
 
+        @Override
         int getBaselineResizeBehavior() {
             if (isResizable(VERTICAL)) {
                 if (baselineSpring != null && !baselineSpring.isResizable(VERTICAL)) {
@@ -2367,10 +2383,12 @@ public class GroupLayout extends Layout {
             return resizable;
         }
 
+        @Override
         int operator(int a, int b) {
             return Math.max(a, b);
         }
 
+        @Override
         int calculateMinimumSize(int axis) {
             if (!isResizable()) {
                 return getPreferredSize(axis);
@@ -2378,6 +2396,7 @@ public class GroupLayout extends Layout {
             return super.calculateMinimumSize(axis);
         }
 
+        @Override
         int calculateMaximumSize(int axis) {
             if (!isResizable()) {
                 return getPreferredSize(axis);
@@ -2385,6 +2404,7 @@ public class GroupLayout extends Layout {
             return super.calculateMaximumSize(axis);
         }
 
+        @Override
         void setValidSize(int axis, int origin, int size) {
             for (int i = 0, max = springs.size(); i < max; i++) {
                 setChildSize(getSpring(i), axis, origin, size);
@@ -2414,6 +2434,7 @@ public class GroupLayout extends Layout {
             }
         }
 
+        @Override
         void insertAutopadding(int axis, ArrayList leadingPadding,
                                ArrayList trailingPadding, ArrayList leading, ArrayList trailing,
                                boolean insert) {
@@ -2490,12 +2511,14 @@ public class GroupLayout extends Layout {
             baselineAnchorSet = true;
         }
 
+        @Override
         void unset() {
             super.unset();
             prefAscent = prefDescent = -1;
             calcedBaseline = false;
         }
 
+        @Override
         void setValidSize(int axis, int origin, int size) {
             checkAxis(axis);
             if (prefAscent == -1) {
@@ -2506,6 +2529,7 @@ public class GroupLayout extends Layout {
             }
         }
 
+        @Override
         int calculateSize(int axis, int type) {
             checkAxis(axis);
             if (!calcedBaseline) {
@@ -2700,6 +2724,7 @@ public class GroupLayout extends Layout {
             }
         }
 
+        @Override
         int getBaseline() {
             if (springs.size() > 1) {
                 // Force the baseline to be calculated
@@ -2711,6 +2736,7 @@ public class GroupLayout extends Layout {
             return -1;
         }
 
+        @Override
         int getBaselineResizeBehavior() {
             if (springs.size() == 1) {
                 return getSpring(0).getBaselineResizeBehavior();
@@ -2773,6 +2799,7 @@ public class GroupLayout extends Layout {
             getComponentInfo(component);
         }
 
+        @Override
         int calculateMinimumSize(int axis) {
             if (isLinked(axis)) {
                 return getLinkSize(axis, MIN_SIZE);
@@ -2780,6 +2807,7 @@ public class GroupLayout extends Layout {
             return calculateNonlinkedMinimumSize(axis);
         }
 
+        @Override
         int calculatePreferredSize(int axis) {
             if (isLinked(axis)) {
                 return getLinkSize(axis, PREF_SIZE);
@@ -2790,6 +2818,7 @@ public class GroupLayout extends Layout {
             return Math.min(max, Math.max(min, pref));
         }
 
+        @Override
         int calculateMaximumSize(int axis) {
             if (isLinked(axis)) {
                 return getLinkSize(axis, MAX_SIZE);
@@ -2856,6 +2885,7 @@ public class GroupLayout extends Layout {
             return ci.getLinkSize(axis, type);
         }
 
+        @Override
         void setSize(int axis, int origin, int size) {
             super.setSize(axis, origin, size);
             this.origin = origin;
@@ -2876,6 +2906,7 @@ public class GroupLayout extends Layout {
             this.component = component;
         }
 
+        @Override
         int getBaseline() {
             if (baseline == -1) {
                 Spring horizontalSpring = getComponentInfo(component).
@@ -2889,6 +2920,7 @@ public class GroupLayout extends Layout {
             return baseline;
         }
 
+        @Override
         int getBaselineResizeBehavior() {
             return getComponent().getBaselineResizeBehavior();
         }
@@ -2908,6 +2940,7 @@ public class GroupLayout extends Layout {
             }
         }
 
+        @Override
         boolean willHaveZeroSize(boolean treatAutopaddingAsZeroSized) {
             return !isVisible();
         }
@@ -2930,14 +2963,17 @@ public class GroupLayout extends Layout {
             this.canGrow = canGrow;
         }
 
+        @Override
         int calculateMinimumSize(int axis) {
             return getPadding(axis);
         }
 
+        @Override
         int calculatePreferredSize(int axis) {
             return getPadding(axis);
         }
 
+        @Override
         int calculateMaximumSize(int axis) {
             if (canGrow) {
                 return Short.MAX_VALUE;
@@ -2956,6 +2992,7 @@ public class GroupLayout extends Layout {
                     target, type, position, host);
         }
 
+        @Override
         boolean willHaveZeroSize(boolean treatAutopaddingAsZeroSized) {
             return false;
         }
@@ -2976,6 +3013,7 @@ public class GroupLayout extends Layout {
             this.max = max;
         }
 
+        @Override
         int calculateMinimumSize(int axis) {
             if (min == PREFERRED_SIZE) {
                 return getPreferredSize(axis);
@@ -2983,10 +3021,12 @@ public class GroupLayout extends Layout {
             return min;
         }
 
+        @Override
         int calculatePreferredSize(int axis) {
             return pref;
         }
 
+        @Override
         int calculateMaximumSize(int axis) {
             if (max == PREFERRED_SIZE) {
                 return getPreferredSize(axis);
@@ -2994,6 +3034,7 @@ public class GroupLayout extends Layout {
             return max;
         }
 
+        @Override
         boolean willHaveZeroSize(boolean treatAutopaddingAsZeroSized) {
             return false;
         }
@@ -3050,6 +3091,7 @@ public class GroupLayout extends Layout {
             this.userCreated = userCreated;
         }
 
+        @Override
         void unset() {
             lastSize = getSize();
             super.unset();
@@ -3140,10 +3182,12 @@ public class GroupLayout extends Layout {
             matches.add(new AutopaddingMatch(source, target));
         }
 
+        @Override
         int calculateMinimumSize(int axis) {
             return size;
         }
 
+        @Override
         int calculatePreferredSize(int axis) {
             if (pref == PREFERRED_SIZE || pref == DEFAULT_SIZE) {
                 return size;
@@ -3151,6 +3195,7 @@ public class GroupLayout extends Layout {
             return Math.max(size, pref);
         }
 
+        @Override
         int calculateMaximumSize(int axis) {
             if (max >= 0) {
                 return Math.max(getPreferredSize(axis), max);
@@ -3162,10 +3207,12 @@ public class GroupLayout extends Layout {
             return (matches == null) ? "" : matches.toString();
         }
 
+        @Override
         public String toString() {
             return super.toString() + getMatchDescription();
         }
 
+        @Override
         boolean willHaveZeroSize(boolean treatAutopaddingAsZeroSized) {
             return treatAutopaddingAsZeroSized;
         }
@@ -3187,6 +3234,7 @@ public class GroupLayout extends Layout {
             setUserCreated(true);
         }
 
+        @Override
         public void addTarget(ComponentSpring spring, int axis) {
             if (targets == null) {
                 targets = new ArrayList(1);
@@ -3194,6 +3242,7 @@ public class GroupLayout extends Layout {
             targets.add(spring);
         }
 
+        @Override
         public void calculatePadding(int axis) {
             LayoutStyle p = getLayoutStyle0();
             int maxPadding = 0;
@@ -3257,6 +3306,7 @@ public class GroupLayout extends Layout {
             return padding;
         }
 
+        @Override
         String getMatchDescription() {
             if (targets != null) {
                 return "leading: " + targets;

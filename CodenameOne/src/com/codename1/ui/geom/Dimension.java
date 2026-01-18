@@ -101,6 +101,7 @@ public class Dimension {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         return "width = " + width + " height = " + height;
     }
@@ -108,6 +109,7 @@ public class Dimension {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         int hash = 3;
         hash = 71 * hash + this.width;
@@ -118,6 +120,7 @@ public class Dimension {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object arg0) {
         if (this == arg0) {
             return true;

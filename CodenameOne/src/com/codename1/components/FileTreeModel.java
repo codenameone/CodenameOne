@@ -78,6 +78,7 @@ public class FileTreeModel implements TreeModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Vector getChildren(Object parent) {
         Vector response = new Vector();
         try {
@@ -127,6 +128,7 @@ public class FileTreeModel implements TreeModel {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean isLeaf(Object node) {
         return !FileSystemStorage.getInstance().isDirectory((String) node);
     }

@@ -103,6 +103,7 @@ class MultiComboBox extends List {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public void addItem(Object item) {
         super.addItem(item);
         if (item instanceof String) {
@@ -113,6 +114,7 @@ class MultiComboBox extends List {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public void setSelectedItem(Object item) {
         super.setSelectedItem(item);
         model.toggleSelected(item);
@@ -121,6 +123,7 @@ class MultiComboBox extends List {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     protected void fireActionEvent() {
         if (multiple) {
             Object obj = getSelectedItem();
@@ -134,6 +137,7 @@ class MultiComboBox extends List {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public void keyReleased(int keyCode) {
         // other events are in keyReleased to prevent the next event from reaching the next form
 
@@ -153,6 +157,7 @@ class MultiComboBox extends List {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     protected void fireClicked() {
         boolean h = handlesInput();
         if (!multiple) {
@@ -167,6 +172,7 @@ class MultiComboBox extends List {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void keyPressed(int keyCode) {
         // scrolling events are in keyPressed to provide immediate feedback
         if (!handlesInput()) {
@@ -242,6 +248,7 @@ class MultiComboBox extends List {
             this.underlyingModel = underlyingModel;
         }
 
+        @Override
         public Object getItemAt(int index) {
             if (underlyingModel != null) {
                 return underlyingModel.getItemAt(index);
@@ -250,6 +257,7 @@ class MultiComboBox extends List {
             }
         }
 
+        @Override
         public int getSize() {
             if (underlyingModel != null) {
                 return underlyingModel.getSize();
@@ -258,6 +266,7 @@ class MultiComboBox extends List {
             }
         }
 
+        @Override
         public int getSelectedIndex() {
             if (underlyingModel != null) {
                 return underlyingModel.getSelectedIndex();
@@ -266,6 +275,7 @@ class MultiComboBox extends List {
             }
         }
 
+        @Override
         public void setSelectedIndex(int index) {
             if (getItemAt(index) instanceof String) { //don't select optgroup
                 if (direction == 0) {
@@ -321,6 +331,7 @@ class MultiComboBox extends List {
             this.optgroup = optgroup;
         }
 
+        @Override
         public Component getListCellRendererComponent(List list, Object value, int index, boolean isSelected) {
             Component cmp = super.getListCellRendererComponent(list, value, index, isSelected);
             if (model.isSelected(value)) {
@@ -350,6 +361,7 @@ class MultiComboBox extends List {
 
         }
 
+        @Override
         public void paint(Graphics g) {
             if (hasFocus()) {
                 g.setColor(getListFocusComponent(null).getSelectedStyle().getBgColor());

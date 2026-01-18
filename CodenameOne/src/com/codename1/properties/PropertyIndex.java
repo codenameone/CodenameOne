@@ -187,17 +187,21 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      *
      * @return an iterator instance
      */
+    @Override
     public Iterator<PropertyBase> iterator() {
         return new Iterator<PropertyBase>() {
             int off = 0;
 
+            @Override
             public boolean hasNext() {
                 return off < properties.length;
             }
 
+            @Override
             public void remove() {
             }
 
+            @Override
             public PropertyBase next() {
                 if (!hasNext()) {
                     throw new NoSuchElementException();
@@ -245,6 +249,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      *
      * @return user readable printout of the property values which is useful for debugging
      */
+    @Override
     public String toString() {
         return toString(true);
     }
@@ -822,6 +827,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      * @param o the object
      * @return true if equals
      */
+    @Override
     public boolean equals(Object o) {
         if (o instanceof PropertyIndex) {
             PropertyIndex other = (PropertyIndex) o;
@@ -928,10 +934,12 @@ public class PropertyIndex implements Iterable<PropertyBase> {
      */
     public Externalizable asExternalizable() {
         return new Externalizable() {
+            @Override
             public int getVersion() {
                 return 1;
             }
 
+            @Override
             public void externalize(DataOutputStream out) throws IOException {
                 out.writeInt(getSize());
                 for (PropertyBase b : PropertyIndex.this) {
@@ -954,6 +962,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                 }
             }
 
+            @Override
             public void internalize(int version, DataInputStream in) throws IOException {
                 int size = in.readInt();
                 for (int iter = 0; iter < size; iter++) {
@@ -985,6 +994,7 @@ public class PropertyIndex implements Iterable<PropertyBase> {
                 }
             }
 
+            @Override
             public String getObjectId() {
                 return getName();
             }

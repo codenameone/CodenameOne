@@ -197,6 +197,7 @@ public class Command implements ActionListener<ActionEvent> {
      *
      * @return Returns a string representation of the object
      */
+    @Override
     public String toString() {
         return getCommandName();
     }
@@ -267,6 +268,7 @@ public class Command implements ActionListener<ActionEvent> {
      * @param obj a Command Object to compare
      * @return true if the obj has the same command name
      */
+    @Override
     public boolean equals(Object obj) {
         if (!(obj instanceof Command)) {
             return false;
@@ -289,6 +291,7 @@ public class Command implements ActionListener<ActionEvent> {
      *
      * @return unique hashcode for the command class
      */
+    @Override
     public int hashCode() {
         return getClass().hashCode() + commandId;
     }
@@ -298,6 +301,7 @@ public class Command implements ActionListener<ActionEvent> {
      *
      * @param evt the Event Object
      */
+    @Override
     public void actionPerformed(ActionEvent evt) {
     }
 

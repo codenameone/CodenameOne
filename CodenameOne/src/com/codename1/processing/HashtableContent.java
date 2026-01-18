@@ -105,6 +105,7 @@ class MapContent implements StructuredContent {
      *
      * @return the object as a string
      */
+    @Override
     public String toString() {
         if (root instanceof Map) {
             if (((Map) root).containsKey("ROOT")) {
@@ -122,6 +123,7 @@ class MapContent implements StructuredContent {
     /**
      * @see java.lang.Object#hashCode()
      */
+    @Override
     public int hashCode() {
         return root.hashCode();
     }
@@ -129,6 +131,7 @@ class MapContent implements StructuredContent {
     /**
      * @see java.lang.Object#equals(Object)
      */
+    @Override
     public boolean equals(Object o) {
         return o instanceof MapContent &&
                 (root == ((MapContent) o).root ||
@@ -172,6 +175,7 @@ class MapContent implements StructuredContent {
      *
      * @see com.codename1.processing.StructuredContent#getChildren(java.lang.String)
      */
+    @Override
     public List getChildren(String name) {
         if (root instanceof String) {
             return new Vector();
@@ -240,6 +244,7 @@ class MapContent implements StructuredContent {
      *
      * @see com.codename1.processing.StructuredContent#getChild(int)
      */
+    @Override
     public StructuredContent getChild(int index) {
         if (root instanceof List) {
             return new MapContent(((List) root).get(index), this);
@@ -261,6 +266,7 @@ class MapContent implements StructuredContent {
      *
      * @see com.codename1.processing.StructuredContent#getDescendants(java.lang.String )
      */
+    @Override
     public List getDescendants(String name) {
         List decendants;
         if (root instanceof Vector || root instanceof Hashtable) {
@@ -326,6 +332,7 @@ class MapContent implements StructuredContent {
      *
      * @see com.codename1.processing.StructuredContent#getAttribute(java.lang.String)
      */
+    @Override
     public String getAttribute(String name) {
         return null;
     }
@@ -335,6 +342,7 @@ class MapContent implements StructuredContent {
      *
      * @see com.codename1.processing.StructuredContent#getAttributes()
      */
+    @Override
     public Map getAttributes() {
         return null;
     }
@@ -344,6 +352,7 @@ class MapContent implements StructuredContent {
      *
      * @see com.codename1.processing.StructuredContent#getParent()
      */
+    @Override
     public StructuredContent getParent() {
         if (parent == null) {
             return null;
@@ -356,6 +365,7 @@ class MapContent implements StructuredContent {
      *
      * @see com.codename1.processing.StructuredContent#getText()
      */
+    @Override
     public String getText() {
         if (root instanceof String) {
             return (String) root;
@@ -370,6 +380,7 @@ class MapContent implements StructuredContent {
         return sc.toString();
     }
 
+    @Override
     public Object getNativeRoot() {
         return root;
     }

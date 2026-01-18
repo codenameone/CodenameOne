@@ -93,6 +93,7 @@ public class TwitterRESTService extends ConnectionRequest {
      */
     public static String initToken(String consumerKey, String consumerSecret) {
         ConnectionRequest auth = new ConnectionRequest() {
+            @Override
             protected void readResponse(InputStream input) throws IOException {
                 JSONParser p = new JSONParser();
                 Hashtable h = p.parse(com.codename1.io.Util.getReader(input));
@@ -123,6 +124,7 @@ public class TwitterRESTService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;
@@ -139,6 +141,7 @@ public class TwitterRESTService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     public int hashCode() {
         return super.hashCode();
     }
@@ -146,6 +149,7 @@ public class TwitterRESTService extends ConnectionRequest {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void readResponse(InputStream input) throws IOException {
         InputStreamReader i = new InputStreamReader(input, "UTF-8");
         parseTree = new JSONParser().parse(i);

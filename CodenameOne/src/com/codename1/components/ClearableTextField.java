@@ -65,6 +65,7 @@ public final class ClearableTextField extends Container {
         cf.add(BorderLayout.CENTER, tf);
         cf.add(BorderLayout.EAST, b);
         b.addActionListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent evt) {
                 tf.stopEditing();
                 tf.setText("");

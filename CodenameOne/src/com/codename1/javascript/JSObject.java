@@ -1100,10 +1100,12 @@ public class JSObject {
             this.callback = callback;
         }
 
+        @Override
         public void onSucess(Double value) {
             callback.onSucess(value.intValue());
         }
 
+        @Override
         public void onError(Object sender, Throwable err, int errorCode, String errorMessage) {
             callback.onError(sender, err, errorCode, errorMessage);
         }

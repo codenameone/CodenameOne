@@ -69,6 +69,7 @@ public class ArrowLinesLayer extends LinesLayer {
      * @param segment
      * @param tile
      */
+    @Override
     protected void paintSegment(Graphics g, Coord[] segment, Tile tile) {
         super.paintSegment(g, segment, tile);
         int pointsNo = segment.length;

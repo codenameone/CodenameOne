@@ -313,6 +313,7 @@ public class Rectangle2D implements Shape {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String toString() {
         return "x = " + x + " y = " + y + " size = " + size;
     }
@@ -453,6 +454,7 @@ public class Rectangle2D implements Shape {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public PathIterator getPathIterator(Transform m) {
         if (path == null) {
             path = new GeneralPath();
@@ -470,6 +472,7 @@ public class Rectangle2D implements Shape {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public PathIterator getPathIterator() {
         return getPathIterator(null);
     }
@@ -477,6 +480,7 @@ public class Rectangle2D implements Shape {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public Rectangle getBounds() {
         return new Rectangle(
                 (int) Math.floor(getX()),
@@ -489,6 +493,7 @@ public class Rectangle2D implements Shape {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public float[] getBounds2D() {
         return new float[]{(float) getX(), (float) getY(), (float) getWidth(), (float) getHeight()};
     }
@@ -496,14 +501,17 @@ public class Rectangle2D implements Shape {
     /**
      * {{@inheritDoc}}
      */
+    @Override
     public boolean isRectangle() {
         return true;
     }
 
+    @Override
     public boolean contains(int x, int y) {
         return contains(x, (double) y);
     }
 
+    @Override
     public Shape intersection(Rectangle rect) {
         Rectangle2D r2 = new Rectangle2D(rect.getX(), rect.getY(), rect.getWidth(), rect.getHeight());
         return intersection(r2);

@@ -162,56 +162,67 @@ public class CSSBorder extends Border {
 
     static {
         decorators.put("background-color", new Decorator() {
+            @Override
             public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue) {
                 return border.backgroundColor(cssPropertyValue);
             }
         });
         decorators.put("background-image", new Decorator() {
+            @Override
             public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue) {
                 return border.backgroundImage(cssPropertyValue);
             }
         });
         decorators.put("background-position", new Decorator() {
+            @Override
             public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue) {
                 return border.backgroundPosition(cssPropertyValue);
             }
         });
         decorators.put("background-repeat", new Decorator() {
+            @Override
             public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue) {
                 return border.backgroundRepeat(cssPropertyValue);
             }
         });
         decorators.put("border-color", new Decorator() {
+            @Override
             public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue) {
                 return border.borderColor(cssPropertyValue);
             }
         });
         decorators.put("border-radius", new Decorator() {
+            @Override
             public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue) {
                 return border.borderRadius(cssPropertyValue);
             }
         });
         decorators.put("border-stroke", new Decorator() {
+            @Override
             public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue) {
                 return border.borderStroke(cssPropertyValue);
             }
         });
         decorators.put("border-style", new Decorator() {
+            @Override
             public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue) {
                 return border.borderStyle(cssPropertyValue);
             }
         });
         decorators.put("border-width", new Decorator() {
+            @Override
             public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue) {
                 return border.borderWidth(cssPropertyValue);
             }
         });
         decorators.put("border-image", new Decorator() {
+            @Override
             public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue) {
                 return border.borderImage(cssPropertyValue);
             }
         });
         decorators.put("box-shadow", new Decorator() {
+            @Override
             public CSSBorder decorate(CSSBorder border, String cssProperty, String cssPropertyValue) {
                 return border.boxShadow(cssPropertyValue);
             }

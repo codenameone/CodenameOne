@@ -403,6 +403,7 @@ public class JavascriptContext {
         }
         getWindow().set(callbackMethod, new JSFunction() {
 
+            @Override
             public void apply(JSObject self, Object[] args) {
                 callback.onSucess(args[0]);
                 getWindow().set(callbackMethod, null, true);
@@ -576,6 +577,7 @@ public class JavascriptContext {
      */
     private void dispatchCallback(final String request) {
         Runnable r = new Runnable() {
+            @Override
             public void run() {
                 String command = request.substring(request.indexOf("/!cn1command/") + "/!cn1command/".length());
                 // Get the callback id
@@ -983,6 +985,7 @@ public class JavascriptContext {
      */
     private class NavigationCallback implements BrowserNavigationCallback {
 
+        @Override
         public boolean shouldNavigate(String url) {
             //System.out.println("In shouldNavigate "+url);
             if (!url.startsWith("javascript:") && url.indexOf("/!cn1command/") != -1) {
@@ -1017,6 +1020,7 @@ public class JavascriptContext {
      */
     private class ScriptMessageListener implements ActionListener<JavascriptEvent> {
 
+        @Override
         public void actionPerformed(JavascriptEvent evt) {
             JavascriptEvent jevt = (JavascriptEvent) evt;
             JSObject source = jevt.getSelf();

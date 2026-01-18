@@ -93,6 +93,7 @@ public class Progress extends Dialog implements ActionListener<NetworkEvent> {
     /**
      * {@inheritDoc}
      */
+    @Override
     protected void actionCommand(Command cmd) {
         if (Display.getInstance().isTouchScreenDevice() || getSoftButtonCount() < 2) {
             for (int iter = 0; iter < getComponentCount(); iter++) {
@@ -112,6 +113,7 @@ public class Progress extends Dialog implements ActionListener<NetworkEvent> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void dispose() {
         NetworkManager.getInstance().removeProgressListener(this);
         super.dispose();
@@ -136,6 +138,7 @@ public class Progress extends Dialog implements ActionListener<NetworkEvent> {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void actionPerformed(NetworkEvent ev) {
         if (ev.getConnectionRequest() == request) {
             if (disposeOnCompletion && ev.getProgressType() == NetworkEvent.PROGRESS_TYPE_COMPLETED) {

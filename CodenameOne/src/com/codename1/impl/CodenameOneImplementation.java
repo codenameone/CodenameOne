@@ -676,6 +676,7 @@ public abstract class CodenameOneImplementation {
      */
     protected final void repaintTextEditor(final boolean focus) {
         Display.getInstance().callSerially(new Runnable() {
+            @Override
             public void run() {
                 if (editingText != null) {
                     editingText.repaint();
@@ -8715,6 +8716,7 @@ public abstract class CodenameOneImplementation {
     }
 
     static class RPush implements Runnable {
+        @Override
         public void run() {
             final long pushId = Preferences.get("push_id", (long) -1);
             if (pushId > -1 && callback != null) {

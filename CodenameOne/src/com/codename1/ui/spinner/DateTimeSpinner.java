@@ -47,6 +47,7 @@ public class DateTimeSpinner extends TimeSpinner {
         off = 0;
     }
 
+    @Override
     void initSpinner() {
         if (date == null) {
             date = Spinner.createDate(startDate.getTime() + off, endDate.getTime() + off, currentDate.getTime(), ' ', Spinner.DATE_FORMAT_DOW_MON_DD);
@@ -68,6 +69,7 @@ public class DateTimeSpinner extends TimeSpinner {
         super.initSpinner();
     }
 
+    @Override
     void addComponents() {
         if (date != null) {
             addComponent(date);
@@ -173,6 +175,7 @@ public class DateTimeSpinner extends TimeSpinner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String[] getPropertyNames() {
         return new String[]{"currentHour", "currentMinute", "minuteStep", "currentMeridiem", "showMeridiem",
                 "currentDate", "startDate", "endDate", "markToday", "includeYear"};
@@ -181,6 +184,7 @@ public class DateTimeSpinner extends TimeSpinner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Class[] getPropertyTypes() {
         return new Class[]{Integer.class, Integer.class, Integer.class, Boolean.class, Boolean.class,
                 Date.class, Date.class, Date.class, Boolean.class, Boolean.class};
@@ -189,6 +193,7 @@ public class DateTimeSpinner extends TimeSpinner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public Object getPropertyValue(String name) {
         if (name.equals("currentDate")) {
             return currentDate;
@@ -211,6 +216,7 @@ public class DateTimeSpinner extends TimeSpinner {
     /**
      * {@inheritDoc}
      */
+    @Override
     public String setPropertyValue(String name, Object value) {
         if (name.equals("currentDate")) {
             setCurrentDate((Date) value);

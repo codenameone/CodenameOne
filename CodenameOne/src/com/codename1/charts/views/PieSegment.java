@@ -76,6 +76,7 @@ public class PieSegment {
         return mValue;
     }
 
+    @Override
     public String toString() {
         return "mDataIndex=" + mDataIndex + ",mValue=" + mValue + ",mStartAngle=" + mStartAngle
                 + ",mEndAngle=" + mEndAngle;

@@ -69,6 +69,7 @@ public class EmailShare extends ShareService {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void share(final String toShare, final String image, final String mimeType) {
         final Form currentForm = Display.getInstance().getCurrent();
         final Form contactsForm = new Form("Contacts");
@@ -78,11 +79,13 @@ public class EmailShare extends ShareService {
         contactsForm.show();
         Display.getInstance().startThread(new Runnable() {
 
+            @Override
             public void run() {
 
                 String[] ids = ContactsManager.getAllContacts();
                 if (ids == null || ids.length == 0) {
                     Display.getInstance().callSerially(new Runnable() {
+                        @Override
                         public void run() {
                             Dialog.show("Failed to Share", "No Contacts Found", "Ok", null);
                             currentForm.showBack();
@@ -95,10 +98,12 @@ public class EmailShare extends ShareService {
                 contacts.setRenderer(createListRenderer());
                 Display.getInstance().callSerially(new Runnable() {
 
+                    @Override
                     public void run() {
 
                         contacts.addActionListener(new ActionListener() {
 
+                            @Override
                             public void actionPerformed(ActionEvent evt) {
                                 final ShareForm[] f = new ShareForm[1];
                                 Hashtable contact = (Hashtable) contacts.getSelectedItem();
@@ -106,6 +111,7 @@ public class EmailShare extends ShareService {
                                     f[0] = new ShareForm(contactsForm, "Send Email", (String) contact.get("email"), toShare,
                                             new ActionListener() {
 
+                                                @Override
                                                 public void actionPerformed(ActionEvent evt) {
                                                     String[] recieptents = new String[1];
                                                     recieptents[0] = f[0].getTo();
@@ -119,6 +125,7 @@ public class EmailShare extends ShareService {
                                     f[0] = new ShareForm(contactsForm, "Send Email", (String) contact.get("email"), toShare, image,
                                             new ActionListener() {
 
+                                                @Override
                                                 public void actionPerformed(ActionEvent evt) {
                                                     String[] recieptents = new String[1];
                                                     recieptents[0] = f[0].getTo();
@@ -136,6 +143,7 @@ public class EmailShare extends ShareService {
                         contactsForm.addComponent(BorderLayout.CENTER, contacts);
                         Command back = new Command("Back") {
 
+                            @Override
                             public void actionPerformed(ActionEvent evt) {
                                 currentForm.showBack();
                             }
@@ -154,6 +162,7 @@ public class EmailShare extends ShareService {
     /**
      * {@inheritDoc}
      */
+    @Override
     public void share(final String toShare) {
         share(toShare, null, null);
     }
@@ -177,6 +186,7 @@ public class EmailShare extends ShareService {
     /**
      * {@inheritDoc}
      */
+    @Override
     public boolean canShareImage() {
         return true;
     }
