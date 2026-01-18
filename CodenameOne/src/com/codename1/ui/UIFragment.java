@@ -530,7 +530,7 @@ public final class UIFragment {
             }
             if (name.startsWith("y")) {
                 BoxLayout l;
-                if (name.startsWith("ybottom") || name.equals("ybl")) {
+                if (name.startsWith("ybottom") || "ybl".equals(name)) {
                     l = new BoxLayout(BoxLayout.Y_AXIS_BOTTOM_LAST);
                 } else {
                     if ("true".equalsIgnoreCase(el.getAttribute("bottomLast"))) {
@@ -543,7 +543,7 @@ public final class UIFragment {
             }
             if (name.startsWith("x")) {
                 BoxLayout l;
-                if (name.startsWith("xnogrow") || name.equals("xng")) {
+                if (name.startsWith("xnogrow") || "xng".equals(name)) {
                     l = new BoxLayout(BoxLayout.X_AXIS_NO_GROW);
                 } else {
                     if ("true".equalsIgnoreCase(el.getAttribute("noGrow")) || "false".equalsIgnoreCase(el.getAttribute("grow"))) {
@@ -554,7 +554,7 @@ public final class UIFragment {
                 }
                 return new Container(l);
             }
-            if (name.equals("flow")) {
+            if ("flow".equals(name)) {
                 FlowLayout fl = new FlowLayout();
                 String align = el.getAttribute("align");
                 String valign = el.getAttribute("valign");
@@ -566,7 +566,7 @@ public final class UIFragment {
                 }
                 return new Container(fl);
             }
-            if (name.equals("grid")) {
+            if ("grid".equals(name)) {
                 String colsStr = el.getAttribute("cols");
                 int cols;
                 try {
@@ -587,7 +587,7 @@ public final class UIFragment {
                 }
                 return new Container(new GridLayout(rows, cols));
             }
-            if (name.equals("table")) {
+            if ("table".equals(name)) {
                 String colsStr = el.getAttribute("cols");
                 String rowsStr = el.getAttribute("rows");
                 int rows = -1;
@@ -617,15 +617,15 @@ public final class UIFragment {
 
 
             }
-            if (name.equals("layered")) {
+            if ("layered".equals(name)) {
                 return new Container(new LayeredLayout());
             }
-            if (name.equals("label")) {
+            if ("label".equals(name)) {
                 Element textEl = el.getNumChildren() > 0 ? el.getChildAt(0) : null;
                 String text = textEl != null ? textEl.getText() : "";
                 return new Label(text);
             }
-            if (name.equals("button")) {
+            if ("button".equals(name)) {
                 Element textEl = el.getNumChildren() > 0 ? el.getChildAt(0) : null;
                 String text = textEl != null ? textEl.getText() : "";
                 return new Button(text);

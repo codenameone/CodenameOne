@@ -2062,9 +2062,9 @@ class CSSEngine {
                     String attrValue = element.getAttribute(attr);
                     return new Label(attrValue == null ? "" : attrValue);
                 }
-            } else if (exp.equals("open-quote")) {
+            } else if ("open-quote".equals(exp)) {
                 return getQuote(true);
-            } else if (exp.equals("close-quote")) {
+            } else if ("close-quote".equals(exp)) {
                 return getQuote(false);
             } else if (exp.startsWith("url(")) {
                 String url = getCSSUrl(exp);
@@ -2143,11 +2143,11 @@ class CSSEngine {
                         if (lbl == null) { // if we didn't find a match we search for the following expressions which are used to remove added content
                             int removeQuoteType = -1;
                             boolean removeAll = false;
-                            if ((str.equals("none")) || (str.equals("normal"))) { // normal/none means remove all content
+                            if (("none".equals(str)) || ("normal".equals(str))) { // normal/none means remove all content
                                 removeAll = true;
-                            } else if (str.equals("no-open-quote")) {
+                            } else if ("no-open-quote".equals(str)) {
                                 removeQuoteType = 0; // 0 is the quote type for open quote, 1 for closed one
-                            } else if (str.equals("no-close-quote")) {
+                            } else if ("no-close-quote".equals(str)) {
                                 removeQuoteType = 1;
                             }
                             if ((removeAll) || (removeQuoteType != -1)) {
@@ -2158,8 +2158,8 @@ class CSSEngine {
                                         Component ui = (Component) e.nextElement();
                                         String conStr = (String) ui.getClientProperty(CLIENT_PROPERTY_CSS_CONTENT);
 
-                                        if ((conStr != null) && (((after) && (conStr.equals("a"))) ||
-                                                ((!after) && (conStr.equals("b"))))) {
+                                        if ((conStr != null) && (((after) && ("a".equals(conStr))) ||
+                                                ((!after) && ("b".equals(conStr))))) {
                                             boolean remove = true;
                                             if (removeQuoteType != -1) {
                                                 Object obj = ui.getClientProperty(HTMLComponent.CLIENT_PROPERTY_QUOTE);

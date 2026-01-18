@@ -1285,9 +1285,9 @@ public class Dialog extends Form {
      * @return the command that might have been triggered by the user within the dialog if commands are placed in the dialog
      */
     public Command showPopupDialog(Rectangle rect) {
-        if (getDialogUIID().equals("Dialog")) {
+        if ("Dialog".equals(getDialogUIID())) {
             setDialogUIID("PopupDialog");
-            if (getTitleComponent().getUIID().equals("DialogTitle")) {
+            if ("DialogTitle".equals(getTitleComponent().getUIID())) {
                 getTitleComponent().setUIID("PopupDialogTitle");
             }
             getContentPane().setUIID("PopupContentPane");
@@ -1404,7 +1404,7 @@ public class Dialog extends Form {
             }
             if (rect.getY() < availableHeight / 2) {
                 // popup downwards
-                if (getDialogUIID().equals("PopupDialog") && isUIIDByPopupPosition) {
+                if ("PopupDialog".equals(getDialogUIID()) && isUIIDByPopupPosition) {
                     getContentPane().setUIID("PopupContentPaneDownwards");
                 }
                 y = rect.getY() + rect.getSize().getHeight();
@@ -1412,7 +1412,7 @@ public class Dialog extends Form {
                 result = show(y, availableHeight - height - y, x, availableWidth - width - x, true, true);
             } else {
                 // popup upwards
-                if (getDialogUIID().equals("PopupDialog") && isUIIDByPopupPosition) {
+                if ("PopupDialog".equals(getDialogUIID()) && isUIIDByPopupPosition) {
                     getContentPane().setUIID("PopupContentPaneUpwards");
                 }
                 int height = Math.min(prefHeight, availableHeight - (availableHeight - rect.getY()));
@@ -1438,7 +1438,7 @@ public class Dialog extends Form {
 
             if (prefWidth > rect.getX()) {
                 // popup right
-                if (getDialogUIID().equals("PopupDialog") && isUIIDByPopupPosition) {
+                if ("PopupDialog".equals(getDialogUIID()) && isUIIDByPopupPosition) {
                     getContentPane().setUIID("PopupContentPaneRight");
                 }
                 x = rect.getX() + rect.getSize().getWidth();
@@ -1450,7 +1450,7 @@ public class Dialog extends Form {
                 result = show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x), true, true);
             } else {
                 // popup left
-                if (getDialogUIID().equals("PopupDialog") && isUIIDByPopupPosition) {
+                if ("PopupDialog".equals(getDialogUIID()) && isUIIDByPopupPosition) {
                     getContentPane().setUIID("PopupContentPaneLeft");
                 }
                 width = Math.min(prefWidth, availableWidth - (availableWidth - rect.getX()));

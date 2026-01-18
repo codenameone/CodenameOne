@@ -117,7 +117,7 @@ class HTMLEventsListener implements ActionListener, FocusListener {
             toggleChecked(element, ((CheckBox) src).isSelected());
         } else if (src instanceof RadioButton) {
             String curDomState = element.getAttributeById(HTMLElement.ATTR_CHECKED);
-            if ((curDomState == null) || (!curDomState.equals("checked"))) {
+            if ((curDomState == null) || (!"checked".equals(curDomState))) {
                 String name = element.getAttributeById(HTMLElement.ATTR_NAME);
                 if (name != null) { // If this is named radiobutton, we need to set the status of the others accordingly
                     for (Enumeration e = comps.keys(); e.hasMoreElements(); ) {

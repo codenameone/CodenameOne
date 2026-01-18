@@ -197,7 +197,7 @@ public class HTMLParser extends XMLParser {
      * @return false if this is the SCRIPT tag, true otherwise
      */
     protected boolean shouldEvaluate(Element element) {
-        return ((((HTMLElement) element).getTagId() != HTMLElement.TAG_UNSUPPORTED) || (!element.getTagName().equalsIgnoreCase("script")));
+        return ((((HTMLElement) element).getTagId() != HTMLElement.TAG_UNSUPPORTED) || (!"script".equalsIgnoreCase(element.getTagName())));
     }
 
 

@@ -211,7 +211,7 @@ public class ScaleImageLabel extends Label {
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if (name.equals("backgroundType")) {
+        if ("backgroundType".equals(name)) {
             return getBackgroundType();
         }
         return null;
@@ -221,7 +221,7 @@ public class ScaleImageLabel extends Label {
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("backgroundType")) {
+        if ("backgroundType".equals(name)) {
             setBackgroundType(((Byte) value).byteValue());
             return null;
         }

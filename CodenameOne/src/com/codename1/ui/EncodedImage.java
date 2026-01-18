@@ -652,7 +652,7 @@ public class EncodedImage extends Image {
     public Image scaled(int width, int height) {
         // J2ME/RIM don't support image IO and Windows Phone doesn't support PNG which prevents
         // scaling translucent images properly
-        if (Display.getInstance().getProperty("encodedImageScaling", "true").equals("true") &&
+        if ("true".equals(Display.getInstance().getProperty("encodedImageScaling", "true")) &&
                 ImageIO.getImageIO() != null && ImageIO.getImageIO().isFormatSupported(ImageIO.FORMAT_PNG)) {
             return scaledEncoded(width, height);
         }

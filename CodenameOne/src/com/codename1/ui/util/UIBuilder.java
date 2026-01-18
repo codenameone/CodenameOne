@@ -205,7 +205,7 @@ public class UIBuilder { //implements Externalizable {
     private Hashtable localCommandListeners;
     private EventDispatcher globalCommandListeners;
     private Hashtable localComponentListeners;
-    private boolean keepResourcesInRam = Display.getInstance().getProperty("cacheResFile", "false").equals("true");
+    private boolean keepResourcesInRam = "true".equals(Display.getInstance().getProperty("cacheResFile", "false"));
     private Vector backCommands;
     /**
      * When reaching the home form the navigation stack is cleared
@@ -438,7 +438,7 @@ public class UIBuilder { //implements Externalizable {
         int commandId = in.readInt();
         String commandAction = in.readUTF();
         String commandArgument = "";
-        if (commandAction.equals("$Execute")) {
+        if ("$Execute".equals(commandAction)) {
             commandArgument = in.readUTF();
         }
         boolean isBack = in.readBoolean();
@@ -719,7 +719,7 @@ public class UIBuilder { //implements Externalizable {
             }
             boolean isBack = in.readBoolean();
             commandArguments[iter] = "";
-            if (commandActions[iter].equals("$Execute")) {
+            if ("$Execute".equals(commandActions[iter])) {
                 commandArguments[iter] = in.readUTF();
             }
             commands[iter] = createCommandImpl(commandName, res.getImage(commandImageName), commandId, commandActions[iter], isBack, commandArguments[iter]);
@@ -768,7 +768,7 @@ public class UIBuilder { //implements Externalizable {
                         if (type == 1) { // String
                             String key = in.readUTF();
                             Object value = in.readUTF();
-                            if (key.equals("$navigation")) {
+                            if ("$navigation".equals(key)) {
                                 Command cmd = createCommandImpl((String) value, null, -1, (String) value, false, "");
                                 cmd.putClientProperty(COMMAND_ACTION, value);
                                 value = cmd;
@@ -1051,7 +1051,7 @@ public class UIBuilder { //implements Externalizable {
                                 typeName = typeNames[iter];
                             }
                             Object value = readCustomPropertyValue(in, type, typeName, res, propertyNames[iter]);
-                            if (cl && customPropertyName.equals("ListItems") && setListModel((ContainerList) cmp)) {
+                            if (cl && "ListItems".equals(customPropertyName) && setListModel((ContainerList) cmp)) {
                                 break;
                             }
                             cmp.setPropertyValue(customPropertyName, value);
@@ -2142,7 +2142,7 @@ public class UIBuilder { //implements Externalizable {
      */
     protected String getBackCommandText(String previousFormTitle) {
         if (UIManager.getInstance().isThemeConstant("backUsesTitleBool", false)) {
-            if (previousFormTitle == null || previousFormTitle.equals("") || previousFormTitle.equals(" ")) {
+            if (previousFormTitle == null || "".equals(previousFormTitle) || " ".equals(previousFormTitle)) {
                 return "Back";
             }
             return previousFormTitle;
@@ -2851,19 +2851,19 @@ public class UIBuilder { //implements Externalizable {
             }
             String action = (String) cmd.getClientProperty(COMMAND_ACTION);
             if (action != null && action.length() > 0) {
-                if (action.equals("$Minimize")) {
+                if ("$Minimize".equals(action)) {
                     Display.getInstance().minimizeApplication();
                     return;
                 }
-                if (action.equals("$Exit")) {
+                if ("$Exit".equals(action)) {
                     Display.getInstance().exitApplication();
                     return;
                 }
-                if (action.equals("$Execute")) {
+                if ("$Execute".equals(action)) {
                     Display.getInstance().execute((String) cmd.getClientProperty(COMMAND_ARGUMENTS));
                     return;
                 }
-                if (action.equals("$Back")) {
+                if ("$Back".equals(action)) {
                     back(evt.getComponent());
                     return;
                 }

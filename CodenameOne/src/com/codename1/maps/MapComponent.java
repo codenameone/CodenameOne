@@ -1105,15 +1105,15 @@ public class MapComponent extends Container {
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if (name.equals("latitude")) {
+        if ("latitude".equals(name)) {
             Coord c = _map.projection().toWGS84(_center);
             return Double.valueOf(c.getLatitude());
         }
-        if (name.equals("longitude")) {
+        if ("longitude".equals(name)) {
             Coord c = _map.projection().toWGS84(_center);
             return Double.valueOf(c.getLongitude());
         }
-        if (name.equals("zoom")) {
+        if ("zoom".equals(name)) {
             return Integer.valueOf(getZoomLevel());
         }
         return null;
@@ -1123,15 +1123,15 @@ public class MapComponent extends Container {
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("latitude")) {
+        if ("latitude".equals(name)) {
             setLatitude(((Double) value).doubleValue());
             return null;
         }
-        if (name.equals("longitude")) {
+        if ("longitude".equals(name)) {
             setLongitude(((Double) value).doubleValue());
             return null;
         }
-        if (name.equals("zoom")) {
+        if ("zoom".equals(name)) {
             setZoomLevel(((Integer) value).intValue());
             return null;
         }

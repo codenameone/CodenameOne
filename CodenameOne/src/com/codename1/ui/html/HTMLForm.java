@@ -87,7 +87,7 @@ class HTMLForm {
             }
         }
 
-        this.isPostMethod = ((method != null) && (method.equalsIgnoreCase("post")));
+        this.isPostMethod = ((method != null) && ("post".equalsIgnoreCase(method)));
     }
 
     /**
@@ -97,7 +97,7 @@ class HTMLForm {
      * @return The reset command
      */
     Command createResetCommand(String value) {
-        if ((value == null) || (value.equals(""))) {
+        if ((value == null) || ("".equals(value))) {
             value = htmlC.getUIManager().localize("html.reset", HTMLForm.DEFAULT_RESET_TEXT);
         }
         return new NamedCommand(null, value, this, false);
@@ -112,7 +112,7 @@ class HTMLForm {
      */
     Command createSubmitCommand(String name, String value) {
         hasSubmitButton = true;
-        if ((value == null) || (value.equals(""))) {
+        if ((value == null) || ("".equals(value))) {
             value = htmlC.getUIManager().localize("html.submit", DEFAULT_SUBMIT_TEXT);
         }
         return new NamedCommand(name, value, this, true);
@@ -286,7 +286,7 @@ class HTMLForm {
                     String errorMsg = null;
                     if (HTMLComponent.SUPPORT_INPUT_FORMAT) {
                         boolean ok = false;
-                        if (text.equals("")) { // check empty - Note that emptyok/-wap-input-required overrides input format
+                        if ("".equals(text)) { // check empty - Note that emptyok/-wap-input-required overrides input format
                             if (emptyNotOk.contains(tf)) {
                                 errorMsg = htmlC.getUIManager().localize("html.format.emptynotok", "Field can't be empty");
                                 error = true;
@@ -350,7 +350,7 @@ class HTMLForm {
             if (params == null) {
                 params = "";
             }
-            if (!params.equals("")) {
+            if (!"".equals(params)) {
                 params = params + "&";
             }
             params = params + HTMLUtils.encodeString(submitKey) + "=" + HTMLUtils.encodeString(submitVal);
@@ -358,7 +358,7 @@ class HTMLForm {
 
         if (!error) {
             DocumentInfo docInfo = new DocumentInfo(url, params, isPostMethod);
-            if ((encType != null) && (!encType.equals(""))) {
+            if ((encType != null) && (!"".equals(encType))) {
                 docInfo.setEncoding(encType);
             }
             htmlC.setPage(docInfo);

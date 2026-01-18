@@ -173,28 +173,28 @@ public class TimeSpinner extends BaseSpinner {
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if (name.equals("durationMode")) {
+        if ("durationMode".equals(name)) {
             if (durationMode) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        if (name.equals("currentHour")) {
+        if ("currentHour".equals(name)) {
             return Integer.valueOf(currentHour);
         }
-        if (name.equals("currentMinute")) {
+        if ("currentMinute".equals(name)) {
             return Integer.valueOf(currentMinute);
         }
-        if (name.equals("minuteStep")) {
+        if ("minuteStep".equals(name)) {
             return Integer.valueOf(minuteStep);
         }
-        if (name.equals("currentMeridiem")) {
+        if ("currentMeridiem".equals(name)) {
             if (currentMeridiem) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        if (name.equals("showMeridiem")) {
+        if ("showMeridiem".equals(name)) {
             if (showMeridiem) {
                 return Boolean.TRUE;
             }
@@ -207,27 +207,27 @@ public class TimeSpinner extends BaseSpinner {
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("currentHour")) {
+        if ("currentHour".equals(name)) {
             setCurrentHour(Integer.parseInt(value.toString()));
             return null;
         }
-        if (name.equals("currentMinute")) {
+        if ("currentMinute".equals(name)) {
             setCurrentMinute(Integer.parseInt(value.toString()));
             return null;
         }
-        if (name.equals("minuteStep")) {
+        if ("minuteStep".equals(name)) {
             setMinuteStep(Integer.parseInt(value.toString()));
             return null;
         }
-        if (name.equals("currentMeridiem")) {
+        if ("currentMeridiem".equals(name)) {
             setCurrentMeridiem(((Boolean) value).booleanValue());
             return null;
         }
-        if (name.equals("showMeridiem")) {
+        if ("showMeridiem".equals(name)) {
             setShowMeridiem(((Boolean) value).booleanValue());
             return null;
         }
-        if (name.equals("durationMode")) {
+        if ("durationMode".equals(name)) {
             setDurationMode(((Boolean) value).booleanValue());
             return null;
         }

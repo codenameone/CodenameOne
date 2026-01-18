@@ -1049,35 +1049,35 @@ public abstract class LookAndFeel {
 
     private void initCommandBehaviorConstant(String c, boolean complete) {
         if (c != null) {
-            if (c.equalsIgnoreCase("SoftKey")) {
+            if ("SoftKey".equalsIgnoreCase(c)) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SOFTKEY);
                 return;
             }
-            if (c.equalsIgnoreCase("Touch")) {
+            if ("Touch".equalsIgnoreCase(c)) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_TOUCH_MENU);
                 return;
             }
-            if (c.equalsIgnoreCase("Bar")) {
+            if ("Bar".equalsIgnoreCase(c)) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_BUTTON_BAR);
                 return;
             }
-            if (c.equalsIgnoreCase("Title")) {
+            if ("Title".equalsIgnoreCase(c)) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_BACK);
                 return;
             }
-            if (c.equalsIgnoreCase("Right")) {
+            if ("Right".equalsIgnoreCase(c)) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_BUTTON_BAR_TITLE_RIGHT);
                 return;
             }
-            if (c.equalsIgnoreCase("Native")) {
+            if ("Native".equalsIgnoreCase(c)) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_NATIVE);
                 return;
             }
-            if (c.equalsIgnoreCase("ICS")) {
+            if ("ICS".equalsIgnoreCase(c)) {
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_ICS);
                 return;
             }
-            if (c.equalsIgnoreCase("SIDE")) {
+            if ("SIDE".equalsIgnoreCase(c)) {
                 Log.p("WARNING: Theme sets the commandBehavior constant which is deprecated.  Please update the theme to NOT include this theme constant.  Using commandBehavior may cause your app to perform in unexpected ways.  In particular, using SIDE command behavior in conjunction with Toolbar.setOnTopSideMenu(true) may result in runtime exceptions.", Log.WARNING);
                 Display.getInstance().setCommandBehavior(Display.COMMAND_BEHAVIOR_SIDE_NAVIGATION);
                 setMenuBarClass(SideMenuBar.class);
@@ -1098,47 +1098,47 @@ public abstract class LookAndFeel {
         if (val == null) {
             return t;
         }
-        if (val.equalsIgnoreCase("empty")) {
+        if ("empty".equalsIgnoreCase(val)) {
             return CommonTransitions.createEmpty();
         }
-        if (val.equalsIgnoreCase("slide")) {
-            if (slideDir.equalsIgnoreCase("horizontal")) {
+        if ("slide".equalsIgnoreCase(val)) {
+            if ("horizontal".equalsIgnoreCase(slideDir)) {
                 return CommonTransitions.createSlide(CommonTransitions.SLIDE_HORIZONTAL, forward, speed);
             } else {
                 return CommonTransitions.createSlide(CommonTransitions.SLIDE_VERTICAL, forward, speed);
             }
         }
-        if (val.equalsIgnoreCase("cover")) {
-            if (slideDir.equalsIgnoreCase("horizontal")) {
+        if ("cover".equalsIgnoreCase(val)) {
+            if ("horizontal".equalsIgnoreCase(slideDir)) {
                 return CommonTransitions.createCover(CommonTransitions.SLIDE_HORIZONTAL, forward, speed);
             } else {
                 return CommonTransitions.createCover(CommonTransitions.SLIDE_VERTICAL, forward, speed);
             }
         }
-        if (val.equalsIgnoreCase("uncover")) {
-            if (slideDir.equalsIgnoreCase("horizontal")) {
+        if ("uncover".equalsIgnoreCase(val)) {
+            if ("horizontal".equalsIgnoreCase(slideDir)) {
                 return CommonTransitions.createUncover(CommonTransitions.SLIDE_HORIZONTAL, forward, speed);
             } else {
                 return CommonTransitions.createUncover(CommonTransitions.SLIDE_VERTICAL, forward, speed);
             }
         }
-        if (val.equalsIgnoreCase("fslide")) {
-            if (slideDir.equalsIgnoreCase("horizontal")) {
+        if ("fslide".equalsIgnoreCase(val)) {
+            if ("horizontal".equalsIgnoreCase(slideDir)) {
                 return CommonTransitions.createFastSlide(CommonTransitions.SLIDE_HORIZONTAL, forward, speed);
             } else {
                 return CommonTransitions.createFastSlide(CommonTransitions.SLIDE_VERTICAL, forward, speed);
             }
         }
-        if (val.equalsIgnoreCase("fade")) {
+        if ("fade".equalsIgnoreCase(val)) {
             return CommonTransitions.createFade(speed);
         }
-        if (val.equalsIgnoreCase("slidefade")) {
+        if ("slidefade".equalsIgnoreCase(val)) {
             return CommonTransitions.createSlideFadeTitle(forward, speed);
         }
-        if (val.equalsIgnoreCase("pulse")) {
+        if ("pulse".equalsIgnoreCase(val)) {
             return CommonTransitions.createDialogPulsate();
         }
-        if (val.equalsIgnoreCase("bubble")) {
+        if ("bubble".equalsIgnoreCase(val)) {
             BubbleTransition transition = new BubbleTransition(speed);
             transition.setRoundBubble(false);
             return transition;

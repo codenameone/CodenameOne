@@ -172,7 +172,7 @@ public class DocumentInfo {
      * @return the full url string including parameters in GET request
      */
     public String getFullUrl() {
-        if ((postRequest) || (params == null) || (params.equals(""))) {
+        if ((postRequest) || (params == null) || ("".equals(params))) {
             return pageURL;
         } else {
             return pageURL + "?" + params;
@@ -278,7 +278,7 @@ public class DocumentInfo {
                     } else if (url.startsWith("../")) { // Go one folder up
                         url = url.substring(3);
                         back++;
-                    } else if (url.equals("..")) {
+                    } else if ("..".equals(url)) {
                         url = "";
                         back++;
                     } else { // either "." or something else not-understandable (resting the URL gets us out of the loop)

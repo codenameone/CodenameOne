@@ -1509,7 +1509,7 @@ public class UIManager {
         if (c == null) {
             return def;
         }
-        return c.equalsIgnoreCase("true") || c.equals("1");
+        return "true".equalsIgnoreCase(c) || "1".equals(c);
     }
 
     /**
@@ -1523,7 +1523,7 @@ public class UIManager {
         if (c == null) {
             return null;
         }
-        if (c.equalsIgnoreCase("true") || c.equals("1")) {
+        if ("true".equalsIgnoreCase(c) || "1".equals(c)) {
             return Boolean.TRUE;
         }
         return Boolean.FALSE;
@@ -1574,7 +1574,7 @@ public class UIManager {
 
     private void buildTheme(Hashtable themeProps) {
         String con = (String) themeProps.get("@includeNativeBool");
-        if (con != null && con.equalsIgnoreCase("true") && Display.getInstance().hasNativeTheme()) {
+        if (con != null && "true".equalsIgnoreCase(con) && Display.getInstance().hasNativeTheme()) {
             boolean a = accessible;
             accessible = true;
             Display.getInstance().installNativeTheme();
@@ -2117,7 +2117,7 @@ public class UIManager {
             if (resourceBundle != null) {
                 String v = (String) resourceBundle.get("@rtl");
                 if (v != null) {
-                    getLookAndFeel().setRTL(v.equalsIgnoreCase("true"));
+                    "true".equalsIgnoreCase(getLookAndFeel().setRTL(v));
 
                     // update some "bidi sensitive" variables in the LaF
                     current.refreshTheme(false);
@@ -2153,7 +2153,7 @@ public class UIManager {
             if (bundle != null) {
                 String v = bundle.get("@rtl");
                 if (v != null) {
-                    getLookAndFeel().setRTL(v.equalsIgnoreCase("true"));
+                    "true".equalsIgnoreCase(getLookAndFeel().setRTL(v));
 
                     // update some "bidi sensitive" variables in the LaF
                     current.refreshTheme(false);

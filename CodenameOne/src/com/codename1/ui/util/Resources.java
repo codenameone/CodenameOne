@@ -947,15 +947,15 @@ public class Resources {
     }
 
     private Border createImageBorder(String[] value) {
-        if (value[0].equals("h")) {
+        if ("h".equals(value[0])) {
             return Border.createHorizonalImageBorder(getImage(value[1]),
                     getImage(value[2]), getImage(value[3]));
         }
-        if (value[0].equals("v")) {
+        if ("v".equals(value[0])) {
             return Border.createVerticalImageBorder(getImage(value[1]),
                     getImage(value[2]), getImage(value[3]));
         }
-        if (value[0].equals("s")) {
+        if ("s".equals(value[0])) {
             Image[] images = new Image[value.length - 1];
             int ilen = images.length;
             for (int iter = 0; iter < ilen; iter++) {
@@ -1337,7 +1337,7 @@ public class Resources {
                         fontScaleRules.put(key, Float.parseFloat((String) theme.get(key)));
                     }
                 }
-                if (key.equals("@defaultFontSizeInt") && defaultFontSizeSetPriority < 1) {
+                if ("@defaultFontSizeInt".equals(key) && defaultFontSizeSetPriority < 1) {
                     int themeMedianFontSize = Integer.parseInt((String) theme.get(key));
                     if (themeMedianFontSize > 0) {
                         double adjustedFontSize = themeMedianFontSize * CN.convertToPixels(1f) * 25.4 / (CN.isDesktop() ? 96f : 160f);
@@ -1345,7 +1345,7 @@ public class Resources {
                         defaultFontSizeSetPriority = 1;
                     }
                 }
-                if (CN.isTablet() && key.equals("@defaultTabletFontSizeInt") && defaultFontSizeSetPriority < 2) {
+                if (CN.isTablet() && "@defaultTabletFontSizeInt".equals(key) && defaultFontSizeSetPriority < 2) {
                     int themeMedianFontSize = Integer.parseInt((String) theme.get(key));
                     if (themeMedianFontSize > 0) {
                         double adjustedFontSize = themeMedianFontSize * CN.convertToPixels(1f) * 25.4 / (CN.isDesktop() ? 96f : 160f);
@@ -1353,7 +1353,7 @@ public class Resources {
                         defaultFontSizeSetPriority = 2;
                     }
                 }
-                if (CN.isDesktop() && key.equals("@defaultDesktopFontSizeInt") && defaultFontSizeSetPriority < 3) {
+                if (CN.isDesktop() && "@defaultDesktopFontSizeInt".equals(key) && defaultFontSizeSetPriority < 3) {
                     int themeMedianFontSize = Integer.parseInt((String) theme.get(key));
                     if (themeMedianFontSize > 0) {
                         double adjustedFontSize = themeMedianFontSize * CN.convertToPixels(1f) * 25.4 / (CN.isDesktop() ? 96f : 160f);

@@ -2935,7 +2935,7 @@ public class Component implements Animation, StyleListener, Editable {
     private void paintPullToRefresh(Graphics g) {
         if (!dragActivated && scrollY == -getUIManager().getLookAndFeel().getPullToRefreshHeight()
                 && getClientProperty("$pullToRelease") != null
-                && getClientProperty("$pullToRelease").equals("update")) {
+                && "update".equals(getClientProperty("$pullToRelease"))) {
 
             putClientProperty("$pullToRelease", "updating");
             draggedMotionY = null;
@@ -2951,7 +2951,7 @@ public class Component implements Animation, StyleListener, Editable {
             });
         }
         boolean updating = getClientProperty("$pullToRelease") != null
-                && getClientProperty("$pullToRelease").equals("updating");
+                && "updating".equals(getClientProperty("$pullToRelease"));
         getUIManager().getLookAndFeel().drawPullToRefresh(g, this, updating);
     }
 
@@ -4646,7 +4646,7 @@ public class Component implements Animation, StyleListener, Editable {
             parent.clearDrag();
         }
         if (getClientProperty("$pullToRelease") != null
-                && !getClientProperty("$pullToRelease").equals("updating")) {
+                && !"updating".equals(getClientProperty("$pullToRelease"))) {
             putClientProperty("$pullToRelease", null);
         }
     }
@@ -5851,7 +5851,7 @@ public class Component implements Animation, StyleListener, Editable {
             }
             if (!shouldScrollX) {
                 if (speed < 0) {
-                    if (UIManager.getInstance().getThemeConstant("ScrollMotion", "DECAY").equals("DECAY")) {
+                    if ("DECAY".equals(UIManager.getInstance().getThemeConstant("ScrollMotion", "DECAY"))) {
                         int timeConstant = UIManager.getInstance().getThemeConstant("ScrollMotionTimeConstantInt", 500);
 
                         draggedMotionY = Motion.createExponentialDecayMotion(scroll, -tl / 2, speed, timeConstant);
@@ -5859,7 +5859,7 @@ public class Component implements Animation, StyleListener, Editable {
                         draggedMotionY = Motion.createFrictionMotion(scroll, -tl / 2, speed, 0.0007f);
                     }
                 } else {
-                    if (UIManager.getInstance().getThemeConstant("ScrollMotion", "DECAY").equals("DECAY")) {
+                    if ("DECAY".equals(UIManager.getInstance().getThemeConstant("ScrollMotion", "DECAY"))) {
                         int timeConstant = UIManager.getInstance().getThemeConstant("ScrollMotionTimeConstantInt", 500);
                         draggedMotionY = Motion.createExponentialDecayMotion(scroll, getScrollDimension().getHeight() -
                                 getHeight() + getInvisibleAreaUnderVKB() + tl / 2, speed, timeConstant);
@@ -7398,7 +7398,7 @@ public class Component implements Animation, StyleListener, Editable {
     public Image paintLock(boolean hardLock) {
         if (!paintLockEnableChecked) {
             paintLockEnableChecked = true;
-            paintLockEnabled = Display.getInstance().getProperty("paintLockEnabled", "true").equals("true");
+            paintLockEnabled = "true".equals(Display.getInstance().getProperty("paintLockEnabled", "true"));
         }
         if (!paintLockEnabled || !Display.getInstance().areMutableImagesFast()) {
             return null;

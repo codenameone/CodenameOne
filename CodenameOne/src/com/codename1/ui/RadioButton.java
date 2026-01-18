@@ -383,7 +383,7 @@ public class RadioButton extends Button {
      * @deprecated uses the deprecated BindTarget interface
      */
     public void bindProperty(String prop, BindTarget target) {
-        if (prop.equals("selected")) {
+        if ("selected".equals(prop)) {
             if (bindListeners == null) {
                 bindListeners = new EventDispatcher();
             }
@@ -398,7 +398,7 @@ public class RadioButton extends Button {
      * @deprecated uses the deprecated BindTarget interface
      */
     public void unbindProperty(String prop, BindTarget target) {
-        if (prop.equals("selected")) {
+        if ("selected".equals(prop)) {
             if (bindListeners == null) {
                 return;
             }
@@ -415,7 +415,7 @@ public class RadioButton extends Button {
      * {@inheritDoc}
      */
     public Object getBoundPropertyValue(String prop) {
-        if (prop.equals("selected")) {
+        if ("selected".equals(prop)) {
             if (isSelected()) {
                 return Boolean.TRUE;
             }
@@ -428,7 +428,7 @@ public class RadioButton extends Button {
      * {@inheritDoc}
      */
     public void setBoundPropertyValue(String prop, Object value) {
-        if (prop.equals("selected")) {
+        if ("selected".equals(prop)) {
             setSelected(value != null && ((Boolean) value).booleanValue());
             return;
         }

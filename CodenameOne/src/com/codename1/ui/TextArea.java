@@ -1042,7 +1042,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
             setShouldCalcPreferredSize(true);
             return;
         }
-        if (text == null || text.equals("")) {
+        if (text == null || "".equals(text)) {
             return;
         }
         Font font = style.getFont();
@@ -1758,7 +1758,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
     }
 
     boolean shouldShowHint() {
-        return getText().equals("");
+        return "".equals(getText());
     }
 
     /**
@@ -1828,7 +1828,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      * @deprecated uses the deprecated BindTarget interface
      */
     public void bindProperty(String prop, BindTarget target) {
-        if (prop.equals("text")) {
+        if ("text".equals(prop)) {
             if (bindListeners == null) {
                 bindListeners = new EventDispatcher();
             }
@@ -1843,7 +1843,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      * @deprecated uses the deprecated BindTarget interface
      */
     public void unbindProperty(String prop, BindTarget target) {
-        if (prop.equals("text")) {
+        if ("text".equals(prop)) {
             if (bindListeners == null) {
                 return;
             }
@@ -1860,7 +1860,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      * {@inheritDoc}
      */
     public Object getBoundPropertyValue(String prop) {
-        if (prop.equals("text")) {
+        if ("text".equals(prop)) {
             return getText();
         }
         return super.getBoundPropertyValue(prop);
@@ -1870,7 +1870,7 @@ public class TextArea extends Component implements ActionSource, TextHolder {
      * {@inheritDoc}
      */
     public void setBoundPropertyValue(String prop, Object value) {
-        if (prop.equals("text")) {
+        if ("text".equals(prop)) {
             if (value == null) {
                 setText("");
             } else {

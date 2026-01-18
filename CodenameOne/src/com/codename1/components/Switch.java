@@ -1013,7 +1013,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if (name.equals("value")) {
+        if ("value".equals(name)) {
             if (value) {
                 return Boolean.TRUE;
             }
@@ -1026,7 +1026,7 @@ public class Switch extends Component implements ActionSource, ReleasableCompone
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("value")) {
+        if ("value".equals(name)) {
             setValue(((Boolean) value).booleanValue());
             return null;
         }

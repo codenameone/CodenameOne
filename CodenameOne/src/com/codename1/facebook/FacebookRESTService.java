@@ -128,7 +128,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     }
 
     public void startBlock(String block) {
-        if (block.equals("paging")) {
+        if ("paging".equals(block)) {
             return;
         }
         Object node;
@@ -173,7 +173,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     }
 
     public void startArray(String block) {
-        if (block.equals("paging")) {
+        if ("paging".equals(block)) {
             return;
         }
         Vector items = new Vector();
@@ -206,7 +206,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     }
 
     public void endArray(String block) {
-        if (block.equals("paging")) {
+        if ("paging".equals(block)) {
             return;
         }
         if (stack.size() > 1) {
@@ -219,7 +219,7 @@ class FacebookRESTService extends ConnectionRequest implements JSONParseCallback
     }
 
     public void endBlock(String block) {
-        if (block.equals("paging")) {
+        if ("paging".equals(block)) {
             return;
         }
         if (stack.size() > 1) {

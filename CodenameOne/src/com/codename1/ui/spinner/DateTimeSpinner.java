@@ -190,19 +190,19 @@ public class DateTimeSpinner extends TimeSpinner {
      * {@inheritDoc}
      */
     public Object getPropertyValue(String name) {
-        if (name.equals("currentDate")) {
+        if ("currentDate".equals(name)) {
             return currentDate;
         }
-        if (name.equals("startDate")) {
+        if ("startDate".equals(name)) {
             return startDate;
         }
-        if (name.equals("endDate")) {
+        if ("endDate".equals(name)) {
             return endDate;
         }
-        if (name.equals("markToday")) {
+        if ("markToday".equals(name)) {
             return Boolean.valueOf(markToday);
         }
-        if (name.equals("includeYear")) {
+        if ("includeYear".equals(name)) {
             return Boolean.valueOf(includeYear);
         }
         return super.getPropertyValue(name);
@@ -212,23 +212,23 @@ public class DateTimeSpinner extends TimeSpinner {
      * {@inheritDoc}
      */
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("currentDate")) {
+        if ("currentDate".equals(name)) {
             setCurrentDate((Date) value);
             return null;
         }
-        if (name.equals("startDate")) {
+        if ("startDate".equals(name)) {
             setStartDate((Date) value);
             return null;
         }
-        if (name.equals("endDate")) {
+        if ("endDate".equals(name)) {
             setEndDate((Date) value);
             return null;
         }
-        if (name.equals("markToday")) {
+        if ("markToday".equals(name)) {
             setMarkToday(((Boolean) value).booleanValue());
             return null;
         }
-        if (name.equals("includeYear")) {
+        if ("includeYear".equals(name)) {
             setIncludeYear(((Boolean) value).booleanValue());
             return null;
         }
