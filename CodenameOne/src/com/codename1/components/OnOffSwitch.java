@@ -577,13 +577,13 @@ public class OnOffSwitch extends Container implements ActionSource {
      */
     @Override
     public Object getPropertyValue(String name) {
-        if (name.equals("on")) {
+        if ("on".equals(name)) {
             return on;
         }
-        if (name.equals("off")) {
+        if ("off".equals(name)) {
             return off;
         }
-        if (name.equals("value")) {
+        if ("value".equals(name)) {
             if (value) {
                 return Boolean.TRUE;
             }
@@ -597,15 +597,15 @@ public class OnOffSwitch extends Container implements ActionSource {
      */
     @Override
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("on")) {
+        if ("on".equals(name)) {
             setOn((String) value);
             return null;
         }
-        if (name.equals("off")) {
+        if ("off".equals(name)) {
             setOff((String) value);
             return null;
         }
-        if (name.equals("value")) {
+        if ("value".equals(name)) {
             setValue(((Boolean) value).booleanValue());
             return null;
         }

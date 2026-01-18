@@ -4610,12 +4610,12 @@ public class Form extends Container {
      */
     @Override
     public Object getPropertyValue(String name) {
-        if (name.equals("titleUIID")) {
+        if ("titleUIID".equals(name)) {
             if (getTitleComponent() != null) {
                 return getTitleComponent().getUIID();
             }
         }
-        if (name.equals("titleAreaUIID")) {
+        if ("titleAreaUIID".equals(name)) {
             if (getTitleArea() != null) {
                 return getTitleArea().getUIID();
             }
@@ -4628,13 +4628,13 @@ public class Form extends Container {
      */
     @Override
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("titleUIID")) {
+        if ("titleUIID".equals(name)) {
             if (getTitleComponent() != null) {
                 getTitleComponent().setUIID((String) value);
             }
             return null;
         }
-        if (name.equals("titleAreaUIID")) {
+        if ("titleAreaUIID".equals(name)) {
             if (getTitleArea() != null) {
                 getTitleArea().setUIID((String) value);
             }

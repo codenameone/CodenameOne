@@ -621,7 +621,7 @@ public class ConnectionRequest implements IOProgressListener {
         if (userHeaders == null) {
             userHeaders = new Hashtable();
         }
-        if (key.equalsIgnoreCase("content-type")) {
+        if ("content-type".equalsIgnoreCase(key)) {
             setContentType(value);
         } else {
             userHeaders.put(key, value);
@@ -723,7 +723,7 @@ public class ConnectionRequest implements IOProgressListener {
             // the default, and add a property to turn it off.
             //  -- SJH Sept. 15, 2016
             boolean shouldAddContentType = contentTypeSetExplicitly ||
-                    Display.getInstance().getProperty("ConnectionRequest.excludeContentTypeFromGetRequests", "true").equals("false");
+                    "false".equals(Display.getInstance().getProperty("ConnectionRequest.excludeContentTypeFromGetRequests", "true"));
 
             if (isPost() || (getHttpMethod() != null && !"get".equalsIgnoreCase(getHttpMethod()))) {
                 shouldAddContentType = true;

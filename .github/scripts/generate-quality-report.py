@@ -900,6 +900,7 @@ def main() -> None:
         forbidden_pmd_rules = {
             "ClassWithOnlyPrivateConstructorsShouldBeFinal",
             "FormalParameterNamingConventions",
+            "LiteralsFirstInComparisons",
             "LocalVariableNamingConventions",
             "MethodNamingConventions",
             "MissingOverride"

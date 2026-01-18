@@ -438,10 +438,10 @@ public class WebBrowser extends Container {
      */
     @Override
     public Object getPropertyValue(String name) {
-        if (name.equals("url")) {
+        if ("url".equals(name)) {
             return getURL();
         }
-        if (name.equals("html")) {
+        if ("html".equals(name)) {
             return getPage();
         }
         return null;
@@ -452,11 +452,11 @@ public class WebBrowser extends Container {
      */
     @Override
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("url")) {
+        if ("url".equals(name)) {
             setURL((String) value);
             return null;
         }
-        if (name.equals("html")) {
+        if ("html".equals(name)) {
             setPage((String) value, null);
             return null;
         }

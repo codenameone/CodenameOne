@@ -992,7 +992,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
      */
     public void setToggle(boolean toggle) {
         this.toggle = toggle;
-        if (toggle && getUIID().equals("CheckBox") || getUIID().equals("RadioButton")) {
+        if (toggle && "CheckBox".equals(getUIID()) || "RadioButton".equals(getUIID())) {
             setUIID("ToggleButton");
         }
     }
@@ -1115,7 +1115,7 @@ public class Button extends Label implements ReleasableComponent, ActionSource<A
         if (capsText == null) {
             if (capsTextDefault) {
                 String uiid = getUIID();
-                return uiid.equals("Button") || uiid.equals("RaisedButton") ||
+                return "Button".equals(uiid) || "RaisedButton".equals(uiid) ||
                         super.getUIManager().getThemeConstant("capsButtonUiids", "").indexOf(uiid) > -1;
             }
             return false;

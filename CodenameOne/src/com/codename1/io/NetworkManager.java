@@ -1018,7 +1018,7 @@ public final class NetworkManager {
         @Override
         protected void readResponse(InputStream input) throws IOException {
             String s = Util.readToString(input);
-            if (!s.equals("hi")) {
+            if (!"hi".equals(s)) {
                 retryWithDifferentAPN();
             }
         }

@@ -177,16 +177,16 @@ public class ImageViewer extends Component {
      */
     @Override
     public Object getPropertyValue(String name) {
-        if (name.equals("eagerLock")) {
+        if ("eagerLock".equals(name)) {
             if (isEagerLock()) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        if (name.equals("image")) {
+        if ("image".equals(name)) {
             return getImage();
         }
-        if (name.equals("imageList")) {
+        if ("imageList".equals(name)) {
             if (getImageList() == null) {
                 return null;
             }
@@ -197,7 +197,7 @@ public class ImageViewer extends Component {
             }
             return a;
         }
-        if (name.equals("swipePlaceholder")) {
+        if ("swipePlaceholder".equals(name)) {
             return getSwipePlaceholder();
         }
         return null;
@@ -208,15 +208,15 @@ public class ImageViewer extends Component {
      */
     @Override
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("eagerLock")) {
+        if ("eagerLock".equals(name)) {
             setEagerLock(value != null && ((Boolean) value).booleanValue());
             return null;
         }
-        if (name.equals("image")) {
+        if ("image".equals(name)) {
             setImage((Image) value);
             return null;
         }
-        if (name.equals("imageList")) {
+        if ("imageList".equals(name)) {
             if (value == null) {
                 setImageList(null);
             } else {
@@ -224,7 +224,7 @@ public class ImageViewer extends Component {
             }
             return null;
         }
-        if (name.equals("swipePlaceholder")) {
+        if ("swipePlaceholder".equals(name)) {
             setSwipePlaceholder((Image) value);
             return null;
         }

@@ -574,7 +574,7 @@ public class AutoCompleteTextField extends TextField {
      */
     @Override
     public Object getPropertyValue(String name) {
-        if (name.equals("completion")) {
+        if ("completion".equals(name)) {
             return getCompletion();
         }
         return null;
@@ -608,7 +608,7 @@ public class AutoCompleteTextField extends TextField {
      */
     @Override
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("completion")) {
+        if ("completion".equals(name)) {
             filter = new FilterProxyListModel<String>(new DefaultListModel<String>((String[]) value));
             return null;
         }

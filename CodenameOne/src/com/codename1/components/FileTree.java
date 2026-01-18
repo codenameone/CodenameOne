@@ -52,7 +52,7 @@ public class FileTree extends Tree {
     @Override
     protected String childToDisplayLabel(Object child) {
         String s = child.toString();
-        if (s.equals("/")) {
+        if ("/".equals(s)) {
             return "Root";
         }
         if (s.endsWith("/")) {

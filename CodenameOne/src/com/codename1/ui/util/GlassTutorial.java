@@ -116,7 +116,7 @@ public class GlassTutorial implements Painter {
             int ypos = dest.getAbsoluteY();
             int w = dest.getWidth();
             int h = dest.getHeight();
-            if (pos.equals(BorderLayout.CENTER)) {
+            if (BorderLayout.CENTER.equals(pos)) {
                 current.setX(xpos);
                 current.setY(ypos);
                 current.setWidth(w);
@@ -127,25 +127,25 @@ public class GlassTutorial implements Painter {
             Dimension d = current.getPreferredSize();
             current.setWidth(d.getWidth());
             current.setHeight(d.getHeight());
-            if (pos.equals(BorderLayout.SOUTH)) {
+            if (BorderLayout.SOUTH.equals(pos)) {
                 current.setX(xpos + w / 2 - d.getWidth() / 2);
                 current.setY(ypos + h);
                 current.paintComponent(g);
                 continue;
             }
-            if (pos.equals(BorderLayout.NORTH)) {
+            if (BorderLayout.NORTH.equals(pos)) {
                 current.setX(xpos + w / 2 - d.getWidth() / 2);
                 current.setY(ypos - d.getHeight());
                 current.paintComponent(g);
                 continue;
             }
-            if (pos.equals(BorderLayout.EAST)) {
+            if (BorderLayout.EAST.equals(pos)) {
                 current.setX(xpos + w);
                 current.setY(ypos + h / 2 - d.getHeight() / 2);
                 current.paintComponent(g);
                 continue;
             }
-            if (pos.equals(BorderLayout.WEST)) {
+            if (BorderLayout.WEST.equals(pos)) {
                 current.setX(xpos - d.getWidth());
                 current.setY(ypos + h / 2 - d.getHeight() / 2);
                 current.paintComponent(g);

@@ -781,7 +781,7 @@ public class RequestBuilder {
         req.setUrl(url);
         req.setHttpMethod(method);
         if (postParameters == null) {
-            req.setPost(method.equalsIgnoreCase("POST") || method.equalsIgnoreCase("PUT") || method.equalsIgnoreCase("PATCH"));
+            req.setPost("POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method) || "PATCH".equalsIgnoreCase(method));
         } else {
             req.setPost(postParameters);
         }

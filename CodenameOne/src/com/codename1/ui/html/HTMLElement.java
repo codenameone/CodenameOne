@@ -924,7 +924,7 @@ public class HTMLElement extends Element {
      * @return The int value of the parsed color
      */
     static int getColor(String colorStr, int defaultColor) {
-        if ((colorStr == null) || (colorStr.equals(""))) {
+        if ((colorStr == null) || ("".equals(colorStr))) {
             return defaultColor;
         }
         if (colorStr.charAt(0) != '#') {

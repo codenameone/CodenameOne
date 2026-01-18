@@ -181,16 +181,16 @@ public class NumericSpinner extends BaseSpinner {
      */
     @Override
     public Object getPropertyValue(String name) {
-        if (name.equals("min")) {
+        if ("min".equals(name)) {
             return Double.valueOf(min);
         }
-        if (name.equals("max")) {
+        if ("max".equals(name)) {
             return Double.valueOf(max);
         }
-        if (name.equals("value")) {
+        if ("value".equals(name)) {
             return Double.valueOf(getValue());
         }
-        if (name.equals("step")) {
+        if ("step".equals(name)) {
             return Double.valueOf(step);
         }
         return null;
@@ -201,19 +201,19 @@ public class NumericSpinner extends BaseSpinner {
      */
     @Override
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("min")) {
+        if ("min".equals(name)) {
             setMin(Double.parseDouble(value.toString()));
             return null;
         }
-        if (name.equals("max")) {
+        if ("max".equals(name)) {
             setMax(Double.parseDouble(value.toString()));
             return null;
         }
-        if (name.equals("value")) {
+        if ("value".equals(name)) {
             setValue(Double.parseDouble(value.toString()));
             return null;
         }
-        if (name.equals("step")) {
+        if ("step".equals(name)) {
             setStep(Double.parseDouble(value.toString()));
             return null;
         }

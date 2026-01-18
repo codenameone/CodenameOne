@@ -323,31 +323,31 @@ public class RSSReader extends List {
      */
     @Override
     public Object getPropertyValue(String name) {
-        if (name.equals("limit")) {
+        if ("limit".equals(name)) {
             return Integer.valueOf(limit); // PMD Fix: PrimitiveWrapperInstantiation avoid constructor
         }
-        if (name.equals("url")) {
+        if ("url".equals(name)) {
             return url;
         }
-        if (name.equals("blockList")) {
+        if ("blockList".equals(name)) {
             if (blockList) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        if (name.equals("progressTitle")) {
+        if ("progressTitle".equals(name)) {
             return progressTitle;
         }
-        if (name.equals("displayProgressPercentage")) {
+        if ("displayProgressPercentage".equals(name)) {
             if (displayProgressPercentage) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        if (name.equals("target")) {
+        if ("target".equals(name)) {
             return targetContainer;
         }
-        if (name.equals("$designMode")) {
+        if ("$designMode".equals(name)) {
             if (designMode) {
                 return Boolean.TRUE;
             }
@@ -362,31 +362,31 @@ public class RSSReader extends List {
      */
     @Override
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("limit")) {
+        if ("limit".equals(name)) {
             limit = ((Integer) value).intValue();
             return null;
         }
-        if (name.equals("url")) {
+        if ("url".equals(name)) {
             url = (String) value;
             return null;
         }
-        if (name.equals("blockList")) {
+        if ("blockList".equals(name)) {
             blockList = ((Boolean) value).booleanValue();
             return null;
         }
-        if (name.equals("progressTitle")) {
+        if ("progressTitle".equals(name)) {
             progressTitle = (String) value;
             return null;
         }
-        if (name.equals("displayProgressPercentage")) {
+        if ("displayProgressPercentage".equals(name)) {
             displayProgressPercentage = ((Boolean) value).booleanValue();
             return null;
         }
-        if (name.equals("target")) {
+        if ("target".equals(name)) {
             targetContainer = (Container) value;
             return null;
         }
-        if (name.equals("$designMode")) {
+        if ("$designMode".equals(name)) {
             designMode = ((Boolean) value).booleanValue();
             return null;
         }

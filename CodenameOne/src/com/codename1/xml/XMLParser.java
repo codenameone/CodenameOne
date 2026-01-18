@@ -603,7 +603,7 @@ public class XMLParser {
         }
         // We do not support any processing instructions
         /*if (procInst) {
-            if (tagName.equals("xml-stylesheet")) { // The XML processing instruction <?xml-stylesheet ... ?> has the same parameters as <link .. > and behaves the same way
+            if ("xml-stylesheet".equals(tagName)) { // The XML processing instruction <?xml-stylesheet ... ?> has the same parameters as <link .. > and behaves the same way
                 tagName="link";
             } else { // Processing instruction not supported - read till its end
                 c=(char)read(is);
@@ -872,9 +872,9 @@ public class XMLParser {
         }
 
         String elementName = null;
-        if (endTag.equals("-->")) {
+        if ("-->".equals(endTag)) {
             elementName = "comment";
-        } else if (endTag.equals(">")) {
+        } else if (">".equals(endTag)) {
             elementName = "XML declaration";
         } else { //CDATA
             if (eventParser) {

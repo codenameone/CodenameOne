@@ -255,7 +255,7 @@ public class GenericSpinner extends BaseSpinner {
      */
     @Override
     public Object getPropertyValue(String name) {
-        if (name.equals("items")) {
+        if ("items".equals(name)) {
             ListModel m = getModel();
             String[] s = new String[m.getSize()];
             int slen = s.length;
@@ -267,13 +267,13 @@ public class GenericSpinner extends BaseSpinner {
             }
             return s;
         }
-        if (name.equals("model")) {
+        if ("model".equals(name)) {
             return getModel();
         }
-        if (name.equals("renderer")) {
+        if ("renderer".equals(name)) {
             return getRenderer();
         }
-        if (name.equals("columns")) {
+        if ("columns".equals(name)) {
             return Integer.valueOf(getColumns());
         }
         return null;
@@ -284,19 +284,19 @@ public class GenericSpinner extends BaseSpinner {
      */
     @Override
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("items")) {
+        if ("items".equals(name)) {
             setModel(new DefaultListModel((Object[]) value));
             return null;
         }
-        if (name.equals("model")) {
+        if ("model".equals(name)) {
             setModel((ListModel) value);
             return null;
         }
-        if (name.equals("renderer")) {
+        if ("renderer".equals(name)) {
             setRenderer((ListCellRenderer) value);
             return null;
         }
-        if (name.equals("columns")) {
+        if ("columns".equals(name)) {
             setColumns(((Integer) value).intValue());
             return null;
         }

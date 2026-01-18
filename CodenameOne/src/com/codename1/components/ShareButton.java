@@ -208,7 +208,7 @@ public class ShareButton extends Button implements ActionListener {
      */
     @Override
     public Object getPropertyValue(String name) {
-        if (name.equals("textToShare")) {
+        if ("textToShare".equals(name)) {
             return getTextToShare();
         }
         return null;
@@ -219,7 +219,7 @@ public class ShareButton extends Button implements ActionListener {
      */
     @Override
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("textToShare")) {
+        if ("textToShare".equals(name)) {
             setTextToShare((String) value);
             return null;
         }

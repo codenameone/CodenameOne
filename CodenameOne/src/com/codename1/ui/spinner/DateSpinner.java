@@ -265,25 +265,25 @@ public class DateSpinner extends BaseSpinner {
      */
     @Override
     public Object getPropertyValue(String name) {
-        if (name.equals("startYear")) {
+        if ("startYear".equals(name)) {
             return Integer.valueOf(startYear);
         }
-        if (name.equals("endYear")) {
+        if ("endYear".equals(name)) {
             return Integer.valueOf(endYear);
         }
-        if (name.equals("currentYear")) {
+        if ("currentYear".equals(name)) {
             return Integer.valueOf(currentYear);
         }
-        if (name.equals("currentDay")) {
+        if ("currentDay".equals(name)) {
             return Integer.valueOf(currentDay);
         }
-        if (name.equals("currentMonth")) {
+        if ("currentMonth".equals(name)) {
             return Integer.valueOf(currentMonth);
         }
-        if (name.equals("monthDayYear")) {
+        if ("monthDayYear".equals(name)) {
             return Boolean.valueOf(monthDayYear);
         }
-        if (name.equals("numericMonths")) {
+        if ("numericMonths".equals(name)) {
             return Boolean.valueOf(numericMonths);
         }
         return null;
@@ -294,31 +294,31 @@ public class DateSpinner extends BaseSpinner {
      */
     @Override
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("startYear")) {
+        if ("startYear".equals(name)) {
             setStartYear(Integer.parseInt(value.toString()));
             return null;
         }
-        if (name.equals("endYear")) {
+        if ("endYear".equals(name)) {
             setEndYear(Integer.parseInt(value.toString()));
             return null;
         }
-        if (name.equals("currentYear")) {
+        if ("currentYear".equals(name)) {
             setCurrentYear(Integer.parseInt(value.toString()));
             return null;
         }
-        if (name.equals("currentDay")) {
+        if ("currentDay".equals(name)) {
             setCurrentDay(Integer.parseInt(value.toString()));
             return null;
         }
-        if (name.equals("currentMonth")) {
+        if ("currentMonth".equals(name)) {
             setCurrentMonth(Integer.parseInt(value.toString()));
             return null;
         }
-        if (name.equals("monthDayYear")) {
+        if ("monthDayYear".equals(name)) {
             setMonthDayYear(((Boolean) value).booleanValue());
             return null;
         }
-        if (name.equals("numericMonths")) {
+        if ("numericMonths".equals(name)) {
             setNumericMonths(((Boolean) value).booleanValue());
             return null;
         }

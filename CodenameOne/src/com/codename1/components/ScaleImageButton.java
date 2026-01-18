@@ -228,7 +228,7 @@ public class ScaleImageButton extends Button {
      */
     @Override
     public Object getPropertyValue(String name) {
-        if (name.equals("backgroundType")) {
+        if ("backgroundType".equals(name)) {
             return getBackgroundType();
         }
         return null;
@@ -239,7 +239,7 @@ public class ScaleImageButton extends Button {
      */
     @Override
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("backgroundType")) {
+        if ("backgroundType".equals(name)) {
             setBackgroundType(((Byte) value).byteValue());
             return null;
         }

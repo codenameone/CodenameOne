@@ -669,11 +669,11 @@ public class MenuBar extends Container implements ActionListener {
     protected Dimension calcPreferredSize() {
         if (soft.length > 1) {
             Dimension d = super.calcPreferredSize();
-            if ((soft[0].getText() == null || soft[0].getText().equals(""))
-                    && (soft[1].getText() == null || soft[1].getText().equals(""))
+            if ((soft[0].getText() == null || "".equals(soft[0].getText()))
+                    && (soft[1].getText() == null || "".equals(soft[1].getText()))
                     && soft[0].getIcon() == null && soft[1].getIcon() == null
                     && (soft.length < 3
-                    || ((soft[2].getText() == null || soft[2].getText().equals("")) && soft[2].getIcon() == null))) {
+                    || ((soft[2].getText() == null || "".equals(soft[2].getText())) && soft[2].getIcon() == null))) {
                 d.setHeight(0);
             }
             return d;

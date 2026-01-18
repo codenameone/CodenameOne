@@ -207,7 +207,7 @@ public final class FaceBookAccess {
      * @param apiVersion valid values are "1.0", "2.0", "2.1"
      */
     public static void setApiVersion(String apiVersion) {
-        if (apiVersion.equals("1.0") || apiVersion.equals("2.0") || apiVersion.equals("2.1")) {
+        if ("1.0".equals(apiVersion) || "2.0".equals(apiVersion) || "2.1".equals(apiVersion)) {
             FaceBookAccess.apiVersion = "v" + apiVersion;
         } else {
             throw new IllegalArgumentException("version must be one of the following 1.0, 2.0, 2.1");
@@ -229,8 +229,8 @@ public final class FaceBookAccess {
         Hashtable additionalParams = new Hashtable();
         String p = Display.getInstance().getPlatformName();
         //on simulator BB and J2ME use the popup display (no need for javascript)
-        if (Display.getInstance().getProperty("OS", "SE").equals("SE") ||
-                p.equals("rim") || p.equals("me")) {
+        if ("SE".equals(Display.getInstance().getProperty("OS", "SE")) ||
+                "rim".equals(p) || "me".equals(p)) {
             additionalParams.put("display", "popup");
         } else {
             additionalParams.put("display", "touch");

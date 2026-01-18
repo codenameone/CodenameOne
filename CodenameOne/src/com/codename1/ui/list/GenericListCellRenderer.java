@@ -313,7 +313,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                     String currentName = entries[iter].getName();
 
                     Object val;
-                    if (currentName.equals("$number")) {
+                    if ("$number".equals(currentName)) {
                         val = "" + (index + 1);
                     } else {
                         // a selected entry might differ in its value to allow for
@@ -354,7 +354,7 @@ public class GenericListCellRenderer<T> implements ListCellRenderer<T>, CellRend
                 int elen = entries.length;
                 for (int iter = 0; iter < elen; iter++) {
                     String currentName = entries[iter].getName();
-                    if (currentName.equals("$number")) {
+                    if ("$number".equals(currentName)) {
                         setComponentValue(entries[iter], "" + (index + 1), list, cmp);
                         continue;
                     }

@@ -472,10 +472,10 @@ public final class UnitValue {
             return u;
         }
 
-        if (unitStr.equals("lp"))
+        if ("lp".equals(unitStr))
             return isHor ? LPX : LPY;
 
-        if (unitStr.equals("sp"))
+        if ("sp".equals(unitStr))
             return isHor ? SPX : SPY;
 
         if (lookup(0, null, null) != UnitConverter.UNABLE)    // To test so we can fail fast
@@ -488,21 +488,21 @@ public final class UnitValue {
             linkId = unitStr.substring(0, pIx);
             String e = unitStr.substring(pIx + 1);
 
-            if (e.equals("x"))
+            if ("x".equals(e))
                 return LINK_X;
-            if (e.equals("y"))
+            if ("y".equals(e))
                 return LINK_Y;
-            if (e.equals("w") || e.equals("width"))
+            if ("w".equals(e) || "width".equals(e))
                 return LINK_W;
-            if (e.equals("h") || e.equals("height"))
+            if ("h".equals(e) || "height".equals(e))
                 return LINK_H;
-            if (e.equals("x2"))
+            if ("x2".equals(e))
                 return LINK_X2;
-            if (e.equals("y2"))
+            if ("y2".equals(e))
                 return LINK_Y2;
-            if (e.equals("xpos"))
+            if ("xpos".equals(e))
                 return LINK_XPOS;
-            if (e.equals("ypos"))
+            if ("ypos".equals(e))
                 return LINK_YPOS;
         }
 

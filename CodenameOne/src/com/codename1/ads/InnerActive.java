@@ -84,19 +84,19 @@ public class InnerActive extends AdsService { // PMD Fix: UnusedPrivateField rem
     @Override
     public void initService(Ads ads) {
         this.os = Display.getInstance().getPlatformName();
-        if (os.equals("and")) {
+        if ("and".equals(os)) {
             if (banner) {
                 po = 559;
             } else {
                 po = 600;
             }
-        } else if (os.equals("rim")) {
+        } else if ("rim".equals(os)) {
             if (banner) {
                 po = 635;
             } else {
                 po = 634;
             }
-        } else if (os.equals("ios")) {
+        } else if ("ios".equals(os)) {
             if (banner) {
                 if (Display.getInstance().isTablet()) {
                     po = 947;
@@ -110,7 +110,7 @@ public class InnerActive extends AdsService { // PMD Fix: UnusedPrivateField rem
                     po = 632;
                 }
             }
-        } else if (os.equals("me")) {
+        } else if ("me".equals(os)) {
             if (banner) {
                 po = 551;
             } else {
@@ -126,7 +126,7 @@ public class InnerActive extends AdsService { // PMD Fix: UnusedPrivateField rem
         //protocol version
         String version = protocolVersion;
         addParam(this, "v", version);
-        if (os.equals("ios")) {
+        if ("ios".equals(os)) {
             hid = Display.getInstance().getProperty("UDID", null);
         } else {
             hid = Display.getInstance().getProperty("IMEI", null);

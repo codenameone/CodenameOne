@@ -159,7 +159,7 @@ public class MultiList extends List {
      */
     @Override
     public Object getPropertyValue(String name) {
-        if (name.equals("placeholder")) {
+        if ("placeholder".equals(name)) {
             return placeholder;
         }
         return unsel.getPropertyValue(name);
@@ -170,7 +170,7 @@ public class MultiList extends List {
      */
     @Override
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("placeholder")) {
+        if ("placeholder".equals(name)) {
             this.placeholder = (Image) value;
             if (unsel != null) {
                 unsel.setIcon(placeholder);

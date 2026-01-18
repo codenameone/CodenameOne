@@ -1103,7 +1103,7 @@ public class SimpleDateFormat extends DateFormat {
         }
         // handle zulu
         if (len == 1) {
-            if (fragment.equalsIgnoreCase("z")) {
+            if ("z".equalsIgnoreCase(fragment)) {
                 return readSubstring(source, ofs, ofs + 1);
             }
             return null;

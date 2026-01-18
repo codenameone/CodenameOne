@@ -1313,9 +1313,9 @@ public class Dialog extends Form {
      * @return the command that might have been triggered by the user within the dialog if commands are placed in the dialog
      */
     public Command showPopupDialog(Rectangle rect) {
-        if (getDialogUIID().equals("Dialog")) {
+        if ("Dialog".equals(getDialogUIID())) {
             setDialogUIID("PopupDialog");
-            if (getTitleComponent().getUIID().equals("DialogTitle")) {
+            if ("DialogTitle".equals(getTitleComponent().getUIID())) {
                 getTitleComponent().setUIID("PopupDialogTitle");
             }
             getContentPane().setUIID("PopupContentPane");
@@ -1432,7 +1432,7 @@ public class Dialog extends Form {
             }
             if (rect.getY() < availableHeight / 2) {
                 // popup downwards
-                if (getDialogUIID().equals("PopupDialog") && isUIIDByPopupPosition) {
+                if ("PopupDialog".equals(getDialogUIID()) && isUIIDByPopupPosition) {
                     getContentPane().setUIID("PopupContentPaneDownwards");
                 }
                 y = rect.getY() + rect.getSize().getHeight();
@@ -1440,7 +1440,7 @@ public class Dialog extends Form {
                 result = show(y, availableHeight - height - y, x, availableWidth - width - x, true, true);
             } else {
                 // popup upwards
-                if (getDialogUIID().equals("PopupDialog") && isUIIDByPopupPosition) {
+                if ("PopupDialog".equals(getDialogUIID()) && isUIIDByPopupPosition) {
                     getContentPane().setUIID("PopupContentPaneUpwards");
                 }
                 int height = Math.min(prefHeight, availableHeight - (availableHeight - rect.getY()));
@@ -1466,7 +1466,7 @@ public class Dialog extends Form {
 
             if (prefWidth > rect.getX()) {
                 // popup right
-                if (getDialogUIID().equals("PopupDialog") && isUIIDByPopupPosition) {
+                if ("PopupDialog".equals(getDialogUIID()) && isUIIDByPopupPosition) {
                     getContentPane().setUIID("PopupContentPaneRight");
                 }
                 x = rect.getX() + rect.getSize().getWidth();
@@ -1478,7 +1478,7 @@ public class Dialog extends Form {
                 result = show(y, availableHeight - height - y, Math.max(0, x), Math.max(0, availableWidth - width - x), true, true);
             } else {
                 // popup left
-                if (getDialogUIID().equals("PopupDialog") && isUIIDByPopupPosition) {
+                if ("PopupDialog".equals(getDialogUIID()) && isUIIDByPopupPosition) {
                     getContentPane().setUIID("PopupContentPaneLeft");
                 }
                 width = Math.min(prefWidth, availableWidth - (availableWidth - rect.getX()));
@@ -1597,11 +1597,11 @@ public class Dialog extends Form {
         int topBottom = Math.max(0, (height - prefHeight) / 2);
         int leftRight = Math.max(0, (width - prefWidth) / 2);
 
-        if (position.equals(BorderLayout.CENTER)) {
+        if (BorderLayout.CENTER.equals(position)) {
             show(topBottom, topBottom, leftRight, leftRight, true, modal);
             return lastCommandPressed;
         }
-        if (position.equals(BorderLayout.EAST)) {
+        if (BorderLayout.EAST.equals(position)) {
             if (stretch) {
                 show(0, 0, Math.max(0, width - prefWidth), 0, true, modal);
             } else {
@@ -1609,7 +1609,7 @@ public class Dialog extends Form {
             }
             return lastCommandPressed;
         }
-        if (position.equals(BorderLayout.WEST)) {
+        if (BorderLayout.WEST.equals(position)) {
             if (stretch) {
                 show(0, 0, 0, Math.max(0, width - prefWidth), true, modal);
             } else {
@@ -1617,7 +1617,7 @@ public class Dialog extends Form {
             }
             return lastCommandPressed;
         }
-        if (position.equals(BorderLayout.NORTH)) {
+        if (BorderLayout.NORTH.equals(position)) {
             if (stretch) {
                 show(0, Math.max(0, height - prefHeight), 0, 0, true, modal);
             } else {
@@ -1625,7 +1625,7 @@ public class Dialog extends Form {
             }
             return lastCommandPressed;
         }
-        if (position.equals(BorderLayout.SOUTH)) {
+        if (BorderLayout.SOUTH.equals(position)) {
             if (stretch) {
                 show(Math.max(0, height - prefHeight), 0, 0, 0, true, modal);
             } else {
@@ -1920,19 +1920,19 @@ public class Dialog extends Form {
             int top = topBottom, bottom = topBottom;
             int left = leftRight, right = leftRight;
 
-            if (position.equals(BorderLayout.EAST)) {
+            if (BorderLayout.EAST.equals(position)) {
                 left = Math.max(0, w - prefWidth);
                 right = 0;
             } else {
-                if (position.equals(BorderLayout.WEST)) {
+                if (BorderLayout.WEST.equals(position)) {
                     right = 0;
                     left = Math.max(0, w - prefWidth);
                 } else {
-                    if (position.equals(BorderLayout.NORTH)) {
+                    if (BorderLayout.NORTH.equals(position)) {
                         top = 0;
                         bottom = Math.max(0, h - prefHeight);
                     } else {
-                        if (position.equals(BorderLayout.SOUTH)) {
+                        if (BorderLayout.SOUTH.equals(position)) {
                             top = Math.max(0, h - prefHeight);
                             bottom = 0;
                         }

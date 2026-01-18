@@ -400,7 +400,7 @@ public class InfiniteProgress extends Component {
      */
     @Override
     public Object getPropertyValue(String name) {
-        if (name.equals("animation")) {
+        if ("animation".equals(name)) {
             return animation;
         }
         return null;
@@ -411,7 +411,7 @@ public class InfiniteProgress extends Component {
      */
     @Override
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("animation")) {
+        if ("animation".equals(name)) {
             this.animation = (Image) value;
             cache.clear();
             return null;

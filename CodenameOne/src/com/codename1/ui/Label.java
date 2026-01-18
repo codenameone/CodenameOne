@@ -828,7 +828,7 @@ public class Label extends Component implements IconHolder, TextHolder {
             icn = i.getImage();
         } else {
             // optimize away a common usage pattern for drawing the background only
-            if (text == null || text.equals("") || text.equals(" ")) {
+            if (text == null || "".equals(text) || " ".equals(text)) {
                 return;
             }
         }
@@ -1196,7 +1196,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      */
     @Override
     public Object getPropertyValue(String name) {
-        if (name.equals("maskName")) {
+        if ("maskName".equals(name)) {
             return getMaskName();
         }
         return null;
@@ -1207,7 +1207,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      */
     @Override
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("maskName")) {
+        if ("maskName".equals(name)) {
             setMaskName((String) value);
             return null;
         }
@@ -1254,7 +1254,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      */
     @Override
     public void bindProperty(String prop, BindTarget target) {
-        if (prop.equals("text")) {
+        if ("text".equals(prop)) {
             if (textBindListeners == null) {
                 textBindListeners = new EventDispatcher();
             }
@@ -1270,7 +1270,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      */
     @Override
     public void unbindProperty(String prop, BindTarget target) {
-        if (prop.equals("text")) {
+        if ("text".equals(prop)) {
             if (textBindListeners == null) {
                 return;
             }
@@ -1288,7 +1288,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      */
     @Override
     public Object getBoundPropertyValue(String prop) {
-        if (prop.equals("text")) {
+        if ("text".equals(prop)) {
             return getText();
         }
         return super.getBoundPropertyValue(prop);
@@ -1299,7 +1299,7 @@ public class Label extends Component implements IconHolder, TextHolder {
      */
     @Override
     public void setBoundPropertyValue(String prop, Object value) {
-        if (prop.equals("text")) {
+        if ("text".equals(prop)) {
             setText((String) value);
             return;
         }

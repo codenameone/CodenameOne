@@ -664,19 +664,19 @@ public class MediaPlayer extends Container {
      */
     @Override
     public Object getPropertyValue(String name) {
-        if (name.equals("backIcon")) {
+        if ("backIcon".equals(name)) {
             return getBackIcon();
         }
-        if (name.equals("forwardIcon")) {
+        if ("forwardIcon".equals(name)) {
             return getFwdIcon();
         }
-        if (name.equals("playIcon")) {
+        if ("playIcon".equals(name)) {
             return getPlayIcon();
         }
-        if (name.equals("pauseIcon")) {
+        if ("pauseIcon".equals(name)) {
             return getPauseIcon();
         }
-        if (name.equals("dataSource")) {
+        if ("dataSource".equals(name)) {
             return getDataSource();
         }
         return super.getPropertyValue(name);
@@ -687,23 +687,23 @@ public class MediaPlayer extends Container {
      */
     @Override
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("backIcon")) {
+        if ("backIcon".equals(name)) {
             this.backIcon = (Image) value;
             return null;
         }
-        if (name.equals("forwardIcon")) {
+        if ("forwardIcon".equals(name)) {
             this.fwdIcon = (Image) value;
             return null;
         }
-        if (name.equals("playIcon")) {
+        if ("playIcon".equals(name)) {
             this.playIcon = (Image) value;
             return null;
         }
-        if (name.equals("pauseIcon")) {
+        if ("pauseIcon".equals(name)) {
             this.pauseIcon = (Image) value;
             return null;
         }
-        if (name.equals("dataSource")) {
+        if ("dataSource".equals(name)) {
             setDataSource((String) value);
             return null;
         }

@@ -1725,7 +1725,7 @@ public class Util {
         }
         if (val instanceof String) {
             String sl = ((String) val).toLowerCase();
-            return sl.startsWith("t") || sl.equals("1");
+            return sl.startsWith("t") || "1".equals(sl);
         }
         return toIntValue(val) != 0;
     }
@@ -1746,7 +1746,7 @@ public class Util {
         }
         if (number instanceof String) {
             String n = (String) number;
-            if (n.length() == 0 || n.equals(" ")) {
+            if (n.length() == 0 || " ".equals(n)) {
                 return 0;
             }
             return Integer.parseInt(n);
@@ -2229,7 +2229,7 @@ public class Util {
             @Override
             protected void readHeaders(Object connection) throws IOException {
                 String acceptRanges = getHeader(connection, "Accept-Ranges");
-                if (checkPartialDownloadSupport && (acceptRanges == null || !acceptRanges.equals("bytes"))) {
+                if (checkPartialDownloadSupport && (acceptRanges == null || !"bytes".equals(acceptRanges))) {
                     // Log.p("The partial downloads of " + url + " are not supported.", Log.WARNING);
                     result.set(-2l);
                 } else {

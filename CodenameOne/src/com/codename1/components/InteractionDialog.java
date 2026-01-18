@@ -689,9 +689,9 @@ public class InteractionDialog extends Container {
         disposed = false;
         pressedOutOfBounds = false;
         getUnselectedStyle().setOpacity(255);
-        if (getUIID().equals("Dialog")) {
+        if ("Dialog".equals(getUIID())) {
             setUIID("PopupDialog");
-            if (getTitleComponent().getUIID().equals("DialogTitle")) {
+            if ("DialogTitle".equals(getTitleComponent().getUIID())) {
                 getTitleComponent().setUIID("PopupDialogTitle");
             }
             getContentPane().setUIID("PopupContentPane");

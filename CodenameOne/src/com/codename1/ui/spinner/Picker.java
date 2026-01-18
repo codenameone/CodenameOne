@@ -119,7 +119,7 @@ public class Picker extends Button {
         // Fixes iOS picker issue https://github.com/codenameone/CodenameOne/issues/3283
         if (!defaultLightweightModeSet) {
             defaultLightweightModeSet = true;
-            defaultUseLightweightPopup = CN.getPlatformName().equals("ios");
+            defaultUseLightweightPopup = "ios".equals(CN.getPlatformName());
         }
 
         if (!Display.getInstance().isNativePickerTypeSupported(Display.PICKER_TYPE_STRINGS)) {
@@ -1552,7 +1552,7 @@ public class Picker extends Button {
      */
     @Override
     public Object getPropertyValue(String name) {
-        if (name.equals("Strings")) {
+        if ("Strings".equals(name)) {
             return getStrings();
         }
         return null;
@@ -1563,7 +1563,7 @@ public class Picker extends Button {
      */
     @Override
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("Strings")) {
+        if ("Strings".equals(name)) {
             setStrings((String[]) value);
             return null;
         }

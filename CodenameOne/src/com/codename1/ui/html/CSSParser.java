@@ -238,7 +238,7 @@ class CSSParser {
      * @return true if one of the supported media types is denoted, false otherwise
      */
     boolean mediaTypeMatches(String mediaTypes) {
-        if ((mediaTypes == null) || (mediaTypes.equals(""))) {
+        if ((mediaTypes == null) || ("".equals(mediaTypes))) {
             return true;
         }
         int comma = mediaTypes.indexOf(',');
@@ -355,7 +355,7 @@ class CSSParser {
         String encoding = htmlC.getDocumentInfo() != null ? htmlC.getDocumentInfo().getEncoding() : null;
         String token = nextToken(r, true, false, true, false);
         while (token.startsWith("@")) {
-            if (token.equals("@import")) {
+            if ("@import".equals(token)) {
                 token = nextToken(r, true, true, true, true);
                 String url = getImportURLByMediaType(token);
                 if (url != null) {
@@ -372,12 +372,12 @@ class CSSParser {
                         }
                     }
                 }
-            } else if (token.equals("@media")) {
+            } else if ("@media".equals(token)) {
                 ExtInputStreamReader mediaReader = getMediaSegment(r, encoding, htmlC);
                 if (mediaReader != null) {
                     parseCSS(mediaReader, htmlC, addTo, null);
                 }
-            } else if (token.equals("@charset")) {
+            } else if ("@charset".equals(token)) {
                 token = CSSEngine.omitQuotesIfExist(nextToken(r, true, false, true, false));
                 if (is != null) { // @charset applies only to external style sheet, and the inputstream is null for embedded CSS segments
                     try {
@@ -579,9 +579,9 @@ class CSSParser {
                     // We ignore commas when collecting a value, since it can be for example: font-family:arial,tahoma,sans-serif etc.
                     // We also ignore spaces in font-family / access key since the value can be: arial, tahoma / send * , #
                     int result = addAttributeTo(parent, token, nextToken(r, false, true, false,
-                            (token.equalsIgnoreCase("-wap-access-key") || (token.equalsIgnoreCase("font-family")) ||
-                                    (token.equalsIgnoreCase("quotes")) || (token.equalsIgnoreCase("border-spacing")) ||
-                                    (token.equalsIgnoreCase("content")) || (token.equalsIgnoreCase("counter-reset")) || (token.equalsIgnoreCase("counter-increment")))), htmlC);
+                            ("-wap-access-key".equalsIgnoreCase(token) || ("font-family".equalsIgnoreCase(token)) ||
+                                    ("quotes".equalsIgnoreCase(token)) || ("border-spacing".equalsIgnoreCase(token)) ||
+                                    ("content".equalsIgnoreCase(token)) || ("counter-reset".equalsIgnoreCase(token)) || ("counter-increment".equalsIgnoreCase(token)))), htmlC);
                     if (result != -1) {
                         // unsupported token we need to read until the newline
                         //while(nextToken(r, false, false,false) != null && !newline) {}

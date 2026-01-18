@@ -466,22 +466,22 @@ public class TextComponent extends InputComponent {
      */
     @Override
     public Object getPropertyValue(String name) {
-        if (name.equals("text")) {
+        if ("text".equals(name)) {
             return field.getText();
         }
-        if (name.equals("hint")) {
+        if ("hint".equals(name)) {
             return field.getHint();
         }
-        if (name.equals("multiline")) {
+        if ("multiline".equals(name)) {
             return Boolean.valueOf(!field.isSingleLineTextArea());
         }
-        if (name.equals("columns")) {
+        if ("columns".equals(name)) {
             return field.getColumns();
         }
-        if (name.equals("rows")) {
+        if ("rows".equals(name)) {
             return field.getRows();
         }
-        if (name.equals("constraint")) {
+        if ("constraint".equals(name)) {
             return field.getConstraint();
         }
 
@@ -493,27 +493,27 @@ public class TextComponent extends InputComponent {
      */
     @Override
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("text")) {
+        if ("text".equals(name)) {
             text((String) value);
             return null;
         }
-        if (name.equals("hint")) {
+        if ("hint".equals(name)) {
             hint((String) value);
             return null;
         }
-        if (name.equals("multiline")) {
+        if ("multiline".equals(name)) {
             field.setSingleLineTextArea(!((Boolean) value).booleanValue());
             return null;
         }
-        if (name.equals("columns")) {
+        if ("columns".equals(name)) {
             field.setColumns((Integer) value);
             return null;
         }
-        if (name.equals("rows")) {
+        if ("rows".equals(name)) {
             field.setRows((Integer) value);
             return null;
         }
-        if (name.equals("constraint")) {
+        if ("constraint".equals(name)) {
             field.setConstraint((Integer) value);
             return null;
         }

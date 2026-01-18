@@ -956,100 +956,100 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
      */
     @Override
     public Object getPropertyValue(String name) {
-        if (name.equals("line1")) {
+        if ("line1".equals(name)) {
             return getTextLine1();
         }
-        if (name.equals("line2")) {
+        if ("line2".equals(name)) {
             return getTextLine2();
         }
-        if (name.equals("line3")) {
+        if ("line3".equals(name)) {
             return getTextLine3();
         }
-        if (name.equals("line4")) {
+        if ("line4".equals(name)) {
             return getTextLine4();
         }
-        if (name.equals("name1")) {
+        if ("name1".equals(name)) {
             return getNameLine1();
         }
-        if (name.equals("name2")) {
+        if ("name2".equals(name)) {
             return getNameLine2();
         }
-        if (name.equals("name3")) {
+        if ("name3".equals(name)) {
             return getNameLine3();
         }
-        if (name.equals("name4")) {
+        if ("name4".equals(name)) {
             return getNameLine4();
         }
-        if (name.equals("uiid1")) {
+        if ("uiid1".equals(name)) {
             return getUIIDLine1();
         }
-        if (name.equals("uiid2")) {
+        if ("uiid2".equals(name)) {
             return getUIIDLine2();
         }
-        if (name.equals("uiid3")) {
+        if ("uiid3".equals(name)) {
             return getUIIDLine3();
         }
-        if (name.equals("uiid4")) {
+        if ("uiid4".equals(name)) {
             return getUIIDLine4();
         }
-        if (name.equals("icon")) {
+        if ("icon".equals(name)) {
             return getIcon();
         }
-        if (name.equals("iconName")) {
+        if ("iconName".equals(name)) {
             return getIconName();
         }
-        if (name.equals("iconUiid")) {
+        if ("iconUiid".equals(name)) {
             return getIconUIID();
         }
-        if (name.equals("iconPosition")) {
+        if ("iconPosition".equals(name)) {
             return getIconPosition();
         }
-        if (name.equals("emblem")) {
+        if ("emblem".equals(name)) {
             return getEmblem();
         }
-        if (name.equals("emblemName")) {
+        if ("emblemName".equals(name)) {
             return getEmblemName();
         }
-        if (name.equals("emblemUiid")) {
+        if ("emblemUiid".equals(name)) {
             return getEmblemUIID();
         }
-        if (name.equals("emblemPosition")) {
+        if ("emblemPosition".equals(name)) {
             return getEmblemPosition();
         }
-        if (name.equals("horizontalLayout")) {
+        if ("horizontalLayout".equals(name)) {
             if (isHorizontalLayout()) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        if (name.equals("invertFirstTwoEntries")) {
+        if ("invertFirstTwoEntries".equals(name)) {
             if (isInvertFirstTwoEntries()) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        if (name.equals("checkBox")) {
+        if ("checkBox".equals(name)) {
             if (isCheckBox()) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        if (name.equals("radioButton")) {
+        if ("radioButton".equals(name)) {
             if (isRadioButton()) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        if (name.equals("group")) {
+        if ("group".equals(name)) {
             return getGroup();
         }
-        if (name.equals("selected")) {
+        if ("selected".equals(name)) {
             if (isSelected()) {
                 return Boolean.TRUE;
             }
             return Boolean.FALSE;
         }
-        if (name.equals("maskName")) {
+        if ("maskName".equals(name)) {
             return getMaskName();
         }
         return null;
@@ -1078,111 +1078,111 @@ public class SpanMultiButton extends Container implements ActionSource, Selectab
      */
     @Override
     public String setPropertyValue(String name, Object value) {
-        if (name.equals("line1")) {
+        if ("line1".equals(name)) {
             setTextLine1((String) value);
             return null;
         }
-        if (name.equals("line2")) {
+        if ("line2".equals(name)) {
             setTextLine2((String) value);
             return null;
         }
-        if (name.equals("line3")) {
+        if ("line3".equals(name)) {
             setTextLine3((String) value);
             return null;
         }
-        if (name.equals("line4")) {
+        if ("line4".equals(name)) {
             setTextLine4((String) value);
             return null;
         }
-        if (name.equals("name1")) {
+        if ("name1".equals(name)) {
             setNameLine1((String) value);
             return null;
         }
-        if (name.equals("name2")) {
+        if ("name2".equals(name)) {
             setNameLine2((String) value);
             return null;
         }
-        if (name.equals("name3")) {
+        if ("name3".equals(name)) {
             setNameLine3((String) value);
             return null;
         }
-        if (name.equals("name4")) {
+        if ("name4".equals(name)) {
             setNameLine4((String) value);
             return null;
         }
-        if (name.equals("uiid1")) {
+        if ("uiid1".equals(name)) {
             setUIIDLine1((String) value);
             return null;
         }
-        if (name.equals("uiid2")) {
+        if ("uiid2".equals(name)) {
             setUIIDLine2((String) value);
             return null;
         }
-        if (name.equals("uiid3")) {
+        if ("uiid3".equals(name)) {
             setUIIDLine3((String) value);
             return null;
         }
-        if (name.equals("uiid4")) {
+        if ("uiid4".equals(name)) {
             setUIIDLine4((String) value);
             return null;
         }
-        if (name.equals("icon")) {
+        if ("icon".equals(name)) {
             setIcon((Image) value);
             return null;
         }
-        if (name.equals("iconUiid")) {
+        if ("iconUiid".equals(name)) {
             setIconUIID((String) value);
             return null;
         }
-        if (name.equals("iconName")) {
+        if ("iconName".equals(name)) {
             setIconName((String) value);
             return null;
         }
-        if (name.equals("iconPosition")) {
+        if ("iconPosition".equals(name)) {
             setIconPosition((String) value);
             return null;
         }
-        if (name.equals("emblem")) {
+        if ("emblem".equals(name)) {
             setEmblem((Image) value);
             return null;
         }
-        if (name.equals("emblemUiid")) {
+        if ("emblemUiid".equals(name)) {
             setEmblemUIID((String) value);
             return null;
         }
-        if (name.equals("emblemName")) {
+        if ("emblemName".equals(name)) {
             setEmblemName((String) value);
             return null;
         }
-        if (name.equals("emblemPosition")) {
+        if ("emblemPosition".equals(name)) {
             setEmblemPosition((String) value);
             return null;
         }
-        if (name.equals("horizontalLayout")) {
+        if ("horizontalLayout".equals(name)) {
             setHorizontalLayout(((Boolean) value).booleanValue());
             return null;
         }
-        if (name.equals("invertFirstTwoEntries")) {
+        if ("invertFirstTwoEntries".equals(name)) {
             setInvertFirstTwoEntries(((Boolean) value).booleanValue());
             return null;
         }
-        if (name.equals("checkBox")) {
+        if ("checkBox".equals(name)) {
             setCheckBox(((Boolean) value).booleanValue());
             return null;
         }
-        if (name.equals("radioButton")) {
+        if ("radioButton".equals(name)) {
             setRadioButton(((Boolean) value).booleanValue());
             return null;
         }
-        if (name.equals("group")) {
+        if ("group".equals(name)) {
             setGroup((String) value);
             return null;
         }
-        if (name.equals("selected")) {
+        if ("selected".equals(name)) {
             setSelected(((Boolean) value).booleanValue());
             return null;
         }
-        if (name.equals("maskName")) {
+        if ("maskName".equals(name)) {
             setMaskName((String) value);
             return null;
         }
